@@ -100,6 +100,9 @@ namespace OpenRA.Mods.Common.Activities
 				if (enterActor.IsDead || oldOwner != enterActor.Owner)
 					return;
 
+				/*
+				03/03/22 - Commented out for the sabotaging disabling change.
+
 				// Sabotage instead of capture
 				if (captures.Info.SabotageThreshold > 0 && !enterActor.Owner.NonCombatant)
 				{
@@ -117,6 +120,7 @@ namespace OpenRA.Mods.Common.Activities
 						return;
 					}
 				}
+				*/
 
 				// Do the capture
 				enterActor.ChangeOwnerSync(self.Owner);

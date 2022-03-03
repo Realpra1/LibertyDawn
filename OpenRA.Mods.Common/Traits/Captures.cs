@@ -131,16 +131,19 @@ namespace OpenRA.Mods.Common.Traits
 					cursor = captures.Info.EnterBlockedCursor;
 					return false;
 				}
+				
+				/*
+				03/03/22 - Commented out for the sabotaging disabling change (i.e., if SabotageThreshold > 0).
 
-				cursor = captures.Info.EnterCursor;
 				if (captures.Info.SabotageThreshold > 0 && !target.Owner.NonCombatant)
 				{
 					var health = target.Trait<IHealth>();
 
-					// Sabotage instead of capture
+					// Sabotage cursor instead of capture cursor.
 					if ((long)health.HP * 100 > captures.Info.SabotageThreshold * (long)health.MaxHP)
 						cursor = captures.Info.SabotageCursor;
 				}
+				*/
 
 				return true;
 			}
