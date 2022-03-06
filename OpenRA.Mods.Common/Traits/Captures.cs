@@ -132,9 +132,6 @@ namespace OpenRA.Mods.Common.Traits
 					return false;
 				}
 				
-				/*
-				03/03/22 - Commented out for the sabotaging disabling change (i.e., if SabotageThreshold > 0).
-
 				if (captures.Info.SabotageThreshold > 0 && !target.Owner.NonCombatant)
 				{
 					var health = target.Trait<IHealth>();
@@ -143,7 +140,6 @@ namespace OpenRA.Mods.Common.Traits
 					if ((long)health.HP * 100 > captures.Info.SabotageThreshold * (long)health.MaxHP)
 						cursor = captures.Info.SabotageCursor;
 				}
-				*/
 
 				return true;
 			}
