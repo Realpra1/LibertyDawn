@@ -205,7 +205,7 @@ E6:
 	CaptureManager:
 	Captures@SABOTAGE:
 		CaptureTypes: building-sabotage
-		SabotageThreshold: 55
+		SabotageThreshold: 0
 		PlayerExperience: 50
 	Captures@CAPTURES:
 		CaptureTypes: building, husk
