@@ -131,7 +131,7 @@ namespace OpenRA.Mods.Common.Traits
 					cursor = captures.Info.EnterBlockedCursor;
 					return false;
 				}
-				
+
 				if (captures.Info.SabotageThreshold > 0 && !target.Owner.NonCombatant)
 				{
 					var health = target.Trait<IHealth>();
