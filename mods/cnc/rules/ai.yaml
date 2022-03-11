@@ -671,23 +671,21 @@ Player:
 		ProductionTypes: pyle,hand,weap,afld,hpad
 		SiloTypes: silo
 		BuildingLimits:
-			proc: 3
 			pyle: 4
 			hand: 4
-			hq: 1
+			hq: 2
 			hpad: 0
 			eye: 1
 			tmpl: 1
 			fix: 2
 			silo: 0
-			sam: 3
 		BuildingFractions:
-			proc: 27
-			pyle: 1
-			hand: 1
-			hq: 1
-			weap: 56
-			afld: 56
+			proc: 20
+			pyle: 2
+			hand: 2
+			hq: 2
+			weap: 60
+			afld: 60
 			gtwr: 2
 			gun: 0
 			atwr: 11
@@ -695,7 +693,7 @@ Player:
 			sam: 1
 			eye: 1
 			tmpl: 1
-			fix: 1
+			fix: 2
 			hpad: 0
     SquadManagerBotModule@basemaker:
 		RequiresCondition: enable-basemaker-ai
