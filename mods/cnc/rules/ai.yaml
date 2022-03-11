@@ -180,7 +180,7 @@ Player:
 					Types: Air, Ground, Water
 					Attractiveness: -10
 					TargetMetric: Value
-					CheckRadius: 6c0
+					CheckRadius: 7c0
 	HarvesterBotModule:
 		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-basemaker-ai || enable-wavemaker-ai || enable-campaignbot-ai
 		HarvesterTypes: harv
