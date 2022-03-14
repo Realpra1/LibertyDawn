@@ -388,7 +388,7 @@
 		RequiresCondition: hazmatsuits
 	ActorLostNotification:
 	SpawnActorOnDeath:
-		Probability: 5
+		Probability: 50
 		Actor: vice
 		OwnerType: InternalName
 		InternalOwner: Creeps
