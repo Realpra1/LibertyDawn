@@ -268,6 +268,50 @@ FTNK:
 		OwnerType: InternalName
 		EffectiveOwnerFromOwner: true
 
+CTNK:
+	Inherits: ^Tank
+	Inherits@EXPERIENCE: ^GainsExperience
+	Inherits@CLOAK: ^AcceptsCloakCrate
+	Inherits@AUTOTARGET: ^AutoTargetGroundAssaultMove
+	Valued:
+		Cost: 700
+	Tooltip:
+		Name: Chemical Tank
+	UpdatesPlayerStatistics:
+		AddToArmyValue: true
+	Buildable:
+		BuildPaletteOrder: 80
+		Prerequisites: tmpl, ~techlevel.high
+		Queue: Vehicle.Nod
+		Description: Heavily armored chemical-spewing vehicle.\n  Strong Harasser vs All Ground Units\n  Weak vs Air
+	Mobile:
+		TurnSpeed: 30
+		Speed: 100
+	Health:
+		HP: 20250
+	Repairable:
+		HpPerStep: 2046
+	Armor:
+		Type: Heavy
+	RevealsShroud:
+		Range: 6c0
+	Armament:
+		Weapon: BigChem
+		LocalOffset: 512,128,42, 512,-128,42
+		MuzzleSequence: muzzle
+	AttackFrontal:
+		Voice: Attack
+	AttackMove:
+		Voice: Attack
+	WithMuzzleOverlay:
+	Explodes:
+		Weapon: ChemtankExplode
+		EmptyWeapon: ChemtankExplode
+	SpawnActorOnDeath:
+		Actor: CTNK.Husk
+		OwnerType: InternalName
+		EffectiveOwnerFromOwner: true
+        
 BGGY:
 	Inherits: ^Vehicle
 	Inherits@@EXPERIENCE: ^GainsExperience

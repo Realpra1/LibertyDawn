@@ -36,6 +36,18 @@ FlametankExplode:
 		ImpactSounds: flamer2.aud
 	Warhead@3Smu: LeaveSmudge
 		SmudgeType: Scorch
+        
+ChemtankExplode:
+	Inherits: ^DamagingExplosion
+	Warhead@1Dam: SpreadDamage
+		Spread: 1c0
+		Damage: 17250
+		DamageTypes: Prone50Percent, TriggerProne, TiberiumDeath
+	Warhead@2Eff: CreateEffect
+		Explosions: chemball
+		ImpactSounds: xplos.aud
+	Warhead@3Smu: LeaveSmudge
+		SmudgeType: Scorch
 
 HeliCrash:
 	Inherits: ^DamagingExplosion

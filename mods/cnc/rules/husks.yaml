@@ -33,6 +33,15 @@ FTNK.Husk:
 		IntoActor: ftnk
 	RenderSprites:
 		Image: ftnk.destroyed
+        
+CTNK.Husk:
+	Inherits: ^Husk
+	Tooltip:
+		Name: Chemical Tank (Destroyed)
+	TransformOnCapture:
+		IntoActor: ctnk
+	RenderSprites:
+		Image: ctnk.destroyed
 
 ARTY.Husk:
 	Inherits: ^LightHusk
