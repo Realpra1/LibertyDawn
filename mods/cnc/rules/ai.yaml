@@ -483,7 +483,8 @@ Player:
             rmbo: 2
 			harv: 50
 			ltnk: 6
-			ftnk: 6
+			ftnk: 5
+            ctnk: 1
 			arty: 38
 			mtnk: 1
 			msam: 40
@@ -641,7 +642,8 @@ Player:
             rmbo: 2
 			harv: 50
 			ltnk: 6
-			ftnk: 6
+			ftnk: 7
+            ctnk: 1
 			arty: 28
 			mtnk: 1
 			msam: 30
@@ -714,7 +716,8 @@ Player:
             rmbo: 2
 			harv: 20
 			ltnk: 11
-			ftnk: 11
+			ftnk: 9
+            ctnk: 2
 			arty: 58
 			mtnk: 1
 			msam: 60
@@ -730,7 +733,7 @@ Player:
 			orca: 0
     SquadManagerBotModule@wavemaker:
 		RequiresCondition: enable-wavemaker-ai
-		SquadSize: 50
+		SquadSize: 55
 		ExcludeFromSquadsTypes: harv, mcv, a10
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
@@ -807,7 +810,8 @@ Player:
             apc: 1
 			harv: 50
 			ltnk: 24
-			ftnk: 10
+			ftnk: 8
+            ctnk: 2
 			arty: 10
 			mtnk: 5
 			msam: 10
