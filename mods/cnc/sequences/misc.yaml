@@ -110,6 +110,7 @@ explosion:
 	piff: piff
 	piffs: piffpiff
 	chemball: chemball
+	bigchem: bigchem
 	small_napalm: napalm1
 	med_napalm: napalm2
 	big_napalm: napalm3
