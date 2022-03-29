@@ -82,7 +82,7 @@ BigChem:
 			Heavy: 75
 		DamageTypes: Prone50Percent, TriggerProne, TiberiumDeath
     Warhead@3Eff: CreateEffect
-		Explosions: chemball
+		Explosions: bigchem
 		ImpactSounds: xplos.aud
 
 Napalm:
