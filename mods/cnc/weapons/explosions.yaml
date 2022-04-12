@@ -112,14 +112,47 @@ UnitExplodeStealthTank:
 GrenadierExplode:
 	Inherits: ^DamagingExplosionHE
 	Warhead@1Dam: SpreadDamage
-		Spread: 256
-		Damage: 1000
+		Spread: 341
+		Damage: 4500
 		Versus:
-			Wood: 70
-			Heavy: 20
+			None: 100
+			Wood: 50
+			Light: 80
+			Heavy: 34
 		DamageTypes: Prone50Percent, TriggerProne, SmallExplosionDeath
 	Warhead@2Eff: CreateEffect
+		Explosions: small_poof
 		ImpactSounds: xplosml2.aud
+
+FlamethrowerExplode:
+	Inherits: ^DamagingExplosion
+	Warhead@1Dam: SpreadDamage
+		Spread: 1c0
+		Damage: 4000
+		Versus:
+			None: 110
+			Wood: 100
+			Light: 100
+			Heavy: 10
+		DamageTypes: Prone50Percent, TriggerProne, FireDeath, Incendiary
+	Warhead@2Eff: CreateEffect
+		Explosions: small_napalm
+		ImpactActors: false
+
+ChemWarriorExplode:
+	Inherits: ^DamagingExplosion
+	Warhead@1Dam: SpreadDamage
+		Spread: 1c0
+		Damage: 8000
+        Versus:
+			None: 70
+			Wood: 75
+			Light: 35
+			Heavy: 75
+		DamageTypes: Prone50Percent, TriggerProne, TiberiumDeath
+	Warhead@2Eff: CreateEffect
+		Explosions: chemball
+		ImpactSounds: xplos.aud
 
 BuildingExplode:
 	Warhead@1Eff: CreateEffect
