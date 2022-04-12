@@ -61,7 +61,29 @@ Dragon:
 		Explosions: small_building
 
 Rockets:
+	ReloadDelay: 50
+	Range: 7c0
 	Inherits: ^MissileWeapon
+    Projectile: Missile
+		Arm: 0
+		Blockable: false
+		Inaccuracy: 128
+		Image: DRAGON
+		Shadow: true
+		HorizontalRateOfTurn: 70
+		TrailImage: smokey
+		ContrailLength: 8
+		Speed: 350
+		RangeLimit: 8c204
+	Warhead@1Dam: SpreadDamage
+		Spread: 128
+		Damage: 3000
+		ValidTargets: Ground, Air
+		Versus:
+			None: 23
+			Wood: 116
+			Light: 100
+			Heavy: 180
 
 BikeRockets:
 	Inherits: ^MissileWeapon
@@ -225,7 +247,7 @@ TowerMissile:
 	ReloadDelay: 30
 	Burst: 2
 	BurstDelays: 8
-	Range: 7c0
+	Range: 8c0
 	Report: rocket2.aud
 	ValidTargets: Ground, Water
 	Projectile: Missile
@@ -233,6 +255,7 @@ TowerMissile:
 		Speed: 298
 		RangeLimit: 8c409
 	Warhead@1Dam: SpreadDamage
+		Damage: 2750
 		Spread: 483
 		ValidTargets: Ground
 		Versus:
