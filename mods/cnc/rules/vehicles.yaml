@@ -22,7 +22,7 @@ MCV:
 	Armor:
 		Type: Heavy
 	RevealsShroud:
-		Range: 8c0
+		Range: 2c0
 	Transforms:
 		IntoActor: fact
 		Offset: -1,-1
@@ -72,7 +72,7 @@ HARV:
 	Armor:
 		Type: Heavy
 	RevealsShroud:
-		Range: 4c0
+		Range: 2c0
 	ActorLostNotification:
 		Notification: HarvesterLost
 	SpawnActorOnDeath:
@@ -124,7 +124,7 @@ APC:
 	Armor:
 		Type: Heavy
 	RevealsShroud:
-		Range: 7c0
+		Range: 4c0
 	Turreted:
 		TurnSpeed: 40
 	AutoTargetPriority@Air:
@@ -202,7 +202,7 @@ ARTY:
 	Armor:
 		Type: Light
 	RevealsShroud:
-		Range: 5c0
+		Range: 3c0
 	Armament:
 		Weapon: ArtilleryShell
 		LocalOffset: 624,0,208
@@ -250,7 +250,7 @@ FTNK:
 	Armor:
 		Type: Heavy
 	RevealsShroud:
-		Range: 6c0
+		Range: 4c0
 	Armament:
 		Weapon: BigFlamer
 		LocalOffset: 512,128,42, 512,-128,42
@@ -294,7 +294,7 @@ CTNK:
 	Armor:
 		Type: Heavy
 	RevealsShroud:
-		Range: 6c0
+		Range: 5c0
 	Armament:
 		Weapon: BigChem
 		LocalOffset: 512,128,42, 512,-128,42
@@ -338,7 +338,7 @@ BGGY:
 	Armor:
 		Type: Light
 	RevealsShroud:
-		Range: 8c0
+		Range: 5c0
 	Turreted:
 		TurnSpeed: 40
 		Offset: -43,0,128
@@ -384,7 +384,7 @@ BIKE:
 	Armor:
 		Type: Light
 	RevealsShroud:
-		Range: 8c0
+		Range: 5c0
 	Armament:
 		Weapon: BikeRockets
 		LocalOffset: -128, -170, 170, -128, 170, 170
@@ -424,7 +424,7 @@ JEEP:
 	Armor:
 		Type: Light
 	RevealsShroud:
-		Range: 8c0
+		Range: 5c0
 	Turreted:
 		TurnSpeed: 40
 		Offset: -85,0,128
@@ -469,7 +469,7 @@ LTNK:
 	Armor:
 		Type: Heavy
 	RevealsShroud:
-		Range: 6c0
+		Range: 3c0
 	Turreted:
 		TurnSpeed: 28
 	Armament:
@@ -514,7 +514,7 @@ MTNK:
 	Armor:
 		Type: Heavy
 	RevealsShroud:
-		Range: 6c0
+		Range: 3c0
 	Turreted:
 		TurnSpeed: 20
 	Armament:
@@ -566,7 +566,7 @@ HTNK:
 	Armor:
 		Type: Heavy
 	RevealsShroud:
-		Range: 6c0
+		Range: 3c0
 	WithSpriteTurret:
 	Turreted:
 		TurnSpeed: 12
@@ -629,7 +629,7 @@ MSAM:
 	Armor:
 		Type: Light
 	RevealsShroud:
-		Range: 5c0
+		Range: 3c0
 	Turreted:
 		TurnSpeed: 512
 		Offset: -256,0,128
@@ -788,7 +788,7 @@ MHQ:
 	Mobile:
 		Speed: 72
 	RevealsShroud:
-		Range: 6c0
+		Range: 10c0
 	WithIdleOverlay@SPINNER:
 		Sequence: spinner
 		Offset: -256,0,256
@@ -815,7 +815,7 @@ TRUCK:
 	Mobile:
 		Speed: 113
 	RevealsShroud:
-		Range: 4c0
+		Range: 2c0
 	DeliversCash:
 		Payload: 1000
 		PlayerExperience: 100

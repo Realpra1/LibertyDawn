@@ -290,7 +290,7 @@
 	Selectable:
 		Bounds: 1024, 1024
 	Repairable:
-		RepairActors: hpad
+		RepairActors: fix
 	Aircraft:
 		AirborneCondition: airborne
 		CruisingCondition: cruising
@@ -339,7 +339,7 @@
 	Armor:
 		Type: None
 	RevealsShroud:
-		Range: 5c0
+		Range: 10c0
 	Mobile:
 		AlwaysTurnInPlace: true
 		Locomotor: foot
@@ -470,7 +470,7 @@
 	Health:
 		HP: 2500
 	RevealsShroud:
-		Range: 2c0
+		Range: 5c0
 	Passenger:
 		CustomPipType: gray
 	ScaredyCat:

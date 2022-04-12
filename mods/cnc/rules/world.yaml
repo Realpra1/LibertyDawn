@@ -25,9 +25,9 @@
 			Rough: 89
 			Road: 111
 			Bridge: 111
-			Tiberium: 78
+			Tiberium: 70
 				PathingCost: 300
-			BlueTiberium: 78
+			BlueTiberium: 70
 				PathingCost: 300
 			Beach: 89
 	Locomotor@CHEM:
@@ -46,10 +46,10 @@
 		Name: wheeled
 		Crushes: crate
 		TerrainSpeeds:
-			Clear: 100
+			Clear: 90
 			Rough: 63
-			Road: 125
-			Bridge: 125
+			Road: 190
+			Bridge: 190
 			Tiberium: 63
 			BlueTiberium: 63
 			Beach: 50
@@ -57,10 +57,10 @@
 		Name: heavywheeled
 		Crushes: crate, infantry
 		TerrainSpeeds:
-			Clear: 100
+			Clear: 90
 			Rough: 63
-			Road: 125
-			Bridge: 125
+			Road: 190
+			Bridge: 190
 			Tiberium: 63
 			BlueTiberium: 63
 			Beach: 50
@@ -69,23 +69,23 @@
 		Crushes: wall, crate, infantry
 		TerrainSpeeds:
 			Clear: 100
-			Rough: 88
-			Road: 125
-			Bridge: 125
-			Tiberium: 88
-			BlueTiberium: 88
-			Beach: 88
+			Rough: 95
+			Road: 105
+			Bridge: 105
+			Tiberium: 95
+			BlueTiberium: 95
+			Beach: 95
 	Locomotor@HEAVYTRACKED:
 		Name: heavytracked
 		Crushes: wall, heavywall, crate, infantry
 		TerrainSpeeds:
 			Clear: 100
-			Rough: 88
-			Road: 125
-			Bridge: 125
-			Tiberium: 88
-			BlueTiberium: 88
-			Beach: 88
+			Rough: 95
+			Road: 105
+			Bridge: 105
+			Tiberium: 95
+			BlueTiberium: 95
+			Beach: 95
 	Locomotor@NAVAL:
 		Name: naval
 		Crushes: crate

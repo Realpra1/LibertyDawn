@@ -50,10 +50,11 @@
 TurretGun:
 	Inherits: ^BallisticWeapon
 	ReloadDelay: 20
-	Range: 6c0
+	Range: 7c0
 	Projectile: Bullet
 		Speed: 853
 	Warhead@1Dam: SpreadDamage
+		Damage: 4400
 		Versus:
 			None: 20
 			Wood: 25
@@ -89,7 +90,7 @@ ArtilleryShell:
 Grenade:
 	Inherits: ^BallisticWeapon
 	ReloadDelay: 50
-	Range: 4c0
+	Range: 5c0
 	Report: toss1.aud
 	Projectile: Bullet
 		Speed: 140
@@ -99,7 +100,7 @@ Grenade:
 		Image: BOMB
 	Warhead@1Dam: SpreadDamage
 		Spread: 341
-		Damage: 5000
+		Damage: 4500
 		Versus:
 			None: 100
 			Wood: 50
