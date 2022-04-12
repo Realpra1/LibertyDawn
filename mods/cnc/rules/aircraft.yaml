@@ -21,7 +21,7 @@ TRAN:
 	Armor:
 		Type: Light
 	RevealsShroud:
-		Range: 10c0
+		Range: 5c0
 		Type: GroundPosition
 	WithIdleOverlay@ROTOR1AIR:
 		Offset: 597,0,85
@@ -143,7 +143,7 @@ ORCA:
 	Armor:
 		Type: Light
 	RevealsShroud:
-		Range: 10c0
+		Range: 8c0
 		Type: GroundPosition
 	Armament@PRIMARY:
 		Weapon: OrcaAGMissiles
