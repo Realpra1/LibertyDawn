@@ -38,6 +38,9 @@ Sniper:
 
 HighV:
 	Inherits: ^HeavyMG
+	Range: 7c0
+    Warhead@1Dam: SpreadDamage
+		Damage: 3300
 
 Vulcan:
 	Inherits: ^HeavyMG
@@ -93,13 +96,13 @@ HeliAAGun:
 	Report: mgun2.aud
 	Warhead@1Dam: SpreadDamage
 		Spread: 128
-		Damage: 1000
+		Damage: 1100
 		InvalidTargets: Wall
 		Versus:
 			None: 150
-			Wood: 30
-			Light: 40
-			Heavy: 10
+			Wood: 20
+			Light: 35
+			Heavy: 5
 		DamageTypes: Prone50Percent, TriggerProne, BulletDeath
 	Warhead@2Eff: CreateEffect
 		Explosions: piff
