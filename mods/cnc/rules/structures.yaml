@@ -845,7 +845,7 @@ GUN:
 		Description: Basic Anti-Tank base defense.\n  Strong vs Tanks, vehicles\n  Weak vs Infantry
 	Building:
 	Health:
-		HP: 41000
+		HP: 61500
 	Armor:
 		Type: Heavy
 	RevealsShroud:
@@ -948,7 +948,7 @@ OBLI:
 		Bounds: 1024, 1024
 		DecorationBounds: 938, 1877, 0, -426
 	Health:
-		HP: 75000
+		HP: 112500
 	Armor:
 		Type: Heavy
 	RevealsShroud:
@@ -993,7 +993,7 @@ GTWR:
 		Description: Basic defensive structure.\n  Strong vs Infantry\n  Weak vs Tanks
 	Building:
 	Health:
-		HP: 40000
+		HP: 60000
 	RevealsShroud:
 		Range: 7c0
 	WithBuildingBib:
@@ -1032,14 +1032,14 @@ ATWR:
 		Bounds: 1024, 1024
 		DecorationBounds: 938, 2048, 0, -512
 	Health:
-		HP: 55000
+		HP: 82500
 	Armor:
 		Type: Heavy
 	RevealsShroud:
 		Range: 8c0
 	-RenderRangeCircle:
 	WithRangeCircle:
-		Range: 7c0
+		Range: 8c0
 		Color: FFFF0080
 	WithBuildingBib:
 		HasMinibib: true
