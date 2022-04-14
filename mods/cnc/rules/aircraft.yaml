@@ -66,9 +66,9 @@ HELI:
 		Description: Helicopter Gunship with Chainguns.\n  Strong vs Infantry, Light Vehicles and\n  Aircraft\n  Weak vs Tanks
 	Aircraft:
 		TurnSpeed: 28
-		Speed: 180
+		Speed: 51
 	Health:
-		HP: 12500
+		HP: 1250
 	Armor:
 		Type: Light
 	RevealsShroud:
@@ -125,7 +125,7 @@ ORCA:
 	Inherits@EXPERIENCE: ^GainsExperience
 	Inherits@AUTOTARGET: ^AutoTargetAllAssaultMove
 	Valued:
-		Cost: 1200
+		Cost: 2200
 	Tooltip:
 		Name: Orca
 	UpdatesPlayerStatistics:
@@ -136,10 +136,10 @@ ORCA:
 		Queue: Aircraft.GDI
 		Description: Helicopter Gunship with AG Missiles.\n  Strong vs Buildings, Tanks\n  Weak vs Infantry
 	Aircraft:
-		TurnSpeed: 28
-		Speed: 186
+		TurnSpeed: 78
+		Speed: 10
 	Health:
-		HP: 10000
+		HP: 30000
 	Armor:
 		Type: Light
 	RevealsShroud:
@@ -164,7 +164,7 @@ ORCA:
 		AttackType: Hover
 		Voice: Attack
 	AmmoPool:
-		Ammo: 6
+		Ammo: 12
 		AmmoCondition: ammo
 	SpawnActorOnDeath:
 		Actor: ORCA.Husk
@@ -187,7 +187,7 @@ C17:
 	Tooltip:
 		Name: Supply Aircraft
 	Valued:
-		Cost: 2000
+		Cost: 20000
 	UpdatesPlayerStatistics:
 		AddToAssetsValue: false
 	Aircraft:
@@ -235,7 +235,7 @@ A10:
 		AddToAssetsValue: false
 	Aircraft:
 		TurnSpeed: 16
-		Speed: 373
+		Speed: 1373
 		Repulsable: False
 	AttackBomber:
 		Armaments: gun, bombs
@@ -263,7 +263,7 @@ TRAN.Husk:
 		Name: Chinook Transport
 	Aircraft:
 		TurnSpeed: 20
-		Speed: 140
+		Speed: 1140
 	RevealsShroud:
 		Range: 10c0
 		Type: GroundPosition
