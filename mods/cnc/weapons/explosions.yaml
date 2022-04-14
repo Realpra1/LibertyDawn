@@ -1,7 +1,7 @@
 ^DamagingExplosion:
 	Warhead@1Dam: SpreadDamage
-		Spread: 426
-		Damage: 4000
+		Spread: 926
+		Damage: 1000
 		Versus:
 			None: 100
 			Wood: 100
@@ -41,7 +41,7 @@ ChemtankExplode:
 	Inherits: ^DamagingExplosion
 	Warhead@1Dam: SpreadDamage
 		Spread: 1c0
-		Damage: 17250
+		Damage: 7250
 		DamageTypes: Prone50Percent, TriggerProne, TiberiumDeath
 	Warhead@2Eff: CreateEffect
 		Explosions: bigchem
@@ -52,7 +52,7 @@ ChemtankExplode:
 HeliCrash:
 	Inherits: ^DamagingExplosion
 	Warhead@1Dam: SpreadDamage
-		Damage: 10000
+		Damage: 4000
 
 HeliExplode:
 	Warhead@1Eff: CreateEffect
@@ -62,7 +62,7 @@ HeliExplode:
 UnitExplode:
 	Inherits: ^DamagingExplosionHE
 	Warhead@1Dam: SpreadDamage
-		Damage: 5000
+		Damage: 2000
 		Versus:
 			Wood: 74
 			Heavy: 24
@@ -143,7 +143,7 @@ ChemWarriorExplode:
 	Inherits: ^DamagingExplosion
 	Warhead@1Dam: SpreadDamage
 		Spread: 1c0
-		Damage: 8000
+		Damage: 14000
         Versus:
 			None: 70
 			Wood: 75
@@ -166,8 +166,8 @@ BuildingExplode:
 Napalm.Crate:
 	Inherits: ^DamagingExplosionHE
 	Warhead@1Dam: SpreadDamage
-		Spread: 170
-		Damage: 5000
+		Spread: 10
+		Damage: 2000
 		Falloff: 1000, 368, 135, 50, 18, 7, 0
 		Versus:
 			Wood: 100
@@ -183,7 +183,7 @@ TiberiumExplosion:
 	Inherits: ^DamagingExplosionHE
 	Warhead@1Dam: SpreadDamage
 		Spread: 9
-		Damage: 1000
+		Damage: 3000
 		Versus:
 			Wood: 70
 			Heavy: 20
