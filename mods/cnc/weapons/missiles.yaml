@@ -1,5 +1,5 @@
 ^MissileWeapon:
-	ReloadDelay: 50
+	ReloadDelay: 250
 	Range: 6c0
 	MinRange: 0c512
 	Report: bazook1.aud
@@ -7,17 +7,17 @@
 	Projectile: Missile
 		Arm: 0
 		Blockable: false
-		Inaccuracy: 128
+		Inaccuracy: 228
 		Image: DRAGON
 		Shadow: true
 		HorizontalRateOfTurn: 60
 		TrailImage: smokey
 		ContrailLength: 8
-		Speed: 298
+		Speed: 698
 		RangeLimit: 7c204
 	Warhead@1Dam: SpreadDamage
-		Spread: 128
-		Damage: 2500
+		Spread: 228
+		Damage: 1500
 		ValidTargets: Ground, Air
 		Versus:
 			None: 28
@@ -41,14 +41,14 @@
 
 Dragon:
 	Inherits: ^MissileWeapon
-	ReloadDelay: 20
+	ReloadDelay: 200
 	Range: 10c0
 	Report: rocket2.aud
 	ValidTargets: Air
 	Burst: 2
 	BurstDelays: 5
 	Projectile: Missile
-		Speed: 426
+		Speed: 926
 		HorizontalRateOfTurn: 80
 		RangeLimit: 12c0
 	Warhead@1Dam: SpreadDamage
@@ -61,7 +61,7 @@ Dragon:
 		Explosions: small_building
 
 Rockets:
-	ReloadDelay: 50
+	ReloadDelay: 150
 	Range: 7c0
 	Inherits: ^MissileWeapon
     Projectile: Missile
@@ -72,8 +72,8 @@ Rockets:
 		Shadow: true
 		HorizontalRateOfTurn: 70
 		TrailImage: smokey
-		ContrailLength: 8
-		Speed: 350
+		ContrailLength: 4
+		Speed: 900
 		RangeLimit: 8c204
 	Warhead@1Dam: SpreadDamage
 		Spread: 128
@@ -87,9 +87,9 @@ Rockets:
 
 BikeRockets:
 	Inherits: ^MissileWeapon
-	ReloadDelay: 60
+	ReloadDelay: 500
 	Burst: 2
-	BurstDelays: 10
+	BurstDelays: 92
 	Projectile: Missile
 		HorizontalRateOfTurn: 40
 		Speed: 213
@@ -102,14 +102,14 @@ BikeRockets:
 
 OrcaAGMissiles:
 	Inherits: ^MissileWeapon
-	ReloadDelay: 12
+	ReloadDelay: 61
 	Range: 4c768
 	MinRange: 1c256
 	ValidTargets: Ground, Water
 	Projectile: Missile
 		Arm: 1
-		HorizontalRateOfTurn: 80
-		Speed: 256
+		HorizontalRateOfTurn: 100
+		Speed: 600
 		RangeLimit: 6c0
 	Warhead@1Dam: SpreadDamage
 		ValidTargets: Ground
@@ -133,18 +133,18 @@ OrcaAAMissiles:
 
 MammothMissiles:
 	Inherits: ^MissileWeapon
-	ReloadDelay: 45
+	ReloadDelay: 4
 	Range: 4c768
 	Report: rocket1.aud
 	Burst: 2
 	BurstDelays: 15
 	Projectile: Missile
 		HorizontalRateOfTurn: 80
-		Speed: 341
+		Speed: 900
 		RangeLimit: 6c0
 	Warhead@1Dam: SpreadDamage
 		Spread: 298
-		Damage: 5000
+		Damage: 9000
 		Versus:
 			None: 44
 			Wood: 66
@@ -158,7 +158,7 @@ MammothMissiles:
 
 227mm:
 	Inherits: ^MissileWeapon
-	ReloadDelay: 100
+	ReloadDelay: 500
 	Range: 11c0
 	MinRange: 3c0
 	Burst: 4
@@ -191,12 +191,12 @@ MammothMissiles:
 
 227mm.stnk:
 	Inherits: ^MissileWeapon
-	ReloadDelay: 70
+	ReloadDelay: 2
 	Range: 7c0
 	Report: rocket1.aud
 	ValidTargets: Ground, Water
-	Burst: 2
-	BurstDelays: 10
+	Burst: 6
+	BurstDelays: 5
 	Projectile: Missile
 		Inaccuracy: 213
 		HorizontalRateOfTurn: 40
@@ -217,10 +217,10 @@ MammothMissiles:
 
 BoatMissile:
 	Inherits: ^MissileWeapon
-	ReloadDelay: 35
+	ReloadDelay: 350
 	Range: 8c0
 	Burst: 2
-	BurstDelays: 10
+	BurstDelays: 41
 	Report: rocket2.aud
 	Projectile: Missile
 		Inaccuracy: 426
@@ -244,7 +244,7 @@ BoatMissile:
 
 TowerMissile:
 	Inherits: ^MissileWeapon
-	ReloadDelay: 30
+	ReloadDelay: 5
 	Burst: 2
 	BurstDelays: 8
 	Range: 8c0
@@ -252,11 +252,11 @@ TowerMissile:
 	ValidTargets: Ground, Water
 	Projectile: Missile
 		HorizontalRateOfTurn: 80
-		Speed: 298
+		Speed: 9999
 		RangeLimit: 8c409
 	Warhead@1Dam: SpreadDamage
-		Damage: 2750
-		Spread: 483
+		Damage: 7750
+		Spread: 183
 		ValidTargets: Ground
 		Versus:
 			None: 52
@@ -270,7 +270,7 @@ TowerMissile:
 
 TowerAAMissile:
 	Inherits: ^MissileWeapon
-	ReloadDelay: 30
+	ReloadDelay: 61
 	Burst: 2
 	BurstDelays: 8
 	Range: 8c0
@@ -279,11 +279,11 @@ TowerAAMissile:
 	Projectile: Missile
 		Image: MISSILE
 		HorizontalRateOfTurn: 80
-		Speed: 426
+		Speed: 926
 		RangeLimit: 9c614
 		Inaccuracy: 0
 	Warhead@1Dam: SpreadDamage
-		Spread: 682
+		Spread: 182
 		ValidTargets: Air
 		Versus:
 			Light: 140
@@ -293,7 +293,7 @@ TowerAAMissile:
 
 Patriot:
 	Inherits: ^MissileWeapon
-	ReloadDelay: 25
+	ReloadDelay: 250
 	Range: 9c0
 	MinRange: 1c0
 	Report: rocket2.aud
@@ -301,12 +301,12 @@ Patriot:
 	Projectile: Missile
 		Image: MISSILE
 		HorizontalRateOfTurn: 80
-		Speed: 300
+		Speed: 3050
 		RangeLimit: 10c819
 		Inaccuracy: 0
 	Warhead@1Dam: SpreadDamage
 		Spread: 682
-		Damage: 5000
+		Damage: 50
 		ValidTargets: Air
 		Versus:
 			None: 20
