@@ -4,7 +4,7 @@ E1:
 	Inherits@AUTOTARGET: ^AutoTargetGroundAssaultMove
 	Inherits@DECORATIONS: ^InfantryExperienceHospitalHazmatOverrides
 	Valued:
-		Cost: 100
+		Cost: 10
 	Tooltip:
 		Name: Minigunner
 	UpdatesPlayerStatistics:
@@ -15,11 +15,11 @@ E1:
 		Queue: Infantry.GDI, Infantry.Nod
 		Description: General-purpose infantry.\n  Strong vs Infantry\n  Weak vs Vehicles
 	Mobile:
-		Speed: 54
+		Speed: 100
 	Health:
-		HP: 5000
+		HP: 10000
 	AutoTarget:
-		ScanRadius: 4
+		ScanRadius: 1
 	Armament:
 		Weapon: M16
 	AttackFrontal:
@@ -36,7 +36,7 @@ E2:
 	Inherits@AUTOTARGET: ^AutoTargetGroundAssaultMove
 	Inherits@DECORATIONS: ^InfantryExperienceHospitalHazmatOverrides
 	Valued:
-		Cost: 160
+		Cost: 10
 	Tooltip:
 		Name: Grenadier
 	UpdatesPlayerStatistics:
@@ -47,9 +47,9 @@ E2:
 		Queue: Infantry.GDI
 		Description: Fast infantry armed with grenades. \n  Strong vs Buildings, slow-moving targets
 	Mobile:
-		Speed: 68
+		Speed: 199
 	Health:
-		HP: 5500
+		HP: 9500
 	AutoTarget:
 		ScanRadius: 4
 	Armament:
@@ -75,7 +75,7 @@ E3:
 	Inherits@AUTOTARGET: ^AutoTargetAllAssaultMove
 	Inherits@DECORATIONS: ^InfantryExperienceHospitalHazmatOverrides
 	Valued:
-		Cost: 300
+		Cost: 200
 	Tooltip:
 		Name: Rocket Soldier
 	UpdatesPlayerStatistics:
@@ -86,9 +86,9 @@ E3:
 		Queue: Infantry.GDI, Infantry.Nod
 		Description: Anti-tank/Anti-aircraft infantry. \n  Strong vs Tanks, Aircraft\n  Weak vs Infantry
 	Mobile:
-		Speed: 39
+		Speed: 100
 	Health:
-		HP: 4500
+		HP: 99500
 	AutoTarget:
 		ScanRadius: 6
 	Armament:
@@ -110,7 +110,7 @@ E4:
 	Inherits@AUTOTARGET: ^AutoTargetGroundAssaultMove
 	Inherits@DECORATIONS: ^InfantryExperienceHospitalHazmatOverrides
 	Valued:
-		Cost: 200
+		Cost: 510
 	Tooltip:
 		Name: Flamethrower
 	UpdatesPlayerStatistics:
@@ -121,11 +121,11 @@ E4:
 		Queue: Infantry.Nod
 		Description: Advanced Anti-infantry unit.\n  Strong vs Infantry, Buildings\n  Weak vs Tanks
 	Mobile:
-		Speed: 54
+		Speed: 5
 	Health:
-		HP: 8500
+		HP: 18500
 	AutoTarget:
-		ScanRadius: 4
+		ScanRadius: 40
 	Armament:
 		Weapon: Flamethrower
 		LocalOffset: 341,0,256
@@ -151,7 +151,7 @@ E5:
 	Inherits@AUTOTARGET: ^AutoTargetGroundAssaultMove
 	Inherits@DECORATIONS: ^InfantryExperienceHospitalHazmatOverrides
 	Valued:
-		Cost: 300
+		Cost: 1300
 	Tooltip:
 		Name: Chemical Warrior
 	UpdatesPlayerStatistics:
@@ -162,10 +162,10 @@ E5:
 		Queue: Infantry.Nod
 		Description: Advanced general-purpose infantry.\n  Strong vs all Ground units
 	Mobile:
-		Speed: 54
+		Speed: 154
 		Locomotor: chem
 	Health:
-		HP: 9000
+		HP: 19000
 	AutoTarget:
 		ScanRadius: 4
 	Armament:
@@ -192,7 +192,7 @@ E6:
 	Inherits: ^Soldier
 	Inherits@selection: ^SelectableSupportUnit
 	Valued:
-		Cost: 500
+		Cost: 11500
 	Tooltip:
 		Name: Engineer
 	UpdatesPlayerStatistics:
@@ -226,7 +226,7 @@ RMBO:
 	Inherits@AUTOTARGET: ^AutoTargetGroundAssaultMove
 	Inherits@DECORATIONS: ^InfantryExperienceHospitalHazmatOverrides
 	Valued:
-		Cost: 1800
+		Cost: 100
 	Tooltip:
 		Name: Commando
 	UpdatesPlayerStatistics:
@@ -237,9 +237,9 @@ RMBO:
 		Queue: Infantry.GDI
 		Description: Elite sniper infantry unit.\n  Strong vs Infantry, Buildings\n  Weak vs Vehicles
 	Mobile:
-		Speed: 68
+		Speed: 680
 	Health:
-		HP: 15000
+		HP: 1500
 	Passenger:
 		CustomPipType: red
 	RevealsShroud:

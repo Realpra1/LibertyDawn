@@ -12,7 +12,7 @@ FACT:
 		Dimensions: 3,3
 		LocalCenterOffset: 0,-512,0
 	Health:
-		HP: 210000
+		HP: 2100000
 	Armor:
 		Type: Wood
 	RevealsShroud:

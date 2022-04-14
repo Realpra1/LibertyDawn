@@ -3,7 +3,7 @@ V19:
 	Selectable:
 		Bounds: 1024, 1024
 	CashTrickler:
-		Amount: 10
+		Amount: 30
 		RequiresCondition: enabled
 	Building:
 		Footprint: x
