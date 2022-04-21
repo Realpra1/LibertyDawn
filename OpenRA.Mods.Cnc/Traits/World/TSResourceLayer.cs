@@ -101,7 +101,7 @@ namespace OpenRA.Mods.Cnc.Traits
 			return neighbourTerrain == veinInfo.TerrainType || veinInfo.AllowedTerrainTypes.Contains(neighbourTerrain);
 		}
 
-		protected override bool AllowResourceAt(string resourceType, CPos cell)
+		public override bool AllowResourceAt(string resourceType, CPos cell)
 		{
 			if (!Map.Contains(cell))
 				return false;

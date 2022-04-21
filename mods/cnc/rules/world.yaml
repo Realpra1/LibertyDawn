@@ -146,7 +146,7 @@
 			BlueTiberium:
 				Sequences: bti1, bti2, bti3, bti4, bti5, bti6, bti7, bti8, bti9, bti10, bti11, bti12
 				Palette: bluetiberium
-				Name: Tiberium
+				Name: Blue Tiberium
 
 World:
 	Inherits: ^BaseWorld
@@ -188,6 +188,9 @@ World:
 				AllowedTerrainTypes: Clear, Road
 				MaxDensity: 12
 	ResourceClaimLayer:
+	SeedsResource:
+		ResourceType: Tiberium
+		Interval: 100
 	WarheadDebugOverlay:
 	CustomTerrainDebugOverlay:
 	MapCreeps:

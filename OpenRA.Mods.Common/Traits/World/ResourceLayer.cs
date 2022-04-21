@@ -34,6 +34,8 @@ namespace OpenRA.Mods.Common.Traits
 	[Desc("Attach this to the world actor.")]
 	public class ResourceLayerInfo : TraitInfo, IResourceLayerInfo, Requires<BuildingInfluenceInfo>
 	{
+		public static ResourceLayer WorldResourceLayer;
+
 		public class ResourceTypeInfo
 		{
 			[FieldLoader.Require]
@@ -99,7 +101,12 @@ namespace OpenRA.Mods.Common.Traits
 			return true;
 		}
 
-		public override object Create(ActorInitializer init) { return new ResourceLayer(init.Self, this); }
+		// public override object Create(ActorInitializer init) { return new ResourceLayer(init.Self, this); }
+		public override object Create(ActorInitializer init)
+		{
+			WorldResourceLayer = new ResourceLayer(init.Self, this);
+			return WorldResourceLayer;
+		}
 	}
 
 	public class ResourceLayer : IResourceLayer, IWorldLoaded
@@ -108,8 +115,9 @@ namespace OpenRA.Mods.Common.Traits
 		readonly World world;
 		protected readonly Map Map;
 		protected readonly BuildingInfluence BuildingInfluence;
-		protected readonly CellLayer<ResourceLayerContents> Content;
-		protected readonly Dictionary<byte, string> ResourceTypesByIndex;
+		protected readonly SeedsResource SelfSeedsResource;
+		public readonly CellLayer<ResourceLayerContents> Content;
+		public readonly Dictionary<byte, string> ResourceTypesByIndex;
 
 		int resCells;
 
@@ -125,6 +133,7 @@ namespace OpenRA.Mods.Common.Traits
 			ResourceTypesByIndex = info.ResourceTypes.ToDictionary(
 				kv => kv.Value.ResourceIndex,
 				kv => kv.Key);
+			SelfSeedsResource = self.Trait<SeedsResource>();
 		}
 
 		protected virtual void WorldLoaded(World w, WorldRenderer wr)
@@ -144,6 +153,7 @@ namespace OpenRA.Mods.Common.Traits
 			if (!info.RecalculateResourceDensity)
 				return;
 
+			// Bookmarked!
 			// Set initial density based on the number of neighboring resources
 			foreach (var cell in w.Map.AllCells)
 			{
@@ -168,17 +178,28 @@ namespace OpenRA.Mods.Common.Traits
 
 		void IWorldLoaded.WorldLoaded(World w, WorldRenderer wr) { WorldLoaded(w, wr); }
 
-		protected virtual bool AllowResourceAt(string resourceType, CPos cell)
+		public virtual bool AllowResourceAt(string resourceType, CPos cell)
 		{
 			if (!Map.Contains(cell) || Map.Ramp[cell] != 0)
+			{
+				// Console.WriteLine("Map doesn't contain the cell, or the cell is a ramp.");
 				return false;
+			}
 
 			if (resourceType == null || !info.ResourceTypes.TryGetValue(resourceType, out var resourceInfo))
+			{
+				// Console.WriteLine("The resource cell is null or a value can't be obtained from its type.");
 				return false;
+			}
 
-			if (!resourceInfo.AllowedTerrainTypes.Contains(Map.GetTerrainInfo(cell).Type))
+			var terrainType = Map.GetTerrainInfo(cell).Type;
+			if (!resourceInfo.AllowedTerrainTypes.Contains(terrainType) && terrainType != "Tiberium")
+			{
+				// Console.WriteLine("This terrain type doesn't allow resources: " + Map.GetTerrainInfo(cell).Type);
 				return false;
+			}
 
+			// Console.WriteLine("Checking to see if a building is present...");
 			return !BuildingInfluence.AnyBuildingAt(cell);
 		}
 
@@ -196,25 +217,49 @@ namespace OpenRA.Mods.Common.Traits
 			return new ResourceLayerContents(resourceType, density.Clamp(1, resourceInfo.MaxDensity));
 		}
 
-		bool CanAddResource(string resourceType, CPos cell, int amount = 1)
+		public bool CanAddResource(string resourceType, CPos cell, int amount = 1)
 		{
-			if (!world.Map.Contains(cell))
-				return false;
+			// Console.WriteLine("Checking to see if we can add resources to this cell... at CPos: " + cell);
 
-			if (resourceType == null || !info.ResourceTypes.TryGetValue(resourceType, out var resourceInfo))
+			if (!world.Map.Contains(cell))
+			{
+				throw new InvalidOperationException("Error 1001: Map doesn't contain the cell!");
+				// return false;
+			}
+
+			if (resourceType == null)
+			{
+				// Console.WriteLine("Error 1002: Resource type is null!");
 				return false;
+			}
+
+			// Console.WriteLine("info: "+info);
+			// Console.WriteLine("resourceType: "+resourceType);
+
+			if (!info.ResourceTypes.TryGetValue(resourceType, out var resourceInfo))
+			{
+				throw new InvalidOperationException("Error 1004: Cannot get value for resource type: " + resourceType);
+				// return false;
+			}
 
 			var content = Content[cell];
 			if (content.Type == null)
+			{
+				// Console.WriteLine("No content type detected, free cell. Returning amount to seed...");
 				return amount <= resourceInfo.MaxDensity && AllowResourceAt(resourceType, cell);
+			}
 
 			if (content.Type != resourceType)
+			{
+				// Console.WriteLine("Content type (" + content.Type + ") does not match resource type (" + resourceType + ").");
 				return false;
+			}
 
+			// Console.WriteLine("Returning content density (" + content.Density + ") + amount (" + amount + ") capped at (" + resourceInfo.MaxDensity + ").");
 			return content.Density + amount <= resourceInfo.MaxDensity;
 		}
 
-		int AddResource(string resourceType, CPos cell, int amount = 1)
+		public int AddResource(string resourceType, CPos cell, int amount = 1)
 		{
 			if (!Content.Contains(cell))
 				return 0;
@@ -234,6 +279,9 @@ namespace OpenRA.Mods.Common.Traits
 			Content[cell] = new ResourceLayerContents(content.Type, density);
 
 			CellChanged?.Invoke(cell, content.Type);
+
+			// Console.WriteLine("Old Density: " + oldDensity);
+			// Console.WriteLine("New Density: " + density);
 
 			return density - oldDensity;
 		}
@@ -285,12 +333,18 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		ResourceLayerContents IResourceLayer.GetResource(CPos cell) { return Content.Contains(cell) ? Content[cell] : default; }
+
 		int IResourceLayer.GetMaxDensity(string resourceType)
 		{
 			if (!info.ResourceTypes.TryGetValue(resourceType, out var resourceInfo))
 				return 0;
 
 			return resourceInfo.MaxDensity;
+		}
+
+		public ResourceLayerContents GetResource(CPos cell)
+		{
+			return Content.Contains(cell) ? Content[cell] : default;
 		}
 
 		bool IResourceLayer.CanAddResource(string resourceType, CPos cell, int amount) { return CanAddResource(resourceType, cell, amount); }
