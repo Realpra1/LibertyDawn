@@ -64,6 +64,7 @@ Rockets:
 	ReloadDelay: 50
 	Range: 7c0
 	Inherits: ^MissileWeapon
+	ValidTargets: Ground, Water, Air
     Projectile: Missile
 		Arm: 0
 		Blockable: false
@@ -77,13 +78,28 @@ Rockets:
 		RangeLimit: 8c204
 	Warhead@1Dam: SpreadDamage
 		Spread: 128
-		Damage: 3000
-		ValidTargets: Ground, Air
+		Damage: 4000
+		ValidTargets: Ground, Water
 		Versus:
-			None: 23
-			Wood: 116
-			Light: 100
+			None: 15
+			Wood: 100
+			Light: 90
 			Heavy: 180
+
+AARockets:
+	ValidTargets: Air
+    Inherits: Rockets
+    Projectile: Missile
+		-Image:
+		Shadow: false
+		-TrailImage:
+		-ContrailLength:
+	Warhead@1Dam: SpreadDamage
+		Damage: 1000
+        ValidTargets: Air
+    -Warhead@2Smu:
+	-Warhead@3Eff:
+	-Warhead@4EffAir:
 
 BikeRockets:
 	Inherits: ^MissileWeapon
@@ -158,9 +174,9 @@ MammothMissiles:
 
 227mm:
 	Inherits: ^MissileWeapon
-	ReloadDelay: 100
-	Range: 11c0
-	MinRange: 3c0
+	ReloadDelay: 125
+	Range: 25c0
+	MinRange: 4c0
 	Burst: 4
 	BurstDelays: 4
 	Report: rocket1.aud
@@ -173,18 +189,19 @@ MammothMissiles:
 		Image: DRAGON
 		Shadow: true
 		TrailImage: smokey
-		Inaccuracy: 853
-		LaunchAngle: 62
-		ContrailLength: 10
-		Speed: 341
+		Inaccuracy: 2c256
+		LaunchAngle: 72
+		ContrailLength: 20
+		Speed: 100
 	Warhead@1Dam: SpreadDamage
+		Damage: 4500
 		Spread: 683
 		ValidTargets: Ground
 		Versus:
-			None: 24
-			Wood: 60
+			None: 40
+			Wood: 25
 			Light: 100
-			Heavy: 48
+			Heavy: 100
 	Warhead@3Eff: CreateEffect
 		Explosions: med_frag
 		ImpactSounds: xplobig4.aud

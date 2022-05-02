@@ -16,7 +16,7 @@ MCV:
 		Speed: 60
 		Locomotor: heavywheeled
 	Health:
-		HP: 120000
+		HP: 60000
 	Repairable:
 		HpPerStep: 1819
 	Armor:
@@ -64,9 +64,9 @@ HARV:
 		HarvestFacings: 8
 		EmptyCondition: no-tiberium
 	Mobile:
-		Speed: 72
+		Speed: 90
 	Health:
-		HP: 62500
+		HP: 31250
 	Repairable:
 		HpPerStep: 2584
 	Armor:
@@ -118,7 +118,7 @@ APC:
 		Speed: 128
 		PauseOnCondition: notmobile
 	Health:
-		HP: 19000
+		HP: 25000
 	Repairable:
 		HpPerStep: 1440
 	Armor:
@@ -165,7 +165,7 @@ APC:
 		RequiresCondition: attack-air
 	Cargo:
 		Types: Infantry
-		MaxWeight: 5
+		MaxWeight: 10
 		UnloadVoice: Unload
 		LoadingCondition: notmobile
 	Explodes:
@@ -190,26 +190,25 @@ ARTY:
 	Buildable:
 		BuildPaletteOrder: 60
 		Prerequisites: anyhq, ~techlevel.medium
-		Queue: Vehicle.Nod
-		Description: Long-range artillery.\n  Strong vs Infantry, Vehicles and Buildings
+		Queue: Vehicle.Nod, Vehicle.GDI
+		Description: Fast mid-range artillery.\n  Strong vs Infantry, Vehicles and Buildings
 	Mobile:
-		TurnSpeed: 16
-		Speed: 72
+		TurnSpeed: 25
+		Speed: 100
 	Health:
-		HP: 7500
+		HP: 13000
 	Repairable:
-		HpPerStep: 568
+		HpPerStep: 768
 	Armor:
 		Type: Light
 	RevealsShroud:
-		Range: 3c0
+		Range: 6c0
 	Armament:
 		Weapon: ArtilleryShell
 		LocalOffset: 624,0,208
 		MuzzleSequence: muzzle
 	AttackFrontal:
 		TargetFrozenActors: True
-		ForceFireIgnoresActors: True
 		Voice: Attack
 	AttackMove:
 		Voice: Attack
@@ -280,7 +279,7 @@ CTNK:
 	UpdatesPlayerStatistics:
 		AddToArmyValue: true
 	Buildable:
-		BuildPaletteOrder: 80
+		BuildPaletteOrder: 90
 		Prerequisites: tmpl, ~techlevel.high
 		Queue: Vehicle.Nod
 		Description: Heavily armored chemical-spewing vehicle.\n  Strong Harasser vs All Ground Units\n  Weak vs Air
@@ -545,24 +544,24 @@ HTNK:
 	Inherits@CLOAK: ^AcceptsCloakCrate
 	Inherits@AUTOTARGET: ^AutoTargetAllAssaultMove
 	Valued:
-		Cost: 1800
+		Cost: 1700
 	Tooltip:
 		Name: Mammoth Tank
 	UpdatesPlayerStatistics:
 		AddToArmyValue: true
 	Buildable:
-		BuildPaletteOrder: 60
+		BuildPaletteOrder: 80
 		Prerequisites: eye, ~techlevel.high
 		Queue: Vehicle.GDI
 		Description: Heavily armored GDI Tank.\nCan attack Aircraft.\n  Strong vs Everything
 	Mobile:
 		Locomotor: heavytracked
-		Speed: 46
-		TurnSpeed: 12
+		Speed: 25
+		TurnSpeed: 8
 	Health:
-		HP: 87000
+		HP: 90000
 	Repairable:
-		HpPerStep: 2198
+		HpPerStep: 4000
 	Armor:
 		Type: Heavy
 	RevealsShroud:
@@ -589,8 +588,8 @@ HTNK:
 		Voice: Attack
 	WithMuzzleOverlay:
 	ChangesHealth:
-		Step: 500
-		Delay: 10
+		Step: 1500
+		Delay: 25
 		StartIfBelow: 50
 		DamageCooldown: 200
 	Explodes:
@@ -615,15 +614,15 @@ MSAM:
 	UpdatesPlayerStatistics:
 		AddToArmyValue: true
 	Buildable:
-		BuildPaletteOrder: 50
+		BuildPaletteOrder: 70
 		Prerequisites: anyhq, ~techlevel.medium
-		Queue: Vehicle.GDI
-		Description: Long range rocket artillery.\n  Strong vs all Ground units.
+		Queue: Vehicle.GDI, Vehicle.Nod
+		Description: Very long range rocket artillery.\n  Strong vs all Ground units.
 	Mobile:
-		Speed: 72
-		TurnSpeed: 16
+		Speed: 30
+		TurnSpeed: 10
 	Health:
-		HP: 12000
+		HP: 7000
 	Repairable:
 		HpPerStep: 606
 	Armor:
@@ -669,7 +668,7 @@ MLRS:
 	UpdatesPlayerStatistics:
 		AddToArmyValue: true
 	Buildable:
-		BuildPaletteOrder: 70
+		BuildPaletteOrder: 80
 		Prerequisites: anyhq, ~techlevel.medium
 		Queue: Vehicle.Nod
 		Description: Powerful anti-air unit.\nCannot attack Ground units.
@@ -725,7 +724,7 @@ STNK:
 	UpdatesPlayerStatistics:
 		AddToArmyValue: true
 	Buildable:
-		BuildPaletteOrder: 90
+		BuildPaletteOrder: 100
 		Prerequisites: tmpl, ~techlevel.high
 		Queue: Vehicle.Nod
 		Description: Long-range missile tank that can cloak.\nCan attack Aircraft.\nHas weak armor. Can be spotted by infantry and defense structures.\n  Strong vs Vehicles, Tanks\n  Weak vs Infantry.

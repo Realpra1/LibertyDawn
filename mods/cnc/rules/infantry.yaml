@@ -4,7 +4,7 @@ E1:
 	Inherits@AUTOTARGET: ^AutoTargetGroundAssaultMove
 	Inherits@DECORATIONS: ^InfantryExperienceHospitalHazmatOverrides
 	Valued:
-		Cost: 100
+		Cost: 90
 	Tooltip:
 		Name: Minigunner
 	UpdatesPlayerStatistics:
@@ -75,7 +75,7 @@ E3:
 	Inherits@AUTOTARGET: ^AutoTargetAllAssaultMove
 	Inherits@DECORATIONS: ^InfantryExperienceHospitalHazmatOverrides
 	Valued:
-		Cost: 300
+		Cost: 250
 	Tooltip:
 		Name: Rocket Soldier
 	UpdatesPlayerStatistics:
@@ -90,9 +90,13 @@ E3:
 	Health:
 		HP: 4500
 	AutoTarget:
-		ScanRadius: 6
-	Armament:
+		ScanRadius: 7
+	Armament@PRIMARY:
 		Weapon: Rockets
+		LocalOffset: 256,43,341
+		FireDelay: 5
+    Armament@SECONDARY:
+		Weapon: AARockets
 		LocalOffset: 256,43,341
 		FireDelay: 5
 	AttackFrontal:
@@ -192,7 +196,7 @@ E6:
 	Inherits: ^Soldier
 	Inherits@selection: ^SelectableSupportUnit
 	Valued:
-		Cost: 500
+		Cost: 250
 	Tooltip:
 		Name: Engineer
 	UpdatesPlayerStatistics:
@@ -213,7 +217,7 @@ E6:
 	CaptureManager:
 	Captures@SABOTAGE:
 		CaptureTypes: building-sabotage
-		SabotageThreshold: 0
+		SabotageThreshold: 80
 		PlayerExperience: 50
 	Captures@CAPTURES:
 		CaptureTypes: building, husk

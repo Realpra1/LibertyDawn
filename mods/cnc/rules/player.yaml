@@ -4,7 +4,7 @@
 	PlayerResources:
 		ResourceValues:
 			Tiberium: 35
-			BlueTiberium: 60
+			BlueTiberium: 70
 
 EditorPlayer:
 	Inherits: ^BasePlayer

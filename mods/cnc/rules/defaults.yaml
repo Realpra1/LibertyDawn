@@ -290,7 +290,7 @@
 	Selectable:
 		Bounds: 1024, 1024
 	Repairable:
-		RepairActors: fix
+		RepairActors: fix, hpad
 	Aircraft:
 		AirborneCondition: airborne
 		CruisingCondition: cruising
@@ -367,7 +367,7 @@
 	HiddenUnderFog:
 	DamagedByTerrain:
 		Terrain: Tiberium, BlueTiberium
-		Damage: 200
+		Damage: 220
 		DamageInterval: 16
 		DamageTypes: TiberiumDeath
 		RequiresCondition: !hazmatsuits
@@ -388,7 +388,7 @@
 		RequiresCondition: hazmatsuits
 	ActorLostNotification:
 	SpawnActorOnDeath:
-		Probability: 50
+		Probability: 25
 		Actor: vice
 		OwnerType: InternalName
 		InternalOwner: Creeps
@@ -490,6 +490,13 @@
 	Inherits@selection: ^SelectableCombatUnit
 	Armament:
 		Weapon: Pistol
+    SpawnActorOnDeath:
+		Probability: 25
+		Actor: vice
+		OwnerType: InternalName
+		InternalOwner: Creeps
+		DeathType: TiberiumDeath
+		RequiresLobbyCreeps: true
 	AttackFrontal:
 	WithInfantryBody:
 		DefaultAttackSequence: shoot
@@ -595,11 +602,11 @@
 		Voice: Move
 	Guardable:
 	ChangesHealth:
-		Step: 100
+		Step: 50
 		Delay: 4
 		StartIfBelow: 100
 	DamagedByTerrain:
-		Damage: -50
+		Damage: -250
 		DamageInterval: 4
 		DamageTypes: TiberiumDeath
 		Terrain: Tiberium, BlueTiberium
@@ -612,6 +619,10 @@
 		Categories: Critter
 	WithDeathAnimation:
 		UseDeathTypeSuffix: false
+    Explodes:
+		Weapon: ViceExplosion
+		EmptyWeapon: ViceExplosion
+		Chance: 100
 
 ^Plane:
 	Inherits@1: ^ExistsInWorld
@@ -1040,7 +1051,7 @@
 	Inherits@1: ^ClassicFacingSpriteActor
 	Interactable:
 	Health:
-		HP: 28000
+		HP: 56000
 	Armor:
 		Type: Heavy
 	HiddenUnderFog:
@@ -1077,14 +1088,16 @@
 		Sequence: 1
 		IsDecoration: True
 	ChangesHealth:
-		Step: -200
+		Step: -28000
 		StartIfBelow: 101
-		Delay: 6
+		Delay: 3000
 
 ^LightHusk:
 	Inherits: ^Husk
 	Health:
-		HP: 4000
+		HP: 56000
+    TransformOnCapture:
+		ForceHealthPercentage: 75
 
 ^HelicopterHusk:
 	Inherits: ^CommonHuskDefaults
