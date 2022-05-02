@@ -5,10 +5,10 @@ CRATE.plain:
 CRATE:
 	Inherits: ^Crate
 	Crate:
-		Duration: 6000
+		Duration: 18000
 	GiveCashCrateAction:
 		Amount: 1000
-		SelectionShares: 20
+		SelectionShares: 10
 		UseCashTick: true
 	RevealMapCrateAction:
 		SelectionShares: 1
@@ -17,12 +17,12 @@ CRATE:
 		Weapon: Napalm.Crate
 		SelectionShares: 5
 	GrantExternalConditionCrateAction@cloak:
-		SelectionShares: 5
+		SelectionShares: 10
 		Sequence: cloak
 		Condition: cloak-crate-collected
 	GiveMcvCrateAction:
 		SelectionShares: 0
-		NoBaseSelectionShares: 50
+		NoBaseSelectionShares: 70
 		Units: mcv
 	ExplodeCrateAction:
 		Weapon: Atomic
@@ -31,9 +31,29 @@ CRATE:
 		Units: vice
 		Owner: Creeps
 		SelectionShares: 10
+    GiveMcvCrateAction@engisquad:
+		Units: e1,e1,e3,e6,e6,e6,apc
+		SelectionShares: 2
+		NoBaseSelectionShares: 30
+    GiveUnitCrateAction@squad:
+		Units: e1,e1,e1,e3,e3,e6
+		SelectionShares: 5
+		ValidFactions: nod, gdi
+    GiveUnitCrateAction@htnk:
+		Units: htnk
+		SelectionShares: 4
+		ValidFactions: gdi
+    GiveUnitCrateAction@ntnks:
+		Units: ltnk, ftnk, arty
+		SelectionShares: 2
+		ValidFactions: nod
+    GiveUnitCrateAction@harasstnks:
+		Units: ctnk, stnk
+		SelectionShares: 2
+		ValidFactions: nod
 	LevelUpCrateAction:
 		Levels: 4
-		SelectionShares: 12
+		SelectionShares: 10
 
 WCRATE:
 	Inherits: ^Crate
