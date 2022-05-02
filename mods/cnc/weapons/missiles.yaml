@@ -66,7 +66,6 @@ Rockets:
 	Inherits: ^MissileWeapon
 	ValidTargets: Ground, Water, Air
     Projectile: Missile
-        ValidTargets: Ground, Water
 		Arm: 0
 		Blockable: false
 		Inaccuracy: 128
