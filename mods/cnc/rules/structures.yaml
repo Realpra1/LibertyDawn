@@ -16,7 +16,7 @@ FACT:
 	Armor:
 		Type: Wood
 	RevealsShroud:
-		Range: 10c0
+		Range: 5c0
 	Production:
 		Produces: Building.GDI, Building.Nod, Defence.GDI, Defence.Nod
 	Transforms:
@@ -225,7 +225,7 @@ PROC:
 	Health:
 		HP: 100000
 	RevealsShroud:
-		Range: 6c0
+		Range: 4c0
 	Refinery:
 		DockAngle: 448
 		DockOffset: 0,2
@@ -430,7 +430,7 @@ AFLD:
 	Health:
 		HP: 110000
 	RevealsShroud:
-		Range: 7c0
+		Range: 4c0
 	RallyPoint:
 	Exit@1:
 		SpawnOffset: -1024,0,0
@@ -545,7 +545,7 @@ HPAD:
 	Health:
 		HP: 60000
 	RevealsShroud:
-		Range: 5c0
+		Range: 4c0
 	Exit@1:
 		SpawnOffset: 0,-256,0
 		Facing: 896
@@ -622,7 +622,7 @@ HQ:
 	Health:
 		HP: 80000
 	RevealsShroud:
-		Range: 10c0
+		Range: 9c0
 	WithBuildingBib:
 	ProvidesRadar:
 		RequiresCondition: !lowpower
@@ -683,7 +683,7 @@ FIX:
 	Health:
 		HP: 80000
 	RevealsShroud:
-		Range: 5c0
+		Range: 4c0
 	WithBuildingBib:
 		HasMinibib: true
 	WithResupplyAnimation:
@@ -787,7 +787,7 @@ TMPL:
 	Health:
 		HP: 210000
 	RevealsShroud:
-		Range: 6c0
+		Range: 10c0
 	RenderDetectionCircle:
 	DetectCloaked:
 		Range: 5c0
@@ -902,7 +902,7 @@ SAM:
 		Footprint: xx
 		Dimensions: 2,1
 	Health:
-		HP: 40000
+		HP: 45000
 	Armor:
 		Type: Heavy
 	RevealsShroud:
