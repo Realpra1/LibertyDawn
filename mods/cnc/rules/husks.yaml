@@ -44,7 +44,7 @@ CTNK.Husk:
 		Image: ctnk.destroyed
 
 ARTY.Husk:
-	Inherits: ^LightHusk
+	Inherits: ^Husk
 	Tooltip:
 		Name: Artillery (Destroyed)
 	TransformOnCapture:
@@ -113,7 +113,7 @@ HTNK.Husk:
 		Image: htnk.destroyed
 
 MSAM.Husk:
-	Inherits: ^LightHusk
+	Inherits: ^Husk
 	Tooltip:
 		Name: Rocket Launcher (Destroyed)
 	ThrowsParticle@turret:
@@ -124,7 +124,7 @@ MSAM.Husk:
 		Image: msam.destroyed
 
 MLRS.Husk:
-	Inherits: ^LightHusk
+	Inherits: ^Husk
 	Tooltip:
 		Name: Mobile S.A.M. (Destroyed)
 	ThrowsParticle@turret:
