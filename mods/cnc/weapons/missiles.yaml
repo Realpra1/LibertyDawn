@@ -95,7 +95,6 @@ AARockets:
 		Shadow: false
 		-TrailImage:
 		-ContrailLength:
-        ValidTargets: Air
 	Warhead@1Dam: SpreadDamage
 		Damage: 1000
         ValidTargets: Air
