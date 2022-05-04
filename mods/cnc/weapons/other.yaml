@@ -13,8 +13,8 @@
 		InvalidTargets: Wall
 		Versus:
 			None: 110
-			Wood: 100
-			Light: 100
+			Wood: 110
+			Light: 80
 			Heavy: 10
 		DamageTypes: Prone50Percent, TriggerProne, FireDeath, Incendiary
 	Warhead@2Smu: LeaveSmudge
@@ -39,9 +39,9 @@ BigFlamer:
 		Spread: 400
 		Damage: 10000
 		Versus:
-			None: 82
-			Wood: 75
-			Light: 75
+			None: 85
+			Wood: 85
+			Light: 65
 			Heavy: 18
 	Warhead@3Eff: CreateEffect
 		Explosions: med_napalm

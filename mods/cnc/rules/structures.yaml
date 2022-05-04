@@ -845,9 +845,9 @@ GUN:
 		Description: Basic Anti-Tank base defense.\n  Strong vs Tanks, vehicles\n  Weak vs Infantry
 	Building:
 	Health:
-		HP: 61500
+		HP: 81500
 	Armor:
-		Type: Heavy
+		Type: Wood
 	RevealsShroud:
 		Range: 6c0
 	WithBuildingBib:
@@ -902,9 +902,9 @@ SAM:
 		Footprint: xx
 		Dimensions: 2,1
 	Health:
-		HP: 45000
+		HP: 60000
 	Armor:
-		Type: Heavy
+		Type: Wood
 	RevealsShroud:
 		Range: 8c0
 	Turreted:
@@ -948,9 +948,9 @@ OBLI:
 		Bounds: 1024, 1024
 		DecorationBounds: 938, 1877, 0, -426
 	Health:
-		HP: 112500
+		HP: 130000
 	Armor:
-		Type: Heavy
+		Type: Wood
 	RevealsShroud:
 		Range: 8c0
 	WithBuildingBib:
@@ -993,7 +993,7 @@ GTWR:
 		Description: Basic defensive structure.\n  Strong vs Infantry\n  Weak vs Tanks
 	Building:
 	Health:
-		HP: 60000
+		HP: 70000
 	RevealsShroud:
 		Range: 7c0
 	WithBuildingBib:
@@ -1032,9 +1032,9 @@ ATWR:
 		Bounds: 1024, 1024
 		DecorationBounds: 938, 2048, 0, -512
 	Health:
-		HP: 82500
+		HP: 102500
 	Armor:
-		Type: Heavy
+		Type: Wood
 	RevealsShroud:
 		Range: 8c0
 	-RenderRangeCircle:

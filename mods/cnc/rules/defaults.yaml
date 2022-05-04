@@ -733,7 +733,7 @@
 		RequiredForShortGame: true
 	RepairableBuilding:
 		RepairPercent: 40
-		RepairStep: 1400
+		RepairStep: 2000
 		PlayerExperience: 15
 		RepairingNotification: Repairing
 	WithDeathAnimation:
