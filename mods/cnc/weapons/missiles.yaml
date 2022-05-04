@@ -128,12 +128,13 @@ OrcaAGMissiles:
 		Speed: 256
 		RangeLimit: 6c0
 	Warhead@1Dam: SpreadDamage
+		Damage: 3000
 		ValidTargets: Ground
 		Versus:
-			None: 32
+			None: 28
 			Wood: 112
 			Light: 112
-			Heavy: 84
+			Heavy: 90
 
 OrcaAAMissiles:
 	Inherits: OrcaAGMissiles
@@ -162,10 +163,10 @@ MammothMissiles:
 		Spread: 298
 		Damage: 5000
 		Versus:
-			None: 44
+			None: 90
 			Wood: 66
-			Light: 90
-			Heavy: 44
+			Light: 10
+			Heavy: 35
 	Warhead@3Eff: CreateEffect
 		Explosions: small_poof
 		ImpactSounds: xplobig4.aud
@@ -177,7 +178,7 @@ MammothMissiles:
 	ReloadDelay: 125
 	Range: 25c0
 	MinRange: 4c0
-	Burst: 4
+	Burst: 2
 	BurstDelays: 4
 	Report: rocket1.aud
 	ValidTargets: Ground, Water
@@ -194,7 +195,7 @@ MammothMissiles:
 		ContrailLength: 20
 		Speed: 100
 	Warhead@1Dam: SpreadDamage
-		Damage: 4500
+		Damage: 9000
 		Spread: 683
 		ValidTargets: Ground
 		Versus:
@@ -209,7 +210,7 @@ MammothMissiles:
 227mm.stnk:
 	Inherits: ^MissileWeapon
 	ReloadDelay: 70
-	Range: 7c0
+	Range: 8c0
 	Report: rocket1.aud
 	ValidTargets: Ground, Water
 	Burst: 2
@@ -220,17 +221,20 @@ MammothMissiles:
 		Speed: 213
 		RangeLimit: 8c409
 	Warhead@1Dam: SpreadDamage
-		Damage: 6000
+		Damage: 14000
 		Versus:
-			None: 25
-			Wood: 75
-			Light: 100
-			Heavy: 90
+			None: 15
+			Wood: 55
+			Light: 35
+			Heavy: 100
 
 227mm.stnkAA:
 	Inherits: 227mm.stnk
 	MinRange: 2c512
 	ValidTargets: Air
+	Warhead@1Dam: SpreadDamage
+        ValidTargets: Air
+		Damage: 2000
 
 BoatMissile:
 	Inherits: ^MissileWeapon
