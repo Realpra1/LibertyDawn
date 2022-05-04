@@ -194,15 +194,15 @@ ARTY:
 		Description: Fast mid-range artillery.\n  Strong vs Infantry, Vehicles and Buildings
 	Mobile:
 		TurnSpeed: 25
-		Speed: 100
+		Speed: 70
 	Health:
-		HP: 13000
+		HP: 10000
 	Repairable:
 		HpPerStep: 768
 	Armor:
 		Type: Light
 	RevealsShroud:
-		Range: 6c0
+		Range: 3c0
 	Armament:
 		Weapon: ArtilleryShell
 		LocalOffset: 624,0,208
@@ -557,7 +557,7 @@ HTNK:
 	Mobile:
 		Locomotor: heavytracked
 		Speed: 25
-		TurnSpeed: 8
+		TurnSpeed: 4
 	Health:
 		HP: 90000
 	Repairable:
@@ -568,7 +568,7 @@ HTNK:
 		Range: 3c0
 	WithSpriteTurret:
 	Turreted:
-		TurnSpeed: 12
+		TurnSpeed: 15
 	Armament@PRIMARY:
 		Weapon: 120mmDual
 		LocalOffset: 900,180,340, 900,-180,340
@@ -591,7 +591,6 @@ HTNK:
 		Step: 1500
 		Delay: 25
 		StartIfBelow: 50
-		DamageCooldown: 200
 	Explodes:
 		Weapon: UnitExplodeMech
 		EmptyWeapon: UnitExplodeMech
@@ -718,7 +717,7 @@ STNK:
 	Inherits@EXPERIENCE: ^GainsExperience
 	Inherits@AUTOTARGET: ^AutoTargetAllAssaultMove
 	Valued:
-		Cost: 900
+		Cost: 1500
 	Tooltip:
 		Name: Stealth Tank
 	UpdatesPlayerStatistics:
@@ -730,7 +729,7 @@ STNK:
 		Description: Long-range missile tank that can cloak.\nCan attack Aircraft.\nHas weak armor. Can be spotted by infantry and defense structures.\n  Strong vs Vehicles, Tanks\n  Weak vs Infantry.
 	Mobile:
 		Locomotor: heavywheeled
-		TurnSpeed: 40
+		TurnSpeed: 50
 		Speed: 127
 	Targetable:
 		TargetTypes: Ground, Vehicle, StealthTank
@@ -741,10 +740,10 @@ STNK:
 	Armor:
 		Type: Light
 	RevealsShroud:
-		Range: 7c0
+		Range: 8c0
 	Cloak:
-		InitialDelay: 85
-		CloakDelay: 85
+		InitialDelay: 75
+		CloakDelay: 75
 		CloakSound: trans1.aud
 		UncloakSound: trans1.aud
 		UncloakOn: Attack, Unload, Dock, Damage, Heal
