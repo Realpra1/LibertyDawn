@@ -11,9 +11,9 @@
 		Damage: 4000
 		Versus:
 			None: 25
-			Wood: 100
-			Light: 100
-			Heavy: 100
+			Wood: 90
+			Light: 140
+			Heavy: 80
 		DamageTypes: Prone50Percent, TriggerProne, ExplosionDeath
 	Warhead@2Smu: LeaveSmudge
 		SmudgeType: Crater
@@ -58,30 +58,30 @@ TurretGun:
 		Versus:
 			None: 20
 			Wood: 25
-			Light: 100
-			Heavy: 100
+			Light: 130
+			Heavy: 90
 
 ArtilleryShell:
 	Inherits: ^BallisticWeapon
-	ReloadDelay: 55
-	Range: 10c0
+	ReloadDelay: 65
+	Range: 11c0
 	MinRange: 1c0
 	Report: tnkfire2.aud
 	TargetActorCenter: true
 	Projectile: Bullet
-		Speed: 400
+		Speed: 160
 		Blockable: false
-		LaunchAngle: 45
-		Inaccuracy: 413
+		LaunchAngle: 55
+		Inaccuracy: 813
 		ContrailLength: 15
 	Warhead@1Dam: SpreadDamage
 		Spread: 341
 		Damage: 10000
 		Versus:
-			None: 80
-			Wood: 100
-			Light: 30
-			Heavy: 150
+			None: 100
+			Wood: 110
+			Light: 90
+			Heavy: 60
 		DamageTypes: Prone50Percent, TriggerProne, SmallExplosionDeath
 	Warhead@3Eff: CreateEffect
 		Explosions: poof
