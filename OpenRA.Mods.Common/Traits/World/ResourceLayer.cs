@@ -22,11 +22,13 @@ namespace OpenRA.Mods.Common.Traits
 		public static readonly ResourceLayerContents Empty = default;
 		public readonly string Type;
 		public readonly int Density;
+		public int Stage;
 
-		public ResourceLayerContents(string type, int density)
+		public ResourceLayerContents(string type, int density, int stage = 1)
 		{
 			Type = type;
 			Density = density;
+			Stage = stage;
 		}
 	}
 
@@ -52,6 +54,9 @@ namespace OpenRA.Mods.Common.Traits
 
 			[Desc("Maximum number of resource units allowed in a single cell.")]
 			public readonly int MaxDensity = 10;
+
+			[Desc("Maximum number of stages a resource cell can reach based on density.")]
+			public readonly int MaxStages = 4;
 
 			public ResourceTypeInfo(MiniYaml yaml)
 			{
@@ -101,7 +106,6 @@ namespace OpenRA.Mods.Common.Traits
 			return true;
 		}
 
-		// public override object Create(ActorInitializer init) { return new ResourceLayer(init.Self, this); }
 		public override object Create(ActorInitializer init)
 		{
 			WorldResourceLayer = new ResourceLayer(init.Self, this);
@@ -153,7 +157,6 @@ namespace OpenRA.Mods.Common.Traits
 			if (!info.RecalculateResourceDensity)
 				return;
 
-			// Bookmarked!
 			// Set initial density based on the number of neighboring resources
 			foreach (var cell in w.Map.AllCells)
 			{
@@ -181,25 +184,15 @@ namespace OpenRA.Mods.Common.Traits
 		public virtual bool AllowResourceAt(string resourceType, CPos cell)
 		{
 			if (!Map.Contains(cell) || Map.Ramp[cell] != 0)
-			{
-				// Console.WriteLine("Map doesn't contain the cell, or the cell is a ramp.");
 				return false;
-			}
 
 			if (resourceType == null || !info.ResourceTypes.TryGetValue(resourceType, out var resourceInfo))
-			{
-				// Console.WriteLine("The resource cell is null or a value can't be obtained from its type.");
 				return false;
-			}
 
 			var terrainType = Map.GetTerrainInfo(cell).Type;
 			if (!resourceInfo.AllowedTerrainTypes.Contains(terrainType) && terrainType != "Tiberium")
-			{
-				// Console.WriteLine("This terrain type doesn't allow resources: " + Map.GetTerrainInfo(cell).Type);
 				return false;
-			}
 
-			// Console.WriteLine("Checking to see if a building is present...");
 			return !BuildingInfluence.AnyBuildingAt(cell);
 		}
 
@@ -219,44 +212,48 @@ namespace OpenRA.Mods.Common.Traits
 
 		public bool CanAddResource(string resourceType, CPos cell, int amount = 1)
 		{
-			// Console.WriteLine("Checking to see if we can add resources to this cell... at CPos: " + cell);
-
 			if (!world.Map.Contains(cell))
-			{
-				throw new InvalidOperationException("Error 1001: Map doesn't contain the cell!");
-				// return false;
-			}
+				return false;
 
 			if (resourceType == null)
-			{
-				// Console.WriteLine("Error 1002: Resource type is null!");
 				return false;
-			}
-
-			// Console.WriteLine("info: "+info);
-			// Console.WriteLine("resourceType: "+resourceType);
 
 			if (!info.ResourceTypes.TryGetValue(resourceType, out var resourceInfo))
-			{
 				throw new InvalidOperationException("Error 1004: Cannot get value for resource type: " + resourceType);
-				// return false;
-			}
 
 			var content = Content[cell];
+
 			if (content.Type == null)
-			{
-				// Console.WriteLine("No content type detected, free cell. Returning amount to seed...");
 				return amount <= resourceInfo.MaxDensity && AllowResourceAt(resourceType, cell);
-			}
 
 			if (content.Type != resourceType)
-			{
-				// Console.WriteLine("Content type (" + content.Type + ") does not match resource type (" + resourceType + ").");
 				return false;
+
+			return content.Density + amount <= resourceInfo.MaxDensity;
+		}
+
+		public bool CanSpreadResource(string resourceType, CPos parentCell)
+		{
+			if (!info.ResourceTypes.TryGetValue(resourceType, out var resourceInfo))
+			{
+				throw new InvalidOperationException("Error 1005: Cannot get value for parent resource type: " + resourceType);
 			}
 
-			// Console.WriteLine("Returning content density (" + content.Density + ") + amount (" + amount + ") capped at (" + resourceInfo.MaxDensity + ").");
-			return content.Density + amount <= resourceInfo.MaxDensity;
+			var content = Content[parentCell];
+			var stageThreshold = resourceInfo.MaxDensity / resourceInfo.MaxStages;
+
+			for (var i = 1; i < resourceInfo.MaxStages; i++)
+			{
+				if (content.Density > (stageThreshold * i))
+				{
+					content.Stage += 1;
+				}
+			}
+
+			if (content.Stage < resourceInfo.MaxStages)
+				return false;
+			else
+				return true;
 		}
 
 		public int AddResource(string resourceType, CPos cell, int amount = 1)
@@ -279,9 +276,6 @@ namespace OpenRA.Mods.Common.Traits
 			Content[cell] = new ResourceLayerContents(content.Type, density);
 
 			CellChanged?.Invoke(cell, content.Type);
-
-			// Console.WriteLine("Old Density: " + oldDensity);
-			// Console.WriteLine("New Density: " + density);
 
 			return density - oldDensity;
 		}

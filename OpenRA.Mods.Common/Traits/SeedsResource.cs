@@ -19,6 +19,9 @@ namespace OpenRA.Mods.Common.Traits
 	public class SeedsResourceInfo : ConditionalTraitInfo
 	{
 		public readonly int Interval = 75;
+		public readonly int IntervalInSeconds = 0;
+		public readonly int	GrowthRateInSeconds = 60;
+		public readonly int PercentageChance = 75;
 		public readonly string ResourceType = "Ore";
 		public readonly int MaxRange = 100;
 		public readonly int Stage = 1;
@@ -36,24 +39,8 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			this.info = info;
 
-			if (self.Info.Name == "world")
-			{
-				// Console.WriteLine("self.Info.Name is: " + self.Info.Name);
-				// Console.WriteLine("self is: " + self);
-				// Console.WriteLine("self.World is: " + self.World);
-				// Console.WriteLine("self.World.WorldActor is: " + self.World.WorldActor); // null
-
-				// No IResourceLayer or ResourceLayer available (yet?).
-				// resourceLayer = self.Trait<ResourceLayer>();
-
-				// self.AddTrait(new IResourceLayer);
-				// resourceLayer = self.Trait<IResourceLayer>();
-			}
-			else
-			{
-				// Console.WriteLine("Name is: " + self.Info.Name);
+			if (self.Info.Name != "world")
 				resourceLayer = self.World.WorldActor.Trait<IResourceLayer>();
-			}
 		}
 
 		int ticks;
@@ -66,9 +53,14 @@ namespace OpenRA.Mods.Common.Traits
 			if (--ticks <= 0)
 			{
 				Seed(self);
-				ticks = info.Interval;
+				if (info.IntervalInSeconds > 0)
+					ticks = info.IntervalInSeconds * 25; // TODO: Find default tick value.
+				else
+					ticks = info.Interval;
 			}
 		}
+
+		private static Random RNG = new Random();
 
 		public void Seed(Actor self)
 		{
@@ -87,29 +79,18 @@ namespace OpenRA.Mods.Common.Traits
 			}
 			else
 			{
-				// Accessing the world's resource layer from a new public field, there's surely a better way to do this?
 				var worldResourceLayer = ResourceLayerInfo.WorldResourceLayer;
-
 				var worldMap = self.World.Map;
 				var worldCells = worldMap.AllCells;
-				// var cells = worldResourceLayer.Content;
 
 				foreach (var cell in worldCells)
 				{
 					var resource = worldMap.Resources[cell];
 
-					if (!worldResourceLayer.ResourceTypesByIndex.TryGetValue(resource.Type, out var resourceType)) { continue; }
-					else
-					{
-						// Console.WriteLine("Found resource (" + resource + ") type: " + resource.Type);
+					if (!worldResourceLayer.ResourceTypesByIndex.TryGetValue(resource.Type, out var resourceType))
+						continue;
 
-						// Console.WriteLine("Processing...");
-						// Console.WriteLine("Cell CPos: " + cell);
-						// Console.WriteLine("Cell X,Y: " + cell.X + "," + cell.Y);
-						// Console.WriteLine("Cell MPos: " + cell.ToMPos(worldMap));
-					}
-
-					if (!worldResourceLayer.AllowResourceAt(resourceType, cell))
+					if (!worldResourceLayer.CanSpreadResource(resourceType, cell))
 						continue;
 
 					var candidateCell = Util.RandomWalk(cell, self.World.SharedRandom)
@@ -119,7 +100,18 @@ namespace OpenRA.Mods.Common.Traits
 					.Cast<CPos?>().FirstOrDefault();
 
 					if (worldResourceLayer.CanAddResource(info.ResourceType, candidateCell.GetValueOrDefault()))
-						worldResourceLayer.AddResource(info.ResourceType, candidateCell.GetValueOrDefault());
+					{
+						var canSeed = false;
+						for (int i = 0; i < 100; i++)
+						{
+							var randomValue = RNG.Next(100);
+							if (randomValue < info.PercentageChance)
+								canSeed = true;
+						}
+
+						if (canSeed)
+							worldResourceLayer.AddResource(info.ResourceType, candidateCell.GetValueOrDefault());
+					}
 				}
 			}
 		}

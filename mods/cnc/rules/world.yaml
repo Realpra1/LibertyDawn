@@ -182,6 +182,7 @@ World:
 				TerrainType: Tiberium
 				AllowedTerrainTypes: Clear, Road
 				MaxDensity: 12
+				MaxStages: 4
 			BlueTiberium:
 				ResourceIndex: 2
 				TerrainType: BlueTiberium
@@ -191,6 +192,9 @@ World:
 	SeedsResource:
 		ResourceType: Tiberium
 		Interval: 100
+		IntervalInSeconds: 10
+		GrowthRateInSeconds: 60
+		PercentageChance: 75
 	WarheadDebugOverlay:
 	CustomTerrainDebugOverlay:
 	MapCreeps:
@@ -289,6 +293,7 @@ EditorWorld:
 				TerrainType: Tiberium
 				AllowedTerrainTypes: Clear, Road
 				MaxDensity: 12
+				MaxStages: 4
 			BlueTiberium:
 				ResourceIndex: 2
 				TerrainType: BlueTiberium
