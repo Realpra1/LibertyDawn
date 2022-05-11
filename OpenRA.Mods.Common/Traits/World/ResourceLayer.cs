@@ -210,7 +210,7 @@ namespace OpenRA.Mods.Common.Traits
 			return new ResourceLayerContents(resourceType, density.Clamp(1, resourceInfo.MaxDensity));
 		}
 
-		public bool CanAddResource(string resourceType, CPos cell, int amount = 1)
+		bool CanAddResource(string resourceType, CPos cell, int amount = 1)
 		{
 			if (!world.Map.Contains(cell))
 				return false;
@@ -341,7 +341,7 @@ namespace OpenRA.Mods.Common.Traits
 			return Content.Contains(cell) ? Content[cell] : default;
 		}
 
-		public bool IResourceLayer.CanAddResource(string resourceType, CPos cell, int amount) { return CanAddResource(resourceType, cell, amount); }
+		bool IResourceLayer.CanAddResource(string resourceType, CPos cell, int amount) { return CanAddResource(resourceType, cell, amount); }
 		int IResourceLayer.AddResource(string resourceType, CPos cell, int amount) { return AddResource(resourceType, cell, amount); }
 		int IResourceLayer.RemoveResource(string resourceType, CPos cell, int amount) { return RemoveResource(resourceType, cell, amount); }
 		void IResourceLayer.ClearResources(CPos cell) { ClearResources(cell); }
