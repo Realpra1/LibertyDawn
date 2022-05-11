@@ -60,7 +60,7 @@ namespace OpenRA.Mods.Common.Traits
 			}
 		}
 
-		private readonly Random rng = new Random();
+		readonly Random rng = new Random();
 
 		public void Seed(Actor self)
 		{
