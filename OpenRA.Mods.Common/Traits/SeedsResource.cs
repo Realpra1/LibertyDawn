@@ -60,7 +60,7 @@ namespace OpenRA.Mods.Common.Traits
 			}
 		}
 
-		private static Random RNG = new Random();
+		private readonly Random rng = new Random();
 
 		public void Seed(Actor self)
 		{
@@ -102,12 +102,9 @@ namespace OpenRA.Mods.Common.Traits
 					if (worldResourceLayer.CanAddResource(info.ResourceType, candidateCell.GetValueOrDefault()))
 					{
 						var canSeed = false;
-						for (int i = 0; i < 100; i++)
-						{
-							var randomValue = RNG.Next(100);
-							if (randomValue < info.PercentageChance)
-								canSeed = true;
-						}
+						var randomValue = rng.Next(100);
+						if (randomValue < info.PercentageChance)
+							canSeed = true;
 
 						if (canSeed)
 							worldResourceLayer.AddResource(info.ResourceType, candidateCell.GetValueOrDefault());
