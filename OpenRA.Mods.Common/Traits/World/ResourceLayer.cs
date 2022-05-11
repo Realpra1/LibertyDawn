@@ -210,7 +210,7 @@ namespace OpenRA.Mods.Common.Traits
 			return new ResourceLayerContents(resourceType, density.Clamp(1, resourceInfo.MaxDensity));
 		}
 
-		bool CanAddResource(string resourceType, CPos cell, int amount = 1)
+		public bool CanAddResource(string resourceType, CPos cell, int amount = 1)
 		{
 			if (!world.Map.Contains(cell))
 				return false;
