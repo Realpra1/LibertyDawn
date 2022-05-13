@@ -235,9 +235,7 @@ namespace OpenRA.Mods.Common.Traits
 		public bool CanSpreadResource(string resourceType, CPos parentCell)
 		{
 			if (!info.ResourceTypes.TryGetValue(resourceType, out var resourceInfo))
-			{
 				throw new InvalidOperationException("Error 1005: Cannot get value for parent resource type: " + resourceType);
-			}
 
 			var content = Content[parentCell];
 			var stageThreshold = resourceInfo.MaxDensity / resourceInfo.MaxStages;
@@ -245,9 +243,7 @@ namespace OpenRA.Mods.Common.Traits
 			for (var i = 1; i < resourceInfo.MaxStages; i++)
 			{
 				if (content.Density > (stageThreshold * i))
-				{
 					content.Stage += 1;
-				}
 			}
 
 			if (content.Stage < resourceInfo.MaxStages)
