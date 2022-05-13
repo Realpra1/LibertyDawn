@@ -33,6 +33,7 @@ namespace OpenRA.Mods.Common.Traits
 	{
 		readonly SeedsResourceInfo info;
 		readonly IResourceLayer resourceLayer;
+		static readonly Random randomGen = new Random();
 
 		public SeedsResource(Actor self, SeedsResourceInfo info)
 			: base(info)
@@ -59,8 +60,6 @@ namespace OpenRA.Mods.Common.Traits
 					ticks = info.Interval;
 			}
 		}
-
-		private static Random RNG = new Random();
 
 		public void Seed(Actor self)
 		{
@@ -104,7 +103,7 @@ namespace OpenRA.Mods.Common.Traits
 						var canSeed = false;
 						for (int i = 0; i < 100; i++)
 						{
-							var randomValue = RNG.Next(100);
+							var randomValue = randomGen.Next(100);
 							if (randomValue < info.PercentageChance)
 								canSeed = true;
 						}
