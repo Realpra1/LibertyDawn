@@ -21,8 +21,9 @@
 		ValidTargets: Ground, Air
 		Versus:
 			None: 28
-			Wood: 116
+			Wood: 110
 			Light: 140
+			Tiberium: 110
 			Heavy: 140
 		DamageTypes: Prone50Percent, TriggerProne, ExplosionDeath
 	Warhead@2Smu: LeaveSmudge
@@ -56,6 +57,7 @@ Dragon:
 		Versus:
 			None: 140
 			Wood: 140
+			Tiberium: 104
 			Heavy: 104
 	Warhead@4EffAir: CreateEffect
 		Explosions: small_building
@@ -84,6 +86,7 @@ Rockets:
 			None: 15
 			Wood: 100
 			Light: 90
+			Tiberium: 90
 			Heavy: 180
 
 AARockets:
@@ -114,6 +117,7 @@ BikeRockets:
 			None: 28
 			Wood: 92
 			Light: 124
+			Tiberium: 110
 			Heavy: 124
 
 OrcaAGMissiles:
@@ -128,13 +132,14 @@ OrcaAGMissiles:
 		Speed: 256
 		RangeLimit: 6c0
 	Warhead@1Dam: SpreadDamage
-		Damage: 3000
+		Damage: 2700
 		ValidTargets: Ground
 		Versus:
-			None: 28
-			Wood: 112
-			Light: 112
-			Heavy: 90
+			None: 25
+			Wood: 75
+			Light: 110
+			Tiberium: 85
+			Heavy: 110
 
 OrcaAAMissiles:
 	Inherits: OrcaAGMissiles
@@ -166,6 +171,7 @@ MammothMissiles:
 			None: 90
 			Wood: 66
 			Light: 10
+			Tiberium: 40
 			Heavy: 35
 	Warhead@3Eff: CreateEffect
 		Explosions: small_poof
@@ -176,7 +182,7 @@ MammothMissiles:
 227mm:
 	Inherits: ^MissileWeapon
 	ReloadDelay: 125
-	Range: 25c0
+	Range: 35c0
 	MinRange: 4c0
 	Burst: 2
 	BurstDelays: 4
@@ -202,6 +208,7 @@ MammothMissiles:
 			None: 40
 			Wood: 25
 			Light: 100
+			Tiberium: 100
 			Heavy: 100
 	Warhead@3Eff: CreateEffect
 		Explosions: med_frag
@@ -221,12 +228,13 @@ MammothMissiles:
 		Speed: 213
 		RangeLimit: 8c409
 	Warhead@1Dam: SpreadDamage
-		Damage: 14000
+		Damage: 10000
 		Versus:
-			None: 15
-			Wood: 55
-			Light: 35
-			Heavy: 100
+			None: 20
+			Wood: 60
+			Light: 45
+			Tiberium: 45
+			Heavy: 140
 
 227mm.stnkAA:
 	Inherits: 227mm.stnk
@@ -255,6 +263,7 @@ BoatMissile:
 			None: 90
 			Wood: 75
 			Light: 60
+			Tiberium: 25
 			Heavy: 25
 		DamageTypes: Prone50Percent, TriggerProne, SmallExplosionDeath
 	Warhead@3Eff: CreateEffect
@@ -283,6 +292,7 @@ TowerMissile:
 			None: 52
 			Wood: 24
 			Light: 100
+			Tiberium: 75
 			Heavy: 100
 		DamageTypes: Prone50Percent, TriggerProne, SmallExplosionDeath
 	Warhead@3Eff: CreateEffect
@@ -333,6 +343,7 @@ Patriot:
 			None: 20
 			Wood: 84
 			Light: 100
+			Tiberium: 74
 			Heavy: 74
 	-Warhead@2Smu:
 	Warhead@4EffAir: CreateEffect
