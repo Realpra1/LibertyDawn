@@ -322,7 +322,7 @@ namespace OpenRA.Mods.Common.Traits
 			CellChanged?.Invoke(cell, null);
 		}
 
-		ResourceLayerContents IResourceLayer.GetResource(CPos cell) { return Content.Contains(cell) ? Content[cell] : default; }
+		// ResourceLayerContents GetResource(CPos cell) { return Content.Contains(cell) ? Content[cell] : default; }
 
 		int IResourceLayer.GetMaxDensity(string resourceType)
 		{
@@ -332,13 +332,10 @@ namespace OpenRA.Mods.Common.Traits
 			return resourceInfo.MaxDensity;
 		}
 
-		public virtual ResourceLayerContents GetResource(CPos cell)
-		{
-			return Content.Contains(cell) ? Content[cell] : default;
-		}
+		public virtual ResourceLayerContents GetResource(CPos cell) { return Content.Contains(cell) ? Content[cell] : default; }
 
-		bool IResourceLayer.CanAddResource(string resourceType, CPos cell, int amount) { return CanAddResource(resourceType, cell, amount); }
-		int IResourceLayer.AddResource(string resourceType, CPos cell, int amount) { return AddResource(resourceType, cell, amount); }
+		// bool IResourceLayer.CanAddResource(string resourceType, CPos cell, int amount) { return CanAddResource(resourceType, cell, amount); }
+		// int IResourceLayer.AddResource(string resourceType, CPos cell, int amount) { return AddResource(resourceType, cell, amount); }
 		int IResourceLayer.RemoveResource(string resourceType, CPos cell, int amount) { return RemoveResource(resourceType, cell, amount); }
 		void IResourceLayer.ClearResources(CPos cell) { ClearResources(cell); }
 		bool IResourceLayer.IsVisible(CPos cell) { return !world.FogObscures(cell); }
