@@ -322,8 +322,6 @@ namespace OpenRA.Mods.Common.Traits
 			CellChanged?.Invoke(cell, null);
 		}
 
-		// ResourceLayerContents GetResource(CPos cell) { return Content.Contains(cell) ? Content[cell] : default; }
-
 		int IResourceLayer.GetMaxDensity(string resourceType)
 		{
 			if (!info.ResourceTypes.TryGetValue(resourceType, out var resourceInfo))
