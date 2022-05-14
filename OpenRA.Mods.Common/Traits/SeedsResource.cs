@@ -100,13 +100,7 @@ namespace OpenRA.Mods.Common.Traits
 
 					if (worldResourceLayer.CanAddResource(info.ResourceType, candidateCell.GetValueOrDefault()))
 					{
-						var canSeed = false;
-						for (int i = 0; i < 100; i++)
-						{
-							var randomValue = randomGen.Next(100);
-							if (randomValue < info.PercentageChance)
-								canSeed = true;
-						}
+						var canSeed = randomGen.Next(100) < info.PercentageChance;
 
 						if (canSeed)
 							worldResourceLayer.AddResource(info.ResourceType, candidateCell.GetValueOrDefault());
