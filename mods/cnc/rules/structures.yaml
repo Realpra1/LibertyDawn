@@ -160,6 +160,8 @@ NUKE:
 		LocalCenterOffset: 0,-512,0
 	Health:
 		HP: 55000
+    Armor:
+		Type: Tiberium
 	RevealsShroud:
 		Range: 4c0
 	WithBuildingBib:
@@ -191,6 +193,8 @@ NUK2:
 		LocalCenterOffset: 0,-512,0
 	Health:
 		HP: 70000
+    Armor:
+		Type: Tiberium
 	RevealsShroud:
 		Range: 4c0
 	WithBuildingBib:
@@ -224,6 +228,8 @@ PROC:
 		LocalCenterOffset: 0,-512,0
 	Health:
 		HP: 100000
+    Armor:
+		Type: Tiberium
 	RevealsShroud:
 		Range: 4c0
 	Refinery:
@@ -270,6 +276,8 @@ SILO:
 	-GivesBuildableArea:
 	Health:
 		HP: 50000
+    Armor:
+		Type: Tiberium
 	RevealsShroud:
 		Range: 4c0
 	WithBuildingBib:
