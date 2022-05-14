@@ -29,7 +29,8 @@ Sniper:
 			None: 100
 			Wood: 50
 			Light: 70
-			Heavy: 30
+			Tiberium: 20
+			Heavy: 20
 		DamageTypes: Prone50Percent, TriggerProne, RippedApartDeath
 	Warhead@2Eff: CreateEffect
 		Explosions: piffs
@@ -58,6 +59,7 @@ Vulcan:
 			None: 90
 			Wood: 15
 			Light: 35
+			Tiberium: 35
 			Heavy: 35
 
 HeliAGGun:
@@ -75,9 +77,10 @@ HeliAGGun:
 		Damage: 2500
 		Versus:
 			None: 100
-			Wood: 75
-			Light: 75
-			Heavy: 25
+			Wood: 50
+			Light: 80
+			Tiberium: 35
+			Heavy: 35
 		DamageTypes: Prone80Percent, TriggerProne, RippedApartDeath
 
 HeliAAGun:
@@ -102,6 +105,7 @@ HeliAAGun:
 			None: 150
 			Wood: 20
 			Light: 35
+			Tiberium: 5
 			Heavy: 5
 		DamageTypes: Prone50Percent, TriggerProne, BulletDeath
 	Warhead@2Eff: CreateEffect
@@ -161,6 +165,7 @@ APCGun:
 			None: 30
 			Wood: 25
 			Light: 75
+			Tiberium: 25
 			Heavy: 25
 		DamageTypes: Prone50Percent, TriggerProne, DefaultDeath
 	Warhead@2Eff: CreateEffect
