@@ -11,6 +11,7 @@ Atomic:
 			None: 100
 			Wood: 100
 			Light: 60
+			Tiberium: 50
 			Heavy: 50
 		DamageTypes: Prone50Percent, TriggerProne, FireDeath, Incendiary
 	Warhead@2Eff_impact: CreateEffect
@@ -28,6 +29,7 @@ Atomic:
 			None: 100
 			Wood: 100
 			Light: 60
+			Tiberium: 50
 			Heavy: 50
 		DamageTypes: Prone50Percent, TriggerProne, FireDeath, Incendiary
 	Warhead@4Res_areanukea: DestroyResource
@@ -53,6 +55,7 @@ Atomic:
 			None: 100
 			Wood: 100
 			Light: 60
+			Tiberium: 50
 			Heavy: 50
 		DamageTypes: Prone50Percent, TriggerProne, FireDeath, Incendiary
 	Warhead@8Res_areanukeb: DestroyResource
@@ -74,6 +77,7 @@ Atomic:
 			None: 100
 			Wood: 100
 			Light: 60
+			Tiberium: 50
 			Heavy: 50
 		DamageTypes: Prone50Percent, TriggerProne, FireDeath, Incendiary
 	Warhead@11Res_areanukec: DestroyResource
