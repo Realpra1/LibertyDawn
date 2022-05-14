@@ -210,7 +210,7 @@ namespace OpenRA.Mods.Common.Traits
 			return new ResourceLayerContents(resourceType, density.Clamp(1, resourceInfo.MaxDensity));
 		}
 
-		public virtual bool CanAddResource(string resourceType, CPos cell, int amount = 1)
+		bool CanAddResource(string resourceType, CPos cell, int amount = 1)
 		{
 			if (!world.Map.Contains(cell))
 				return false;
@@ -252,7 +252,7 @@ namespace OpenRA.Mods.Common.Traits
 				return true;
 		}
 
-		public virtual int AddResource(string resourceType, CPos cell, int amount = 1)
+		int AddResource(string resourceType, CPos cell, int amount = 1)
 		{
 			if (!Content.Contains(cell))
 				return 0;
@@ -322,6 +322,8 @@ namespace OpenRA.Mods.Common.Traits
 			CellChanged?.Invoke(cell, null);
 		}
 
+		ResourceLayerContents IResourceLayer.GetResource(CPos cell) { return Content.Contains(cell) ? Content[cell] : default; }
+
 		int IResourceLayer.GetMaxDensity(string resourceType)
 		{
 			if (!info.ResourceTypes.TryGetValue(resourceType, out var resourceInfo))
@@ -330,10 +332,8 @@ namespace OpenRA.Mods.Common.Traits
 			return resourceInfo.MaxDensity;
 		}
 
-		public virtual ResourceLayerContents GetResource(CPos cell) { return Content.Contains(cell) ? Content[cell] : default; }
-
-		// bool IResourceLayer.CanAddResource(string resourceType, CPos cell, int amount) { return CanAddResource(resourceType, cell, amount); }
-		// int IResourceLayer.AddResource(string resourceType, CPos cell, int amount) { return AddResource(resourceType, cell, amount); }
+		bool IResourceLayer.CanAddResource(string resourceType, CPos cell, int amount) { return CanAddResource(resourceType, cell, amount); }
+		int IResourceLayer.AddResource(string resourceType, CPos cell, int amount) { return AddResource(resourceType, cell, amount); }
 		int IResourceLayer.RemoveResource(string resourceType, CPos cell, int amount) { return RemoveResource(resourceType, cell, amount); }
 		void IResourceLayer.ClearResources(CPos cell) { ClearResources(cell); }
 		bool IResourceLayer.IsVisible(CPos cell) { return !world.FogObscures(cell); }

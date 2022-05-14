@@ -81,6 +81,7 @@ namespace OpenRA.Mods.Common.Traits
 				var worldResourceLayer = ResourceLayerInfo.WorldResourceLayer;
 				var worldMap = self.World.Map;
 				var worldCells = worldMap.AllCells;
+				IResourceLayer rLayer = worldResourceLayer;
 
 				foreach (var cell in worldCells)
 				{
@@ -95,15 +96,15 @@ namespace OpenRA.Mods.Common.Traits
 					var candidateCell = Util.RandomWalk(cell, self.World.SharedRandom)
 
 					.Take(info.MaxRange)
-					.SkipWhile(p => worldResourceLayer.GetResource(p).Type == info.ResourceType && !worldResourceLayer.CanAddResource(info.ResourceType, p))
+					.SkipWhile(p => rLayer.GetResource(p).Type == info.ResourceType && !rLayer.CanAddResource(info.ResourceType, p))
 					.Cast<CPos?>().FirstOrDefault();
 
-					if (worldResourceLayer.CanAddResource(info.ResourceType, candidateCell.GetValueOrDefault()))
+					if (rLayer.CanAddResource(info.ResourceType, candidateCell.GetValueOrDefault()))
 					{
 						var canSeed = randomGen.Next(100) < info.PercentageChance;
 
 						if (canSeed)
-							worldResourceLayer.AddResource(info.ResourceType, candidateCell.GetValueOrDefault());
+							rLayer.AddResource(info.ResourceType, candidateCell.GetValueOrDefault());
 					}
 				}
 			}
