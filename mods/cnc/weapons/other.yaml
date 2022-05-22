@@ -15,6 +15,7 @@
 			None: 110
 			Wood: 110
 			Light: 80
+			Tiberium: 65
 			Heavy: 10
 		DamageTypes: Prone50Percent, TriggerProne, FireDeath, Incendiary
 	Warhead@2Smu: LeaveSmudge
@@ -42,6 +43,7 @@ BigFlamer:
 			None: 85
 			Wood: 85
 			Light: 65
+			Tiberium: 65
 			Heavy: 18
 	Warhead@3Eff: CreateEffect
 		Explosions: med_napalm
@@ -57,7 +59,8 @@ Chemspray:
 			None: 70
 			Wood: 75
 			Light: 25
-			Heavy: 75
+			Tiberium: 140
+			Heavy: 60
 		DamageTypes: Prone50Percent, TriggerProne, TiberiumDeath
 	Warhead@3Eff: CreateEffect
 		Explosions: chemball
@@ -79,7 +82,8 @@ BigChem:
 			None: 60
 			Wood: 75
 			Light: 25
-			Heavy: 75
+			Tiberium: 130
+			Heavy: 50
 		DamageTypes: Prone50Percent, TriggerProne, TiberiumDeath
     Warhead@3Eff: CreateEffect
 		Explosions: bigchem
