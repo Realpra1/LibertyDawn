@@ -6,6 +6,7 @@
 			None: 100
 			Wood: 100
 			Light: 100
+			Tiberium: 100
 			Heavy: 100
 		DamageTypes: Prone50Percent, TriggerProne, ExplosionDeath
 	Warhead@2Eff: CreateEffect
@@ -23,6 +24,7 @@
 			None: 90
 			Wood: 75
 			Light: 60
+			Tiberium: 25
 			Heavy: 25
 
 FlametankExplode:
@@ -42,6 +44,12 @@ ChemtankExplode:
 	Warhead@1Dam: SpreadDamage
 		Spread: 1c0
 		Damage: 17250
+        Versus:
+			None: 90
+			Wood: 55
+			Light: 75
+			Tiberium: 120
+			Heavy: 45
 		DamageTypes: Prone50Percent, TriggerProne, TiberiumDeath
 	Warhead@2Eff: CreateEffect
 		Explosions: bigchem
@@ -65,6 +73,7 @@ UnitExplode:
 		Damage: 5000
 		Versus:
 			Wood: 74
+			Tiberium: 24
 			Heavy: 24
 	Warhead@2Eff: CreateEffect
 		ImpactSounds: xplobig6.aud
@@ -75,6 +84,7 @@ UnitExplodeShip:
 		Damage: 5000
 		Versus:
 			Wood: 74
+			Tiberium: 24
 			Heavy: 24
 	Warhead@2Eff: CreateEffect
 		Explosions: building
@@ -118,6 +128,7 @@ GrenadierExplode:
 			None: 100
 			Wood: 50
 			Light: 80
+			Tiberium: 50
 			Heavy: 34
 		DamageTypes: Prone50Percent, TriggerProne, SmallExplosionDeath
 	Warhead@2Eff: CreateEffect
@@ -133,6 +144,7 @@ FlamethrowerExplode:
 			None: 110
 			Wood: 100
 			Light: 100
+			Tiberium: 65
 			Heavy: 10
 		DamageTypes: Prone50Percent, TriggerProne, FireDeath, Incendiary
 	Warhead@2Eff: CreateEffect
@@ -148,6 +160,7 @@ ChemWarriorExplode:
 			None: 70
 			Wood: 75
 			Light: 35
+			Tiberium: 140
 			Heavy: 75
 		DamageTypes: Prone50Percent, TriggerProne, TiberiumDeath
 	Warhead@2Eff: CreateEffect

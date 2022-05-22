@@ -66,11 +66,11 @@ HARV:
 	Mobile:
 		Speed: 90
 	Health:
-		HP: 31250
+		HP: 35000
 	Repairable:
 		HpPerStep: 2584
 	Armor:
-		Type: Heavy
+		Type: Tiberium
 	RevealsShroud:
 		Range: 2c0
 	ActorLostNotification:
