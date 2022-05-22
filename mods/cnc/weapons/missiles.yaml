@@ -208,7 +208,7 @@ MammothMissiles:
 			None: 40
 			Wood: 25
 			Light: 100
-			Tiberium: 100
+			Tiberium: 25
 			Heavy: 100
 	Warhead@3Eff: CreateEffect
 		Explosions: med_frag

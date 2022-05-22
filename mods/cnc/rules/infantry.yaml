@@ -194,7 +194,6 @@ E5:
 
 E6:
 	Inherits: ^Soldier
-	Inherits@selection: ^SelectableSupportUnit
 	Valued:
 		Cost: 250
 	Tooltip:
