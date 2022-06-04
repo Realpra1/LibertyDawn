@@ -190,7 +190,7 @@ ARTY:
 	Buildable:
 		BuildPaletteOrder: 60
 		Prerequisites: anyhq, ~techlevel.medium
-		Queue: Vehicle.Nod, Vehicle.GDI
+		Queue: Vehicle.Nod
 		Description: Fast mid-range artillery.\n  Strong vs Infantry, Vehicles and Buildings
 	Mobile:
 		TurnSpeed: 25
@@ -243,7 +243,7 @@ FTNK:
 		TurnSpeed: 28
 		Speed: 92
 	Health:
-		HP: 27000
+		HP: 30000
 	Repairable:
 		HpPerStep: 2046
 	Armor:
@@ -287,7 +287,7 @@ CTNK:
 		TurnSpeed: 30
 		Speed: 100
 	Health:
-		HP: 20250
+		HP: 22500
 	Repairable:
 		HpPerStep: 2046
 	Armor:
@@ -615,7 +615,7 @@ MSAM:
 	Buildable:
 		BuildPaletteOrder: 70
 		Prerequisites: anyhq, ~techlevel.medium
-		Queue: Vehicle.GDI, Vehicle.Nod
+		Queue: Vehicle.GDI
 		Description: Very long range rocket artillery.\n  Strong vs all Ground units.
 	Mobile:
 		Speed: 30
@@ -726,7 +726,7 @@ STNK:
 		BuildPaletteOrder: 100
 		Prerequisites: tmpl, ~techlevel.high
 		Queue: Vehicle.Nod
-		Description: Long-range missile tank that can cloak.\nCan attack Aircraft.\nHas weak armor. Can be spotted by infantry and defense structures.\n  Strong vs Vehicles, Tanks\n  Weak vs Infantry.
+		Description: Long-range missile tank that can cloak.\nCan attack Aircraft.\nHas weak armor. Can be spotted by infantry and defense structures.\n  Strong vs Tanks\n  Weak vs Infantry.
 	Mobile:
 		Locomotor: heavywheeled
 		TurnSpeed: 50

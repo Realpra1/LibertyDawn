@@ -43,13 +43,21 @@ CRATE:
 		Units: htnk
 		SelectionShares: 4
 		ValidFactions: gdi
-    GiveUnitCrateAction@ntnks:
+    GiveUnitCrateAction@gtnks:
+		Units: mtnk, msam
+		SelectionShares: 1
+		ValidFactions: gdi
+    GiveUnitCrateAction@ntnks1:
 		Units: ltnk, ftnk, arty
-		SelectionShares: 2
+		SelectionShares: 1
+		ValidFactions: nod
+    GiveUnitCrateAction@ntnks2:
+		Units: ltnk, ctnk, arty
+		SelectionShares: 1
 		ValidFactions: nod
     GiveUnitCrateAction@harasstnks:
-		Units: ctnk, stnk
-		SelectionShares: 2
+		Units: stnk
+		SelectionShares: 3
 		ValidFactions: nod
 	LevelUpCrateAction:
 		Levels: 4

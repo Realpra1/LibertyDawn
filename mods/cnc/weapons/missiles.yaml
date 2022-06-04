@@ -232,9 +232,9 @@ MammothMissiles:
 		Versus:
 			None: 20
 			Wood: 60
-			Light: 45
+			Light: 35
 			Tiberium: 45
-			Heavy: 140
+			Heavy: 170
 
 227mm.stnkAA:
 	Inherits: 227mm.stnk
