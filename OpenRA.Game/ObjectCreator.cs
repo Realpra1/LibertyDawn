@@ -15,7 +15,6 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using OpenRA.Primitives;
-using OpenRA.Support;
 
 namespace OpenRA
 {
