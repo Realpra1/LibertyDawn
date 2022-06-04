@@ -12,7 +12,7 @@
 		Versus:
 			None: 25
 			Wood: 90
-			Light: 140
+			Light: 150
 			Tiberium: 80
 			Heavy: 80
 		DamageTypes: Prone50Percent, TriggerProne, ExplosionDeath
@@ -36,7 +36,7 @@
 		Versus:
 			None: 24
 			Wood: 88
-			Light: 100
+			Light: 105
 			Heavy: 88
 
 120mm:
@@ -59,7 +59,7 @@ TurretGun:
 		Versus:
 			None: 20
 			Wood: 25
-			Light: 130
+			Light: 135
 			Tiberium: 90
 			Heavy: 90
 
