@@ -2,8 +2,8 @@ Atomic:
 	ValidTargets: Ground, Water, Air, Trees
 	Report: nukemisl.aud
 	Warhead@1Dam_impact: 733
-		Spread: 259
-		Damage: 120
+		Spread: 277
+		Damage: 119
 		Falloff: 1000, 368, 135, 50, 18, 7, 0
 		ValidTargets: Ground, Air, Trees
 		AffectsParent: True
@@ -19,8 +19,8 @@ Atomic:
 		ImpactSounds: nukexplo.aud
 		ImpactActors: false
 	Warhead@3Dam_areanukea: 705
-		Spread: 280
-		Damage: 998
+		Spread: 103
+		Damage: 689
 		Falloff: 1000, 700, 500, 300, 150, 50, 0
 		Delay: 3
 		ValidTargets: Ground, Air
@@ -45,8 +45,8 @@ Atomic:
 		Delay: 3
 		ImpactActors: false
 	Warhead@7Dam_areanukeb: 529
-		Spread: 59
-		Damage: 739
+		Spread: 285
+		Damage: 485
 		Falloff: 1000, 368, 135, 50, 18, 7, 0
 		Delay: 6
 		ValidTargets: Ground, Air, Trees
@@ -67,8 +67,8 @@ Atomic:
 		Size: 4
 		Delay: 6
 	Warhead@10Dam_areanukec: 586
-		Spread: 53
-		Damage: 318
+		Spread: 92
+		Damage: 95
 		Falloff: 1000, 368, 135, 50, 18, 7, 0
 		Delay: 9
 		ValidTargets: Ground, Air, Trees
@@ -99,7 +99,7 @@ IonCannon:
 	ValidTargets: Ground, Water, Air, Trees
 	Warhead@1Dam_impact: 363
 		Range: 0, 1c1, 2c1, 2c512
-		Damage: 323
+		Damage: 341
 		Falloff: 1000, 1000, 250, 100
 		ValidTargets: Ground, Air, Trees
 		AffectsParent: True

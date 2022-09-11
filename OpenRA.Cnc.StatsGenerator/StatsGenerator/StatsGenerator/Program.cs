@@ -114,7 +114,9 @@ namespace StatsGenerator
 			if (s.Contains(':')) // HP
 			{
 				var splitted = s.Split(':');
-				if (splitted[0] == check || splitted[0] == string.Format("\t\t{0}", check))
+				if (splitted[0] == check ||
+				    splitted[0] == string.Format("\t\t{0}", check) ||
+				    splitted[0] == string.Format("\t{0}", check))
 				{
 					stringToWrite = string.Format("{0}: {1}", splitted[0], RandomNumber(lower, higher));
 				}

@@ -71,7 +71,7 @@
 	DamageMultiplier@RANK-ELITE: 150
 		RequiresCondition: rank-elite
 		Modifier: 80
-	SpeedMultiplier@RANK-ELITE: 75
+	SpeedMultiplier@RANK-ELITE: 177
 		RequiresCondition: rank-elite
 		Modifier: 125
 	RangeMultiplier@RANK-ELITE:
@@ -235,7 +235,7 @@
 		Action: Kill
 	Mobile:
 		Locomotor: wheeled
-		TurnSpeed: 9
+		TurnSpeed: 137
 	Selectable:
 		Bounds: 1024, 1024
 	Targetable:
@@ -267,7 +267,7 @@
 	Inherits: ^Vehicle
 	Mobile:
 		Locomotor: tracked
-		TurnSpeed: 298
+		TurnSpeed: 133
 	Tooltip:
 		GenericName: Tank
 
@@ -367,7 +367,7 @@
 	HiddenUnderFog:
 	DamagedByTerrain: 798
 		Terrain: Tiberium, BlueTiberium
-		Damage: 716
+		Damage: 927
 		DamageInterval: 419
 		DamageTypes: 181
 		RequiresCondition: !hazmatsuits
@@ -446,7 +446,7 @@
 		GenericName: Soldier
 	Guard:
 	TakeCover:
-		SpeedModifier: 204
+		SpeedModifier: 114
 		DamageModifiers: 97
 			Prone50Percent: 50
 			Prone80Percent: 80
@@ -461,14 +461,14 @@
 	Inherits: ^Infantry
 	Inherits@selection: ^SelectableSupportUnit
 	Valued:
-		Cost: 2224
+		Cost: 3661
 	Tooltip:
 		Name: Civilian
 		GenericVisibility: None
 	Mobile:
-		Speed: 265
+		Speed: 123
 	Health:
-		HP: 26391
+		HP: 33024
 	RevealsShroud:
 		Range: 5c0
 	Passenger:
@@ -511,7 +511,7 @@
 	OwnerLostAction:
 		Action: Kill
 	Health:
-		HP: 35716
+		HP: 21077
 	Armor:
 		Type: Wood
 	Buildable:
@@ -519,14 +519,14 @@
 		BuildPaletteOrder: 50
 		Prerequisites: ~disabled
 	Valued:
-		Cost: 2121
+		Cost: 3080
 	Tooltip:
 		Name: Dinosaur
 	RevealsShroud:
 		Range: 6c0
 	Mobile:
 		Locomotor: critter
-		Speed: 88
+		Speed: 291
 		Voice: Move
 	Selectable:
 		Bounds: 1024, 1024
@@ -542,7 +542,7 @@
 	WithDeathAnimation:
 		UseDeathTypeSuffix: false
 	AutoTarget:
-		ScanRadius: 3
+		ScanRadius: 18
 	AttackMove:
 		Voice: Attack
 	AttackFrontal:
@@ -566,26 +566,26 @@
 	OwnerLostAction:
 		Action: Kill
 	Health:
-		HP: 46609
+		HP: 49140
 	Armor:
 		Type: Light
 	RevealsShroud:
 		Range: 6c0
 	Mobile:
 		Voice: Move
-		Speed: 239
+		Speed: 30
 		Locomotor: visc
 	Selectable:
 		Bounds: 1024, 1024
 	Targetable:
 		TargetTypes: Ground, Creep
 	AutoTarget:
-		ScanRadius: 18
+		ScanRadius: 8
 	AttackMove:
 		Voice: Attack
 	HiddenUnderFog:
 	Valued:
-		Cost: 2439
+		Cost: 1736
 	Tooltip:
 		Name: Visceroid
 	Armament:
@@ -606,7 +606,7 @@
 		Delay: 4
 		StartIfBelow: 100
 	DamagedByTerrain: 73
-		Damage: 410
+		Damage: 889
 		DamageInterval: 746
 		DamageTypes: 395
 		Terrain: Tiberium, BlueTiberium
@@ -688,7 +688,7 @@
 	Armor:
 		Type: Wood
 	Health:
-		HP: 22220
+		HP: 19618
 	Building:
 		Dimensions: 1,1
 		Footprint: x
@@ -925,7 +925,7 @@
 	FrozenUnderFog:
 	ScriptTriggers:
 	Health:
-		HP: 4974
+		HP: 8092
 	AppearsOnMapPreview:
 		Terrain: Wall
 	RadarColorFromTerrain:
@@ -951,7 +951,7 @@
 	AppearsOnMapPreview:
 		Terrain: Tree
 	Health:
-		HP: 939
+		HP: 37833
 	Armor:
 		Type: Wood
 	Targetable:
@@ -1051,7 +1051,7 @@
 	Inherits@1: ^ClassicFacingSpriteActor
 	Interactable:
 	Health:
-		HP: 11265
+		HP: 22282
 	Armor:
 		Type: Heavy
 	HiddenUnderFog:
@@ -1095,7 +1095,7 @@
 ^LightHusk:
 	Inherits: ^Husk
 	Health:
-		HP: 16015
+		HP: 36009
     TransformOnCapture:
 		ForceHealthPercentage: 75
 
@@ -1125,7 +1125,7 @@
 		RequiresForceFire: true
 		TargetTypes: Ground, Water
 	Health:
-		HP: 4913
+		HP: 2154
 	Armor:
 		Type: Heavy
 	SoundOnDamageTransition: 788
