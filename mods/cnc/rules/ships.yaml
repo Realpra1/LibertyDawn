@@ -4,22 +4,22 @@ BOAT:
 	Inherits@EXPERIENCE: ^GainsExperience
 	Inherits@AUTOTARGET: ^AutoTargetAll
 	Valued:
-		Cost: 300
+		Cost: 1420
 	Tooltip:
 		Name: Gunboat
 	UpdatesPlayerStatistics:
 		AddToArmyValue: true
 	Health:
-		HP: 70000
+		HP: 36418
 	Armor:
 		Type: Heavy
 	TDGunboat:
-		Speed: 29
+		Speed: 167
 	RevealsShroud:
 		Range: 7c0
 		Type: CenterPosition
 	Turreted:
-		TurnSpeed: 20
+		TurnSpeed: 54
 		Offset: 0,896,171
 	Armament:
 		Weapon: BoatMissile
@@ -39,16 +39,16 @@ BOAT:
 	AutoTarget:
 		AllowMovement: false
 	RejectsOrders:
-	GrantConditionOnDamageState@HEAVY:
+	GrantConditionOnDamageState@HEAVY: 899
 		Condition: heavy-damage
-		ValidDamageStates: Heavy
-	GrantConditionOnDamageState@CRITICAL:
+		ValidDamageStates: 505
+	GrantConditionOnDamageState@CRITICAL: 793
 		Condition: critical-damage
-		ValidDamageStates: Critical
-	SpeedMultiplier@HEAVYDAMAGE:
+		ValidDamageStates: 928
+	SpeedMultiplier@HEAVYDAMAGE: 140
 		RequiresCondition: heavy-damage
 		Modifier: 75
-	SpeedMultiplier@CRITICALDAMAGE:
+	SpeedMultiplier@CRITICALDAMAGE: 233
 		RequiresCondition: critical-damage
 		Modifier: 50
 
@@ -56,17 +56,17 @@ LST:
 	Inherits: ^Ship
 	Inherits@TRANSPORT: ^Transport
 	Valued:
-		Cost: 300
+		Cost: 3822
 	Tooltip:
 		Name: Landing Craft
 	Mobile:
 		Locomotor: lcraft
 		InitialFacing: 0
-		TurnSpeed: 16
-		Speed: 170
+		TurnSpeed: 19
+		Speed: 44
 		PauseOnCondition: notmobile
 	Health:
-		HP: 40000
+		HP: 10674
 	Armor:
 		Type: Heavy
 	RevealsShroud:

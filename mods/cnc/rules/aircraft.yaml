@@ -2,7 +2,7 @@ TRAN:
 	Inherits: ^Helicopter
 	Inherits@TRANSPORT: ^Transport
 	Valued:
-		Cost: 750
+		Cost: 658
 	Tooltip:
 		Name: Chinook Transport
 	UpdatesPlayerStatistics:
@@ -13,11 +13,11 @@ TRAN:
 		Queue: Aircraft.GDI, Aircraft.Nod
 		Description: Fast Infantry Transport Helicopter.\n  Unarmed
 	Aircraft:
-		TurnSpeed: 20
-		Speed: 150
+		TurnSpeed: 192
+		Speed: 196
 		AltitudeVelocity: 0c100
 	Health:
-		HP: 9000
+		HP: 44465
 	Armor:
 		Type: Light
 	RevealsShroud:
@@ -54,7 +54,7 @@ HELI:
 	Inherits@EXPERIENCE: ^GainsExperience
 	Inherits@AUTOTARGET: ^AutoTargetAllAssaultMove
 	Valued:
-		Cost: 1200
+		Cost: 1172
 	Tooltip:
 		Name: Apache Longbow
 	UpdatesPlayerStatistics:
@@ -65,10 +65,10 @@ HELI:
 		Queue: Aircraft.Nod
 		Description: Helicopter Gunship with Chainguns.\n  Strong vs Infantry, Light Vehicles and\n  Aircraft\n  Weak vs Tanks
 	Aircraft:
-		TurnSpeed: 28
-		Speed: 180
+		TurnSpeed: 13
+		Speed: 162
 	Health:
-		HP: 12500
+		HP: 21291
 	Armor:
 		Type: Light
 	RevealsShroud:
@@ -88,16 +88,16 @@ HELI:
 	AttackMove:
 		Voice: Attack
 	AutoTarget:
-		ScanRadius: 4
+		ScanRadius: 19
 	AttackAircraft:
 		FacingTolerance: 80
 		OpportunityFire: false
 		PersistentTargeting: false
 		AttackType: Hover
 		Voice: Attack
-	AmmoPool:
-		Ammo: 10
-		AmmoCondition: ammo
+	AmmoPool: 40
+		Ammo: 48
+		AmmoCondition: 82
 	WithIdleOverlay@ROTORAIR:
 		Offset: 0,0,85
 		Sequence: rotor
@@ -109,12 +109,12 @@ HELI:
 	WithMuzzleOverlay:
 	SpawnActorOnDeath:
 		Actor: HELI.Husk
-	ReloadAmmoPool:
+	ReloadAmmoPool: 94
 		Delay: 70
 		Count: 2
 	Selectable:
 		DecorationBounds: 1280, 1024
-	WithAmmoPipsDecoration:
+	WithAmmoPipsDecoration: 55
 		Position: BottomLeft
 		Margin: 4, 3
 		RequiresSelection: true
@@ -125,7 +125,7 @@ ORCA:
 	Inherits@EXPERIENCE: ^GainsExperience
 	Inherits@AUTOTARGET: ^AutoTargetAllAssaultMove
 	Valued:
-		Cost: 1200
+		Cost: 800
 	Tooltip:
 		Name: Orca
 	UpdatesPlayerStatistics:
@@ -136,10 +136,10 @@ ORCA:
 		Queue: Aircraft.GDI
 		Description: Helicopter Gunship with AG Missiles.\n  Strong vs Buildings, Tanks\n  Weak vs Infantry
 	Aircraft:
-		TurnSpeed: 28
-		Speed: 186
+		TurnSpeed: 243
+		Speed: 36
 	Health:
-		HP: 10000
+		HP: 5167
 	Armor:
 		Type: Light
 	RevealsShroud:
@@ -156,26 +156,26 @@ ORCA:
 	AttackMove:
 		Voice: Attack
 	AutoTarget:
-		ScanRadius: 5
+		ScanRadius: 7
 	AttackAircraft:
 		FacingTolerance: 80
 		OpportunityFire: false
 		PersistentTargeting: false
 		AttackType: Hover
 		Voice: Attack
-	AmmoPool:
-		Ammo: 6
-		AmmoCondition: ammo
+	AmmoPool: 23
+		Ammo: 79
+		AmmoCondition: 48
 	SpawnActorOnDeath:
 		Actor: ORCA.Husk
 	WithMoveAnimation:
 		MoveSequence: move
-	ReloadAmmoPool:
+	ReloadAmmoPool: 59
 		Delay: 100
 		Count: 2
 	Selectable:
 		DecorationBounds: 1280, 1024
-	WithAmmoPipsDecoration:
+	WithAmmoPipsDecoration: 46
 		Position: BottomLeft
 		Margin: 4, 3
 		RequiresSelection: true
@@ -187,12 +187,12 @@ C17:
 	Tooltip:
 		Name: Supply Aircraft
 	Valued:
-		Cost: 2000
+		Cost: 2053
 	UpdatesPlayerStatistics:
 		AddToAssetsValue: false
 	Aircraft:
-		TurnSpeed: 20
-		Speed: 700
+		TurnSpeed: 33
+		Speed: 256
 		Repulsable: False
 		MaximumPitch: 36
 	HiddenUnderFog:
@@ -200,7 +200,7 @@ C17:
 		Type: CenterPosition
 	Cargo:
 		MaxWeight: 10
-	DamageMultiplier@INVULNERABLE:
+	DamageMultiplier@INVULNERABLE: 634
 		Modifier: 0
 	GrantConditionOnPrerequisite@GLOBALC17STEALTH:
 		Condition: global-C17-stealth
@@ -230,12 +230,12 @@ A10:
 	Tooltip:
 		Name: A10 Bomber
 	Valued:
-		Cost: 2000
+		Cost: 245
 	UpdatesPlayerStatistics:
 		AddToAssetsValue: false
 	Aircraft:
-		TurnSpeed: 16
-		Speed: 373
+		TurnSpeed: 280
+		Speed: 94
 		Repulsable: False
 	AttackBomber:
 		Armaments: gun, bombs
@@ -262,8 +262,8 @@ TRAN.Husk:
 	Tooltip:
 		Name: Chinook Transport
 	Aircraft:
-		TurnSpeed: 20
-		Speed: 140
+		TurnSpeed: 176
+		Speed: 237
 	RevealsShroud:
 		Range: 10c0
 		Type: GroundPosition
@@ -281,8 +281,8 @@ HELI.Husk:
 	Tooltip:
 		Name: Apache Longbow
 	Aircraft:
-		TurnSpeed: 16
-		Speed: 186
+		TurnSpeed: 61
+		Speed: 105
 	RevealsShroud:
 		Range: 10c0
 		Type: GroundPosition
@@ -297,8 +297,8 @@ ORCA.Husk:
 	Tooltip:
 		Name: Orca
 	Aircraft:
-		TurnSpeed: 16
-		Speed: 186
+		TurnSpeed: 40
+		Speed: 35
 	RevealsShroud:
 		Range: 10c0
 		Type: GroundPosition

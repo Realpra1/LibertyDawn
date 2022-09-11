@@ -1,14 +1,14 @@
 ^DamagingExplosion:
-	Warhead@1Dam: SpreadDamage
-		Spread: 426
-		Damage: 4000
+	Warhead@1Dam: 764
+		Spread: 73
+		Damage: 623
 		Versus:
 			None: 100
 			Wood: 100
 			Light: 100
 			Tiberium: 100
 			Heavy: 100
-		DamageTypes: Prone50Percent, TriggerProne, ExplosionDeath
+		DamageTypes: 795
 	Warhead@2Eff: CreateEffect
 		Explosions: poof
 		ImpactSounds: xplos.aud
@@ -19,7 +19,7 @@
 
 ^DamagingExplosionHE:
 	Inherits: ^DamagingExplosion
-	Warhead@1Dam: SpreadDamage
+	Warhead@1Dam: 484
 		Versus:
 			None: 90
 			Wood: 75
@@ -29,10 +29,10 @@
 
 FlametankExplode:
 	Inherits: ^DamagingExplosion
-	Warhead@1Dam: SpreadDamage
-		Spread: 1c0
-		Damage: 11500
-		DamageTypes: Prone50Percent, TriggerProne, FireDeath
+	Warhead@1Dam: 95
+		Spread: 160
+		Damage: 627
+		DamageTypes: 967
 	Warhead@2Eff: CreateEffect
 		Explosions: big_napalm
 		ImpactSounds: flamer2.aud
@@ -41,16 +41,16 @@ FlametankExplode:
         
 ChemtankExplode:
 	Inherits: ^DamagingExplosion
-	Warhead@1Dam: SpreadDamage
-		Spread: 1c0
-		Damage: 17250
+	Warhead@1Dam: 592
+		Spread: 105
+		Damage: 964
         Versus:
 			None: 90
 			Wood: 55
 			Light: 75
 			Tiberium: 120
 			Heavy: 45
-		DamageTypes: Prone50Percent, TriggerProne, TiberiumDeath
+		DamageTypes: 81
 	Warhead@2Eff: CreateEffect
 		Explosions: bigchem
 		ImpactSounds: xplos.aud
@@ -59,8 +59,8 @@ ChemtankExplode:
 
 HeliCrash:
 	Inherits: ^DamagingExplosion
-	Warhead@1Dam: SpreadDamage
-		Damage: 10000
+	Warhead@1Dam: 255
+		Damage: 620
 
 HeliExplode:
 	Warhead@1Eff: CreateEffect
@@ -69,8 +69,8 @@ HeliExplode:
 
 UnitExplode:
 	Inherits: ^DamagingExplosionHE
-	Warhead@1Dam: SpreadDamage
-		Damage: 5000
+	Warhead@1Dam: 969
+		Damage: 300
 		Versus:
 			Wood: 74
 			Tiberium: 24
@@ -80,8 +80,8 @@ UnitExplode:
 
 UnitExplodeShip:
 	Inherits: ^DamagingExplosionHE
-	Warhead@1Dam: SpreadDamage
-		Damage: 5000
+	Warhead@1Dam: 189
+		Damage: 834
 		Versus:
 			Wood: 74
 			Tiberium: 24
@@ -116,53 +116,53 @@ UnitExplodeHarvEmpty:
 
 UnitExplodeStealthTank:
 	Inherits: UnitExplodeBig
-	Warhead@1Dam: SpreadDamage
+	Warhead@1Dam: 859
 		InvalidTargets: StealthTank
 
 GrenadierExplode:
 	Inherits: ^DamagingExplosionHE
-	Warhead@1Dam: SpreadDamage
-		Spread: 1c0
-		Damage: 4500
+	Warhead@1Dam: 478
+		Spread: 249
+		Damage: 176
 		Versus:
 			None: 100
 			Wood: 50
 			Light: 80
 			Tiberium: 50
 			Heavy: 34
-		DamageTypes: Prone50Percent, TriggerProne, SmallExplosionDeath
+		DamageTypes: 854
 	Warhead@2Eff: CreateEffect
 		Explosions: small_poof
 		ImpactSounds: xplosml2.aud
 
 FlamethrowerExplode:
 	Inherits: ^DamagingExplosion
-	Warhead@1Dam: SpreadDamage
-		Spread: 1c0
-		Damage: 4000
+	Warhead@1Dam: 154
+		Spread: 289
+		Damage: 845
 		Versus:
 			None: 110
 			Wood: 100
 			Light: 100
 			Tiberium: 65
 			Heavy: 10
-		DamageTypes: Prone50Percent, TriggerProne, FireDeath, Incendiary
+		DamageTypes: 269
 	Warhead@2Eff: CreateEffect
 		Explosions: small_napalm
 		ImpactActors: false
 
 ChemWarriorExplode:
 	Inherits: ^DamagingExplosion
-	Warhead@1Dam: SpreadDamage
-		Spread: 1c0
-		Damage: 8000
+	Warhead@1Dam: 539
+		Spread: 175
+		Damage: 507
         Versus:
 			None: 70
 			Wood: 75
 			Light: 35
 			Tiberium: 140
 			Heavy: 75
-		DamageTypes: Prone50Percent, TriggerProne, TiberiumDeath
+		DamageTypes: 760
 	Warhead@2Eff: CreateEffect
 		Explosions: chemball
 		ImpactSounds: xplos.aud
@@ -178,14 +178,14 @@ BuildingExplode:
 
 Napalm.Crate:
 	Inherits: ^DamagingExplosionHE
-	Warhead@1Dam: SpreadDamage
-		Spread: 170
-		Damage: 5000
+	Warhead@1Dam: 254
+		Spread: 67
+		Damage: 347
 		Falloff: 1000, 368, 135, 50, 18, 7, 0
 		Versus:
 			Wood: 100
 		AffectsParent: true
-		DamageTypes: Prone50Percent, TriggerProne, FireDeath
+		DamageTypes: 204
 	Warhead@2Eff: CreateEffect
 		Explosions: med_napalm
 		ImpactSounds: flamer2.aud
@@ -194,13 +194,13 @@ Napalm.Crate:
 
 TiberiumExplosion:
 	Inherits: ^DamagingExplosionHE
-	Warhead@1Dam: SpreadDamage
-		Spread: 9
-		Damage: 1000
+	Warhead@1Dam: 297
+		Spread: 295
+		Damage: 142
 		Versus:
 			Wood: 70
 			Heavy: 20
-		DamageTypes: Prone50Percent, TriggerProne, SmallExplosionDeath
+		DamageTypes: 534
 	Warhead@2Eff: CreateEffect
 		Explosions: chemball
 		ImpactSounds: xplosml2.aud

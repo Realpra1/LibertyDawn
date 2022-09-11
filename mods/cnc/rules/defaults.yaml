@@ -65,13 +65,13 @@
 	FirepowerMultiplier@RANK-ELITE:
 		RequiresCondition: rank-elite
 		Modifier: 125
-	DamageMultiplier@RANK-2:
+	DamageMultiplier@RANK-2: 662
 		RequiresCondition: rank-veteran == 2
 		Modifier: 80
-	DamageMultiplier@RANK-ELITE:
+	DamageMultiplier@RANK-ELITE: 150
 		RequiresCondition: rank-elite
 		Modifier: 80
-	SpeedMultiplier@RANK-ELITE:
+	SpeedMultiplier@RANK-ELITE: 21
 		RequiresCondition: rank-elite
 		Modifier: 125
 	RangeMultiplier@RANK-ELITE:
@@ -85,7 +85,7 @@
 		PercentageStep: 5
 		Delay: 75
 		StartIfBelow: 100
-		DamageCooldown: 125
+		DamageCooldown: 547
 		RequiresCondition: rank-elite
 	WithDecoration@RANK-1:
 		Image: rank
@@ -189,7 +189,7 @@
 
 ^PlayerHandicaps:
 	HandicapFirepowerMultiplier:
-	HandicapDamageMultiplier:
+	HandicapDamageMultiplier: 456
 	HandicapProductionTimeMultiplier:
 
 ^AcceptsCloakCrate:
@@ -202,9 +202,9 @@
 		RequiresCondition: cloak-crate-collected
 	ExternalCondition@CLOAK:
 		Condition: cloak-crate-collected
-	GrantConditionOnDamageState@UNCLOAK:
+	GrantConditionOnDamageState@UNCLOAK: 839
 		Condition: cloak-force-disabled
-		ValidDamageStates: Critical
+		ValidDamageStates: 331
 
 ^Transport:
 	Cargo:
@@ -235,7 +235,7 @@
 		Action: Kill
 	Mobile:
 		Locomotor: wheeled
-		TurnSpeed: 20
+		TurnSpeed: 119
 	Selectable:
 		Bounds: 1024, 1024
 	Targetable:
@@ -247,7 +247,7 @@
 	ActorLostNotification:
 	HiddenUnderFog:
 	AttackMove:
-	WithDamageOverlay:
+	WithDamageOverlay: 544
 	WithFacingSpriteBody:
 	Explodes:
 		Weapon: UnitExplodeSmall
@@ -267,7 +267,7 @@
 	Inherits: ^Vehicle
 	Mobile:
 		Locomotor: tracked
-		TurnSpeed: 20
+		TurnSpeed: 285
 	Tooltip:
 		GenericName: Tank
 
@@ -365,11 +365,11 @@
 	Passenger:
 		CargoType: Infantry
 	HiddenUnderFog:
-	DamagedByTerrain:
+	DamagedByTerrain: 798
 		Terrain: Tiberium, BlueTiberium
-		Damage: 220
-		DamageInterval: 16
-		DamageTypes: TiberiumDeath
+		Damage: 130
+		DamageInterval: 419
+		DamageTypes: 181
 		RequiresCondition: !hazmatsuits
 	GrantConditionOnTerrain@HAZMAT:
 		Condition: ontiberium
@@ -402,14 +402,14 @@
 		Step: 500
 		Delay: 100
 		StartIfBelow: 100
-		DamageCooldown: 125
+		DamageCooldown: 421
 		RequiresCondition: hospitalheal
 	GrantConditionOnPrerequisite@HOSPITAL:
 		Condition: hospital
 		Prerequisites: hosp
-	GrantConditionOnDamageState@HOSPITAL:
+	GrantConditionOnDamageState@HOSPITAL: 688
 		Condition: damaged
-		ValidDamageStates: Light, Medium, Heavy, Critical
+		ValidDamageStates: 706
 	GrantCondition@HOSPITAL:
 		RequiresCondition: hospital && damaged
 		Condition: hospitalheal
@@ -446,11 +446,11 @@
 		GenericName: Soldier
 	Guard:
 	TakeCover:
-		SpeedModifier: 60
-		DamageModifiers:
+		SpeedModifier: 149
+		DamageModifiers: 97
 			Prone50Percent: 50
 			Prone80Percent: 80
-		DamageTriggers: TriggerProne
+		DamageTriggers: 810
 		ProneOffset: 400,0,0
 	WithInfantryBody:
 		IdleSequences: idle1, idle2
@@ -461,14 +461,14 @@
 	Inherits: ^Infantry
 	Inherits@selection: ^SelectableSupportUnit
 	Valued:
-		Cost: 10
+		Cost: 3975
 	Tooltip:
 		Name: Civilian
 		GenericVisibility: None
 	Mobile:
-		Speed: 54
+		Speed: 130
 	Health:
-		HP: 2500
+		HP: 2361
 	RevealsShroud:
 		Range: 5c0
 	Passenger:
@@ -511,7 +511,7 @@
 	OwnerLostAction:
 		Action: Kill
 	Health:
-		HP: 100000
+		HP: 14274
 	Armor:
 		Type: Wood
 	Buildable:
@@ -519,14 +519,14 @@
 		BuildPaletteOrder: 50
 		Prerequisites: ~disabled
 	Valued:
-		Cost: 1000
+		Cost: 4683
 	Tooltip:
 		Name: Dinosaur
 	RevealsShroud:
 		Range: 6c0
 	Mobile:
 		Locomotor: critter
-		Speed: 113
+		Speed: 207
 		Voice: Move
 	Selectable:
 		Bounds: 1024, 1024
@@ -542,7 +542,7 @@
 	WithDeathAnimation:
 		UseDeathTypeSuffix: false
 	AutoTarget:
-		ScanRadius: 4
+		ScanRadius: 14
 	AttackMove:
 		Voice: Attack
 	AttackFrontal:
@@ -566,26 +566,26 @@
 	OwnerLostAction:
 		Action: Kill
 	Health:
-		HP: 30000
+		HP: 1641
 	Armor:
 		Type: Light
 	RevealsShroud:
 		Range: 6c0
 	Mobile:
 		Voice: Move
-		Speed: 68
+		Speed: 168
 		Locomotor: visc
 	Selectable:
 		Bounds: 1024, 1024
 	Targetable:
 		TargetTypes: Ground, Creep
 	AutoTarget:
-		ScanRadius: 5
+		ScanRadius: 3
 	AttackMove:
 		Voice: Attack
 	HiddenUnderFog:
 	Valued:
-		Cost: 700
+		Cost: 155
 	Tooltip:
 		Name: Visceroid
 	Armament:
@@ -605,10 +605,10 @@
 		Step: 50
 		Delay: 4
 		StartIfBelow: 100
-	DamagedByTerrain:
-		Damage: -750
-		DamageInterval: 4
-		DamageTypes: TiberiumDeath
+	DamagedByTerrain: 73
+		Damage: 413
+		DamageInterval: 746
+		DamageTypes: 395
 		Terrain: Tiberium, BlueTiberium
 	Voiced:
 		VoiceSet: DinoVoice
@@ -660,7 +660,7 @@
 	HiddenUnderFog:
 	ActorLostNotification:
 	AttackMove:
-	WithDamageOverlay:
+	WithDamageOverlay: 860
 	Explodes:
 		Weapon: UnitExplodeShip
 		EmptyWeapon: UnitExplodeShip
@@ -688,14 +688,14 @@
 	Armor:
 		Type: Wood
 	Health:
-		HP: 40000
+		HP: 15511
 	Building:
 		Dimensions: 1,1
 		Footprint: x
 	ActorPreviewPlaceBuildingPreview:
 		PreviewAlpha: 0.65
-	SoundOnDamageTransition:
-		DamagedSounds: xplobig4.aud
+	SoundOnDamageTransition: 861
+		DamagedSounds: 122
 		DestroyedSounds: crumble.aud, xplobig4.aud
 	WithSpriteBody:
 	Explodes:
@@ -826,7 +826,7 @@
 		GenericName: Field
 	-Explodes:
 	-ShakeOnDeath:
-	-SoundOnDamageTransition:
+	-SoundOnDamageTransition: 453
 	-Demolishable:
 	RenderSprites:
 		Palette: terrain
@@ -925,7 +925,7 @@
 	FrozenUnderFog:
 	ScriptTriggers:
 	Health:
-		HP: 10000
+		HP: 49597
 	AppearsOnMapPreview:
 		Terrain: Wall
 	RadarColorFromTerrain:
@@ -951,26 +951,26 @@
 	AppearsOnMapPreview:
 		Terrain: Tree
 	Health:
-		HP: 50000
+		HP: 19352
 	Armor:
 		Type: Wood
 	Targetable:
 		TargetTypes: Trees
-	WithDamageOverlay@SmallBurn:
-		DamageTypes: Incendiary
+	WithDamageOverlay@SmallBurn: 606
+		DamageTypes: 825
 		Image: burn-s
-		MinimumDamageState: Light
-		MaximumDamageState: Medium
-	WithDamageOverlay@MediumBurn:
-		DamageTypes: Incendiary
+		MinimumDamageState: 280
+		MaximumDamageState: 510
+	WithDamageOverlay@MediumBurn: 601
+		DamageTypes: 274
 		Image: burn-m
-		MinimumDamageState: Medium
-		MaximumDamageState: Heavy
-	WithDamageOverlay@LargeBurn:
-		DamageTypes: Incendiary
+		MinimumDamageState: 347
+		MaximumDamageState: 169
+	WithDamageOverlay@LargeBurn: 897
+		DamageTypes: 578
 		Image: burn-l
-		MinimumDamageState: Heavy
-		MaximumDamageState: Dead
+		MinimumDamageState: 846
+		MaximumDamageState: 611
 	HiddenUnderShroud:
 	HitShape:
 	MapEditorData:
@@ -1051,7 +1051,7 @@
 	Inherits@1: ^ClassicFacingSpriteActor
 	Interactable:
 	Health:
-		HP: 56000
+		HP: 38172
 	Armor:
 		Type: Heavy
 	HiddenUnderFog:
@@ -1095,7 +1095,7 @@
 ^LightHusk:
 	Inherits: ^Husk
 	Health:
-		HP: 56000
+		HP: 10748
     TransformOnCapture:
 		ForceHealthPercentage: 75
 
@@ -1125,11 +1125,11 @@
 		RequiresForceFire: true
 		TargetTypes: Ground, Water
 	Health:
-		HP: 60000
+		HP: 2948
 	Armor:
 		Type: Heavy
-	SoundOnDamageTransition:
-		DamagedSounds: xplos.aud
+	SoundOnDamageTransition: 788
+		DamagedSounds: 608
 		DestroyedSounds: xplobig4.aud
 	ScriptTriggers:
 	BodyOrientation:
