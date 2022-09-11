@@ -48,16 +48,17 @@ namespace StatsGenerator
 					var stringToWrite = s;
 
 
-					stringToWrite = CheckForSpeciffic(s, "HP", stringToWrite, 10, 50000);
+					stringToWrite = CheckForSpeciffic(s, "HP", stringToWrite, 10, 100000);
 					stringToWrite = CheckForSpeciffic(s, "Ammo", stringToWrite, 1, 100);
-					stringToWrite = CheckForSpeciffic(s, "Damage", stringToWrite, 50, 1000);
+					stringToWrite = CheckForSpeciffic(s, "Damage", stringToWrite, 500, 20000);
 					stringToWrite = CheckForSpeciffic(s, "Speed", stringToWrite, 3, 300);
 					stringToWrite = CheckForSpeciffic(s, "Spread", stringToWrite, 50, 300);
-					
+					stringToWrite = CheckForSpecifficWithPostfix(s, "Range", stringToWrite, 1, 35);
+
 					if (s.Contains("Cost"))
 					{
 						var update = s.Split(':');
-						stringToWrite = string.Format("{0}: {1}", update[0], RandomNumber(10, 5000));
+						stringToWrite = string.Format("{0}: {1}", update[0], RandomNumber(10, 3000));
 					}
 					if (s.Contains("ScanRadius"))
 					{
@@ -102,9 +103,25 @@ namespace StatsGenerator
 			}
 		}
 
+		private static string CheckForSpecifficWithPostfix(string s, string check, string stringToWrite, int lower, int higher)
+		{
+			if (s.Contains(':')) 
+			{
+				var splitted = s.Split(':');
+				if (splitted[0] == check ||
+				    splitted[0] == string.Format("\t\t{0}", check) ||
+				    splitted[0] == string.Format("\t{0}", check))
+				{
+					stringToWrite = string.Format("{0}: {1}c0", splitted[0], RandomNumber(lower, higher));
+				}
+			}
+
+			return stringToWrite;
+		}
+
 		private static string CheckForSpeciffic(string s, string check, string stringToWrite, int lower, int higher)
 		{
-			if (s.Contains(':')) // HP
+			if (s.Contains(':')) 
 			{
 				var splitted = s.Split(':');
 				if (splitted[0] == check ||
