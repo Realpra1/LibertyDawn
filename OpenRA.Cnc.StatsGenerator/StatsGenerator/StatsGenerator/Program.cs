@@ -70,11 +70,6 @@ namespace StatsGenerator
 						var update = s.Split(':');
 						stringToWrite = string.Format("{0}: {1}", update[0], RandomNumber(1, 300));
 					}
-					if (s.Contains("Spread"))
-					{
-						var update = s.Split(':');
-						stringToWrite = string.Format("{0}: {1}", update[0], RandomNumber(50, 300));
-					}
 					if (s.Contains("DetonationDelay"))
 					{
 						var update = s.Split(':');

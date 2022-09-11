@@ -2,13 +2,13 @@ Sniper:
 	Report: ramgun2.aud
 	ValidTargets: Ground, Infantry
 	InvalidTargets: Vehicle, Water, Structure, Wall, Husk, Creep
-	ReloadDelay: 101
+	ReloadDelay: 169
 	Range: 8c0
 	Projectile: Bullet
-		Speed: 244
-	Warhead@1Dam: 119
-		Spread: 127
-		Damage: 809
+		Speed: 211
+	Warhead@1Dam: SpreadDamage
+		Spread: 68
+		Damage: 925
 		ValidTargets: Infantry
 		DamageTypes: Prone50Percent, TriggerProne, BulletDeath
 	Warhead@2Eff: CreateEffect
@@ -17,14 +17,14 @@ Sniper:
 		ValidTargets: Ground, Water, Air
 
 ^HeavyMG:
-	ReloadDelay: 126
+	ReloadDelay: 89
 	Range: 6c0
 	Report: gun8.aud
 	Projectile: Bullet
-		Speed: 63
-	Warhead@1Dam: 64
-		Spread: 259
-		Damage: 824
+		Speed: 136
+	Warhead@1Dam: SpreadDamage
+		Spread: 293
+		Damage: 860
 		Versus:
 			None: 100
 			Wood: 50
@@ -40,21 +40,21 @@ Sniper:
 HighV:
 	Inherits: ^HeavyMG
 	Range: 7c0
-    Warhead@1Dam: 209
-		Damage: 973
+    Warhead@1Dam: SpreadDamage
+		Damage: 691
 
 Vulcan:
 	Inherits: ^HeavyMG
 	Range: 8c0
 	Burst: 9
-	BurstDelays: 144
+	BurstDelays: 282
 	FirstBurstTargetOffset: -2984,0,0
 	FollowingBurstTargetOffset: 746,0,0
-	ReloadDelay: 102
+	ReloadDelay: 95
 	Report: gun5.aud
-	Warhead@1Dam: 241
-		Spread: 215
-		Damage: 179
+	Warhead@1Dam: SpreadDamage
+		Spread: 276
+		Damage: 457
 		Versus:
 			None: 90
 			Wood: 15
@@ -64,17 +64,17 @@ Vulcan:
 
 HeliAGGun:
 	Inherits: ^HeavyMG
-	ReloadDelay: 110
+	ReloadDelay: 113
 	Burst: 2
-	BurstDelays: 132
+	BurstDelays: 249
 	Range: 4c0
 	MinRange: 0c768
 	Report: gun5.aud
 	Projectile: Bullet
 		Blockable: false
-	Warhead@1Dam: 188
-		Spread: 110
-		Damage: 739
+	Warhead@1Dam: SpreadDamage
+		Spread: 294
+		Damage: 356
 		Versus:
 			None: 100
 			Wood: 50
@@ -86,20 +86,20 @@ HeliAGGun:
 HeliAAGun:
 	Inherits: HeliAGGun
 	ValidTargets: Air
-	Warhead@1Dam: 152
+	Warhead@1Dam: SpreadDamage
 		ValidTargets: Air
 		Versus:
 			Light: 55
 
 ^LightMG:
 	Inherits: ^HeavyMG
-	ReloadDelay: 73
+	ReloadDelay: 35
 	Range: 4c0
 	InvalidTargets: Wall
 	Report: mgun2.aud
-	Warhead@1Dam: 285
-		Spread: 153
-		Damage: 53
+	Warhead@1Dam: SpreadDamage
+		Spread: 197
+		Damage: 358
 		InvalidTargets: Wall
 		Versus:
 			None: 150
@@ -114,11 +114,11 @@ HeliAAGun:
 
 Pistol:
 	Inherits: ^LightMG
-	ReloadDelay: 54
+	ReloadDelay: 132
 	Range: 3c0
 	Report: gun18.aud
-	Warhead@1Dam: 91
-		Damage: 391
+	Warhead@1Dam: SpreadDamage
+		Damage: 725
 		Versus:
 			None: 100
 	Warhead@2Eff: CreateEffect
@@ -139,7 +139,7 @@ MachineGun:
 	Inherits: ^LightMG
 	Burst: 5
 	Report: mgun11.aud
-	Warhead@1Dam: 134
+	Warhead@1Dam: SpreadDamage
 		Versus:
 			Wood: 10
 			Light: 70
@@ -148,19 +148,19 @@ MachineGun:
 
 MachineGunH:
 	Inherits: MachineGun
-	Warhead@1Dam: 79
+	Warhead@1Dam: SpreadDamage
 		Versus:
 			Light: 80
 
 APCGun:
-	ReloadDelay: 38
+	ReloadDelay: 69
 	Range: 5c0
 	Report: gun20.aud
 	Projectile: Bullet
-		Speed: 40
-	Warhead@1Dam: 251
-		Spread: 198
-		Damage: 404
+		Speed: 56
+	Warhead@1Dam: SpreadDamage
+		Spread: 136
+		Damage: 69
 		Versus:
 			None: 30
 			Wood: 25
@@ -178,9 +178,9 @@ APCGun.AA:
 	Range: 8c0
 	ValidTargets: Air
 	Projectile: Bullet
-		Speed: 265
+		Speed: 149
 		Blockable: false
-	Warhead@1Dam: 68
+	Warhead@1Dam: SpreadDamage
 		ValidTargets: Air
 		Versus:
 			Light: 140
