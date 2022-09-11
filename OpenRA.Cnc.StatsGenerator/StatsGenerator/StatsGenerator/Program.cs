@@ -10,18 +10,18 @@ namespace StatsGenerator
 		public static readonly string[] PATHS =
 		{
 			"C:\\Dev\\LibertyDawn\\mods\\cnc\\rules\\aircraft.yaml",
-			//"C:\\Dev\\LibertyDawn\\mods\\cnc\\rules\\vehicles.yaml",
-			//"C:\\Dev\\LibertyDawn\\mods\\cnc\\rules\\civilian.yaml",
-			//"C:\\Dev\\LibertyDawn\\mods\\cnc\\rules\\defaults.yaml",
-			//"C:\\Dev\\LibertyDawn\\mods\\cnc\\rules\\infantry.yaml",
-			//"C:\\Dev\\LibertyDawn\\mods\\cnc\\rules\\ships.yaml",
-			//"C:\\Dev\\LibertyDawn\\mods\\cnc\\rules\\structures.yaml",
-			//"C:\\Dev\\LibertyDawn\\mods\\cnc\\weapons\\missiles.yaml",
-			//"C:\\Dev\\LibertyDawn\\mods\\cnc\\weapons\\ballistics.yaml",
-			//"C:\\Dev\\LibertyDawn\\mods\\cnc\\weapons\\superweapons.yaml",
-			//"C:\\Dev\\LibertyDawn\\mods\\cnc\\weapons\\smallcaliber.yaml",
-			//"C:\\Dev\\LibertyDawn\\mods\\cnc\\weapons\\other.yaml",
-			//"C:\\Dev\\LibertyDawn\\mods\\cnc\\weapons\\explosions.yaml"
+			"C:\\Dev\\LibertyDawn\\mods\\cnc\\rules\\vehicles.yaml",
+			"C:\\Dev\\LibertyDawn\\mods\\cnc\\rules\\civilian.yaml",
+			"C:\\Dev\\LibertyDawn\\mods\\cnc\\rules\\defaults.yaml",
+			"C:\\Dev\\LibertyDawn\\mods\\cnc\\rules\\infantry.yaml",
+			"C:\\Dev\\LibertyDawn\\mods\\cnc\\rules\\ships.yaml",
+			"C:\\Dev\\LibertyDawn\\mods\\cnc\\rules\\structures.yaml",
+			"C:\\Dev\\LibertyDawn\\mods\\cnc\\weapons\\missiles.yaml",
+			"C:\\Dev\\LibertyDawn\\mods\\cnc\\weapons\\ballistics.yaml",
+			"C:\\Dev\\LibertyDawn\\mods\\cnc\\weapons\\superweapons.yaml",
+			"C:\\Dev\\LibertyDawn\\mods\\cnc\\weapons\\smallcaliber.yaml",
+			"C:\\Dev\\LibertyDawn\\mods\\cnc\\weapons\\other.yaml",
+			"C:\\Dev\\LibertyDawn\\mods\\cnc\\weapons\\explosions.yaml"
 		};
 
 		private static readonly Random random = new Random();
