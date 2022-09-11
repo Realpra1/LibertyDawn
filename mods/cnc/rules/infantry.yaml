@@ -4,7 +4,7 @@ E1:
 	Inherits@AUTOTARGET: ^AutoTargetGroundAssaultMove
 	Inherits@DECORATIONS: ^InfantryExperienceHospitalHazmatOverrides
 	Valued:
-		Cost: 3689
+		Cost: 3276
 	Tooltip:
 		Name: Minigunner
 	UpdatesPlayerStatistics:
@@ -15,11 +15,11 @@ E1:
 		Queue: Infantry.GDI, Infantry.Nod
 		Description: General-purpose infantry.\n  Strong vs Infantry\n  Weak vs Vehicles
 	Mobile:
-		Speed: 45
+		Speed: 65
 	Health:
-		HP: 13188
+		HP: 23628
 	AutoTarget:
-		ScanRadius: 16
+		ScanRadius: 11
 	Armament:
 		Weapon: M16
 	AttackFrontal:
@@ -36,7 +36,7 @@ E2:
 	Inherits@AUTOTARGET: ^AutoTargetGroundAssaultMove
 	Inherits@DECORATIONS: ^InfantryExperienceHospitalHazmatOverrides
 	Valued:
-		Cost: 2071
+		Cost: 2407
 	Tooltip:
 		Name: Grenadier
 	UpdatesPlayerStatistics:
@@ -47,15 +47,15 @@ E2:
 		Queue: Infantry.GDI
 		Description: Fast infantry armed with grenades. \n  Strong vs Buildings, slow-moving targets
 	Mobile:
-		Speed: 277
+		Speed: 293
 	Health:
-		HP: 38160
+		HP: 3016
 	AutoTarget:
 		ScanRadius: 14
 	Armament:
 		Weapon: Grenade
 		LocalOffset: 0,0,427
-		FireDelay: 197
+		FireDelay: 239
 	AttackFrontal:
 		Voice: Attack
 	AttackMove:
@@ -75,7 +75,7 @@ E3:
 	Inherits@AUTOTARGET: ^AutoTargetAllAssaultMove
 	Inherits@DECORATIONS: ^InfantryExperienceHospitalHazmatOverrides
 	Valued:
-		Cost: 3874
+		Cost: 3664
 	Tooltip:
 		Name: Rocket Soldier
 	UpdatesPlayerStatistics:
@@ -86,19 +86,19 @@ E3:
 		Queue: Infantry.GDI, Infantry.Nod
 		Description: Anti-tank/Anti-aircraft infantry. \n  Strong vs Tanks, Aircraft\n  Weak vs Infantry
 	Mobile:
-		Speed: 162
+		Speed: 140
 	Health:
-		HP: 18084
+		HP: 8629
 	AutoTarget:
-		ScanRadius: 16
+		ScanRadius: 4
 	Armament@PRIMARY:
 		Weapon: Rockets
 		LocalOffset: 256,43,341
-		FireDelay: 125
+		FireDelay: 173
     Armament@SECONDARY:
 		Weapon: AARockets
 		LocalOffset: 256,43,341
-		FireDelay: 187
+		FireDelay: 73
 	AttackFrontal:
 		Voice: Attack
 	AttackMove:
@@ -114,7 +114,7 @@ E4:
 	Inherits@AUTOTARGET: ^AutoTargetGroundAssaultMove
 	Inherits@DECORATIONS: ^InfantryExperienceHospitalHazmatOverrides
 	Valued:
-		Cost: 4042
+		Cost: 2372
 	Tooltip:
 		Name: Flamethrower
 	UpdatesPlayerStatistics:
@@ -125,15 +125,15 @@ E4:
 		Queue: Infantry.Nod
 		Description: Advanced Anti-infantry unit.\n  Strong vs Infantry, Buildings\n  Weak vs Tanks
 	Mobile:
-		Speed: 124
+		Speed: 226
 	Health:
-		HP: 42211
+		HP: 5236
 	AutoTarget:
-		ScanRadius: 5
+		ScanRadius: 13
 	Armament:
 		Weapon: Flamethrower
 		LocalOffset: 341,0,256
-		FireDelay: 13
+		FireDelay: 97
 		MuzzleSequence: muzzle
 	AttackFrontal:
 		Voice: Attack
@@ -155,7 +155,7 @@ E5:
 	Inherits@AUTOTARGET: ^AutoTargetGroundAssaultMove
 	Inherits@DECORATIONS: ^InfantryExperienceHospitalHazmatOverrides
 	Valued:
-		Cost: 2265
+		Cost: 1768
 	Tooltip:
 		Name: Chemical Warrior
 	UpdatesPlayerStatistics:
@@ -166,16 +166,16 @@ E5:
 		Queue: Infantry.Nod
 		Description: Advanced general-purpose infantry.\n  Strong vs all Ground units
 	Mobile:
-		Speed: 35
+		Speed: 130
 		Locomotor: chem
 	Health:
-		HP: 22640
+		HP: 43845
 	AutoTarget:
-		ScanRadius: 14
+		ScanRadius: 17
 	Armament:
 		Weapon: Chemspray
 		LocalOffset: 341,0,256
-		FireDelay: 130
+		FireDelay: 120
 		MuzzleSequence: muzzle
 	AttackFrontal:
 		Voice: Attack
@@ -195,7 +195,7 @@ E5:
 E6:
 	Inherits: ^Soldier
 	Valued:
-		Cost: 2370
+		Cost: 3117
 	Tooltip:
 		Name: Engineer
 	UpdatesPlayerStatistics:
@@ -206,9 +206,9 @@ E6:
 		Queue: Infantry.GDI, Infantry.Nod
 		Description: 227
 	Mobile:
-		Speed: 237
+		Speed: 96
 	Health:
-		HP: 48485
+		HP: 14628
 	Passenger:
 		CustomPipType: yellow
 	EngineerRepair:
@@ -229,7 +229,7 @@ RMBO:
 	Inherits@AUTOTARGET: ^AutoTargetGroundAssaultMove
 	Inherits@DECORATIONS: ^InfantryExperienceHospitalHazmatOverrides
 	Valued:
-		Cost: 754
+		Cost: 501
 	Tooltip:
 		Name: Commando
 	UpdatesPlayerStatistics:
@@ -240,17 +240,17 @@ RMBO:
 		Queue: Infantry.GDI
 		Description: Elite sniper infantry unit.\n  Strong vs Infantry, Buildings\n  Weak vs Vehicles
 	Mobile:
-		Speed: 238
+		Speed: 105
 	Health:
-		HP: 26632
+		HP: 29576
 	Passenger:
 		CustomPipType: red
 	RevealsShroud:
 		Range: 13c0
 	AutoTarget:
-		ScanRadius: 6
+		ScanRadius: 13
 	Demolition:
-		DetonationDelay: 176
+		DetonationDelay: 462
 		Voice: Demolish
 	Armament:
 		Weapon: Sniper

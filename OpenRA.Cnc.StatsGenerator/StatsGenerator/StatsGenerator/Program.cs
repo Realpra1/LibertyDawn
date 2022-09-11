@@ -47,14 +47,10 @@ namespace StatsGenerator
 				{
 					var stringToWrite = s;
 
-					if (s.Contains(':')) // HP
-					{
-						var splitted = s.Split(':');
-						if (splitted[0] == "\t\tHP")
-						{
-							stringToWrite = string.Format("{0}: {1}", splitted[0], RandomNumber(10,50000));
-						}
-					}
+
+					stringToWrite = CheckForSpeciffic(s, "HP", stringToWrite, 10, 50000);
+					stringToWrite = CheckForSpeciffic(s, "Ammo", stringToWrite, 1, 100);
+					stringToWrite = CheckForSpeciffic(s, "Damage", stringToWrite, 50, 1000);
 
 					if (s.Contains("Cost"))
 					{
@@ -91,11 +87,6 @@ namespace StatsGenerator
 						var update = s.Split(':');
 						stringToWrite = string.Format("{0}: {1}", update[0], RandomNumber(5, 200));
 					}
-					if (s.Contains("Damage"))
-					{
-						var update = s.Split(':');
-						stringToWrite = string.Format("{0}: {1}", update[0], RandomNumber(50, 1000));
-					}
 					if (s.Contains("HorizontalRateOfTurn"))
 					{
 						var update = s.Split(':');
@@ -106,12 +97,7 @@ namespace StatsGenerator
 						var update = s.Split(':');
 						stringToWrite = string.Format("{0}: {1}", update[0], RandomNumber(10, 300));
 					}
-					if (s.Contains("Ammo"))
-					{
-						var update = s.Split(':');
-						stringToWrite = string.Format("{0}: {1}", update[0], RandomNumber(1, 100));
-					}
-
+				
 
 					bld.AppendLine(stringToWrite);
 				}
@@ -121,6 +107,20 @@ namespace StatsGenerator
 				var newPath = string.Format("{0}\\{1}.yaml",pathDic,fileName);
 				File.WriteAllText(newPath, bld.ToString());
 			}
+		}
+
+		private static string CheckForSpeciffic(string s, string check, string stringToWrite, int lower, int higher)
+		{
+			if (s.Contains(':')) // HP
+			{
+				var splitted = s.Split(':');
+				if (splitted[0] == check || splitted[0] == string.Format("\t\t{0}", check))
+				{
+					stringToWrite = string.Format("{0}: {1}", splitted[0], RandomNumber(lower, higher));
+				}
+			}
+
+			return stringToWrite;
 		}
 	}
 }

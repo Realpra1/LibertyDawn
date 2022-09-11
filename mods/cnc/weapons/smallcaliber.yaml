@@ -2,13 +2,13 @@ Sniper:
 	Report: ramgun2.aud
 	ValidTargets: Ground, Infantry
 	InvalidTargets: Vehicle, Water, Structure, Wall, Husk, Creep
-	ReloadDelay: 143
+	ReloadDelay: 50
 	Range: 8c0
 	Projectile: Bullet
-		Speed: 299
+		Speed: 261
 	Warhead@1Dam: 838
-		Spread: 260
-		Damage: 970
+		Spread: 189
+		Damage: 619
 		ValidTargets: Infantry
 		DamageTypes: 201
 	Warhead@2Eff: CreateEffect
@@ -17,14 +17,14 @@ Sniper:
 		ValidTargets: Ground, Water, Air
 
 ^HeavyMG:
-	ReloadDelay: 16
+	ReloadDelay: 103
 	Range: 6c0
 	Report: gun8.aud
 	Projectile: Bullet
-		Speed: 290
+		Speed: 5
 	Warhead@1Dam: 293
-		Spread: 265
-		Damage: 274
+		Spread: 132
+		Damage: 490
 		Versus:
 			None: 100
 			Wood: 50
@@ -41,20 +41,20 @@ HighV:
 	Inherits: ^HeavyMG
 	Range: 7c0
     Warhead@1Dam: 582
-		Damage: 556
+		Damage: 743
 
 Vulcan:
 	Inherits: ^HeavyMG
 	Range: 8c0
 	Burst: 9
-	BurstDelays: 160
+	BurstDelays: 110
 	FirstBurstTargetOffset: -2984,0,0
 	FollowingBurstTargetOffset: 746,0,0
-	ReloadDelay: 46
+	ReloadDelay: 31
 	Report: gun5.aud
 	Warhead@1Dam: 301
-		Spread: 240
-		Damage: 134
+		Spread: 92
+		Damage: 988
 		Versus:
 			None: 90
 			Wood: 15
@@ -64,17 +64,17 @@ Vulcan:
 
 HeliAGGun:
 	Inherits: ^HeavyMG
-	ReloadDelay: 134
+	ReloadDelay: 78
 	Burst: 2
-	BurstDelays: 31
+	BurstDelays: 81
 	Range: 4c0
 	MinRange: 0c768
 	Report: gun5.aud
 	Projectile: Bullet
 		Blockable: false
 	Warhead@1Dam: 603
-		Spread: 143
-		Damage: 185
+		Spread: 151
+		Damage: 441
 		Versus:
 			None: 100
 			Wood: 50
@@ -93,13 +93,13 @@ HeliAAGun:
 
 ^LightMG:
 	Inherits: ^HeavyMG
-	ReloadDelay: 73
+	ReloadDelay: 14
 	Range: 4c0
 	InvalidTargets: Wall
 	Report: mgun2.aud
 	Warhead@1Dam: 818
-		Spread: 76
-		Damage: 858
+		Spread: 193
+		Damage: 486
 		InvalidTargets: Wall
 		Versus:
 			None: 150
@@ -114,11 +114,11 @@ HeliAAGun:
 
 Pistol:
 	Inherits: ^LightMG
-	ReloadDelay: 119
+	ReloadDelay: 143
 	Range: 3c0
 	Report: gun18.aud
 	Warhead@1Dam: 638
-		Damage: 307
+		Damage: 961
 		Versus:
 			None: 100
 	Warhead@2Eff: CreateEffect
@@ -153,14 +153,14 @@ MachineGunH:
 			Light: 80
 
 APCGun:
-	ReloadDelay: 168
+	ReloadDelay: 66
 	Range: 5c0
 	Report: gun20.aud
 	Projectile: Bullet
-		Speed: 89
+		Speed: 40
 	Warhead@1Dam: 62
-		Spread: 151
-		Damage: 234
+		Spread: 73
+		Damage: 464
 		Versus:
 			None: 30
 			Wood: 25
@@ -178,7 +178,7 @@ APCGun.AA:
 	Range: 8c0
 	ValidTargets: Air
 	Projectile: Bullet
-		Speed: 265
+		Speed: 151
 		Blockable: false
 	Warhead@1Dam: 953
 		ValidTargets: Air

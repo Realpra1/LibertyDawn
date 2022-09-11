@@ -1,7 +1,7 @@
 ^DamagingExplosion:
 	Warhead@1Dam: 764
-		Spread: 73
-		Damage: 623
+		Spread: 176
+		Damage: 116
 		Versus:
 			None: 100
 			Wood: 100
@@ -30,8 +30,8 @@
 FlametankExplode:
 	Inherits: ^DamagingExplosion
 	Warhead@1Dam: 95
-		Spread: 160
-		Damage: 627
+		Spread: 177
+		Damage: 689
 		DamageTypes: 967
 	Warhead@2Eff: CreateEffect
 		Explosions: big_napalm
@@ -42,8 +42,8 @@ FlametankExplode:
 ChemtankExplode:
 	Inherits: ^DamagingExplosion
 	Warhead@1Dam: 592
-		Spread: 105
-		Damage: 964
+		Spread: 220
+		Damage: 782
         Versus:
 			None: 90
 			Wood: 55
@@ -60,7 +60,7 @@ ChemtankExplode:
 HeliCrash:
 	Inherits: ^DamagingExplosion
 	Warhead@1Dam: 255
-		Damage: 620
+		Damage: 69
 
 HeliExplode:
 	Warhead@1Eff: CreateEffect
@@ -70,7 +70,7 @@ HeliExplode:
 UnitExplode:
 	Inherits: ^DamagingExplosionHE
 	Warhead@1Dam: 969
-		Damage: 300
+		Damage: 823
 		Versus:
 			Wood: 74
 			Tiberium: 24
@@ -81,7 +81,7 @@ UnitExplode:
 UnitExplodeShip:
 	Inherits: ^DamagingExplosionHE
 	Warhead@1Dam: 189
-		Damage: 834
+		Damage: 902
 		Versus:
 			Wood: 74
 			Tiberium: 24
@@ -122,8 +122,8 @@ UnitExplodeStealthTank:
 GrenadierExplode:
 	Inherits: ^DamagingExplosionHE
 	Warhead@1Dam: 478
-		Spread: 249
-		Damage: 176
+		Spread: 172
+		Damage: 582
 		Versus:
 			None: 100
 			Wood: 50
@@ -138,8 +138,8 @@ GrenadierExplode:
 FlamethrowerExplode:
 	Inherits: ^DamagingExplosion
 	Warhead@1Dam: 154
-		Spread: 289
-		Damage: 845
+		Spread: 257
+		Damage: 912
 		Versus:
 			None: 110
 			Wood: 100
@@ -154,8 +154,8 @@ FlamethrowerExplode:
 ChemWarriorExplode:
 	Inherits: ^DamagingExplosion
 	Warhead@1Dam: 539
-		Spread: 175
-		Damage: 507
+		Spread: 244
+		Damage: 57
         Versus:
 			None: 70
 			Wood: 75
@@ -179,8 +179,8 @@ BuildingExplode:
 Napalm.Crate:
 	Inherits: ^DamagingExplosionHE
 	Warhead@1Dam: 254
-		Spread: 67
-		Damage: 347
+		Spread: 68
+		Damage: 441
 		Falloff: 1000, 368, 135, 50, 18, 7, 0
 		Versus:
 			Wood: 100
@@ -195,8 +195,8 @@ Napalm.Crate:
 TiberiumExplosion:
 	Inherits: ^DamagingExplosionHE
 	Warhead@1Dam: 297
-		Spread: 295
-		Damage: 142
+		Spread: 193
+		Damage: 265
 		Versus:
 			Wood: 70
 			Heavy: 20

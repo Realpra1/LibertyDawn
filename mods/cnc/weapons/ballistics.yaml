@@ -1,14 +1,14 @@
 ^BallisticWeapon:
-	ReloadDelay: 118
+	ReloadDelay: 117
 	Range: 4c768
 	Report: tnkfire6.aud
 	Projectile: Bullet
 		Image: 120MM
-		Speed: 294
+		Speed: 235
 		Shadow: true
 	Warhead@1Dam: 347
-		Spread: 69
-		Damage: 882
+		Spread: 299
+		Damage: 100
 		Versus:
 			None: 25
 			Wood: 90
@@ -26,13 +26,13 @@
 
 70mm:
 	Inherits: ^BallisticWeapon
-	ReloadDelay: 199
+	ReloadDelay: 70
 	Range: 4c0
 	Report: tnkfire3.aud
 	Projectile: Bullet
-		Speed: 232
+		Speed: 168
 	Warhead@1Dam: 906
-		Damage: 452
+		Damage: 795
 		Versus:
 			None: 24
 			Wood: 88
@@ -46,16 +46,16 @@
 120mmDual:
 	Inherits: ^BallisticWeapon
 	Burst: 2
-	BurstDelays: 179
+	BurstDelays: 24
 
 TurretGun:
 	Inherits: ^BallisticWeapon
-	ReloadDelay: 100
+	ReloadDelay: 60
 	Range: 7c0
 	Projectile: Bullet
-		Speed: 239
+		Speed: 19
 	Warhead@1Dam: 246
-		Damage: 262
+		Damage: 272
 		Versus:
 			None: 20
 			Wood: 25
@@ -65,20 +65,20 @@ TurretGun:
 
 ArtilleryShell:
 	Inherits: ^BallisticWeapon
-	ReloadDelay: 189
+	ReloadDelay: 111
 	Range: 11c0
 	MinRange: 1c0
 	Report: tnkfire2.aud
 	TargetActorCenter: true
 	Projectile: Bullet
-		Speed: 151
+		Speed: 154
 		Blockable: false
 		LaunchAngle: 55
 		Inaccuracy: 813
 		ContrailLength: 15
 	Warhead@1Dam: 612
-		Spread: 116
-		Damage: 523
+		Spread: 143
+		Damage: 619
 		Versus:
 			None: 100
 			Wood: 110
@@ -92,18 +92,18 @@ ArtilleryShell:
 
 Grenade:
 	Inherits: ^BallisticWeapon
-	ReloadDelay: 53
+	ReloadDelay: 95
 	Range: 5c0
 	Report: toss1.aud
 	Projectile: Bullet
-		Speed: 13
+		Speed: 297
 		Blockable: false
 		LaunchAngle: 62
 		Inaccuracy: 813
 		Image: BOMB
 	Warhead@1Dam: 845
-		Spread: 228
-		Damage: 412
+		Spread: 167
+		Damage: 553
 		Versus:
 			None: 100
 			Wood: 50
