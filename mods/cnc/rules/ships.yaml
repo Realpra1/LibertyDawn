@@ -4,17 +4,17 @@ BOAT:
 	Inherits@EXPERIENCE: ^GainsExperience
 	Inherits@AUTOTARGET: ^AutoTargetAll
 	Valued:
-		Cost: 2661
+		Cost: 1211
 	Tooltip:
 		Name: Gunboat
 	UpdatesPlayerStatistics:
 		AddToArmyValue: true
 	Health:
-		HP: 16292
+		HP: 61465
 	Armor:
 		Type: Heavy
 	TDGunboat:
-		Speed: 73
+		Speed: 96
 	RevealsShroud:
 		Range: 33c0
 		Type: CenterPosition
@@ -56,17 +56,17 @@ LST:
 	Inherits: ^Ship
 	Inherits@TRANSPORT: ^Transport
 	Valued:
-		Cost: 2410
+		Cost: 1227
 	Tooltip:
 		Name: Landing Craft
 	Mobile:
 		Locomotor: lcraft
 		InitialFacing: 0
 		TurnSpeed: 16
-		Speed: 174
+		Speed: 125
 		PauseOnCondition: notmobile
 	Health:
-		HP: 9128
+		HP: 69448
 	Armor:
 		Type: Heavy
 	RevealsShroud:

@@ -2,7 +2,7 @@ TRAN:
 	Inherits: ^Helicopter
 	Inherits@TRANSPORT: ^Transport
 	Valued:
-		Cost: 270
+		Cost: 1246
 	Tooltip:
 		Name: Chinook Transport
 	UpdatesPlayerStatistics:
@@ -14,10 +14,10 @@ TRAN:
 		Description: Fast Infantry Transport Helicopter.\n  Unarmed
 	Aircraft:
 		TurnSpeed: 20
-		Speed: 66
+		Speed: 53
 		AltitudeVelocity: 0c100
 	Health:
-		HP: 23262
+		HP: 63938
 	Armor:
 		Type: Light
 	RevealsShroud:
@@ -54,7 +54,7 @@ HELI:
 	Inherits@EXPERIENCE: ^GainsExperience
 	Inherits@AUTOTARGET: ^AutoTargetAllAssaultMove
 	Valued:
-		Cost: 1816
+		Cost: 1543
 	Tooltip:
 		Name: Apache Longbow
 	UpdatesPlayerStatistics:
@@ -66,9 +66,9 @@ HELI:
 		Description: Helicopter Gunship with Chainguns.\n  Strong vs Infantry, Light Vehicles and\n  Aircraft\n  Weak vs Tanks
 	Aircraft:
 		TurnSpeed: 28
-		Speed: 277
+		Speed: 206
 	Health:
-		HP: 78530
+		HP: 68861
 	Armor:
 		Type: Light
 	RevealsShroud:
@@ -88,7 +88,7 @@ HELI:
 	AttackMove:
 		Voice: Attack
 	AutoTarget:
-		ScanRadius: 14
+		ScanRadius: 12
 	AttackAircraft:
 		FacingTolerance: 80
 		OpportunityFire: false
@@ -96,7 +96,7 @@ HELI:
 		AttackType: Hover
 		Voice: Attack
 	AmmoPool:
-		Ammo: 69
+		Ammo: 68
 		AmmoCondition: ammo
 	WithIdleOverlay@ROTORAIR:
 		Offset: 0,0,85
@@ -125,7 +125,7 @@ ORCA:
 	Inherits@EXPERIENCE: ^GainsExperience
 	Inherits@AUTOTARGET: ^AutoTargetAllAssaultMove
 	Valued:
-		Cost: 1435
+		Cost: 2171
 	Tooltip:
 		Name: Orca
 	UpdatesPlayerStatistics:
@@ -137,9 +137,9 @@ ORCA:
 		Description: Helicopter Gunship with AG Missiles.\n  Strong vs Buildings, Tanks\n  Weak vs Infantry
 	Aircraft:
 		TurnSpeed: 28
-		Speed: 299
+		Speed: 93
 	Health:
-		HP: 96938
+		HP: 73507
 	Armor:
 		Type: Light
 	RevealsShroud:
@@ -156,7 +156,7 @@ ORCA:
 	AttackMove:
 		Voice: Attack
 	AutoTarget:
-		ScanRadius: 11
+		ScanRadius: 15
 	AttackAircraft:
 		FacingTolerance: 80
 		OpportunityFire: false
@@ -164,7 +164,7 @@ ORCA:
 		AttackType: Hover
 		Voice: Attack
 	AmmoPool:
-		Ammo: 74
+		Ammo: 87
 		AmmoCondition: ammo
 	SpawnActorOnDeath:
 		Actor: ORCA.Husk
@@ -187,12 +187,12 @@ C17:
 	Tooltip:
 		Name: Supply Aircraft
 	Valued:
-		Cost: 2106
+		Cost: 1686
 	UpdatesPlayerStatistics:
 		AddToAssetsValue: false
 	Aircraft:
 		TurnSpeed: 20
-		Speed: 86
+		Speed: 61
 		Repulsable: False
 		MaximumPitch: 36
 	HiddenUnderFog:
@@ -230,12 +230,12 @@ A10:
 	Tooltip:
 		Name: A10 Bomber
 	Valued:
-		Cost: 1372
+		Cost: 1026
 	UpdatesPlayerStatistics:
 		AddToAssetsValue: false
 	Aircraft:
 		TurnSpeed: 16
-		Speed: 48
+		Speed: 213
 		Repulsable: False
 	AttackBomber:
 		Armaments: gun, bombs
@@ -263,7 +263,7 @@ TRAN.Husk:
 		Name: Chinook Transport
 	Aircraft:
 		TurnSpeed: 20
-		Speed: 46
+		Speed: 241
 	RevealsShroud:
 		Range: 16c0
 		Type: GroundPosition
@@ -282,7 +282,7 @@ HELI.Husk:
 		Name: Apache Longbow
 	Aircraft:
 		TurnSpeed: 16
-		Speed: 67
+		Speed: 258
 	RevealsShroud:
 		Range: 23c0
 		Type: GroundPosition
@@ -298,7 +298,7 @@ ORCA.Husk:
 		Name: Orca
 	Aircraft:
 		TurnSpeed: 16
-		Speed: 42
+		Speed: 255
 	RevealsShroud:
 		Range: 34c0
 		Type: GroundPosition

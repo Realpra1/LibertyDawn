@@ -53,7 +53,7 @@ namespace StatsGenerator
 					stringToWrite = CheckForSpeciffic(s, "Damage", stringToWrite, 500, 20000);
 					stringToWrite = CheckForSpeciffic(s, "Speed", stringToWrite, 3, 300);
 					stringToWrite = CheckForSpeciffic(s, "Spread", stringToWrite, 50, 300);
-					stringToWrite = CheckForSpecifficWithPostfix(s, "Range", stringToWrite, 1, 35);
+			//		stringToWrite = CheckForSpecifficWithPostfix(s, "Range", stringToWrite, 1, 35);
 
 					if (s.Contains("Cost"))
 					{
