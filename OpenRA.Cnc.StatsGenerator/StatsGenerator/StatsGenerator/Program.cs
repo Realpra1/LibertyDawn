@@ -51,7 +51,9 @@ namespace StatsGenerator
 					stringToWrite = CheckForSpeciffic(s, "HP", stringToWrite, 10, 50000);
 					stringToWrite = CheckForSpeciffic(s, "Ammo", stringToWrite, 1, 100);
 					stringToWrite = CheckForSpeciffic(s, "Damage", stringToWrite, 50, 1000);
-
+					stringToWrite = CheckForSpeciffic(s, "Speed", stringToWrite, 3, 300);
+					stringToWrite = CheckForSpeciffic(s, "Spread", stringToWrite, 50, 300);
+					
 					if (s.Contains("Cost"))
 					{
 						var update = s.Split(':');
@@ -62,11 +64,7 @@ namespace StatsGenerator
 						var update = s.Split(':');
 						stringToWrite = string.Format("{0}: {1}", update[0], RandomNumber(1, 20));
 					}
-					if (s.Contains("Speed"))
-					{
-						var update = s.Split(':');
-						stringToWrite = string.Format("{0}: {1}", update[0], RandomNumber(3, 300));
-					}
+					
 					if (s.Contains("FireDelay"))
 					{
 						var update = s.Split(':');
