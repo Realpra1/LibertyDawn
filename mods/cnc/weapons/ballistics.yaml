@@ -1,21 +1,21 @@
 ^BallisticWeapon:
-	ReloadDelay: 155
+	ReloadDelay: 40
 	Range: 4c768
 	Report: tnkfire6.aud
 	Projectile: Bullet
 		Image: 120MM
-		Speed: 83
+		Speed: 682
 		Shadow: true
-	Warhead@1Dam: 347
-		Spread: 165
-		Damage: 659
+	Warhead@1Dam: SpreadDamage
+		Spread: 128
+		Damage: 4000
 		Versus:
 			None: 25
 			Wood: 90
 			Light: 150
 			Tiberium: 80
 			Heavy: 80
-		DamageTypes: 161
+		DamageTypes: Prone50Percent, TriggerProne, ExplosionDeath
 	Warhead@2Smu: LeaveSmudge
 		SmudgeType: Crater
 		InvalidTargets: Vehicle, Structure, Wall, Husk, Trees, Creep
@@ -26,13 +26,13 @@
 
 70mm:
 	Inherits: ^BallisticWeapon
-	ReloadDelay: 180
+	ReloadDelay: 30
 	Range: 4c0
 	Report: tnkfire3.aud
 	Projectile: Bullet
-		Speed: 150
-	Warhead@1Dam: 906
-		Damage: 306
+		Speed: 853
+	Warhead@1Dam: SpreadDamage
+		Damage: 2500
 		Versus:
 			None: 24
 			Wood: 88
@@ -46,16 +46,16 @@
 120mmDual:
 	Inherits: ^BallisticWeapon
 	Burst: 2
-	BurstDelays: 281
+	BurstDelays: 8
 
 TurretGun:
 	Inherits: ^BallisticWeapon
-	ReloadDelay: 149
+	ReloadDelay: 20
 	Range: 7c0
 	Projectile: Bullet
-		Speed: 242
-	Warhead@1Dam: 246
-		Damage: 971
+		Speed: 853
+	Warhead@1Dam: SpreadDamage
+		Damage: 4400
 		Versus:
 			None: 20
 			Wood: 25
@@ -65,51 +65,51 @@ TurretGun:
 
 ArtilleryShell:
 	Inherits: ^BallisticWeapon
-	ReloadDelay: 61
+	ReloadDelay: 65
 	Range: 11c0
 	MinRange: 1c0
 	Report: tnkfire2.aud
 	TargetActorCenter: true
 	Projectile: Bullet
-		Speed: 211
+		Speed: 160
 		Blockable: false
 		LaunchAngle: 55
 		Inaccuracy: 813
 		ContrailLength: 15
-	Warhead@1Dam: 612
-		Spread: 58
-		Damage: 126
+	Warhead@1Dam: SpreadDamage
+		Spread: 341
+		Damage: 10000
 		Versus:
 			None: 100
 			Wood: 110
 			Light: 90
 			Tiberium: 110
 			Heavy: 60
-		DamageTypes: 542
+		DamageTypes: Prone50Percent, TriggerProne, SmallExplosionDeath
 	Warhead@3Eff: CreateEffect
 		Explosions: poof
 		ImpactSounds: xplosml2.aud
 
 Grenade:
 	Inherits: ^BallisticWeapon
-	ReloadDelay: 25
+	ReloadDelay: 50
 	Range: 5c0
 	Report: toss1.aud
 	Projectile: Bullet
-		Speed: 295
+		Speed: 140
 		Blockable: false
 		LaunchAngle: 62
 		Inaccuracy: 813
 		Image: BOMB
-	Warhead@1Dam: 845
-		Spread: 208
-		Damage: 117
+	Warhead@1Dam: SpreadDamage
+		Spread: 1c0
+		Damage: 4500
 		Versus:
 			None: 100
 			Wood: 50
 			Light: 80
 			Tiberium: 50
 			Heavy: 34
-		DamageTypes: 70
+		DamageTypes: Prone50Percent, TriggerProne, SmallExplosionDeath
 	Warhead@3Eff: CreateEffect
 		Explosions: small_poof

@@ -4,7 +4,7 @@ E1:
 	Inherits@AUTOTARGET: ^AutoTargetGroundAssaultMove
 	Inherits@DECORATIONS: ^InfantryExperienceHospitalHazmatOverrides
 	Valued:
-		Cost: 4883
+		Cost: 90
 	Tooltip:
 		Name: Minigunner
 	UpdatesPlayerStatistics:
@@ -15,9 +15,9 @@ E1:
 		Queue: Infantry.GDI, Infantry.Nod
 		Description: General-purpose infantry.\n  Strong vs Infantry\n  Weak vs Vehicles
 	Mobile:
-		Speed: 249
+		Speed: 54
 	Health:
-		HP: 49428
+		HP: 5000
 	AutoTarget:
 		ScanRadius: 4
 	Armament:
@@ -36,7 +36,7 @@ E2:
 	Inherits@AUTOTARGET: ^AutoTargetGroundAssaultMove
 	Inherits@DECORATIONS: ^InfantryExperienceHospitalHazmatOverrides
 	Valued:
-		Cost: 3636
+		Cost: 160
 	Tooltip:
 		Name: Grenadier
 	UpdatesPlayerStatistics:
@@ -47,15 +47,15 @@ E2:
 		Queue: Infantry.GDI
 		Description: Fast infantry armed with grenades. \n  Strong vs Buildings, slow-moving targets
 	Mobile:
-		Speed: 123
+		Speed: 68
 	Health:
-		HP: 13828
+		HP: 5500
 	AutoTarget:
-		ScanRadius: 15
+		ScanRadius: 4
 	Armament:
 		Weapon: Grenade
 		LocalOffset: 0,0,427
-		FireDelay: 137
+		FireDelay: 15
 	AttackFrontal:
 		Voice: Attack
 	AttackMove:
@@ -75,7 +75,7 @@ E3:
 	Inherits@AUTOTARGET: ^AutoTargetAllAssaultMove
 	Inherits@DECORATIONS: ^InfantryExperienceHospitalHazmatOverrides
 	Valued:
-		Cost: 2852
+		Cost: 250
 	Tooltip:
 		Name: Rocket Soldier
 	UpdatesPlayerStatistics:
@@ -86,19 +86,19 @@ E3:
 		Queue: Infantry.GDI, Infantry.Nod
 		Description: Anti-tank/Anti-aircraft infantry. \n  Strong vs Tanks, Aircraft\n  Weak vs Infantry
 	Mobile:
-		Speed: 193
+		Speed: 39
 	Health:
-		HP: 38999
+		HP: 4500
 	AutoTarget:
-		ScanRadius: 17
+		ScanRadius: 7
 	Armament@PRIMARY:
 		Weapon: Rockets
 		LocalOffset: 256,43,341
-		FireDelay: 2
+		FireDelay: 5
     Armament@SECONDARY:
 		Weapon: AARockets
 		LocalOffset: 256,43,341
-		FireDelay: 286
+		FireDelay: 5
 	AttackFrontal:
 		Voice: Attack
 	AttackMove:
@@ -114,7 +114,7 @@ E4:
 	Inherits@AUTOTARGET: ^AutoTargetGroundAssaultMove
 	Inherits@DECORATIONS: ^InfantryExperienceHospitalHazmatOverrides
 	Valued:
-		Cost: 2316
+		Cost: 200
 	Tooltip:
 		Name: Flamethrower
 	UpdatesPlayerStatistics:
@@ -125,15 +125,15 @@ E4:
 		Queue: Infantry.Nod
 		Description: Advanced Anti-infantry unit.\n  Strong vs Infantry, Buildings\n  Weak vs Tanks
 	Mobile:
-		Speed: 194
+		Speed: 54
 	Health:
-		HP: 17304
+		HP: 8500
 	AutoTarget:
-		ScanRadius: 16
+		ScanRadius: 4
 	Armament:
 		Weapon: Flamethrower
 		LocalOffset: 341,0,256
-		FireDelay: 2
+		FireDelay: 3
 		MuzzleSequence: muzzle
 	AttackFrontal:
 		Voice: Attack
@@ -155,7 +155,7 @@ E5:
 	Inherits@AUTOTARGET: ^AutoTargetGroundAssaultMove
 	Inherits@DECORATIONS: ^InfantryExperienceHospitalHazmatOverrides
 	Valued:
-		Cost: 4281
+		Cost: 300
 	Tooltip:
 		Name: Chemical Warrior
 	UpdatesPlayerStatistics:
@@ -166,16 +166,16 @@ E5:
 		Queue: Infantry.Nod
 		Description: Advanced general-purpose infantry.\n  Strong vs all Ground units
 	Mobile:
-		Speed: 226
+		Speed: 54
 		Locomotor: chem
 	Health:
-		HP: 40239
+		HP: 9000
 	AutoTarget:
-		ScanRadius: 15
+		ScanRadius: 4
 	Armament:
 		Weapon: Chemspray
 		LocalOffset: 341,0,256
-		FireDelay: 24
+		FireDelay: 3
 		MuzzleSequence: muzzle
 	AttackFrontal:
 		Voice: Attack
@@ -184,7 +184,7 @@ E5:
 	TakeCover:
 		ProneOffset: 190,0,-190
 	WithMuzzleOverlay:
-	-DamagedByTerrain: 255
+	-DamagedByTerrain:
 	WithInfantryBody:
 		DefaultAttackSequence: shoot
     Explodes:
@@ -195,7 +195,7 @@ E5:
 E6:
 	Inherits: ^Soldier
 	Valued:
-		Cost: 3908
+		Cost: 250
 	Tooltip:
 		Name: Engineer
 	UpdatesPlayerStatistics:
@@ -204,11 +204,11 @@ E6:
 		BuildPaletteOrder: 30
 		Prerequisites: barracks
 		Queue: Infantry.GDI, Infantry.Nod
-		Description: 227
+		Description: Damages and captures enemy structures.\n  Repairs destroyed vehicles\n  Unarmed
 	Mobile:
-		Speed: 182
+		Speed: 46
 	Health:
-		HP: 21437
+		HP: 3000
 	Passenger:
 		CustomPipType: yellow
 	EngineerRepair:
@@ -229,7 +229,7 @@ RMBO:
 	Inherits@AUTOTARGET: ^AutoTargetGroundAssaultMove
 	Inherits@DECORATIONS: ^InfantryExperienceHospitalHazmatOverrides
 	Valued:
-		Cost: 2362
+		Cost: 1800
 	Tooltip:
 		Name: Commando
 	UpdatesPlayerStatistics:
@@ -240,17 +240,17 @@ RMBO:
 		Queue: Infantry.GDI
 		Description: Elite sniper infantry unit.\n  Strong vs Infantry, Buildings\n  Weak vs Vehicles
 	Mobile:
-		Speed: 71
+		Speed: 68
 	Health:
-		HP: 7675
+		HP: 15000
 	Passenger:
 		CustomPipType: red
 	RevealsShroud:
 		Range: 13c0
 	AutoTarget:
-		ScanRadius: 1
+		ScanRadius: 8
 	Demolition:
-		DetonationDelay: 434
+		DetonationDelay: 45
 		Voice: Demolish
 	Armament:
 		Weapon: Sniper

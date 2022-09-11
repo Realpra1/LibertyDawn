@@ -1,14 +1,14 @@
 ^FlameWeapon:
 	ValidTargets: Ground, Water, Trees
-	ReloadDelay: 114
+	ReloadDelay: 55
 	Range: 3c0
 	InvalidTargets: Wall
 	Report: flamer2.aud
 	Projectile: Bullet
-		Speed: 180
-	Warhead@1Dam: 884
-		Spread: 180
-		Damage: 223
+		Speed: 1c682
+	Warhead@1Dam: SpreadDamage
+		Spread: 1c0
+		Damage: 5000
 		ValidTargets: Ground, Water, Trees
 		InvalidTargets: Wall
 		Versus:
@@ -17,7 +17,7 @@
 			Light: 80
 			Tiberium: 45
 			Heavy: 15
-		DamageTypes: 918
+		DamageTypes: Prone50Percent, TriggerProne, FireDeath, Incendiary
 	Warhead@2Smu: LeaveSmudge
 		SmudgeType: Scorch
 		InvalidTargets: Vehicle, Structure, Wall
@@ -30,15 +30,15 @@ Flamethrower:
 
 BigFlamer:
 	Inherits: ^FlameWeapon
-	ReloadDelay: 147
+	ReloadDelay: 65
 	Range: 3c512
 	Projectile: Bullet
-		Speed: 136
+		Speed: 341
 	Burst: 2
-	BurstDelays: 289
-	Warhead@1Dam: 975
-		Spread: 141
-		Damage: 198
+	BurstDelays: 10
+	Warhead@1Dam: SpreadDamage
+		Spread: 400
+		Damage: 10000
 		Versus:
 			None: 85
 			Wood: 100
@@ -50,10 +50,10 @@ BigFlamer:
 
 Chemspray:
 	Inherits: ^FlameWeapon
-	ReloadDelay: 175
+	ReloadDelay: 65
 	-InvalidTargets:
-	Warhead@1Dam: 935
-		Damage: 796
+	Warhead@1Dam: SpreadDamage
+		Damage: 8000
 		-InvalidTargets:
 		Versus:
 			None: 70
@@ -61,47 +61,47 @@ Chemspray:
 			Light: 40
 			Tiberium: 140
 			Heavy: 60
-		DamageTypes: 874
+		DamageTypes: Prone50Percent, TriggerProne, TiberiumDeath
 	Warhead@3Eff: CreateEffect
 		Explosions: chemball
 		ImpactSounds: xplos.aud
 
 BigChem:
 	Inherits: ^FlameWeapon
-	ReloadDelay: 136
+	ReloadDelay: 65
 	-InvalidTargets:
 	Range: 3c512
 	Projectile: Bullet
-		Speed: 7
+		Speed: 341
 	Burst: 2
-	BurstDelays: 257
-	Warhead@1Dam: 775
-		Spread: 262
-		Damage: 864
+	BurstDelays: 10
+	Warhead@1Dam: SpreadDamage
+		Spread: 400
+		Damage: 17000
 		Versus:
 			None: 70
 			Wood: 25
 			Light: 40
 			Tiberium: 140
 			Heavy: 60
-		DamageTypes: 221
+		DamageTypes: Prone50Percent, TriggerProne, TiberiumDeath
     Warhead@3Eff: CreateEffect
 		Explosions: bigchem
 		ImpactSounds: xplos.aud
 
 Napalm:
 	Inherits: ^FlameWeapon
-	ReloadDelay: 56
+	ReloadDelay: 4
 	Range: 2c0
 	Burst: 2
-	BurstDelays: 137
+	BurstDelays: 2
 	-Projectile:
 	Projectile: GravityBomb
 		Image: BOMBLET
 		Shadow: true
-	Warhead@1Dam: 733
-		Spread: 75
-		Damage: 755
+	Warhead@1Dam: SpreadDamage
+		Spread: 341
+		Damage: 3000
 		Falloff: 1000, 368, 135, 50, 18, 7, 0
 		Versus:
 			Wood: 35
@@ -110,60 +110,60 @@ Napalm:
 		Explosions: med_napalm
 
 Laser:
-	ReloadDelay: 68
+	ReloadDelay: 40
 	Range: 8c0
 	Report: obelray1.aud
 	Projectile: LaserZap
 		Width: 85
 		HitAnim: laserfire
 		ZOffset: 2047
-	Warhead@1Dam: 732
-		Spread: 214
-		Damage: 503
+	Warhead@1Dam: SpreadDamage
+		Spread: 42
+		Damage: 39600
 		Versus:
 			Wood: 50
-		DamageTypes: 934
+		DamageTypes: Prone50Percent, TriggerProne, FireDeath
 	Warhead@2Smu: LeaveSmudge
 		SmudgeType: Scorch
 		InvalidTargets: Vehicle, Structure, Wall, Husk, Trees, Creep
 
 ^DinoWeapon:
-	ReloadDelay: 122
+	ReloadDelay: 30
 	Range: 1c0
 	Report: dinoatk1.aud
 	Projectile: Bullet
-		Speed: 135
-	Warhead@1Dam: 960
-		Spread: 256
-		Damage: 834
+		Speed: 1c682
+	Warhead@1Dam: SpreadDamage
+		Spread: 213
+		Damage: 18000
 		Versus:
 			None: 90
 			Wood: 10
 			Light: 30
 			Heavy: 10
-		DamageTypes: 868
+		DamageTypes: Prone50Percent, TriggerProne, RippedApartDeath
 
 Tail:
 	Inherits: ^DinoWeapon
 
 Horn:
 	Inherits: ^DinoWeapon
-	ReloadDelay: 180
-	Warhead@1Dam: 338
-		Damage: 363
+	ReloadDelay: 20
+	Warhead@1Dam: SpreadDamage
+		Damage: 12000
 
 Teeth:
 	Inherits: ^DinoWeapon
 
 Claw:
 	Inherits: ^DinoWeapon
-	ReloadDelay: 100
-	Warhead@1Dam: 64
-		Damage: 583
+	ReloadDelay: 10
+	Warhead@1Dam: SpreadDamage
+		Damage: 6000
 
 Demolish:
-	Warhead@1Dam: 381
-		DamageTypes: 118
+	Warhead@1Dam: SpreadDamage
+		DamageTypes: DefaultDeath
 	Warhead@2Eff: CreateEffect
 		Explosions: building
 		ImpactSounds: xplobig6.aud
