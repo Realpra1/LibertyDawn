@@ -1,7 +1,7 @@
 ^DamagingExplosion:
 	Warhead@1Dam: SpreadDamage
-		Spread: 125
-		Damage: 7403
+		Spread: 188
+		Damage: 18197
 		Versus:
 			None: 100
 			Wood: 100
@@ -30,8 +30,8 @@
 FlametankExplode:
 	Inherits: ^DamagingExplosion
 	Warhead@1Dam: SpreadDamage
-		Spread: 196
-		Damage: 14256
+		Spread: 116
+		Damage: 3333
 		DamageTypes: Prone50Percent, TriggerProne, FireDeath
 	Warhead@2Eff: CreateEffect
 		Explosions: big_napalm
@@ -42,8 +42,8 @@ FlametankExplode:
 ChemtankExplode:
 	Inherits: ^DamagingExplosion
 	Warhead@1Dam: SpreadDamage
-		Spread: 143
-		Damage: 10574
+		Spread: 62
+		Damage: 4537
         Versus:
 			None: 90
 			Wood: 55
@@ -60,7 +60,7 @@ ChemtankExplode:
 HeliCrash:
 	Inherits: ^DamagingExplosion
 	Warhead@1Dam: SpreadDamage
-		Damage: 13172
+		Damage: 15174
 
 HeliExplode:
 	Warhead@1Eff: CreateEffect
@@ -70,7 +70,7 @@ HeliExplode:
 UnitExplode:
 	Inherits: ^DamagingExplosionHE
 	Warhead@1Dam: SpreadDamage
-		Damage: 2911
+		Damage: 5779
 		Versus:
 			Wood: 74
 			Tiberium: 24
@@ -81,7 +81,7 @@ UnitExplode:
 UnitExplodeShip:
 	Inherits: ^DamagingExplosionHE
 	Warhead@1Dam: SpreadDamage
-		Damage: 10787
+		Damage: 2448
 		Versus:
 			Wood: 74
 			Tiberium: 24
@@ -122,8 +122,8 @@ UnitExplodeStealthTank:
 GrenadierExplode:
 	Inherits: ^DamagingExplosionHE
 	Warhead@1Dam: SpreadDamage
-		Spread: 215
-		Damage: 1164
+		Spread: 252
+		Damage: 7988
 		Versus:
 			None: 100
 			Wood: 50
@@ -138,8 +138,8 @@ GrenadierExplode:
 FlamethrowerExplode:
 	Inherits: ^DamagingExplosion
 	Warhead@1Dam: SpreadDamage
-		Spread: 98
-		Damage: 11237
+		Spread: 270
+		Damage: 792
 		Versus:
 			None: 110
 			Wood: 100
@@ -154,8 +154,8 @@ FlamethrowerExplode:
 ChemWarriorExplode:
 	Inherits: ^DamagingExplosion
 	Warhead@1Dam: SpreadDamage
-		Spread: 131
-		Damage: 10465
+		Spread: 74
+		Damage: 11068
         Versus:
 			None: 70
 			Wood: 75
@@ -179,8 +179,8 @@ BuildingExplode:
 Napalm.Crate:
 	Inherits: ^DamagingExplosionHE
 	Warhead@1Dam: SpreadDamage
-		Spread: 72
-		Damage: 592
+		Spread: 271
+		Damage: 14186
 		Falloff: 1000, 368, 135, 50, 18, 7, 0
 		Versus:
 			Wood: 100
@@ -195,8 +195,8 @@ Napalm.Crate:
 TiberiumExplosion:
 	Inherits: ^DamagingExplosionHE
 	Warhead@1Dam: SpreadDamage
-		Spread: 260
-		Damage: 8358
+		Spread: 84
+		Damage: 6437
 		Versus:
 			Wood: 70
 			Heavy: 20

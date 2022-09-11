@@ -339,7 +339,7 @@
 	Armor:
 		Type: None
 	RevealsShroud:
-		Range: 9c0
+		Range: 10c0
 	Mobile:
 		AlwaysTurnInPlace: true
 		Locomotor: foot
@@ -367,7 +367,7 @@
 	HiddenUnderFog:
 	DamagedByTerrain:
 		Terrain: Tiberium, BlueTiberium
-		Damage: 18390
+		Damage: 15126
 		DamageInterval: 16
 		DamageTypes: TiberiumDeath
 		RequiresCondition: !hazmatsuits
@@ -422,7 +422,7 @@
 		BlinkInterval: 32
 		BlinkPattern: On, Off
 	DetectCloaked:
-		Range: 28c0
+		Range: 2c0
 	DeathSounds@NORMAL:
 		DeathTypes: DefaultDeath, BulletDeath, SmallExplosionDeath, ExplosionDeath, RippedApartDeath
 	DeathSounds@BURNED:
@@ -461,16 +461,16 @@
 	Inherits: ^Infantry
 	Inherits@selection: ^SelectableSupportUnit
 	Valued:
-		Cost: 1811
+		Cost: 1575
 	Tooltip:
 		Name: Civilian
 		GenericVisibility: None
 	Mobile:
-		Speed: 45
+		Speed: 142
 	Health:
-		HP: 60364
+		HP: 46403
 	RevealsShroud:
-		Range: 25c0
+		Range: 5c0
 	Passenger:
 		CustomPipType: gray
 	ScaredyCat:
@@ -511,7 +511,7 @@
 	OwnerLostAction:
 		Action: Kill
 	Health:
-		HP: 43441
+		HP: 91221
 	Armor:
 		Type: Wood
 	Buildable:
@@ -519,14 +519,14 @@
 		BuildPaletteOrder: 50
 		Prerequisites: ~disabled
 	Valued:
-		Cost: 2341
+		Cost: 1344
 	Tooltip:
 		Name: Dinosaur
 	RevealsShroud:
-		Range: 34c0
+		Range: 6c0
 	Mobile:
 		Locomotor: critter
-		Speed: 109
+		Speed: 134
 		Voice: Move
 	Selectable:
 		Bounds: 1024, 1024
@@ -542,7 +542,7 @@
 	WithDeathAnimation:
 		UseDeathTypeSuffix: false
 	AutoTarget:
-		ScanRadius: 5
+		ScanRadius: 9
 	AttackMove:
 		Voice: Attack
 	AttackFrontal:
@@ -566,26 +566,26 @@
 	OwnerLostAction:
 		Action: Kill
 	Health:
-		HP: 80903
+		HP: 27049
 	Armor:
 		Type: Light
 	RevealsShroud:
-		Range: 31c0
+		Range: 6c0
 	Mobile:
 		Voice: Move
-		Speed: 266
+		Speed: 229
 		Locomotor: visc
 	Selectable:
 		Bounds: 1024, 1024
 	Targetable:
 		TargetTypes: Ground, Creep
 	AutoTarget:
-		ScanRadius: 16
+		ScanRadius: 17
 	AttackMove:
 		Voice: Attack
 	HiddenUnderFog:
 	Valued:
-		Cost: 2418
+		Cost: 2822
 	Tooltip:
 		Name: Visceroid
 	Armament:
@@ -606,7 +606,7 @@
 		Delay: 4
 		StartIfBelow: 100
 	DamagedByTerrain:
-		Damage: 5475
+		Damage: 5704
 		DamageInterval: 4
 		DamageTypes: TiberiumDeath
 		Terrain: Tiberium, BlueTiberium
@@ -688,7 +688,7 @@
 	Armor:
 		Type: Wood
 	Health:
-		HP: 89791
+		HP: 46978
 	Building:
 		Dimensions: 1,1
 		Footprint: x
@@ -709,7 +709,7 @@
 		Notification: BuildingLost
 	ShakeOnDeath:
 	Guardable:
-		Range: 15c0
+		Range: 3c0
 	Tooltip:
 		GenericName: Structure
 	FrozenUnderFog:
@@ -805,7 +805,7 @@
 		RepairingNotification: Repairing
 	EngineerRepairable:
 	RevealsShroud:
-		Range: 20c0
+		Range: 3c0
 	Tooltip:
 		ShowOwnerRow: True
 	MapEditorData:
@@ -912,7 +912,7 @@
 		CrushClasses: wall
 		CrushSound: sandbag2.aud
 	LineBuild:
-		Range: 9c0
+		Range: 8
 		NodeTypes: wall
 	LineBuildNode:
 		Types: wall
@@ -925,7 +925,7 @@
 	FrozenUnderFog:
 	ScriptTriggers:
 	Health:
-		HP: 19626
+		HP: 95083
 	AppearsOnMapPreview:
 		Terrain: Wall
 	RadarColorFromTerrain:
@@ -951,7 +951,7 @@
 	AppearsOnMapPreview:
 		Terrain: Tree
 	Health:
-		HP: 65879
+		HP: 86876
 	Armor:
 		Type: Wood
 	Targetable:
@@ -1051,7 +1051,7 @@
 	Inherits@1: ^ClassicFacingSpriteActor
 	Interactable:
 	Health:
-		HP: 20026
+		HP: 44821
 	Armor:
 		Type: Heavy
 	HiddenUnderFog:
@@ -1095,7 +1095,7 @@
 ^LightHusk:
 	Inherits: ^Husk
 	Health:
-		HP: 93675
+		HP: 56107
     TransformOnCapture:
 		ForceHealthPercentage: 75
 
@@ -1125,7 +1125,7 @@
 		RequiresForceFire: true
 		TargetTypes: Ground, Water
 	Health:
-		HP: 6520
+		HP: 2254
 	Armor:
 		Type: Heavy
 	SoundOnDamageTransition:

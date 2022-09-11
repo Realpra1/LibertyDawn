@@ -4,7 +4,7 @@ FACT:
 	Selectable:
 		Bounds: 3072, 2048
 	Valued:
-		Cost: 1007
+		Cost: 2877
 	Tooltip:
 		Name: Construction Yard
 	Building:
@@ -12,11 +12,11 @@ FACT:
 		Dimensions: 3,3
 		LocalCenterOffset: 0,-512,0
 	Health:
-		HP: 35117
+		HP: 42925
 	Armor:
 		Type: Wood
 	RevealsShroud:
-		Range: 23c0
+		Range: 5c0
 	Production:
 		Produces: Building.GDI, Building.Nod, Defence.GDI, Defence.Nod
 	Transforms:
@@ -102,7 +102,7 @@ FACT:
 		ProductionType: Defence.Nod
 		Color: 8A8A8A
 	BaseProvider:
-		Range: 23c0
+		Range: 14c0
 	WithBuildingBib:
 	WithBuildingPlacedAnimation:
 		RequiresCondition: !build-incomplete
@@ -144,7 +144,7 @@ NUKE:
 	HitShape:
 		TargetableOffsets: 630,299,0
 	Valued:
-		Cost: 1867
+		Cost: 2027
 	Tooltip:
 		Name: Power Plant
 	ProvidesPrerequisite:
@@ -159,11 +159,11 @@ NUKE:
 		Dimensions: 2,3
 		LocalCenterOffset: 0,-512,0
 	Health:
-		HP: 40355
+		HP: 77306
     Armor:
 		Type: Tiberium
 	RevealsShroud:
-		Range: 8c0
+		Range: 4c0
 	WithBuildingBib:
 	Power:
 		Amount: 100
@@ -177,7 +177,7 @@ NUK2:
 	HitShape:
 		TargetableOffsets: 630,299,0
 	Valued:
-		Cost: 112
+		Cost: 1599
 	Tooltip:
 		Name: Advanced Power Plant
 	ProvidesPrerequisite:
@@ -192,11 +192,11 @@ NUK2:
 		Dimensions: 2,3
 		LocalCenterOffset: 0,-512,0
 	Health:
-		HP: 1979
+		HP: 72360
     Armor:
 		Type: Tiberium
 	RevealsShroud:
-		Range: 26c0
+		Range: 4c0
 	WithBuildingBib:
 	Power:
 		Amount: 200
@@ -214,7 +214,7 @@ PROC:
 			TopLeft: -512, -1450
 			BottomRight: 896, -512
 	Valued:
-		Cost: 1688
+		Cost: 1786
 	Tooltip:
 		Name: Tiberium Refinery
 	Buildable:
@@ -227,11 +227,11 @@ PROC:
 		Dimensions: 3,4
 		LocalCenterOffset: 0,-512,0
 	Health:
-		HP: 79577
+		HP: 62079
     Armor:
 		Type: Tiberium
 	RevealsShroud:
-		Range: 12c0
+		Range: 4c0
 	Refinery:
 		DockAngle: 448
 		DockOffset: 0,2
@@ -262,7 +262,7 @@ SILO:
 	Inherits@shape: ^2x1Shape
 	Inherits@RESOURCES: ^StoresResources
 	Valued:
-		Cost: 59
+		Cost: 997
 	Tooltip:
 		Name: Tiberium Silo
 	Buildable:
@@ -275,11 +275,11 @@ SILO:
 		Dimensions: 2,1
 	-GivesBuildableArea:
 	Health:
-		HP: 33280
+		HP: 96834
     Armor:
 		Type: Tiberium
 	RevealsShroud:
-		Range: 5c0
+		Range: 4c0
 	WithBuildingBib:
 		HasMinibib: true
 	-WithSpriteBody:
@@ -306,7 +306,7 @@ PYLE:
 			TopLeft: -1024, -1024
 			BottomRight: 1024, 640
 	Valued:
-		Cost: 2927
+		Cost: 1295
 	Tooltip:
 		Name: Barracks
 	ProvidesPrerequisite:
@@ -321,9 +321,9 @@ PYLE:
 		Dimensions: 2,3
 		LocalCenterOffset: 0,-512,0
 	Health:
-		HP: 18554
+		HP: 65249
 	RevealsShroud:
-		Range: 9c0
+		Range: 5c0
 	WithBuildingBib:
 	RallyPoint:
 	Exit@1:
@@ -362,7 +362,7 @@ HAND:
 		UseTargetableCellsOffsets: false
 		TargetableOffsets: 0,0,0, 630,-512,0, 355,512,0, -281,-512,0, -630,512,0
 	Valued:
-		Cost: 1455
+		Cost: 232
 	Tooltip:
 		Name: Hand of Nod
 	ProvidesPrerequisite:
@@ -377,7 +377,7 @@ HAND:
 		Dimensions: 2,3
 		LocalCenterOffset: 0,-512,0
 	Health:
-		HP: 84566
+		HP: 22859
 	RevealsShroud:
 		Range: 5c0
 	WithBuildingBib:
@@ -421,7 +421,7 @@ AFLD:
 			TopLeft: -2048, -1024
 			BottomRight: 2048, 1024
 	Valued:
-		Cost: 479
+		Cost: 537
 	Tooltip:
 		Name: Airstrip
 	ProvidesPrerequisite:
@@ -436,9 +436,9 @@ AFLD:
 		Dimensions: 4,3
 		LocalCenterOffset: 0,-512,0
 	Health:
-		HP: 18013
+		HP: 43911
 	RevealsShroud:
-		Range: 11c0
+		Range: 4c0
 	RallyPoint:
 	Exit@1:
 		SpawnOffset: -1024,0,0
@@ -477,7 +477,7 @@ WEAP:
 			TopLeft: -1536, -1024
 			BottomRight: 1536, 512
 	Valued:
-		Cost: 379
+		Cost: 231
 	Tooltip:
 		Name: Weapons Factory
 	ProvidesPrerequisite:
@@ -495,9 +495,9 @@ WEAP:
 		Bounds: 3072, 2048
 		DecorationBounds: 3072, 2730, 0, -682
 	Health:
-		HP: 47795
+		HP: 83023
 	RevealsShroud:
-		Range: 7c0
+		Range: 4c0
 	WithBuildingBib:
 	WithProductionDoorOverlay:
 		RequiresCondition: !build-incomplete
@@ -539,7 +539,7 @@ HPAD:
 		UseTargetableCellsOffsets: false
 		TargetableOffsets: 0,0,0, 768,-512,0, 768,512,0, -281,-512,0, -630,512,0
 	Valued:
-		Cost: 2833
+		Cost: 1709
 	Tooltip:
 		Name: Helipad
 	Buildable:
@@ -551,9 +551,9 @@ HPAD:
 		Footprint: xx xx
 		Dimensions: 2,2
 	Health:
-		HP: 954
+		HP: 38859
 	RevealsShroud:
-		Range: 5c0
+		Range: 4c0
 	Exit@1:
 		SpawnOffset: 0,-256,0
 		Facing: 896
@@ -608,7 +608,7 @@ HQ:
 			TopLeft: -1024, -384
 			BottomRight: 1024, 1024
 	Valued:
-		Cost: 61
+		Cost: 1641
 	Tooltip:
 		Name: Communications Center
 	ProvidesPrerequisite:
@@ -628,15 +628,15 @@ HQ:
 	WithSpriteBody:
 		PauseOnCondition: lowpower
 	Health:
-		HP: 76785
+		HP: 62485
 	RevealsShroud:
-		Range: 10c0
+		Range: 9c0
 	WithBuildingBib:
 	ProvidesRadar:
 		RequiresCondition: !lowpower
 	RenderDetectionCircle:
 	DetectCloaked:
-		Range: 15c0
+		Range: 5c0
 		RequiresCondition: !lowpower
 	AirstrikePower:
 		PauseOnCondition: lowpower
@@ -674,7 +674,7 @@ FIX:
 		Type: Polygon
 			Points: -1536,-256, -341,-940, 341,-940, 1536,-256, 1536,341, 341,1110, -341,1110, -1536,341
 	Valued:
-		Cost: 1973
+		Cost: 1446
 	Tooltip:
 		Name: Repair Facility
 	Buildable:
@@ -689,9 +689,9 @@ FIX:
 		Bounds: 2730, 1450, 0, 128
 		DecorationBounds: 3072, 2048
 	Health:
-		HP: 49052
+		HP: 42599
 	RevealsShroud:
-		Range: 33c0
+		Range: 4c0
 	WithBuildingBib:
 		HasMinibib: true
 	WithResupplyAnimation:
@@ -716,7 +716,7 @@ EYE:
 			TopLeft: -1024, -384
 			BottomRight: 1024, 1024
 	Valued:
-		Cost: 687
+		Cost: 594
 	Tooltip:
 		Name: Advanced Communications Center
 	ProvidesPrerequisite:
@@ -736,15 +736,15 @@ EYE:
 	WithSpriteBody:
 		PauseOnCondition: lowpower
 	Health:
-		HP: 4382
+		HP: 21856
 	RevealsShroud:
-		Range: 9c0
+		Range: 10c0
 	WithBuildingBib:
 	ProvidesRadar:
 		RequiresCondition: !lowpower
 	RenderDetectionCircle:
 	DetectCloaked:
-		Range: 26c0
+		Range: 5c0
 		RequiresCondition: !lowpower
 	IonCannonPower:
 		PauseOnCondition: lowpower
@@ -775,7 +775,7 @@ TMPL:
 		UseTargetableCellsOffsets: false
 		TargetableOffsets: 0,0,0, 0,-896,0, 0,896,0, 840,0,0, -706,0,0, -706,-768,0, -706,640,0
 	Valued:
-		Cost: 844
+		Cost: 408
 	Tooltip:
 		Name: Temple of Nod
 	ProvidesPrerequisite:
@@ -793,12 +793,12 @@ TMPL:
 		Bounds: 3072, 2048
 		DecorationBounds: 3072, 2901, 0, -512
 	Health:
-		HP: 85200
+		HP: 30780
 	RevealsShroud:
-		Range: 4c0
+		Range: 10c0
 	RenderDetectionCircle:
 	DetectCloaked:
-		Range: 10c0
+		Range: 5c0
 		RequiresCondition: !lowpower
 	NukePower:
 		PauseOnCondition: lowpower
@@ -842,7 +842,7 @@ GUN:
 	Selectable:
 		Bounds: 1024, 1024
 	Valued:
-		Cost: 1911
+		Cost: 615
 	Tooltip:
 		Name: Turret
 	Buildable:
@@ -853,11 +853,11 @@ GUN:
 		Description: Basic Anti-Tank base defense.\n  Strong vs Tanks, vehicles\n  Weak vs Infantry
 	Building:
 	Health:
-		HP: 17426
+		HP: 16407
 	Armor:
 		Type: Wood
 	RevealsShroud:
-		Range: 7c0
+		Range: 6c0
 	WithBuildingBib:
 		HasMinibib: true
 	Turreted:
@@ -879,7 +879,7 @@ GUN:
 	WithMuzzleOverlay:
 	-WithDeathAnimation:
 	DetectCloaked:
-		Range: 4c0
+		Range: 3c0
 	Power:
 		Amount: -20
 	-BodyOrientation:
@@ -897,7 +897,7 @@ SAM:
 			TopLeft: -768,-512
 			BottomRight: 768,512
 	Valued:
-		Cost: 1829
+		Cost: 1717
 	Tooltip:
 		Name: SAM Site
 	Buildable:
@@ -910,11 +910,11 @@ SAM:
 		Footprint: xx
 		Dimensions: 2,1
 	Health:
-		HP: 51509
+		HP: 82389
 	Armor:
 		Type: Wood
 	RevealsShroud:
-		Range: 11c0
+		Range: 8c0
 	Turreted:
 		TurnSpeed: 40
 		InitialFacing: 0
@@ -943,7 +943,7 @@ OBLI:
 	Inherits@IDISABLE: ^DisabledOverlay
 	Inherits@AUTOTARGET: ^AutoTargetGround
 	Valued:
-		Cost: 1799
+		Cost: 2275
 	Tooltip:
 		Name: Obelisk of Light
 	Buildable:
@@ -956,11 +956,11 @@ OBLI:
 		Bounds: 1024, 1024
 		DecorationBounds: 938, 1877, 0, -426
 	Health:
-		HP: 48089
+		HP: 98697
 	Armor:
 		Type: Wood
 	RevealsShroud:
-		Range: 32c0
+		Range: 8c0
 	WithBuildingBib:
 		HasMinibib: true
 	-WithSpriteBody:
@@ -979,7 +979,7 @@ OBLI:
 		Interval: 30, 40
 	-SpawnActorsOnSell:
 	DetectCloaked:
-		Range: 17c0
+		Range: 5c0
 		RequiresCondition: !lowpower
 	Power:
 		Amount: -90
@@ -990,7 +990,7 @@ GTWR:
 	Selectable:
 		Bounds: 1024, 1024
 	Valued:
-		Cost: 72
+		Cost: 788
 	Tooltip:
 		Name: Guard Tower
 	Buildable:
@@ -1001,9 +1001,9 @@ GTWR:
 		Description: Basic defensive structure.\n  Strong vs Infantry\n  Weak vs Tanks
 	Building:
 	Health:
-		HP: 42879
+		HP: 95530
 	RevealsShroud:
-		Range: 23c0
+		Range: 7c0
 	WithBuildingBib:
 		HasMinibib: true
 	Armament:
@@ -1015,7 +1015,7 @@ GTWR:
 	BodyOrientation:
 		QuantizedFacings: 8
 	DetectCloaked:
-		Range: 13c0
+		Range: 3c0
 	WithMuzzleOverlay:
 	Turreted:
 		TurnSpeed: 512
@@ -1027,7 +1027,7 @@ ATWR:
 	Inherits@IDISABLE: ^DisabledOverlay
 	Inherits@AUTOTARGET: ^AutoTargetAll
 	Valued:
-		Cost: 798
+		Cost: 2726
 	Tooltip:
 		Name: Advanced Guard Tower
 	Buildable:
@@ -1040,14 +1040,14 @@ ATWR:
 		Bounds: 1024, 1024
 		DecorationBounds: 938, 2048, 0, -512
 	Health:
-		HP: 63606
+		HP: 42548
 	Armor:
 		Type: Wood
 	RevealsShroud:
-		Range: 15c0
+		Range: 8c0
 	-RenderRangeCircle:
 	WithRangeCircle:
-		Range: 22c0
+		Range: 8c0
 		Color: FFFF0080
 	WithBuildingBib:
 		HasMinibib: true
@@ -1067,7 +1067,7 @@ ATWR:
 	BodyOrientation:
 		QuantizedFacings: 8
 	DetectCloaked:
-		Range: 18c0
+		Range: 5c0
 		RequiresCondition: !lowpower
 	Power:
 		Amount: -50
@@ -1075,7 +1075,7 @@ ATWR:
 SBAG:
 	Inherits: ^Wall
 	Valued:
-		Cost: 121
+		Cost: 1978
 	CustomSellValue:
 		Value: 0
 	Tooltip:
@@ -1097,7 +1097,7 @@ SBAG:
 CYCL:
 	Inherits: ^Wall
 	Valued:
-		Cost: 1642
+		Cost: 734
 	CustomSellValue:
 		Value: 0
 	Tooltip:
@@ -1119,7 +1119,7 @@ CYCL:
 BRIK:
 	Inherits: ^Wall
 	Valued:
-		Cost: 1862
+		Cost: 10
 	CustomSellValue:
 		Value: 0
 	Tooltip:
@@ -1131,7 +1131,7 @@ BRIK:
 		BuildDuration: 330
 		Description: Stops infantry and most tanks.\nBlocks some projectiles.
 	Health:
-		HP: 63415
+		HP: 49645
 	Armor:
 		Type: Heavy
 	BlocksProjectiles:
