@@ -367,7 +367,7 @@
 	HiddenUnderFog:
 	DamagedByTerrain:
 		Terrain: Tiberium, BlueTiberium
-		Damage: 220
+		Damage: 533
 		DamageInterval: 16
 		DamageTypes: TiberiumDeath
 		RequiresCondition: !hazmatsuits
@@ -461,14 +461,14 @@
 	Inherits: ^Infantry
 	Inherits@selection: ^SelectableSupportUnit
 	Valued:
-		Cost: 10
+		Cost: 2017
 	Tooltip:
 		Name: Civilian
 		GenericVisibility: None
 	Mobile:
-		Speed: 54
+		Speed: 69
 	Health:
-		HP: 2500
+		HP: 76448
 	RevealsShroud:
 		Range: 5c0
 	Passenger:
@@ -511,7 +511,7 @@
 	OwnerLostAction:
 		Action: Kill
 	Health:
-		HP: 100000
+		HP: 48967
 	Armor:
 		Type: Wood
 	Buildable:
@@ -519,14 +519,14 @@
 		BuildPaletteOrder: 50
 		Prerequisites: ~disabled
 	Valued:
-		Cost: 1000
+		Cost: 1776
 	Tooltip:
 		Name: Dinosaur
 	RevealsShroud:
 		Range: 6c0
 	Mobile:
 		Locomotor: critter
-		Speed: 113
+		Speed: 24
 		Voice: Move
 	Selectable:
 		Bounds: 1024, 1024
@@ -542,7 +542,7 @@
 	WithDeathAnimation:
 		UseDeathTypeSuffix: false
 	AutoTarget:
-		ScanRadius: 4
+		ScanRadius: 11
 	AttackMove:
 		Voice: Attack
 	AttackFrontal:
@@ -566,26 +566,26 @@
 	OwnerLostAction:
 		Action: Kill
 	Health:
-		HP: 30000
+		HP: 49523
 	Armor:
 		Type: Light
 	RevealsShroud:
 		Range: 6c0
 	Mobile:
 		Voice: Move
-		Speed: 68
+		Speed: 168
 		Locomotor: visc
 	Selectable:
 		Bounds: 1024, 1024
 	Targetable:
 		TargetTypes: Ground, Creep
 	AutoTarget:
-		ScanRadius: 5
+		ScanRadius: 15
 	AttackMove:
 		Voice: Attack
 	HiddenUnderFog:
 	Valued:
-		Cost: 700
+		Cost: 1814
 	Tooltip:
 		Name: Visceroid
 	Armament:
@@ -606,7 +606,7 @@
 		Delay: 4
 		StartIfBelow: 100
 	DamagedByTerrain:
-		Damage: -750
+		Damage: 11788
 		DamageInterval: 4
 		DamageTypes: TiberiumDeath
 		Terrain: Tiberium, BlueTiberium
@@ -688,7 +688,7 @@
 	Armor:
 		Type: Wood
 	Health:
-		HP: 40000
+		HP: 72786
 	Building:
 		Dimensions: 1,1
 		Footprint: x
@@ -925,7 +925,7 @@
 	FrozenUnderFog:
 	ScriptTriggers:
 	Health:
-		HP: 10000
+		HP: 17876
 	AppearsOnMapPreview:
 		Terrain: Wall
 	RadarColorFromTerrain:
@@ -951,7 +951,7 @@
 	AppearsOnMapPreview:
 		Terrain: Tree
 	Health:
-		HP: 50000
+		HP: 82476
 	Armor:
 		Type: Wood
 	Targetable:
@@ -1051,7 +1051,7 @@
 	Inherits@1: ^ClassicFacingSpriteActor
 	Interactable:
 	Health:
-		HP: 56000
+		HP: 4062
 	Armor:
 		Type: Heavy
 	HiddenUnderFog:
@@ -1095,7 +1095,7 @@
 ^LightHusk:
 	Inherits: ^Husk
 	Health:
-		HP: 56000
+		HP: 15749
     TransformOnCapture:
 		ForceHealthPercentage: 75
 
@@ -1125,7 +1125,7 @@
 		RequiresForceFire: true
 		TargetTypes: Ground, Water
 	Health:
-		HP: 60000
+		HP: 44830
 	Armor:
 		Type: Heavy
 	SoundOnDamageTransition:

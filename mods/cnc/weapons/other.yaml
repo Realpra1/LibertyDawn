@@ -1,14 +1,14 @@
 ^FlameWeapon:
 	ValidTargets: Ground, Water, Trees
-	ReloadDelay: 55
+	ReloadDelay: 105
 	Range: 3c0
 	InvalidTargets: Wall
 	Report: flamer2.aud
 	Projectile: Bullet
-		Speed: 1c682
+		Speed: 95
 	Warhead@1Dam: SpreadDamage
-		Spread: 1c0
-		Damage: 5000
+		Spread: 66
+		Damage: 7965
 		ValidTargets: Ground, Water, Trees
 		InvalidTargets: Wall
 		Versus:
@@ -30,15 +30,15 @@ Flamethrower:
 
 BigFlamer:
 	Inherits: ^FlameWeapon
-	ReloadDelay: 65
+	ReloadDelay: 35
 	Range: 3c512
 	Projectile: Bullet
-		Speed: 341
+		Speed: 234
 	Burst: 2
-	BurstDelays: 10
+	BurstDelays: 297
 	Warhead@1Dam: SpreadDamage
-		Spread: 400
-		Damage: 10000
+		Spread: 262
+		Damage: 6537
 		Versus:
 			None: 85
 			Wood: 100
@@ -50,10 +50,10 @@ BigFlamer:
 
 Chemspray:
 	Inherits: ^FlameWeapon
-	ReloadDelay: 65
+	ReloadDelay: 79
 	-InvalidTargets:
 	Warhead@1Dam: SpreadDamage
-		Damage: 8000
+		Damage: 1503
 		-InvalidTargets:
 		Versus:
 			None: 70
@@ -68,16 +68,16 @@ Chemspray:
 
 BigChem:
 	Inherits: ^FlameWeapon
-	ReloadDelay: 65
+	ReloadDelay: 19
 	-InvalidTargets:
 	Range: 3c512
 	Projectile: Bullet
-		Speed: 341
+		Speed: 150
 	Burst: 2
-	BurstDelays: 10
+	BurstDelays: 33
 	Warhead@1Dam: SpreadDamage
-		Spread: 400
-		Damage: 17000
+		Spread: 191
+		Damage: 9996
 		Versus:
 			None: 70
 			Wood: 25
@@ -91,17 +91,17 @@ BigChem:
 
 Napalm:
 	Inherits: ^FlameWeapon
-	ReloadDelay: 4
+	ReloadDelay: 8
 	Range: 2c0
 	Burst: 2
-	BurstDelays: 2
+	BurstDelays: 265
 	-Projectile:
 	Projectile: GravityBomb
 		Image: BOMBLET
 		Shadow: true
 	Warhead@1Dam: SpreadDamage
-		Spread: 341
-		Damage: 3000
+		Spread: 278
+		Damage: 8796
 		Falloff: 1000, 368, 135, 50, 18, 7, 0
 		Versus:
 			Wood: 35
@@ -110,7 +110,7 @@ Napalm:
 		Explosions: med_napalm
 
 Laser:
-	ReloadDelay: 40
+	ReloadDelay: 13
 	Range: 8c0
 	Report: obelray1.aud
 	Projectile: LaserZap
@@ -118,8 +118,8 @@ Laser:
 		HitAnim: laserfire
 		ZOffset: 2047
 	Warhead@1Dam: SpreadDamage
-		Spread: 42
-		Damage: 39600
+		Spread: 274
+		Damage: 1307
 		Versus:
 			Wood: 50
 		DamageTypes: Prone50Percent, TriggerProne, FireDeath
@@ -128,14 +128,14 @@ Laser:
 		InvalidTargets: Vehicle, Structure, Wall, Husk, Trees, Creep
 
 ^DinoWeapon:
-	ReloadDelay: 30
+	ReloadDelay: 94
 	Range: 1c0
 	Report: dinoatk1.aud
 	Projectile: Bullet
-		Speed: 1c682
+		Speed: 293
 	Warhead@1Dam: SpreadDamage
-		Spread: 213
-		Damage: 18000
+		Spread: 63
+		Damage: 3012
 		Versus:
 			None: 90
 			Wood: 10
@@ -148,18 +148,18 @@ Tail:
 
 Horn:
 	Inherits: ^DinoWeapon
-	ReloadDelay: 20
+	ReloadDelay: 131
 	Warhead@1Dam: SpreadDamage
-		Damage: 12000
+		Damage: 19937
 
 Teeth:
 	Inherits: ^DinoWeapon
 
 Claw:
 	Inherits: ^DinoWeapon
-	ReloadDelay: 10
+	ReloadDelay: 44
 	Warhead@1Dam: SpreadDamage
-		Damage: 6000
+		Damage: 1827
 
 Demolish:
 	Warhead@1Dam: SpreadDamage
