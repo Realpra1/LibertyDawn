@@ -2,7 +2,7 @@ MCV:
 	Inherits: ^Vehicle
 	Inherits@selection: ^SelectableSupportUnit
 	Valued:
-		Cost: 2370
+		Cost: 2383
 	Tooltip:
 		Name: Mobile Construction Vehicle
 	Buildable:
@@ -13,10 +13,10 @@ MCV:
 	Selectable:
 		DecorationBounds: 1536, 1536
 	Mobile:
-		Speed: 200
+		Speed: 279
 		Locomotor: heavywheeled
 	Health:
-		HP: 3299
+		HP: 99048
 	Repairable:
 		HpPerStep: 1819
 	Armor:
@@ -43,7 +43,7 @@ HARV:
 	Inherits@CLOAK: ^AcceptsCloakCrate
 	Inherits@selection: ^SelectableEconomicUnit
 	Valued:
-		Cost: 1626
+		Cost: 430
 	Tooltip:
 		Name: Harvester
 		GenericName: Harvester
@@ -64,9 +64,9 @@ HARV:
 		HarvestFacings: 8
 		EmptyCondition: no-tiberium
 	Mobile:
-		Speed: 269
+		Speed: 95
 	Health:
-		HP: 67911
+		HP: 91594
 	Repairable:
 		HpPerStep: 2584
 	Armor:
@@ -103,7 +103,7 @@ APC:
 	Inherits@AUTOTARGET: ^AutoTargetAllAssaultMove
 	Inherits@TRANSPORT: ^Transport
 	Valued:
-		Cost: 1079
+		Cost: 562
 	Tooltip:
 		Name: APC
 	UpdatesPlayerStatistics:
@@ -115,10 +115,10 @@ APC:
 		Description: Armed infantry transport.\nCan attack Aircraft.\n  Strong vs Vehicles\n  Weak vs Infantry
 	Mobile:
 		TurnSpeed: 20
-		Speed: 72
+		Speed: 184
 		PauseOnCondition: notmobile
 	Health:
-		HP: 26991
+		HP: 13707
 	Repairable:
 		HpPerStep: 1440
 	Armor:
@@ -182,7 +182,7 @@ ARTY:
 	Inherits@CLOAK: ^AcceptsCloakCrate
 	Inherits@AUTOTARGET: ^AutoTargetGroundAssaultMove
 	Valued:
-		Cost: 945
+		Cost: 2681
 	Tooltip:
 		Name: Artillery
 	UpdatesPlayerStatistics:
@@ -194,9 +194,9 @@ ARTY:
 		Description: Fast mid-range artillery.\n  Strong vs Infantry, Vehicles and Buildings
 	Mobile:
 		TurnSpeed: 25
-		Speed: 80
+		Speed: 82
 	Health:
-		HP: 77283
+		HP: 52471
 	Repairable:
 		HpPerStep: 768
 	Armor:
@@ -229,7 +229,7 @@ FTNK:
 	Inherits@CLOAK: ^AcceptsCloakCrate
 	Inherits@AUTOTARGET: ^AutoTargetGroundAssaultMove
 	Valued:
-		Cost: 408
+		Cost: 1811
 	Tooltip:
 		Name: Flame Tank
 	UpdatesPlayerStatistics:
@@ -241,9 +241,9 @@ FTNK:
 		Description: Heavily armored flame-throwing vehicle.\n  Strong vs Infantry, Buildings and Vehicles\n  Weak vs Tanks
 	Mobile:
 		TurnSpeed: 28
-		Speed: 42
+		Speed: 169
 	Health:
-		HP: 85775
+		HP: 4889
 	Repairable:
 		HpPerStep: 2046
 	Armor:
@@ -273,7 +273,7 @@ CTNK:
 	Inherits@CLOAK: ^AcceptsCloakCrate
 	Inherits@AUTOTARGET: ^AutoTargetGroundAssaultMove
 	Valued:
-		Cost: 165
+		Cost: 1562
 	Tooltip:
 		Name: Chemical Tank
 	UpdatesPlayerStatistics:
@@ -285,9 +285,9 @@ CTNK:
 		Description: Heavily armored chemical-spewing vehicle.\n  Strong Harasser vs All Ground Units\n  Weak vs Air
 	Mobile:
 		TurnSpeed: 30
-		Speed: 274
+		Speed: 83
 	Health:
-		HP: 64591
+		HP: 72492
 	Repairable:
 		HpPerStep: 2046
 	Armor:
@@ -317,7 +317,7 @@ BGGY:
 	Inherits@CLOAK: ^AcceptsCloakCrate
 	Inherits@AUTOTARGET: ^AutoTargetGroundAssaultMove
 	Valued:
-		Cost: 2314
+		Cost: 1610
 	Tooltip:
 		Name: Nod Buggy
 	UpdatesPlayerStatistics:
@@ -329,9 +329,9 @@ BGGY:
 		Description: Fast scout and anti-infantry vehicle.\n  Strong vs Infantry\n  Weak vs Tanks
 	Mobile:
 		TurnSpeed: 40
-		Speed: 104
+		Speed: 82
 	Health:
-		HP: 66562
+		HP: 4263
 	Repairable:
 		HpPerStep: 1819
 	Armor:
@@ -362,7 +362,7 @@ BIKE:
 	Inherits@CLOAK: ^AcceptsCloakCrate
 	Inherits@AUTOTARGET: ^AutoTargetAllAssaultMove
 	Valued:
-		Cost: 983
+		Cost: 97
 	Tooltip:
 		Name: Recon Bike
 	UpdatesPlayerStatistics:
@@ -374,10 +374,10 @@ BIKE:
 		Description: Fast scout vehicle, armed with\nrockets.\nCan attack Aircraft.\n  Strong vs Vehicles, Tanks\n  Weak vs Infantry
 	Mobile:
 		TurnSpeed: 40
-		Speed: 226
+		Speed: 134
 		Locomotor: wheeled
 	Health:
-		HP: 58667
+		HP: 39961
 	Repairable:
 		HpPerStep: 1000
 	Armor:
@@ -403,7 +403,7 @@ JEEP:
 	Inherits@CLOAK: ^AcceptsCloakCrate
 	Inherits@AUTOTARGET: ^AutoTargetGroundAssaultMove
 	Valued:
-		Cost: 300
+		Cost: 210
 	Tooltip:
 		Name: Hum-Vee
 	UpdatesPlayerStatistics:
@@ -415,9 +415,9 @@ JEEP:
 		Description: Fast scout and anti-infantry vehicle.\n  Strong vs Infantry\n  Weak vs Tanks
 	Mobile:
 		TurnSpeed: 40
-		Speed: 139
+		Speed: 222
 	Health:
-		HP: 40872
+		HP: 42081
 	Repairable:
 		HpPerStep: 1819
 	Armor:
@@ -448,7 +448,7 @@ LTNK:
 	Inherits@CLOAK: ^AcceptsCloakCrate
 	Inherits@AUTOTARGET: ^AutoTargetGroundAssaultMove
 	Valued:
-		Cost: 1784
+		Cost: 1890
 	Tooltip:
 		Name: Light Tank
 	UpdatesPlayerStatistics:
@@ -460,9 +460,9 @@ LTNK:
 		Description: Fast, light tank.\n  Strong vs Vehicles, Tanks\n  Weak vs Infantry
 	Mobile:
 		TurnSpeed: 28
-		Speed: 106
+		Speed: 257
 	Health:
-		HP: 32919
+		HP: 53357
 	Repairable:
 		HpPerStep: 2062
 	Armor:
@@ -494,7 +494,7 @@ MTNK:
 	Inherits@CLOAK: ^AcceptsCloakCrate
 	Inherits@AUTOTARGET: ^AutoTargetGroundAssaultMove
 	Valued:
-		Cost: 147
+		Cost: 950
 	Tooltip:
 		Name: Medium Tank
 	UpdatesPlayerStatistics:
@@ -505,9 +505,9 @@ MTNK:
 		Queue: Vehicle.GDI
 		Description: General-Purpose GDI Tank.\n  Strong vs Tanks, Vehicles\n  Weak vs Infantry
 	Mobile:
-		Speed: 237
+		Speed: 163
 	Health:
-		HP: 82199
+		HP: 34604
 	Repairable:
 		HpPerStep: 2274
 	Armor:
@@ -544,7 +544,7 @@ HTNK:
 	Inherits@CLOAK: ^AcceptsCloakCrate
 	Inherits@AUTOTARGET: ^AutoTargetAllAssaultMove
 	Valued:
-		Cost: 800
+		Cost: 2335
 	Tooltip:
 		Name: Mammoth Tank
 	UpdatesPlayerStatistics:
@@ -556,10 +556,10 @@ HTNK:
 		Description: Heavily armored GDI Tank.\nCan attack Aircraft.\n  Strong vs Everything
 	Mobile:
 		Locomotor: heavytracked
-		Speed: 206
+		Speed: 157
 		TurnSpeed: 4
 	Health:
-		HP: 29678
+		HP: 89140
 	Repairable:
 		HpPerStep: 4000
 	Armor:
@@ -607,7 +607,7 @@ MSAM:
 	Inherits@CLOAK: ^AcceptsCloakCrate
 	Inherits@AUTOTARGET: ^AutoTargetGroundAssaultMove
 	Valued:
-		Cost: 98
+		Cost: 222
 	Tooltip:
 		Name: Rocket Launcher
 	UpdatesPlayerStatistics:
@@ -618,10 +618,10 @@ MSAM:
 		Queue: Vehicle.GDI
 		Description: Very long range rocket artillery.\n  Strong vs all Ground units.
 	Mobile:
-		Speed: 193
+		Speed: 103
 		TurnSpeed: 10
 	Health:
-		HP: 62594
+		HP: 18964
 	Repairable:
 		HpPerStep: 606
 	Armor:
@@ -661,7 +661,7 @@ MLRS:
 	Inherits@CLOAK: ^AcceptsCloakCrate
 	Inherits@AUTOTARGET: ^AutoTargetAir
 	Valued:
-		Cost: 716
+		Cost: 862
 	Tooltip:
 		Name: Mobile S.A.M.
 	UpdatesPlayerStatistics:
@@ -672,10 +672,10 @@ MLRS:
 		Queue: Vehicle.Nod
 		Description: Powerful anti-air unit.\nCannot attack Ground units.
 	Mobile:
-		Speed: 109
+		Speed: 234
 		TurnSpeed: 28
 	Health:
-		HP: 297
+		HP: 80279
 	Repairable:
 		HpPerStep: 1364
 	Armor:
@@ -690,7 +690,7 @@ MLRS:
 		Weapon: Patriot
 		LocalOffset: 0,-171,0, 0,171,0
 	AmmoPool:
-		Ammo: 82
+		Ammo: 14
 		AmmoCondition: ammo
 	AttackTurreted:
 	WithSpriteTurret:
@@ -717,7 +717,7 @@ STNK:
 	Inherits@EXPERIENCE: ^GainsExperience
 	Inherits@AUTOTARGET: ^AutoTargetAllAssaultMove
 	Valued:
-		Cost: 816
+		Cost: 836
 	Tooltip:
 		Name: Stealth Tank
 	UpdatesPlayerStatistics:
@@ -730,11 +730,11 @@ STNK:
 	Mobile:
 		Locomotor: heavywheeled
 		TurnSpeed: 50
-		Speed: 245
+		Speed: 216
 	Targetable:
 		TargetTypes: Ground, Vehicle, StealthTank
 	Health:
-		HP: 42630
+		HP: 31009
 	Repairable:
 		HpPerStep: 758
 	Armor:
@@ -776,15 +776,15 @@ STNK:
 MHQ:
 	Inherits: ^Vehicle
 	Valued:
-		Cost: 1669
+		Cost: 81
 	Tooltip:
 		Name: Mobile HQ
 	Health:
-		HP: 86183
+		HP: 47284
 	Armor:
 		Type: Light
 	Mobile:
-		Speed: 128
+		Speed: 238
 	RevealsShroud:
 		Range: 10c0
 	WithIdleOverlay@SPINNER:
@@ -803,15 +803,15 @@ TRUCK:
 		BuildDuration: 500
 		Description: Transports cash to other players.\n  Builds fast\n  Unarmed
 	Valued:
-		Cost: 263
+		Cost: 57
 	Tooltip:
 		Name: Supply Truck
 	Health:
-		HP: 71885
+		HP: 29301
 	Armor:
 		Type: Light
 	Mobile:
-		Speed: 225
+		Speed: 191
 	RevealsShroud:
 		Range: 2c0
 	DeliversCash:
