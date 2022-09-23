@@ -1,7 +1,7 @@
 ^FlameWeapon:
 	ValidTargets: Ground, Water, Trees
 	ReloadDelay: 55
-	Range: 3c0
+	Range: 4c0
 	InvalidTargets: Wall
 	Report: flamer2.aud
 	Projectile: Bullet
@@ -57,8 +57,8 @@ Chemspray:
 		-InvalidTargets:
 		Versus:
 			None: 70
-			Wood: 25
-			Light: 40
+			Wood: 30
+			Light: 25
 			Tiberium: 140
 			Heavy: 60
 		DamageTypes: Prone50Percent, TriggerProne, TiberiumDeath
@@ -77,12 +77,12 @@ BigChem:
 	BurstDelays: 10
 	Warhead@1Dam: SpreadDamage
 		Spread: 400
-		Damage: 17000
+		Damage: 16000
 		Versus:
 			None: 70
-			Wood: 25
-			Light: 40
-			Tiberium: 140
+			Wood: 30
+			Light: 25
+			Tiberium: 135
 			Heavy: 60
 		DamageTypes: Prone50Percent, TriggerProne, TiberiumDeath
     Warhead@3Eff: CreateEffect
@@ -110,7 +110,7 @@ Napalm:
 		Explosions: med_napalm
 
 Laser:
-	ReloadDelay: 40
+	ReloadDelay: 36
 	Range: 8c0
 	Report: obelray1.aud
 	Projectile: LaserZap
@@ -121,7 +121,8 @@ Laser:
 		Spread: 42
 		Damage: 39600
 		Versus:
-			Wood: 50
+			Wood: 35
+			Tiberium: 50
 		DamageTypes: Prone50Percent, TriggerProne, FireDeath
 	Warhead@2Smu: LeaveSmudge
 		SmudgeType: Scorch

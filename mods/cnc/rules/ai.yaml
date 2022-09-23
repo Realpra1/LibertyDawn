@@ -443,11 +443,11 @@ Player:
 			tmpl: 1
 			fix: 1
 			silo: 1
-			gtwr: 2
-            gun: 1
-			atwr: 1
-			obli: 2
-			sam: 1
+			gtwr: 1
+            gun: 0
+			atwr: 3
+			obli: 4
+			sam: 2
 		BuildingFractions:
 			proc: 27
 			pyle: 1
@@ -475,29 +475,34 @@ Player:
 		RequiresCondition: enable-brutalis-ai || enable-wavemaker-ai
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI
 		UnitsToBuild:
-			e1: 73
-			e2: 0
-			e3: 25
-			e4: 0
-			e5: 0
+			e1: 65
+			e2: 25
+			e3: 40
+			e4: 15
+			e5: 15
             rmbo: 2
 			harv: 50
-			ltnk: 6
-			ftnk: 5
+			ltnk: 4
+			ftnk: 4
             ctnk: 1
 			arty: 38
 			mtnk: 1
 			msam: 40
+			stnk: 3
+			apc: 1
+			bggy: 1
+			bike: 1
+            jeep: 1
+			mlrs: 1
 			htnk: 9
 			heli: 0
 			orca: 0
 		UnitLimits:
 			harv: 7
-			stnk: 0
-			mlrs: 0
-			apc: 0
+			mlrs: 4
 			heli: 0
 			orca: 0
+            rmbo: 2
     BaseBuilderBotModule@viki:
 		RequiresCondition: enable-viki-ai
 		BuildingQueues: Building.Nod, Building.GDI
@@ -525,11 +530,11 @@ Player:
 			tmpl: 1
 			fix: 1
 			silo: 1
-			gtwr: 2
-            gun: 1
-			atwr: 1
-			obli: 2
-			sam: 1
+			gtwr: 1
+            gun: 0
+			atwr: 3
+			obli: 4
+			sam: 2
 		BuildingFractions:
 			proc: 27
 			pyle: 31
@@ -557,24 +562,26 @@ Player:
 		RequiresCondition: enable-viki-ai
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI
 		UnitsToBuild:
-			e1: 73
-			e2: 0
-			e3: 25
-			e4: 0
-			e5: 0
+			e1: 65
+			e2: 25
+			e3: 40
+			e4: 15
+			e5: 15
             rmbo: 2
 			harv: 60
-			arty: 40
-			msam: 40
+			arty: 39
+			msam: 39
+            mlrs: 1
+			apc: 1
 			heli: 0
 			orca: 0
 		UnitLimits:
 			harv: 8
 			stnk: 0
 			mlrs: 0
-			apc: 0
 			heli: 0
 			orca: 0
+            rmbo: 2
     BaseBuilderBotModule@skynet:
 		RequiresCondition: enable-skynet-ai
 		BuildingQueues: Building.Nod, Building.GDI
@@ -602,11 +609,11 @@ Player:
 			tmpl: 1
 			fix: 1
 			silo: 1
-			gtwr: 2
-            gun: 1
-			atwr: 1
-			obli: 2
-			sam: 1
+			gtwr: 1
+            gun: 0
+			atwr: 3
+			obli: 4
+			sam: 2
 		BuildingFractions:
 			proc: 27
 			pyle: 1
@@ -634,29 +641,34 @@ Player:
 		RequiresCondition: enable-skynet-ai
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI
 		UnitsToBuild:
-			e1: 73
-			e2: 0
-			e3: 25
-			e4: 0
-			e5: 0
+			e1: 65
+			e2: 25
+			e3: 40
+			e4: 15
+			e5: 15
             rmbo: 2
 			harv: 50
-			ltnk: 6
-			ftnk: 7
+			ltnk: 4
+			ftnk: 4
             ctnk: 1
-			arty: 28
+			arty: 38
 			mtnk: 1
-			msam: 30
+			msam: 40
+			stnk: 3
+			apc: 1
+			bggy: 1
+			bike: 1
+            jeep: 1
+			mlrs: 1
 			htnk: 9
 			heli: 10
 			orca: 10
 		UnitLimits:
 			harv: 7
-			stnk: 0
-			mlrs: 0
-			apc: 0
+			mlrs: 4
 			heli: 3
 			orca: 3
+            rmbo: 2
     BaseBuilderBotModule@basemaker:
 		RequiresCondition: enable-basemaker-ai
 		BuildingQueues: Building.Nod, Building.GDI
@@ -676,7 +688,7 @@ Player:
 			pyle: 4
 			hand: 4
 			hq: 2
-			hpad: 0
+			hpad: 1
 			eye: 1
 			tmpl: 1
 			fix: 2
@@ -696,7 +708,7 @@ Player:
 			eye: 1
 			tmpl: 1
 			fix: 2
-			hpad: 0
+			hpad: 1
     SquadManagerBotModule@basemaker:
 		RequiresCondition: enable-basemaker-ai
 		SquadSize: 20
@@ -707,30 +719,34 @@ Player:
 	UnitBuilderBotModule@basemaker:
 		RequiresCondition: enable-basemaker-ai
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI
-		UnitsToBuild:
-			e1: 73
-			e2: 0
-			e3: 25
-			e4: 0
-			e5: 0
+        UnitsToBuild:
+			e1: 65
+			e2: 25
+			e3: 40
+			e4: 15
+			e5: 15
             rmbo: 2
 			harv: 20
 			ltnk: 11
 			ftnk: 9
-            ctnk: 2
+            ctnk: 1
 			arty: 58
 			mtnk: 1
 			msam: 60
+			stnk: 3
+			apc: 1
+			bggy: 1
+			bike: 1
+            jeep: 1
+			mlrs: 1
 			htnk: 19
-			heli: 0
-			orca: 0
+			heli: 1
+			orca: 1
 		UnitLimits:
-			stnk: 0
-			mlrs: 0
-            jeep: 0
-			apc: 0
-			heli: 0
-			orca: 0
+			mlrs: 4
+			heli: 3
+			orca: 3
+            rmbo: 2
     SquadManagerBotModule@wavemaker:
 		RequiresCondition: enable-wavemaker-ai
 		SquadSize: 55
@@ -765,10 +781,10 @@ Player:
 			tmpl: 1
 			fix: 1
 			silo: 1
-			gtwr: 5
-            gun: 3
+			gtwr: 2
+            gun: 1
 			atwr: 4
-			obli: 4
+			obli: 5
 			sam: 3
 		BuildingFractions:
 			proc: 27
@@ -796,32 +812,32 @@ Player:
 	UnitBuilderBotModule@campaignbot:
 		RequiresCondition: enable-campaignbot-ai
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI
-		UnitsToBuild:
-			e1: 70
-			e2: 1
-			e3: 25
-			e4: 1
-			e5: 1
+        UnitsToBuild:
+			e1: 65
+			e2: 25
+			e3: 40
+			e4: 15
+			e5: 15
             rmbo: 2
+			harv: 50
+			ltnk: 4
+			ftnk: 4
+            ctnk: 1
+			arty: 38
+			mtnk: 1
+			msam: 40
+			stnk: 3
+			apc: 1
 			bggy: 1
 			bike: 1
-			stnk: 1
-			jeep: 5
-            apc: 1
-			harv: 50
-			ltnk: 24
-			ftnk: 8
-            ctnk: 2
-			arty: 10
-			mtnk: 5
-			msam: 10
-            mlrs: 1
-			htnk: 28
-			heli: 1
-			orca: 1
+            jeep: 1
+			mlrs: 1
+			htnk: 9
+			heli: 0
+			orca: 0
 		UnitLimits:
 			harv: 2
-			stnk: 1
-			mlrs: 1
+			mlrs: 4
 			heli: 1
 			orca: 1
+            rmbo: 2

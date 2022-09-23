@@ -8,7 +8,7 @@ Sniper:
 		Speed: 5c682
 	Warhead@1Dam: SpreadDamage
 		Spread: 42
-		Damage: 10000
+		Damage: 13000
 		ValidTargets: Infantry
 		DamageTypes: Prone50Percent, TriggerProne, BulletDeath
 	Warhead@2Eff: CreateEffect
@@ -160,11 +160,11 @@ APCGun:
 		Speed: 900
 	Warhead@1Dam: SpreadDamage
 		Spread: 128
-		Damage: 1000
+		Damage: 950
 		Versus:
 			None: 30
 			Wood: 25
-			Light: 75
+			Light: 45
 			Tiberium: 25
 			Heavy: 25
 		DamageTypes: Prone50Percent, TriggerProne, DefaultDeath
