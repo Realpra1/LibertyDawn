@@ -1,7 +1,7 @@
 ^FlameWeapon:
 	ValidTargets: Ground, Water, Trees
 	ReloadDelay: 55
-	Range: 3c0
+	Range: 4c0
 	InvalidTargets: Wall
 	Report: flamer2.aud
 	Projectile: Bullet
@@ -110,7 +110,7 @@ Napalm:
 		Explosions: med_napalm
 
 Laser:
-	ReloadDelay: 40
+	ReloadDelay: 36
 	Range: 8c0
 	Report: obelray1.aud
 	Projectile: LaserZap
@@ -121,7 +121,8 @@ Laser:
 		Spread: 42
 		Damage: 39600
 		Versus:
-			Wood: 50
+			Wood: 35
+			Tiberium: 50
 		DamageTypes: Prone50Percent, TriggerProne, FireDeath
 	Warhead@2Smu: LeaveSmudge
 		SmudgeType: Scorch
