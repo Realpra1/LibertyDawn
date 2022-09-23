@@ -1,5 +1,6 @@
 MCV:
 	Inherits: ^Vehicle
+	Inherits@CLOAK: ^AcceptsCloakCrate
 	Inherits@selection: ^SelectableSupportUnit
 	Valued:
 		Cost: 3000
@@ -114,8 +115,8 @@ APC:
 		Queue: Vehicle.GDI
 		Description: Armed infantry transport.\nCan attack Aircraft.\n  Strong vs Vehicles\n  Weak vs Infantry
 	Mobile:
-		TurnSpeed: 20
-		Speed: 128
+		TurnSpeed: 28
+		Speed: 110
 		PauseOnCondition: notmobile
 	Health:
 		HP: 25000
@@ -196,7 +197,7 @@ ARTY:
 		TurnSpeed: 25
 		Speed: 70
 	Health:
-		HP: 10000
+		HP: 10500
 	Repairable:
 		HpPerStep: 768
 	Armor:
@@ -621,7 +622,7 @@ MSAM:
 		Speed: 30
 		TurnSpeed: 10
 	Health:
-		HP: 7000
+		HP: 6650
 	Repairable:
 		HpPerStep: 606
 	Armor:
@@ -634,13 +635,25 @@ MSAM:
 	Armament@PRIMARY:
 		Weapon: 227mm
 		LocalOffset: 213,128,0, 213,-128,0
+		PauseOnCondition: !ammo
 	Armament@SECONDARY:
 		Name: secondary
 		Weapon: 227mm
 		LocalOffset: 213,-128,0, 213,128,0
+		PauseOnCondition: !ammo
+    AmmoPool:
+		Ammo: 32
+		AmmoCondition: ammo
+	ReloadAmmoPool:
+		Delay: 375
+		Count: 4
+    WithAmmoPipsDecoration:
+		Position: BottomLeft
+		Margin: 4, 3
+		RequiresSelection: true
+		PipCount: 5
 	AttackFrontal:
 		TargetFrozenActors: True
-		ForceFireIgnoresActors: True
 		Voice: Attack
 	AttackMove:
 		Voice: Attack
