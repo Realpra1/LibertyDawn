@@ -240,7 +240,7 @@ PROC:
 		DragLength: 12
 		TickRate: 15
 	StoresResources:
-		Capacity: 1000
+		Capacity: 500
 	Selectable:
 		Bounds: 3072, 2389
 		DecorationBounds: 3114, 3072
@@ -286,7 +286,7 @@ SILO:
 	WithResourceLevelSpriteBody:
 		Sequence: stages
 	StoresResources:
-		Capacity: 3000
+		Capacity: 4000
 	-SpawnActorsOnSell:
 	Power:
 		Amount: -10
@@ -751,7 +751,7 @@ EYE:
 		Prerequisites: ~techlevel.superweapons
 		Icon: ioncannon
 		Cursor: ioncannon
-		ChargeInterval: 9000
+		ChargeInterval: 7500
 		Name: Ion Cannon
 		Description: Initiate an Ion Cannon strike.\nApplies instant damage to a small area.
 		BeginChargeSpeechNotification: IonCannonCharging
