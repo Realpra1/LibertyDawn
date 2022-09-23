@@ -57,8 +57,8 @@ Chemspray:
 		-InvalidTargets:
 		Versus:
 			None: 70
-			Wood: 25
-			Light: 40
+			Wood: 30
+			Light: 25
 			Tiberium: 140
 			Heavy: 60
 		DamageTypes: Prone50Percent, TriggerProne, TiberiumDeath
@@ -77,12 +77,12 @@ BigChem:
 	BurstDelays: 10
 	Warhead@1Dam: SpreadDamage
 		Spread: 400
-		Damage: 17000
+		Damage: 16000
 		Versus:
 			None: 70
-			Wood: 25
-			Light: 40
-			Tiberium: 140
+			Wood: 30
+			Light: 25
+			Tiberium: 135
 			Heavy: 60
 		DamageTypes: Prone50Percent, TriggerProne, TiberiumDeath
     Warhead@3Eff: CreateEffect
