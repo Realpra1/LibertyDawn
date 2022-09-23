@@ -53,6 +53,7 @@ Dragon:
 		HorizontalRateOfTurn: 80
 		RangeLimit: 12c0
 	Warhead@1Dam: SpreadDamage
+		Spread: 1200
 		ValidTargets: Air
 		Versus:
 			None: 140
@@ -139,7 +140,7 @@ OrcaAGMissiles:
 			Wood: 75
 			Light: 110
 			Tiberium: 85
-			Heavy: 110
+			Heavy: 121
 
 OrcaAAMissiles:
 	Inherits: OrcaAGMissiles
@@ -192,23 +193,24 @@ MammothMissiles:
 	# Remove default Missile properties
 	-Projectile:
 	Projectile: Bullet
+        Arm: 1
 		Blockable: false
 		Image: DRAGON
 		Shadow: true
 		TrailImage: smokey
 		Inaccuracy: 2c256
 		LaunchAngle: 72
-		ContrailLength: 20
+		ContrailLength: 25
 		Speed: 100
 	Warhead@1Dam: SpreadDamage
-		Damage: 9000
+		Damage: 9900
 		Spread: 683
 		ValidTargets: Ground
 		Versus:
 			None: 40
-			Wood: 25
+			Wood: 28
 			Light: 100
-			Tiberium: 25
+			Tiberium: 28
 			Heavy: 100
 	Warhead@3Eff: CreateEffect
 		Explosions: med_frag
@@ -336,7 +338,7 @@ Patriot:
 		RangeLimit: 10c819
 		Inaccuracy: 0
 	Warhead@1Dam: SpreadDamage
-		Spread: 682
+		Spread: 1200
 		Damage: 5000
 		ValidTargets: Air
 		Versus:
