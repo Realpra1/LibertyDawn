@@ -61,6 +61,8 @@ HOSP:
 	WithBuildingBib:
 		HasMinibib: true
 	ProvidesPrerequisite@buildingname:
+    GivesBuildableArea:
+		AreaTypes: building
 
 HOSP.Husk:
 	Inherits: ^CivBuildingHusk
@@ -95,6 +97,8 @@ BIO:
 	SpawnActorOnDeath:
 		Actor: BIO.Husk
 	ProvidesPrerequisite@buildingname:
+    GivesBuildableArea:
+		AreaTypes: building
 
 BIO.Husk:
 	Inherits: ^CivBuildingHusk
@@ -139,3 +143,5 @@ MISS:
 		HasMinibib: true
 	WithMakeAnimation:
 	ProvidesPrerequisite@buildingname:
+    GivesBuildableArea:
+		AreaTypes: building
