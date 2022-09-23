@@ -53,6 +53,7 @@ Dragon:
 		HorizontalRateOfTurn: 80
 		RangeLimit: 12c0
 	Warhead@1Dam: SpreadDamage
+		Damage: 2500
 		Spread: 1200
 		ValidTargets: Air
 		Versus:
@@ -114,12 +115,27 @@ BikeRockets:
 		HorizontalRateOfTurn: 40
 		Speed: 213
 	Warhead@1Dam: SpreadDamage
-		Versus:
+		ValidTargets: Ground, Water
+        Versus:
 			None: 28
 			Wood: 92
 			Light: 124
 			Tiberium: 110
 			Heavy: 124
+    
+BikeAARockets:
+    Inherits: BikeRockets
+	Projectile: Missile
+		-Image:
+		Shadow: false
+		-TrailImage:
+		-ContrailLength:
+	Warhead@1Dam: SpreadDamage
+        Damage: 1250
+		ValidTargets: Air
+    -Warhead@2Smu:
+	-Warhead@3Eff:
+	-Warhead@4EffAir:
 
 OrcaAGMissiles:
 	Inherits: ^MissileWeapon
@@ -193,7 +209,6 @@ MammothMissiles:
 	# Remove default Missile properties
 	-Projectile:
 	Projectile: Bullet
-        Arm: 1
 		Blockable: false
 		Image: DRAGON
 		Shadow: true
@@ -232,10 +247,10 @@ MammothMissiles:
 	Warhead@1Dam: SpreadDamage
 		Damage: 10000
 		Versus:
-			None: 20
-			Wood: 60
-			Light: 35
-			Tiberium: 45
+			None: 15
+			Wood: 70
+			Light: 40
+			Tiberium: 55
 			Heavy: 170
 
 227mm.stnkAA:
@@ -244,7 +259,7 @@ MammothMissiles:
 	ValidTargets: Air
 	Warhead@1Dam: SpreadDamage
         ValidTargets: Air
-		Damage: 2000
+		Damage: 4000
 
 BoatMissile:
 	Inherits: ^MissileWeapon
