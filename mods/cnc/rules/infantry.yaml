@@ -127,7 +127,7 @@ E4:
 	Mobile:
 		Speed: 54
 	Health:
-		HP: 8500
+		HP: 9500
 	AutoTarget:
 		ScanRadius: 4
 	Armament:
@@ -169,7 +169,7 @@ E5:
 		Speed: 54
 		Locomotor: chem
 	Health:
-		HP: 9000
+		HP: 11000
 	AutoTarget:
 		ScanRadius: 4
 	Armament:
