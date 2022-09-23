@@ -288,7 +288,7 @@ CTNK:
 		TurnSpeed: 30
 		Speed: 100
 	Health:
-		HP: 22500
+		HP: 27000
 	Repairable:
 		HpPerStep: 2046
 	Armor:
@@ -385,8 +385,12 @@ BIKE:
 		Type: Light
 	RevealsShroud:
 		Range: 5c0
-	Armament:
-		Weapon: BikeRockets
+    Armament@PRIMARY:
+        Weapon: BikeRockets
+		LocalOffset: -128, -170, 170, -128, 170, 170
+		LocalYaw: 100, -100
+	Armament@SECONDARY:
+		Weapon: BikeAARockets
 		LocalOffset: -128, -170, 170, -128, 170, 170
 		LocalYaw: 100, -100
 	AttackFrontal:
