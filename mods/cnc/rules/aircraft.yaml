@@ -14,7 +14,7 @@ TRAN:
 		Description: Fast Infantry Transport Helicopter.\n  Unarmed
 	Aircraft:
 		TurnSpeed: 20
-		Speed: 150
+		Speed: 142
 		AltitudeVelocity: 0c100
 	Health:
 		HP: 9000
@@ -54,7 +54,7 @@ HELI:
 	Inherits@EXPERIENCE: ^GainsExperience
 	Inherits@AUTOTARGET: ^AutoTargetAllAssaultMove
 	Valued:
-		Cost: 1200
+		Cost: 1100
 	Tooltip:
 		Name: Apache Longbow
 	UpdatesPlayerStatistics:
@@ -66,9 +66,9 @@ HELI:
 		Description: Helicopter Gunship with Chainguns.\n  Strong vs Infantry, Light Vehicles and\n  Aircraft\n  Weak vs Tanks
 	Aircraft:
 		TurnSpeed: 28
-		Speed: 180
+		Speed: 171
 	Health:
-		HP: 12500
+		HP: 13750
 	Armor:
 		Type: Light
 	RevealsShroud:
@@ -136,10 +136,10 @@ ORCA:
 		Queue: Aircraft.GDI
 		Description: Helicopter Gunship with AG Missiles.\n  Strong vs Buildings, Tanks\n  Weak vs Infantry
 	Aircraft:
-		TurnSpeed: 28
-		Speed: 186
+		TurnSpeed: 40
+		Speed: 205
 	Health:
-		HP: 10000
+		HP: 9500
 	Armor:
 		Type: Light
 	RevealsShroud:
