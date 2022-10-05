@@ -585,7 +585,7 @@
 		Voice: Attack
 	HiddenUnderFog:
 	Valued:
-		Cost: 700
+		Cost: 1500
 	Tooltip:
 		Name: Visceroid
 	Armament:
