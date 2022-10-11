@@ -57,7 +57,7 @@ namespace OpenRA.Mods.Common.Activities
 
 			if (IsCanceling || harv.IsFull)
 			{
-				if (self.World.ActorsHavingTrait<Harvester>(h => h.LinkedProc == harv.LastLinkedProc).Count() >= harv.Info.MaxUnloadQueue)
+				if (self.World.ActorsHavingTrait<Harvester>(h => h.LinkedProc == harv.LinkedProc).Count() >= harv.Info.MaxUnloadQueue)
 					harv.LinkedProc = null;
 				return true;
 			}
