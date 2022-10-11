@@ -31,6 +31,22 @@ SPLITBLUE:
 		Terrain: BlueTiberium
 	AppearsOnMapPreview:
 		Terrain: BlueTiberium
+        
+SPLITRED:
+	Inherits: ^TibTree
+	RenderSprites:
+		Image: split3
+	SeedsResource:
+		ResourceType: RedTiberium
+		Interval: 110
+	WithIdleAnimation:
+		Interval: 500, 1000
+	Tooltip:
+		Name: Blossom Tree (red)
+	RadarColorFromTerrain:
+		Terrain: RedTiberium
+	AppearsOnMapPreview:
+		Terrain: RedTiberium
 
 ROCK1:
 	Inherits: ^Rock

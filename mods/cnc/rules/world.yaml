@@ -29,6 +29,8 @@
 				PathingCost: 300
 			BlueTiberium: 70
 				PathingCost: 300
+            RedTiberium: 70
+				PathingCost: 300
 			Beach: 89
 	Locomotor@CHEM:
 		Name: chem
@@ -41,6 +43,7 @@
 			Bridge: 111
 			Tiberium: 100
 			BlueTiberium: 100
+			RedTiberium: 100
 			Beach: 89
 	Locomotor@WHEELED:
 		Name: wheeled
@@ -52,6 +55,7 @@
 			Bridge: 190
 			Tiberium: 63
 			BlueTiberium: 63
+			RedTiberium: 63
 			Beach: 50
 	Locomotor@HEAVYWHEELED:
 		Name: heavywheeled
@@ -63,6 +67,7 @@
 			Bridge: 190
 			Tiberium: 63
 			BlueTiberium: 63
+			RedTiberium: 63
 			Beach: 50
 	Locomotor@TRACKED:
 		Name: tracked
@@ -74,6 +79,7 @@
 			Bridge: 105
 			Tiberium: 95
 			BlueTiberium: 95
+			RedTiberium: 95
 			Beach: 95
 	Locomotor@HEAVYTRACKED:
 		Name: heavytracked
@@ -85,6 +91,7 @@
 			Bridge: 105
 			Tiberium: 95
 			BlueTiberium: 95
+			RedTiberium: 95
 			Beach: 95
 	Locomotor@NAVAL:
 		Name: naval
@@ -101,6 +108,7 @@
 			Water: 100
 			Tiberium: 100
 			BlueTiberium: 100
+			RedTiberium: 100
 			Beach: 100
 			River: 100
 	Locomotor@CRITTER:
@@ -112,6 +120,7 @@
 			Bridge: 111
 			Tiberium: 78
 			BlueTiberium: 78
+			RedTiberium: 78
 			Beach: 89
 	Locomotor@VISC:
 		Name: visc
@@ -123,6 +132,7 @@
 			Bridge: 111
 			Tiberium: 100
 			BlueTiberium: 100
+			RedTiberium: 100
 			Beach: 89
 	Faction@Random:
 		Name: Any
@@ -140,13 +150,17 @@
 	ResourceRenderer:
 		ResourceTypes:
 			Tiberium:
-				Sequences: ti1, ti2, ti3, ti4, ti5, ti6, ti7, ti8, ti9, ti10, ti11, ti12
+				Sequences: ti1, ti4, ti8, ti12
 				Palette: staticterrain
 				Name: Tiberium
 			BlueTiberium:
-				Sequences: bti1, bti2, bti3, bti4, bti5, bti6, bti7, bti8, bti9, bti10, bti11, bti12
+				Sequences: bti1, bti4, bti8, bti12
 				Palette: bluetiberium
-				Name: Tiberium
+				Name: Blue Tiberium
+            RedTiberium:
+				Sequences: bti1, bti4, bti8, bti12
+				Palette: redtiberium
+				Name: Red Tiberium
 
 World:
 	Inherits: ^BaseWorld
@@ -181,12 +195,26 @@ World:
 				ResourceIndex: 1
 				TerrainType: Tiberium
 				AllowedTerrainTypes: Clear, Road
-				MaxDensity: 12
+				MaxDensity: 4
+                SeedsResource:
+                    ResourceType: Tiberium
+                    Interval: 110
 			BlueTiberium:
 				ResourceIndex: 2
 				TerrainType: BlueTiberium
 				AllowedTerrainTypes: Clear, Road
-				MaxDensity: 12
+				MaxDensity: 4
+                SeedsResource:
+                    ResourceType: BlueTiberium
+                    Interval: 110
+            RedTiberium:
+				ResourceIndex: 3
+				TerrainType: RedTiberium
+				AllowedTerrainTypes: Clear, Road
+				MaxDensity: 4
+                SeedsResource:
+                    ResourceType: RedTiberium
+                    Interval: 110
 	ResourceClaimLayer:
 	WarheadDebugOverlay:
 	CustomTerrainDebugOverlay:
@@ -198,12 +226,14 @@ World:
 	MapBuildRadius:
 		AllyBuildRadiusCheckboxDisplayOrder: 4
 		BuildRadiusCheckboxDisplayOrder: 5
+        BuildRadiusCheckboxEnabled: False
 	MapOptions:
 		ShortGameCheckboxDisplayOrder: 2
 		TechLevelDropdownDisplayOrder: 2
 		GameSpeedDropdownDisplayOrder: 3
 	MapStartingLocations:
 		SeparateTeamSpawnsCheckboxDisplayOrder: 6
+        SeparateTeamSpawnsCheckboxEnabled: False
 	CreateMapPlayers:
 	StartingUnits@mcvonly:
 		Class: none
@@ -227,25 +257,25 @@ World:
 		ClassName: Heavy Support
 		Factions: nod
 		BaseActor: mcv
-		SupportActors: e1,e1,e1,e1,e3,e3,ltnk,ltnk,ftnk
+		SupportActors: e1,e1,e1,e1,e3,e3,ltnk,ltnk,ftnk,ctnk,arty,bggy
 	StartingUnits@heavynodb:
 		Class: heavy
 		ClassName: Heavy Support
 		Factions: nod
 		BaseActor: mcv
-		SupportActors: e1,e1,e1,e1,e1,e3,e3,e3,ftnk,ftnk
+		SupportActors: e1,e1,e1,e1,e1,e3,e3,e3,ftnk,ftnk,stnk
 	StartingUnits@heavygdia:
 		Class: heavy
 		ClassName: Heavy Support
 		Factions: gdi
 		BaseActor: mcv
-		SupportActors: e1,e1,e1,e1,e3,e3,jeep,mtnk,mtnk
+		SupportActors: e1,e1,e1,e1,e3,e3,jeep,mtnk,mtnk,msam,msam
 	StartingUnits@heavygdib:
 		Class: heavy
 		ClassName: Heavy Support
 		Factions: gdi
 		BaseActor: mcv
-		SupportActors: e1,e1,e1,e1,e1,e2,e2,e2,e3,e3,apc,mtnk
+		SupportActors: e1,e1,e1,e1,e1,e2,e2,e2,e3,e3,apc,mtnk,htnk
 	SpawnStartingUnits:
 		DropdownDisplayOrder: 0
 	CrateSpawner:
@@ -285,12 +315,26 @@ EditorWorld:
 				ResourceIndex: 1
 				TerrainType: Tiberium
 				AllowedTerrainTypes: Clear, Road
-				MaxDensity: 12
+				MaxDensity: 4
+                SeedsResource:
+                    ResourceType: Tiberium
+                    Interval: 110
 			BlueTiberium:
 				ResourceIndex: 2
 				TerrainType: BlueTiberium
 				AllowedTerrainTypes: Clear, Road
-				MaxDensity: 12
+				MaxDensity: 4
+                SeedsResource:
+                    ResourceType: BlueTiberium
+                    Interval: 110
+            RedTiberium:
+				ResourceIndex: 3
+				TerrainType: RedTiberium
+				AllowedTerrainTypes: Clear, Road
+				MaxDensity: 4
+                SeedsResource:
+                    ResourceType: RedTiberium
+                    Interval: 110
 	EditorSelectionLayer:
 	LoadWidgetAtGameStart:
 	EditorActionManager:

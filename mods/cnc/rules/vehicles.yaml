@@ -56,12 +56,12 @@ HARV:
 	Selectable:
 		DecorationBounds: 1536, 1536
 	Harvester:
-		Resources: Tiberium, BlueTiberium
+		Resources: Tiberium, BlueTiberium, RedTiberium
 		Capacity: 20
 		BaleLoadDelay: 12
 		BaleUnloadDelay: 6
-		SearchFromProcRadius: 15
-		SearchFromHarvesterRadius: 8
+		SearchFromProcRadius: 40
+		SearchFromHarvesterRadius: 20
 		HarvestFacings: 8
 		EmptyCondition: no-tiberium
 	Mobile:
@@ -96,6 +96,7 @@ HARV:
 		ResourceSequences:
 			Tiberium: pip-green
 			BlueTiberium: pip-blue
+			RedTiberium: pip-red
 
 APC:
 	Inherits: ^Tank

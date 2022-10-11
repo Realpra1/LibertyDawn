@@ -5,6 +5,7 @@
 		ResourceValues:
 			Tiberium: 35
 			BlueTiberium: 70
+			RedTiberium: 140
 
 EditorPlayer:
 	Inherits: ^BasePlayer
@@ -28,12 +29,13 @@ Player:
 	PlayerResources:
 		CashTickUpNotification: CashTickUp
 		CashTickDownNotification: CashTickDown
-		SelectableCash: 2500, 5000, 7500, 10000, 20000
-		DefaultCash: 7500
+		SelectableCash: 0, 2500, 5000, 7500, 10000, 20000
+		DefaultCash: 10000
 	DeveloperMode:
 		CheckboxDisplayOrder: 9
 	BaseAttackNotifier:
 	Shroud:
+        ExploredMapCheckboxEnabled: True
 		FogCheckboxDisplayOrder: 3
 	LobbyPrerequisiteCheckbox@GLOBALFACTUNDEPLOY:
 		ID: factundeploy
@@ -46,7 +48,7 @@ Player:
 		ID: C17-Stealth
 		Label: Stealth Deliveries
 		Description: Nod's delivery plane is cloaked
-		Enabled: False
+		Enabled: True
 		DisplayOrder: 8
 		Prerequisites: global-C17-stealth
 	PlayerStatistics:

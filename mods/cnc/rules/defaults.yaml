@@ -297,7 +297,7 @@
 		CanHover: True
 		TakeOffOnResupply: true
 		VTOL: true
-		LandableTerrainTypes: Clear, Rough, Road, Beach, Tiberium, BlueTiberium
+		LandableTerrainTypes: Clear, Rough, Road, Beach, Tiberium, BlueTiberium, RedTiberium
 		Crushes: crate, infantry
 		CanSlide: True
 	HiddenUnderFog:
@@ -366,14 +366,14 @@
 		CargoType: Infantry
 	HiddenUnderFog:
 	DamagedByTerrain:
-		Terrain: Tiberium, BlueTiberium
+		Terrain: Tiberium, BlueTiberium, RedTiberium
 		Damage: 220
 		DamageInterval: 16
 		DamageTypes: TiberiumDeath
 		RequiresCondition: !hazmatsuits
 	GrantConditionOnTerrain@HAZMAT:
 		Condition: ontiberium
-		TerrainTypes: Tiberium, BlueTiberium
+		TerrainTypes: Tiberium, BlueTiberium, RedTiberium
 	GrantConditionOnPrerequisite@HAZMAT:
 		Condition: biolab
 		Prerequisites: bio
@@ -474,7 +474,7 @@
 	Passenger:
 		CustomPipType: gray
 	ScaredyCat:
-		AvoidTerrainTypes: Tiberium, BlueTiberium
+		AvoidTerrainTypes: Tiberium, BlueTiberium, RedTiberium
 	Crushable:
 		CrushSound: squish2.aud
 	Voiced:
@@ -482,7 +482,7 @@
 	Wanders:
 		MinMoveDelay: 150
 		MaxMoveDelay: 750
-		AvoidTerrainTypes: Tiberium, BlueTiberium
+		AvoidTerrainTypes: Tiberium, BlueTiberium, RedTiberium
 	MapEditorData:
 		Categories: Civilian infantry
 
@@ -609,7 +609,7 @@
 		Damage: -750
 		DamageInterval: 4
 		DamageTypes: TiberiumDeath
-		Terrain: Tiberium, BlueTiberium
+		Terrain: Tiberium, BlueTiberium, RedTiberium
 	Voiced:
 		VoiceSet: DinoVoice
 	HitShape:
@@ -1065,7 +1065,7 @@
 ^Husk:
 	Inherits: ^CommonHuskDefaults
 	Husk:
-		AllowedTerrain: Clear, Rough, Road, Tiberium, BlueTiberium, Beach
+		AllowedTerrain: Clear, Rough, Road, Tiberium, BlueTiberium, RedTiberium, Beach
 	Targetable:
 		RequiresForceFire: true
 		TargetTypes: Ground, Husk
@@ -1149,7 +1149,7 @@
 		GenericName: Crate
 		ShowOwnerRow: false
 	Crate:
-		TerrainTypes: Clear, Rough, Road, Tiberium, BlueTiberium, Beach
+		TerrainTypes: Clear, Rough, Road, Tiberium, BlueTiberium, RedTiberium, Beach
 	RenderSprites:
 		Palette: effect
 		Image: scrate

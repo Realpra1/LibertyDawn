@@ -15,6 +15,12 @@ Terrain:
 		AcceptsSmudgeType: Crater, Scorch
 		Color: 54FCFC
 		RestrictPlayerColor: true
+    TerrainType@RedTiberium:
+		Type: RedTiberium
+		TargetTypes: Ground
+		AcceptsSmudgeType: Crater, Scorch
+		Color: FF1A1A
+		RestrictPlayerColor: true
 	TerrainType@Bridge:
 		Type: Bridge
 		TargetTypes: Ground, Bridge

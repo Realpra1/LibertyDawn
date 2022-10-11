@@ -2,6 +2,9 @@
   <PropertyGroup>
     <IsPublishable Condition="'$(CopyD2kDll)' == 'False'">false</IsPublishable>
   </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="NUnit3TestAdapter" Version="4.2.1" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\OpenRA.Game\OpenRA.Game.csproj">
