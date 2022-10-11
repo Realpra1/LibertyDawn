@@ -60,7 +60,9 @@ HARV:
 		Capacity: 20
 		BaleLoadDelay: 12
 		BaleUnloadDelay: 6
-		SearchFromProcRadius: 40
+        MaxUnloadQueue : 7
+        UnloadQueueCostModifier: 100
+		SearchFromProcRadius: 25
 		SearchFromHarvesterRadius: 20
 		HarvestFacings: 8
 		EmptyCondition: no-tiberium

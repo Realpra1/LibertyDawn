@@ -20,7 +20,7 @@ Terrain:
 		TargetTypes: Ground
 		AcceptsSmudgeType: Crater, Scorch
 		Color: FF1A1A
-		RestrictPlayerColor: true
+		RestrictPlayerColor: false
 	TerrainType@Bridge:
 		Type: Bridge
 		TargetTypes: Ground, Bridge

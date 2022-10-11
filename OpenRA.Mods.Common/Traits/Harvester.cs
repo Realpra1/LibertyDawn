@@ -199,10 +199,12 @@ namespace OpenRA.Mods.Common.Traits
 				self.World, mobile.Locomotor, self, refineries.Select(r => r.Key), self.Location, BlockedByActor.None,
 				location =>
 				{
-					if (!refineries.Contains(location))
+					var refinery = refineries.Where(r => r.Key.X < location.X + 2 && r.Key.X > location.X - 2
+						&& r.Key.Y < location.Y + 2 && r.Key.Y > location.Y - 2);
+					if (refinery.Count() == 0)
 						return 0;
 
-					var occupancy = refineries[location].First().Occupancy;
+					var occupancy = refinery.First().First().Occupancy;
 
 					// Too many harvesters clogs up the refinery's delivery location:
 					if (occupancy >= Info.MaxUnloadQueue)

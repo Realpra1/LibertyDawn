@@ -56,7 +56,11 @@ namespace OpenRA.Mods.Common.Activities
 				Cancel(self, true);
 
 			if (IsCanceling || harv.IsFull)
+			{
+				if (self.World.ActorsHavingTrait<Harvester>(h => h.LinkedProc == harv.LastLinkedProc).Count() >= harv.Info.MaxUnloadQueue)
+					harv.LinkedProc = null;
 				return true;
+			}
 
 			// Move towards the target cell
 			if (self.Location != targetCell)
