@@ -24,9 +24,12 @@
 	Warhead@3Eff: CreateEffect
 		Explosions: small_napalm
 		ImpactActors: false
-
+    
 Flamethrower:
 	Inherits: ^FlameWeapon
+    Warhead@4Res_area: DestroyResource
+		Size: 0
+		Delay: 1
 
 BigFlamer:
 	Inherits: ^FlameWeapon
@@ -47,6 +50,9 @@ BigFlamer:
 			Heavy: 15
 	Warhead@3Eff: CreateEffect
 		Explosions: med_napalm
+    Warhead@4Res_area: DestroyResource
+		Size: 1
+		Delay: 1
 
 Chemspray:
 	Inherits: ^FlameWeapon
@@ -108,6 +114,9 @@ Napalm:
 			Heavy: 80
 	Warhead@3Eff: CreateEffect
 		Explosions: med_napalm
+    Warhead@4Res_area: DestroyResource
+		Size: 1
+		Delay: 1
 
 Laser:
 	ReloadDelay: 36

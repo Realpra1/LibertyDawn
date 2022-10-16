@@ -61,7 +61,7 @@ HARV:
 		BaleLoadDelay: 12
 		BaleUnloadDelay: 6
         MaxUnloadQueue : 7
-        UnloadQueueCostModifier: 100
+        UnloadQueueCostModifier: 3000
 		SearchFromProcRadius: 25
 		SearchFromHarvesterRadius: 20
 		HarvestFacings: 8
