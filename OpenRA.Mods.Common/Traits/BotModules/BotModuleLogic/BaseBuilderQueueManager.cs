@@ -35,6 +35,7 @@ namespace OpenRA.Mods.Common.Traits
 		int cachedBases;
 		int cachedBuildings;
 		int minimumExcessPower;
+		CPos? lastUsedDefenseLocation = null;
 
 		WaterCheck waterState = WaterCheck.NotChecked;
 
@@ -155,6 +156,8 @@ namespace OpenRA.Mods.Common.Traits
 				{
 					// Check if Building is a defense and if we should place it towards the enemy or not.
 					if (actorInfo.HasTraitInfo<AttackBaseInfo>() && world.LocalRandom.Next(100) < baseBuilder.Info.PlaceDefenseTowardsEnemyChance)
+						type = BuildingType.Defense;
+					else if (baseBuilder.Info.PlaceAsDefenses.Contains(actorInfo.Name) && world.LocalRandom.Next(100) < baseBuilder.Info.PlaceAsDefenseChance)
 						type = BuildingType.Defense;
 					else if (baseBuilder.Info.RefineryTypes.Contains(actorInfo.Name))
 						type = BuildingType.Refinery;
@@ -310,10 +313,29 @@ namespace OpenRA.Mods.Common.Traits
 				}
 			}
 
+			//If other building types are limited we allow AI to build less important buildings:
+			Dictionary<string, int> limitedFractions = new Dictionary<string, int>();
+			int totalLimitedFrac = 0;
+
+			foreach (var playerBuilding in playerBuildings)
+			{
+				var name = playerBuilding.Info.Name;
+				if (limitedFractions.ContainsKey(name))
+					continue;
+				var count = playerBuildings.Count(a => a.Info.Name == name);
+				if (baseBuilder.Info.BuildingLimits.ContainsKey(name) && baseBuilder.Info.BuildingLimits[name] <= count)
+				{
+					limitedFractions.Add(name, baseBuilder.Info.BuildingFractions.ContainsKey(name) ? baseBuilder.Info.BuildingFractions[name] : 0);
+					totalLimitedFrac += limitedFractions[name];
+				}
+			}
+
 			// Build everything else
 			foreach (var frac in baseBuilder.Info.BuildingFractions.Shuffle(world.LocalRandom))
 			{
 				var name = frac.Key;
+				if (limitedFractions.ContainsKey(name))
+					continue;
 
 				// Does this building have initial delay, if so have we passed it?
 				if (baseBuilder.Info.BuildingDelays != null &&
@@ -327,10 +349,7 @@ namespace OpenRA.Mods.Common.Traits
 
 				// Do we want to build this structure?
 				var count = playerBuildings.Count(a => a.Info.Name == name);
-				if (count * 100 > frac.Value * playerBuildings.Length)
-					continue;
-
-				if (baseBuilder.Info.BuildingLimits.ContainsKey(name) && baseBuilder.Info.BuildingLimits[name] <= count)
+				if (count * 100 > (frac.Value + totalLimitedFrac) * playerBuildings.Length)
 					continue;
 
 				// If we're considering to build a naval structure, check whether there is enough water inside the base perimeter
@@ -411,7 +430,9 @@ namespace OpenRA.Mods.Common.Traits
 						.ClosestTo(world.Map.CenterOfCell(baseBuilder.DefenseCenter));
 
 					var targetCell = closestEnemy != null ? closestEnemy.Location : baseCenter;
-					return findPos(baseBuilder.DefenseCenter, targetCell, baseBuilder.Info.MinimumDefenseRadius, baseBuilder.Info.MaximumDefenseRadius);
+					lastUsedDefenseLocation = findPos(lastUsedDefenseLocation ?? baseBuilder.DefenseCenter,
+						targetCell, baseBuilder.Info.MinimumDefenseRadius, baseBuilder.Info.MaximumDefenseRadius);
+					return lastUsedDefenseLocation;
 
 				case BuildingType.Refinery:
 

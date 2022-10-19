@@ -130,7 +130,10 @@ namespace OpenRA.Mods.Common.Traits
 				world.Actors.Count(a => a.Owner == player && a.Info.Name == name) >= Info.UnitLimits[name])
 				return;
 
-			bot.QueueOrder(Order.StartProduction(queue.Actor, name, 1));
+			int queueAmount = System.Math.Max(1,
+				world.ActorsHavingTrait<Building>().Where(a => a.Owner == player).Count() / 20);
+
+			bot.QueueOrder(Order.StartProduction(queue.Actor, name, queueAmount));
 		}
 
 		// In cases where we want to build a specific unit but don't know the queue name (because there's more than one possibility)

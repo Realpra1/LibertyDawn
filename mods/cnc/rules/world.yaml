@@ -194,7 +194,7 @@ World:
 			Tiberium:
 				ResourceIndex: 1
 				TerrainType: Tiberium
-				AllowedTerrainTypes: Clear, Road
+				AllowedTerrainTypes: Clear, Road, Rough, Beach, Bridge
 				MaxDensity: 4
                 SeedsResource:
                     ResourceType: Tiberium
@@ -202,7 +202,7 @@ World:
 			BlueTiberium:
 				ResourceIndex: 2
 				TerrainType: BlueTiberium
-				AllowedTerrainTypes: Clear, Road
+				AllowedTerrainTypes: Clear, Road, Rough, Beach, Bridge
 				MaxDensity: 4
                 SeedsResource:
                     ResourceType: BlueTiberium
@@ -210,7 +210,7 @@ World:
             RedTiberium:
 				ResourceIndex: 3
 				TerrainType: RedTiberium
-				AllowedTerrainTypes: Clear, Road
+				AllowedTerrainTypes: Clear, Road, Rough, Beach, Bridge
 				MaxDensity: 4
                 SeedsResource:
                     ResourceType: RedTiberium
@@ -314,7 +314,7 @@ EditorWorld:
 			Tiberium:
 				ResourceIndex: 1
 				TerrainType: Tiberium
-				AllowedTerrainTypes: Clear, Road
+				AllowedTerrainTypes: Clear, Road, Rough, Beach, Bridge
 				MaxDensity: 4
                 SeedsResource:
                     ResourceType: Tiberium
@@ -322,7 +322,7 @@ EditorWorld:
 			BlueTiberium:
 				ResourceIndex: 2
 				TerrainType: BlueTiberium
-				AllowedTerrainTypes: Clear, Road
+				AllowedTerrainTypes: Clear, Road, Rough, Beach, Bridge
 				MaxDensity: 4
                 SeedsResource:
                     ResourceType: BlueTiberium
@@ -330,7 +330,7 @@ EditorWorld:
             RedTiberium:
 				ResourceIndex: 3
 				TerrainType: RedTiberium
-				AllowedTerrainTypes: Clear, Road
+				AllowedTerrainTypes: Clear, Road, Rough, Beach, Bridge
 				MaxDensity: 4
                 SeedsResource:
                     ResourceType: RedTiberium

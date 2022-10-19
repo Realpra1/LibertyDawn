@@ -649,7 +649,7 @@ MSAM:
 		LocalOffset: 213,-128,0, 213,128,0
 		PauseOnCondition: !ammo
     AmmoPool:
-		Ammo: 24
+		Ammo: 28
 		AmmoCondition: ammo
 	ReloadAmmoPool:
 		Delay: 375

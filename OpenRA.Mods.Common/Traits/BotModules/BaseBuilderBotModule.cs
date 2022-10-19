@@ -30,6 +30,12 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Tells the AI what building types are considered power plants.")]
 		public readonly HashSet<string> PowerTypes = new HashSet<string>();
 
+		[Desc("Forces AI to treat these buildings as defenses and build them toward enemy.")]
+		public readonly HashSet<string> PlaceAsDefenses = new HashSet<string>();
+
+		[Desc("Chance of forced placing as defense.")]
+		public readonly int PlaceAsDefenseChance = 50;
+
 		[Desc("Tells the AI what building types are considered infantry production facilities.")]
 		public readonly HashSet<string> BarracksTypes = new HashSet<string>();
 
