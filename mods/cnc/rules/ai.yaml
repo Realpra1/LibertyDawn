@@ -17,9 +17,9 @@ Player:
     ModularBot@SkyNet:
 		Name: SkyNet
 		Type: skynet
-    ModularBot@BaseMaker:
-		Name: BaseMaker
-		Type: basemaker
+    ModularBot@IronReaper:
+		Name: IronReaper
+		Type: ironreaper
     ModularBot@WaveMaker:
 		Name: WaveMaker
 		Type: wavemaker
@@ -44,9 +44,9 @@ Player:
     GrantConditionOnBotOwner@skynet:
 		Condition: enable-skynet-ai
 		Bots: skynet
-    GrantConditionOnBotOwner@basemaker:
-		Condition: enable-basemaker-ai
-		Bots: basemaker
+    GrantConditionOnBotOwner@ironreaper:
+		Condition: enable-ironreaper-ai
+		Bots: ironreaper
     GrantConditionOnBotOwner@wavemaker:
 		Condition: enable-wavemaker-ai
 		Bots: wavemaker
@@ -115,7 +115,7 @@ Player:
 					TargetMetric: Value
 					CheckRadius: 7c0
     SupportPowerBotModule@b:
-		RequiresCondition: enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-basemaker-ai || enable-wavemaker-ai || enable-campaignbot-ai
+		RequiresCondition: enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-campaignbot-ai
 		Decisions:
 			Airstrike:
 				OrderName: AirstrikePowerInfoOrder
@@ -182,13 +182,13 @@ Player:
 					TargetMetric: Value
 					CheckRadius: 7c0
 	HarvesterBotModule:
-		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-basemaker-ai || enable-wavemaker-ai || enable-campaignbot-ai
+		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-campaignbot-ai
 		HarvesterTypes: harv
 		RefineryTypes: proc  
 	BuildingRepairBotModule:
-		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-basemaker-ai || enable-wavemaker-ai || enable-campaignbot-ai
+		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-campaignbot-ai
 	McvManagerBotModule:
-		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-basemaker-ai || enable-wavemaker-ai || enable-campaignbot-ai
+		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-campaignbot-ai
 		McvTypes: mcv
 		ConstructionYardTypes: fact
 		McvFactoryTypes: weap,afld
@@ -777,8 +777,8 @@ Player:
 			heli: 20
 			orca: 20
             rmbo: 2
-    BaseBuilderBotModule@basemaker:
-		RequiresCondition: enable-basemaker-ai
+    BaseBuilderBotModule@ironreaper:
+		RequiresCondition: enable-ironreaper-ai
 		BuildingQueues: Building.Nod, Building.GDI
 		DefenseQueues: Defence.Nod, Defence.GDI
 		MinimumExcessPower: 1
@@ -788,21 +788,24 @@ Player:
         MinBaseRadius: 6
         MaxBaseRadius: 49
         MaximumDefenseRadius: 49
-        PlaceDefenseTowardsEnemyChance: 95
+        PlaceDefenseTowardsEnemyChance: 90
 		ConstructionYardTypes: fact
 		RefineryTypes: proc
 		PowerTypes: nuke
-        PlaceAsDefenses: nuke
+        PlaceAsDefenses: nuke, hand, pyle, weap, afld
         PlaceAsDefenseChance: 33
 		BarracksTypes: pyle,hand
 		VehiclesFactoryTypes: weap,afld
 		ProductionTypes: pyle,hand,weap,afld,hpad
 		SiloTypes: silo
 		BuildingLimits:
+            proc: 100
+            weap: 80
+			afld: 80
 			pyle: 6
 			hand: 6
 			hq: 1
-			hpad: 1
+			hpad: 2
             gtwr: 20
 			gun: 1
 			eye: 1
@@ -813,7 +816,7 @@ Player:
             proc: 0
 			pyle: 2000
 			hand: 2000
-			hq: 5000
+			hq: 4500
 			weap: 0
 			afld: 0
 			gtwr: 2000
@@ -823,33 +826,33 @@ Player:
 			sam: 2000
 			eye: 9000
 			tmpl: 9000
-			fix: 5000
+			fix: 4500
 			hpad: 7500
 		BuildingFractions:
 			proc: 15
 			pyle: 25
 			hand: 25
-			hq: 100
-			weap: 58
-			afld: 57
+			hq: 5
+			weap: 33
+			afld: 33
 			gtwr: 3
 			gun: 1
 			atwr: 11
 			obli: 10
-			sam: 2
-			eye: 100
-			tmpl: 100
-			fix: 100
+			sam: 1
+			eye: 5
+			tmpl: 5
+			fix: 5
 			hpad: 1
-    SquadManagerBotModule@basemaker:
-		RequiresCondition: enable-basemaker-ai
+    SquadManagerBotModule@ironreaper:
+		RequiresCondition: enable-ironreaper-ai
 		SquadSize: 20
 		ExcludeFromSquadsTypes: harv, mcv, a10
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
-	UnitBuilderBotModule@basemaker:
-		RequiresCondition: enable-basemaker-ai
+	UnitBuilderBotModule@ironreaper:
+		RequiresCondition: enable-ironreaper-ai
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI
         IdleBaseUnitsMaximum: 999
         UnitsToBuild:
@@ -877,7 +880,7 @@ Player:
 			orca: 1
             mcv: 0
 		UnitLimits:
-            harv: 250
+            harv: 150
 			mlrs: 4
 			heli: 6
 			orca: 5
