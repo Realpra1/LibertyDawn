@@ -298,14 +298,14 @@ namespace OpenRA.Mods.Common.Traits
 		void IResourceLayer.ClearResources(CPos cell) { ClearResources(cell); }
 		bool IResourceLayer.IsVisible(CPos cell) { return !world.FogObscures(cell); }
 
-		//private int tickcounter = 0;
+		// private int tickcounter = 0;
 		public void Tick(Actor self)
 		{
-			//tickcounter++;
-			//Log.Write("debug", "Tickcounter: " + tickcounter);
-			//This gets ticked, but also out games. Not a problem?
-			//1. Spread resources? Do as proper trait yaml thing? But here for efficiency.
-			//2. Limit red tib creations if lot of tiberium on map for efficiency (ie. map will become stable blue largely... or all explode and thus self-remove)
+			// tickcounter++;
+			// Log.Write("debug", "Tickcounter: " + tickcounter);
+			// This gets ticked, but also out games. Not a problem?
+			// 1. Spread resources? Do as proper trait yaml thing? But here for efficiency.
+			// 2. Limit red tib creations if lot of tiberium on map for efficiency (ie. map will become stable blue largely... or all explode and thus self-remove)
 		}
 
 		bool IResourceLayer.IsEmpty => resCells < 1;

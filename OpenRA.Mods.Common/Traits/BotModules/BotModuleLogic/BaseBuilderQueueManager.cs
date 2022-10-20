@@ -313,7 +313,7 @@ namespace OpenRA.Mods.Common.Traits
 				}
 			}
 
-			//If other building types are limited we allow AI to build less important buildings:
+			// If other building types are limited we allow AI to build less important buildings:
 			Dictionary<string, int> limitedFractions = new Dictionary<string, int>();
 			int totalLimitedFrac = 0;
 
