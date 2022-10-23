@@ -190,6 +190,7 @@ World:
 		SmokeSequences: idle
 	ResourceLayer:
 		RecalculateResourceDensity: true
+        SpeedModifier: 75
 		ResourceTypes:
 			Tiberium:
 				ResourceIndex: 1
@@ -336,6 +337,7 @@ EditorWorld:
 	EditorCursorLayer:
 	EditorResourceLayer:
 		RecalculateResourceDensity: true
+        SpeedModifier: 75
 		ResourceTypes:
 			Tiberium:
 				ResourceIndex: 1
@@ -370,7 +372,7 @@ EditorWorld:
                     1: 2250
                     5: 750
                     15: 3000
-                    20: 36000
+                    20: 18000
             RedTiberium:
 				ResourceIndex: 3
 				TerrainType: RedTiberium

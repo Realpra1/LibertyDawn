@@ -93,6 +93,9 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Override the density saved in maps with values calculated based on the number of neighbouring resource cells.")]
 		public readonly bool RecalculateResourceDensity = false;
 
+		[Desc("Change all spread and stage times (percent).")]
+		public readonly int SpeedModifier = 100;
+
 		// Copied to EditorResourceLayerInfo, ResourceRendererInfo
 		protected static object LoadResourceTypes(MiniYaml yaml)
 		{
@@ -403,12 +406,12 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				foreach (var typeInfo in info.ResourceTypes.Values)
 				{
-					if (!ResourceTickQueues.ContainsKey(typeInfo.SpreadInterval))
-						ResourceTickQueues.Add(typeInfo.SpreadInterval, new FastUniqueQueue<CPos, ResourceTickInfo>());
+					if (!ResourceTickQueues.ContainsKey(typeInfo.SpreadInterval * 100 / info.SpeedModifier))
+						ResourceTickQueues.Add(typeInfo.SpreadInterval * 100 / info.SpeedModifier, new FastUniqueQueue<CPos, ResourceTickInfo>());
 					foreach (var densityInterval in typeInfo.DensityIntervals.Values)
 					{
-						if (!ResourceTickQueues.ContainsKey(densityInterval) && densityInterval != 0)
-							ResourceTickQueues.Add(densityInterval, new FastUniqueQueue<CPos, ResourceTickInfo>());
+						if (!ResourceTickQueues.ContainsKey(densityInterval * 100 / info.SpeedModifier) && densityInterval != 0)
+							ResourceTickQueues.Add(densityInterval * 100 / info.SpeedModifier, new FastUniqueQueue<CPos, ResourceTickInfo>());
 					}
 				}
 			}
@@ -427,11 +430,11 @@ namespace OpenRA.Mods.Common.Traits
 					return;
 
 				var content = Content[cell];
-				var cellTickInfo = new ResourceTickInfo(typeInfo.DensityIntervals.ContainsKey(content.Density) ? typeInfo.DensityIntervals[content.Density] : 0, typeInfo.SpreadInterval, tickTime);
+				var cellTickInfo = new ResourceTickInfo(typeInfo.DensityIntervals.ContainsKey(content.Density) ? typeInfo.DensityIntervals[content.Density] * 100 / info.SpeedModifier : 0, typeInfo.SpreadInterval * 100 / info.SpeedModifier, tickTime);
 
 				if (typeInfo.SpreadInterval != 0 && content.Density == typeInfo.MaxDensity)
 				{
-					var mySpreadQueue = ResourceTickQueues[typeInfo.SpreadInterval];
+					var mySpreadQueue = ResourceTickQueues[typeInfo.SpreadInterval * 100 / info.SpeedModifier];
 					mySpreadQueue.Add(cell, cellTickInfo);
 				}
 
@@ -446,7 +449,7 @@ namespace OpenRA.Mods.Common.Traits
 					if (typeInfo.DensityIntervals[content.Density] == 0)
 						return;
 
-					var myStageQueue = ResourceTickQueues[typeInfo.DensityIntervals[content.Density]];
+					var myStageQueue = ResourceTickQueues[typeInfo.DensityIntervals[content.Density] * 100 / info.SpeedModifier];
 
 					myStageQueue.Add(cell, cellTickInfo);
 				}

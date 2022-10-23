@@ -230,6 +230,9 @@ MammothMissiles:
 	Warhead@3Eff: CreateEffect
 		Explosions: med_frag
 		ImpactSounds: xplobig4.aud
+    Warhead@4Res_area: DestroyResource
+		Size: 0
+		Delay: 1
 
 227mm.stnk:
 	Inherits: ^MissileWeapon
