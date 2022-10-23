@@ -214,13 +214,13 @@ namespace OpenRA.Mods.Common
 				neighborVectors.Add("C4", new CVec(-1, 1));
 			}
 
-			List<string> pickList = new List<string> { "1", "2", "3", "4" };
-			int number = cardinalsOnly ? 4 : 8;
+			var pickList = new List<string> { "1", "2", "3", "4" };
+			var number = cardinalsOnly ? 4 : 8;
 			if (!cardinalsOnly)
 				pickList.AddRange(new List<string> { "C1", "C2", "C3", "C4" });
-			pickList = Util.Shuffle(pickList, r).Take(8).ToList();
+			pickList = Util.Shuffle(pickList, r).Take(number).ToList();
 
-			for (int i = 0; i < number; i++)
+			for (var i = 0; i < number; i++)
 			{
 				var first = pickList.First();
 				if (first.StartsWith('C') && r.Next(0, 1000) >= 707)

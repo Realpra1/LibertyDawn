@@ -224,7 +224,7 @@ World:
                     1: 2250
                     5: 750
                     15: 3000
-                    20: 36000
+                    20: 18000
             RedTiberium:
 				ResourceIndex: 3
 				TerrainType: RedTiberium

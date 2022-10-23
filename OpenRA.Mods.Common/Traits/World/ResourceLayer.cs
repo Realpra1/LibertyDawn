@@ -478,7 +478,7 @@ namespace OpenRA.Mods.Common.Traits
 			if (resourceInfo.SpreadInterval != 0 && Content[cell].Density == resourceInfo.MaxDensity && tickTime - tickInfo.LastSpreadTime >= tickInfo.ExpectedSpreadInterval)
 			{
 				tickInfo.LastSpreadTime = tickTime;
-				var seedLoc = Util.CircularRandomNeighbors(cell, self.World.SharedRandom, true)
+				var seedLoc = Util.CircularRandomNeighbors(cell, self.World.SharedRandom, (cell.X + cell.Y + cell.X * cell.Y) % 100 > 35)
 					.Take(4)
 					.SkipWhile(p => Content[p].Type == Content[cell].Type
 						&& !CanAddResource(Content[cell].Type, p, resourceInfo.MaxDensity))
@@ -536,7 +536,7 @@ namespace OpenRA.Mods.Common.Traits
 					return;
 				foreach (var pair in ResourceTickQueues)
 				{
-					var checkNumber = Math.Max(25*pair.Value.Size() / pair.Key, 1);
+					var checkNumber = Math.Max(25 * pair.Value.Size() / pair.Key, 1);
 					for (var i = 0; i < checkNumber; i++)
 					{
 						var entry = pair.Value.HeadEntry();
