@@ -238,12 +238,15 @@ namespace OpenRA.Mods.Common.Traits
 				conditionToken = self.RevokeCondition(conditionToken);
 		}
 
-		public void AcceptResource(Actor self, string resourceType)
+		public void AcceptResource(Actor self, string resourceType, int added)
 		{
+			var currentContents = contents.Values.Sum();
+			var amount = Math.Min(added, Info.Capacity - currentContents);
+
 			if (!contents.ContainsKey(resourceType))
-				contents[resourceType] = 1;
+				contents[resourceType] = Math.Min(amount, Info.Capacity);
 			else
-				contents[resourceType]++;
+				contents[resourceType] = Math.Min(contents[resourceType] + amount, Info.Capacity);
 
 			UpdateCondition(self);
 		}

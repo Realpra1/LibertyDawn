@@ -20,6 +20,8 @@ namespace OpenRA.Mods.Common.Traits
 		public readonly int Interval = 75;
 		public readonly string ResourceType = "Ore";
 		public readonly int MaxRange = 100;
+		[Desc("Will only place resource of density of 1 around itself, never more or further.")]
+		public readonly bool SeedOnly = false;
 
 		public override object Create(ActorInitializer init) { return new SeedsResource(init.Self, this); }
 	}
@@ -52,10 +54,23 @@ namespace OpenRA.Mods.Common.Traits
 
 		public void Seed(Actor self)
 		{
-			var cell = Util.RandomWalk(self.Location, self.World.SharedRandom)
-				.Take(info.MaxRange)
-				.SkipWhile(p => resourceLayer.GetResource(p).Type == info.ResourceType && !resourceLayer.CanAddResource(info.ResourceType, p))
-				.Cast<CPos?>().FirstOrDefault();
+			CPos? cell;
+
+			if (info.SeedOnly)
+			{
+				cell = Util.CircularRandomNeighbors(self.Location, self.World.SharedRandom)
+					.Take(8)
+					.SkipWhile(p => resourceLayer.GetResource(p).Type == info.ResourceType
+						&& !resourceLayer.CanAddResource(info.ResourceType, p, resourceLayer.GetMaxDensity(info.ResourceType)))
+					.Cast<CPos?>().FirstOrDefault();
+			}
+			else
+			{
+				cell = Util.RandomWalk(self.Location, self.World.SharedRandom)
+					.Take(info.MaxRange)
+					.SkipWhile(p => resourceLayer.GetResource(p).Type == info.ResourceType && !resourceLayer.CanAddResource(info.ResourceType, p))
+					.Cast<CPos?>().FirstOrDefault();
+			}
 
 			if (cell != null && resourceLayer.CanAddResource(info.ResourceType, cell.Value))
 				resourceLayer.AddResource(info.ResourceType, cell.Value);

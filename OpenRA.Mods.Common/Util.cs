@@ -198,6 +198,43 @@ namespace OpenRA.Mods.Common
 			}
 		}
 
+		static readonly Dictionary<string, CVec> neighborVectors = new Dictionary<string, CVec>();
+		public static IEnumerable<CPos> CircularRandomNeighbors(CPos p, MersenneTwister r, bool cardinalsOnly = false)
+		{
+			if (neighborVectors.Count == 0)
+			{
+				neighborVectors.Add("1", new CVec(0, 1));
+				neighborVectors.Add("2", new CVec(1, 0));
+				neighborVectors.Add("3", new CVec(0, -1));
+				neighborVectors.Add("4", new CVec(-1, 0));
+
+				neighborVectors.Add("C1", new CVec(1, 1));
+				neighborVectors.Add("C2", new CVec(1, -1));
+				neighborVectors.Add("C3", new CVec(-1, -1));
+				neighborVectors.Add("C4", new CVec(-1, 1));
+			}
+
+			List<string> pickList = new List<string> { "1", "2", "3", "4" };
+			int number = cardinalsOnly ? 4 : 8;
+			if (!cardinalsOnly)
+				pickList.AddRange(new List<string> { "C1", "C2", "C3", "C4" });
+			pickList = Util.Shuffle(pickList, r).Take(8).ToList();
+
+			for (int i = 0; i < number; i++)
+			{
+				var first = pickList.First();
+				if (first.StartsWith('C') && r.Next(0, 1000) >= 707)
+				{
+					pickList.Remove(first);
+					pickList.Add(first);
+				}
+
+				first = pickList.First();
+				pickList.Remove(first);
+				yield return p + neighborVectors[first];
+			}
+		}
+
 		public static int RandomInRange(MersenneTwister random, int[] range)
 		{
 			if (range.Length == 0)

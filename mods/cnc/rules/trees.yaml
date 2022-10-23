@@ -2,7 +2,9 @@ SPLIT2:
 	Inherits: ^TibTree
 	SeedsResource:
 		ResourceType: Tiberium
-		Interval: 55
+		Interval: 282
+        MaxRange: 20
+        SeedOnly: true
 	WithIdleAnimation:
 		Interval: 500, 1000
 
@@ -12,7 +14,9 @@ SPLIT3:
 		Image: split2
 	SeedsResource:
 		ResourceType: Tiberium
-		Interval: 55
+		Interval: 282
+        MaxRange: 20
+        SeedOnly: true
 	WithIdleAnimation:
 		Interval: 500, 1000
 
@@ -22,7 +26,9 @@ SPLITBLUE:
 		Image: split3
 	SeedsResource:
 		ResourceType: BlueTiberium
-		Interval: 110
+		Interval: 282
+        MaxRange: 20
+        SeedOnly: true
 	WithIdleAnimation:
 		Interval: 500, 1000
 	Tooltip:
@@ -38,7 +44,9 @@ SPLITRED:
 		Image: split3
 	SeedsResource:
 		ResourceType: RedTiberium
-		Interval: 110
+		Interval: 282
+        MaxRange: 20
+        SeedOnly: true
 	WithIdleAnimation:
 		Interval: 500, 1000
 	Tooltip:

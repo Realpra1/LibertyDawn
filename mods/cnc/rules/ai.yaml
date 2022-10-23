@@ -833,8 +833,8 @@ Player:
 			pyle: 25
 			hand: 25
 			hq: 5
-			weap: 33
-			afld: 33
+			weap: 25
+			afld: 25
 			gtwr: 3
 			gun: 1
 			atwr: 11

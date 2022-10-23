@@ -30,6 +30,22 @@ namespace OpenRA.Mods.Common.Traits
 		}
 	}
 
+	public class ResourceTickInfo
+	{
+		public readonly int ExpectedStageInterval;
+		public readonly int ExpectedSpreadInterval;
+		public int LastStageTime;
+		public int LastSpreadTime;
+
+		public ResourceTickInfo(int expectedStageInterval, int expectedSpreadInterval, int currentTime)
+		{
+			ExpectedStageInterval = expectedStageInterval;
+			ExpectedSpreadInterval = expectedSpreadInterval;
+			LastStageTime = currentTime;
+			LastSpreadTime = currentTime;
+		}
+	}
+
 	[TraitLocation(SystemActors.World)]
 	[Desc("Attach this to the world actor.")]
 	public class ResourceLayerInfo : TraitInfo, IResourceLayerInfo, Requires<BuildingInfluenceInfo>
@@ -51,6 +67,20 @@ namespace OpenRA.Mods.Common.Traits
 			[Desc("Maximum number of resource units allowed in a single cell.")]
 			public readonly int MaxDensity = 10;
 
+			[Desc("How fast does each stage/density grow, null/0 for never.")]
+			public readonly Dictionary<int, int> DensityIntervals = new Dictionary<int, int>();
+
+			[Desc("How much density does each stage have (code assumes stage 1 always 1).")]
+			public readonly Dictionary<int, int> StageDensities = new Dictionary<int, int>();
+
+			[Desc("Max stage will change into this resource, null for never.")]
+			public readonly string MaxStageEvolvesTo = null;
+
+			[Desc("Spread interval (max stages only), 0 for never.")]
+			public readonly int SpreadInterval = 0;
+
+			// TODO: Blue/red damage/explosion => Later, simple spread and evolution first.
+			// TODO: Red resource spores. (See Linux game folder for stage info)
 			public ResourceTypeInfo(MiniYaml yaml)
 			{
 				FieldLoader.Load(this, yaml);
@@ -102,7 +132,7 @@ namespace OpenRA.Mods.Common.Traits
 		public override object Create(ActorInitializer init) { return new ResourceLayer(init.Self, this); }
 	}
 
-	public class ResourceLayer : IResourceLayer, IWorldLoaded
+	public class ResourceLayer : IResourceLayer, IWorldLoaded, ITick
 	{
 		readonly ResourceLayerInfo info;
 		readonly World world;
@@ -110,6 +140,9 @@ namespace OpenRA.Mods.Common.Traits
 		protected readonly BuildingInfluence BuildingInfluence;
 		protected readonly CellLayer<ResourceLayerContents> Content;
 		protected readonly Dictionary<byte, string> ResourceTypesByIndex;
+
+		// Sorted by intervals. When cell reached, do the expected action(s). One queue per interval length. Cell can be part of multiple queues.
+		protected readonly Dictionary<int, FastUniqueQueue<CPos, ResourceTickInfo>> ResourceTickQueues = new Dictionary<int, FastUniqueQueue<CPos, ResourceTickInfo>>();
 
 		int resCells;
 
@@ -129,6 +162,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		protected virtual void WorldLoaded(World w, WorldRenderer wr)
 		{
+			MakeQueues();
 			foreach (var cell in w.Map.AllCells)
 			{
 				var resource = world.Map.Resources[cell];
@@ -139,6 +173,9 @@ namespace OpenRA.Mods.Common.Traits
 					continue;
 
 				Content[cell] = CreateResourceCell(resourceType, cell, resource.Index);
+
+				if (!info.RecalculateResourceDensity)
+					AddToTickQueue(cell, resourceType);
 			}
 
 			if (!info.RecalculateResourceDensity)
@@ -160,8 +197,18 @@ namespace OpenRA.Mods.Common.Traits
 						++adjacent;
 				}
 
-				var density = Math.Max(int2.Lerp(0, resourceInfo.MaxDensity, adjacent, directions.Length), 1);
-				Content[cell] = new ResourceLayerContents(resource.Type, density);
+				if (resourceInfo.StageDensities.Count() > 0)
+				{
+					var stage = Math.Max(int2.Lerp(0, resourceInfo.StageDensities.Count(), adjacent, directions.Length), 1);
+					Content[cell] = new ResourceLayerContents(resource.Type, resourceInfo.StageDensities[stage]);
+				}
+				else
+				{
+					var density = Math.Max(int2.Lerp(0, resourceInfo.MaxDensity, adjacent, directions.Length), 1);
+					Content[cell] = new ResourceLayerContents(resource.Type, density);
+				}
+
+				AddToTickQueue(cell, resourceInfo);
 			}
 		}
 
@@ -213,6 +260,26 @@ namespace OpenRA.Mods.Common.Traits
 			return content.Density + amount <= resourceInfo.MaxDensity;
 		}
 
+		/// <summary>
+		/// Finds closest allowed density using max or stage density config.
+		/// </summary>
+		static int ClosestDensity(ResourceLayerInfo.ResourceTypeInfo typeInfo, int newDensity, bool roundUp)
+		{
+			if (typeInfo.StageDensities.Count == 0)
+				return Math.Min(newDensity, typeInfo.MaxDensity);
+
+			int down = 0, up = typeInfo.MaxDensity;
+			foreach (var density in typeInfo.StageDensities.Values)
+			{
+				if (newDensity >= density && density > down)
+					down = density;
+				if (newDensity <= density && density < up)
+					up = density;
+			}
+
+			return roundUp ? up : down;
+		}
+
 		int AddResource(string resourceType, CPos cell, int amount = 1)
 		{
 			if (!Content.Contains(cell))
@@ -222,22 +289,31 @@ namespace OpenRA.Mods.Common.Traits
 				return 0;
 
 			var content = Content[cell];
+			int oldDensity;
 			if (content.Type == null)
+			{
 				content = CreateResourceCell(resourceType, cell, 0);
+				oldDensity = 0;
+			}
+			else
+				oldDensity = content.Density;
 
 			if (content.Type != resourceType)
 				return 0;
 
-			var oldDensity = content.Density;
-			var density = Math.Min(resourceInfo.MaxDensity, oldDensity + amount);
-			Content[cell] = new ResourceLayerContents(content.Type, density);
+			var density = ClosestDensity(resourceInfo, oldDensity + amount, true);
 
+			Content[cell] = new ResourceLayerContents(content.Type, density);
 			CellChanged?.Invoke(cell, content.Type);
+			AddToTickQueue(cell, resourceInfo);
 
 			return density - oldDensity;
 		}
 
-		int RemoveResource(string resourceType, CPos cell, int amount = 1)
+		/// <summary>
+		/// Returns amount removed. May be more or less than amount parameter depending on the resource cell and stage config.
+		/// </summary>
+		int RemoveResource(string resourceType, CPos cell, int amountAttempt = 1)
 		{
 			if (!Content.Contains(cell))
 				return 0;
@@ -246,20 +322,28 @@ namespace OpenRA.Mods.Common.Traits
 			if (content.Type == null || content.Type != resourceType)
 				return 0;
 
+			int newDensity = content.Density - amountAttempt;
+			if (info.ResourceTypes.TryGetValue(resourceType, out var resourceInfo) && resourceInfo.StageDensities.Count != 0)
+			{
+				newDensity = ClosestDensity(resourceInfo, content.Density - amountAttempt, false);
+			}
+
 			var oldDensity = content.Density;
-			var density = Math.Max(0, oldDensity - amount);
+			var density = Math.Max(0, newDensity);
 
 			if (density == 0)
 			{
 				Content[cell] = ResourceLayerContents.Empty;
 				Map.CustomTerrain[cell] = byte.MaxValue;
 				--resCells;
+				RemoveFromTickQueue(cell);
 
 				CellChanged?.Invoke(cell, null);
 			}
 			else
 			{
 				Content[cell] = new ResourceLayerContents(content.Type, density);
+				AddToTickQueue(cell, resourceType);
 				CellChanged?.Invoke(cell, content.Type);
 			}
 
@@ -279,6 +363,7 @@ namespace OpenRA.Mods.Common.Traits
 			Content[cell] = ResourceLayerContents.Empty;
 			Map.CustomTerrain[cell] = byte.MaxValue;
 			--resCells;
+			RemoveFromTickQueue(cell);
 
 			CellChanged?.Invoke(cell, null);
 		}
@@ -297,17 +382,174 @@ namespace OpenRA.Mods.Common.Traits
 		int IResourceLayer.RemoveResource(string resourceType, CPos cell, int amount) { return RemoveResource(resourceType, cell, amount); }
 		void IResourceLayer.ClearResources(CPos cell) { ClearResources(cell); }
 		bool IResourceLayer.IsVisible(CPos cell) { return !world.FogObscures(cell); }
-
-		// private int tickcounter = 0;
-		// public void Tick(Actor self)
-		// {
-			// tickcounter++;
-			// Log.Write("debug", "Tickcounter: " + tickcounter);
-			// This gets ticked, but also out games. Not a problem?
-			// 1. Spread resources? Do as proper trait yaml thing? But here for efficiency.
-			// 2. Limit red tib creations if lot of tiberium on map for efficiency (ie. map will become stable blue largely... or all explode and thus self-remove)
-		// }
 		bool IResourceLayer.IsEmpty => resCells < 1;
 		IResourceLayerInfo IResourceLayer.Info => info;
+		void ITick.Tick(Actor self) { Tick(self); }
+
+		void AddToTickQueue(CPos cell, string resourceType)
+		{
+			if (!info.ResourceTypes.TryGetValue(resourceType, out var resourceInfo))
+			{
+				Log.Write("debug", "Resource info was not found for type: " + resourceType);
+				return;
+			}
+
+			AddToTickQueue(cell, resourceInfo);
+		}
+
+		void MakeQueues()
+		{
+			try
+			{
+				foreach (var typeInfo in info.ResourceTypes.Values)
+				{
+					if (!ResourceTickQueues.ContainsKey(typeInfo.SpreadInterval))
+						ResourceTickQueues.Add(typeInfo.SpreadInterval, new FastUniqueQueue<CPos, ResourceTickInfo>());
+					foreach (var densityInterval in typeInfo.DensityIntervals.Values)
+					{
+						if (!ResourceTickQueues.ContainsKey(densityInterval) && densityInterval != 0)
+							ResourceTickQueues.Add(densityInterval, new FastUniqueQueue<CPos, ResourceTickInfo>());
+					}
+				}
+			}
+			catch (Exception ex)
+			{
+				Log.Write("debug", ex.Message + "\n" + ex.StackTrace);
+			}
+		}
+
+		void AddToTickQueue(CPos cell, ResourceLayerInfo.ResourceTypeInfo typeInfo)
+		{
+			try
+			{
+				RemoveFromTickQueue(cell);
+				if (typeInfo == null)
+					return;
+
+				var content = Content[cell];
+				var cellTickInfo = new ResourceTickInfo(typeInfo.DensityIntervals.ContainsKey(content.Density) ? typeInfo.DensityIntervals[content.Density] : 0, typeInfo.SpreadInterval, tickTime);
+
+				if (typeInfo.SpreadInterval != 0 && content.Density == typeInfo.MaxDensity)
+				{
+					var mySpreadQueue = ResourceTickQueues[typeInfo.SpreadInterval];
+					mySpreadQueue.Add(cell, cellTickInfo);
+				}
+
+				if (typeInfo.DensityIntervals.Count != 0)
+				{
+					if (!typeInfo.DensityIntervals.ContainsKey(content.Density))
+					{
+						Log.Write("debug", "Invalid yaml configuration of StageIntervals, missing for " + content.Type + " density: " + content.Density);
+						return;
+					}
+
+					if (typeInfo.DensityIntervals[content.Density] == 0)
+						return;
+
+					var myStageQueue = ResourceTickQueues[typeInfo.DensityIntervals[content.Density]];
+
+					myStageQueue.Add(cell, cellTickInfo);
+				}
+			}
+			catch (Exception ex)
+			{
+				Log.Write("debug", ex.Message + "\n" + ex.StackTrace);
+			}
+		}
+
+		/// <summary>
+		/// Removes cell from all tick queues.
+		/// </summary>
+		void RemoveFromTickQueue(CPos cell)
+		{
+			foreach (var pair in ResourceTickQueues)
+			{
+				if (pair.Value.ContainsKey(cell))
+					pair.Value.Remove(cell);
+			}
+		}
+
+		bool DoResourceTickActions(Actor self, CPos cell, ResourceTickInfo tickInfo)
+		{
+			if (!info.ResourceTypes.TryGetValue(Content[cell].Type, out var resourceInfo))
+				return false;
+			// Spreading
+			if (resourceInfo.SpreadInterval != 0 && Content[cell].Density == resourceInfo.MaxDensity && tickTime - tickInfo.LastSpreadTime >= tickInfo.ExpectedSpreadInterval)
+			{
+				tickInfo.LastSpreadTime = tickTime;
+				var seedLoc = Util.CircularRandomNeighbors(cell, self.World.SharedRandom, true)
+					.Take(4)
+					.SkipWhile(p => Content[p].Type == Content[cell].Type
+						&& !CanAddResource(Content[cell].Type, p, resourceInfo.MaxDensity))
+					.Cast<CPos?>().FirstOrDefault();
+
+				if (seedLoc != null && CanAddResource(Content[cell].Type, seedLoc.Value))
+					AddResource(Content[cell].Type, seedLoc.Value);
+			}
+
+			// Stage/stage to new resource
+			if (resourceInfo.DensityIntervals.Count != 0 && tickTime - tickInfo.LastStageTime >= tickInfo.ExpectedStageInterval)
+			{
+				tickInfo.LastStageTime = tickTime;
+				if (Content[cell].Density == resourceInfo.MaxDensity)
+				{
+					if (string.IsNullOrEmpty(resourceInfo.MaxStageEvolvesTo))
+						return false;
+
+					info.ResourceTypes.TryGetValue(resourceInfo.MaxStageEvolvesTo, out var newResourceInfo);
+					if (newResourceInfo == null)
+					{
+						RemoveFromTickQueue(cell);
+						return false;
+					}
+
+					Content[cell] = new ResourceLayerContents(resourceInfo.MaxStageEvolvesTo, newResourceInfo.MaxDensity);
+					CellChanged?.Invoke(cell, Content[cell].Type);
+					AddToTickQueue(cell, newResourceInfo);
+				}
+				else
+					AddResource(Content[cell].Type, cell, 1);
+
+				return true;
+			}
+			return false;
+		}
+
+		int tickTime = -1;
+
+		/// <summary>
+		/// See Shroud.cs for similar use of Tick. 25 ticks in one second.
+		/// Custom queue stuff is for performance as there can be a lot of resources on a map, all essentially having timed events.
+		/// This way avoids for example checking all resource cells every tick or some such folly and spreads out the work over time.
+		/// </summary>
+		void Tick(Actor self)
+		{
+			try
+			{
+				if (resCells == 0 || ResourceTickQueues.Count == 0)
+					return;
+
+				tickTime++;
+				if (tickTime % 25 != 0)
+					return;
+				foreach (var pair in ResourceTickQueues)
+				{
+					var checkNumber = Math.Max(25*pair.Value.Size() / pair.Key, 1); // Key is interval.
+					for (var i = 0; i < checkNumber; i++)
+					{
+						var entry = pair.Value.HeadEntry();
+						if (entry == null)
+							break;
+						pair.Value.Poll();
+						if(!DoResourceTickActions(self, entry.Key, entry.Value))
+							pair.Value.Add(entry.Key, entry.Value); // Re-queue for next ticks ... adds old objs by error here.
+					}
+				}
+			}
+			catch (Exception ex)
+			{
+				Log.Write("debug", ex.Message + "\n" + ex.StackTrace);
+			}
+}
 	}
 }

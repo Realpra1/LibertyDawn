@@ -88,10 +88,13 @@ namespace OpenRA.Mods.Common.Activities
 			}
 
 			var resource = resourceLayer.GetResource(self.Location);
-			if (resource.Type == null || resourceLayer.RemoveResource(resource.Type, self.Location) != 1)
+			if (resource.Type == null)
 				return true;
 
-			harv.AcceptResource(self, resource.Type);
+			var removed = resourceLayer.RemoveResource(resource.Type, self.Location);
+			if (removed == 0)
+				return true;
+			harv.AcceptResource(self, resource.Type, removed);
 
 			foreach (var t in notifyHarvesterActions)
 				t.Harvested(self, resource.Type);

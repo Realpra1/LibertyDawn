@@ -14,7 +14,7 @@ Terrain:
 		TargetTypes: Ground
 		AcceptsSmudgeType: Crater, Scorch
 		Color: 54FCFC
-		RestrictPlayerColor: true
+		RestrictPlayerColor: false
     TerrainType@RedTiberium:
 		Type: RedTiberium
 		TargetTypes: Ground
@@ -55,7 +55,7 @@ Terrain:
 		TargetTypes: Ground
 		AcceptsSmudgeType: Crater, Scorch
 		Color: A1E21C
-		RestrictPlayerColor: true
+		RestrictPlayerColor: false
 	TerrainType@Tree:
 		Type: Tree
 		TargetTypes: Ground
