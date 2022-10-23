@@ -473,6 +473,7 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			if (!info.ResourceTypes.TryGetValue(Content[cell].Type, out var resourceInfo))
 				return false;
+
 			// Spreading
 			if (resourceInfo.SpreadInterval != 0 && Content[cell].Density == resourceInfo.MaxDensity && tickTime - tickInfo.LastSpreadTime >= tickInfo.ExpectedSpreadInterval)
 			{
@@ -512,6 +513,7 @@ namespace OpenRA.Mods.Common.Traits
 
 				return true;
 			}
+
 			return false;
 		}
 
@@ -534,15 +536,15 @@ namespace OpenRA.Mods.Common.Traits
 					return;
 				foreach (var pair in ResourceTickQueues)
 				{
-					var checkNumber = Math.Max(25*pair.Value.Size() / pair.Key, 1); // Key is interval.
+					var checkNumber = Math.Max(25*pair.Value.Size() / pair.Key, 1);
 					for (var i = 0; i < checkNumber; i++)
 					{
 						var entry = pair.Value.HeadEntry();
 						if (entry == null)
 							break;
 						pair.Value.Poll();
-						if(!DoResourceTickActions(self, entry.Key, entry.Value))
-							pair.Value.Add(entry.Key, entry.Value); // Re-queue for next ticks ... adds old objs by error here.
+						if (!DoResourceTickActions(self, entry.Key, entry.Value))
+							pair.Value.Add(entry.Key, entry.Value);
 					}
 				}
 			}
@@ -550,6 +552,6 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				Log.Write("debug", ex.Message + "\n" + ex.StackTrace);
 			}
-}
+		}
 	}
 }

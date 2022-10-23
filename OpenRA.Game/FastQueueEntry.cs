@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace OpenRA
+﻿namespace OpenRA
 {
 	public class FastQueueEntry<K, V> where K : struct
 	{
