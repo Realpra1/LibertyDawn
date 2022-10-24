@@ -190,42 +190,42 @@ World:
 		SmokeSequences: idle
 	ResourceLayer:
 		RecalculateResourceDensity: true
-        SpeedModifier: 75
+        SpeedModifier: 50
 		ResourceTypes:
 			Tiberium:
 				ResourceIndex: 1
 				TerrainType: Tiberium
 				AllowedTerrainTypes: Clear, Road, Rough, Beach, Bridge
                 MaxStageEvolvesTo: BlueTiberium
-				MaxDensity: 20
-                SpreadInterval: 563
+				MaxDensity: 5
+                SpreadInterval: 282
                 StageDensities:
                     1: 1
-                    2: 5
-                    3: 15
-                    4: 20
+                    2: 2
+                    3: 4
+                    4: 5
                 DensityIntervals:
-                    1: 2250
-                    5: 750
-                    15: 3000
-                    20: 18000
+                    1: 1125
+                    2: 375
+                    4: 1500
+                    5: 18000
 			BlueTiberium:
 				ResourceIndex: 2
 				TerrainType: BlueTiberium
 				AllowedTerrainTypes: Clear, Road, Rough, Beach, Bridge
 				MaxStageEvolvesTo: RedTiberium
-				MaxDensity: 20
+				MaxDensity: 10
                 SpreadInterval: 563
                 StageDensities:
                     1: 1
-                    2: 5
-                    3: 15
-                    4: 20
+                    2: 3
+                    3: 8
+                    4: 10
                 DensityIntervals:
                     1: 2250
-                    5: 750
-                    15: 3000
-                    20: 18000
+                    3: 750
+                    8: 3000
+                    10: 18000
             RedTiberium:
 				ResourceIndex: 3
 				TerrainType: RedTiberium
@@ -337,37 +337,36 @@ EditorWorld:
 	EditorCursorLayer:
 	EditorResourceLayer:
 		RecalculateResourceDensity: true
-        SpeedModifier: 75
 		ResourceTypes:
 			Tiberium:
 				ResourceIndex: 1
 				TerrainType: Tiberium
 				AllowedTerrainTypes: Clear, Road, Rough, Beach, Bridge
                 MaxStageEvolvesTo: BlueTiberium
-				MaxDensity: 20
-                SpreadInterval: 563
+				MaxDensity: 5
+                SpreadInterval: 282
                 StageDensities:
                     1: 1
-                    2: 5
-                    3: 15
-                    4: 20
+                    2: 2
+                    3: 4
+                    4: 5
                 DensityIntervals:
-                    1: 2250
-                    5: 750
-                    15: 3000
+                    1: 1125
+                    5: 375
+                    15: 1500
                     20: 18000
 			BlueTiberium:
 				ResourceIndex: 2
 				TerrainType: BlueTiberium
 				AllowedTerrainTypes: Clear, Road, Rough, Beach, Bridge
 				MaxStageEvolvesTo: RedTiberium
-				MaxDensity: 20
+				MaxDensity: 10
                 SpreadInterval: 563
                 StageDensities:
                     1: 1
-                    2: 5
-                    3: 15
-                    4: 20
+                    2: 3
+                    3: 8
+                    4: 10
                 DensityIntervals:
                     1: 2250
                     5: 750

@@ -6,7 +6,7 @@ SPLIT2:
         MaxRange: 20
         SeedOnly: true
 	WithIdleAnimation:
-		Interval: 500, 1000
+		Interval: 282, 1000
 
 SPLIT3:
 	Inherits: ^TibTree
@@ -18,7 +18,7 @@ SPLIT3:
         MaxRange: 20
         SeedOnly: true
 	WithIdleAnimation:
-		Interval: 500, 1000
+		Interval: 282, 1000
 
 SPLITBLUE:
 	Inherits: ^TibTree
@@ -30,7 +30,7 @@ SPLITBLUE:
         MaxRange: 20
         SeedOnly: true
 	WithIdleAnimation:
-		Interval: 500, 1000
+		Interval: 282, 1000
 	Tooltip:
 		Name: Blossom Tree (blue)
 	RadarColorFromTerrain:
@@ -48,7 +48,7 @@ SPLITRED:
         MaxRange: 20
         SeedOnly: true
 	WithIdleAnimation:
-		Interval: 500, 1000
+		Interval: 282, 1000
 	Tooltip:
 		Name: Blossom Tree (red)
 	RadarColorFromTerrain:
