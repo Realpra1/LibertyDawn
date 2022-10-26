@@ -58,7 +58,7 @@ HARV:
 	Harvester:
 		Resources: Tiberium, BlueTiberium, RedTiberium
 		Capacity: 20
-		BaleLoadDelay: 12
+		BaleLoadDelay: 36
 		BaleUnloadDelay: 6
         MaxUnloadQueue : 7
         UnloadQueueCostModifier: 3000
