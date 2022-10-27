@@ -105,6 +105,24 @@ namespace OpenRA.Mods.Common.Warheads
 
 				InflictDamage(victim, firedBy, closestActiveShape.HitShape, updatedWarheadArgs);
 			}
+
+			if (!ValidTargets.Contains("Ground"))
+				return;
+
+			var targetTile = firedBy.World.Map.CellContaining(pos);
+			var affectedCells = firedBy.World.Map.FindTilesInAnnulus(targetTile, 0, firedBy.World.Map.DistanceToCells(Range[Range.Length - 1].Length));
+			var resourceLayer = firedBy.World.WorldActor.Trait<IResourceLayer>();
+			foreach (var cell in affectedCells)
+			{
+				var falloffDistance = (firedBy.World.Map.CenterOfCell(cell) - pos).Length;
+				var localModifiers = args.DamageModifiers.Append(GetDamageFalloff(falloffDistance));
+				var updatedWarheadArgs = new WarheadArgs(args)
+				{
+					DamageModifiers = localModifiers.ToArray()
+				};
+				var damage = Util.ApplyPercentageModifiers(Damage, updatedWarheadArgs.DamageModifiers);
+				resourceLayer.DamageResource(firedBy, cell, damage);
+			}
 		}
 
 		int GetDamageFalloff(int distance)

@@ -113,3 +113,32 @@ Grenade:
 		DamageTypes: Prone50Percent, TriggerProne, SmallExplosionDeath
 	Warhead@3Eff: CreateEffect
 		Explosions: small_poof
+        
+TiberiumMeteor:
+	Inherits: ^BallisticWeapon
+	ReloadDelay: 50
+	Range: 20c0
+	Report: toss1.aud
+	Projectile: Bullet
+		Speed: 140
+		Blockable: false
+		LaunchAngle: 62
+		Inaccuracy: 813
+		Image: BOMB
+        TrailImage: smokey
+		ContrailLength: 8
+	Warhead@1Dam: SpreadDamage
+		Spread: 1c0
+		Damage: 4500
+		Versus:
+			None: 100
+			Wood: 35
+			Light: 80
+			Tiberium: 100
+			Heavy: 30
+		DamageTypes: Prone50Percent, TriggerProne, SmallExplosionDeath, TiberiumDeath
+	Warhead@3Eff: CreateEffect
+		Explosions: small_poof
+    Warhead@4Res: CreateResource
+		AddsResourceType: Tiberium
+		Size: 0,0

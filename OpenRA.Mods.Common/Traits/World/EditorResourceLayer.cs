@@ -89,6 +89,7 @@ namespace OpenRA.Mods.Common.Traits
 		bool IResourceLayer.CanAddResource(string resourceType, CPos cell, int amount) { return CanAddResource(resourceType, cell, amount); }
 		int IResourceLayer.AddResource(string resourceType, CPos cell, int amount) { return AddResource(resourceType, cell, amount); }
 		int IResourceLayer.RemoveResource(string resourceType, CPos cell, int amount) { return RemoveResource(resourceType, cell, amount); }
+		void IResourceLayer.DamageResource(Actor source, CPos cell, int damage) { return; }
 		void IResourceLayer.ClearResources(CPos cell) { ClearResources(cell); }
 		bool IResourceLayer.IsVisible(CPos cell) { return Map.Contains(cell); }
 		bool IResourceLayer.IsEmpty => false;

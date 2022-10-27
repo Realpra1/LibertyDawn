@@ -94,6 +94,11 @@ Atomic:
 		Multiplier: 1,1
 	Warhead@14FlashEffect: FlashPaletteEffect
 		Duration: 20
+        
+AtomicTib:
+	Inherits: Atomic
+    -Warhead@13Shake:
+    -Warhead@14FlashEffect:
 
 IonCannon:
 	ValidTargets: Ground, Water, Air, Trees

@@ -692,6 +692,7 @@ namespace OpenRA.Mods.Common.Traits
 		bool CanAddResource(string resourceType, CPos cell, int amount = 1);
 		int AddResource(string resourceType, CPos cell, int amount = 1);
 		int RemoveResource(string resourceType, CPos cell, int amount = 1);
+		void DamageResource(Actor source, CPos cell, int damage);
 		void ClearResources(CPos cell);
 
 		bool IsVisible(CPos cell);

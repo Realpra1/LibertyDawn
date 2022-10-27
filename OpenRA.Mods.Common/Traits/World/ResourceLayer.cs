@@ -12,7 +12,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using OpenRA.GameRules;
 using OpenRA.Graphics;
+using OpenRA.Primitives;
 using OpenRA.Traits;
 
 namespace OpenRA.Mods.Common.Traits
@@ -46,9 +48,21 @@ namespace OpenRA.Mods.Common.Traits
 		}
 	}
 
+	public class DelayedResourceAction
+	{
+		public readonly int WaitForTickTime;
+		public readonly Action Action;
+
+		public DelayedResourceAction(int waitForTickTime, Action action)
+		{
+			WaitForTickTime = waitForTickTime;
+			Action = action;
+		}
+	}
+
 	[TraitLocation(SystemActors.World)]
 	[Desc("Attach this to the world actor.")]
-	public class ResourceLayerInfo : TraitInfo, IResourceLayerInfo, Requires<BuildingInfluenceInfo>
+	public class ResourceLayerInfo : TraitInfo, IRulesetLoaded, IResourceLayerInfo, Requires<BuildingInfluenceInfo>
 	{
 		public class ResourceTypeInfo
 		{
@@ -73,14 +87,26 @@ namespace OpenRA.Mods.Common.Traits
 			[Desc("How much density does each stage have (code assumes stage 1 always 1).")]
 			public readonly Dictionary<int, int> StageDensities = new Dictionary<int, int>();
 
-			[Desc("Max stage will change into this resource, null for never.")]
+			[Desc("Max stage will change into this resource, null for never. 'Explode' for explosion.")]
 			public readonly string MaxStageEvolvesTo = null;
 
 			[Desc("Spread interval (max stages only), 0 for never.")]
 			public readonly int SpreadInterval = 0;
 
-			// TODO: Blue/red damage/explosion => Later, simple spread and evolution first.
-			// TODO: Red resource spores. (See Linux game folder for stage info)
+			[Desc("Weapon(s) to use if resource explodes.")]
+			public readonly HashSet<string> Explosions = null;
+
+			public HashSet<WeaponInfo> ExplosionsInfo = new HashSet<WeaponInfo>();
+
+			[Desc("Chance of exploding when damaged.")]
+			public readonly int ExplosionChance = 0;
+
+			[Desc("Minimum damage.")]
+			public readonly int MinimumDamage = 1000;
+
+			[Desc("After exploding what remains, random choice from list, any non resource means removal. Current stage minus 1 max always assumed.")]
+			public readonly HashSet<string> ExplodeInto = null;
+
 			public ResourceTypeInfo(MiniYaml yaml)
 			{
 				FieldLoader.Load(this, yaml);
@@ -106,6 +132,23 @@ namespace OpenRA.Mods.Common.Traits
 					ret[r.Key] = new ResourceTypeInfo(r.Value);
 
 			return ret;
+		}
+
+		public void RulesetLoaded(Ruleset rules, ActorInfo info)
+		{
+			foreach (var resourceInfo in ResourceTypes.Values)
+			{
+				if (resourceInfo.Explosions != null)
+				{
+					foreach (var explosion in resourceInfo.Explosions)
+					{
+						var weaponToLower = explosion.ToLowerInvariant();
+						if (!rules.Weapons.TryGetValue(weaponToLower, out var weapon))
+							throw new YamlException($"Weapons Ruleset does not contain an entry '{weaponToLower}'");
+						resourceInfo.ExplosionsInfo.Add(weapon);
+					}
+				}
+			}
 		}
 
 		bool IResourceLayerInfo.TryGetTerrainType(string resourceType, out string terrainType)
@@ -146,6 +189,8 @@ namespace OpenRA.Mods.Common.Traits
 
 		// Sorted by intervals. When cell reached, do the expected action(s). One queue per interval length. Cell can be part of multiple queues.
 		protected readonly Dictionary<int, FastUniqueQueue<CPos, ResourceTickInfo>> ResourceTickQueues = new Dictionary<int, FastUniqueQueue<CPos, ResourceTickInfo>>();
+
+		readonly Dictionary<CPos, DelayedResourceAction> delayedActions = new Dictionary<CPos, DelayedResourceAction>();
 
 		int resCells;
 
@@ -353,6 +398,29 @@ namespace OpenRA.Mods.Common.Traits
 			return oldDensity - density;
 		}
 
+		void DamageResource(Actor source, CPos cell, int damage)
+		{
+			try
+			{
+				var content = Content[cell];
+				if (content.Type == null || !info.ResourceTypes.TryGetValue(content.Type, out var resourceInfo))
+					return;
+
+				if (damage < resourceInfo.MinimumDamage)
+					return;
+
+				if (world.SharedRandom.Next(1, 100) > resourceInfo.ExplosionChance)
+					return;
+
+				if (!delayedActions.ContainsKey(cell))
+					delayedActions.Add(cell, new DelayedResourceAction(tickTime + world.SharedRandom.Next(12, 50), () => DoExplode(source, resourceInfo, cell)));
+			}
+			catch (Exception ex)
+			{
+				Log.Write("debug", ex.Message + "\n" + ex.StackTrace);
+			}
+		}
+
 		void ClearResources(CPos cell)
 		{
 			if (!Content.Contains(cell))
@@ -383,6 +451,7 @@ namespace OpenRA.Mods.Common.Traits
 		bool IResourceLayer.CanAddResource(string resourceType, CPos cell, int amount) { return CanAddResource(resourceType, cell, amount); }
 		int IResourceLayer.AddResource(string resourceType, CPos cell, int amount) { return AddResource(resourceType, cell, amount); }
 		int IResourceLayer.RemoveResource(string resourceType, CPos cell, int amount) { return RemoveResource(resourceType, cell, amount); }
+		void IResourceLayer.DamageResource(Actor source, CPos cell, int damage) { DamageResource(source, cell, damage); }
 		void IResourceLayer.ClearResources(CPos cell) { ClearResources(cell); }
 		bool IResourceLayer.IsVisible(CPos cell) { return !world.FogObscures(cell); }
 		bool IResourceLayer.IsEmpty => resCells < 1;
@@ -500,11 +569,22 @@ namespace OpenRA.Mods.Common.Traits
 					if (string.IsNullOrEmpty(resourceInfo.MaxStageEvolvesTo))
 						return false;
 
+					if (resourceInfo.MaxStageEvolvesTo.ToLower() == "explode" && !delayedActions.ContainsKey(cell))
+					{
+						var resActor = world.CreateActor("vice", new TypeDictionary
+						{
+							new OwnerInit(world.Players.Where(p => p.PlayerName == "Creeps").FirstOrDefault())
+						});
+						DoExplode(resActor, resourceInfo, cell);
+						resActor.Dispose();
+						return true;
+					}
+
 					info.ResourceTypes.TryGetValue(resourceInfo.MaxStageEvolvesTo, out var newResourceInfo);
 					if (newResourceInfo == null)
 					{
 						RemoveFromTickQueue(cell);
-						return false;
+						return true;
 					}
 
 					Content[cell] = new ResourceLayerContents(resourceInfo.MaxStageEvolvesTo, newResourceInfo.MaxDensity);
@@ -535,6 +615,21 @@ namespace OpenRA.Mods.Common.Traits
 					return;
 
 				tickTime++;
+
+				if (delayedActions.Count != 0)
+				{
+					var removeKeys = new List<CPos>();
+					foreach (var action in delayedActions)
+						if (action.Value.WaitForTickTime <= tickTime)
+							removeKeys.Add(action.Key);
+
+					foreach (var removeKey in removeKeys)
+					{
+						delayedActions[removeKey].Action();
+						delayedActions.Remove(removeKey);
+					}
+				}
+
 				if (tickTime % 25 != 0)
 					return;
 				foreach (var pair in ResourceTickQueues)
@@ -555,6 +650,106 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				Log.Write("debug", ex.Message + "\n" + ex.StackTrace);
 			}
+		}
+
+		void DoExplode(Actor source, ResourceLayerInfo.ResourceTypeInfo resourceInfo, CPos cell)
+		{
+			try
+			{
+				foreach (var weapon in resourceInfo.ExplosionsInfo)
+				{
+					if (weapon.Projectile != null)
+					{
+						var burst = world.SharedRandom.Next(1, 8);
+						for (var i = 0; i <= burst; i++)
+						{
+							ResourceProjectile(source, weapon, cell);
+						}
+					}
+					else
+					{
+						ResourceExplosion(source, weapon, cell);
+					}
+				}
+
+				var content = Content[cell];
+				var newDensity = world.SharedRandom.Next(0, Math.Max(0, content.Density - 1));
+				if (newDensity == 0 || resourceInfo.ExplodeInto.Count == 0)
+					RemoveResource(content.Type, cell, content.Density);
+				else
+				{
+					var newType = resourceInfo.ExplodeInto.ElementAt(world.SharedRandom.Next(0, resourceInfo.ExplodeInto.Count - 1));
+					info.ResourceTypes.TryGetValue(newType, out var newResourceInfo);
+
+					if (newType == content.Type)
+						RemoveResource(content.Type, cell, content.Density - newDensity);
+					else if (newResourceInfo == null)
+						RemoveResource(content.Type, cell, content.Density);
+					else
+					{
+						Content[cell] = new ResourceLayerContents(newType,
+							ClosestDensity(newResourceInfo, int2.Lerp(1, newResourceInfo.MaxDensity, newDensity, resourceInfo.MaxDensity), false));
+						CellChanged?.Invoke(cell, Content[cell].Type);
+						AddToTickQueue(cell, newResourceInfo);
+					}
+				}
+			}
+			catch (Exception ex)
+			{
+				Log.Write("debug", ex.Message + "\n" + ex.StackTrace);
+			}
+		}
+
+		void ResourceProjectile(Actor source, WeaponInfo weapon, CPos cell)
+		{
+			Func<WPos> muzzlePosition = () => Map.CenterOfCell(cell);
+
+			var angle = world.SharedRandom.Next(0, 180);
+			var length = world.SharedRandom.Next(-weapon.Range.Length, weapon.Range.Length);
+			var targetPos = new WPos((int)(muzzlePosition().X + Math.Cos(angle * Math.PI / 180) * length),
+				(int)(muzzlePosition().Y + Math.Sin(angle * Math.PI / 180) * length),
+				muzzlePosition().Z);
+
+			// 1024 for 360 degrees, so 128 is 45 degrees:
+			Func<WAngle> muzzleFacing = () => new WAngle(int2.Lerp(20, 128, length, weapon.Range.Length));
+			var muzzleOrientation = WRot.FromYaw(muzzleFacing());
+
+			var args = new ProjectileArgs
+			{
+				Weapon = weapon,
+				Facing = muzzleFacing(),
+				CurrentMuzzleFacing = muzzleFacing,
+				DamageModifiers = Array.Empty<int>(),
+				InaccuracyModifiers = Array.Empty<int>(),
+				RangeModifiers = Array.Empty<int>(),
+				Source = muzzlePosition(),
+				CurrentSource = muzzlePosition,
+				SourceActor = source,
+				PassiveTarget = targetPos,
+				GuidedTarget = Target.FromPos(targetPos)
+			};
+
+			if (args.Weapon.Projectile != null)
+			{
+				var projectile = args.Weapon.Projectile.Create(args);
+				if (projectile != null)
+					world.Add(projectile);
+
+				if (args.Weapon.Report != null && args.Weapon.Report.Any())
+					Game.Sound.Play(SoundType.World, args.Weapon.Report, world, muzzlePosition());
+			}
+		}
+
+		void ResourceExplosion(Actor damageSource, WeaponInfo weapon, CPos cell)
+		{
+			if (weapon == null)
+				return;
+
+			var source = damageSource;
+			if (weapon.Report != null && weapon.Report.Any())
+				Game.Sound.Play(SoundType.World, weapon.Report, damageSource.World, Map.CenterOfCell(cell));
+
+			weapon.Impact(Target.FromPos(Map.CenterOfCell(cell)), source);
 		}
 	}
 }

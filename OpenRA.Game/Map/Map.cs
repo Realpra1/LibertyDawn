@@ -967,6 +967,12 @@ namespace OpenRA
 			return new CPos(u, v);
 		}
 
+		public int DistanceToCells(int distance)
+		{
+			var fakeCell = CellContaining(new WPos(distance, 0, 0));
+			return fakeCell.X;
+		}
+
 		public PPos ProjectedCellCovering(WPos pos)
 		{
 			var projectedPos = pos - new WVec(0, pos.Z, pos.Z);
