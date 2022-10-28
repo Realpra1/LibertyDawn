@@ -15,8 +15,6 @@ HARV.Husk:
 		IntoActor: harv
 	RenderSprites:
 		Image: harv.destroyed
-    Health:
-		HP: 19000
 
 APC.Husk:
 	Inherits: ^Husk

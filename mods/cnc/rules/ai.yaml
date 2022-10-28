@@ -799,7 +799,7 @@ Player:
 		ProductionTypes: pyle,hand,weap,afld,hpad
 		SiloTypes: silo
 		BuildingLimits:
-            proc: 100
+            proc: 40
             weap: 80
 			afld: 80
 			pyle: 6
@@ -873,17 +873,34 @@ Player:
 			apc: 1
 			bggy: 1
 			bike: 1
-            jeep: 1
+            jeep: 5
 			mlrs: 0
 			htnk: 14
 			heli: 1
 			orca: 1
             mcv: 0
 		UnitLimits:
-            harv: 150
+            ltnk: 25
+			ftnk: 25
+            ctnk: 25
+			arty: 25
+			mtnk: 25
+			msam: 25
+			stnk: 25
+			apc: 25
+			bggy: 25
+			bike: 25
+            jeep: 25
+			htnk: 50
+            harv: 100
 			mlrs: 4
 			heli: 6
 			orca: 5
+            e1: 50
+			e2: 50
+			e3: 50
+			e4: 50
+			e5: 50
             rmbo: 2
             mcv: 1
         UnitDelays:

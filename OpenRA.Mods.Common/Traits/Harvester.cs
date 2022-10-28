@@ -78,6 +78,13 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Condition to grant while empty.")]
 		public readonly string EmptyCondition = null;
 
+		[GrantedConditionReference]
+		[Desc("Condition to grant while with unstable resource.")]
+		public readonly string UnstableCondition = null;
+
+		[Desc("Unstable resource types.")]
+		public readonly string UnstableResource = null;
+
 		[VoiceReference]
 		public readonly string HarvestVoice = "Action";
 
@@ -115,6 +122,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly ResourceClaimLayer claimLayer;
 		readonly Dictionary<string, int> contents = new Dictionary<string, int>();
 		int conditionToken = Actor.InvalidConditionToken;
+		int unstableConditionToken = Actor.InvalidConditionToken;
 
 		[Sync]
 		public Actor LastLinkedProc = null;
@@ -224,18 +232,29 @@ namespace OpenRA.Mods.Common.Traits
 		public bool IsFull => contents.Values.Sum() == Info.Capacity;
 		public bool IsEmpty => contents.Values.Sum() == 0;
 		public int Fullness => contents.Values.Sum() * 100 / Info.Capacity;
+		public bool IsUnstable => contents.ContainsKey(Info.UnstableResource);
 
 		void UpdateCondition(Actor self)
 		{
-			if (string.IsNullOrEmpty(Info.EmptyCondition))
-				return;
+			if (!string.IsNullOrEmpty(Info.UnstableCondition) && !string.IsNullOrEmpty(Info.UnstableResource))
+			{
+				var enabled = IsUnstable;
 
-			var enabled = IsEmpty;
+				if (enabled && unstableConditionToken == Actor.InvalidConditionToken)
+					unstableConditionToken = self.GrantCondition(Info.UnstableCondition);
+				else if (!enabled && unstableConditionToken != Actor.InvalidConditionToken)
+					unstableConditionToken = self.RevokeCondition(unstableConditionToken);
+			}
 
-			if (enabled && conditionToken == Actor.InvalidConditionToken)
-				conditionToken = self.GrantCondition(Info.EmptyCondition);
-			else if (!enabled && conditionToken != Actor.InvalidConditionToken)
-				conditionToken = self.RevokeCondition(conditionToken);
+			if (!string.IsNullOrEmpty(Info.EmptyCondition))
+			{
+				var enabled = IsEmpty;
+
+				if (enabled && conditionToken == Actor.InvalidConditionToken)
+					conditionToken = self.GrantCondition(Info.EmptyCondition);
+				else if (!enabled && conditionToken != Actor.InvalidConditionToken)
+					conditionToken = self.RevokeCondition(conditionToken);
+			}
 		}
 
 		public void AcceptResource(Actor self, string resourceType, int added)

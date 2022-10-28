@@ -250,7 +250,7 @@ World:
                     1: 2250
                     5: 750
                     15: 3000
-                    20: 3000
+                    20: 1500
 	ResourceClaimLayer:
 	WarheadDebugOverlay:
 	CustomTerrainDebugOverlay:

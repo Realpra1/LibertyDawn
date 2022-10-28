@@ -46,7 +46,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly IHealth health;
 
 		[Sync]
-		int ticks;
+		int ticks = -1;
 
 		[Sync]
 		int damageTicks;
@@ -60,7 +60,10 @@ namespace OpenRA.Mods.Common.Traits
 		void ITick.Tick(Actor self)
 		{
 			if (self.IsDead || IsTraitDisabled)
+			{
+				ticks = -1;
 				return;
+			}
 
 			// Cast to long to avoid overflow when multiplying by the health
 			if (health.HP >= Info.StartIfBelow * (long)health.MaxHP / 100)
@@ -71,6 +74,9 @@ namespace OpenRA.Mods.Common.Traits
 				--damageTicks;
 				return;
 			}
+
+			if (ticks == -1)
+				ticks = Info.Delay;
 
 			if (--ticks <= 0)
 			{

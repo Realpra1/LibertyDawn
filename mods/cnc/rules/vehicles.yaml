@@ -66,6 +66,8 @@ HARV:
 		SearchFromHarvesterRadius: 20
 		HarvestFacings: 8
 		EmptyCondition: no-tiberium
+        UnstableCondition: unstable-tiberium
+        UnstableResource: RedTiberium
 	Mobile:
 		Speed: 90
 	Health:
@@ -90,6 +92,18 @@ HARV:
 	Explodes:
 		RequiresCondition: !no-tiberium
 		Weapon: TiberiumExplosion
+    Explodes@unstable:
+		RequiresCondition: unstable-tiberium
+		Weapon: AtomicTib
+    Blink:
+		RequiresCondition: unstable-tiberium
+        StartDelay: 2250
+        BlinkColor: FF9999
+    ChangesHealth:
+		RequiresCondition: unstable-tiberium
+		Step: -100000
+		Delay: 3000
+		StartIfBelow: 101
 	WithHarvesterPipsDecoration:
 		Position: BottomLeft
 		Margin: 4, 3

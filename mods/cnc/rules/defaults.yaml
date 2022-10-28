@@ -1088,9 +1088,9 @@
 		Sequence: 1
 		IsDecoration: True
 	ChangesHealth:
-		Step: -9000
+		Step: -56001
 		StartIfBelow: 101
-		Delay: 500
+		Delay: 3000
 
 ^LightHusk:
 	Inherits: ^Husk
