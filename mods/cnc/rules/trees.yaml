@@ -26,11 +26,11 @@ SPLITBLUE:
 		Image: split3
 	SeedsResource:
 		ResourceType: BlueTiberium
-		Interval: 282
+		Interval: 563
         MaxRange: 20
         SeedOnly: true
 	WithIdleAnimation:
-		Interval: 282, 1000
+		Interval: 563, 1000
 	Tooltip:
 		Name: Blossom Tree (blue)
 	RadarColorFromTerrain:
@@ -44,11 +44,11 @@ SPLITRED:
 		Image: split3
 	SeedsResource:
 		ResourceType: RedTiberium
-		Interval: 282
+		Interval: 563
         MaxRange: 20
         SeedOnly: true
 	WithIdleAnimation:
-		Interval: 282, 1000
+		Interval: 563, 1000
 	Tooltip:
 		Name: Blossom Tree (red)
 	RadarColorFromTerrain:

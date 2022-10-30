@@ -94,9 +94,10 @@ HARV:
 		Weapon: TiberiumExplosion
     Explodes@unstable:
 		RequiresCondition: unstable-tiberium
-		Weapon: AtomicTib
+		Weapon: Atomic
     Blink:
 		RequiresCondition: unstable-tiberium
+        Interval: 13
         StartDelay: 2250
         BlinkColor: FF9999
     ChangesHealth:
