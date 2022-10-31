@@ -78,12 +78,12 @@ namespace OpenRA.Graphics
 			Update(cell, null, null, 1f, 1f, true);
 		}
 
-		public void Update(CPos cell, ISpriteSequence sequence, PaletteReference palette, int frame)
+		public void Update(CPos cell, ISpriteSequence sequence, PaletteReference palette, int frame, float3? overlay = null)
 		{
-			Update(cell, sequence.GetSprite(frame), palette, sequence.Scale, sequence.GetAlpha(frame), sequence.IgnoreWorldTint);
+			Update(cell, sequence.GetSprite(frame), palette, sequence.Scale, sequence.GetAlpha(frame), sequence.IgnoreWorldTint, overlay);
 		}
 
-		public void Update(CPos cell, Sprite sprite, PaletteReference palette, float scale = 1f, float alpha = 1f, bool ignoreTint = false)
+		public void Update(CPos cell, Sprite sprite, PaletteReference palette, float scale = 1f, float alpha = 1f, bool ignoreTint = false, float3? overlay = null)
 		{
 			var xyz = float3.Zero;
 			if (sprite != null)
@@ -92,7 +92,7 @@ namespace OpenRA.Graphics
 				xyz = worldRenderer.Screen3DPosition(cellOrigin) + scale * (sprite.Offset - 0.5f * sprite.Size);
 			}
 
-			Update(cell.ToMPos(map.Grid.Type), sprite, palette, xyz, scale, alpha, ignoreTint);
+			Update(cell.ToMPos(map.Grid.Type), sprite, palette, xyz, scale, alpha, ignoreTint, overlay);
 		}
 
 		void UpdateTint(MPos uv)
@@ -154,7 +154,7 @@ namespace OpenRA.Graphics
 			throw new InvalidDataException("Sheet overflow");
 		}
 
-		public void Update(MPos uv, Sprite sprite, PaletteReference palette, in float3 pos, float scale, float alpha, bool ignoreTint)
+		public void Update(MPos uv, Sprite sprite, PaletteReference palette, in float3 pos, float scale, float alpha, bool ignoreTint, float3? overlay = null)
 		{
 			int2 samplers;
 			if (sprite != null)
@@ -181,12 +181,12 @@ namespace OpenRA.Graphics
 				return;
 
 			var offset = rowStride * uv.V + 6 * uv.U;
-			Util.FastCreateQuad(vertices, pos, sprite, samplers, palette?.TextureIndex ?? 0, offset, scale * sprite.Size, alpha * float3.Ones, alpha);
+			Util.FastCreateQuad(vertices, pos, sprite, samplers, palette?.TextureIndex ?? 0, offset, scale * sprite.Size, overlay ?? alpha * float3.Ones, alpha);
 			palettes[uv.V * map.MapSize.X + uv.U] = palette;
 
 			if (worldRenderer.TerrainLighting != null)
 			{
-				this.ignoreTint[offset] = ignoreTint;
+				this.ignoreTint[offset] = overlay == null && ignoreTint;
 				UpdateTint(uv);
 			}
 

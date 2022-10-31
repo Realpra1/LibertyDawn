@@ -190,7 +190,7 @@ World:
 		SmokeSequences: idle
 	ResourceLayer:
 		RecalculateResourceDensity: true
-        SpeedModifier: 100
+        SpeedModifier: 150
 		ResourceTypes:
 			Tiberium:
 				ResourceIndex: 1
@@ -235,6 +235,8 @@ World:
 				TerrainType: RedTiberium
 				AllowedTerrainTypes: Clear, Road, Rough, Beach, Bridge
                 MaxStageEvolvesTo: Explode
+                BlinkWarningInterval: 750
+                BlinkColor: FFDDDD
                 ExplosionChance: 100
                 MinimumDamage: 1000
                 Explosions: AtomicTib, TiberiumMeteor
@@ -250,7 +252,7 @@ World:
                     1: 4500
                     5: 1500
                     15: 6000
-                    20: 3000
+                    20: 6000
 	ResourceClaimLayer:
 	WarheadDebugOverlay:
 	CustomTerrainDebugOverlay:

@@ -25,10 +25,14 @@ namespace OpenRA.Mods.Common.Traits
 		public readonly string Type;
 		public readonly int Density;
 
-		public ResourceLayerContents(string type, int density)
+		// I don't like this way of adding overlay to res sprites, but don't know how else to do it. Turning resources into actors may have been better ultimately.
+		public readonly Color? Overlay;
+
+		public ResourceLayerContents(string type, int density, Color? overlay = null)
 		{
 			Type = type;
 			Density = density;
+			Overlay = overlay;
 		}
 	}
 
@@ -100,6 +104,15 @@ namespace OpenRA.Mods.Common.Traits
 
 			[Desc("Chance of exploding when damaged.")]
 			public readonly int ExplosionChance = 0;
+
+			[Desc("Blink interval before max stage change.")]
+			public readonly int BlinkInterval = 13;
+
+			[Desc("Blink interval before max stage change.")]
+			public readonly int BlinkWarningInterval = 0;
+
+			[Desc("Color used for blinking.")]
+			public readonly string BlinkColor = null;
 
 			[Desc("Minimum damage.")]
 			public readonly int MinimumDamage = 1000;
@@ -190,7 +203,8 @@ namespace OpenRA.Mods.Common.Traits
 		// Sorted by intervals. When cell reached, do the expected action(s). One queue per interval length. Cell can be part of multiple queues.
 		protected readonly Dictionary<int, FastUniqueQueue<CPos, ResourceTickInfo>> ResourceTickQueues = new Dictionary<int, FastUniqueQueue<CPos, ResourceTickInfo>>();
 
-		readonly Dictionary<CPos, DelayedResourceAction> delayedActions = new Dictionary<CPos, DelayedResourceAction>();
+		readonly Dictionary<CPos, DelayedResourceAction> delayedExplosions = new Dictionary<CPos, DelayedResourceAction>();
+		readonly Dictionary<CPos, DelayedResourceAction> blinks = new Dictionary<CPos, DelayedResourceAction>();
 
 		int resCells;
 
@@ -412,8 +426,8 @@ namespace OpenRA.Mods.Common.Traits
 				if (world.SharedRandom.Next(1, 100) > resourceInfo.ExplosionChance)
 					return;
 
-				if (!delayedActions.ContainsKey(cell))
-					delayedActions.Add(cell, new DelayedResourceAction(tickTime + world.SharedRandom.Next(12, 50), () => DoExplode(source, resourceInfo, cell)));
+				if (!delayedExplosions.ContainsKey(cell))
+					delayedExplosions.Add(cell, new DelayedResourceAction(tickTime + world.SharedRandom.Next(12, 50), () => DoExplode(source, resourceInfo, cell)));
 			}
 			catch (Exception ex)
 			{
@@ -521,6 +535,14 @@ namespace OpenRA.Mods.Common.Traits
 					var myStageQueue = ResourceTickQueues[typeInfo.DensityIntervals[content.Density] * 100 / info.SpeedModifier];
 
 					myStageQueue.Add(cell, cellTickInfo);
+
+					if (content.Density == typeInfo.MaxDensity && typeInfo.BlinkInterval != 0 && !string.IsNullOrEmpty(typeInfo.BlinkColor))
+					{
+						var color = Color.TryParse(typeInfo.BlinkColor, out var tColor) ? tColor : Color.Gray;
+						blinks.Add(cell,
+							new DelayedResourceAction(tickTime + Math.Max(1, typeInfo.DensityIntervals[content.Density] * 100 / info.SpeedModifier - typeInfo.BlinkWarningInterval),
+							() => DoBlink(cell, color, typeInfo.BlinkInterval, typeInfo)));
+					}
 				}
 			}
 			catch (Exception ex)
@@ -569,7 +591,7 @@ namespace OpenRA.Mods.Common.Traits
 					if (string.IsNullOrEmpty(resourceInfo.MaxStageEvolvesTo))
 						return false;
 
-					if (resourceInfo.MaxStageEvolvesTo.ToLower() == "explode" && !delayedActions.ContainsKey(cell))
+					if (resourceInfo.MaxStageEvolvesTo.ToLower() == "explode" && !delayedExplosions.ContainsKey(cell))
 					{
 						var resActor = world.CreateActor("vice", new TypeDictionary
 						{
@@ -616,17 +638,33 @@ namespace OpenRA.Mods.Common.Traits
 
 				tickTime++;
 
-				if (delayedActions.Count != 0)
+				if (delayedExplosions.Count != 0)
 				{
 					var removeKeys = new List<CPos>();
-					foreach (var action in delayedActions)
+					foreach (var action in delayedExplosions)
 						if (action.Value.WaitForTickTime <= tickTime)
 							removeKeys.Add(action.Key);
 
 					foreach (var removeKey in removeKeys)
 					{
-						delayedActions[removeKey].Action();
-						delayedActions.Remove(removeKey);
+						var item = delayedExplosions[removeKey];
+						delayedExplosions.Remove(removeKey);
+						item.Action();
+					}
+				}
+
+				if (blinks.Count != 0)
+				{
+					var removeKeys = new List<CPos>();
+					foreach (var action in blinks)
+						if (action.Value.WaitForTickTime <= tickTime)
+							removeKeys.Add(action.Key);
+
+					foreach (var removeKey in removeKeys)
+					{
+						var item = blinks[removeKey];
+						blinks.Remove(removeKey);
+						item.Action();
 					}
 				}
 
@@ -650,6 +688,31 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				Log.Write("debug", ex.Message + "\n" + ex.StackTrace);
 			}
+		}
+
+		void DoBlink(CPos cell, Color color, int interval, ResourceLayerInfo.ResourceTypeInfo typeInfo)
+		{
+			var content = Content[cell];
+
+			// 1. Check if cell density or cell type changed/empty.
+			if (content.Density != typeInfo.MaxDensity || content.Type != typeInfo.TerrainType || blinks.ContainsKey(cell))
+				return;
+
+			// 2. Either blink or remove overlay and re-queue.
+			if (content.Overlay == null)
+			{
+				Content[cell] = new ResourceLayerContents(content.Type, content.Density, color);
+				blinks.Add(cell,
+							new DelayedResourceAction(tickTime + 4, () => DoBlink(cell, color, interval, typeInfo)));
+			}
+			else
+			{
+				Content[cell] = new ResourceLayerContents(content.Type, content.Density, null);
+				blinks.Add(cell,
+							new DelayedResourceAction(tickTime + interval, () => DoBlink(cell, color, interval, typeInfo)));
+			}
+
+			CellChanged?.Invoke(cell, content.Type);
 		}
 
 		void DoExplode(Actor source, ResourceLayerInfo.ResourceTypeInfo resourceInfo, CPos cell)

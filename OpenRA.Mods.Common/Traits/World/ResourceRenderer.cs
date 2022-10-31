@@ -176,18 +176,22 @@ namespace OpenRA.Mods.Common.Traits
 		protected RendererCellContents CreateRenderCellContents(WorldRenderer wr, ResourceLayerContents contents, CPos cell)
 		{
 			if (contents.Type != null && contents.Density > 0 && Info.ResourceTypes.TryGetValue(contents.Type, out var resourceInfo))
-				return new RendererCellContents(contents.Type, contents.Density, resourceInfo, ChooseVariant(contents.Type, cell), wr.Palette(resourceInfo.Palette));
+				return new RendererCellContents(contents.Type, contents.Density, resourceInfo, ChooseVariant(contents.Type, cell), wr.Palette(resourceInfo.Palette), contents.Overlay);
 
 			return RendererCellContents.Empty;
 		}
 
-		protected void UpdateSpriteLayers(CPos cell, ISpriteSequence sequence, int frame, PaletteReference palette)
+		protected void UpdateSpriteLayers(CPos cell, ISpriteSequence sequence, int frame, PaletteReference palette, Color? overlay = null)
 		{
 			// resource.Type is meaningless (and may be null) if resource.Sequence is null
 			if (sequence != null)
 			{
+				float3? tint = null;
+				if (overlay != null)
+					tint = new float3(overlay.Value.R / 255f, overlay.Value.G / 255f, overlay.Value.B / 255f);
+
 				shadowLayer?.Update(cell, sequence.GetShadow(frame, WAngle.Zero), palette, 1f, 1f, sequence.IgnoreWorldTint);
-				spriteLayer.Update(cell, sequence, palette, frame);
+				spriteLayer.Update(cell, sequence, palette, frame, tint);
 			}
 			else
 			{
@@ -217,7 +221,7 @@ namespace OpenRA.Mods.Common.Traits
 
 					// Contents are the same, so just update the density
 					if (rendererCellContents.Type == contents.Type)
-						rendererCellContents = new RendererCellContents(rendererCellContents, contents.Density);
+						rendererCellContents = new RendererCellContents(rendererCellContents, contents.Density, contents.Overlay);
 					else
 						rendererCellContents = CreateRenderCellContents(wr, contents, cell);
 				}
@@ -237,7 +241,7 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				var maxDensity = ResourceLayer.GetMaxDensity(content.Type);
 				var frame = int2.Lerp(0, content.Sequence.Length - 1, content.Density, maxDensity);
-				UpdateSpriteLayers(cell, content.Sequence, frame, content.Palette);
+				UpdateSpriteLayers(cell, content.Sequence, frame, content.Palette, content.Overlay);
 			}
 			else
 				UpdateSpriteLayers(cell, null, 0, null);
@@ -344,25 +348,28 @@ namespace OpenRA.Mods.Common.Traits
 			public readonly ISpriteSequence Sequence;
 			public readonly PaletteReference Palette;
 			public readonly int Density;
+			public readonly Color? Overlay;
 
 			public static readonly RendererCellContents Empty = default;
 
-			public RendererCellContents(string resourceType, int density, ResourceRendererInfo.ResourceTypeInfo info, ISpriteSequence sequence, PaletteReference palette)
+			public RendererCellContents(string resourceType, int density, ResourceRendererInfo.ResourceTypeInfo info, ISpriteSequence sequence, PaletteReference palette, Color? overlay = null)
 			{
 				Type = resourceType;
 				Density = density;
 				Info = info;
 				Sequence = sequence;
 				Palette = palette;
+				Overlay = overlay;
 			}
 
-			public RendererCellContents(RendererCellContents contents, int density)
+			public RendererCellContents(RendererCellContents contents, int density, Color? overlay = null)
 			{
 				Type = contents.Type;
 				Density = density;
 				Info = contents.Info;
 				Sequence = contents.Sequence;
 				Palette = contents.Palette;
+				Overlay = overlay;
 			}
 		}
 	}
