@@ -1,5 +1,7 @@
 TRAN:
 	Inherits: ^Helicopter
+	Inherits@CLOAK: ^AcceptsCloakCrate
+	Inherits@EXPERIENCE: ^GainsExperience
 	Inherits@TRANSPORT: ^Transport
 	Valued:
 		Cost: 750
@@ -51,6 +53,7 @@ TRAN:
 
 HELI:
 	Inherits: ^Helicopter
+	Inherits@CLOAK: ^AcceptsCloakCrate
 	Inherits@EXPERIENCE: ^GainsExperience
 	Inherits@AUTOTARGET: ^AutoTargetAllAssaultMove
 	Valued:
@@ -122,6 +125,7 @@ HELI:
 
 ORCA:
 	Inherits: ^Helicopter
+	Inherits@CLOAK: ^AcceptsCloakCrate
 	Inherits@EXPERIENCE: ^GainsExperience
 	Inherits@AUTOTARGET: ^AutoTargetAllAssaultMove
 	Valued:
