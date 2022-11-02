@@ -1,7 +1,6 @@
 TRAN:
 	Inherits: ^Helicopter
 	Inherits@CLOAK: ^AcceptsCloakCrate
-	Inherits@EXPERIENCE: ^GainsExperience
 	Inherits@TRANSPORT: ^Transport
 	Valued:
 		Cost: 750
