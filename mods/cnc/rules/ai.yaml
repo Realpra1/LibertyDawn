@@ -829,9 +829,9 @@ Player:
 			fix: 4500
 			hpad: 7500
 		BuildingFractions:
-			proc: 15
-			pyle: 25
-			hand: 25
+			proc: 20
+			pyle: 15
+			hand: 15
 			hq: 5
 			weap: 25
 			afld: 25
@@ -862,7 +862,7 @@ Player:
 			e4: 15
 			e5: 15
             rmbo: 2
-			harv: 25
+			harv: 100
 			ltnk: 11
 			ftnk: 6
             ctnk: 0
