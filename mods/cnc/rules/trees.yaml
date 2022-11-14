@@ -137,6 +137,14 @@ T03.Transformable:
 		Type: Tiberium
 		IntoActor: split2
 		Offset: 0,1
+    TransformsNearResources@blue:
+		Type: BlueTiberium
+		IntoActor: splitblue
+		Offset: 0,1
+    TransformsNearResources@red:
+		Type: RedTiberium
+		IntoActor: splitred
+		Offset: 0,1
 	EditorOnlyTooltip:
 		Name: (Tree that can transform into a Blossom Tree)
 
@@ -288,6 +296,14 @@ T13.Transformable:
 	TransformsNearResources:
 		Type: Tiberium
 		IntoActor: split3
+		Offset: 0,1
+    TransformsNearResources@blue:
+		Type: BlueTiberium
+		IntoActor: splitblue
+		Offset: 0,1
+    TransformsNearResources@red:
+		Type: RedTiberium
+		IntoActor: splitred
 		Offset: 0,1
 	EditorOnlyTooltip:
 		Name: (Tree that can transform into a Blossom Tree)
