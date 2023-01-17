@@ -66,7 +66,7 @@ TurretGun:
 ArtilleryShell:
 	Inherits: ^BallisticWeapon
 	ReloadDelay: 65
-	Range: 12c0
+	Range: 11c0
 	MinRange: 1c0
 	Report: tnkfire2.aud
 	TargetActorCenter: true

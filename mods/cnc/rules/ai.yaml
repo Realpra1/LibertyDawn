@@ -23,9 +23,12 @@ Player:
     ModularBot@WaveMaker:
 		Name: WaveMaker
 		Type: wavemaker
-    ModularBot@CampaignBot:
-		Name: CampaignBot
-		Type: campaignbot
+    ModularBot@Easy:
+		Name: Easy
+		Type: Easy
+    ModularBot@Easiest:
+		Name: Easiest
+		Type: Easiest
 	GrantConditionOnBotOwner@cabal:
 		Condition: enable-cabal-ai
 		Bots: cabal
@@ -50,9 +53,12 @@ Player:
     GrantConditionOnBotOwner@wavemaker:
 		Condition: enable-wavemaker-ai
 		Bots: wavemaker
-    GrantConditionOnBotOwner@campaignbot:
-		Condition: enable-campaignbot-ai
-		Bots: campaignbot
+    GrantConditionOnBotOwner@Easy:
+		Condition: enable-Easy-ai
+		Bots: Easy
+    GrantConditionOnBotOwner@Easiest:
+		Condition: enable-Easiest-ai
+		Bots: Easiest
 	SupportPowerBotModule@a:
 		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai
 		Decisions:
@@ -115,7 +121,7 @@ Player:
 					TargetMetric: Value
 					CheckRadius: 7c0
     SupportPowerBotModule@b:
-		RequiresCondition: enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-campaignbot-ai
+		RequiresCondition: enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai
 		Decisions:
 			Airstrike:
 				OrderName: AirstrikePowerInfoOrder
@@ -181,14 +187,18 @@ Player:
 					Attractiveness: -10
 					TargetMetric: Value
 					CheckRadius: 7c0
+    SupportPowerBotModule@c:
+        Inherits: SupportPowerBotModule@b
+        RequiresCondition: enable-Easiest-ai
+        -NukePower:
 	HarvesterBotModule:
-		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-campaignbot-ai
+		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai || enable-Easiest-ai
 		HarvesterTypes: harv
 		RefineryTypes: proc  
 	BuildingRepairBotModule:
-		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-campaignbot-ai
+		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai || enable-Easiest-ai
 	McvManagerBotModule:
-		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-campaignbot-ai
+		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai || enable-Easiest-ai
 		McvTypes: mcv
 		ConstructionYardTypes: fact
 		McvFactoryTypes: weap,afld
@@ -928,10 +938,11 @@ Player:
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
-    BaseBuilderBotModule@campaignbot:
-		RequiresCondition: enable-campaignbot-ai
+    BaseBuilderBotModule@Easy:
+		RequiresCondition: enable-Easy-ai
 		BuildingQueues: Building.Nod, Building.GDI
 		DefenseQueues: Defence.Nod, Defence.GDI
+        AdditionalMinimumRefineryCount: 0
 		MinimumExcessPower: 1
 		MaximumExcessPower: 150
 		ExcessPowerIncrement: 1
@@ -944,12 +955,12 @@ Player:
 		ProductionTypes: pyle,hand,weap,afld,hpad
 		SiloTypes: silo
 		BuildingLimits:
-			proc: 2
-			pyle: 2
-			hand: 2
+			proc: 1
+			pyle: 1
+			hand: 1
 			hq: 1
-			weap: 2
-			afld: 2
+			weap: 1
+			afld: 1
 			hpad: 1
 			eye: 1
 			tmpl: 1
@@ -992,15 +1003,15 @@ Player:
 			tmpl: 1
 			fix: 1
 			hpad: 1
-    SquadManagerBotModule@campaignbot:
-		RequiresCondition: enable-campaignbot-ai
+    SquadManagerBotModule@Easy:
+		RequiresCondition: enable-Easy-ai
 		SquadSize: 4
 		ExcludeFromSquadsTypes: harv, mcv, a10
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
-	UnitBuilderBotModule@campaignbot:
-		RequiresCondition: enable-campaignbot-ai
+	UnitBuilderBotModule@Easy:
+		RequiresCondition: enable-Easy-ai
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI
         IdleBaseUnitsMaximum: 999
         UnitsToBuild:
@@ -1045,7 +1056,135 @@ Player:
 			orca: 5000
             mcv: 3000
 		UnitLimits:
-			harv: 2
+			harv: 1
+			mlrs: 4
+			heli: 1
+			orca: 1
+            rmbo: 2
+    BaseBuilderBotModule@Easiest:
+		RequiresCondition: enable-Easiest-ai
+		BuildingQueues: Building.Nod, Building.GDI
+		DefenseQueues: Defence.Nod, Defence.GDI
+        AdditionalMinimumRefineryCount: 0
+		MinimumExcessPower: 1
+		MaximumExcessPower: 150
+		ExcessPowerIncrement: 1
+		ExcessPowerIncreaseThreshold: 1
+		ConstructionYardTypes: fact
+		RefineryTypes: proc
+		PowerTypes: nuke,nuk2
+		BarracksTypes: pyle,hand
+		VehiclesFactoryTypes: weap,afld
+		ProductionTypes: pyle,hand,weap,afld,hpad
+		SiloTypes: silo
+		BuildingLimits:
+			proc: 1
+			pyle: 1
+			hand: 1
+			hq: 1
+			weap: 1
+			afld: 1
+			hpad: 1
+			eye: 1
+			tmpl: 1
+			fix: 1
+			silo: 0
+			gtwr: 1
+            gun: 1
+			atwr: 1
+			obli: 1
+			sam: 1
+        BuildingDelays:
+			pyle: 1500
+			hand: 1500
+			hq: 1500
+			weap: 9000
+			afld: 9000
+			gtwr: 1500
+			gun: 1500
+			atwr: 1500
+			obli: 1500
+			sam: 1500
+			eye: 10500
+			tmpl: 10500
+			fix: 1500
+			hpad: 10500
+		BuildingFractions:
+			proc: 27
+			pyle: 1
+			hand: 1
+			hq: 1
+			weap: 55
+			afld: 55
+			gtwr: 6
+			gun: 1
+			atwr: 7
+			obli: 6
+			sam: 1
+			eye: 1
+			tmpl: 1
+			fix: 1
+			hpad: 1
+    SquadManagerBotModule@Easiest:
+		RequiresCondition: enable-Easiest-ai
+		SquadSize: 3
+		ExcludeFromSquadsTypes: harv, mcv, a10
+		ConstructionYardTypes: fact
+        AirUnitsTypes: heli, orca
+		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
+	UnitBuilderBotModule@Easiest:
+		RequiresCondition: enable-Easiest-ai
+		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI
+        IdleBaseUnitsMaximum: 999
+        UnitsToBuild:
+			e1: 100
+			e2: 100
+			e3: 100
+			e4: 100
+			e5: 100
+            rmbo: 2
+			harv: 100
+			ltnk: 100
+			ftnk: 100
+            ctnk: 100
+			arty: 100
+			mtnk: 100
+			msam: 100
+			stnk: 100
+			apc: 100
+			bggy: 100
+			bike: 100
+            jeep: 100
+			mlrs: 0
+			htnk: 100
+			heli: 100
+			orca: 100
+        UnitDelays:
+            e1: 7500
+			e2: 7500
+			e3: 7500
+			e4: 7500
+			e5: 7500
+            rmbo: 7500
+			harv: 2250
+			ltnk: 5000
+			ftnk: 5000
+            ctnk: 5000
+			arty: 3000
+			mtnk: 5000
+			msam: 3000
+			stnk: 5000
+			apc: 5000
+			bggy: 0
+			bike: 5000
+            jeep: 0
+			mlrs: 5000
+			htnk: 5000
+			heli: 5000
+			orca: 5000
+            mcv: 3000
+		UnitLimits:
+			harv: 1
 			mlrs: 4
 			heli: 1
 			orca: 1

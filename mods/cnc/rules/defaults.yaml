@@ -925,7 +925,13 @@
 	FrozenUnderFog:
 	ScriptTriggers:
 	Health:
-		HP: 10000
+		HP: 20000
+    ChangesHealth:
+        Step: 0
+		PercentageStep: 2
+		Delay: 25
+		StartIfBelow: 100
+        DamageCooldown: 250
 	AppearsOnMapPreview:
 		Terrain: Wall
 	RadarColorFromTerrain:

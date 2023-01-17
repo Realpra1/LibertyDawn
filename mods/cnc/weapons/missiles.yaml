@@ -65,7 +65,7 @@ Dragon:
 		Explosions: small_building
 
 Rockets:
-	ReloadDelay: 50
+	ReloadDelay: 75
 	Range: 7c0
 	Inherits: ^MissileWeapon
 	ValidTargets: Ground, Water, Air
@@ -100,7 +100,7 @@ AARockets:
 		-TrailImage:
 		-ContrailLength:
 	Warhead@1Dam: SpreadDamage
-		Damage: 1000
+		Damage: 1500
         ValidTargets: Air
     -Warhead@2Smu:
 	-Warhead@3Eff:
