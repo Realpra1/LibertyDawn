@@ -188,9 +188,51 @@ Player:
 					TargetMetric: Value
 					CheckRadius: 7c0
     SupportPowerBotModule@c:
-        Inherits: SupportPowerBotModule@b
         RequiresCondition: enable-Easiest-ai
-        -NukePower:
+        Decisions:
+			Airstrike:
+				OrderName: AirstrikePowerInfoOrder
+				MinimumAttractiveness: 2500
+				Consideration@1:
+					Against: Enemy
+					Types: Vehicle, Infantry
+					Attractiveness: 1
+					TargetMetric: Value
+					CheckRadius: 1c0
+				Consideration@2:
+					Against: Ally
+					Types: Ground, Water
+					Attractiveness: -20
+					TargetMetric: Value
+					CheckRadius: 3c0
+				Consideration@3:
+					Against: Enemy
+					Types: Structure
+					Attractiveness: 1
+					TargetMetric: Value
+					CheckRadius: 1c0
+			IonCannonPower:
+				OrderName: IonCannonPowerInfoOrder
+				MinimumAttractiveness: 2800
+				FineScanRadius: 2
+				Consideration@1:
+					Against: Enemy
+					Types: Air, Tank, Vehicle, Infantry, Water
+					Attractiveness: 2
+					TargetMetric: Value
+					CheckRadius: 2c0
+				Consideration@2:
+					Against: Enemy
+					Types: Structure
+					Attractiveness: 1
+					TargetMetric: Value
+					CheckRadius: 2c0
+				Consideration@3:
+					Against: Ally
+					Types: Ground, Water
+					Attractiveness: -10
+					TargetMetric: Value
+					CheckRadius: 2c0
 	HarvesterBotModule:
 		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai || enable-Easiest-ai
 		HarvesterTypes: harv
