@@ -1128,7 +1128,7 @@ BRIK:
 		BuildPaletteOrder: 30
 		Prerequisites: vehicleproduction
 		Queue: Defence.GDI, Defence.Nod
-		BuildDuration: 330
+		BuildDuration: 250
 		Description: Stops infantry and most tanks.\nBlocks some projectiles.
 	Health:
 		HP: 50000

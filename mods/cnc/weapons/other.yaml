@@ -84,6 +84,7 @@ BigChem:
 	Warhead@1Dam: SpreadDamage
 		Spread: 400
 		Damage: 16000
+		-InvalidTargets:
 		Versus:
 			None: 70
 			Wood: 30

@@ -96,6 +96,7 @@ E3:
 		LocalOffset: 256,43,341
 		FireDelay: 5
     Armament@SECONDARY:
+		Name: secondary
 		Weapon: AARockets
 		LocalOffset: 256,43,341
 		FireDelay: 5

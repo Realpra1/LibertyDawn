@@ -47,12 +47,15 @@
 	Inherits: ^BallisticWeapon
 	Burst: 2
 	BurstDelays: 8
+    Warhead@3Eff: CreateEffect
+		ImpactActors: true
 
 TurretGun:
 	Inherits: ^BallisticWeapon
 	ReloadDelay: 20
 	Range: 7c0
 	Projectile: Bullet
+		Blockable: false
 		Speed: 853
 	Warhead@1Dam: SpreadDamage
 		Damage: 4400
@@ -96,8 +99,8 @@ Grenade:
 	Range: 6c0
 	Report: toss1.aud
 	Projectile: Bullet
-		Speed: 140
 		Blockable: false
+		Speed: 140
 		LaunchAngle: 62
 		Inaccuracy: 813
 		Image: BOMB
@@ -113,6 +116,8 @@ Grenade:
 		DamageTypes: Prone50Percent, TriggerProne, SmallExplosionDeath
 	Warhead@3Eff: CreateEffect
 		Explosions: small_poof
+		ImpactSounds: xplos.aud
+		ImpactActors: true
         
 TiberiumMeteor:
 	Inherits: ^BallisticWeapon

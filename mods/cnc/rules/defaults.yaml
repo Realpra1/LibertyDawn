@@ -395,7 +395,7 @@
 		DeathType: TiberiumDeath
 		RequiresLobbyCreeps: true
 	Crushable:
-		WarnProbability: 75
+		WarnProbability: 10
 		CrushSound: squish2.aud
 	Guardable:
 	ChangesHealth@HOSPITAL:

@@ -65,13 +65,13 @@ Dragon:
 		Explosions: small_building
 
 Rockets:
+	Inherits: ^MissileWeapon
 	ReloadDelay: 75
 	Range: 7c0
-	Inherits: ^MissileWeapon
-	ValidTargets: Ground, Water, Air
+	ValidTargets: Ground, Water
     Projectile: Missile
 		Arm: 0
-		Blockable: false
+        Blockable: true
 		Inaccuracy: 128
 		Image: DRAGON
 		Shadow: true
@@ -92,26 +92,23 @@ Rockets:
 			Heavy: 180
 
 AARockets:
-	ValidTargets: Air
     Inherits: Rockets
+	ValidTargets: Air
     Projectile: Missile
-		-Image:
-		Shadow: false
-		-TrailImage:
-		-ContrailLength:
+		Blockable: false
 	Warhead@1Dam: SpreadDamage
 		Damage: 1500
         ValidTargets: Air
     -Warhead@2Smu:
-	-Warhead@3Eff:
-	-Warhead@4EffAir:
 
 BikeRockets:
 	Inherits: ^MissileWeapon
+	ValidTargets: Ground, Water
 	ReloadDelay: 60
 	Burst: 2
 	BurstDelays: 10
 	Projectile: Missile
+        Blockable: true
 		HorizontalRateOfTurn: 40
 		Speed: 213
 	Warhead@1Dam: SpreadDamage
@@ -125,17 +122,13 @@ BikeRockets:
     
 BikeAARockets:
     Inherits: BikeRockets
-	Projectile: Missile
-		-Image:
-		Shadow: false
-		-TrailImage:
-		-ContrailLength:
+    ValidTargets: Air
+    Projectile: Missile
+        Blockable: false
 	Warhead@1Dam: SpreadDamage
         Damage: 1250
 		ValidTargets: Air
     -Warhead@2Smu:
-	-Warhead@3Eff:
-	-Warhead@4EffAir:
 
 OrcaAGMissiles:
 	Inherits: ^MissileWeapon
