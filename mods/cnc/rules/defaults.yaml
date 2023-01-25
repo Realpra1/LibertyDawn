@@ -243,6 +243,7 @@
 	Repairable:
 		RepairActors: fix
 	Passenger:
+        Weight: 10
 		CargoType: Vehicle
 	ActorLostNotification:
 	HiddenUnderFog:
@@ -905,14 +906,14 @@
 		LineBuildFootprintAlpha: 0.65
 	RequiresBuildableArea:
 		AreaTypes: building
-		Adjacent: 4
+		Adjacent: 5
 	Targetable:
 		TargetTypes: Ground, Wall
 	Crushable:
 		CrushClasses: wall
 		CrushSound: sandbag2.aud
 	LineBuild:
-		Range: 8
+		Range: 15
 		NodeTypes: wall
 	LineBuildNode:
 		Types: wall

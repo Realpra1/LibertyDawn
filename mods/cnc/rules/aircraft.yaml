@@ -41,7 +41,7 @@ TRAN:
 		Sequence: slow-rotor2
 		RequiresCondition: !airborne
 	Cargo:
-		Types: Infantry
+		Types: Infantry, Vehicle
 		MaxWeight: 10
 		UnloadVoice: Unload
 		AfterUnloadDelay: 40

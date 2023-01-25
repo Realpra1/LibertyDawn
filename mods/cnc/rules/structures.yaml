@@ -1131,7 +1131,7 @@ BRIK:
 		BuildDuration: 250
 		Description: Stops infantry and most tanks.\nBlocks some projectiles.
 	Health:
-		HP: 50000
+		HP: 75000
 	Armor:
 		Type: Heavy
 	BlocksProjectiles:

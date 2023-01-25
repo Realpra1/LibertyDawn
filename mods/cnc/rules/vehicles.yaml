@@ -588,7 +588,7 @@ HTNK:
 	Armor:
 		Type: Heavy
 	RevealsShroud:
-		Range: 3c0
+		Range: 5c0
 	WithSpriteTurret:
 	Turreted:
 		TurnSpeed: 15
