@@ -115,7 +115,7 @@ AtomicTib:
     Warhead@2Dam_impact: SpreadDamage
 		Spread: 2c0
 		Damage: 10000
-		Delay: 7
+		Delay: 6
 		Falloff: 0, 700, 0, 0, 0
 		ValidTargets: Ground, Air, Trees
 		AffectsParent: True
@@ -129,7 +129,7 @@ AtomicTib:
     Warhead@3Dam_impact: SpreadDamage
 		Spread: 2c0
 		Damage: 10000
-		Delay: 13
+		Delay: 12
 		Falloff: 0, 0, 150, 25, 0
 		ValidTargets: Ground, Air, Trees
 		AffectsParent: True
