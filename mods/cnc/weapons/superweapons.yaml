@@ -96,9 +96,82 @@ Atomic:
 		Duration: 20
         
 AtomicTib:
-	Inherits: Atomic
-    -Warhead@13Shake:
-    -Warhead@14FlashEffect:
+	ValidTargets: Ground, Water, Air, Trees
+	Report: nukemisl.aud
+    Warhead@1Dam_impact: SpreadDamage
+		Spread: 2c0
+		Damage: 15000
+		Delay: 1
+		Falloff: 1000, 0, 0, 0, 0
+		ValidTargets: Ground, Air, Trees
+		AffectsParent: True
+		Versus:
+			None: 100
+			Wood: 60
+			Light: 80
+			Tiberium: 100
+			Heavy: 50
+		DamageTypes: Prone50Percent, TriggerProne, TiberiumDeath
+    Warhead@2Dam_impact: SpreadDamage
+		Spread: 2c0
+		Damage: 10000
+		Delay: 7
+		Falloff: 0, 700, 0, 0, 0
+		ValidTargets: Ground, Air, Trees
+		AffectsParent: True
+		Versus:
+			None: 100
+			Wood: 60
+			Light: 80
+			Tiberium: 100
+			Heavy: 50
+		DamageTypes: Prone50Percent, TriggerProne, TiberiumDeath
+    Warhead@3Dam_impact: SpreadDamage
+		Spread: 2c0
+		Damage: 10000
+		Delay: 13
+		Falloff: 0, 0, 150, 25, 0
+		ValidTargets: Ground, Air, Trees
+		AffectsParent: True
+		Versus:
+			None: 100
+			Wood: 60
+			Light: 80
+			Tiberium: 100
+			Heavy: 50
+		DamageTypes: Prone50Percent, TriggerProne, TiberiumDeath
+	Warhead@2Eff_impact: CreateEffect
+		Explosions: nuke_explosion
+		ImpactSounds: nukexplo.aud
+		ImpactActors: false
+	Warhead@4Res_areanukea: DestroyResource
+		Size: 3
+		Delay: 1
+	Warhead@5Smu_areanukea: LeaveSmudge
+		SmudgeType: Scorch
+		InvalidTargets: Vehicle, Structure, Wall
+		Size: 3
+		Delay: 1
+	Warhead@6Eff_areanukea: CreateEffect
+		ImpactSounds: xplobig4.aud
+		Delay: 3
+		ImpactActors: false
+	Warhead@8Res_areanukeb: DestroyResource
+		Size: 4
+		Delay: 7
+	Warhead@9Smu_areanukeb: LeaveSmudge
+		SmudgeType: Scorch
+		InvalidTargets: Vehicle, Structure, Wall
+		Size: 4
+		Delay: 7
+	Warhead@11Res_areanukec: DestroyResource
+		Size: 5
+		Delay: 13
+	Warhead@12Smu_areanukec: LeaveSmudge
+		SmudgeType: Scorch
+		InvalidTargets: Vehicle, Structure, Wall
+		Size: 5
+		Delay: 13
 
 IonCannon:
 	ValidTargets: Ground, Water, Air, Trees

@@ -374,6 +374,20 @@ T18:
 		RequireTilesets: DESERT
 	SpawnActorOnDeath:
 		Actor: T18.Husk
+    TransformsNearResources:
+		Type: Tiberium
+		IntoActor: split2
+		Offset: 0,1
+    TransformsNearResources@blue:
+		Type: BlueTiberium
+		IntoActor: splitblue
+		Offset: 0,1
+    TransformsNearResources@red:
+		Type: RedTiberium
+		IntoActor: splitred
+		Offset: 0,1
+	EditorOnlyTooltip:
+		Name: (Tree that can transform into a Blossom Tree)
 
 T18.Husk:
 	Inherits: ^TreeHusk
