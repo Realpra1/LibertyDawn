@@ -18,8 +18,6 @@ E1:
 		Speed: 54
 	Health:
 		HP: 5000
-	AutoTarget:
-		ScanRadius: 4
 	Armament:
 		Weapon: M16
 	AttackFrontal:
@@ -50,8 +48,6 @@ E2:
 		Speed: 68
 	Health:
 		HP: 5500
-	AutoTarget:
-		ScanRadius: 4
 	Armament:
 		Weapon: Grenade
 		LocalOffset: 0,0,427
@@ -89,8 +85,6 @@ E3:
 		Speed: 39
 	Health:
 		HP: 4500
-	AutoTarget:
-		ScanRadius: 7
 	Armament@PRIMARY:
 		Weapon: Rockets
 		LocalOffset: 256,43,341
@@ -129,8 +123,6 @@ E4:
 		Speed: 54
 	Health:
 		HP: 9500
-	AutoTarget:
-		ScanRadius: 4
 	Armament:
 		Weapon: Flamethrower
 		LocalOffset: 341,0,256
@@ -171,8 +163,6 @@ E5:
 		Locomotor: chem
 	Health:
 		HP: 11000
-	AutoTarget:
-		ScanRadius: 4
 	Armament:
 		Weapon: Chemspray
 		LocalOffset: 341,0,256
@@ -248,8 +238,6 @@ RMBO:
 		CustomPipType: red
 	RevealsShroud:
 		Range: 13c0
-	AutoTarget:
-		ScanRadius: 8
 	Demolition:
 		DetonationDelay: 45
 		Voice: Demolish

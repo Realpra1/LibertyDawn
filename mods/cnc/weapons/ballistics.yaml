@@ -45,6 +45,7 @@
 
 120mmDual:
 	Inherits: ^BallisticWeapon
+	Range: 5c0
 	Burst: 2
 	BurstDelays: 8
     Warhead@3Eff: CreateEffect

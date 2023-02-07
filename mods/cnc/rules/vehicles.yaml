@@ -582,13 +582,13 @@ HTNK:
 		Speed: 25
 		TurnSpeed: 4
 	Health:
-		HP: 90000
+		HP: 100000
 	Repairable:
 		HpPerStep: 4000
 	Armor:
 		Type: Heavy
 	RevealsShroud:
-		Range: 5c0
+		Range: 4c0
 	WithSpriteTurret:
 	Turreted:
 		TurnSpeed: 15
@@ -611,9 +611,15 @@ HTNK:
 		Voice: Attack
 	WithMuzzleOverlay:
 	ChangesHealth:
-		Step: 1500
-		Delay: 25
+		Step: 0
+        PercentageStep: 3
+		Delay: 50
 		StartIfBelow: 50
+    ChangesHealth@b:
+		Step: 0
+        PercentageStep: 1
+		Delay: 50
+		StartIfBelow: 101
 	Explodes:
 		Weapon: UnitExplodeMech
 		EmptyWeapon: UnitExplodeMech
