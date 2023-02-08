@@ -844,16 +844,15 @@ Player:
 		ConstructionYardTypes: fact
 		RefineryTypes: proc
 		PowerTypes: nuke
-        PlaceAsDefenses: nuke, hand, pyle, weap, afld
+        PlaceAsDefenses: nuke, hand, pyle, weap, afld, proc
         PlaceAsDefenseChance: 33
 		BarracksTypes: pyle,hand
 		VehiclesFactoryTypes: weap,afld
 		ProductionTypes: pyle,hand,weap,afld,hpad
 		SiloTypes: silo
 		BuildingLimits:
-            proc: 40
-            weap: 80
-			afld: 80
+            weap: 15
+			afld: 15
 			pyle: 6
 			hand: 6
 			hq: 1
@@ -862,7 +861,7 @@ Player:
 			gun: 1
 			eye: 1
 			tmpl: 1
-			fix: 1
+			fix: 2
 			silo: 0
         BuildingDelays:
             proc: 0

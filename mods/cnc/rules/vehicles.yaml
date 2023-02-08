@@ -582,7 +582,7 @@ HTNK:
 		Speed: 25
 		TurnSpeed: 4
 	Health:
-		HP: 100000
+		HP: 90000
 	Repairable:
 		HpPerStep: 4000
 	Armor:
@@ -618,7 +618,7 @@ HTNK:
     ChangesHealth@b:
 		Step: 0
         PercentageStep: 1
-		Delay: 50
+		Delay: 100
 		StartIfBelow: 101
 	Explodes:
 		Weapon: UnitExplodeMech

@@ -131,7 +131,7 @@ Laser:
 		Spread: 42
 		Damage: 39600
 		Versus:
-			Wood: 35
+			Wood: 30
 			Tiberium: 50
 		DamageTypes: Prone50Percent, TriggerProne, FireDeath
 	Warhead@2Smu: LeaveSmudge
