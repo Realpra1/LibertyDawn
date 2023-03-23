@@ -634,11 +634,10 @@ HQ:
 	RevealsShroud:
 		Range: 9c0
     Production:
-		Produces: Building.GDI
+		Produces: Upgrade
         MoveIntoWorld: false
 	ProductionQueue:
-		Type: Building.GDI
-		DisplayOrder: 3
+		Type: Upgrade
 		Group: Building
 		LowPowerModifier: 150
 		ReadyAudio: NewOptions
@@ -648,7 +647,7 @@ HQ:
 		OnHoldAudio: OnHold
 		CancelledAudio: Cancelled
     ProductionBar:
-		ProductionType: Building.GDI
+		ProductionType: Upgrade
 	Exit:
 	WithBuildingBib:
 	ProvidesRadar:
