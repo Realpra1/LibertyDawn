@@ -613,6 +613,8 @@ HQ:
 		Name: Communications Center
 	ProvidesPrerequisite:
 		Prerequisite: anyhq
+    ProvidesPrerequisite@hq:
+        Prerequisite: hq
 	Buildable:
 		BuildPaletteOrder: 70
 		Prerequisites: proc, ~techlevel.medium
@@ -631,6 +633,23 @@ HQ:
 		HP: 80000
 	RevealsShroud:
 		Range: 9c0
+    Production:
+		Produces: Building.GDI
+        MoveIntoWorld: false
+	ProductionQueue:
+		Type: Building.GDI
+		DisplayOrder: 3
+		Group: Building
+		LowPowerModifier: 150
+		ReadyAudio: NewOptions
+		BlockedAudio: NoBuild
+		LimitedAudio: Building
+		QueuedAudio: Building
+		OnHoldAudio: OnHold
+		CancelledAudio: Cancelled
+    ProductionBar:
+		ProductionType: Building.GDI
+	Exit:
 	WithBuildingBib:
 	ProvidesRadar:
 		RequiresCondition: !lowpower
@@ -915,6 +934,9 @@ SAM:
 		Type: Wood
 	RevealsShroud:
 		Range: 8c0
+    DetectCloaked:
+		Range: 4c0
+		RequiresCondition: !lowpower
 	Turreted:
 		TurnSpeed: 40
 		InitialFacing: 0
@@ -928,7 +950,6 @@ SAM:
 	AttackPopupTurreted:
 		PauseOnCondition: lowpower || build-incomplete
 	WithMuzzleOverlay:
-	-RenderDetectionCircle:
 	Power:
 		Amount: -20
 	-BodyOrientation:
