@@ -388,10 +388,10 @@ BIKE:
 		AddToArmyValue: true
 	Buildable:
 		BuildPaletteOrder: 30
-		Prerequisites: afld
+		Prerequisites: afld, upgrade.harass1
 		Queue: Vehicle.Nod
 		Description: Fast scout vehicle, armed with\nrockets.\nCan attack Aircraft.\n  Strong vs Vehicles, Tanks\n  Weak vs Infantry
-	Mobile:
+    Mobile:
 		TurnSpeed: 40
 		Speed: 192
 		Locomotor: wheeled

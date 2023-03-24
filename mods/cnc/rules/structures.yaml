@@ -635,7 +635,6 @@ HQ:
 		Range: 9c0
     Production:
 		Produces: Upgrade
-        MoveIntoWorld: false
 	ProductionQueue:
 		Type: Upgrade
 		Group: Building
