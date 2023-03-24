@@ -184,11 +184,13 @@ upgrade.harass1:
 		Prerequisites: hq
 		Queue: Upgrade
 		BuildLimit: 1
-		BuildDuration: 1500
+		BuildDuration: 250
 		BuildDurationModifier: 100
 		Description: Unlocks basic harassment specialization
 	Valued:
-		Cost: 500
+		Cost: 100
 	RenderSprites:
 		Image: bike
 	ProvidesPrerequisite@upgradename:
+    Interactable:
+	AlwaysVisible:
