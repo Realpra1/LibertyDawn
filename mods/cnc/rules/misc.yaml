@@ -229,5 +229,7 @@ downgrade.harass:
 	AlwaysVisible:
 
 ANYHARASS:
+	AlwaysVisible:
+	Interactable:
     Tooltip:
 		Name: harassment specialization
