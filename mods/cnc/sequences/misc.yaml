@@ -475,3 +475,7 @@ airstrikedirection:
 		X: -15
 		Y: -12
 		Offset: -7, -7, 0
+
+downgrade:
+    icon: downgrade.tem
+		AddExtension: False

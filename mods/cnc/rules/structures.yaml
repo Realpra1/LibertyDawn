@@ -507,6 +507,11 @@ WEAP:
 		SpawnOffset: -512,-512,0
 		ExitCell: 0,1
 		ExitDelay: 3
+        Priority: 2
+    Exit@2:
+		SpawnOffset: 0,-512,0
+		ExitCell: 1,1
+		ExitDelay: 3
 	Production:
 		Produces: Vehicle.GDI
 	ProductionQueue:
