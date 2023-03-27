@@ -61,9 +61,6 @@ namespace OpenRA.Mods.Common.Traits
 			if (!self.IsInWorld || self.IsDead || IsTraitDisabled)
 				return;
 
-			if (!self.World.Map.Contains(self.Location))
-				return;
-
 			if (lifetime-- <= 0)
 				self.World.AddFrameEndTask(w => Kill(self));
 		}

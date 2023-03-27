@@ -189,8 +189,45 @@ upgrade.harass1:
 		Description: Unlocks basic harassment specialization
 	Valued:
 		Cost: 100
+    KillsSelf:
+        RemoveInstead: true
+        RequiresCondition: downgrade.harass
+		Delay: 1
+    GrantConditionOnPrerequisite:
+		Condition: downgrade.harass
+		Prerequisites: downgrade.harass
 	RenderSprites:
 		Image: bike
 	ProvidesPrerequisite@upgradename:
+    ProvidesPrerequisite:
+		Prerequisite: anyharass
     Interactable:
 	AlwaysVisible:
+    
+downgrade.harass:
+    Interactable:
+	ScriptTriggers:
+	Tooltip:
+		Name: Downgrade harassment specialization
+	Buildable:
+		BuildPaletteOrder: 100
+		Prerequisites: anyharass
+		Queue: Upgrade
+		BuildLimit: 1
+		BuildDuration: 125
+		BuildDurationModifier: 100
+		Description: Downgrade harassment specialization
+	Valued:
+		Cost: 0
+    KillsSelf:
+        RemoveInstead: true
+		Delay: 1
+	RenderSprites:
+		Image: downgrade
+	ProvidesPrerequisite@upgradename:
+    Interactable:
+	AlwaysVisible:
+
+ANYHARASS:
+    Tooltip:
+		Name: harassment specialization
