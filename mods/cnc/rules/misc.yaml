@@ -175,18 +175,84 @@ FLARE:
 	Interactable:
 
 upgrade.harass1:
-	Interactable:
+	Inherits: ^MaxUpgrades
 	ScriptTriggers:
 	Tooltip:
 		Name: Harassment I
 	Buildable:
 		BuildPaletteOrder: 10
-		Prerequisites: hq
+		Prerequisites: hq, !maxupgrades
 		Queue: Upgrade
 		BuildLimit: 1
 		BuildDuration: 250
 		BuildDurationModifier: 100
-		Description: Unlocks basic harassment specialization
+		Description: Basic harassment specialization
+	Valued:
+		Cost: 100
+    KillsSelf:
+        RemoveInstead: true
+        RequiresCondition: downgrade.harass && !upgrade.harass2
+		Delay: 1
+    GrantConditionOnPrerequisite:
+		Condition: downgrade.harass
+		Prerequisites: downgrade.harass
+    GrantConditionOnPrerequisite@h2:
+		Condition: upgrade.harass2
+		Prerequisites: upgrade.harass2
+	RenderSprites:
+		Image: bike
+	ProvidesPrerequisite@upgradename:
+    ProvidesPrerequisite:
+		Prerequisite: anyharass
+    Interactable:
+	AlwaysVisible:
+    
+upgrade.harass2:
+	Inherits: ^MaxUpgrades
+	ScriptTriggers:
+	Tooltip:
+		Name: Harassment II
+	Buildable:
+		BuildPaletteOrder: 40
+		Prerequisites: hq, upgrade.harass1, !maxupgrades
+		Queue: Upgrade
+		BuildLimit: 1
+		BuildDuration: 250
+		BuildDurationModifier: 100
+		Description: Medium harassment specialization
+	Valued:
+		Cost: 100
+    KillsSelf:
+        RemoveInstead: true
+        RequiresCondition: downgrade.harass && !upgrade.harass3
+		Delay: 1
+    GrantConditionOnPrerequisite:
+		Condition: downgrade.harass
+		Prerequisites: downgrade.harass
+    GrantConditionOnPrerequisite@h3:
+		Condition: upgrade.harass3
+		Prerequisites: upgrade.harass3
+	RenderSprites:
+		Image: ltnk
+	ProvidesPrerequisite@upgradename:
+    ProvidesPrerequisite:
+		Prerequisite: anyharass
+    Interactable:
+	AlwaysVisible:
+    
+upgrade.harass3:
+	Inherits: ^MaxUpgrades
+	ScriptTriggers:
+	Tooltip:
+		Name: Harassment III
+	Buildable:
+		BuildPaletteOrder: 70
+		Prerequisites: hq, upgrade.harass2, !maxupgrades
+		Queue: Upgrade
+		BuildLimit: 1
+		BuildDuration: 250
+		BuildDurationModifier: 100
+		Description: Advanced harassment specialization
 	Valued:
 		Cost: 100
     KillsSelf:
@@ -197,7 +263,7 @@ upgrade.harass1:
 		Condition: downgrade.harass
 		Prerequisites: downgrade.harass
 	RenderSprites:
-		Image: bike
+		Image: stnk
 	ProvidesPrerequisite@upgradename:
     ProvidesPrerequisite:
 		Prerequisite: anyharass
@@ -205,7 +271,6 @@ upgrade.harass1:
 	AlwaysVisible:
     
 downgrade.harass:
-    Interactable:
 	ScriptTriggers:
 	Tooltip:
 		Name: Downgrade harassment specialization
@@ -227,9 +292,39 @@ downgrade.harass:
 	ProvidesPrerequisite@upgradename:
     Interactable:
 	AlwaysVisible:
-
+    
 ANYHARASS:
 	AlwaysVisible:
 	Interactable:
     Tooltip:
 		Name: harassment specialization
+        
+upgrade.hunting1:
+	Inherits: ^MaxUpgrades
+	ScriptTriggers:
+	Tooltip:
+		Name: Hunting I
+	Buildable:
+		BuildPaletteOrder: 20
+		Prerequisites: hq, !maxupgrades
+		Queue: Upgrade
+		BuildLimit: 1
+		BuildDuration: 250
+		BuildDurationModifier: 100
+		Description: Basic hunting specialization
+	Valued:
+		Cost: 100
+    KillsSelf:
+        RemoveInstead: true
+        RequiresCondition: downgrade.hunting && !upgrade.hunting2
+		Delay: 2
+    GrantConditionOnPrerequisite:
+		Condition: downgrade.hunting
+		Prerequisites: downgrade.hunting
+	RenderSprites:
+		Image: MTNK
+	ProvidesPrerequisite@upgradename:
+    ProvidesPrerequisite:
+		Prerequisite: anyhunting
+    Interactable:
+	AlwaysVisible:

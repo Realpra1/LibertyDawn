@@ -1222,3 +1222,23 @@
 	Inherits@selectiondecorations: ^Selectable
 	Selectable:
 		Priority: 2
+
+^MaxUpgrades:
+    ProvidesPrerequisite@maxreq:
+		Prerequisite: maxupgrades
+        RequiresCondition: upgrades >= 3
+    GrantConditionOnPrerequisite@maxreqh1:
+		Condition: upgrades
+		Prerequisites: upgrade.harass1
+    GrantConditionOnPrerequisite@maxreqh2:
+		Condition: upgrades
+		Prerequisites: upgrade.harass2
+    GrantConditionOnPrerequisite@maxreqh3:
+		Condition: upgrades
+		Prerequisites: upgrade.harass3
+
+MaxUpgrades:
+	AlwaysVisible:
+	Interactable:
+    Tooltip:
+		Name: less than 3 upgrades
