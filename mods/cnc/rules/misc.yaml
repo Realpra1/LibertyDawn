@@ -8,11 +8,11 @@ CRATE:
 		Duration: 18000
 	GiveCashCrateAction:
 		Amount: 1000
-		SelectionShares: 10
+		SelectionShares: 5
 		UseCashTick: true
-	RevealMapCrateAction:
-		SelectionShares: 1
-		Sequence: reveal-map
+    GiveUnitCrateAction@trucks:
+		Units: truck, truck
+		SelectionShares: 10
 	ExplodeCrateAction@fire:
 		Weapon: Napalm.Crate
 		SelectionShares: 5
@@ -31,6 +31,9 @@ CRATE:
 		Units: vice
 		Owner: Creeps
 		SelectionShares: 10
+    GiveUnitCrateAction@playervice:
+		Units: pvice
+		SelectionShares: 3
     GiveMcvCrateAction@engisquad:
 		Units: e1,e1,e3,e6,e6,e6,apc
 		SelectionShares: 2
@@ -279,7 +282,7 @@ downgrade.harass:
 		Prerequisites: anyharass
 		Queue: Upgrade
 		BuildLimit: 1
-		BuildDuration: 125
+		BuildDuration: 50
 		BuildDurationModifier: 100
 		Description: Downgrade harassment specialization
 	Valued:
@@ -299,11 +302,23 @@ ANYHARASS:
     Tooltip:
 		Name: harassment specialization
         
-upgrade.hunting1:
+ANYRECON:
+	AlwaysVisible:
+	Interactable:
+    Tooltip:
+		Name: recon specialization
+        
+ANYECONOMY:
+	AlwaysVisible:
+	Interactable:
+    Tooltip:
+		Name: economy specialization
+        
+upgrade.recon1:
 	Inherits: ^MaxUpgrades
 	ScriptTriggers:
 	Tooltip:
-		Name: Hunting I
+		Name: Recon I
 	Buildable:
 		BuildPaletteOrder: 20
 		Prerequisites: hq, !maxupgrades
@@ -311,20 +326,228 @@ upgrade.hunting1:
 		BuildLimit: 1
 		BuildDuration: 250
 		BuildDurationModifier: 100
-		Description: Basic hunting specialization
+		Description: Basic recon specialization
 	Valued:
 		Cost: 100
     KillsSelf:
         RemoveInstead: true
-        RequiresCondition: downgrade.hunting && !upgrade.hunting2
-		Delay: 2
+        RequiresCondition: downgrade.recon && !upgrade.recon2
+		Delay: 1
     GrantConditionOnPrerequisite:
-		Condition: downgrade.hunting
-		Prerequisites: downgrade.hunting
+		Condition: downgrade.recon
+		Prerequisites: downgrade.recon
+    GrantConditionOnPrerequisite@r2:
+		Condition: upgrade.recon2
+		Prerequisites: upgrade.recon2
 	RenderSprites:
 		Image: MTNK
 	ProvidesPrerequisite@upgradename:
     ProvidesPrerequisite:
-		Prerequisite: anyhunting
+		Prerequisite: anyrecon
+    Interactable:
+	AlwaysVisible:
+
+upgrade.recon2:
+	Inherits: ^MaxUpgrades
+	ScriptTriggers:
+	Tooltip:
+		Name: Recon II
+	Buildable:
+		BuildPaletteOrder: 50
+		Prerequisites: hq, upgrade.recon1, !maxupgrades
+		Queue: Upgrade
+		BuildLimit: 1
+		BuildDuration: 250
+		BuildDurationModifier: 100
+		Description: Medium recon specialization
+	Valued:
+		Cost: 100
+    KillsSelf:
+        RemoveInstead: true
+        RequiresCondition: downgrade.recon && !upgrade.recon3
+		Delay: 1
+    GrantConditionOnPrerequisite:
+		Condition: downgrade.recon
+		Prerequisites: downgrade.recon
+    GrantConditionOnPrerequisite@r3:
+		Condition: upgrade.recon3
+		Prerequisites: upgrade.recon3
+	RenderSprites:
+		Image: ORCA
+	ProvidesPrerequisite@upgradename:
+    ProvidesPrerequisite:
+		Prerequisite: anyrecon
+    Interactable:
+	AlwaysVisible:
+ 
+upgrade.recon3:
+	Inherits: ^MaxUpgrades
+	ScriptTriggers:
+	Tooltip:
+		Name: Recon III
+	Buildable:
+		BuildPaletteOrder: 80
+		Prerequisites: hq, upgrade.recon2, !maxupgrades
+		Queue: Upgrade
+		BuildLimit: 1
+		BuildDuration: 250
+		BuildDurationModifier: 100
+		Description: Advanced recon specialization
+	Valued:
+		Cost: 100
+    KillsSelf:
+        RemoveInstead: true
+        RequiresCondition: downgrade.recon
+		Delay: 1
+    GrantConditionOnPrerequisite:
+		Condition: downgrade.recon
+		Prerequisites: downgrade.recon
+	RenderSprites:
+		Image: EYE
+	ProvidesPrerequisite@upgradename:
+    ProvidesPrerequisite:
+		Prerequisite: anyrecon
+    Interactable:
+	AlwaysVisible:
+    
+downgrade.recon:
+	ScriptTriggers:
+	Tooltip:
+		Name: Downgrade recon specialization
+	Buildable:
+		BuildPaletteOrder: 110
+		Prerequisites: anyrecon
+		Queue: Upgrade
+		BuildLimit: 1
+		BuildDuration: 50
+		BuildDurationModifier: 100
+		Description: Downgrade recon specialization
+	Valued:
+		Cost: 0
+    KillsSelf:
+        RemoveInstead: true
+		Delay: 1
+	RenderSprites:
+		Image: downgrade
+	ProvidesPrerequisite@upgradename:
+    Interactable:
+	AlwaysVisible:
+    
+upgrade.economy1:
+	Inherits: ^MaxUpgrades
+	ScriptTriggers:
+	Tooltip:
+		Name: Economy I
+	Buildable:
+		BuildPaletteOrder: 30
+		Prerequisites: hq, !maxupgrades
+		Queue: Upgrade
+		BuildLimit: 1
+		BuildDuration: 250
+		BuildDurationModifier: 100
+		Description: Basic economy specialization
+	Valued:
+		Cost: 100
+    KillsSelf:
+        RemoveInstead: true
+        RequiresCondition: downgrade.economy && !upgrade.economy2
+		Delay: 1
+    GrantConditionOnPrerequisite:
+		Condition: downgrade.economy
+		Prerequisites: downgrade.economy
+    GrantConditionOnPrerequisite@e2:
+		Condition: upgrade.economy2
+		Prerequisites: upgrade.economy2
+	RenderSprites:
+		Image: NUK2
+	ProvidesPrerequisite@upgradename:
+    ProvidesPrerequisite:
+		Prerequisite: anyeconomy
+    Interactable:
+	AlwaysVisible:
+
+upgrade.economy2:
+	Inherits: ^MaxUpgrades
+	ScriptTriggers:
+	Tooltip:
+		Name: Economy II
+	Buildable:
+		BuildPaletteOrder: 60
+		Prerequisites: hq, upgrade.economy1, !maxupgrades
+		Queue: Upgrade
+		BuildLimit: 1
+		BuildDuration: 250
+		BuildDurationModifier: 100
+		Description: Medium economy specialization
+	Valued:
+		Cost: 100
+    KillsSelf:
+        RemoveInstead: true
+        RequiresCondition: downgrade.economy && !upgrade.economy3
+		Delay: 1
+    GrantConditionOnPrerequisite:
+		Condition: downgrade.economy
+		Prerequisites: downgrade.economy
+    GrantConditionOnPrerequisite@e3:
+		Condition: upgrade.economy3
+		Prerequisites: upgrade.economy3
+	RenderSprites:
+		Image: HTNK
+	ProvidesPrerequisite@upgradename:
+    ProvidesPrerequisite:
+		Prerequisite: anyeconomy
+    Interactable:
+	AlwaysVisible:
+ 
+upgrade.economy3:
+	Inherits: ^MaxUpgrades
+	ScriptTriggers:
+	Tooltip:
+		Name: Economy III
+	Buildable:
+		BuildPaletteOrder: 90
+		Prerequisites: hq, upgrade.economy2, !maxupgrades
+		Queue: Upgrade
+		BuildLimit: 1
+		BuildDuration: 250
+		BuildDurationModifier: 100
+		Description: Advanced economy specialization
+	Valued:
+		Cost: 100
+    KillsSelf:
+        RemoveInstead: true
+        RequiresCondition: downgrade.economy
+		Delay: 1
+    GrantConditionOnPrerequisite:
+		Condition: downgrade.economy
+		Prerequisites: downgrade.economy
+	RenderSprites:
+		Image: HARV
+	ProvidesPrerequisite@upgradename:
+    ProvidesPrerequisite:
+		Prerequisite: anyeconomy
+    Interactable:
+	AlwaysVisible:
+    
+downgrade.economy:
+	ScriptTriggers:
+	Tooltip:
+		Name: Downgrade economy specialization
+	Buildable:
+		BuildPaletteOrder: 120
+		Prerequisites: anyeconomy
+		Queue: Upgrade
+		BuildLimit: 1
+		BuildDuration: 50
+		BuildDurationModifier: 100
+		Description: Downgrade economy specialization
+	Valued:
+		Cost: 0
+    KillsSelf:
+        RemoveInstead: true
+		Delay: 1
+	RenderSprites:
+		Image: downgrade
+	ProvidesPrerequisite@upgradename:
     Interactable:
 	AlwaysVisible:

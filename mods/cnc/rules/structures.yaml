@@ -292,7 +292,6 @@ SILO:
 		Amount: -10
 	MustBeDestroyed:
 		RequiredForShortGame: false
-	-AcceptsDeliveredCash:
 	Selectable:
 		Bounds: 2048, 1024
 		DecorationBounds: 2090, 1280

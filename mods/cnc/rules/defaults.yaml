@@ -1236,6 +1236,24 @@
     GrantConditionOnPrerequisite@maxreqh3:
 		Condition: upgrades
 		Prerequisites: upgrade.harass3
+    GrantConditionOnPrerequisite@maxreqr1:
+		Condition: upgrades
+		Prerequisites: upgrade.recon1
+    GrantConditionOnPrerequisite@maxreqr2:
+		Condition: upgrades
+		Prerequisites: upgrade.recon2
+    GrantConditionOnPrerequisite@maxreqr3:
+		Condition: upgrades
+		Prerequisites: upgrade.recon3
+    GrantConditionOnPrerequisite@maxreqe1:
+		Condition: upgrades
+		Prerequisites: upgrade.economy1
+    GrantConditionOnPrerequisite@maxreqe2:
+		Condition: upgrades
+		Prerequisites: upgrade.economy2
+    GrantConditionOnPrerequisite@maxreqe3:
+		Condition: upgrades
+		Prerequisites: upgrade.economy3
 
 MaxUpgrades:
 	AlwaysVisible:

@@ -187,6 +187,8 @@ APC:
 		MaxWeight: 10
 		UnloadVoice: Unload
 		LoadingCondition: notmobile
+    Selectable:
+		DecorationBounds: 1280, 1024
 	Explodes:
 		Weapon: UnitExplodeBig
 		EmptyWeapon: UnitExplodeBig

@@ -553,6 +553,7 @@ namespace OpenRA
 		void UpdateConditionState(string condition, int token, bool isRevoke)
 		{
 			var conditionState = conditionStates.GetOrAdd(condition);
+			string donothing = this.ToString();
 
 			if (isRevoke)
 				conditionState.Tokens.Remove(token);
@@ -581,8 +582,10 @@ namespace OpenRA
 			var token = nextConditionToken++;
 			conditionTokens.Add(token, condition);
 			UpdateConditionState(condition, token, false);
-			return token;
+			return token; // TODO: On third upgrade this is granted twice.
 		}
+
+		int justRevokedThisToken = InvalidConditionToken;
 
 		/// <summary>
 		/// Revokes a previously granted condition.
@@ -591,11 +594,17 @@ namespace OpenRA
 		/// <returns>The invalid token ID.</returns>
 		public int RevokeCondition(int token)
 		{
+			// Avoid self-update infinite loop:
+			if (justRevokedThisToken == token)
+				return InvalidConditionToken;
+
 			if (!conditionTokens.TryGetValue(token, out var condition))
 				throw new InvalidOperationException($"Attempting to revoke condition with invalid token {token} for {this}.");
 
 			conditionTokens.Remove(token);
+			justRevokedThisToken = token;
 			UpdateConditionState(condition, token, true);
+			justRevokedThisToken = InvalidConditionToken;
 			return InvalidConditionToken;
 		}
 

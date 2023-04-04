@@ -182,14 +182,17 @@ namespace OpenRA.Mods.Common.Traits
 				if (!nowHidden && hidden)
 					watcher.PrerequisitesItemVisible(Key);
 
-				if (nowHasPrerequisites && !hasPrerequisites)
+				bool unavailable = !nowHasPrerequisites && hasPrerequisites; // Doing it this way prevents a double update error.
+				bool available = nowHasPrerequisites && !hasPrerequisites;
+				hasPrerequisites = nowHasPrerequisites;
+
+				if (available)
 					watcher.PrerequisitesAvailable(Key);
 
-				if (!nowHasPrerequisites && hasPrerequisites)
+				if (unavailable)
 					watcher.PrerequisitesUnavailable(Key);
 
 				hidden = nowHidden;
-				hasPrerequisites = nowHasPrerequisites;
 			}
 		}
 	}
