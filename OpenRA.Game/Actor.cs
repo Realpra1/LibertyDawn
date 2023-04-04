@@ -553,7 +553,6 @@ namespace OpenRA
 		void UpdateConditionState(string condition, int token, bool isRevoke)
 		{
 			var conditionState = conditionStates.GetOrAdd(condition);
-			string donothing = this.ToString();
 
 			if (isRevoke)
 				conditionState.Tokens.Remove(token);
