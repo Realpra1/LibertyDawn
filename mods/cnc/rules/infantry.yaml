@@ -41,8 +41,8 @@ E2:
 		AddToArmyValue: true
 	Buildable:
 		BuildPaletteOrder: 40
-		Prerequisites: anyhq, ~techlevel.medium
-		Queue: Infantry.GDI
+		Prerequisites: upgrade.economy1, ~techlevel.medium
+		Queue: Infantry.GDI, Infantry.Nod
 		Description: Fast infantry armed with grenades. \n  Strong vs Buildings, slow-moving targets
 	Mobile:
 		Speed: 68
@@ -116,8 +116,8 @@ E4:
 		AddToArmyValue: true
 	Buildable:
 		BuildPaletteOrder: 40
-		Prerequisites: anyhq, ~techlevel.medium
-		Queue: Infantry.Nod
+		Prerequisites: upgrade.recon1, ~techlevel.medium
+		Queue: Infantry.Nod, Infantry.GDI
 		Description: Advanced Anti-infantry unit.\n  Strong vs Infantry, Buildings\n  Weak vs Tanks
 	Mobile:
 		Speed: 54
@@ -148,15 +148,15 @@ E5:
 	Inherits@AUTOTARGET: ^AutoTargetGroundAssaultMove
 	Inherits@DECORATIONS: ^InfantryExperienceHospitalHazmatOverrides
 	Valued:
-		Cost: 300
+		Cost: 200
 	Tooltip:
 		Name: Chemical Warrior
 	UpdatesPlayerStatistics:
 		AddToArmyValue: true
 	Buildable:
 		BuildPaletteOrder: 50
-		Prerequisites: tmpl, ~techlevel.high
-		Queue: Infantry.Nod
+		Prerequisites: upgrade.covert1, ~techlevel.medium
+		Queue: Infantry.Nod, Infantry.GDI
 		Description: Advanced general-purpose infantry.\n  Strong vs all Ground units
 	Mobile:
 		Speed: 54
@@ -227,8 +227,8 @@ RMBO:
 		AddToArmyValue: true
 	Buildable:
 		BuildPaletteOrder: 50
-		Prerequisites: eye, ~techlevel.high
-		Queue: Infantry.GDI
+		Prerequisites: upgrade.recon3, ~techlevel.high
+		Queue: Infantry.GDI, Infantry.Nod
 		Description: Elite sniper infantry unit.\n  Strong vs Infantry, Buildings\n  Weak vs Vehicles
 	Mobile:
 		Speed: 68

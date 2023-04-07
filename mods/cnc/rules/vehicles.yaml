@@ -3,12 +3,12 @@ MCV:
 	Inherits@CLOAK: ^AcceptsCloakCrate
 	Inherits@selection: ^SelectableSupportUnit
 	Valued:
-		Cost: 3000
+		Cost: 3500
 	Tooltip:
 		Name: Mobile Construction Vehicle
 	Buildable:
-		BuildPaletteOrder: 100
-		Prerequisites: anyhq, ~techlevel.medium, fix
+		BuildPaletteOrder: 110
+		Prerequisites: anyhq, ~techlevel.medium
 		Queue: Vehicle.GDI, Vehicle.Nod
 		Description: Deploys into another Construction Yard.\n  Unarmed
 	Selectable:
@@ -43,6 +43,7 @@ HARV:
 	Inherits: ^Tank
 	Inherits@CLOAK: ^AcceptsCloakCrate
 	Inherits@selection: ^SelectableEconomicUnit
+	Inherits@CLOAKED: ^Cloaked
 	Valued:
 		Cost: 1100
 	Tooltip:
@@ -59,8 +60,8 @@ HARV:
 		Resources: Tiberium, BlueTiberium, RedTiberium
 		Capacity: 20
 		BaleLoadDelay: 25
-		BaleUnloadDelay: 6
-        MaxUnloadQueue : 7
+		BaleUnloadDelay: 4
+        MaxUnloadQueue : 8
         UnloadQueueCostModifier: 3000
 		SearchFromProcRadius: 25
 		SearchFromHarvesterRadius: 20
@@ -78,6 +79,11 @@ HARV:
 		Type: Tiberium
 	RevealsShroud:
 		Range: 2c0
+    Cloak:
+		RequiresCondition: upgrade.covert2
+    GrantConditionOnPrerequisite:
+        Prerequisites: upgrade.covert2
+        Condition: upgrade.covert2
 	ActorLostNotification:
 		Notification: HarvesterLost
 	SpawnActorOnDeath:
@@ -128,9 +134,9 @@ APC:
 	UpdatesPlayerStatistics:
 		AddToArmyValue: true
 	Buildable:
-		BuildPaletteOrder: 30
-		Prerequisites: pyle
-		Queue: Vehicle.GDI
+		BuildPaletteOrder: 35
+		Prerequisites: upgrade.covert1
+		Queue: Vehicle.GDI, Vehicle.Nod
 		Description: Armed infantry transport.\nCan attack Aircraft.\n  Strong vs Vehicles\n  Weak vs Infantry
 	Mobile:
 		TurnSpeed: 28
@@ -210,8 +216,8 @@ ARTY:
 		AddToArmyValue: true
 	Buildable:
 		BuildPaletteOrder: 60
-		Prerequisites: anyhq, ~techlevel.medium
-		Queue: Vehicle.Nod
+		Prerequisites: upgrade.covert2, ~techlevel.medium
+		Queue: Vehicle.Nod, Vehicle.GDI
 		Description: Fast mid-range artillery.\n  Strong vs Infantry, Vehicles and Buildings
 	Mobile:
 		TurnSpeed: 25
@@ -257,8 +263,8 @@ FTNK:
 		AddToArmyValue: true
 	Buildable:
 		BuildPaletteOrder: 50
-		Prerequisites: anyhq, ~techlevel.medium
-		Queue: Vehicle.Nod
+		Prerequisites: upgrade.recon2, ~!upgrade.covert2, ~techlevel.medium
+		Queue: Vehicle.Nod, Vehicle.GDI
 		Description: Heavily armored flame-throwing vehicle.\n  Strong vs Infantry, Buildings and Vehicles\n  Weak vs Tanks
 	Mobile:
 		TurnSpeed: 28
@@ -294,15 +300,15 @@ CTNK:
 	Inherits@CLOAK: ^AcceptsCloakCrate
 	Inherits@AUTOTARGET: ^AutoTargetGroundAssaultMove
 	Valued:
-		Cost: 700
+		Cost: 600
 	Tooltip:
 		Name: Chemical Tank
 	UpdatesPlayerStatistics:
 		AddToArmyValue: true
 	Buildable:
-		BuildPaletteOrder: 90
-		Prerequisites: tmpl, ~techlevel.high
-		Queue: Vehicle.Nod
+		BuildPaletteOrder: 55
+		Prerequisites: ~upgrade.covert2, ~techlevel.medium
+		Queue: Vehicle.Nod, Vehicle.GDI
 		Description: Heavily armored chemical-spewing vehicle.\n  Strong Harasser vs All Ground Units\n  Weak vs Air
 	Mobile:
 		TurnSpeed: 30
@@ -345,12 +351,12 @@ BGGY:
 		AddToArmyValue: true
 	Buildable:
 		BuildPaletteOrder: 20
-		Prerequisites: afld
-		Queue: Vehicle.Nod
+		Prerequisites: upgrade.covert1
+		Queue: Vehicle.Nod, Vehicle.GDI
 		Description: Fast scout and anti-infantry vehicle.\n  Strong vs Infantry\n  Weak vs Tanks
 	Mobile:
-		TurnSpeed: 40
-		Speed: 170
+		TurnSpeed: 50
+		Speed: 175
 	Health:
 		HP: 12000
 	Repairable:
@@ -390,11 +396,11 @@ BIKE:
 		AddToArmyValue: true
 	Buildable:
 		BuildPaletteOrder: 30
-		Prerequisites: afld, upgrade.harass1
-		Queue: Vehicle.Nod
-		Description: Fast scout vehicle, armed with\nrockets.\nCan attack Aircraft.\n  Strong vs Vehicles, Tanks\n  Weak vs Infantry
+		Prerequisites: upgrade.covert1
+		Queue: Vehicle.Nod, Vehicle.GDI
+		Description: Fast attack vehicle, armed with\nrockets.\nCan attack Aircraft.\n  Strong vs Vehicles, Tanks\n  Weak vs Infantry
     Mobile:
-		TurnSpeed: 40
+		TurnSpeed: 50
 		Speed: 192
 		Locomotor: wheeled
 	Health:
@@ -428,19 +434,19 @@ JEEP:
 	Inherits@CLOAK: ^AcceptsCloakCrate
 	Inherits@AUTOTARGET: ^AutoTargetGroundAssaultMove
 	Valued:
-		Cost: 400
+		Cost: 350
 	Tooltip:
 		Name: Hum-Vee
 	UpdatesPlayerStatistics:
 		AddToArmyValue: true
 	Buildable:
-		BuildPaletteOrder: 20
-		Prerequisites: weap
-		Queue: Vehicle.GDI
+		BuildPaletteOrder: 25
+		Prerequisites: afldunlock
+		Queue: Vehicle.GDI, Vehicle.Nod
 		Description: Fast scout and anti-infantry vehicle.\n  Strong vs Infantry\n  Weak vs Tanks
 	Mobile:
 		TurnSpeed: 40
-		Speed: 145
+		Speed: 135
 	Health:
 		HP: 16000
 	Repairable:
@@ -480,8 +486,8 @@ LTNK:
 		AddToArmyValue: true
 	Buildable:
 		BuildPaletteOrder: 40
-		Prerequisites: anyhq, ~techlevel.medium
-		Queue: Vehicle.Nod
+		Prerequisites: upgrade.recon1, ~techlevel.medium
+		Queue: Vehicle.Nod, Vehicle.GDI
 		Description: Fast, light tank.\n  Strong vs Vehicles, Tanks\n  Weak vs Infantry
 	Mobile:
 		TurnSpeed: 28
@@ -525,9 +531,9 @@ MTNK:
 	UpdatesPlayerStatistics:
 		AddToArmyValue: true
 	Buildable:
-		BuildPaletteOrder: 40
-		Prerequisites: anyhq, ~techlevel.medium
-		Queue: Vehicle.GDI
+		BuildPaletteOrder: 45
+		Prerequisites: upgrade.economy2, ~techlevel.medium
+		Queue: Vehicle.GDI, Vehicle.Nod
 		Description: General-Purpose GDI Tank.\n  Strong vs Tanks, Vehicles\n  Weak vs Infantry
 	Mobile:
 		Speed: 72
@@ -575,9 +581,9 @@ HTNK:
 	UpdatesPlayerStatistics:
 		AddToArmyValue: true
 	Buildable:
-		BuildPaletteOrder: 80
-		Prerequisites: eye, ~techlevel.high
-		Queue: Vehicle.GDI
+		BuildPaletteOrder: 85
+		Prerequisites: upgrade.economy3, ~techlevel.high
+		Queue: Vehicle.GDI, Vehicle.Nod
 		Description: Heavily armored GDI Tank.\nCan attack Aircraft.\n  Strong vs Everything
 	Mobile:
 		Locomotor: heavytracked
@@ -645,8 +651,8 @@ MSAM:
 		AddToArmyValue: true
 	Buildable:
 		BuildPaletteOrder: 70
-		Prerequisites: anyhq, ~techlevel.medium
-		Queue: Vehicle.GDI
+		Prerequisites: upgrade.economy2, ~techlevel.medium
+		Queue: Vehicle.GDI, Vehicle.Nod
 		Description: Very long range rocket artillery.\n  Strong vs all Ground units.
 	Mobile:
 		Speed: 30
@@ -711,8 +717,8 @@ MLRS:
 		AddToArmyValue: true
 	Buildable:
 		BuildPaletteOrder: 80
-		Prerequisites: anyhq, ~techlevel.medium
-		Queue: Vehicle.Nod
+		Prerequisites: upgrade.economy2, ~techlevel.medium
+		Queue: Vehicle.Nod, Vehicle.GDI
 		Description: Powerful anti-air unit.\nCannot attack Ground units.
 	Mobile:
 		Speed: 92
@@ -762,6 +768,7 @@ STNK:
 	Inherits: ^Vehicle
 	Inherits@EXPERIENCE: ^GainsExperience
 	Inherits@AUTOTARGET: ^AutoTargetAllAssaultMove
+	Inherits@CLOAKED: ^Cloaked
 	Valued:
 		Cost: 1500
 	Tooltip:
@@ -770,8 +777,8 @@ STNK:
 		AddToArmyValue: true
 	Buildable:
 		BuildPaletteOrder: 100
-		Prerequisites: tmpl, ~techlevel.high
-		Queue: Vehicle.Nod
+		Prerequisites: upgrade.covert3, ~techlevel.high
+		Queue: Vehicle.Nod, Vehicle.GDI
 		Description: Long-range missile tank that can cloak.\nCan attack Aircraft.\nHas weak armor. Can be spotted by infantry and defense structures.\n  Strong vs Tanks\n  Weak vs Infantry.
 	Mobile:
 		Locomotor: heavywheeled
@@ -787,16 +794,6 @@ STNK:
 		Type: Light
 	RevealsShroud:
 		Range: 8c0
-	Cloak:
-		InitialDelay: 75
-		CloakDelay: 75
-		CloakSound: trans1.aud
-		UncloakSound: trans1.aud
-		UncloakOn: Attack, Unload, Dock, Damage, Heal
-		PauseOnCondition: cloak-force-disabled
-	GrantConditionOnDamageState@UNCLOAK:
-		Condition: cloak-force-disabled
-		ValidDamageStates: Critical
 	Armament@PRIMARY:
 		Weapon: 227mm.stnk
 		LocalOffset: 213,43,128, 213,-43,128

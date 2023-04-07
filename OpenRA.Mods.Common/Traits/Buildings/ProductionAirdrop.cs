@@ -76,8 +76,8 @@ namespace OpenRA.Mods.Common.Traits
 				spawnFacing = info.Facing;
 			}
 
-			// Assume a single exit point for simplicity
-			var exit = self.Info.TraitInfos<ExitInfo>().First();
+			var exitObj = SelectExit(self, producee, productionType);
+			var exit = exitObj != null ? exitObj.Info : self.Info.TraitInfos<ExitInfo>().First();
 
 			foreach (var tower in self.TraitsImplementing<INotifyDelivery>())
 				tower.IncomingDelivery(self);

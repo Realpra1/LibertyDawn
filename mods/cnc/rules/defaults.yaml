@@ -1222,20 +1222,32 @@
 	Inherits@selectiondecorations: ^Selectable
 	Selectable:
 		Priority: 2
+        
+^Cloaked:
+    Cloak:
+		InitialDelay: 75
+		CloakDelay: 75
+		CloakSound: trans1.aud
+		UncloakSound: trans1.aud
+		UncloakOn: Attack, Unload, Dock, Damage, Heal
+		PauseOnCondition: cloak-force-disabled
+	GrantConditionOnDamageState@UNCLOAK:
+		Condition: cloak-force-disabled
+		ValidDamageStates: Critical
 
 ^MaxUpgrades:
     ProvidesPrerequisite@maxreq:
 		Prerequisite: maxupgrades
         RequiresCondition: upgrades >= 3
-    GrantConditionOnPrerequisite@maxreqh1:
+    GrantConditionOnPrerequisite@maxreqc1:
 		Condition: upgrades
-		Prerequisites: upgrade.harass1
-    GrantConditionOnPrerequisite@maxreqh2:
+		Prerequisites: upgrade.covert1
+    GrantConditionOnPrerequisite@maxreqc2:
 		Condition: upgrades
-		Prerequisites: upgrade.harass2
-    GrantConditionOnPrerequisite@maxreqh3:
+		Prerequisites: upgrade.covert2
+    GrantConditionOnPrerequisite@maxreqc3:
 		Condition: upgrades
-		Prerequisites: upgrade.harass3
+		Prerequisites: upgrade.covert3
     GrantConditionOnPrerequisite@maxreqr1:
 		Condition: upgrades
 		Prerequisites: upgrade.recon1

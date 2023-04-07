@@ -48,7 +48,9 @@ Player:
 		ID: C17-Stealth
 		Label: Stealth Deliveries
 		Description: Nod's delivery plane is cloaked
-		Enabled: True
+		Enabled: False
+        Visible: False
+        Locked: True
 		DisplayOrder: 8
 		Prerequisites: global-C17-stealth
 	PlayerStatistics:

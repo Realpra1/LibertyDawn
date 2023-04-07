@@ -10,7 +10,7 @@ TRAN:
 		AddToArmyValue: true
 	Buildable:
 		BuildPaletteOrder: 10
-		Prerequisites: hpad
+		Prerequisites: upgrade.covert2
 		Queue: Aircraft.GDI, Aircraft.Nod
 		Description: Fast Infantry Transport Helicopter.\n  Unarmed
 	Aircraft:
@@ -63,8 +63,8 @@ HELI:
 		AddToArmyValue: true
 	Buildable:
 		BuildPaletteOrder: 20
-		Prerequisites: hpad, anyhq, ~techlevel.medium
-		Queue: Aircraft.Nod
+		Prerequisites: upgrade.recon2, ~techlevel.medium
+		Queue: Aircraft.Nod, Aircraft.GDI
 		Description: Helicopter Gunship with Chainguns.\n  Strong vs Infantry, Light Vehicles and\n  Aircraft\n  Weak vs Tanks
 	Aircraft:
 		TurnSpeed: 28
@@ -137,12 +137,12 @@ ORCA:
 		AddToArmyValue: true
 	Buildable:
 		BuildPaletteOrder: 20
-		Prerequisites: hpad, anyhq, ~techlevel.medium
-		Queue: Aircraft.GDI
+		Prerequisites: upgrade.recon3, ~techlevel.medium
+		Queue: Aircraft.GDI, Aircraft.Nod
 		Description: Helicopter Gunship with AG Missiles.\n  Strong vs Buildings, Tanks\n  Weak vs Infantry
 	Aircraft:
 		TurnSpeed: 40
-		Speed: 205
+		Speed: 215
 	Health:
 		HP: 9500
 	Armor:

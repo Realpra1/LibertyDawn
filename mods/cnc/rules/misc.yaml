@@ -58,7 +58,7 @@ CRATE:
 		Units: ltnk, ctnk, arty
 		SelectionShares: 1
 		ValidFactions: nod
-    GiveUnitCrateAction@harasstnks:
+    GiveUnitCrateAction@coverttnks:
 		Units: stnk
 		SelectionShares: 3
 		ValidFactions: nod
@@ -177,114 +177,111 @@ FLARE:
 		Categories: System
 	Interactable:
 
-upgrade.harass1:
+upgrade.covert1:
 	Inherits: ^MaxUpgrades
 	ScriptTriggers:
 	Tooltip:
-		Name: Harassment I
+		Name: Covert I
 	Buildable:
 		BuildPaletteOrder: 10
 		Prerequisites: hq, !maxupgrades
 		Queue: Upgrade
 		BuildLimit: 1
-		BuildDuration: 250
 		BuildDurationModifier: 100
-		Description: Basic harassment specialization
+		Description: Basic covert specialization
 	Valued:
 		Cost: 100
     KillsSelf:
         RemoveInstead: true
-        RequiresCondition: downgrade.harass && !upgrade.harass2
+        RequiresCondition: downgrade.covert && !upgrade.covert2
 		Delay: 1
     GrantConditionOnPrerequisite:
-		Condition: downgrade.harass
-		Prerequisites: downgrade.harass
+		Condition: downgrade.covert
+		Prerequisites: downgrade.covert
     GrantConditionOnPrerequisite@h2:
-		Condition: upgrade.harass2
-		Prerequisites: upgrade.harass2
+		Condition: upgrade.covert2
+		Prerequisites: upgrade.covert2
 	RenderSprites:
 		Image: bike
 	ProvidesPrerequisite@upgradename:
     ProvidesPrerequisite:
-		Prerequisite: anyharass
+		Prerequisite: anycovert
     Interactable:
 	AlwaysVisible:
     
-upgrade.harass2:
+upgrade.covert2:
 	Inherits: ^MaxUpgrades
 	ScriptTriggers:
 	Tooltip:
-		Name: Harassment II
+		Name: Covert II
 	Buildable:
 		BuildPaletteOrder: 40
-		Prerequisites: hq, upgrade.harass1, !maxupgrades
+		Prerequisites: hq, upgrade.covert1, !maxupgrades
 		Queue: Upgrade
 		BuildLimit: 1
-		BuildDuration: 250
 		BuildDurationModifier: 100
-		Description: Medium harassment specialization
+		Description: Medium covert specialization
 	Valued:
 		Cost: 100
     KillsSelf:
         RemoveInstead: true
-        RequiresCondition: downgrade.harass && !upgrade.harass3
+        RequiresCondition: downgrade.covert && !upgrade.covert3
 		Delay: 1
     GrantConditionOnPrerequisite:
-		Condition: downgrade.harass
-		Prerequisites: downgrade.harass
+		Condition: downgrade.covert
+		Prerequisites: downgrade.covert
     GrantConditionOnPrerequisite@h3:
-		Condition: upgrade.harass3
-		Prerequisites: upgrade.harass3
+		Condition: upgrade.covert3
+		Prerequisites: upgrade.covert3
 	RenderSprites:
-		Image: ltnk
+		Image: ctnk
 	ProvidesPrerequisite@upgradename:
     ProvidesPrerequisite:
-		Prerequisite: anyharass
+		Prerequisite: anycovert
     Interactable:
 	AlwaysVisible:
     
-upgrade.harass3:
+upgrade.covert3:
 	Inherits: ^MaxUpgrades
 	ScriptTriggers:
 	Tooltip:
-		Name: Harassment III
+		Name: Covert III
 	Buildable:
 		BuildPaletteOrder: 70
-		Prerequisites: hq, upgrade.harass2, !maxupgrades
+		Prerequisites: hq, upgrade.covert2, !maxupgrades
 		Queue: Upgrade
 		BuildLimit: 1
-		BuildDuration: 250
 		BuildDurationModifier: 100
-		Description: Advanced harassment specialization
+		Description: Advanced covert specialization
 	Valued:
 		Cost: 100
     KillsSelf:
         RemoveInstead: true
-        RequiresCondition: downgrade.harass
+        RequiresCondition: downgrade.covert
 		Delay: 1
     GrantConditionOnPrerequisite:
-		Condition: downgrade.harass
-		Prerequisites: downgrade.harass
+		Condition: downgrade.covert
+		Prerequisites: downgrade.covert
 	RenderSprites:
-		Image: stnk
+		Image: TMPL
 	ProvidesPrerequisite@upgradename:
     ProvidesPrerequisite:
-		Prerequisite: anyharass
+		Prerequisite: anycovert
     Interactable:
 	AlwaysVisible:
     
-downgrade.harass:
+downgrade.covert:
 	ScriptTriggers:
 	Tooltip:
-		Name: Downgrade harassment specialization
+		Name: Downgrade covert specialization
 	Buildable:
 		BuildPaletteOrder: 100
-		Prerequisites: anyharass
+		Prerequisites: anycovert
 		Queue: Upgrade
 		BuildLimit: 1
 		BuildDuration: 50
 		BuildDurationModifier: 100
-		Description: Downgrade harassment specialization
+		Description: Downgrade covert specialization
 	Valued:
 		Cost: 0
     KillsSelf:
@@ -296,11 +293,11 @@ downgrade.harass:
     Interactable:
 	AlwaysVisible:
     
-ANYHARASS:
+ANYCOVERT:
 	AlwaysVisible:
 	Interactable:
     Tooltip:
-		Name: harassment specialization
+		Name: covert specialization
         
 ANYRECON:
 	AlwaysVisible:
@@ -313,7 +310,13 @@ ANYECONOMY:
 	Interactable:
     Tooltip:
 		Name: economy specialization
-        
+
+AFLDUNLOCK:
+	AlwaysVisible:
+	Interactable:
+    Tooltip:
+		Name: economy or recon specialization
+
 upgrade.recon1:
 	Inherits: ^MaxUpgrades
 	ScriptTriggers:
@@ -324,7 +327,6 @@ upgrade.recon1:
 		Prerequisites: hq, !maxupgrades
 		Queue: Upgrade
 		BuildLimit: 1
-		BuildDuration: 250
 		BuildDurationModifier: 100
 		Description: Basic recon specialization
 	Valued:
@@ -340,10 +342,12 @@ upgrade.recon1:
 		Condition: upgrade.recon2
 		Prerequisites: upgrade.recon2
 	RenderSprites:
-		Image: MTNK
+		Image: LTNK
 	ProvidesPrerequisite@upgradename:
     ProvidesPrerequisite:
 		Prerequisite: anyrecon
+    ProvidesPrerequisite@afldunlock:
+		Prerequisite: afldunlock
     Interactable:
 	AlwaysVisible:
 
@@ -357,7 +361,6 @@ upgrade.recon2:
 		Prerequisites: hq, upgrade.recon1, !maxupgrades
 		Queue: Upgrade
 		BuildLimit: 1
-		BuildDuration: 250
 		BuildDurationModifier: 100
 		Description: Medium recon specialization
 	Valued:
@@ -373,7 +376,7 @@ upgrade.recon2:
 		Condition: upgrade.recon3
 		Prerequisites: upgrade.recon3
 	RenderSprites:
-		Image: ORCA
+		Image: HELI
 	ProvidesPrerequisite@upgradename:
     ProvidesPrerequisite:
 		Prerequisite: anyrecon
@@ -390,7 +393,6 @@ upgrade.recon3:
 		Prerequisites: hq, upgrade.recon2, !maxupgrades
 		Queue: Upgrade
 		BuildLimit: 1
-		BuildDuration: 250
 		BuildDurationModifier: 100
 		Description: Advanced recon specialization
 	Valued:
@@ -443,7 +445,6 @@ upgrade.economy1:
 		Prerequisites: hq, !maxupgrades
 		Queue: Upgrade
 		BuildLimit: 1
-		BuildDuration: 250
 		BuildDurationModifier: 100
 		Description: Basic economy specialization
 	Valued:
@@ -463,6 +464,8 @@ upgrade.economy1:
 	ProvidesPrerequisite@upgradename:
     ProvidesPrerequisite:
 		Prerequisite: anyeconomy
+    ProvidesPrerequisite@afldunlock:
+		Prerequisite: afldunlock
     Interactable:
 	AlwaysVisible:
 
@@ -476,7 +479,6 @@ upgrade.economy2:
 		Prerequisites: hq, upgrade.economy1, !maxupgrades
 		Queue: Upgrade
 		BuildLimit: 1
-		BuildDuration: 250
 		BuildDurationModifier: 100
 		Description: Medium economy specialization
 	Valued:
@@ -492,7 +494,7 @@ upgrade.economy2:
 		Condition: upgrade.economy3
 		Prerequisites: upgrade.economy3
 	RenderSprites:
-		Image: HTNK
+		Image: MTNK
 	ProvidesPrerequisite@upgradename:
     ProvidesPrerequisite:
 		Prerequisite: anyeconomy
@@ -509,7 +511,6 @@ upgrade.economy3:
 		Prerequisites: hq, upgrade.economy2, !maxupgrades
 		Queue: Upgrade
 		BuildLimit: 1
-		BuildDuration: 250
 		BuildDurationModifier: 100
 		Description: Advanced economy specialization
 	Valued:
@@ -522,7 +523,7 @@ upgrade.economy3:
 		Condition: downgrade.economy
 		Prerequisites: downgrade.economy
 	RenderSprites:
-		Image: HARV
+		Image: HTNK
 	ProvidesPrerequisite@upgradename:
     ProvidesPrerequisite:
 		Prerequisite: anyeconomy

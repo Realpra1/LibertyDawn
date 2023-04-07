@@ -177,14 +177,14 @@ NUK2:
 	HitShape:
 		TargetableOffsets: 630,299,0
 	Valued:
-		Cost: 800
+		Cost: 500
 	Tooltip:
 		Name: Advanced Power Plant
 	ProvidesPrerequisite:
 		Prerequisite: anypower
 	Buildable:
 		BuildPaletteOrder: 80
-		Prerequisites: anyhq, ~techlevel.medium
+		Prerequisites: upgrade.economy1, ~techlevel.medium
 		Queue: Building.GDI, Building.Nod
 		Description: Provides more power, cheaper than the\nstandard Power Plant
 	Building:
@@ -192,7 +192,7 @@ NUK2:
 		Dimensions: 2,3
 		LocalCenterOffset: 0,-512,0
 	Health:
-		HP: 70000
+		HP: 55000
     Armor:
 		Type: Tiberium
 	RevealsShroud:
@@ -267,7 +267,7 @@ SILO:
 		Name: Tiberium Silo
 	Buildable:
 		BuildPaletteOrder: 35
-		Prerequisites: proc
+		Prerequisites: upgrade.economy1
 		Queue: Defence.GDI, Defence.Nod
 		Description: Stores processed Tiberium
 	Building:
@@ -427,8 +427,8 @@ AFLD:
 		Prerequisite: vehicleproduction
 	Buildable:
 		BuildPaletteOrder: 40
-		Prerequisites: proc
-		Queue: Building.Nod
+		Prerequisites: ~!upgrade.covert1
+		Queue: Building.Nod, Building.GDI
 		Description: Provides a dropzone\nfor vehicle reinforcements
 	Building:
 		Footprint: XXX+ xxx+ ====
@@ -442,6 +442,15 @@ AFLD:
 	Exit@1:
 		SpawnOffset: -1024,0,0
 		ExitCell: 3,1
+        Priority: 3
+    Exit@2:
+		SpawnOffset: -1024,0,0
+		ExitCell: 3,2
+        Priority: 2
+    Exit@3:
+		SpawnOffset: -1024,0,0
+		ExitCell: 3,0
+        Priority: 1
 	ProductionAirdrop:
 		Produces: Vehicle.Nod
 		ActorType: c17
@@ -483,8 +492,8 @@ WEAP:
 		Prerequisite: vehicleproduction
 	Buildable:
 		BuildPaletteOrder: 40
-		Prerequisites: proc
-		Queue: Building.GDI
+		Prerequisites: ~upgrade.covert1
+		Queue: Building.GDI, Building.Nod
 		Description: Produces vehicles
 	Building:
 		Footprint: xxx +++ ===
@@ -506,10 +515,15 @@ WEAP:
 		SpawnOffset: -512,-512,0
 		ExitCell: 0,1
 		ExitDelay: 3
-        Priority: 2
+        Priority: 3
     Exit@2:
-		SpawnOffset: 0,-512,0
+		SpawnOffset: -512,-512,0
 		ExitCell: 1,1
+		ExitDelay: 3
+        Priority: 2
+    Exit@3:
+		SpawnOffset: -512,-512,0
+		ExitCell: -1,1
 		ExitDelay: 3
 	Production:
 		Produces: Vehicle.GDI
@@ -661,7 +675,7 @@ HQ:
 		RequiresCondition: !lowpower
 	AirstrikePower:
 		PauseOnCondition: lowpower
-		Prerequisites: ~techlevel.superweapons
+		Prerequisites: ~upgrade.economy3, ~techlevel.superweapons
 		Icon: airstrike
 		ChargeInterval: 7500
 		SquadSize: 3
@@ -700,7 +714,7 @@ FIX:
 		Name: Repair Facility
 	Buildable:
 		BuildPaletteOrder: 60
-		Prerequisites: vehicleproduction
+		Prerequisites: upgrade.economy1
 		Queue: Building.GDI, Building.Nod
 		Description: Repairs vehicles
 	Building:
@@ -719,7 +733,7 @@ FIX:
 		RequiresCondition: !build-incomplete
 	Reservable:
 	RepairsUnits:
-		HpPerStep: 1000
+		HpPerStep: 2000
 		Interval: 15
 		PlayerExperience: 25
 		StartRepairingNotification: Repairing
@@ -744,8 +758,8 @@ EYE:
 		Prerequisite: anyhq
 	Buildable:
 		BuildPaletteOrder: 100
-		Prerequisites: anyhq, ~techlevel.high
-		Queue: Building.GDI
+		Prerequisites: upgrade.recon3, ~techlevel.high
+		Queue: Building.GDI, Building.Nod
 		Description: Provides radar and Orbital Ion Cannon support power.\nUnlocks Mammoth Tank and Commando.\nRequires power to operate.
 	Building:
 		Footprint: X_ xx ==
@@ -803,7 +817,7 @@ TMPL:
 		Prerequisite: anyhq
 	Buildable:
 		BuildPaletteOrder: 100
-		Prerequisites: anyhq, ~techlevel.high
+		Prerequisites: upgrade.covert3, ~techlevel.high
 		Queue: Building.Nod
 		Description: Provides Nuclear Strike support power.\nUnlocks Stealth Tank, Chem. Warrior and Obelisk of Light.\nRequires power to operate.
 	Building:
@@ -868,7 +882,7 @@ GUN:
 		Name: Turret
 	Buildable:
 		BuildPaletteOrder: 45
-		Prerequisites: barracks
+		Prerequisites: upgrade.recon1
 		Queue: Defence.GDI, Defence.Nod
 		BuildDuration: 960
 		Description: Basic Anti-Tank base defense.\n  Strong vs Tanks, vehicles\n  Weak vs Infantry
@@ -923,8 +937,8 @@ SAM:
 		Name: SAM Site
 	Buildable:
 		BuildPaletteOrder: 50
-		Prerequisites: hand
-		Queue: Defence.Nod
+		Prerequisites: upgrade.economy2
+		Queue: Defence.Nod, Defence.GDI
 		BuildDuration: 1130
 		Description: Anti-Aircraft base defense.\n  Strong vs Aircraft\n  Cannot target Ground units.
 	Building:
@@ -937,8 +951,8 @@ SAM:
 	RevealsShroud:
 		Range: 8c0
     DetectCloaked:
-		Range: 4c0
-		RequiresCondition: !lowpower
+		Range: 0c0
+    -RenderDetectionCircle:
 	Turreted:
 		TurnSpeed: 40
 		InitialFacing: 0
@@ -970,9 +984,9 @@ OBLI:
 	Tooltip:
 		Name: Obelisk of Light
 	Buildable:
-		BuildPaletteOrder: 60
-		Prerequisites: tmpl, ~techlevel.high
-		Queue: Defence.Nod
+		BuildPaletteOrder: 65
+		Prerequisites: upgrade.economy3, ~techlevel.high
+		Queue: Defence.Nod, Defence.GDI
 		BuildDuration: 2080
 		Description: Advanced base defense.\nRequires power to operate.\n  Strong vs all Ground units\n  Cannot target Aircraft
 	Selectable:
@@ -984,6 +998,9 @@ OBLI:
 		Type: Wood
 	RevealsShroud:
 		Range: 8c0
+    DetectCloaked:
+		Range: 0c0
+    -RenderDetectionCircle:
 	WithBuildingBib:
 		HasMinibib: true
 	-WithSpriteBody:
@@ -1001,9 +1018,6 @@ OBLI:
 		SoundFiles: obelpowr.aud
 		Interval: 30, 40
 	-SpawnActorsOnSell:
-	DetectCloaked:
-		Range: 5c0
-		RequiresCondition: !lowpower
 	Power:
 		Amount: -90
 
@@ -1018,7 +1032,7 @@ GTWR:
 		Name: Guard Tower
 	Buildable:
 		BuildPaletteOrder: 40
-		Prerequisites: barracks
+		Prerequisites: upgrade.recon2
 		Queue: Defence.GDI, Defence.Nod
 		BuildDuration: 960
 		Description: Basic defensive structure.\n  Strong vs Infantry\n  Weak vs Tanks
@@ -1055,8 +1069,8 @@ ATWR:
 		Name: Advanced Guard Tower
 	Buildable:
 		BuildPaletteOrder: 60
-		Prerequisites: anyhq, ~techlevel.medium
-		Queue: Defence.GDI
+		Prerequisites: upgrade.recon3, ~techlevel.medium
+		Queue: Defence.GDI, Defence.Nod
 		BuildDuration: 1920
 		Description: All-purpose defensive structure.\n  Strong vs Aircraft, Infantry\n  Weak vs Tanks
 	Selectable:
@@ -1105,11 +1119,14 @@ SBAG:
 		Name: Sandbag Barrier
 	Buildable:
 		BuildPaletteOrder: 20
-		Prerequisites: fact
+		Prerequisites: upgrade.recon1
 		Queue: Defence.GDI
-		Description: Stops infantry and light vehicles.\nCan be crushed by tanks.
-	Armor:
-		Type: Light
+		Description: Stops infantry and light vehicles.\nBlocks some projectiles.\nCan be crushed by tanks.
+	Health:
+		HP: 25000
+    Armor:
+		Type: Heavy
+	BlocksProjectiles:
 	LineBuild:
 		NodeTypes: sandbag
 	LineBuildNode:
@@ -1120,18 +1137,20 @@ SBAG:
 CYCL:
 	Inherits: ^Wall
 	Valued:
-		Cost: 25
+		Cost: 20
 	CustomSellValue:
 		Value: 0
 	Tooltip:
 		Name: Chain Link Barrier
 	Buildable:
 		BuildPaletteOrder: 20
-		Prerequisites: fact
-		Queue: Defence.Nod
+		Prerequisites: ~upgrade.covert1
+		Queue: Defence.Nod, Defence.GDI
 		Description: Stops infantry and light vehicles.\nCan be crushed by tanks.
-	Armor:
-		Type: Light
+	Health:
+		HP: 15000
+    Armor:
+		Type: Heavy
 	LineBuild:
 		NodeTypes: chain
 	LineBuildNode:
@@ -1149,7 +1168,7 @@ BRIK:
 		Name: Concrete Barrier
 	Buildable:
 		BuildPaletteOrder: 30
-		Prerequisites: vehicleproduction
+		Prerequisites: upgrade.recon2
 		Queue: Defence.GDI, Defence.Nod
 		BuildDuration: 250
 		Description: Stops infantry and most tanks.\nBlocks some projectiles.
@@ -1160,7 +1179,7 @@ BRIK:
 	BlocksProjectiles:
 	Crushable:
 		CrushClasses: heavywall
-		-CrushSound:
+        CrushSound: hvydoor1.aud
 	LineBuild:
 		NodeTypes: concrete
 	LineBuildNode:

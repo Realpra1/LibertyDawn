@@ -273,10 +273,15 @@ World:
 		SeparateTeamSpawnsCheckboxDisplayOrder: 6
         SeparateTeamSpawnsCheckboxEnabled: False
 	CreateMapPlayers:
-	StartingUnits@mcvonly:
+	StartingUnits@mcvonlygdi:
 		Class: none
 		ClassName: MCV Only
-		Factions: gdi, nod
+		Factions: gdi
+		BaseActor: mcv
+    StartingUnits@mcvonlynod:
+		Class: none
+		ClassName: MCV Only
+		Factions: nod
 		BaseActor: mcv
 	StartingUnits@defaultgdia:
 		Class: light
