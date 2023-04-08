@@ -36,7 +36,6 @@ namespace OpenRA.Mods.Common.Traits
 
 	public class GrantConditionInRange : ConditionalTrait<GrantConditionInRangeInfo>, INotifyRemovedFromWorld, ITick
 	{
-
 		readonly GrantConditionInRangeInfo info;
 
 		int delay;

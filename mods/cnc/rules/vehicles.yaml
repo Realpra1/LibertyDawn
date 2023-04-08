@@ -80,6 +80,7 @@ HARV:
 	RevealsShroud:
 		Range: 2c0
     Cloak:
+		UncloakOn: Attack, Damage, Heal
 		RequiresCondition: upgrade.covert2 || StealthGen || cloak-crate-collected
     GrantConditionOnPrerequisite:
         Prerequisites: upgrade.covert2
