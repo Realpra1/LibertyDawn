@@ -43,7 +43,7 @@ HARV:
 	Inherits: ^Tank
 	Inherits@CLOAK: ^AcceptsCloakCrate
 	Inherits@selection: ^SelectableEconomicUnit
-	Inherits@CLOAKED: ^Cloaked
+	Inherits@CLOAKED: ^Cloakable
 	Valued:
 		Cost: 1100
 	Tooltip:
@@ -80,7 +80,7 @@ HARV:
 	RevealsShroud:
 		Range: 2c0
     Cloak:
-		RequiresCondition: upgrade.covert2
+		RequiresCondition: upgrade.covert2 || StealthGen || cloak-crate-collected
     GrantConditionOnPrerequisite:
         Prerequisites: upgrade.covert2
         Condition: upgrade.covert2
@@ -768,7 +768,9 @@ STNK:
 	Inherits: ^Vehicle
 	Inherits@EXPERIENCE: ^GainsExperience
 	Inherits@AUTOTARGET: ^AutoTargetAllAssaultMove
-	Inherits@CLOAKED: ^Cloaked
+	Inherits@CLOAKED: ^Cloakable
+    Cloak:
+        -RequiresCondition:
 	Valued:
 		Cost: 1500
 	Tooltip:
@@ -818,23 +820,37 @@ STNK:
 
 MHQ:
 	Inherits: ^Vehicle
+	Inherits@CLOAK: ^AcceptsCloakCrate
 	Valued:
 		Cost: 1000
+	UpdatesPlayerStatistics:
+		AddToArmyValue: true
 	Tooltip:
 		Name: Mobile HQ
 	Health:
-		HP: 20000
+		HP: 10000
 	Armor:
 		Type: Light
 	Mobile:
 		Speed: 72
 	RevealsShroud:
+		Range: 5c0
+    DetectCloaked:
 		Range: 10c0
+    RenderDetectionCircle:
 	WithIdleOverlay@SPINNER:
 		Sequence: spinner
 		Offset: -256,0,256
 	Buildable:
-		Description: Mobile base of operations
+        Queue: Vehicle.GDI, Vehicle.Nod
+		BuildPaletteOrder: 75
+		Prerequisites: upgrade.recon3
+		Description: Detects stealth
+    SpawnActorOnDeath:
+		Actor: MHQ.Husk
+		OwnerType: InternalName
+		EffectiveOwnerFromOwner: true
+    -MustBeDestroyed:
 
 TRUCK:
 	Inherits: ^Vehicle

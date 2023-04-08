@@ -146,6 +146,15 @@ STNK.Husk:
 		Weapon: UnitExplodeStealthTank
 		EmptyWeapon: UnitExplodeStealthTank
 
+MHQ.Husk:
+	Inherits: ^Husk
+	Tooltip:
+		Name: Mobile HQ (Destroyed)
+	TransformOnCapture:
+		IntoActor: MHQ
+	RenderSprites:
+		Image: mhq.destroyed
+
 TRUCK.Husk:
 	Inherits: ^LightHusk
 	Tooltip:

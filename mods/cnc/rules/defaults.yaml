@@ -193,18 +193,8 @@
 	HandicapProductionTimeMultiplier:
 
 ^AcceptsCloakCrate:
-	Cloak:
-		InitialDelay: 15
-		CloakDelay: 90
-		CloakSound: trans1.aud
-		UncloakSound: trans1.aud
-		PauseOnCondition: cloak-force-disabled
-		RequiresCondition: cloak-crate-collected
 	ExternalCondition@CLOAK:
 		Condition: cloak-crate-collected
-	GrantConditionOnDamageState@UNCLOAK:
-		Condition: cloak-force-disabled
-		ValidDamageStates: Critical
 
 ^Transport:
 	Cargo:
@@ -230,6 +220,7 @@
 	Inherits@3: ^ClassicFacingSpriteActor
 	Inherits@selection: ^SelectableCombatUnit
 	Inherits@handicaps: ^PlayerHandicaps
+    Inherits@cloakable: ^Cloakable
 	Huntable:
 	OwnerLostAction:
 		Action: Kill
@@ -263,6 +254,12 @@
 	HitShape:
 	MapEditorData:
 		Categories: Vehicle
+    DetectCloaked@RECON:
+		Range: 2c0
+        RequiresCondition: upgrade.recon2
+    GrantConditionOnPrerequisite@RECON:
+        Condition: upgrade.recon2
+        Prerequisites: upgrade.recon2
 
 ^Tank:
 	Inherits: ^Vehicle
@@ -277,6 +274,7 @@
 	Inherits@3: ^ClassicFacingSpriteActor
 	Inherits@selection: ^SelectableCombatUnit
 	Inherits@handicaps: ^PlayerHandicaps
+    Inherits@cloakable: ^Cloakable
 	Huntable:
 	OwnerLostAction:
 		Action: Kill
@@ -332,6 +330,7 @@
 	Inherits@3: ^SpriteActor
 	Inherits@selection: ^SelectableCombatUnit
 	Inherits@handicaps: ^PlayerHandicaps
+    Inherits@cloakable: ^Cloakable
 	Huntable:
 	OwnerLostAction:
 		Action: Kill
@@ -341,8 +340,14 @@
 		Type: None
 	RevealsShroud:
 		Range: 10c0
-	DetectCloaked:
-		Range: 3c0
+	DetectCloaked@a:
+		Range: 2c0
+    DetectCloaked@b:
+		Range: 4c0
+        RequiresCondition: upgrade.recon1
+    GrantConditionOnPrerequisite@RECON:
+        Condition: upgrade.recon1
+        Prerequisites: upgrade.recon1
 	Mobile:
 		AlwaysTurnInPlace: true
 		Locomotor: foot
@@ -681,6 +686,7 @@
 	Inherits@shape: ^1x1Shape
 	Inherits@selection: ^SelectableBuilding
 	Inherits@handicaps: ^PlayerHandicaps
+    Inherits@cloakable: ^Cloakable
 	Huntable:
 	OwnerLostAction:
 		Action: Kill
@@ -1223,7 +1229,7 @@
 	Selectable:
 		Priority: 2
         
-^Cloaked:
+^Cloakable:
     Cloak:
 		InitialDelay: 75
 		CloakDelay: 75
@@ -1231,9 +1237,21 @@
 		UncloakSound: trans1.aud
 		UncloakOn: Attack, Unload, Dock, Damage, Heal
 		PauseOnCondition: cloak-force-disabled
+        RequiresCondition: StealthGen || cloak-crate-collected
 	GrantConditionOnDamageState@UNCLOAK:
 		Condition: cloak-force-disabled
 		ValidDamageStates: Critical
+    
+^StealthGenerator:
+    GrantConditionInRange@stealthrange:
+        Condition: StealthGen
+        Range: 9c0
+        ValidRelationships: Ally
+        RequiresCondition: !lowpower
+    WithRangeCircle@stealthcircle:
+        Range: 9c0
+        Color: 8080ff80
+        RequiresCondition: !lowpower
 
 ^MaxUpgrades:
     ProvidesPrerequisite@maxreq:

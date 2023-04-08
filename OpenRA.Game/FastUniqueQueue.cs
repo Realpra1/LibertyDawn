@@ -235,6 +235,18 @@ namespace OpenRA
 			return map.Count;
 		}
 
+		public Dictionary<K, FastQueueEntry<K, V>>.KeyCollection Keys()
+		{
+			return map.Keys;
+		}
+
+		public void Clear()
+		{
+			map.Clear();
+			tail = null;
+			head = null;
+		}
+
 		public FastQueueEntry<K, V> GetEntry(K? key)
 		{
 			if (!key.HasValue || !map.ContainsKey(key.Value))

@@ -234,14 +234,26 @@ Player:
 					TargetMetric: Value
 					CheckRadius: 2c0
 	HarvesterBotModule:
-		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai || enable-Easiest-ai
+		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-Easy-ai || enable-Easiest-ai
 		HarvesterTypes: harv
-		RefineryTypes: proc  
+		RefineryTypes: proc
+    HarvesterBotModule@b:
+		RequiresCondition: enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai
+		HarvesterTypes: harv
+        HarvesterEnemyAvoidanceRadius: 15c0
+		RefineryTypes: proc
 	BuildingRepairBotModule:
 		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai || enable-Easiest-ai
 	McvManagerBotModule:
-		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai || enable-Easiest-ai
+		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-Easy-ai || enable-Easiest-ai
 		McvTypes: mcv
+		ConstructionYardTypes: fact
+		McvFactoryTypes: weap,afld
+    McvManagerBotModule@b:
+		RequiresCondition: enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai
+		McvTypes: mcv
+        RestrictMCVDeploymentFallbackToBase: false
+        MaxBaseRadius: 49
 		ConstructionYardTypes: fact
 		McvFactoryTypes: weap,afld
 	BaseBuilderBotModule@cabal:
@@ -898,6 +910,7 @@ Player:
     SquadManagerBotModule@ironreaper:
 		RequiresCondition: enable-ironreaper-ai
 		SquadSize: 20
+        MaxBaseRadius: 49
 		ExcludeFromSquadsTypes: harv, mcv, a10
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
@@ -1136,11 +1149,13 @@ Player:
 			obli: 1
 			sam: 1
         BuildingDelays:
-			pyle: 1500
-			hand: 1500
+            nuke: 1500
+            proc: 3000
+			pyle: 3000
+			hand: 3000
 			hq: 1500
-			weap: 9000
-			afld: 9000
+			weap: 10000
+			afld: 10000
 			gtwr: 1500
 			gun: 1500
 			atwr: 1500
@@ -1201,12 +1216,12 @@ Player:
 			heli: 100
 			orca: 100
         UnitDelays:
-            e1: 7500
-			e2: 7500
-			e3: 7500
-			e4: 7500
-			e5: 7500
-            rmbo: 7500
+            e1: 10000
+			e2: 10000
+			e3: 10000
+			e4: 10000
+			e5: 10000
+            rmbo: 10000
 			harv: 2250
 			ltnk: 5000
 			ftnk: 5000
