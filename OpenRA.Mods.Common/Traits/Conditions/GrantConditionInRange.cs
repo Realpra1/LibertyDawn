@@ -14,7 +14,7 @@ using OpenRA.Traits;
 
 namespace OpenRA.Mods.Common.Traits
 {
-	[Desc("Any actor with this trait enabled will grant a condition to other actors within range.")]
+	[Desc("Any actor with this trait enabled will grant a condition to other actors with this trait within range.")]
 	public class GrantConditionInRangeInfo : ConditionalTraitInfo
 	{
 		[Desc("How far away the condition will be granted.")]
@@ -24,6 +24,9 @@ namespace OpenRA.Mods.Common.Traits
 		[GrantedConditionReference]
 		[Desc("The condition to grant.")]
 		public readonly string Condition = null;
+
+		[Desc("Will grant the condition if this is true. Otherwise only receive.")]
+		public readonly bool Granter = false;
 
 		[Desc("Player relationships who can receive the condition.")]
 		public readonly PlayerRelationship ValidRelationships = PlayerRelationship.Ally;
@@ -76,6 +79,9 @@ namespace OpenRA.Mods.Common.Traits
 
 		void ITick.Tick(Actor self)
 		{
+			if (!info.Granter)
+				return;
+
 			if (!self.IsInWorld || self.IsDead || IsTraitDisabled)
 			{
 				RevokeAll(self);

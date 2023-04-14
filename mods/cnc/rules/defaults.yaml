@@ -260,6 +260,8 @@
     GrantConditionOnPrerequisite@RECON:
         Condition: upgrade.recon2
         Prerequisites: upgrade.recon2
+    Cloak:
+        RequiresCondition: StealthGen || cloak-crate-collected
 
 ^Tank:
 	Inherits: ^Vehicle
@@ -324,6 +326,8 @@
 		Categories: Aircraft
 	SpawnActorOnDeath:
 		RequiresCondition: airborne
+    Cloak:
+        RequiresCondition: StealthGen || cloak-crate-collected
 
 ^Infantry:
 	Inherits@1: ^ExistsInWorld
@@ -348,6 +352,8 @@
     GrantConditionOnPrerequisite@RECON:
         Condition: upgrade.recon1
         Prerequisites: upgrade.recon1
+    Cloak:
+        RequiresCondition: StealthGen
 	Mobile:
 		AlwaysTurnInPlace: true
 		Locomotor: foot
@@ -725,6 +731,8 @@
 		Categories: Building
 	CommandBarBlacklist:
 	AcceptsDeliveredCash:
+    Cloak:
+        RequiresCondition: StealthGen
 
 ^BaseBuilding:
 	Inherits: ^Building
@@ -1237,14 +1245,17 @@
 		UncloakSound: trans1.aud
 		UncloakOn: Attack, Unload, Dock, Damage, Heal
 		PauseOnCondition: cloak-force-disabled
-        RequiresCondition: StealthGen || cloak-crate-collected
 	GrantConditionOnDamageState@UNCLOAK:
 		Condition: cloak-force-disabled
 		ValidDamageStates: Critical
+    GrantConditionInRange@StealthGenReceiver:
+        Condition: StealthGen
+        Granter: false
     
 ^StealthGenerator:
     GrantConditionInRange@stealthrange:
         Condition: StealthGen
+        Granter: true
         Range: 9c0
         ValidRelationships: Ally
         RequiresCondition: !lowpower
