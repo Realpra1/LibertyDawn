@@ -772,6 +772,7 @@ STNK:
 	Inherits@CLOAKED: ^Cloakable
     Cloak:
         -RequiresCondition:
+    -GrantConditionInRange@StealthGenReceiver:
 	Valued:
 		Cost: 1500
 	Tooltip:
@@ -856,6 +857,8 @@ MHQ:
 TRUCK:
 	Inherits: ^Vehicle
 	Inherits@selection: ^SelectableSupportUnit
+    Cloak:
+        RequiresCondition: StealthGen
 	Buildable:
 		Queue: Vehicle.GDI, Vehicle.Nod
 		BuildPaletteOrder: 35
