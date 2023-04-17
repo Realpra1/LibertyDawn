@@ -214,10 +214,10 @@ World:
 				TerrainType: BlueTiberium
 				AllowedTerrainTypes: Clear, Road, Rough, Beach, Bridge
 				MaxStageEvolvesTo: RedTiberium
-                ExplosionChance: 50
+                ExplosionChance: 30
                 MinimumDamage: 1000
                 Explosions: ChemtankExplode
-                ExplodeInto: BlueTiberium, Tiberium, Nothing
+                ExplodeInto: BlueTiberium, BlueTiberium, BlueTiberium, Tiberium, Nothing
 				MaxDensity: 10
                 SpreadInterval: 1125
                 StageDensities:
