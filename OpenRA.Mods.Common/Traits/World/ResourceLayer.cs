@@ -203,7 +203,7 @@ namespace OpenRA.Mods.Common.Traits
 		// Sorted by intervals. When cell reached, do the expected action(s). One queue per interval length. Cell can be part of multiple queues.
 		protected readonly Dictionary<int, FastUniqueQueue<CPos, ResourceTickInfo>> ResourceTickQueues = new Dictionary<int, FastUniqueQueue<CPos, ResourceTickInfo>>();
 
-		readonly Dictionary<CPos, DelayedResourceAction> delayedExplosions = new Dictionary<CPos, DelayedResourceAction>();
+		readonly FastUniqueQueue<CPos, DelayedResourceAction> delayedExplosions = new FastUniqueQueue<CPos, DelayedResourceAction>();
 		readonly Dictionary<CPos, DelayedResourceAction> blinks = new Dictionary<CPos, DelayedResourceAction>();
 
 		int resCells;
@@ -412,6 +412,8 @@ namespace OpenRA.Mods.Common.Traits
 			return oldDensity - density;
 		}
 
+		readonly int explodeDelayMin = 12;
+		readonly int explodeDelayMax = 50;
 		void DamageResource(Actor source, CPos cell, int damage)
 		{
 			try
@@ -427,7 +429,7 @@ namespace OpenRA.Mods.Common.Traits
 					return;
 
 				if (!delayedExplosions.ContainsKey(cell))
-					delayedExplosions.Add(cell, new DelayedResourceAction(tickTime + world.SharedRandom.Next(12, 50), () => DoExplode(source, resourceInfo, cell)));
+					delayedExplosions.Add(cell, new DelayedResourceAction(tickTime + world.SharedRandom.Next(explodeDelayMin, explodeDelayMax), () => DoExplode(source, resourceInfo, cell)));
 			}
 			catch (Exception ex)
 			{
@@ -536,7 +538,9 @@ namespace OpenRA.Mods.Common.Traits
 
 					myStageQueue.Add(cell, cellTickInfo);
 
-					if (content.Density == typeInfo.MaxDensity && typeInfo.BlinkInterval != 0 && !string.IsNullOrEmpty(typeInfo.BlinkColor))
+					if (content.Density == typeInfo.MaxDensity && typeInfo.BlinkWarningInterval != 0
+						&& !string.IsNullOrEmpty(typeInfo.BlinkColor)
+						&& typeInfo.BlinkInterval != 0)
 					{
 						var color = Color.TryParse(typeInfo.BlinkColor, out var tColor) ? tColor : Color.Gray;
 						blinks.Add(cell,
@@ -623,6 +627,7 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		int tickTime = -1;
+		readonly Dictionary<int, LinkedList<CPos>> scheduledExplosions = new Dictionary<int, LinkedList<CPos>>();
 
 		/// <summary>
 		/// See Shroud.cs for similar use of Tick. 25 ticks in one second.
@@ -638,18 +643,43 @@ namespace OpenRA.Mods.Common.Traits
 
 				tickTime++;
 
-				if (delayedExplosions.Count != 0)
+				if (delayedExplosions.Size() != 0)
 				{
-					var removeKeys = new List<CPos>();
-					foreach (var action in delayedExplosions)
-						if (action.Value.WaitForTickTime <= tickTime)
-							removeKeys.Add(action.Key);
-
-					foreach (var removeKey in removeKeys)
+					if (scheduledExplosions.ContainsKey(tickTime))
 					{
-						var item = delayedExplosions[removeKey];
-						delayedExplosions.Remove(removeKey);
-						item.Action();
+						var scheduled = scheduledExplosions[tickTime];
+						scheduledExplosions.Remove(tickTime);
+
+						foreach (var cell in scheduled)
+						{
+							var action = delayedExplosions.Remove(cell);
+							if (action == null || tickTime != action.WaitForTickTime)
+								continue;
+
+							action.Action();
+						}
+					}
+
+					var checkNumber = Math.Max(delayedExplosions.Size() / explodeDelayMin, 1);
+
+					for (var i = 0; i < checkNumber && i < delayedExplosions.Size(); i++)
+					{
+						var entry = delayedExplosions.HeadEntry();
+						if (entry == null)
+							break;
+						delayedExplosions.Poll();
+
+						if (tickTime >= entry.Value.WaitForTickTime)
+							entry.Value.Action();
+						else
+						{
+							if (!scheduledExplosions.ContainsKey(entry.Value.WaitForTickTime))
+								scheduledExplosions.Add(entry.Value.WaitForTickTime, new LinkedList<CPos>());
+
+							scheduledExplosions[entry.Value.WaitForTickTime].AddLast(entry.Key); // Adding multiple times doesn't matter.
+
+							delayedExplosions.Add(entry.Key, entry.Value);
+						}
 					}
 				}
 
