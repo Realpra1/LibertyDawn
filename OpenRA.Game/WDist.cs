@@ -30,6 +30,7 @@ namespace OpenRA
 		public static readonly WDist Zero = new WDist(0);
 		public static readonly WDist MaxValue = new WDist(int.MaxValue);
 		public static WDist FromCells(int cells) { return new WDist(1024 * cells); }
+		public static int ToCells(WDist dist) { return dist.Length / 1024; }
 
 		public static WDist operator +(WDist a, WDist b) { return new WDist(a.Length + b.Length); }
 		public static WDist operator -(WDist a, WDist b) { return new WDist(a.Length - b.Length); }

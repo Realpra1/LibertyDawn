@@ -82,7 +82,7 @@ HARV:
     Cloak:
 		UncloakOn: Attack, Damage, Heal
 		RequiresCondition: upgrade.covert2 || StealthGen || cloak-crate-collected
-    GrantConditionOnPrerequisite:
+    GrantConditionOnPrerequisite@covert:
         Prerequisites: upgrade.covert2
         Condition: upgrade.covert2
 	ActorLostNotification:
