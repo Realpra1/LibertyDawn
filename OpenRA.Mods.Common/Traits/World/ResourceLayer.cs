@@ -38,6 +38,7 @@ namespace OpenRA.Mods.Common.Traits
 
 	public class ResourceTickInfo
 	{
+		public readonly int Token;
 		public readonly int ExpectedStageInterval;
 		public readonly int ExpectedSpreadInterval;
 		public int LastStageTime;
@@ -45,6 +46,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		public ResourceTickInfo(int expectedStageInterval, int expectedSpreadInterval, int currentTime)
 		{
+			Token = currentTime;
 			ExpectedStageInterval = expectedStageInterval;
 			ExpectedSpreadInterval = expectedSpreadInterval;
 			LastStageTime = currentTime;
@@ -56,20 +58,11 @@ namespace OpenRA.Mods.Common.Traits
 	{
 		public readonly int WaitForTickTime;
 		public readonly Action Action;
-		public readonly CPos Cell;
 
 		public DelayedResourceAction(int waitForTickTime, Action action)
 		{
 			WaitForTickTime = waitForTickTime;
 			Action = action;
-			Cell = CPos.Zero;
-		}
-
-		public DelayedResourceAction(int waitForTickTime, Action action, CPos cell)
-		{
-			WaitForTickTime = waitForTickTime;
-			Action = action;
-			Cell = cell;
 		}
 	}
 
@@ -209,11 +202,11 @@ namespace OpenRA.Mods.Common.Traits
 		protected readonly CellLayer<ResourceLayerContents> Content;
 		protected readonly Dictionary<byte, string> ResourceTypesByIndex;
 
-		// Sorted by intervals. When cell reached, do the expected action(s). One queue per interval length. Cell can be part of multiple queues.
-		protected readonly Dictionary<int, FastUniqueQueue<CPos, ResourceTickInfo>> ResourceTickQueues = new Dictionary<int, FastUniqueQueue<CPos, ResourceTickInfo>>();
-
+		readonly Dictionary<CPos, int> tickTokens = new Dictionary<CPos, int>();
 		readonly Dictionary<CPos, bool> delayedExplosions = new Dictionary<CPos, bool>();
 		readonly Dictionary<CPos, bool> blinks = new Dictionary<CPos, bool>();
+		readonly Dictionary<CPos, int> stageTimes = new Dictionary<CPos, int>();
+		readonly Dictionary<CPos, int> spreadTimes = new Dictionary<CPos, int>();
 		readonly Dictionary<int, LinkedList<DelayedResourceAction>> scheduledActions = new Dictionary<int, LinkedList<DelayedResourceAction>>();
 
 		int resCells;
@@ -293,7 +286,6 @@ namespace OpenRA.Mods.Common.Traits
 
 		protected virtual void WorldLoaded(World w, WorldRenderer wr)
 		{
-			MakeQueues();
 			foreach (var cell in w.Map.AllCells)
 			{
 				var resource = world.Map.Resources[cell];
@@ -467,7 +459,8 @@ namespace OpenRA.Mods.Common.Traits
 				Content[cell] = ResourceLayerContents.Empty;
 				Map.CustomTerrain[cell] = byte.MaxValue;
 				--resCells;
-				RemoveFromTickQueue(cell);
+				if (!tickTokens.TryAdd(cell, tickTime + 1))
+					tickTokens[cell] = tickTime + 1;
 
 				CellChanged?.Invoke(cell, null);
 			}
@@ -523,7 +516,8 @@ namespace OpenRA.Mods.Common.Traits
 			Content[cell] = ResourceLayerContents.Empty;
 			Map.CustomTerrain[cell] = byte.MaxValue;
 			--resCells;
-			RemoveFromTickQueue(cell);
+			if (!tickTokens.TryAdd(cell, tickTime + 1))
+				tickTokens[cell] = tickTime + 1;
 
 			CellChanged?.Invoke(cell, null);
 		}
@@ -558,32 +552,15 @@ namespace OpenRA.Mods.Common.Traits
 			AddToTickQueue(cell, resourceInfo);
 		}
 
-		void MakeQueues()
-		{
-			try
-			{
-				foreach (var typeInfo in info.ResourceTypes.Values)
-				{
-					if (!ResourceTickQueues.ContainsKey(typeInfo.SpreadInterval * 100 / info.SpeedModifier))
-						ResourceTickQueues.Add(typeInfo.SpreadInterval * 100 / info.SpeedModifier, new FastUniqueQueue<CPos, ResourceTickInfo>());
-					foreach (var densityInterval in typeInfo.DensityIntervals.Values)
-					{
-						if (!ResourceTickQueues.ContainsKey(densityInterval * 100 / info.SpeedModifier) && densityInterval != 0)
-							ResourceTickQueues.Add(densityInterval * 100 / info.SpeedModifier, new FastUniqueQueue<CPos, ResourceTickInfo>());
-					}
-				}
-			}
-			catch (Exception ex)
-			{
-				Log.Write("debug", ex.Message + "\n" + ex.StackTrace);
-			}
-		}
-
 		void AddToTickQueue(CPos cell, ResourceLayerInfo.ResourceTypeInfo typeInfo)
 		{
 			try
 			{
-				RemoveFromTickQueue(cell);
+				if (!tickTokens.TryAdd(cell, tickTime))
+					tickTokens[cell] = tickTime;
+				spreadTimes.Remove(cell);
+				stageTimes.Remove(cell);
+
 				if (typeInfo == null)
 					return;
 
@@ -592,8 +569,9 @@ namespace OpenRA.Mods.Common.Traits
 
 				if (typeInfo.SpreadInterval != 0 && content.Density == typeInfo.MaxDensity)
 				{
-					var mySpreadQueue = ResourceTickQueues[typeInfo.SpreadInterval * 100 / info.SpeedModifier];
-					mySpreadQueue.Add(cell, cellTickInfo);
+					ScheduleSpreadTime(tickTime + cellTickInfo.ExpectedSpreadInterval,
+						new DelayedResourceAction(tickTime + cellTickInfo.ExpectedSpreadInterval, () => DoResourceTickActions(cell, cellTickInfo)),
+						cell);
 				}
 
 				if (typeInfo.DensityIntervals.Count != 0)
@@ -607,9 +585,10 @@ namespace OpenRA.Mods.Common.Traits
 					if (typeInfo.DensityIntervals[content.Density] == 0)
 						return;
 
-					var myStageQueue = ResourceTickQueues[cellTickInfo.ExpectedStageInterval];
+					ScheduleStageTime(tickTime + cellTickInfo.ExpectedStageInterval,
+						new DelayedResourceAction(tickTime + cellTickInfo.ExpectedStageInterval, () => DoResourceTickActions(cell, cellTickInfo)),
+						cell);
 
-					myStageQueue.Add(cell, cellTickInfo);
 					CheckForAndScheduleBlink(cell, typeInfo, tickTime + cellTickInfo.ExpectedStageInterval);
 				}
 			}
@@ -639,27 +618,21 @@ namespace OpenRA.Mods.Common.Traits
 			}
 		}
 
-		/// <summary>
-		/// Removes cell from all tick queues.
-		/// </summary>
-		void RemoveFromTickQueue(CPos cell)
-		{
-			foreach (var pair in ResourceTickQueues)
-			{
-				if (pair.Value.ContainsKey(cell))
-					pair.Value.Remove(cell);
-			}
-		}
-
-		bool DoResourceTickActions(Actor self, CPos cell, ResourceTickInfo tickInfo)
+		void DoResourceTickActions(CPos cell, ResourceTickInfo tickInfo)
 		{
 			if (!info.ResourceTypes.TryGetValue(Content[cell].Type, out var resourceInfo))
-				return false;
+				return;
+
+			if (ResourceTypesByIndex[resourceInfo.ResourceIndex] != Content[cell].Type
+				|| !tickTokens.ContainsKey(cell) || tickTokens[cell] != tickInfo.Token)
+				return;
 
 			if (resourceInfo.SpreadInterval != 0 && Content[cell].Density == resourceInfo.MaxDensity && tickTime - tickInfo.LastSpreadTime >= tickInfo.ExpectedSpreadInterval)
 			{
+				if (tickTime == spreadTimes[cell])
+					spreadTimes.Remove(cell);
 				tickInfo.LastSpreadTime = tickTime;
-				var seedLoc = Util.CircularRandomNeighbors(cell, self.World.SharedRandom, (cell.X + cell.Y + cell.X * cell.Y) % 100 > 35)
+				var seedLoc = Util.CircularRandomNeighbors(cell, world.SharedRandom, (cell.X + cell.Y + cell.X * cell.Y) % 100 > 35)
 					.Take(3)
 					.SkipWhile(p => Content[p].Type == Content[cell].Type
 						&& !CanAddResource(Content[cell].Type, p, resourceInfo.MaxDensity))
@@ -669,9 +642,16 @@ namespace OpenRA.Mods.Common.Traits
 					AddResource(Content[cell].Type, seedLoc.Value);
 			}
 
+			if (resourceInfo.SpreadInterval != 0 && Content[cell].Density == resourceInfo.MaxDensity)
+				ScheduleSpreadTime(tickTime + tickInfo.ExpectedSpreadInterval,
+					new DelayedResourceAction(tickTime + tickInfo.ExpectedSpreadInterval, () => DoResourceTickActions(cell, tickInfo)),
+					cell);
+
 			// Stage/stage to new resource
 			if (resourceInfo.DensityIntervals.Count != 0 && tickTime - tickInfo.LastStageTime >= tickInfo.ExpectedStageInterval)
 			{
+				if (tickTime == stageTimes[cell])
+					stageTimes.Remove(cell);
 				tickInfo.LastStageTime = tickTime;
 				if (Content[cell].Density == resourceInfo.MaxDensity)
 				{
@@ -680,16 +660,16 @@ namespace OpenRA.Mods.Common.Traits
 
 					if (!blinks.ContainsKey(cell) && blinkWarnInterval != 0 && !string.IsNullOrEmpty(maxStageEvolvesTo))
 					{
+						// Restart countdown if about to explode/change with no configured blinking first.
 						CheckForAndScheduleBlink(cell, resourceInfo, tickTime + tickInfo.ExpectedStageInterval);
 						if (blinks.ContainsKey(cell))
-							return false; // Restart countdown if about to explode/change with no configured blinking first.
+							ScheduleStageTime(tickTime + tickInfo.ExpectedStageInterval,
+								new DelayedResourceAction(tickTime + tickInfo.ExpectedStageInterval, () => DoResourceTickActions(cell, tickInfo)),
+								cell);
 					}
 
 					if (string.IsNullOrEmpty(maxStageEvolvesTo))
-					{
-						RemoveFromTickQueue(cell);
-						return true;
-					}
+						return;
 
 					if (maxStageEvolvesTo.ToLower() == "explode" && !delayedExplosions.ContainsKey(cell))
 					{
@@ -699,15 +679,12 @@ namespace OpenRA.Mods.Common.Traits
 						});
 						DoExplode(resActor, resourceInfo, cell);
 						resActor.Dispose();
-						return true;
+						return;
 					}
 
 					info.ResourceTypes.TryGetValue(maxStageEvolvesTo, out var newResourceInfo);
 					if (newResourceInfo == null)
-					{
-						RemoveFromTickQueue(cell);
-						return true;
-					}
+						return;
 
 					Content[cell] = new ResourceLayerContents(maxStageEvolvesTo, newResourceInfo.MaxDensity);
 					CellChanged?.Invoke(cell, Content[cell].Type);
@@ -718,14 +695,29 @@ namespace OpenRA.Mods.Common.Traits
 
 				CheckForAndScheduleBlink(cell, resourceInfo, tickTime + tickInfo.ExpectedStageInterval);
 
-				return true;
+				return;
 			}
+		}
 
-			return false;
+		protected void ScheduleStageTime(int expectedTime, DelayedResourceAction action, CPos cell)
+		{
+			if (!stageTimes.ContainsKey(cell) || expectedTime < stageTimes[cell])
+				Schedule(expectedTime, action);
+
+			if (!stageTimes.ContainsKey(cell))
+				stageTimes.Add(cell, expectedTime);
+		}
+
+		protected void ScheduleSpreadTime(int expectedTime, DelayedResourceAction action, CPos cell)
+		{
+			if (!spreadTimes.ContainsKey(cell) || expectedTime < spreadTimes[cell])
+				Schedule(expectedTime, action);
+
+			if (!spreadTimes.ContainsKey(cell))
+				spreadTimes.Add(cell, expectedTime);
 		}
 
 		int tickTime = -1;
-		readonly Dictionary<int, LinkedList<CPos>> scheduledExplosions = new Dictionary<int, LinkedList<CPos>>();
 
 		/// <summary>
 		/// See Shroud.cs for similar use of Tick. 25 ticks in one second.
@@ -736,7 +728,7 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			try
 			{
-				if (resCells == 0 || ResourceTickQueues.Count == 0)
+				if (resCells == 0)
 					return;
 
 				tickTime++;
@@ -747,22 +739,6 @@ namespace OpenRA.Mods.Common.Traits
 						action.Action();
 					scheduledActions[tickTime].Clear();
 					scheduledActions.Remove(tickTime);
-				}
-
-				if (tickTime % 25 != 0)
-					return;
-				foreach (var pair in ResourceTickQueues)
-				{
-					var checkNumber = Math.Max(25 * pair.Value.Size() / pair.Key, 1);
-					for (var i = 0; i < checkNumber; i++)
-					{
-						var entry = pair.Value.HeadEntry();
-						if (entry == null)
-							break;
-						pair.Value.Poll();
-						if (!DoResourceTickActions(self, entry.Key, entry.Value))
-							pair.Value.Add(entry.Key, entry.Value);
-					}
 				}
 			}
 			catch (Exception ex)
