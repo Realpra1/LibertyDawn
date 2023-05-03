@@ -215,6 +215,8 @@ namespace OpenRA.Mods.Common.Traits
 
 		protected void Schedule(int waitForTickTime, DelayedResourceAction action)
 		{
+			if (waitForTickTime <= tickTime)
+				throw new Exception("Invalid scheduling.");
 			if (!scheduledActions.ContainsKey(waitForTickTime))
 				scheduledActions.Add(waitForTickTime, new LinkedList<DelayedResourceAction>());
 			scheduledActions[waitForTickTime].AddLast(action);
@@ -620,7 +622,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		void DoResourceTickActions(CPos cell, ResourceTickInfo tickInfo)
 		{
-			if (!info.ResourceTypes.TryGetValue(Content[cell].Type, out var resourceInfo))
+			if (Content[cell].Type == null || !info.ResourceTypes.TryGetValue(Content[cell].Type, out var resourceInfo))
 				return;
 
 			if (ResourceTypesByIndex[resourceInfo.ResourceIndex] != Content[cell].Type
@@ -629,7 +631,7 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (resourceInfo.SpreadInterval != 0 && Content[cell].Density == resourceInfo.MaxDensity && tickTime - tickInfo.LastSpreadTime >= tickInfo.ExpectedSpreadInterval)
 			{
-				if (tickTime == spreadTimes[cell])
+				if (spreadTimes.ContainsKey(cell) && tickTime == spreadTimes[cell])
 					spreadTimes.Remove(cell);
 				tickInfo.LastSpreadTime = tickTime;
 				var seedLoc = Util.CircularRandomNeighbors(cell, world.SharedRandom, (cell.X + cell.Y + cell.X * cell.Y) % 100 > 35)
@@ -650,7 +652,7 @@ namespace OpenRA.Mods.Common.Traits
 			// Stage/stage to new resource
 			if (resourceInfo.DensityIntervals.Count != 0 && tickTime - tickInfo.LastStageTime >= tickInfo.ExpectedStageInterval)
 			{
-				if (tickTime == stageTimes[cell])
+				if (stageTimes.ContainsKey(cell) && tickTime == stageTimes[cell])
 					stageTimes.Remove(cell);
 				tickInfo.LastStageTime = tickTime;
 				if (Content[cell].Density == resourceInfo.MaxDensity)
@@ -736,7 +738,16 @@ namespace OpenRA.Mods.Common.Traits
 				if (scheduledActions.ContainsKey(tickTime))
 				{
 					foreach (var action in scheduledActions[tickTime])
-						action.Action();
+					{
+						try
+						{
+							action.Action();
+						}
+						catch (Exception ex)
+						{
+							Log.Write("debug", ex.Message + "\n" + ex.StackTrace);
+						}
+					}
 					scheduledActions[tickTime].Clear();
 					scheduledActions.Remove(tickTime);
 				}
