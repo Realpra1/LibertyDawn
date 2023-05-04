@@ -9,6 +9,9 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Range of the effect.")]
 		public readonly WDist Range = WDist.FromCells(6);
 
+		[Desc("New speed growth/spread modfier in percent.")]
+		public readonly int SpeedModifier = 600;
+
 		public class ModifiesResourcesTypeInfo
 		{
 			[Desc("Max stage evolves into.")]

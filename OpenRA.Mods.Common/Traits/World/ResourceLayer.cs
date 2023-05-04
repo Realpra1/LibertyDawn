@@ -236,12 +236,15 @@ namespace OpenRA.Mods.Common.Traits
 
 		protected ModifiesResourcesInfo.ModifiesResourcesTypeInfo GetModifiedTypeInfo(CPos cell, ResourceLayerInfo.ResourceTypeInfo typeInfo)
 		{
+			var content = Content[cell];
+			if (content.Type == null)
+				return null;
+
 			var modifier = GetModifier(cell);
 
 			if (modifier == null)
 				return null;
 
-			var content = Content[cell];
 			if (!modifier.Info.ModifiesResourcesTypes.TryGetValue(content.Type, out var resModInfo))
 				return null;
 
@@ -258,6 +261,13 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			var modTypeInfo = GetModifiedTypeInfo(cell, typeInfo);
 			return modTypeInfo != null ? modTypeInfo.BlinkWarningInterval : typeInfo.BlinkWarningInterval;
+		}
+
+		protected int GetSpeedModifier(CPos cell, ResourceLayerInfo.ResourceTypeInfo typeInfo)
+		{
+			var modifier = GetModifier(cell);
+
+			return modifier != null ? modifier.Info.SpeedModifier : info.SpeedModifier;
 		}
 
 		protected int modifierCachedTickTime = 0;
@@ -566,8 +576,9 @@ namespace OpenRA.Mods.Common.Traits
 				if (typeInfo == null)
 					return;
 
+				var speedModifier = GetSpeedModifier(cell, typeInfo);
 				var content = Content[cell];
-				var cellTickInfo = new ResourceTickInfo(typeInfo.DensityIntervals.ContainsKey(content.Density) ? typeInfo.DensityIntervals[content.Density] * 100 / info.SpeedModifier : 0, typeInfo.SpreadInterval * 100 / info.SpeedModifier, tickTime);
+				var cellTickInfo = new ResourceTickInfo(typeInfo.DensityIntervals.ContainsKey(content.Density) ? typeInfo.DensityIntervals[content.Density] * 100 / speedModifier : 0, typeInfo.SpreadInterval * 100 / speedModifier, tickTime);
 
 				if (typeInfo.SpreadInterval != 0 && content.Density == typeInfo.MaxDensity)
 				{
@@ -665,9 +676,12 @@ namespace OpenRA.Mods.Common.Traits
 						// Restart countdown if about to explode/change with no configured blinking first.
 						CheckForAndScheduleBlink(cell, resourceInfo, tickTime + tickInfo.ExpectedStageInterval);
 						if (blinks.ContainsKey(cell))
+						{
 							ScheduleStageTime(tickTime + tickInfo.ExpectedStageInterval,
 								new DelayedResourceAction(tickTime + tickInfo.ExpectedStageInterval, () => DoResourceTickActions(cell, tickInfo)),
 								cell);
+							return;
+						}
 					}
 
 					if (string.IsNullOrEmpty(maxStageEvolvesTo))
@@ -748,6 +762,7 @@ namespace OpenRA.Mods.Common.Traits
 							Log.Write("debug", ex.Message + "\n" + ex.StackTrace);
 						}
 					}
+
 					scheduledActions[tickTime].Clear();
 					scheduledActions.Remove(tickTime);
 				}
