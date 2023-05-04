@@ -259,6 +259,7 @@ PROC:
 
 SILO:
 	Inherits: ^BaseBuilding
+	Inherits@IDISABLE: ^DisabledOverlay
 	Inherits@shape: ^2x1Shape
 	Inherits@RESOURCES: ^StoresResources
 	Valued:
@@ -288,6 +289,20 @@ SILO:
 	StoresResources:
 		Capacity: 4000
 	-SpawnActorsOnSell:
+    ModifiesResources:
+        ModifiesResourcesTypes:
+			Tiberium:
+                MaxStageEvolvesTo: BlueTiberium
+			BlueTiberium:
+				MaxStageEvolvesTo: RedTiberium
+            RedTiberium:
+				MaxStageEvolvesTo: Nothing
+                BlinkWarningInterval: 0
+        RequiresCondition: !lowpower
+    WithRangeCircle@effectcircle:
+        Range: 6c0
+        Color: 8080ff80
+        RequiresCondition: !lowpower
 	Power:
 		Amount: -10
 	MustBeDestroyed:
@@ -1121,7 +1136,7 @@ SBAG:
 	Buildable:
 		BuildPaletteOrder: 20
 		Prerequisites: upgrade.recon1
-		Queue: Defence.GDI
+		Queue: Defence.GDI, Defence.Nod
 		Description: Stops infantry and light vehicles.\nBlocks some projectiles.\nCan be crushed by tanks.
 	Health:
 		HP: 25000
