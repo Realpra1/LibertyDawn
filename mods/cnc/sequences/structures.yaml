@@ -116,6 +116,10 @@ resonator:
 		Start: 32
 		Length: 32
 		Offset: 0,-14
+    dead:
+		Start: 32
+		Offset: 0,-14
+		Tick: 800
 	make: resonatormake
 		Length: *
 		Offset: 0,-14
@@ -123,7 +127,8 @@ resonator:
 		Length: *
         TilesetOverrides:
 			JUNGLE: TEMPERAT
-			WINTER: TEMPERAT
+			WINTER: SNOW
+			DESERT: TEMPERAT
 		UseTilesetExtension: true
 	icon: resonatoricon
 

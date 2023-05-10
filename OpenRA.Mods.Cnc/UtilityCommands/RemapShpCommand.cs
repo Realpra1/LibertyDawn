@@ -42,14 +42,14 @@ namespace OpenRA.Mods.Cnc.UtilityCommands
 			var srcModData = new ModData(utility.Mods[srcMod], utility.Mods);
 			Game.ModData = srcModData;
 
-			var srcPaletteInfo = srcModData.DefaultRules.Actors[SystemActors.World].TraitInfo<PlayerColorPaletteInfo>();
-			var srcRemapIndex = srcPaletteInfo.RemapIndex;
+			var srcPaletteInfos = srcModData.DefaultRules.Actors[SystemActors.World].TraitInfos<PlayerColorPaletteInfo>();
+			var srcRemapIndex = srcPaletteInfos.FirstOrDefault(a => a.BaseName == "player")?.RemapIndex;
 
 			var destMod = args[2].Split(':')[0];
 			var destModData = new ModData(utility.Mods[destMod], utility.Mods);
 			Game.ModData = destModData;
-			var destPaletteInfo = destModData.DefaultRules.Actors[SystemActors.World].TraitInfo<PlayerColorPaletteInfo>();
-			var destRemapIndex = destPaletteInfo.RemapIndex;
+			var destPaletteInfos = destModData.DefaultRules.Actors[SystemActors.World].TraitInfos<PlayerColorPaletteInfo>();
+			var destRemapIndex = destPaletteInfos.FirstOrDefault(a => a.BaseName == "player")?.RemapIndex;
 			var shadowIndex = Array.Empty<int>();
 
 			// the remap range is always 16 entries, but their location and order changes

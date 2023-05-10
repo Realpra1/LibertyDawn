@@ -272,12 +272,13 @@ namespace OpenRA.Mods.Common.Traits
 		protected Dictionary<CPos, ModifiesResources> cachedModifiers = new Dictionary<CPos, ModifiesResources>();
 		protected ModifiesResources GetModifier(CPos cell)
 		{
-			if (tickTime <= modifierCachedTickTime + 50)
+			if (tickTime != -1 && tickTime <= modifierCachedTickTime + 50)
 				return cachedModifiers.ContainsKey(cell) ? cachedModifiers[cell] : null;
 
 			var prevCached = cachedModifiers;
 			cachedModifiers = new Dictionary<CPos, ModifiesResources>();
 			var modifiers = world.ActorsWithTrait<ModifiesResources>();
+			var toUpdate = new LinkedList<CPos>();
 
 			foreach (var modifier in modifiers)
 			{
@@ -289,12 +290,15 @@ namespace OpenRA.Mods.Common.Traits
 				foreach (var modCell in moddedCells)
 				{
 					if (!prevCached.ContainsKey(modCell))
-						AddToTickQueue(modCell, Content[cell].Type, true);
+						toUpdate.AddLast(modCell);
 					cachedModifiers.TryAdd(modCell, modifier.Trait);
 				}
 			}
 
 			modifierCachedTickTime = tickTime;
+
+			foreach (var modCell in toUpdate)
+				AddToTickQueue(modCell, Content[modCell].Type, true);
 
 			return cachedModifiers.ContainsKey(cell) ? cachedModifiers[cell] : null;
 		}
@@ -563,6 +567,8 @@ namespace OpenRA.Mods.Common.Traits
 
 		void AddToTickQueue(CPos cell, string resourceType, bool updateOnly)
 		{
+			if (String.IsNullOrEmpty(resourceType))
+				return;
 			if (!info.ResourceTypes.TryGetValue(resourceType, out var resourceInfo))
 			{
 				Log.Write("debug", "Resource info was not found for type: " + resourceType);

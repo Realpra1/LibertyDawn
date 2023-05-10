@@ -1121,20 +1121,22 @@ RESONATOR:
 		BuildPaletteOrder: 100
 		Prerequisites: upgrade.economy3, ~techlevel.high
 		Queue: Defence.GDI, Defence.Nod
-		Description: Accelerates tiberium spread by 400%
+		Description: Accelerates tiberium spread by 500%.\nPrevents spontaneous red tiberium instability events.
 	Selectable:
 		Bounds: 1024, 1024
 		DecorationBounds: 938, 2048, 0, -512
 	Health:
 		HP: 50000
 	Armor:
-		Type: Wood
+		Type: Tiberium
 	RevealsShroud:
 		Range: 4c0
     WithBuildingBib:
 		HasMinibib: true
     Power:
 		Amount: -100
+    WithSpriteBody:
+		PauseOnCondition: lowpower
 	-GivesBuildableArea:
 	MustBeDestroyed:
 		RequiredForShortGame: false
@@ -1143,6 +1145,8 @@ RESONATOR:
 	MapEditorData:
 		Categories: Defense
     ModifiesResources:
+        SpreadModifier: 750
+        StageModifier: 150
         ModifiesResourcesTypes:
 			Tiberium:
                 MaxStageEvolvesTo: BlueTiberium
