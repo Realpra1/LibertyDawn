@@ -108,6 +108,25 @@ silo:
 	icon: siloicnh.tem
 		AddExtension: False
 
+resonator:
+	idle:
+		Length: 32
+		Offset: 0,-14
+	damaged-idle:
+		Start: 32
+		Length: 32
+		Offset: 0,-14
+	make: resonatormake
+		Length: *
+		Offset: 0,-14
+	bib: mbRESONATOR
+		Length: *
+        TilesetOverrides:
+			JUNGLE: TEMPERAT
+			WINTER: TEMPERAT
+		UseTilesetExtension: true
+	icon: resonatoricon
+
 hand:
 	Defaults:
 		Offset: 0,-8

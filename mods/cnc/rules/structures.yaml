@@ -259,7 +259,6 @@ PROC:
 
 SILO:
 	Inherits: ^BaseBuilding
-	Inherits@IDISABLE: ^DisabledOverlay
 	Inherits@shape: ^2x1Shape
 	Inherits@RESOURCES: ^StoresResources
 	Valued:
@@ -289,20 +288,6 @@ SILO:
 	StoresResources:
 		Capacity: 4000
 	-SpawnActorsOnSell:
-    ModifiesResources:
-        ModifiesResourcesTypes:
-			Tiberium:
-                MaxStageEvolvesTo: BlueTiberium
-			BlueTiberium:
-				MaxStageEvolvesTo: RedTiberium
-            RedTiberium:
-				MaxStageEvolvesTo: Nothing
-                BlinkWarningInterval: 0
-        RequiresCondition: !lowpower
-    WithRangeCircle@effectcircle:
-        Range: 6c0
-        Color: 8080ff80
-        RequiresCondition: !lowpower
 	Power:
 		Amount: -10
 	MustBeDestroyed:
@@ -1125,6 +1110,53 @@ ATWR:
 	Power:
 		Amount: -50
 
+RESONATOR:
+	Inherits: ^BaseBuilding
+	Inherits@IDISABLE: ^DisabledOverlay
+    Valued:
+		Cost: 1500
+	Tooltip:
+		Name: Tiberium Resonator
+	Buildable:
+		BuildPaletteOrder: 100
+		Prerequisites: upgrade.economy3, ~techlevel.high
+		Queue: Defence.GDI, Defence.Nod
+		Description: Accelerates tiberium spread by 400%
+	Selectable:
+		Bounds: 1024, 1024
+		DecorationBounds: 938, 2048, 0, -512
+	Health:
+		HP: 50000
+	Armor:
+		Type: Wood
+	RevealsShroud:
+		Range: 4c0
+    WithBuildingBib:
+		HasMinibib: true
+    Power:
+		Amount: -100
+	-GivesBuildableArea:
+	MustBeDestroyed:
+		RequiredForShortGame: false
+	Targetable:
+		TargetTypes: Ground, C4, Structure, Defense
+	MapEditorData:
+		Categories: Defense
+    ModifiesResources:
+        ModifiesResourcesTypes:
+			Tiberium:
+                MaxStageEvolvesTo: BlueTiberium
+			BlueTiberium:
+				MaxStageEvolvesTo: RedTiberium
+            RedTiberium:
+				MaxStageEvolvesTo: Nothing
+                BlinkWarningInterval: 0
+        RequiresCondition: !lowpower
+    WithRangeCircle@effectcircle:
+        Range: 6c0
+        Color: 8080ff80
+        RequiresCondition: !lowpower
+        
 SBAG:
 	Inherits: ^Wall
 	Valued:

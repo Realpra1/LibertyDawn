@@ -54,18 +54,6 @@ namespace OpenRA.Mods.Common.Traits
 		}
 	}
 
-	public class DelayedResourceAction
-	{
-		public readonly int WaitForTickTime;
-		public readonly Action Action;
-
-		public DelayedResourceAction(int waitForTickTime, Action action)
-		{
-			WaitForTickTime = waitForTickTime;
-			Action = action;
-		}
-	}
-
 	[TraitLocation(SystemActors.World)]
 	[Desc("Attach this to the world actor.")]
 	public class ResourceLayerInfo : TraitInfo, IRulesetLoaded, IResourceLayerInfo, Requires<BuildingInfluenceInfo>
@@ -134,8 +122,11 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Override the density saved in maps with values calculated based on the number of neighbouring resource cells.")]
 		public readonly bool RecalculateResourceDensity = false;
 
-		[Desc("Change all spread and stage times (percent).")]
-		public readonly int SpeedModifier = 100;
+		[Desc("Change all spread and not-max stage times (percent).")]
+		public readonly int SpreadModifier = 100;
+
+		[Desc("Change max stage time (percent).")]
+		public readonly int StageModifier = 100;
 
 		// Copied to EditorResourceLayerInfo, ResourceRendererInfo
 		protected static object LoadResourceTypes(MiniYaml yaml)
@@ -204,21 +195,21 @@ namespace OpenRA.Mods.Common.Traits
 
 		readonly Dictionary<CPos, int> tickTokens = new Dictionary<CPos, int>();
 		readonly Dictionary<CPos, bool> delayedExplosions = new Dictionary<CPos, bool>();
-		readonly Dictionary<CPos, bool> blinks = new Dictionary<CPos, bool>();
+		readonly Dictionary<CPos, int> blinks = new Dictionary<CPos, int>();
 		readonly Dictionary<CPos, int> stageTimes = new Dictionary<CPos, int>();
 		readonly Dictionary<CPos, int> spreadTimes = new Dictionary<CPos, int>();
-		readonly Dictionary<int, LinkedList<DelayedResourceAction>> scheduledActions = new Dictionary<int, LinkedList<DelayedResourceAction>>();
+		readonly Dictionary<int, LinkedList<Action>> scheduledActions = new Dictionary<int, LinkedList<Action>>();
 
 		int resCells;
 
 		public event Action<CPos, string> CellChanged;
 
-		protected void Schedule(int waitForTickTime, DelayedResourceAction action)
+		protected void Schedule(int waitForTickTime, Action action)
 		{
 			if (waitForTickTime <= tickTime)
 				throw new Exception("Invalid scheduling.");
 			if (!scheduledActions.ContainsKey(waitForTickTime))
-				scheduledActions.Add(waitForTickTime, new LinkedList<DelayedResourceAction>());
+				scheduledActions.Add(waitForTickTime, new LinkedList<Action>());
 			scheduledActions[waitForTickTime].AddLast(action);
 		}
 
@@ -263,20 +254,28 @@ namespace OpenRA.Mods.Common.Traits
 			return modTypeInfo != null ? modTypeInfo.BlinkWarningInterval : typeInfo.BlinkWarningInterval;
 		}
 
-		protected int GetSpeedModifier(CPos cell, ResourceLayerInfo.ResourceTypeInfo typeInfo)
+		protected int GetSpreadModifier(CPos cell, ResourceLayerInfo.ResourceTypeInfo typeInfo)
 		{
 			var modifier = GetModifier(cell);
 
-			return modifier != null ? modifier.Info.SpeedModifier : info.SpeedModifier;
+			return modifier != null ? modifier.Info.SpreadModifier : info.SpreadModifier;
+		}
+
+		protected int GetStageModifier(CPos cell, ResourceLayerInfo.ResourceTypeInfo typeInfo)
+		{
+			var modifier = GetModifier(cell);
+
+			return modifier != null ? modifier.Info.StageModifier : info.StageModifier;
 		}
 
 		protected int modifierCachedTickTime = 0;
 		protected Dictionary<CPos, ModifiesResources> cachedModifiers = new Dictionary<CPos, ModifiesResources>();
 		protected ModifiesResources GetModifier(CPos cell)
 		{
-			if (tickTime <= modifierCachedTickTime + 25)
+			if (tickTime <= modifierCachedTickTime + 50)
 				return cachedModifiers.ContainsKey(cell) ? cachedModifiers[cell] : null;
 
+			var prevCached = cachedModifiers;
 			cachedModifiers = new Dictionary<CPos, ModifiesResources>();
 			var modifiers = world.ActorsWithTrait<ModifiesResources>();
 
@@ -288,7 +287,11 @@ namespace OpenRA.Mods.Common.Traits
 				var moddedCells = world.Map.FindTilesInCircle(modifier.Actor.Location, WDist.ToCells(modifier.Trait.Range));
 
 				foreach (var modCell in moddedCells)
+				{
+					if (!prevCached.ContainsKey(modCell))
+						AddToTickQueue(modCell, Content[cell].Type, true);
 					cachedModifiers.TryAdd(modCell, modifier.Trait);
+				}
 			}
 
 			modifierCachedTickTime = tickTime;
@@ -506,7 +509,7 @@ namespace OpenRA.Mods.Common.Traits
 				{
 					var waitForTime = tickTime + world.SharedRandom.Next(explodeDelayMin, explodeDelayMax);
 					delayedExplosions.Add(cell, true);
-					Schedule(waitForTime, new DelayedResourceAction(waitForTime, () => DoExplode(source, resourceInfo, cell)));
+					Schedule(waitForTime, () => DoExplode(source, resourceInfo, cell));
 				}
 			}
 			catch (Exception ex)
@@ -555,6 +558,11 @@ namespace OpenRA.Mods.Common.Traits
 
 		void AddToTickQueue(CPos cell, string resourceType)
 		{
+			AddToTickQueue(cell, resourceType, false);
+		}
+
+		void AddToTickQueue(CPos cell, string resourceType, bool updateOnly)
+		{
 			if (!info.ResourceTypes.TryGetValue(resourceType, out var resourceInfo))
 			{
 				Log.Write("debug", "Resource info was not found for type: " + resourceType);
@@ -566,24 +574,32 @@ namespace OpenRA.Mods.Common.Traits
 
 		void AddToTickQueue(CPos cell, ResourceLayerInfo.ResourceTypeInfo typeInfo)
 		{
+			AddToTickQueue(cell, typeInfo, false);
+		}
+
+		void AddToTickQueue(CPos cell, ResourceLayerInfo.ResourceTypeInfo typeInfo, bool updateOnly)
+		{
 			try
 			{
-				if (!tickTokens.TryAdd(cell, tickTime))
-					tickTokens[cell] = tickTime;
+				var useTickTime = updateOnly && tickTokens.ContainsKey(cell) ? tickTokens[cell] : tickTime;
+
+				if (!tickTokens.TryAdd(cell, useTickTime))
+					tickTokens[cell] = useTickTime;
 				spreadTimes.Remove(cell);
 				stageTimes.Remove(cell);
 
 				if (typeInfo == null)
 					return;
 
-				var speedModifier = GetSpeedModifier(cell, typeInfo);
+				var spreadModifier = GetSpreadModifier(cell, typeInfo);
 				var content = Content[cell];
-				var cellTickInfo = new ResourceTickInfo(typeInfo.DensityIntervals.ContainsKey(content.Density) ? typeInfo.DensityIntervals[content.Density] * 100 / speedModifier : 0, typeInfo.SpreadInterval * 100 / speedModifier, tickTime);
+				var stageModifier = content.Density == typeInfo.MaxDensity ? GetStageModifier(cell, typeInfo) : GetSpreadModifier(cell, typeInfo);
+				var cellTickInfo = new ResourceTickInfo(typeInfo.DensityIntervals.ContainsKey(content.Density) ? typeInfo.DensityIntervals[content.Density] * 100 / stageModifier : 0, typeInfo.SpreadInterval * 100 / spreadModifier, useTickTime);
 
 				if (typeInfo.SpreadInterval != 0 && content.Density == typeInfo.MaxDensity)
 				{
-					ScheduleSpreadTime(tickTime + cellTickInfo.ExpectedSpreadInterval,
-						new DelayedResourceAction(tickTime + cellTickInfo.ExpectedSpreadInterval, () => DoResourceTickActions(cell, cellTickInfo)),
+					ScheduleSpreadTime(Math.Max(useTickTime + cellTickInfo.ExpectedSpreadInterval, tickTime + 1),
+						() => DoResourceTickActions(cell, cellTickInfo),
 						cell);
 				}
 
@@ -598,11 +614,11 @@ namespace OpenRA.Mods.Common.Traits
 					if (typeInfo.DensityIntervals[content.Density] == 0)
 						return;
 
-					ScheduleStageTime(tickTime + cellTickInfo.ExpectedStageInterval,
-						new DelayedResourceAction(tickTime + cellTickInfo.ExpectedStageInterval, () => DoResourceTickActions(cell, cellTickInfo)),
+					ScheduleStageTime(Math.Max(useTickTime + cellTickInfo.ExpectedStageInterval, tickTime + 1),
+						() => DoResourceTickActions(cell, cellTickInfo),
 						cell);
 
-					CheckForAndScheduleBlink(cell, typeInfo, tickTime + cellTickInfo.ExpectedStageInterval);
+					CheckForAndScheduleBlink(cell, typeInfo, Math.Max(useTickTime + cellTickInfo.ExpectedStageInterval, tickTime + 1));
 				}
 			}
 			catch (Exception ex)
@@ -613,10 +629,14 @@ namespace OpenRA.Mods.Common.Traits
 
 		protected void CheckForAndScheduleBlink(CPos cell, ResourceLayerInfo.ResourceTypeInfo typeInfo, int expectedStagingTime)
 		{
-			if (blinks.ContainsKey(cell))
-				return;
-
 			var blinkWarnInterval = GetBlinkWarningInterval(cell, typeInfo);
+			var waitForTime = Math.Max(tickTime + 1, expectedStagingTime - blinkWarnInterval);
+
+			if (blinks.ContainsKey(cell) && blinks[cell] <= waitForTime)
+				return;
+			if (blinks.ContainsKey(cell))
+				blinks.Remove(cell);
+
 
 			if (Content[cell].Density == typeInfo.MaxDensity
 				&& blinkWarnInterval != 0
@@ -624,10 +644,9 @@ namespace OpenRA.Mods.Common.Traits
 				&& typeInfo.BlinkInterval != 0)
 			{
 				var color = Color.TryParse(typeInfo.BlinkColor, out var tColor) ? tColor : Color.Gray;
-				var waitForTime = Math.Max(tickTime + 1, expectedStagingTime - blinkWarnInterval);
-				blinks.Add(cell, true);
+				blinks.TryAdd(cell, waitForTime);
 				Schedule(waitForTime,
-					new DelayedResourceAction(waitForTime, () => DoBlink(cell, color, typeInfo.BlinkInterval, typeInfo)));
+					() => DoBlink(cell, color, typeInfo.BlinkInterval, typeInfo));
 			}
 		}
 
@@ -657,7 +676,7 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (resourceInfo.SpreadInterval != 0 && Content[cell].Density == resourceInfo.MaxDensity)
 				ScheduleSpreadTime(tickTime + tickInfo.ExpectedSpreadInterval,
-					new DelayedResourceAction(tickTime + tickInfo.ExpectedSpreadInterval, () => DoResourceTickActions(cell, tickInfo)),
+					() => DoResourceTickActions(cell, tickInfo),
 					cell);
 
 			// Stage/stage to new resource
@@ -678,7 +697,7 @@ namespace OpenRA.Mods.Common.Traits
 						if (blinks.ContainsKey(cell))
 						{
 							ScheduleStageTime(tickTime + tickInfo.ExpectedStageInterval,
-								new DelayedResourceAction(tickTime + tickInfo.ExpectedStageInterval, () => DoResourceTickActions(cell, tickInfo)),
+								() => DoResourceTickActions(cell, tickInfo),
 								cell);
 							return;
 						}
@@ -715,7 +734,7 @@ namespace OpenRA.Mods.Common.Traits
 			}
 		}
 
-		protected void ScheduleStageTime(int expectedTime, DelayedResourceAction action, CPos cell)
+		protected void ScheduleStageTime(int expectedTime, Action action, CPos cell)
 		{
 			if (!stageTimes.ContainsKey(cell) || expectedTime < stageTimes[cell])
 				Schedule(expectedTime, action);
@@ -724,7 +743,7 @@ namespace OpenRA.Mods.Common.Traits
 				stageTimes.Add(cell, expectedTime);
 		}
 
-		protected void ScheduleSpreadTime(int expectedTime, DelayedResourceAction action, CPos cell)
+		protected void ScheduleSpreadTime(int expectedTime, Action action, CPos cell)
 		{
 			if (!spreadTimes.ContainsKey(cell) || expectedTime < spreadTimes[cell])
 				Schedule(expectedTime, action);
@@ -755,7 +774,7 @@ namespace OpenRA.Mods.Common.Traits
 					{
 						try
 						{
-							action.Action();
+							action();
 						}
 						catch (Exception ex)
 						{
@@ -779,10 +798,10 @@ namespace OpenRA.Mods.Common.Traits
 			var blinkWarnInterval = GetBlinkWarningInterval(cell, typeInfo);
 
 			// 1. Check if cell density or cell type changed/empty.
-			if (!blinks.ContainsKey(cell) || content.Density != typeInfo.MaxDensity || content.Type != typeInfo.TerrainType || blinkWarnInterval == 0)
+			if (!blinks.ContainsKey(cell) || blinks[cell] != tickTime || content.Density != typeInfo.MaxDensity || content.Type != typeInfo.TerrainType || blinkWarnInterval == 0)
 			{
 				Content[cell] = new ResourceLayerContents(content.Type, content.Density, null); // Remove any overlay.
-				blinks.Remove(cell);
+					blinks.Remove(cell);
 				CellChanged?.Invoke(cell, content.Type);
 				return;
 			}
@@ -791,14 +810,16 @@ namespace OpenRA.Mods.Common.Traits
 			if (content.Overlay == null)
 			{
 				Content[cell] = new ResourceLayerContents(content.Type, content.Density, color);
+				blinks[cell] = tickTime + 4;
 				Schedule(tickTime + 4,
-							new DelayedResourceAction(tickTime + 4, () => DoBlink(cell, color, interval, typeInfo)));
+							() => DoBlink(cell, color, interval, typeInfo));
 			}
 			else
 			{
 				Content[cell] = new ResourceLayerContents(content.Type, content.Density, null);
+				blinks[cell] = tickTime + interval;
 				Schedule(tickTime + interval,
-							new DelayedResourceAction(tickTime + interval, () => DoBlink(cell, color, interval, typeInfo)));
+							() => DoBlink(cell, color, interval, typeInfo));
 			}
 
 			CellChanged?.Invoke(cell, content.Type);
