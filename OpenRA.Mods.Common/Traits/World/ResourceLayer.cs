@@ -637,7 +637,6 @@ namespace OpenRA.Mods.Common.Traits
 			if (blinks.ContainsKey(cell))
 				blinks.Remove(cell);
 
-
 			if (Content[cell].Density == typeInfo.MaxDensity
 				&& blinkWarnInterval != 0
 				&& !string.IsNullOrEmpty(typeInfo.BlinkColor)
@@ -801,7 +800,7 @@ namespace OpenRA.Mods.Common.Traits
 			if (!blinks.ContainsKey(cell) || blinks[cell] != tickTime || content.Density != typeInfo.MaxDensity || content.Type != typeInfo.TerrainType || blinkWarnInterval == 0)
 			{
 				Content[cell] = new ResourceLayerContents(content.Type, content.Density, null); // Remove any overlay.
-					blinks.Remove(cell);
+				blinks.Remove(cell);
 				CellChanged?.Invoke(cell, content.Type);
 				return;
 			}
