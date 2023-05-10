@@ -567,7 +567,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		void AddToTickQueue(CPos cell, string resourceType, bool updateOnly)
 		{
-			if (String.IsNullOrEmpty(resourceType))
+			if (string.IsNullOrEmpty(resourceType))
 				return;
 			if (!info.ResourceTypes.TryGetValue(resourceType, out var resourceInfo))
 			{
