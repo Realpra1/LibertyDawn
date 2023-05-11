@@ -675,6 +675,8 @@ HQ:
 		RequiresCondition: !lowpower
 	Power:
 		Amount: -50
+    AirstrikePower:
+        Prerequisites: ~disabled
 
 FIX:
 	Inherits: ^BaseBuilding
