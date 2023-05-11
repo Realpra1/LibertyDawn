@@ -1256,11 +1256,11 @@
     GrantConditionInRange@stealthrange:
         Condition: StealthGen
         Granter: true
-        Range: 9c0
+        Range: 7c0
         ValidRelationships: Ally
         RequiresCondition: !lowpower
     WithRangeCircle@stealthcircle:
-        Range: 9c0
+        Range: 7c0
         Color: 8080ff80
         RequiresCondition: !lowpower
 

@@ -108,7 +108,7 @@ silo:
 	icon: siloicnh.tem
 		AddExtension: False
 
-resonator:
+stealth:
 	idle:
 		Length: 32
 		Offset: 0,-14
@@ -120,15 +120,44 @@ resonator:
 		Start: 32
 		Offset: 0,-14
 		Tick: 800
-	make: resonatormake
+	make: stealthmake
 		Length: *
 		Offset: 0,-14
-	bib: mbRESONATOR
+	bib: mbSTEALTH
 		Length: *
         TilesetOverrides:
 			JUNGLE: TEMPERAT
 			WINTER: SNOW
 			DESERT: TEMPERAT
+		UseTilesetExtension: true
+	icon: stealthicon
+
+resonator:
+	idle:
+		Length: 11
+        Reverses: true
+		Offset: 0,-12
+		Tick: 120
+	damaged-idle:
+		Start: 11
+		Length: 11
+        Reverses: true
+		Offset: 0,-12
+		Tick: 120
+    dead:
+		Start: 11
+		Offset: 0,-12
+		Tick: 800
+	make: resonatormake
+		Length: *
+		Offset: 0,-12
+	bib: mbRESONATOR
+		Length: *
+		Offset: 0,2
+        TilesetOverrides:
+			JUNGLE: DESERT
+            DESERT: TEMPERAT
+			WINTER: SNOW
 		UseTilesetExtension: true
 	icon: resonatoricon
 
