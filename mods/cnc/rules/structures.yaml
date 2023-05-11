@@ -676,6 +676,7 @@ HQ:
 	Power:
 		Amount: -50
     AirstrikePower:
+        UnitType: a10
         Prerequisites: ~disabled
 
 FIX:
