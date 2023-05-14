@@ -134,18 +134,16 @@ stealth:
 
 resonator:
 	idle:
-		Length: 11
+        Length: 5
         Reverses: true
 		Offset: 0,-12
 		Tick: 120
 	damaged-idle:
-		Start: 11
-		Length: 11
-        Reverses: true
+		Start: 15
+		Length: 1
 		Offset: 0,-12
-		Tick: 120
     dead:
-		Start: 11
+		Start: 15
 		Offset: 0,-12
 		Tick: 800
 	make: resonatormake

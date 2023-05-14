@@ -535,7 +535,7 @@ MTNK:
 		BuildPaletteOrder: 45
 		Prerequisites: upgrade.economy2, ~techlevel.medium
 		Queue: Vehicle.GDI, Vehicle.Nod
-		Description: General-Purpose GDI Tank.\n  Strong vs Tanks, Vehicles\n  Weak vs Infantry
+		Description: General-Purpose Tank.\n  Strong vs Tanks, Vehicles\n  Weak vs Infantry
 	Mobile:
 		Speed: 72
 	Health:
@@ -585,7 +585,7 @@ HTNK:
 		BuildPaletteOrder: 85
 		Prerequisites: upgrade.economy3, ~techlevel.high
 		Queue: Vehicle.GDI, Vehicle.Nod
-		Description: Heavily armored GDI Tank.\nCan attack Aircraft.\n  Strong vs Everything
+		Description: Heavily armored Tank.\nCan attack Aircraft.\n  Strong vs Everything
 	Mobile:
 		Locomotor: heavytracked
 		Speed: 25
