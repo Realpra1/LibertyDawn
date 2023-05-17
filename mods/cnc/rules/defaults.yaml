@@ -693,6 +693,8 @@
 	Inherits@selection: ^SelectableBuilding
 	Inherits@handicaps: ^PlayerHandicaps
     Inherits@cloakable: ^Cloakable
+    Cloak:
+        RequiresCondition: StealthGen
 	Huntable:
 	OwnerLostAction:
 		Action: Kill
@@ -731,8 +733,6 @@
 		Categories: Building
 	CommandBarBlacklist:
 	AcceptsDeliveredCash:
-    Cloak:
-        RequiresCondition: StealthGen
 
 ^BaseBuilding:
 	Inherits: ^Building
@@ -905,6 +905,9 @@
 ^Wall:
 	Inherits@1: ^SpriteActor
 	Inherits@shape: ^1x1Shape
+    Inherits@cloakable: ^Cloakable
+    Cloak:
+        RequiresCondition: StealthGen
 	Interactable:
 		Bounds: 1024, 1024
 	CombatDebugOverlay:
