@@ -562,7 +562,7 @@ HPAD:
 		Name: Helipad
 	Buildable:
 		BuildPaletteOrder: 50
-		Prerequisites: proc
+		Prerequisites: hpadunlock
 		Queue: Building.GDI, Building.Nod
 		Description: Produces and repairs helicopters
 	Building:
@@ -949,8 +949,6 @@ SAM:
 		Type: Wood
 	RevealsShroud:
 		Range: 8c0
-    DetectCloaked:
-		Range: 0c0
     -RenderDetectionCircle:
 	Turreted:
 		TurnSpeed: 40
@@ -997,8 +995,6 @@ OBLI:
 		Type: Wood
 	RevealsShroud:
 		Range: 8c0
-    DetectCloaked:
-		Range: 0c0
     -RenderDetectionCircle:
 	WithBuildingBib:
 		HasMinibib: true

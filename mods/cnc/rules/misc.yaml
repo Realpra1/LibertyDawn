@@ -238,6 +238,8 @@ upgrade.covert2:
 	ProvidesPrerequisite@upgradename:
     ProvidesPrerequisite:
 		Prerequisite: anycovert
+    ProvidesPrerequisite@hpad:
+		Prerequisite: hpadunlock
     Interactable:
 	AlwaysVisible:
     
@@ -316,6 +318,12 @@ AFLDUNLOCK:
 	Interactable:
     Tooltip:
 		Name: economy or recon specialization
+        
+HPADUNLOCK:
+	AlwaysVisible:
+	Interactable:
+    Tooltip:
+		Name: covert II or recon II specialization
 
 upgrade.recon1:
 	Inherits: ^MaxUpgrades
@@ -380,6 +388,8 @@ upgrade.recon2:
 	ProvidesPrerequisite@upgradename:
     ProvidesPrerequisite:
 		Prerequisite: anyrecon
+    ProvidesPrerequisite@hpad:
+		Prerequisite: hpadunlock
     Interactable:
 	AlwaysVisible:
  

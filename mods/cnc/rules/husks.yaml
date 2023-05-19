@@ -16,6 +16,15 @@ HARV.Husk:
 	RenderSprites:
 		Image: harv.destroyed
 
+SHARV.Husk:
+	Inherits: ^Husk
+	Tooltip:
+		Name: Stealth Harvester (Destroyed)
+	TransformOnCapture:
+		IntoActor: sharv
+	RenderSprites:
+		Image: harv.destroyed
+
 APC.Husk:
 	Inherits: ^Husk
 	Tooltip:

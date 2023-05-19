@@ -32,6 +32,28 @@ harv.destroyed:
 		Facings: 32
 		UseClassicFacings: True
 		ZOffset: -512
+        
+sharv:
+	idle: harv
+		Facings: 32
+		UseClassicFacings: True
+	harvest: harv
+		Start: 32
+		Length: 4
+		Facings: 8
+		Tick: 60
+	dock: harvdump
+		Length: 7
+	dock-loop: harvdump
+		Start: 7
+	icon: sharvicnh.tem
+		AddExtension: False
+
+sharv.destroyed:
+	idle: harv
+		Facings: 32
+		UseClassicFacings: True
+		ZOffset: -512
 
 bggy:
 	idle:

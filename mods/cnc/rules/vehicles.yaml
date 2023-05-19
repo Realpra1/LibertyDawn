@@ -81,14 +81,91 @@ HARV:
 		Range: 2c0
     Cloak:
 		UncloakOn: Attack, Damage, Heal
-		RequiresCondition: upgrade.covert2 || StealthGen || cloak-crate-collected
-    GrantConditionOnPrerequisite@covert:
-        Prerequisites: upgrade.covert2
-        Condition: upgrade.covert2
+		RequiresCondition: StealthGen || cloak-crate-collected
 	ActorLostNotification:
 		Notification: HarvesterLost
 	SpawnActorOnDeath:
 		Actor: HARV.Husk
+		OwnerType: InternalName
+		EffectiveOwnerFromOwner: true
+	WithHarvestAnimation:
+	WithDockingAnimation:
+	Explodes@EMPTY:
+		Weapon: UnitExplodeHarvEmpty
+		EmptyWeapon: UnitExplodeHarvEmpty
+	Explodes:
+		RequiresCondition: !no-tiberium
+		Weapon: TiberiumExplosion
+    Explodes@unstable:
+		RequiresCondition: unstable-tiberium
+		Weapon: Atomic
+    Blink:
+		RequiresCondition: unstable-tiberium
+        Interval: 13
+        StartDelay: 2250
+        BlinkColor: FF9999
+    ChangesHealth:
+		RequiresCondition: unstable-tiberium
+		Step: -100000
+		Delay: 3000
+		StartIfBelow: 101
+	WithHarvesterPipsDecoration:
+		Position: BottomLeft
+		Margin: 4, 3
+		RequiresSelection: true
+		PipCount: 7
+		ResourceSequences:
+			Tiberium: pip-green
+			BlueTiberium: pip-blue
+			RedTiberium: pip-red
+
+SHARV:
+	Inherits: ^Tank
+	Inherits@selection: ^SelectableEconomicUnit
+	Inherits@CLOAKED: ^Cloakable
+    Cloak:
+		UncloakOn: Attack, Damage, Heal
+        -RequiresCondition:
+    -GrantConditionInRange@StealthGenReceiver:
+	Valued:
+		Cost: 1250
+	Tooltip:
+		Name: Stealth Harvester
+		GenericName: Stealth Harvester
+	Buildable:
+		BuildPaletteOrder: 11
+		Prerequisites: proc, upgrade.covert2
+		Queue: Vehicle.GDI, Vehicle.Nod
+		Description: Collects Tiberium for processing.\n  Invisible
+	Selectable:
+		DecorationBounds: 1536, 1536
+	Harvester:
+		Resources: Tiberium, BlueTiberium, RedTiberium
+		Capacity: 20
+		BaleLoadDelay: 25
+		BaleUnloadDelay: 4
+        MaxUnloadQueue : 8
+        UnloadQueueCostModifier: 3000
+		SearchFromProcRadius: 25
+		SearchFromHarvesterRadius: 20
+		HarvestFacings: 8
+		EmptyCondition: no-tiberium
+        UnstableCondition: unstable-tiberium
+        UnstableResource: RedTiberium
+	Mobile:
+		Speed: 90
+	Health:
+		HP: 35000
+	Repairable:
+		HpPerStep: 2584
+	Armor:
+		Type: Tiberium
+	RevealsShroud:
+		Range: 2c0
+	ActorLostNotification:
+		Notification: HarvesterLost
+	SpawnActorOnDeath:
+		Actor: SHARV.Husk
 		OwnerType: InternalName
 		EffectiveOwnerFromOwner: true
 	WithHarvestAnimation:
@@ -138,7 +215,7 @@ APC:
 		BuildPaletteOrder: 35
 		Prerequisites: upgrade.covert1
 		Queue: Vehicle.GDI, Vehicle.Nod
-		Description: Armed infantry transport.\nCan attack Aircraft.\n  Strong vs Vehicles\n  Weak vs Infantry
+		Description: Armored infantry transport.\n  Decent vs Vehicles\n  Weak vs Infantry
 	Mobile:
 		TurnSpeed: 28
 		Speed: 110
@@ -153,42 +230,18 @@ APC:
 		Range: 4c0
 	Turreted:
 		TurnSpeed: 40
-	AutoTargetPriority@Air:
-		ValidTargets: Air
-		Priority: 2
 	Armament@PRIMARY:
 		Weapon: APCGun
 		Recoil: 48
 		RecoilRecovery: 18
 		LocalOffset: 255,100,189, 255,-100,189
 		MuzzleSequence: muzzle
-		PauseOnCondition: reload-air
-		ReloadingCondition: reload-ground
-	Armament@SECONDARY:
-		Name: secondary
-		Weapon: APCGun.AA
-		Recoil: 48
-		RecoilRecovery: 18
-		LocalOffset: 175,100,299, 175,-100,299
-		MuzzleSequence: muzzle-air
-		PauseOnCondition: reload-ground
-		ReloadingCondition: reload-air
-	GrantConditionOnAttack:
-		Condition: attack-air
-		ArmamentNames: secondary
-		RevokeDelay: 18
-		RevokeOnNewTarget: False
-		RevokeAll: True
 	AttackMove:
 		Voice: Attack
 	AttackTurreted:
 		Voice: Attack
 	WithMuzzleOverlay:
 	WithSpriteTurret:
-		RequiresCondition: !attack-air
-	WithSpriteTurret@AIR:
-		Sequence: turret-air
-		RequiresCondition: attack-air
 	Cargo:
 		Types: Infantry
 		MaxWeight: 10
@@ -836,7 +889,7 @@ MHQ:
 	Mobile:
 		Speed: 72
 	RevealsShroud:
-		Range: 5c0
+		Range: 10c0
     DetectCloaked:
 		Range: 10c0
     RenderDetectionCircle:
