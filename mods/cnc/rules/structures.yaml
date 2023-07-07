@@ -161,7 +161,7 @@ NUKE:
 	Health:
 		HP: 55000
     Armor:
-		Type: Tiberium
+		Type: TiberiumWood
 	RevealsShroud:
 		Range: 4c0
 	WithBuildingBib:
@@ -194,7 +194,7 @@ NUK2:
 	Health:
 		HP: 55000
     Armor:
-		Type: Tiberium
+		Type: TiberiumWood
 	RevealsShroud:
 		Range: 4c0
 	WithBuildingBib:
@@ -229,7 +229,7 @@ PROC:
 	Health:
 		HP: 100000
     Armor:
-		Type: Tiberium
+		Type: TiberiumWood
 	RevealsShroud:
 		Range: 4c0
 	Refinery:
@@ -277,7 +277,7 @@ SILO:
 	Health:
 		HP: 50000
     Armor:
-		Type: Tiberium
+		Type: TiberiumWood
 	RevealsShroud:
 		Range: 4c0
 	WithBuildingBib:
@@ -828,6 +828,8 @@ TMPL:
 		DecorationBounds: 3072, 2901, 0, -512
 	Health:
 		HP: 210000
+    Armor:
+		Type: TiberiumWood
 	RevealsShroud:
 		Range: 10c0
 	RenderDetectionCircle:
@@ -1157,7 +1159,7 @@ RESONATOR:
 	Health:
 		HP: 50000
 	Armor:
-		Type: Tiberium
+		Type: TiberiumWood
 	RevealsShroud:
 		Range: 4c0
     WithBuildingBib:

@@ -1,5 +1,5 @@
 ^MissileWeapon:
-	ReloadDelay: 50
+	ReloadDelay: 55
 	Range: 6c0
 	MinRange: 0c512
 	Report: bazook1.aud
@@ -21,9 +21,10 @@
 		ValidTargets: Ground, Air
 		Versus:
 			None: 28
-			Wood: 110
+			Wood: 80
+			TiberiumWood: 80
 			Light: 140
-			Tiberium: 110
+			Tiberium: 140
 			Heavy: 140
 		DamageTypes: Prone50Percent, TriggerProne, ExplosionDeath
 	Warhead@2Smu: LeaveSmudge
@@ -59,6 +60,7 @@ Dragon:
 		Versus:
 			None: 140
 			Wood: 140
+			TiberiumWood: 140
 			Tiberium: 104
 			Heavy: 104
 	Warhead@4EffAir: CreateEffect
@@ -66,7 +68,7 @@ Dragon:
 
 Rockets:
 	Inherits: ^MissileWeapon
-	ReloadDelay: 75
+	ReloadDelay: 90
 	Range: 7c0
 	ValidTargets: Ground, Water
     Projectile: Missile
@@ -86,10 +88,11 @@ Rockets:
 		ValidTargets: Ground, Water
 		Versus:
 			None: 15
-			Wood: 100
-			Light: 90
-			Tiberium: 90
-			Heavy: 180
+			Wood: 50
+			TiberiumWood: 50
+			Light: 100
+			Tiberium: 200
+			Heavy: 200
 
 AARockets:
     Inherits: Rockets
@@ -116,9 +119,10 @@ BikeRockets:
         Versus:
 			None: 28
 			Wood: 92
+			TiberiumWood: 92
 			Light: 124
-			Tiberium: 110
-			Heavy: 124
+			Tiberium: 100
+			Heavy: 100
     
 BikeAARockets:
     Inherits: BikeRockets
@@ -147,8 +151,9 @@ OrcaAGMissiles:
 		Versus:
 			None: 25
 			Wood: 75
+			TiberiumWood: 75
 			Light: 110
-			Tiberium: 85
+			Tiberium: 121
 			Heavy: 121
 
 OrcaAAMissiles:
@@ -179,10 +184,11 @@ MammothMissiles:
 		Damage: 5000
 		Versus:
 			None: 130
-			Wood: 66
-			Light: 10
-			Tiberium: 20
-			Heavy: 15
+			Wood: 50
+			TiberiumWood: 50
+			Light: 75
+			Tiberium: 10
+			Heavy: 10
 	Warhead@3Eff: CreateEffect
 		Explosions: small_poof
 		ImpactSounds: xplobig4.aud
@@ -217,8 +223,9 @@ MammothMissiles:
 		Versus:
 			None: 40
 			Wood: 28
+			TiberiumWood: 28
 			Light: 100
-			Tiberium: 28
+			Tiberium: 100
 			Heavy: 100
 	Warhead@3Eff: CreateEffect
 		Explosions: med_frag
@@ -245,8 +252,9 @@ MammothMissiles:
 		Versus:
 			None: 15
 			Wood: 70
+			TiberiumWood: 70
 			Light: 40
-			Tiberium: 55
+			Tiberium: 170
 			Heavy: 170
 
 227mm.stnkAA:
@@ -275,6 +283,7 @@ BoatMissile:
 		Versus:
 			None: 90
 			Wood: 75
+			TiberiumWood: 75
 			Light: 60
 			Tiberium: 25
 			Heavy: 25
@@ -304,6 +313,7 @@ TowerMissile:
 		Versus:
 			None: 60
 			Wood: 50
+			TiberiumWood: 50
 			Light: 100
 			Tiberium: 60
 			Heavy: 60
@@ -355,6 +365,7 @@ Patriot:
 		Versus:
 			None: 20
 			Wood: 84
+			TiberiumWood: 84
 			Light: 100
 			Tiberium: 74
 			Heavy: 74

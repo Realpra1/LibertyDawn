@@ -10,6 +10,7 @@ Atomic:
 		Versus:
 			None: 100
 			Wood: 100
+			TiberiumWood: 100
 			Light: 60
 			Tiberium: 50
 			Heavy: 50
@@ -28,6 +29,7 @@ Atomic:
 		Versus:
 			None: 100
 			Wood: 100
+			TiberiumWood: 100
 			Light: 60
 			Tiberium: 50
 			Heavy: 50
@@ -54,6 +56,7 @@ Atomic:
 		Versus:
 			None: 100
 			Wood: 100
+			TiberiumWood: 100
 			Light: 60
 			Tiberium: 50
 			Heavy: 50
@@ -76,6 +79,7 @@ Atomic:
 		Versus:
 			None: 100
 			Wood: 100
+			TiberiumWood: 100
 			Light: 60
 			Tiberium: 50
 			Heavy: 50
@@ -108,9 +112,10 @@ AtomicTib:
 		Versus:
 			None: 100
 			Wood: 60
+			TiberiumWood: 80
 			Light: 80
 			Tiberium: 100
-			Heavy: 50
+			Heavy: 40
 		DamageTypes: Prone50Percent, TriggerProne, TiberiumDeath
     Warhead@2Dam_impact: SpreadDamage
 		Spread: 2c0
@@ -122,9 +127,10 @@ AtomicTib:
 		Versus:
 			None: 100
 			Wood: 60
+			TiberiumWood: 80
 			Light: 80
 			Tiberium: 100
-			Heavy: 50
+			Heavy: 40
 		DamageTypes: Prone50Percent, TriggerProne, TiberiumDeath
     Warhead@3Dam_impact: SpreadDamage
 		Spread: 2c0
@@ -136,9 +142,10 @@ AtomicTib:
 		Versus:
 			None: 100
 			Wood: 60
+			TiberiumWood: 80
 			Light: 80
 			Tiberium: 100
-			Heavy: 50
+			Heavy: 40
 		DamageTypes: Prone50Percent, TriggerProne, TiberiumDeath
 	Warhead@2Eff_impact: CreateEffect
 		Explosions: nuke_explosion

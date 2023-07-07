@@ -12,11 +12,12 @@
 		ValidTargets: Ground, Water, Trees
 		InvalidTargets: Wall
 		Versus:
-			None: 110
-			Wood: 120
+			None: 90
+			Wood: 100
+            TiberiumWood: 100
 			Light: 80
-			Tiberium: 45
-			Heavy: 15
+			Tiberium: 20
+			Heavy: 20
 		DamageTypes: Prone50Percent, TriggerProne, FireDeath, Incendiary
 	Warhead@2Smu: LeaveSmudge
 		SmudgeType: Scorch
@@ -41,13 +42,14 @@ BigFlamer:
 	BurstDelays: 10
 	Warhead@1Dam: SpreadDamage
 		Spread: 400
-		Damage: 10000
+		Damage: 11500
 		Versus:
-			None: 85
-			Wood: 100
-			Light: 75
-			Tiberium: 45
-			Heavy: 15
+			None: 90
+			Wood: 120
+            TiberiumWood: 120
+			Light: 80
+			Tiberium: 20
+			Heavy: 20
 	Warhead@3Eff: CreateEffect
 		Explosions: med_napalm
     Warhead@4Res_area: DestroyResource
@@ -57,16 +59,16 @@ BigFlamer:
 Chemspray:
 	Inherits: ^FlameWeapon
 	ReloadDelay: 65
-	-InvalidTargets:
 	Warhead@1Dam: SpreadDamage
-		Damage: 8000
+		Damage: 6000
 		-InvalidTargets:
 		Versus:
-			None: 70
-			Wood: 30
-			Light: 25
-			Tiberium: 140
-			Heavy: 60
+			None: 120
+			Wood: 50
+            TiberiumWood: 120
+			Light: 50
+			Tiberium: 120
+			Heavy: 10
 		DamageTypes: Prone50Percent, TriggerProne, TiberiumDeath
 	Warhead@3Eff: CreateEffect
 		Explosions: chemball
@@ -83,14 +85,15 @@ BigChem:
 	BurstDelays: 10
 	Warhead@1Dam: SpreadDamage
 		Spread: 400
-		Damage: 16000
+		Damage: 13800
 		-InvalidTargets:
 		Versus:
-			None: 70
-			Wood: 30
-			Light: 25
-			Tiberium: 135
-			Heavy: 60
+			None: 120
+			Wood: 50
+            TiberiumWood: 120
+			Light: 50
+			Tiberium: 120
+			Heavy: 10
 		DamageTypes: Prone50Percent, TriggerProne, TiberiumDeath
     Warhead@3Eff: CreateEffect
 		Explosions: bigchem
@@ -111,8 +114,12 @@ Napalm:
 		Damage: 3000
 		Falloff: 1000, 368, 135, 50, 18, 7, 0
 		Versus:
-			Wood: 35
-			Heavy: 80
+			None: 100
+			Wood: 80
+			TiberiumWood: 80
+			Light: 50
+			Tiberium: 10
+			Heavy: 10
 	Warhead@3Eff: CreateEffect
 		Explosions: med_napalm
     Warhead@4Res_area: DestroyResource
@@ -132,7 +139,7 @@ Laser:
 		Damage: 39600
 		Versus:
 			Wood: 30
-			Tiberium: 50
+            TiberiumWood: 30
 		DamageTypes: Prone50Percent, TriggerProne, FireDeath
 	Warhead@2Smu: LeaveSmudge
 		SmudgeType: Scorch
@@ -150,6 +157,7 @@ Laser:
 		Versus:
 			None: 90
 			Wood: 10
+			TiberiumWood: 10
 			Light: 30
 			Heavy: 10
 		DamageTypes: Prone50Percent, TriggerProne, RippedApartDeath

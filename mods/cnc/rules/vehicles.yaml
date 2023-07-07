@@ -363,12 +363,12 @@ CTNK:
 		BuildPaletteOrder: 55
 		Prerequisites: ~upgrade.covert2, ~techlevel.medium
 		Queue: Vehicle.Nod, Vehicle.GDI
-		Description: Heavily armored chemical-spewing vehicle.\n  Strong Harasser vs All Ground Units\n  Weak vs Air
+		Description: Chemical-spewing vehicle.\n Strong vs Infantry and tiberium or nuclear related Stuctures and Units\n Weak vs Air and Tanks
 	Mobile:
 		TurnSpeed: 30
 		Speed: 100
 	Health:
-		HP: 27000
+		HP: 25000
 	Repairable:
 		HpPerStep: 2046
 	Armor:

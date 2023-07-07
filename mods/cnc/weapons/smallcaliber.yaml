@@ -28,6 +28,7 @@ Sniper:
 		Versus:
 			None: 100
 			Wood: 50
+			TiberiumWood: 50
 			Light: 70
 			Tiberium: 20
 			Heavy: 20
@@ -56,13 +57,14 @@ Vulcan:
 	Report: gun5.aud
 	Warhead@1Dam: SpreadDamage
 		Spread: 426
-		Damage: 10000
+		Damage: 5000
 		Versus:
-			None: 90
-			Wood: 15
-			Light: 35
-			Tiberium: 35
-			Heavy: 35
+			None: 50
+			Wood: 10
+			TiberiumWood: 10
+			Light: 100
+			Tiberium: 50
+			Heavy: 50
 
 HeliAGGun:
 	Inherits: ^HeavyMG
@@ -80,6 +82,7 @@ HeliAGGun:
 		Versus:
 			None: 100
 			Wood: 50
+			TiberiumWood: 50
 			Light: 80
 			Tiberium: 35
 			Heavy: 35
@@ -106,6 +109,7 @@ HeliAAGun:
 		Versus:
 			None: 150
 			Wood: 20
+			TiberiumWood: 20
 			Light: 35
 			Tiberium: 5
 			Heavy: 5
@@ -144,7 +148,9 @@ MachineGun:
 	Warhead@1Dam: SpreadDamage
 		Versus:
 			Wood: 10
+			TiberiumWood: 10
 			Light: 70
+            Heavy: 10
 	Warhead@2Eff: CreateEffect
 		Inaccuracy: 213
 
@@ -166,6 +172,7 @@ APCGun:
 		Versus:
 			None: 30
 			Wood: 25
+			TiberiumWood: 25
 			Light: 45
 			Tiberium: 25
 			Heavy: 25

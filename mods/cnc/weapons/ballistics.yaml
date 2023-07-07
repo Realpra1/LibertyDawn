@@ -1,5 +1,5 @@
 ^BallisticWeapon:
-	ReloadDelay: 40
+	ReloadDelay: 80
 	Range: 4c768
 	Report: tnkfire6.aud
 	Projectile: Bullet
@@ -8,13 +8,14 @@
 		Shadow: true
 	Warhead@1Dam: SpreadDamage
 		Spread: 128
-		Damage: 4000
+		Damage: 8800
 		Versus:
-			None: 25
-			Wood: 90
+			None: 20
+			Wood: 100
+            TiberiumWood: 100
 			Light: 150
 			Tiberium: 80
-			Heavy: 80
+			Heavy: 70
 		DamageTypes: Prone50Percent, TriggerProne, ExplosionDeath
 	Warhead@2Smu: LeaveSmudge
 		SmudgeType: Crater
@@ -26,18 +27,20 @@
 
 70mm:
 	Inherits: ^BallisticWeapon
-	ReloadDelay: 30
+	ReloadDelay: 60
 	Range: 4c0
 	Report: tnkfire3.aud
 	Projectile: Bullet
 		Speed: 853
 	Warhead@1Dam: SpreadDamage
-		Damage: 2500
+		Damage: 5500
 		Versus:
-			None: 24
-			Wood: 88
-			Light: 105
-			Heavy: 88
+			None: 20
+			Wood: 100
+            TiberiumWood: 100
+			Light: 150
+			Tiberium: 80
+			Heavy: 70
 
 120mm:
 	Inherits: ^BallisticWeapon
@@ -63,6 +66,7 @@ TurretGun:
 		Versus:
 			None: 20
 			Wood: 25
+            TiberiumWood: 25
 			Light: 135
 			Tiberium: 90
 			Heavy: 90
@@ -86,9 +90,10 @@ ArtilleryShell:
 		Versus:
 			None: 100
 			Wood: 110
+            TiberiumWood: 110
 			Light: 90
-			Tiberium: 110
-			Heavy: 60
+			Tiberium: 60
+			Heavy: 50
 		DamageTypes: Prone50Percent, TriggerProne, SmallExplosionDeath
 	Warhead@3Eff: CreateEffect
 		Explosions: poof
@@ -110,10 +115,11 @@ Grenade:
 		Damage: 4500
 		Versus:
 			None: 100
-			Wood: 35
-			Light: 80
-			Tiberium: 35
-			Heavy: 30
+			Wood: 90
+			TiberiumWood: 90
+			Light: 50
+			Tiberium: 20
+			Heavy: 20
 		DamageTypes: Prone50Percent, TriggerProne, SmallExplosionDeath
 	Warhead@3Eff: CreateEffect
 		Explosions: small_poof
@@ -139,8 +145,9 @@ TiberiumMeteor:
 		Versus:
 			None: 100
 			Wood: 35
+			TiberiumWood: 35
 			Light: 80
-			Tiberium: 100
+			Tiberium: 30
 			Heavy: 30
 		DamageTypes: Prone50Percent, TriggerProne, SmallExplosionDeath, TiberiumDeath
 	Warhead@3Eff: CreateEffect
