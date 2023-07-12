@@ -99,7 +99,6 @@ BRIK:
 		Prerequisites: ~disabled
 
 HQ:
-	-AirstrikePower:
 
 EYE:
 	Buildable:

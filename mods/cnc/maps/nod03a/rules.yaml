@@ -16,8 +16,6 @@ Player:
 		DefaultCash: 4000
 
 HQ:
-	AirstrikePower:
-		Prerequisites: ~disabled
 	Tooltip:
 	Buildable:
 		Description: Provides an overview of the battlefield.\nRequires power to operate.

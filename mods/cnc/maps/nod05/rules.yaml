@@ -127,9 +127,6 @@ SBAG:
 		Queue: Defence.GDI, Defence.Nod
 
 HQ:
-	AirstrikePower:
-		Prerequisites: gdi
-		SquadSize: 1
 
 A10:
 	Targetable:

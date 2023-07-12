@@ -114,8 +114,6 @@ TRAN:
 		Prerequisites: ~disabled
 
 HQ:
-	AirstrikePower:
-		Prerequisites: gdi
 
 BOAT:
 	Health:

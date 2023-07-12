@@ -83,9 +83,6 @@ HTNK:
 		Prerequisites: ~disabled
 
 HQ:
-	AirstrikePower:
-		Prerequisites: gdi
-		SquadSize: 1
 
 RMBO:
 	Buildable:

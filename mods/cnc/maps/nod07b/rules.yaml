@@ -123,6 +123,3 @@ GTWR:
 		Queue: Defence.GDI
 
 HQ:
-	AirstrikePower:
-		Prerequisites: gdi
-		SquadSize: 1

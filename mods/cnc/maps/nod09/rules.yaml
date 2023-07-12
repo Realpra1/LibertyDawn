@@ -125,9 +125,6 @@ SBAG:
 		Queue: Defence.GDI, Defence.Nod
 
 HQ:
-	AirstrikePower:
-		Prerequisites: gdi
-		SquadSize: 2
 
 BOAT:
 	Health:

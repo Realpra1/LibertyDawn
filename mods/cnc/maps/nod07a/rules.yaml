@@ -129,9 +129,6 @@ GTWR:
 		Weapon: HighV.in
 
 HQ:
-	AirstrikePower:
-		Prerequisites: gdi
-		SquadSize: 1
 
 TRAN.IN:
 	Inherits: TRAN
