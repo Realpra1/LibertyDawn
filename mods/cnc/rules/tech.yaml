@@ -18,11 +18,11 @@ V19:
 	TooltipDescription@other:
 		Description: Capture to receive additional funds.
 		ValidRelationships: Neutral, Enemy
-	SpawnActorOnDeath:
-		Actor: V19.Husk
 	UpdatesDerrickCount:
 	GrantConditionOnCombatantOwner:
 		Condition: enabled
+    GivesBuildableArea:
+		AreaTypes: building
 
 V19.Husk:
 	Inherits: ^CivBuildingHusk
@@ -56,8 +56,6 @@ HOSP:
 	TooltipDescription@other:
 		Description: Capture to enable self-healing for infantry.
 		ValidRelationships: Neutral, Enemy
-	SpawnActorOnDeath:
-		Actor: HOSP.Husk
 	WithBuildingBib:
 		HasMinibib: true
 	ProvidesPrerequisite@buildingname:
@@ -94,8 +92,6 @@ BIO:
 	TooltipDescription@other:
 		Description: Capture to enable Tiberium immunity for infantry.
 		ValidRelationships: Neutral, Enemy
-	SpawnActorOnDeath:
-		Actor: BIO.Husk
 	ProvidesPrerequisite@buildingname:
     GivesBuildableArea:
 		AreaTypes: building
