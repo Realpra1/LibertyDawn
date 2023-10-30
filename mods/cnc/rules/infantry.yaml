@@ -148,7 +148,7 @@ E5:
 	Inherits@AUTOTARGET: ^AutoTargetGroundAssaultMove
 	Inherits@DECORATIONS: ^InfantryExperienceHospitalHazmatOverrides
 	Valued:
-		Cost: 200
+		Cost: 225
 	Tooltip:
 		Name: Chemical Warrior
 	UpdatesPlayerStatistics:

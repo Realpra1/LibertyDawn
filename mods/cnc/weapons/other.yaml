@@ -1,7 +1,7 @@
 ^FlameWeapon:
 	ValidTargets: Ground, Water, Trees
 	ReloadDelay: 55
-	Range: 4c0
+	Range: 3c0
 	InvalidTargets: Wall
 	Report: flamer2.aud
 	Projectile: Bullet
