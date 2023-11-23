@@ -28,6 +28,9 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Will grant the condition if this is true. Otherwise only receive.")]
 		public readonly bool Granter = false;
 
+		[Desc("Will get the condition if this is true. Otherwise not.")]
+		public readonly bool Receiver = true;
+
 		[Desc("Player relationships who can receive the condition.")]
 		public readonly PlayerRelationship ValidRelationships = PlayerRelationship.Ally;
 
@@ -102,6 +105,23 @@ namespace OpenRA.Mods.Common.Traits
 			// Using FastUniqueQueue in this way keeps performance at O(N) instead of O(N^2) despite having to compare two lists.
 			foreach (var actor in actorsInRange)
 			{
+				var grantTraits = actor.TraitsImplementing<GrantConditionInRange>();
+				bool abort = true;
+				if (grantTraits != null)
+				{
+					foreach (var grantTrait in grantTraits)
+					{
+						if (grantTrait.Info.Condition == Info.Condition && grantTrait.Info.Receiver)
+						{
+							abort = false;
+							break;
+						}
+					}
+				}
+
+				if (abort)
+					continue;
+
 				if (!actorRevokeTokenMap.ContainsKey(actor.ActorID))
 				{
 					var revokeToken = actor.GrantCondition(info.Condition);

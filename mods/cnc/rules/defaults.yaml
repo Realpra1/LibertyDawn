@@ -1286,13 +1286,12 @@
     GrantConditionInRange@repairrange:
         Condition: RepairGen
         Granter: true
+        Receiver: false
         Range: 7c0
         ValidRelationships: Ally
-        RequiresCondition: !lowpower
     WithRangeCircle@repaircircle:
         Range: 7c0
         Color: 8080ff80
-        RequiresCondition: !lowpower
 
 ^MaxUpgrades:
     ProvidesPrerequisite@maxreq:
