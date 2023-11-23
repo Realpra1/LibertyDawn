@@ -427,7 +427,6 @@ AFLD:
 		Prerequisite: vehicleproduction
 	Buildable:
 		BuildPaletteOrder: 40
-		Prerequisites: ~!upgrade.covert1
 		Queue: Building.Nod, Building.GDI
 		Description: Provides a dropzone\nfor vehicle reinforcements
 	Building:
@@ -635,7 +634,7 @@ HQ:
         Prerequisite: hq
 	Buildable:
 		BuildPaletteOrder: 70
-		Prerequisites: proc, ~techlevel.medium
+		Prerequisites: ~techlevel.medium
 		Queue: Building.GDI, Building.Nod
 		Description: Provides radar and Air Strike support power.\nUnlocks higher-tech units and buildings.\nRequires power to operate.
 	Building:

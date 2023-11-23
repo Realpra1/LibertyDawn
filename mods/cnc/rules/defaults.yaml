@@ -377,6 +377,7 @@
 			ExplosionDeath: 4
 			FireDeath: 5
 			TiberiumDeath: 6
+            TibGun: 6
 		CrushedSequence: die-crushed
 	AttackMove:
 	Passenger:
@@ -385,7 +386,7 @@
 	DamagedByTerrain:
 		Terrain: Tiberium, BlueTiberium, RedTiberium
 		Damage: 220
-		DamageInterval: 16
+		DamageInterval: 25
 		DamageTypes: TiberiumDeath
 		RequiresCondition: !hazmatsuits
 	GrantConditionOnTerrain@HAZMAT:
@@ -405,11 +406,18 @@
 		RequiresCondition: hazmatsuits
 	ActorLostNotification:
 	SpawnActorOnDeath:
-		Probability: 25
+		Probability: 5
 		Actor: vice
 		OwnerType: InternalName
 		InternalOwner: Creeps
 		DeathType: TiberiumDeath
+		RequiresLobbyCreeps: true
+    SpawnActorOnDeath@TibGun:
+		Probability: 40
+		Actor: vice
+		OwnerType: InternalName
+		InternalOwner: Creeps
+		DeathType: TibGun
 		RequiresLobbyCreeps: true
 	Crushable:
 		WarnProbability: 10

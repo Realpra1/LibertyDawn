@@ -69,7 +69,7 @@ Chemspray:
 			Light: 50
 			Tiberium: 120
 			Heavy: 10
-		DamageTypes: Prone50Percent, TriggerProne, TiberiumDeath
+		DamageTypes: Prone50Percent, TriggerProne, TibGun
 	Warhead@3Eff: CreateEffect
 		Explosions: chemball
 		ImpactSounds: xplos.aud
@@ -94,7 +94,7 @@ BigChem:
 			Light: 50
 			Tiberium: 120
 			Heavy: 10
-		DamageTypes: Prone50Percent, TriggerProne, TiberiumDeath
+		DamageTypes: Prone50Percent, TriggerProne, TibGun
     Warhead@3Eff: CreateEffect
 		Explosions: bigchem
 		ImpactSounds: xplos.aud
