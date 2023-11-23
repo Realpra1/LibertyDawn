@@ -184,7 +184,7 @@ NUK2:
 		Prerequisite: anypower
 	Buildable:
 		BuildPaletteOrder: 80
-		Prerequisites: upgrade.economy1, ~techlevel.medium
+		Prerequisites: upgrade.economy2, ~techlevel.medium
 		Queue: Building.GDI, Building.Nod
 		Description: Provides more power, cheaper than the\nstandard Power Plant
 	Building:
@@ -1111,7 +1111,7 @@ STEALTH:
 	Inherits@IDISABLE: ^DisabledOverlay
     Inherits@StealthGen: ^StealthGenerator
     Valued:
-		Cost: 1500
+		Cost: 1000
 	Tooltip:
 		Name: Stealth Generator
 	Buildable:
