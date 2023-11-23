@@ -413,7 +413,7 @@
 		DeathType: TiberiumDeath
 		RequiresLobbyCreeps: true
     SpawnActorOnDeath@TibGun:
-		Probability: 40
+		Probability: 75
 		Actor: vice
 		OwnerType: InternalName
 		InternalOwner: Creeps
