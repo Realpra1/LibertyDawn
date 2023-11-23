@@ -22,11 +22,8 @@ CRATE:
 		Condition: cloak-crate-collected
 	GiveMcvCrateAction:
 		SelectionShares: 0
-		NoBaseSelectionShares: 70
+		NoBaseSelectionShares: 25
 		Units: mcv
-	ExplodeCrateAction:
-		Weapon: Atomic
-		SelectionShares: 1
 	GiveUnitCrateAction:
 		Units: vice
 		Owner: Creeps
@@ -190,7 +187,7 @@ upgrade.covert1:
 		BuildDurationModifier: 100
 		Description: Basic covert specialization
 	Valued:
-		Cost: 100
+		Cost: 1000
     KillsSelf:
         RemoveInstead: true
         RequiresCondition: downgrade.covert && !upgrade.covert2
@@ -222,7 +219,7 @@ upgrade.covert2:
 		BuildDurationModifier: 100
 		Description: Medium covert specialization
 	Valued:
-		Cost: 100
+		Cost: 1000
     KillsSelf:
         RemoveInstead: true
         RequiresCondition: downgrade.covert && !upgrade.covert3
@@ -256,7 +253,7 @@ upgrade.covert3:
 		BuildDurationModifier: 100
 		Description: Advanced covert specialization
 	Valued:
-		Cost: 100
+		Cost: 1000
     KillsSelf:
         RemoveInstead: true
         RequiresCondition: downgrade.covert
@@ -281,7 +278,7 @@ downgrade.covert:
 		Prerequisites: anycovert
 		Queue: Upgrade
 		BuildLimit: 1
-		BuildDuration: 50
+		BuildDuration: 25
 		BuildDurationModifier: 100
 		Description: Downgrade covert specialization
 	Valued:
@@ -338,7 +335,7 @@ upgrade.recon1:
 		BuildDurationModifier: 100
 		Description: Basic recon specialization
 	Valued:
-		Cost: 100
+		Cost: 1000
     KillsSelf:
         RemoveInstead: true
         RequiresCondition: downgrade.recon && !upgrade.recon2
@@ -372,7 +369,7 @@ upgrade.recon2:
 		BuildDurationModifier: 100
 		Description: Medium recon specialization
 	Valued:
-		Cost: 100
+		Cost: 1000
     KillsSelf:
         RemoveInstead: true
         RequiresCondition: downgrade.recon && !upgrade.recon3
@@ -406,7 +403,7 @@ upgrade.recon3:
 		BuildDurationModifier: 100
 		Description: Advanced recon specialization
 	Valued:
-		Cost: 100
+		Cost: 1000
     KillsSelf:
         RemoveInstead: true
         RequiresCondition: downgrade.recon
@@ -431,7 +428,7 @@ downgrade.recon:
 		Prerequisites: anyrecon
 		Queue: Upgrade
 		BuildLimit: 1
-		BuildDuration: 50
+		BuildDuration: 25
 		BuildDurationModifier: 100
 		Description: Downgrade recon specialization
 	Valued:
@@ -458,7 +455,7 @@ upgrade.economy1:
 		BuildDurationModifier: 100
 		Description: Basic economy specialization
 	Valued:
-		Cost: 100
+		Cost: 1000
     KillsSelf:
         RemoveInstead: true
         RequiresCondition: downgrade.economy && !upgrade.economy2
@@ -492,7 +489,7 @@ upgrade.economy2:
 		BuildDurationModifier: 100
 		Description: Medium economy specialization
 	Valued:
-		Cost: 100
+		Cost: 1000
     KillsSelf:
         RemoveInstead: true
         RequiresCondition: downgrade.economy && !upgrade.economy3
@@ -524,7 +521,7 @@ upgrade.economy3:
 		BuildDurationModifier: 100
 		Description: Advanced economy specialization
 	Valued:
-		Cost: 100
+		Cost: 1000
     KillsSelf:
         RemoveInstead: true
         RequiresCondition: downgrade.economy
@@ -549,7 +546,7 @@ downgrade.economy:
 		Prerequisites: anyeconomy
 		Queue: Upgrade
 		BuildLimit: 1
-		BuildDuration: 50
+		BuildDuration: 25
 		BuildDurationModifier: 100
 		Description: Downgrade economy specialization
 	Valued:

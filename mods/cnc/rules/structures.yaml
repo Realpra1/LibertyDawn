@@ -678,6 +678,7 @@ HQ:
 
 FIX:
 	Inherits: ^BaseBuilding
+    Inherits@repairgen: ^RepairGenerator
 	HitShape:
 		TargetableOffsets: 840,0,0, 598,-640,0, 598,640,0, -1060,0,0, -768,-640,0, -768,640,0
 		Type: Polygon
@@ -690,7 +691,7 @@ FIX:
 		BuildPaletteOrder: 60
 		Prerequisites: upgrade.economy1
 		Queue: Building.GDI, Building.Nod
-		Description: Repairs vehicles
+		Description: Repairs units in range
 	Building:
 		Footprint: _+_ +++ _+_
 		Dimensions: 3,3

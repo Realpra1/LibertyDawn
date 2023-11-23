@@ -221,6 +221,7 @@
 	Inherits@selection: ^SelectableCombatUnit
 	Inherits@handicaps: ^PlayerHandicaps
     Inherits@cloakable: ^Cloakable
+    Inherits@repairgen: ^GenRepairable
 	Huntable:
 	OwnerLostAction:
 		Action: Kill
@@ -277,6 +278,7 @@
 	Inherits@selection: ^SelectableCombatUnit
 	Inherits@handicaps: ^PlayerHandicaps
     Inherits@cloakable: ^Cloakable
+    Inherits@repairgen: ^GenRepairable
 	Huntable:
 	OwnerLostAction:
 		Action: Kill
@@ -335,6 +337,7 @@
 	Inherits@selection: ^SelectableCombatUnit
 	Inherits@handicaps: ^PlayerHandicaps
     Inherits@cloakable: ^Cloakable
+    Inherits@repairgen: ^GenRepairable
 	Huntable:
 	OwnerLostAction:
 		Action: Kill
@@ -1263,6 +1266,30 @@
         ValidRelationships: Ally
         RequiresCondition: !lowpower
     WithRangeCircle@stealthcircle:
+        Range: 7c0
+        Color: 8080ff80
+        RequiresCondition: !lowpower
+      
+^GenRepairable:
+    ChangesHealth@RepairGen:
+		Step: 0
+		PercentageStep: 5
+		Delay: 75
+		StartIfBelow: 100
+        DamageCooldown: 250
+        RequiresCondition: RepairGen
+    GrantConditionInRange@RepairGenReceiver:
+        Condition: RepairGen
+        Granter: false
+      
+^RepairGenerator:
+    GrantConditionInRange@repairrange:
+        Condition: RepairGen
+        Granter: true
+        Range: 7c0
+        ValidRelationships: Ally
+        RequiresCondition: !lowpower
+    WithRangeCircle@repaircircle:
         Range: 7c0
         Color: 8080ff80
         RequiresCondition: !lowpower
