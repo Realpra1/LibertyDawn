@@ -190,8 +190,8 @@ World:
 		SmokeSequences: idle
 	ResourceLayer:
 		RecalculateResourceDensity: true
-        SpreadModifier: 150
-        StageModifier: 150
+        SpreadModifier: 100
+        StageModifier: 100
 		ResourceTypes:
 			Tiberium:
 				ResourceIndex: 1

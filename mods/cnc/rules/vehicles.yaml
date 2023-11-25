@@ -128,7 +128,7 @@ SHARV:
         -RequiresCondition:
     -GrantConditionInRange@StealthGenReceiver:
 	Valued:
-		Cost: 1250
+		Cost: 1150
 	Tooltip:
 		Name: Stealth Harvester
 		GenericName: Stealth Harvester
@@ -827,7 +827,7 @@ STNK:
         -RequiresCondition:
     -GrantConditionInRange@StealthGenReceiver:
 	Valued:
-		Cost: 1500
+		Cost: 1200
 	Tooltip:
 		Name: Stealth Tank
 	UpdatesPlayerStatistics:

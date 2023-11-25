@@ -246,7 +246,7 @@ PROC:
 		DecorationBounds: 3114, 3072
 	CustomSellValue:
 		Value: 400
-	FreeActor:
+	FreeActor@standard:
 		Actor: HARV
 		SpawnOffset: 1,2
 		Facing: 256
@@ -1111,7 +1111,7 @@ STEALTH:
 	Inherits@IDISABLE: ^DisabledOverlay
     Inherits@StealthGen: ^StealthGenerator
     Valued:
-		Cost: 1000
+		Cost: 750
 	Tooltip:
 		Name: Stealth Generator
 	Buildable:
@@ -1131,7 +1131,7 @@ STEALTH:
     WithBuildingBib:
 		HasMinibib: true
     Power:
-		Amount: -100
+		Amount: -50
     WithSpriteBody:
 		PauseOnCondition: lowpower
 	MustBeDestroyed:
@@ -1149,7 +1149,7 @@ RESONATOR:
 		BuildPaletteOrder: 100
 		Prerequisites: upgrade.economy3, ~techlevel.high
 		Queue: Building.GDI, Building.Nod
-		Description: Accelerates tiberium spread by 500%.\nPrevents spontaneous red tiberium instability events.
+		Description: Accelerates tiberium spread by 750%.\nPrevents spontaneous red tiberium instability events.
 	Building:
 		Footprint: xx
 		Dimensions: 2,1
@@ -1172,7 +1172,7 @@ RESONATOR:
 		RequiredForShortGame: true
     ModifiesResources:
         SpreadModifier: 750
-        StageModifier: 150
+        StageModifier: 100
         ModifiesResourcesTypes:
 			Tiberium:
                 MaxStageEvolvesTo: BlueTiberium

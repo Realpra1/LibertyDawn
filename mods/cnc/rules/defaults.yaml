@@ -1284,7 +1284,7 @@
 		PercentageStep: 5
 		Delay: 75
 		StartIfBelow: 100
-        DamageCooldown: 250
+        DamageCooldown: 0
         RequiresCondition: RepairGen
     GrantConditionInRange@RepairGenReceiver:
         Condition: RepairGen
