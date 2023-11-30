@@ -112,9 +112,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		void INotifyOwnerChanged.OnOwnerChanged(Actor self, Player oldOwner, Player newOwner)
 		{
-			Unregister(self);
 			globalManager = newOwner.PlayerActor.Trait<GrantConditionOnPrerequisiteManager>();
-			Register(self);
 		}
 
 		void INotifyPrerequisitesUpdated.PrerequisitesUpdated(Actor self, bool available)

@@ -257,10 +257,10 @@
 		Categories: Vehicle
     DetectCloaked@RECON:
 		Range: 2c0
-        RequiresCondition: upgrade.recon2
+        RequiresCondition: upgrade.recon3
     GrantConditionOnPrerequisite@RECON:
-        Condition: upgrade.recon2
-        Prerequisites: upgrade.recon2
+        Condition: upgrade.recon3
+        Prerequisites: upgrade.recon3
     Cloak:
         RequiresCondition: StealthGen || cloak-crate-collected
 
@@ -349,12 +349,16 @@
 		Range: 10c0
 	DetectCloaked@a:
 		Range: 2c0
+        RequiresCondition: upgrade.recon1
     DetectCloaked@b:
 		Range: 4c0
-        RequiresCondition: upgrade.recon1
+        RequiresCondition: upgrade.recon2
     GrantConditionOnPrerequisite@RECON:
         Condition: upgrade.recon1
         Prerequisites: upgrade.recon1
+    GrantConditionOnPrerequisite@RECON2:
+        Condition: upgrade.recon2
+        Prerequisites: upgrade.recon2
     Cloak:
         RequiresCondition: StealthGen
 	Mobile:
@@ -1270,11 +1274,11 @@
     GrantConditionInRange@stealthrange:
         Condition: StealthGen
         Granter: true
-        Range: 7c0
+        Range: 10c0
         ValidRelationships: Ally
         RequiresCondition: !lowpower
     WithRangeCircle@stealthcircle:
-        Range: 7c0
+        Range: 10c0
         Color: 8080ff80
         RequiresCondition: !lowpower
       

@@ -98,6 +98,7 @@ AARockets:
     Inherits: Rockets
 	ValidTargets: Air
     Projectile: Missile
+		Inaccuracy: 1024
 		Blockable: false
 	Warhead@1Dam: SpreadDamage
 		Damage: 1500
@@ -128,9 +129,10 @@ BikeAARockets:
     Inherits: BikeRockets
     ValidTargets: Air
     Projectile: Missile
+		Inaccuracy: 1024
         Blockable: false
 	Warhead@1Dam: SpreadDamage
-        Damage: 1250
+        Damage: 800
 		ValidTargets: Air
     -Warhead@2Smu:
 
@@ -261,6 +263,8 @@ MammothMissiles:
 	Inherits: 227mm.stnk
 	MinRange: 2c512
 	ValidTargets: Air
+    Projectile: Missile
+		Inaccuracy: 1024
 	Warhead@1Dam: SpreadDamage
         ValidTargets: Air
 		Damage: 4000

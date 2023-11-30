@@ -641,8 +641,8 @@ HTNK:
 		Description: Heavily armored Tank.\nCan attack Aircraft.\n  Strong vs Everything
 	Mobile:
 		Locomotor: heavytracked
-		Speed: 25
-		TurnSpeed: 4
+		Speed: 35
+		TurnSpeed: 10
 	Health:
 		HP: 90000
 	Repairable:
@@ -709,8 +709,8 @@ MSAM:
 		Queue: Vehicle.GDI, Vehicle.Nod
 		Description: Very long range rocket artillery.\n  Strong vs all Ground units.
 	Mobile:
-		Speed: 30
-		TurnSpeed: 10
+		Speed: 40
+		TurnSpeed: 15
 	Health:
 		HP: 6650
 	Repairable:
@@ -732,7 +732,7 @@ MSAM:
 		LocalOffset: 213,-128,0, 213,128,0
 		PauseOnCondition: !ammo
     AmmoPool:
-		Ammo: 28
+		Ammo: 42
 		AmmoCondition: ammo
 	ReloadAmmoPool:
 		Delay: 375
@@ -785,9 +785,6 @@ MLRS:
 		Type: Light
 	RevealsShroud:
 		Range: 8c0
-	DetectCloaked:
-		Range: 3c0
-    RenderDetectionCircle:
 	Turreted:
 		TurnSpeed: 32
 		Offset: -128,0,128
@@ -827,7 +824,7 @@ STNK:
         -RequiresCondition:
     -GrantConditionInRange@StealthGenReceiver:
 	Valued:
-		Cost: 1200
+		Cost: 900
 	Tooltip:
 		Name: Stealth Tank
 	UpdatesPlayerStatistics:
