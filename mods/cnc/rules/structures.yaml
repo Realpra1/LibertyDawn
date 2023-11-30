@@ -250,6 +250,14 @@ PROC:
 		Actor: HARV
 		SpawnOffset: 1,2
 		Facing: 256
+        AtSpawnOnly: true
+        Prerequisites: !upgrade.covert2
+    FreeActor@sharv:
+		Actor: SHARV
+		SpawnOffset: 1,2
+		Facing: 256
+        AtSpawnOnly: true
+        Prerequisites: upgrade.covert2
 	WithBuildingBib:
 	WithResourceLevelOverlay:
 		RequiresCondition: !build-incomplete

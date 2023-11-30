@@ -164,6 +164,8 @@ namespace OpenRA.Traits
 	public interface INotifyAddedToWorld { void AddedToWorld(Actor self); }
 	[RequireExplicitImplementation]
 	public interface INotifyRemovedFromWorld { void RemovedFromWorld(Actor self); }
+	[RequireExplicitImplementation]
+	public interface INotifyPrerequisitesUpdated { void PrerequisitesUpdated(Actor self, bool available); }
 
 	[RequireExplicitImplementation]
 	public interface INotifyActorDisposing { void Disposing(Actor self); }

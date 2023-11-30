@@ -30,7 +30,7 @@ namespace OpenRA.Mods.Common.Traits
 		public override object Create(ActorInitializer init) { return new GrantConditionOnPrerequisite(this); }
 	}
 
-	public class GrantConditionOnPrerequisite : INotifyCreated, INotifyAddedToWorld, INotifyRemovedFromWorld, INotifyOwnerChanged
+	public class GrantConditionOnPrerequisite : INotifyCreated, INotifyAddedToWorld, INotifyRemovedFromWorld, INotifyOwnerChanged, INotifyPrerequisitesUpdated
 	{
 		readonly GrantConditionOnPrerequisiteInfo info;
 
@@ -50,11 +50,21 @@ namespace OpenRA.Mods.Common.Traits
 
 		void INotifyAddedToWorld.AddedToWorld(Actor self)
 		{
+			Register(self);
+		}
+
+		void Register(Actor self)
+		{
 			if (info.Prerequisites.Any())
 				globalManager.Register(self, this, info.Prerequisites);
 		}
 
 		void INotifyRemovedFromWorld.RemovedFromWorld(Actor self)
+		{
+			Unregister(self);
+		}
+
+		void Unregister(Actor self)
 		{
 			if (info.Prerequisites.Any())
 				globalManager.Unregister(self, this, info.Prerequisites);
@@ -62,10 +72,12 @@ namespace OpenRA.Mods.Common.Traits
 
 		void INotifyOwnerChanged.OnOwnerChanged(Actor self, Player oldOwner, Player newOwner)
 		{
+			Unregister(self);
 			globalManager = newOwner.PlayerActor.Trait<GrantConditionOnPrerequisiteManager>();
+			Register(self);
 		}
 
-		public void PrerequisitesUpdated(Actor self, bool available)
+		void INotifyPrerequisitesUpdated.PrerequisitesUpdated(Actor self, bool available)
 		{
 			if (available == wasAvailable)
 				return;

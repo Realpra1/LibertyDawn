@@ -9,7 +9,9 @@
  */
 #endregion
 
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using OpenRA.Primitives;
 using OpenRA.Traits;
 
@@ -33,8 +35,14 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Whether another actor should spawn upon re-enabling the trait.")]
 		public readonly bool AllowRespawn = false;
 
+		[Desc("Free actor can only spawn if trait enabled at create event, if not, then it never spawns.")]
+		public readonly bool AtSpawnOnly = false;
+
 		[Desc("Display order for the free actor checkbox in the map editor")]
 		public readonly int EditorFreeActorDisplayOrder = 4;
+
+		[Desc("List of required prerequisites.")]
+		public readonly string[] Prerequisites = Array.Empty<string>();
 
 		IEnumerable<EditorActorOption> IEditorActorOptions.ActorOptions(ActorInfo ai, World world)
 		{
@@ -56,19 +64,80 @@ namespace OpenRA.Mods.Common.Traits
 		public override object Create(ActorInitializer init) { return new FreeActor(init, this); }
 	}
 
-	public class FreeActor : ConditionalTrait<FreeActorInfo>
+	public class FreeActor : ConditionalTrait<FreeActorInfo>, INotifyCreated, INotifyAddedToWorld, INotifyRemovedFromWorld, INotifyOwnerChanged, INotifyPrerequisitesUpdated
 	{
+		protected bool wasAvailable;
+		protected GrantConditionOnPrerequisiteManager globalManager;
+
+		protected FreeActorInfo info;
+
 		protected bool allowSpawn;
+		protected bool hasSpawned = false;
 
 		public FreeActor(ActorInitializer init, FreeActorInfo info)
 			: base(info)
 		{
 			allowSpawn = init.GetValue<FreeActorInit, bool>(info, true);
+			this.info = info;
+		}
+
+		void INotifyCreated.Created(Actor self)
+		{
+			globalManager = self.Owner.PlayerActor.Trait<GrantConditionOnPrerequisiteManager>();
+		}
+
+		void INotifyAddedToWorld.AddedToWorld(Actor self)
+		{
+			Register(self);
+			SpawnLogic(self, true);
+		}
+
+		void Register(Actor self)
+		{
+			if (info.Prerequisites.Any())
+				globalManager.Register(self, this, info.Prerequisites);
+		}
+
+		void INotifyRemovedFromWorld.RemovedFromWorld(Actor self)
+		{
+			Unregister(self);
+		}
+
+		void Unregister(Actor self)
+		{
+			if (info.Prerequisites.Any())
+				globalManager.Unregister(self, this, info.Prerequisites);
+		}
+
+		void INotifyOwnerChanged.OnOwnerChanged(Actor self, Player oldOwner, Player newOwner)
+		{
+			Unregister(self);
+			globalManager = newOwner.PlayerActor.Trait<GrantConditionOnPrerequisiteManager>();
+			Register(self);
+		}
+
+		void INotifyPrerequisitesUpdated.PrerequisitesUpdated(Actor self, bool available)
+		{
+			if (available == wasAvailable)
+				return;
+
+			wasAvailable = available;
+
+			if (wasAvailable)
+				SpawnLogic(self);
 		}
 
 		protected override void TraitEnabled(Actor self)
 		{
-			if (!allowSpawn)
+			SpawnLogic(self);
+		}
+
+		void SpawnLogic(Actor self, bool spawnEvent = false)
+		{
+			if (!allowSpawn || (!wasAvailable && info.Prerequisites.Any()))
+				return;
+
+			if (info.AtSpawnOnly && !spawnEvent)
 				return;
 
 			allowSpawn = Info.AllowRespawn;

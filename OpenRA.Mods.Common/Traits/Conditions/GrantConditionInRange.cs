@@ -22,7 +22,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		[FieldLoader.Require]
 		[GrantedConditionReference]
-		[Desc("The condition to grant.")]
+		[Desc("The condition to grant or receive.")]
 		public readonly string Condition = null;
 
 		[Desc("Will grant the condition if this is true. Otherwise only receive.")]
