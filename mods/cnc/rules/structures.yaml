@@ -240,7 +240,7 @@ PROC:
 		DragLength: 12
 		TickRate: 15
 	StoresResources:
-		Capacity: 50
+		Capacity: 150
 	Selectable:
 		Bounds: 3072, 2389
 		DecorationBounds: 3114, 3072
