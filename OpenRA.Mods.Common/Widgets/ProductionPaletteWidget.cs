@@ -322,7 +322,8 @@ namespace OpenRA.Mods.Common.Widgets
 
 				if (canQueue)
 				{
-					var queued = !modifiers.HasModifier(Modifiers.Ctrl);
+					// Removed CTRL jumps queue logic, unused and undocumented.
+					var queued = true;
 					World.IssueOrder(Order.StartProduction(CurrentQueue.Actor, icon.Name, handleCount, queued));
 					return true;
 				}
