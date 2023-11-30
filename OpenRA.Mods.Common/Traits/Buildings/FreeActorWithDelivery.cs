@@ -38,7 +38,7 @@ namespace OpenRA.Mods.Common.Traits
 
 	public class FreeActorWithDelivery : FreeActor
 	{
-		readonly FreeActorWithDeliveryInfo info;
+		new readonly FreeActorWithDeliveryInfo info;
 		readonly Actor self;
 
 		public FreeActorWithDelivery(ActorInitializer init, FreeActorWithDeliveryInfo info)
