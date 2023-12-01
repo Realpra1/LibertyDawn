@@ -77,7 +77,7 @@ HELI:
 		Range: 10c0
 		Type: GroundPosition
     DetectCloaked:
-		Range: 5c0
+		Range: 3c0
 	Armament@PRIMARY:
 		Weapon: HeliAGGun
 		LocalOffset: 128,-213,-85, 128,213,-85
@@ -151,7 +151,7 @@ ORCA:
 		Range: 8c0
 		Type: GroundPosition
     DetectCloaked:
-		Range: 4c0
+		Range: 2c0
 	Armament@PRIMARY:
 		Weapon: OrcaAGMissiles
 		LocalOffset: 427,-171,-213, 427,171,-213

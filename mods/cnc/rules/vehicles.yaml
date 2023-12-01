@@ -38,6 +38,11 @@ MCV:
 		Actor: MCV.Husk
 		OwnerType: InternalName
 		EffectiveOwnerFromOwner: true
+    GrantConditionOnPrerequisite@covert3:
+		Condition: upgrade.covert3
+		Prerequisites: upgrade.covert3
+    Cloak:
+        RequiresCondition: upgrade.covert3 || StealthGen || cloak-crate-collected
 
 HARV:
 	Inherits: ^Tank
@@ -886,9 +891,9 @@ MHQ:
 	Mobile:
 		Speed: 72
 	RevealsShroud:
-		Range: 10c0
+		Range: 15c0
     DetectCloaked:
-		Range: 10c0
+		Range: 16c0
     RenderDetectionCircle:
 	WithIdleOverlay@SPINNER:
 		Sequence: spinner
