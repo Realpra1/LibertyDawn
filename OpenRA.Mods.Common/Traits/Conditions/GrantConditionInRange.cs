@@ -52,7 +52,7 @@ namespace OpenRA.Mods.Common.Traits
 		/// String used because I'm bad at C# generics.
 		/// </summary>
 		readonly FastUniqueQueue<uint, string> actorRevokeTokenMap = new FastUniqueQueue<uint, string>();
-		Dictionary<uint, Actor> actorMap = new Dictionary<uint, Actor>();
+		readonly Dictionary<uint, Actor> actorMap = new Dictionary<uint, Actor>();
 
 		public GrantConditionInRange(GrantConditionInRangeInfo info)
 			: base(info)
