@@ -72,7 +72,7 @@ namespace OpenRA.Mods.Common.Traits
 		protected FreeActorInfo info;
 
 		protected bool allowSpawn;
-		protected bool hasSpawned = false;
+		protected bool onSpawnHappened = false;
 
 		public FreeActor(ActorInitializer init, FreeActorInfo info)
 			: base(info)
@@ -112,6 +112,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		void INotifyOwnerChanged.OnOwnerChanged(Actor self, Player oldOwner, Player newOwner)
 		{
+			onSpawnHappened = true;
 			globalManager = newOwner.PlayerActor.Trait<GrantConditionOnPrerequisiteManager>();
 		}
 
@@ -136,8 +137,11 @@ namespace OpenRA.Mods.Common.Traits
 			if (!allowSpawn || (!wasAvailable && info.Prerequisites.Any()))
 				return;
 
-			if (info.AtSpawnOnly && !spawnEvent)
-				return;
+			if (info.AtSpawnOnly)
+				if (!spawnEvent || onSpawnHappened)
+					return;
+				else
+					onSpawnHappened = true;
 
 			allowSpawn = Info.AllowRespawn;
 

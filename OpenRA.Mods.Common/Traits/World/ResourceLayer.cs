@@ -717,8 +717,9 @@ namespace OpenRA.Mods.Common.Traits
 						{
 							new OwnerInit(world.Players.Where(p => p.PlayerName == "Creeps").FirstOrDefault())
 						});
-						DoExplode(resActor, resourceInfo, cell);
-						resActor.Dispose();
+
+						delayedExplosions.Add(cell, true);
+						Schedule(tickTime + world.SharedRandom.Next(1, 240), () => DoExplode(resActor, resourceInfo, cell));
 						return;
 					}
 
@@ -873,6 +874,8 @@ namespace OpenRA.Mods.Common.Traits
 						AddToTickQueue(cell, newResourceInfo);
 					}
 				}
+
+				source.Dispose();
 			}
 			catch (Exception ex)
 			{

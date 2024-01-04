@@ -226,6 +226,7 @@ RMBO:
 	UpdatesPlayerStatistics:
 		AddToArmyValue: true
 	Buildable:
+        BuildDuration: 1200
 		BuildPaletteOrder: 50
 		Prerequisites: upgrade.recon3, ~techlevel.high
 		Queue: Infantry.GDI, Infantry.Nod

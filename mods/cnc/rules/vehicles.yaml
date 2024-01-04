@@ -3,10 +3,11 @@ MCV:
 	Inherits@CLOAK: ^AcceptsCloakCrate
 	Inherits@selection: ^SelectableSupportUnit
 	Valued:
-		Cost: 3500
+		Cost: 4000
 	Tooltip:
 		Name: Mobile Construction Vehicle
 	Buildable:
+        BuildDuration: 2400
 		BuildPaletteOrder: 110
 		Prerequisites: anyhq, ~techlevel.medium
 		Queue: Vehicle.GDI, Vehicle.Nod
@@ -85,7 +86,7 @@ HARV:
 	RevealsShroud:
 		Range: 2c0
     Cloak:
-		UncloakOn: Attack, Damage, Heal
+		UncloakOn: Attack, Damage
 		RequiresCondition: StealthGen || cloak-crate-collected
 	ActorLostNotification:
 		Notification: HarvesterLost
@@ -207,9 +208,12 @@ SHARV:
 APC:
 	Inherits: ^Tank
 	Inherits@EXPERIENCE: ^GainsExperience
-	Inherits@CLOAK: ^AcceptsCloakCrate
 	Inherits@AUTOTARGET: ^AutoTargetAllAssaultMove
 	Inherits@TRANSPORT: ^Transport
+    Inherits@CLOAKED: ^Cloakable
+    Cloak:
+        -RequiresCondition:
+    -GrantConditionInRange@StealthGenReceiver:
 	Valued:
 		Cost: 600
 	Tooltip:
@@ -220,7 +224,7 @@ APC:
 		BuildPaletteOrder: 35
 		Prerequisites: upgrade.covert1
 		Queue: Vehicle.GDI, Vehicle.Nod
-		Description: Armored infantry transport.\n  Decent vs Vehicles\n  Weak vs Infantry
+		Description: Armored and stealthed infantry transport.\n  Decent vs Vehicles\n  Weak vs Infantry
 	Mobile:
 		TurnSpeed: 28
 		Speed: 110
@@ -640,6 +644,7 @@ HTNK:
 	UpdatesPlayerStatistics:
 		AddToArmyValue: true
 	Buildable:
+        BuildDuration: 1200
 		BuildPaletteOrder: 85
 		Prerequisites: upgrade.economy3, ~techlevel.high
 		Queue: Vehicle.GDI, Vehicle.Nod
@@ -879,7 +884,7 @@ MHQ:
 	Inherits: ^Vehicle
 	Inherits@CLOAK: ^AcceptsCloakCrate
 	Valued:
-		Cost: 1000
+		Cost: 500
 	UpdatesPlayerStatistics:
 		AddToArmyValue: true
 	Tooltip:
@@ -889,7 +894,7 @@ MHQ:
 	Armor:
 		Type: Light
 	Mobile:
-		Speed: 72
+		Speed: 100
 	RevealsShroud:
 		Range: 15c0
     DetectCloaked:

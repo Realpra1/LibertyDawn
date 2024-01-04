@@ -9,6 +9,7 @@
  */
 #endregion
 
+using System.Collections.Generic;
 using System.Linq;
 using OpenRA.Traits;
 
@@ -51,6 +52,7 @@ namespace OpenRA.Mods.Common.Traits
 		/// String used because I'm bad at C# generics.
 		/// </summary>
 		readonly FastUniqueQueue<uint, string> actorRevokeTokenMap = new FastUniqueQueue<uint, string>();
+		Dictionary<uint, Actor> actorMap = new Dictionary<uint, Actor>();
 
 		public GrantConditionInRange(GrantConditionInRangeInfo info)
 			: base(info)
@@ -98,6 +100,7 @@ namespace OpenRA.Mods.Common.Traits
 
 			int initCount = actorRevokeTokenMap.Size();
 			int pinged = 0;
+			Dictionary<uint, bool> pingedActors = new Dictionary<uint, bool>();
 
 			var actorsInRange = self.World.FindActorsInCircle(self.CenterPosition, info.Range)
 				.Where(a => info.ValidRelationships.HasRelationship(a.Owner.RelationshipWith(self.Owner)));
@@ -126,11 +129,15 @@ namespace OpenRA.Mods.Common.Traits
 				{
 					var revokeToken = actor.GrantCondition(info.Condition);
 					actorRevokeTokenMap.PutIfAbsent(actor.ActorID, revokeToken.ToString());
+					pingedActors.Add(actor.ActorID, true);
+					actorMap.TryAdd(actor.ActorID, actor);
 				}
 				else
 				{
 					pinged++;
 					actorRevokeTokenMap.AddLast(actor.ActorID, actorRevokeTokenMap.GetEntry(actor.ActorID).Value);
+					pingedActors.Add(actor.ActorID, true);
+					actorMap.TryAdd(actor.ActorID, actor);
 				}
 			}
 
@@ -138,12 +145,18 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				var leftRange = actorRevokeTokenMap.HeadEntry();
 				actorRevokeTokenMap.Poll();
-				if (leftRange != null)
+				if (leftRange != null && !pingedActors.ContainsKey(leftRange.Key))
 				{
-					var actor = self.World.GetActorById(leftRange.Key);
+					var actor = actorMap.GetValueOrDefault(leftRange.Key);
+
 					if (actor != null)
+					{
 						actor.RevokeCondition(int.Parse(leftRange.Value));
+						actorMap.Remove(leftRange.Key);
+					}
 				}
+				else if (leftRange != null)
+					actorRevokeTokenMap.AddLast(leftRange.Key, leftRange.Value);
 			}
 		}
 	}

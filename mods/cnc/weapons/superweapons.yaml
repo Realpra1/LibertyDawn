@@ -105,7 +105,7 @@ AtomicTib:
     Warhead@1Dam_impact: SpreadDamage
 		Spread: 2c0
 		Damage: 15000
-		Delay: 1
+		Delay: 2
 		Falloff: 1000, 0, 0, 0, 0
 		ValidTargets: Ground, Air, Trees
 		AffectsParent: True
@@ -120,7 +120,7 @@ AtomicTib:
     Warhead@2Dam_impact: SpreadDamage
 		Spread: 2c0
 		Damage: 10000
-		Delay: 6
+		Delay: 7
 		Falloff: 0, 700, 0, 0, 0
 		ValidTargets: Ground, Air, Trees
 		AffectsParent: True
@@ -164,15 +164,15 @@ AtomicTib:
 		Delay: 3
 		ImpactActors: false
 	Warhead@8Res_areanukeb: DestroyResource
-		Size: 4
-		Delay: 7
+		Size: 6
+		Delay: 6
 	Warhead@9Smu_areanukeb: LeaveSmudge
 		SmudgeType: Scorch
 		InvalidTargets: Vehicle, Structure, Wall
 		Size: 4
-		Delay: 7
+		Delay: 6
 	Warhead@11Res_areanukec: DestroyResource
-		Size: 5
+		Size: 9
 		Delay: 13
 	Warhead@12Smu_areanukec: LeaveSmudge
 		SmudgeType: Scorch

@@ -644,7 +644,7 @@ HQ:
 		BuildPaletteOrder: 70
 		Prerequisites: ~techlevel.medium
 		Queue: Building.GDI, Building.Nod
-		Description: Provides radar and Air Strike support power.\nUnlocks higher-tech units and buildings.\nRequires power to operate.
+		Description: Provides radar and unlocks higher-tech units and buildings.\nRequires power to operate.
 	Building:
 		Footprint: X_ xx ==
 		Dimensions: 2,3
@@ -742,7 +742,7 @@ EYE:
 		BuildPaletteOrder: 100
 		Prerequisites: upgrade.recon3, ~techlevel.high
 		Queue: Building.GDI, Building.Nod
-		Description: Provides radar and Orbital Ion Cannon support power.\nUnlocks Mammoth Tank and Commando.\nRequires power to operate.
+		Description: Provides radar and Orbital Ion Cannon and Air Strike support powers.\nRequires power to operate.
 	Building:
 		Footprint: X_ xx ==
 		Dimensions: 2,3

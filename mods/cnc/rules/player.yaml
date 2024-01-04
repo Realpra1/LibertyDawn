@@ -72,6 +72,10 @@ Player:
 		Name: Unrestricted
 		Prerequisites: techlevel.low, techlevel.medium, techlevel.high, techlevel.superweapons
 		Id: unrestricted
+    ProvidesTechPrerequisite@extra:
+		Name: Extra
+		Prerequisites: techlevel.low, techlevel.medium, techlevel.high, techlevel.superweapons, techlevel.extra
+		Id: extra
 	GrantConditionOnPrerequisiteManager:
 	ResourceStorageWarning:
 	PlayerExperience:
