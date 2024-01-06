@@ -235,11 +235,11 @@ Player:
 					CheckRadius: 2c0
 	HarvesterBotModule:
 		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-Easy-ai || enable-Easiest-ai
-		HarvesterTypes: harv
+		HarvesterTypes: harv, sharv
 		RefineryTypes: proc
     HarvesterBotModule@b:
 		RequiresCondition: enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai
-		HarvesterTypes: harv
+		HarvesterTypes: harv, sharv
         HarvesterEnemyAvoidanceRadius: 15c0
 		RefineryTypes: proc
 	BuildingRepairBotModule:
@@ -269,7 +269,7 @@ Player:
 		PowerTypes: nuke, nuk2
 		BarracksTypes: pyle, hand
 		VehiclesFactoryTypes: weap, afld
-		ProductionTypes: pyle, hand, weap, afld, hpad
+		ProductionTypes: pyle, hand, weap, afld, hpad, hq
 		SiloTypes: silo
 		BuildingLimits:
 			proc: 4
@@ -308,7 +308,7 @@ Player:
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
 	UnitBuilderBotModule@cabal:
 		RequiresCondition: enable-cabal-ai
-		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI
+		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
 		UnitsToBuild:
 			e1: 65
 			e2: 25
@@ -328,6 +328,9 @@ Player:
 			htnk: 50
 			heli: 5
 			orca: 5
+            upgrade.economy1: 1
+            upgrade.economy2: 1
+            upgrade.recon1: 1
 		UnitLimits:
 			harv: 8
 	BaseBuilderBotModule@watson:
@@ -343,7 +346,7 @@ Player:
 		PowerTypes: nuke,nuk2
 		BarracksTypes: pyle,hand
 		VehiclesFactoryTypes: weap,afld
-		ProductionTypes: pyle,hand,weap,afld,hpad
+		ProductionTypes: pyle,hand,weap,afld,hpad, hq
 		SiloTypes: silo
 		BuildingLimits:
 			proc: 4
@@ -382,7 +385,7 @@ Player:
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
 	UnitBuilderBotModule@watson:
 		RequiresCondition: enable-watson-ai
-		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI
+		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
 		UnitsToBuild:
 			e1: 65
 			e2: 30
@@ -402,6 +405,9 @@ Player:
 			htnk: 50
 			jeep: 20
 			mtnk: 50
+            upgrade.economy1: 1
+            upgrade.economy2: 1
+            upgrade.recon1: 1
 		UnitLimits:
 			harv: 8
     BaseBuilderBotModule@hal9001:
@@ -417,7 +423,7 @@ Player:
 		PowerTypes: nuke,nuk2
 		BarracksTypes: pyle,hand
 		VehiclesFactoryTypes: weap,afld
-		ProductionTypes: pyle,hand,weap,afld,hpad
+		ProductionTypes: pyle,hand,weap,afld,hpad, hq
 		SiloTypes: silo
 		BuildingLimits:
 			proc: 4
@@ -456,7 +462,7 @@ Player:
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
 	UnitBuilderBotModule@hal9001:
 		RequiresCondition: enable-hal9001-ai
-		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI
+		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
 		UnitsToBuild:
 			e1: 65
 			e2: 30
@@ -478,371 +484,13 @@ Player:
 			msam: 50
 			htnk: 50
 			orca: 10
+            upgrade.economy1: 1
+            upgrade.economy2: 1
+            upgrade.recon1: 1
 		UnitLimits:
 			harv: 8
     BaseBuilderBotModule@brutalis:
 		RequiresCondition: enable-brutalis-ai || enable-wavemaker-ai
-		BuildingQueues: Building.Nod, Building.GDI
-		DefenseQueues: Defence.Nod, Defence.GDI
-		MinimumExcessPower: 1
-		MaximumExcessPower: 150
-		ExcessPowerIncrement: 1
-		ExcessPowerIncreaseThreshold: 1
-        MinBaseRadius: 5
-		ConstructionYardTypes: fact
-		RefineryTypes: proc
-		PowerTypes: nuke,nuk2
-		BarracksTypes: pyle,hand
-		VehiclesFactoryTypes: weap,afld
-		ProductionTypes: pyle,hand,weap,afld,hpad
-		SiloTypes: silo
-		BuildingLimits:
-			proc: 3
-			pyle: 2
-			hand: 2
-			hq: 1
-			weap: 4
-			afld: 4
-			hpad: 0
-			eye: 1
-			tmpl: 1
-			fix: 1
-			silo: 1
-			gtwr: 1
-            gun: 0
-			atwr: 3
-			obli: 4
-			sam: 2
-        BuildingDelays:
-            proc: 0
-			pyle: 2000
-			hand: 2000
-			hq: 5000
-			weap: 0
-			afld: 0
-			gtwr: 2000
-			gun: 2000
-			atwr: 2000
-			obli: 2000
-			sam: 2000
-			eye: 9000
-			tmpl: 9000
-			fix: 5000
-			hpad: 9000
-		BuildingFractions:
-			proc: 27
-			pyle: 1
-			hand: 1
-			hq: 1
-			weap: 66
-			afld: 66
-			gtwr: 1
-			gun: 0
-			atwr: 2
-			obli: 1
-			sam: 1
-			eye: 1
-			tmpl: 1
-			fix: 1
-			hpad: 0
-    SquadManagerBotModule@brutalis:
-		RequiresCondition: enable-brutalis-ai
-		SquadSize: 20
-		ExcludeFromSquadsTypes: harv, mcv, a10
-		ConstructionYardTypes: fact
-        AirUnitsTypes: heli, orca
-		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
-	UnitBuilderBotModule@brutalis:
-		RequiresCondition: enable-brutalis-ai || enable-wavemaker-ai
-		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI
-        IdleBaseUnitsMaximum: 999
-		UnitsToBuild:
-			e1: 65
-			e2: 25
-			e3: 40
-			e4: 15
-			e5: 15
-            rmbo: 2
-			harv: 50
-			ltnk: 4
-			ftnk: 4
-            ctnk: 0
-			arty: 38
-			mtnk: 1
-			msam: 40
-			stnk: 3
-			apc: 1
-			bggy: 1
-			bike: 1
-            jeep: 1
-			mlrs: 0
-			htnk: 9
-			heli: 0
-			orca: 0
-        UnitDelays:
-			harv: 0
-			ltnk: 5000
-			ftnk: 5000
-            ctnk: 5000
-			arty: 3000
-			mtnk: 5000
-			msam: 3000
-			stnk: 5000
-			apc: 5000
-			bggy: 4000
-			bike: 5000
-            jeep: 4000
-			mlrs: 5000
-			htnk: 5000
-			heli: 5000
-			orca: 5000
-            mcv: 3000
-		UnitLimits:
-			harv: 12
-			mlrs: 4
-			heli: 0
-			orca: 0
-            rmbo: 2
-    BaseBuilderBotModule@viki:
-		RequiresCondition: enable-viki-ai
-		BuildingQueues: Building.Nod, Building.GDI
-		DefenseQueues: Defence.Nod, Defence.GDI
-		MinimumExcessPower: 1
-		MaximumExcessPower: 150
-		ExcessPowerIncrement: 1
-		ExcessPowerIncreaseThreshold: 1
-        MinBaseRadius: 5
-		ConstructionYardTypes: fact
-		RefineryTypes: proc
-		PowerTypes: nuke,nuk2
-		BarracksTypes: pyle,hand
-		VehiclesFactoryTypes: weap,afld
-		ProductionTypes: pyle,hand,weap,afld,hpad
-		SiloTypes: silo
-		BuildingLimits:
-			proc: 3
-			pyle: 4
-			hand: 4
-			hq: 1
-			weap: 2
-			afld: 2
-			hpad: 0
-			eye: 1
-			tmpl: 1
-			fix: 1
-			silo: 1
-			gtwr: 1
-            gun: 0
-			atwr: 3
-			obli: 4
-			sam: 2
-        BuildingDelays:
-            proc: 0
-			pyle: 2000
-			hand: 2000
-			hq: 5000
-			weap: 0
-			afld: 0
-			gtwr: 2000
-			gun: 2000
-			atwr: 2000
-			obli: 2000
-			sam: 2000
-			eye: 9000
-			tmpl: 9000
-			fix: 5000
-			hpad: 9000
-		BuildingFractions:
-			proc: 27
-			pyle: 31
-			hand: 31
-			hq: 1
-			weap: 36
-			afld: 36
-			gtwr: 1
-			gun: 0
-			atwr: 2
-			obli: 1
-			sam: 1
-			eye: 1
-			tmpl: 1
-			fix: 1
-			hpad: 0
-    SquadManagerBotModule@viki:
-		RequiresCondition: enable-viki-ai
-		SquadSize: 25
-		ExcludeFromSquadsTypes: harv, mcv, a10
-		ConstructionYardTypes: fact
-        AirUnitsTypes: heli, orca
-		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
-	UnitBuilderBotModule@viki:
-		RequiresCondition: enable-viki-ai
-		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI
-        IdleBaseUnitsMaximum: 999
-		UnitsToBuild:
-			e1: 65
-			e2: 25
-			e3: 40
-			e4: 15
-			e5: 15
-            rmbo: 2
-			harv: 60
-			arty: 39
-			msam: 39
-            mlrs: 1
-			apc: 1
-			heli: 0
-			orca: 0
-        UnitDelays:
-			harv: 0
-			ltnk: 5000
-			ftnk: 5000
-            ctnk: 5000
-			arty: 3000
-			mtnk: 5000
-			msam: 3000
-			stnk: 5000
-			apc: 5000
-			bggy: 4000
-			bike: 5000
-            jeep: 4000
-			mlrs: 5000
-			htnk: 5000
-			heli: 5000
-			orca: 5000
-            mcv: 3000
-		UnitLimits:
-			harv: 12
-			stnk: 0
-			mlrs: 0
-			heli: 0
-			orca: 0
-            rmbo: 2
-    BaseBuilderBotModule@skynet:
-		RequiresCondition: enable-skynet-ai
-		BuildingQueues: Building.Nod, Building.GDI
-		DefenseQueues: Defence.Nod, Defence.GDI
-		MinimumExcessPower: 1
-		MaximumExcessPower: 150
-		ExcessPowerIncrement: 1
-		ExcessPowerIncreaseThreshold: 1
-        MinBaseRadius: 5
-		ConstructionYardTypes: fact
-		RefineryTypes: proc
-		PowerTypes: nuke,nuk2
-		BarracksTypes: pyle,hand
-		VehiclesFactoryTypes: weap,afld
-		ProductionTypes: pyle,hand,weap,afld,hpad
-		SiloTypes: silo
-		BuildingLimits:
-			proc: 3
-			pyle: 1
-			hand: 1
-			hq: 1
-			weap: 3
-			afld: 3
-			hpad: 2
-			eye: 1
-			tmpl: 1
-			fix: 1
-			silo: 1
-			gtwr: 1
-            gun: 0
-			atwr: 3
-			obli: 4
-			sam: 2
-        BuildingDelays:
-            proc: 0
-			pyle: 2000
-			hand: 2000
-			hq: 5000
-			weap: 0
-			afld: 0
-			gtwr: 2000
-			gun: 2000
-			atwr: 2000
-			obli: 2000
-			sam: 2000
-			eye: 9000
-			tmpl: 9000
-			fix: 5000
-			hpad: 9000
-		BuildingFractions:
-			proc: 27
-			pyle: 1
-			hand: 1
-			hq: 1
-			weap: 56
-			afld: 56
-			gtwr: 1
-			gun: 0
-			atwr: 2
-			obli: 1
-			sam: 1
-			eye: 1
-			tmpl: 1
-			fix: 1
-			hpad: 10
-    SquadManagerBotModule@skynet:
-		RequiresCondition: enable-skynet-ai
-		SquadSize: 10
-		ExcludeFromSquadsTypes: harv, mcv, a10
-		ConstructionYardTypes: fact
-        AirUnitsTypes: heli, orca
-		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
-	UnitBuilderBotModule@skynet:
-		RequiresCondition: enable-skynet-ai
-		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI
-        IdleBaseUnitsMaximum: 999
-		UnitsToBuild:
-			e1: 65
-			e2: 25
-			e3: 40
-			e4: 15
-			e5: 15
-            rmbo: 2
-			harv: 50
-			ltnk: 4
-			ftnk: 4
-            ctnk: 0
-			arty: 28
-			mtnk: 1
-			msam: 30
-			stnk: 3
-			apc: 1
-			bggy: 1
-			bike: 1
-            jeep: 1
-			mlrs: 0
-			htnk: 9
-			heli: 10
-			orca: 10
-        UnitDelays:
-			harv: 0
-			ltnk: 5000
-			ftnk: 5000
-            ctnk: 5000
-			arty: 3000
-			mtnk: 5000
-			msam: 3000
-			stnk: 5000
-			apc: 5000
-			bggy: 4000
-			bike: 5000
-            jeep: 4000
-			mlrs: 5000
-			htnk: 5000
-			heli: 5000
-			orca: 5000
-            mcv: 3000
-		UnitLimits:
-			harv: 12
-			mlrs: 4
-			heli: 20
-			orca: 20
-            rmbo: 2
-    BaseBuilderBotModule@ironreaper:
-		RequiresCondition: enable-ironreaper-ai
 		BuildingQueues: Building.Nod, Building.GDI
 		DefenseQueues: Defence.Nod, Defence.GDI
 		MinimumExcessPower: 1
@@ -853,17 +501,18 @@ Player:
         MaxBaseRadius: 49
         MaximumDefenseRadius: 49
         PlaceDefenseTowardsEnemyChance: 90
-		ConstructionYardTypes: fact
-		RefineryTypes: proc
-		PowerTypes: nuke
         PlaceAsDefenses: nuke, hand, pyle, weap, afld, proc
         PlaceAsDefenseChance: 33
+		ConstructionYardTypes: fact
+		RefineryTypes: proc, resonator
+		PowerTypes: nuke,nuk2
 		BarracksTypes: pyle,hand
 		VehiclesFactoryTypes: weap,afld
-		ProductionTypes: pyle,hand,weap,afld,hpad
+		ProductionTypes: pyle,hand,weap,afld,hpad,hq
 		SiloTypes: silo
 		BuildingLimits:
             weap: 15
+            nuk2: 8
 			afld: 15
 			pyle: 6
 			hand: 6
@@ -874,7 +523,8 @@ Player:
 			eye: 1
 			tmpl: 1
 			fix: 2
-			silo: 0
+			silo: 1
+            resonator: 20
         BuildingDelays:
             proc: 0
 			pyle: 2000
@@ -890,6 +540,7 @@ Player:
 			eye: 9000
 			tmpl: 9000
 			fix: 4500
+			silo: 2000
 			hpad: 7500
 		BuildingFractions:
 			proc: 20
@@ -899,7 +550,7 @@ Player:
 			weap: 25
 			afld: 25
 			gtwr: 3
-			gun: 1
+			gun: 11
 			atwr: 11
 			obli: 10
 			sam: 1
@@ -907,19 +558,26 @@ Player:
 			tmpl: 5
 			fix: 5
 			hpad: 1
-    SquadManagerBotModule@ironreaper:
-		RequiresCondition: enable-ironreaper-ai
+            resonator: 5
+    SquadManagerBotModule@brutalis:
+		RequiresCondition: enable-brutalis-ai
 		SquadSize: 20
-        MaxBaseRadius: 49
 		ExcludeFromSquadsTypes: harv, mcv, a10
 		ConstructionYardTypes: fact
-        AirUnitsTypes: heli, orca
+        AirUnitsTypes: heli, orca, stnk
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
-	UnitBuilderBotModule@ironreaper:
-		RequiresCondition: enable-ironreaper-ai
-		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI
+    SquadManagerBotModule@wavemaker:
+		RequiresCondition: enable-wavemaker-ai
+		SquadSize: 100
+		ExcludeFromSquadsTypes: harv, mcv, a10
+		ConstructionYardTypes: fact
+        AirUnitsTypes: heli, orca, stnk
+		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
+    UnitBuilderBotModule@brutalis:
+		RequiresCondition: enable-brutalis-ai || enable-wavemaker-ai
+		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
         IdleBaseUnitsMaximum: 999
-        UnitsToBuild:
+		UnitsToBuild:
 			e1: 65
 			e2: 25
 			e3: 40
@@ -943,6 +601,432 @@ Player:
 			heli: 1
 			orca: 1
             mcv: 0
+            upgrade.economy1: 1
+            upgrade.economy2: 1
+            upgrade.economy3: 1
+		UnitLimits:
+            ltnk: 25
+			ftnk: 25
+            ctnk: 25
+			arty: 25
+			mtnk: 25
+			msam: 25
+			stnk: 25
+			apc: 25
+			bggy: 25
+			bike: 25
+            jeep: 25
+			htnk: 50
+            harv: 100
+			mlrs: 4
+			heli: 6
+			orca: 5
+            e1: 25
+			e2: 25
+			e3: 50
+			e4: 50
+			e5: 50
+            rmbo: 2
+            mcv: 1
+        UnitDelays:
+			harv: 0
+			ltnk: 5000
+			ftnk: 5000
+            ctnk: 5000
+			arty: 3000
+			mtnk: 5000
+			msam: 3000
+			stnk: 5000
+			apc: 5000
+			bggy: 4000
+			bike: 5000
+            jeep: 4000
+			mlrs: 5000
+			htnk: 5000
+			heli: 5000
+			orca: 5000
+            mcv: 3000
+    BaseBuilderBotModule@viki:
+		RequiresCondition: enable-viki-ai
+		BuildingQueues: Building.Nod, Building.GDI
+		DefenseQueues: Defence.Nod, Defence.GDI
+		MinimumExcessPower: 1
+		MaximumExcessPower: 600
+		ExcessPowerIncrement: 5
+		ExcessPowerIncreaseThreshold: 1
+        MinBaseRadius: 6
+        MaxBaseRadius: 49
+		ConstructionYardTypes: fact
+		RefineryTypes: proc
+		PowerTypes: nuke,nuk2
+		BarracksTypes: pyle,hand
+		VehiclesFactoryTypes: weap,afld
+		ProductionTypes: pyle,hand,weap,afld,hpad,hq
+		SiloTypes: silo
+		BuildingLimits:
+            weap: 15
+            nuk2: 8
+			afld: 1
+			pyle: 6
+			hand: 6
+			hq: 1
+			hpad: 0
+			eye: 1
+			tmpl: 1
+			fix: 1
+			silo: 1
+			gtwr: 1
+            gun: 0
+			atwr: 3
+			obli: 4
+			sam: 2
+        BuildingDelays:
+            proc: 0
+			pyle: 2000
+			hand: 2000
+			hq: 5000
+			weap: 0
+			afld: 0
+			gtwr: 2000
+			gun: 2000
+			atwr: 2000
+			obli: 2000
+			sam: 2000
+			eye: 9000
+			tmpl: 9000
+			fix: 5000
+			hpad: 9000
+		BuildingFractions:
+			proc: 31
+			pyle: 31
+			hand: 31
+            stealth: 2
+			hq: 1
+			weap: 36
+			afld: 1
+			gtwr: 1
+			gun: 0
+			atwr: 2
+			obli: 1
+			sam: 1
+			eye: 1
+			tmpl: 1
+			fix: 1
+    SquadManagerBotModule@viki:
+		RequiresCondition: enable-viki-ai
+		SquadSize: 30
+		ExcludeFromSquadsTypes: harv, sharv, mcv, a10
+		ConstructionYardTypes: fact
+        AirUnitsTypes: heli, orca, stnk
+		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
+	UnitBuilderBotModule@viki:
+		RequiresCondition: enable-viki-ai
+		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
+        IdleBaseUnitsMaximum: 999
+		UnitsToBuild:
+			e1: 25
+			e2: 25
+			e3: 50
+			e4: 15
+			e5: 20
+            rmbo: 2
+			harv: 1
+			sharv: 60
+			arty: 39
+			msam: 39
+            stnk: 5
+            mlrs: 1
+            ctnk: 2
+			bggy: 1
+			bike: 2
+			apc: 0
+			heli: 0
+			orca: 0
+            mcv: 0
+            upgrade.covert1: 1
+            upgrade.covert2: 1
+            upgrade.covert3: 1
+        UnitDelays:
+			harv: 0
+			sharv: 0
+			ltnk: 5000
+			ftnk: 5000
+            ctnk: 5000
+			arty: 3000
+			mtnk: 5000
+			msam: 3000
+			stnk: 5000
+			apc: 5000
+			bggy: 4000
+			bike: 5000
+            jeep: 4000
+			mlrs: 5000
+			htnk: 5000
+			heli: 5000
+			orca: 5000
+            mcv: 5000
+		UnitLimits:
+			harv: 4
+			sharv: 100
+			mlrs: 0
+			heli: 0
+			orca: 0
+            rmbo: 2
+            mcv: 1
+    BaseBuilderBotModule@skynet:
+		RequiresCondition: enable-skynet-ai
+		BuildingQueues: Building.Nod, Building.GDI
+		DefenseQueues: Defence.Nod, Defence.GDI
+        MinimumExcessPower: 1
+		MaximumExcessPower: 600
+		ExcessPowerIncrement: 5
+		ExcessPowerIncreaseThreshold: 1
+        MinBaseRadius: 6
+        MaxBaseRadius: 49
+        MaximumDefenseRadius: 49
+        PlaceDefenseTowardsEnemyChance: 25
+		ConstructionYardTypes: fact
+		RefineryTypes: proc
+		PowerTypes: nuke,nuk2
+		BarracksTypes: pyle,hand
+		VehiclesFactoryTypes: weap,afld
+		ProductionTypes: pyle,hand,weap,afld,hpad,hq
+		SiloTypes: silo
+		BuildingLimits:
+			pyle: 3
+			hand: 3
+			hq: 1
+			weap: 7
+			afld: 10
+			hpad: 5
+			eye: 1
+			tmpl: 1
+			fix: 1
+			silo: 1
+			gtwr: 1
+            gun: 1
+			atwr: 40
+			obli: 4
+			sam: 2
+        BuildingDelays:
+            proc: 0
+			pyle: 2000
+			hand: 2000
+			hq: 5000
+			weap: 0
+			afld: 0
+			gtwr: 2000
+			gun: 2000
+			atwr: 2000
+			obli: 2000
+			sam: 2000
+			eye: 9000
+			tmpl: 9000
+			fix: 5000
+			hpad: 9000
+		BuildingFractions:
+			proc: 30
+			pyle: 10
+			hand: 10
+			hq: 1
+			weap: 56
+			afld: 56
+			gtwr: 1
+			gun: 1
+			atwr: 4
+			obli: 1
+			sam: 1
+			eye: 1
+			tmpl: 1
+			fix: 1
+			hpad: 10
+    SquadManagerBotModule@skynet:
+		RequiresCondition: enable-skynet-ai
+		SquadSize: 10
+		ExcludeFromSquadsTypes: harv, mcv, a10
+		ConstructionYardTypes: fact
+        AirUnitsTypes: heli, orca
+		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
+	UnitBuilderBotModule@skynet:
+		RequiresCondition: enable-skynet-ai
+		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
+        IdleBaseUnitsMaximum: 999
+		UnitsToBuild:
+			e1: 65
+			e2: 25
+			e3: 40
+			e4: 15
+			e5: 15
+            rmbo: 2
+			harv: 50
+			ltnk: 10
+			ftnk: 10
+            ctnk: 0
+			arty: 28
+			mtnk: 1
+			msam: 30
+			stnk: 3
+			apc: 1
+			bggy: 1
+			bike: 1
+            jeep: 5
+			mlrs: 0
+			htnk: 9
+			heli: 8
+			orca: 12
+            mhq: 10
+            mcv: 0
+            upgrade.recon1: 1
+            upgrade.recon2: 1
+            upgrade.recon3: 1
+        UnitDelays:
+			harv: 0
+			ltnk: 5000
+			ftnk: 5000
+            ctnk: 5000
+			arty: 3000
+			mtnk: 5000
+			msam: 3000
+			stnk: 5000
+			apc: 5000
+			bggy: 4000
+			bike: 5000
+            jeep: 4000
+			mlrs: 5000
+			htnk: 5000
+			heli: 5000
+			orca: 5000
+            mcv: 3000
+		UnitLimits:
+            harv: 100
+            ltnk: 25
+			ftnk: 25
+            ctnk: 25
+			arty: 25
+			mtnk: 25
+			msam: 25
+			stnk: 25
+			apc: 25
+			bggy: 25
+			bike: 25
+            jeep: 25
+			htnk: 50
+			mlrs: 4
+			heli: 40
+			orca: 40
+            e1: 50
+			e2: 50
+			e3: 50
+			e4: 50
+			e5: 50
+            rmbo: 2
+            mcv: 1
+            mhq: 1
+    BaseBuilderBotModule@ironreaper:
+		RequiresCondition: enable-ironreaper-ai
+		BuildingQueues: Building.Nod, Building.GDI
+		DefenseQueues: Defence.Nod, Defence.GDI
+		MinimumExcessPower: 1
+		MaximumExcessPower: 600
+		ExcessPowerIncrement: 5
+		ExcessPowerIncreaseThreshold: 1
+        MinBaseRadius: 6
+        MaxBaseRadius: 49
+        MaximumDefenseRadius: 49
+        PlaceDefenseTowardsEnemyChance: 90
+		ConstructionYardTypes: fact
+		RefineryTypes: proc, resonator
+		PowerTypes: nuke, nuk2
+        PlaceAsDefenses: nuke, hand, pyle, weap, afld, proc
+        PlaceAsDefenseChance: 33
+		BarracksTypes: pyle,hand
+		VehiclesFactoryTypes: weap,afld
+		ProductionTypes: pyle,hand,weap,afld,hpad, hq
+		SiloTypes: silo
+		BuildingLimits:
+            weap: 15
+            nuk2: 8
+			afld: 15
+			pyle: 6
+			hand: 6
+			hq: 1
+			hpad: 0
+			eye: 1
+			tmpl: 1
+			fix: 2
+			silo: 1
+            resonator: 20
+        BuildingDelays:
+            proc: 0
+			pyle: 2000
+			hand: 2000
+			hq: 4500
+			weap: 0
+			afld: 0
+			gtwr: 2000
+			gun: 2000
+			atwr: 2000
+			obli: 2000
+			sam: 2000
+			eye: 9000
+			tmpl: 9000
+			fix: 4500
+			silo: 2000
+		BuildingFractions:
+			proc: 20
+			pyle: 15
+			hand: 15
+			hq: 5
+			weap: 25
+			afld: 25
+			gtwr: 11
+			gun: 11
+			atwr: 11
+			obli: 10
+			sam: 1
+			eye: 5
+			tmpl: 5
+			fix: 5
+            resonator: 5
+    SquadManagerBotModule@ironreaper:
+		RequiresCondition: enable-ironreaper-ai
+		SquadSize: 20
+        MaxBaseRadius: 49
+		ExcludeFromSquadsTypes: harv, mcv, a10
+		ConstructionYardTypes: fact
+        AirUnitsTypes: heli, orca
+		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
+	UnitBuilderBotModule@ironreaper:
+		RequiresCondition: enable-ironreaper-ai
+		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
+        IdleBaseUnitsMaximum: 999
+        UnitsToBuild:
+			e1: 25
+			e2: 25
+			e3: 50
+			e4: 10
+			e5: 15
+            rmbo: 2
+			harv: 100
+			ltnk: 11
+			ftnk: 6
+            ctnk: 0
+			arty: 57
+			mtnk: 1
+			msam: 59
+			stnk: 2
+			apc: 1
+			bggy: 1
+			bike: 1
+            jeep: 5
+			mlrs: 0
+			htnk: 14
+			heli: 1
+			orca: 1
+            mcv: 0
+            upgrade.economy1: 1
+            upgrade.economy2: 1
+            upgrade.recon1: 1
 		UnitLimits:
             ltnk: 25
 			ftnk: 25
@@ -985,13 +1069,6 @@ Player:
 			heli: 5000
 			orca: 5000
             mcv: 3000
-    SquadManagerBotModule@wavemaker:
-		RequiresCondition: enable-wavemaker-ai
-		SquadSize: 55
-		ExcludeFromSquadsTypes: harv, mcv, a10
-		ConstructionYardTypes: fact
-        AirUnitsTypes: heli, orca
-		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
     BaseBuilderBotModule@Easy:
 		RequiresCondition: enable-Easy-ai
 		BuildingQueues: Building.Nod, Building.GDI
@@ -1006,7 +1083,7 @@ Player:
 		PowerTypes: nuke,nuk2
 		BarracksTypes: pyle,hand
 		VehiclesFactoryTypes: weap,afld
-		ProductionTypes: pyle,hand,weap,afld,hpad
+		ProductionTypes: pyle,hand,weap,afld,hpad,hq
 		SiloTypes: silo
 		BuildingLimits:
 			proc: 1
@@ -1066,7 +1143,7 @@ Player:
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
 	UnitBuilderBotModule@Easy:
 		RequiresCondition: enable-Easy-ai
-		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI
+		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
         IdleBaseUnitsMaximum: 999
         UnitsToBuild:
 			e1: 65
@@ -1091,6 +1168,9 @@ Player:
 			htnk: 9
 			heli: 0
 			orca: 0
+            upgrade.economy1: 1
+            upgrade.economy2: 1
+            upgrade.recon1: 1
         UnitDelays:
 			harv: 0
 			ltnk: 5000
@@ -1129,7 +1209,7 @@ Player:
 		PowerTypes: nuke,nuk2
 		BarracksTypes: pyle,hand
 		VehiclesFactoryTypes: weap,afld
-		ProductionTypes: pyle,hand,weap,afld,hpad
+		ProductionTypes: pyle,hand,weap,afld,hpad,hq
 		SiloTypes: silo
 		BuildingLimits:
 			proc: 1
@@ -1190,7 +1270,7 @@ Player:
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
 	UnitBuilderBotModule@Easiest:
 		RequiresCondition: enable-Easiest-ai
-		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI
+		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
         IdleBaseUnitsMaximum: 999
         UnitsToBuild:
 			e1: 100
@@ -1215,6 +1295,9 @@ Player:
 			htnk: 100
 			heli: 100
 			orca: 100
+            upgrade.economy1: 1
+            upgrade.economy2: 1
+            upgrade.recon1: 1
         UnitDelays:
             e1: 10000
 			e2: 10000

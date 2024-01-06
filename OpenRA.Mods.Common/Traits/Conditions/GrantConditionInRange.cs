@@ -74,12 +74,18 @@ namespace OpenRA.Mods.Common.Traits
 
 			foreach (var actorId in actorRevokeTokenMap.Keys())
 			{
-				var actor = self.World.GetActorById(actorId);
+				var actor = actorMap.GetValueOrDefault(actorId);
+
 				if (actor != null)
-					actor.RevokeCondition(int.Parse(actorRevokeTokenMap.GetEntry(actorId).Value));
+				{
+					if (!actor.IsDead)
+						actor.RevokeCondition(int.Parse(actorRevokeTokenMap.GetEntry(actorId).Value));
+					actorMap.Remove(actorId);
+				}
 			}
 
 			actorRevokeTokenMap.Clear();
+			actorMap.Clear();
 		}
 
 		void ITick.Tick(Actor self)
@@ -151,7 +157,8 @@ namespace OpenRA.Mods.Common.Traits
 
 					if (actor != null)
 					{
-						actor.RevokeCondition(int.Parse(leftRange.Value));
+						if (!actor.IsDead)
+							actor.RevokeCondition(int.Parse(leftRange.Value));
 						actorMap.Remove(leftRange.Key);
 					}
 				}

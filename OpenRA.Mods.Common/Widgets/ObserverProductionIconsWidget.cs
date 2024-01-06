@@ -157,8 +157,10 @@ namespace OpenRA.Mods.Common.Widgets
 
 				productionIconsBounds.Add(rect);
 
-				var pio = queue.Actor.Owner.PlayerActor.TraitsImplementing<IProductionIconOverlay>()
-					.FirstOrDefault(p => p.IsOverlayActive(actor));
+				var pio = queue.Actor.Owner.PlayerActor.IsInWorld && !queue.Actor.Owner.PlayerActor.IsDead
+					? queue.Actor.Owner.PlayerActor.TraitsImplementing<IProductionIconOverlay>()
+						.FirstOrDefault(p => p.IsOverlayActive(actor))
+					: null;
 
 				if (pio != null)
 					WidgetUtils.DrawSpriteCentered(pio.Sprite, worldRenderer.Palette(pio.Palette),

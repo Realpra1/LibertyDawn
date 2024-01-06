@@ -205,6 +205,8 @@ upgrade.covert1:
 		Prerequisite: anycovert
     Interactable:
 	AlwaysVisible:
+    OwnerLostAction:
+		Action: Dispose
     
 upgrade.covert2:
 	Inherits: ^MaxUpgrades
@@ -239,6 +241,8 @@ upgrade.covert2:
 		Prerequisite: hpadunlock
     Interactable:
 	AlwaysVisible:
+    OwnerLostAction:
+		Action: Dispose
     
 upgrade.covert3:
 	Inherits: ^MaxUpgrades
@@ -268,6 +272,8 @@ upgrade.covert3:
 		Prerequisite: anycovert
     Interactable:
 	AlwaysVisible:
+    OwnerLostAction:
+		Action: Dispose
     
 downgrade.covert:
 	ScriptTriggers:
@@ -355,6 +361,8 @@ upgrade.recon1:
 		Prerequisite: afldunlock
     Interactable:
 	AlwaysVisible:
+    OwnerLostAction:
+		Action: Dispose
 
 upgrade.recon2:
 	Inherits: ^MaxUpgrades
@@ -389,6 +397,8 @@ upgrade.recon2:
 		Prerequisite: hpadunlock
     Interactable:
 	AlwaysVisible:
+    OwnerLostAction:
+		Action: Dispose
  
 upgrade.recon3:
 	Inherits: ^MaxUpgrades
@@ -418,6 +428,8 @@ upgrade.recon3:
 		Prerequisite: anyrecon
     Interactable:
 	AlwaysVisible:
+    OwnerLostAction:
+		Action: Dispose
     
 downgrade.recon:
 	ScriptTriggers:
@@ -475,6 +487,8 @@ upgrade.economy1:
 		Prerequisite: afldunlock
     Interactable:
 	AlwaysVisible:
+    OwnerLostAction:
+		Action: Dispose
 
 upgrade.economy2:
 	Inherits: ^MaxUpgrades
@@ -507,6 +521,8 @@ upgrade.economy2:
 		Prerequisite: anyeconomy
     Interactable:
 	AlwaysVisible:
+    OwnerLostAction:
+		Action: Dispose
  
 upgrade.economy3:
 	Inherits: ^MaxUpgrades
@@ -536,6 +552,8 @@ upgrade.economy3:
 		Prerequisite: anyeconomy
     Interactable:
 	AlwaysVisible:
+    OwnerLostAction:
+		Action: Dispose
     
 downgrade.economy:
 	ScriptTriggers:
