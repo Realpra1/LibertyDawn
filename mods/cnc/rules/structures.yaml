@@ -159,7 +159,7 @@ NUKE:
 		Dimensions: 2,3
 		LocalCenterOffset: 0,-512,0
 	Health:
-		HP: 55000
+		HP: 60000
     Armor:
 		Type: TiberiumWood
 	RevealsShroud:
@@ -192,7 +192,7 @@ NUK2:
 		Dimensions: 2,3
 		LocalCenterOffset: 0,-512,0
 	Health:
-		HP: 55000
+		HP: 50000
     Armor:
 		Type: TiberiumWood
 	RevealsShroud:
@@ -698,7 +698,7 @@ FIX:
 		BuildPaletteOrder: 60
 		Prerequisites: upgrade.economy1
 		Queue: Building.GDI, Building.Nod
-		Description: Repairs units in range
+		Description: Repairs everything in range
 	Building:
 		Footprint: _+_ +++ _+_
 		Dimensions: 3,3
@@ -706,7 +706,7 @@ FIX:
 		Bounds: 2730, 1450, 0, 128
 		DecorationBounds: 3072, 2048
 	Health:
-		HP: 80000
+		HP: 50000
 	RevealsShroud:
 		Range: 4c0
 	WithBuildingBib:

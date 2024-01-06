@@ -713,13 +713,9 @@ namespace OpenRA.Mods.Common.Traits
 
 					if (maxStageEvolvesTo.ToLower() == "explode" && !delayedExplosions.ContainsKey(cell))
 					{
-						var resActor = world.CreateActor("vice", new TypeDictionary
-						{
-							new OwnerInit(world.Players.Where(p => p.PlayerName == "Creeps").FirstOrDefault())
-						});
-
+						var resActor = world.Players.Where(p => p.PlayerName == "Creeps").FirstOrDefault().PlayerActor;
 						delayedExplosions.Add(cell, true);
-						Schedule(tickTime + world.SharedRandom.Next(1, 240), () => DoExplode(resActor, resourceInfo, cell));
+						Schedule(tickTime + world.SharedRandom.Next(1, 120), () => DoExplode(resActor, resourceInfo, cell));
 						return;
 					}
 
@@ -874,8 +870,6 @@ namespace OpenRA.Mods.Common.Traits
 						AddToTickQueue(cell, newResourceInfo);
 					}
 				}
-
-				source.Dispose();
 			}
 			catch (Exception ex)
 			{

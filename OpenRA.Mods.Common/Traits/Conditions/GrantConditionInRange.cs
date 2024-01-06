@@ -52,6 +52,7 @@ namespace OpenRA.Mods.Common.Traits
 		/// String used because I'm bad at C# generics.
 		/// </summary>
 		readonly FastUniqueQueue<uint, string> actorRevokeTokenMap = new FastUniqueQueue<uint, string>();
+
 		readonly Dictionary<uint, Actor> actorMap = new Dictionary<uint, Actor>();
 
 		public GrantConditionInRange(GrantConditionInRangeInfo info)
@@ -78,7 +79,7 @@ namespace OpenRA.Mods.Common.Traits
 
 				if (actor != null)
 				{
-					if (!actor.IsDead)
+					if (!actor.IsDead && !actor.Disposed)
 						actor.RevokeCondition(int.Parse(actorRevokeTokenMap.GetEntry(actorId).Value));
 					actorMap.Remove(actorId);
 				}
@@ -93,7 +94,7 @@ namespace OpenRA.Mods.Common.Traits
 			if (!info.Granter)
 				return;
 
-			if (!self.IsInWorld || self.IsDead || IsTraitDisabled)
+			if (!self.IsInWorld || self.IsDead || self.Disposed || IsTraitDisabled)
 			{
 				RevokeAll(self);
 				return;
@@ -157,7 +158,7 @@ namespace OpenRA.Mods.Common.Traits
 
 					if (actor != null)
 					{
-						if (!actor.IsDead)
+						if (!actor.IsDead && !actor.Disposed)
 							actor.RevokeCondition(int.Parse(leftRange.Value));
 						actorMap.Remove(leftRange.Key);
 					}

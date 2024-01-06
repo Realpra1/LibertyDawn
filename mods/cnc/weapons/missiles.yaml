@@ -315,12 +315,12 @@ TowerMissile:
 		Spread: 483
 		ValidTargets: Ground
 		Versus:
-			None: 60
+			None: 100
 			Wood: 50
 			TiberiumWood: 50
 			Light: 100
-			Tiberium: 60
-			Heavy: 60
+			Tiberium: 50
+			Heavy: 50
 		DamageTypes: Prone50Percent, TriggerProne, SmallExplosionDeath
 	Warhead@3Eff: CreateEffect
 		Explosions: big_frag

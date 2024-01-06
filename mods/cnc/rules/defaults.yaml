@@ -751,6 +751,7 @@
 
 ^BaseBuilding:
 	Inherits: ^Building
+    Inherits@repairgen: ^GenRepairable
 	Building:
 		RequiresBaseProvider: true
 		BuildSounds: constru2.aud, hvydoor1.aud
@@ -1286,7 +1287,7 @@
     ChangesHealth@RepairGen:
 		Step: 0
 		PercentageStep: 5
-		Delay: 75
+		Delay: 108
 		StartIfBelow: 100
         DamageCooldown: 0
         RequiresCondition: RepairGen
@@ -1298,7 +1299,7 @@
     GrantConditionInRange@repairrange:
         Condition: RepairGen
         Granter: true
-        Receiver: false
+        Receiver: true
         Range: 7c0
         ValidRelationships: Ally
     WithRangeCircle@repaircircle:

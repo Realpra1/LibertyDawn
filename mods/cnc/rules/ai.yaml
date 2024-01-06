@@ -511,6 +511,7 @@ Player:
 		ProductionTypes: pyle,hand,weap,afld,hpad,hq
 		SiloTypes: silo
 		BuildingLimits:
+            proc: 75
             weap: 15
             nuk2: 8
 			afld: 15
@@ -664,6 +665,7 @@ Player:
 		ProductionTypes: pyle,hand,weap,afld,hpad,hq
 		SiloTypes: silo
 		BuildingLimits:
+            proc: 75
             weap: 15
             nuk2: 8
 			afld: 1
@@ -793,6 +795,7 @@ Player:
 		ProductionTypes: pyle,hand,weap,afld,hpad,hq
 		SiloTypes: silo
 		BuildingLimits:
+            proc: 75
 			pyle: 3
 			hand: 3
 			hq: 1
@@ -944,6 +947,7 @@ Player:
 		ProductionTypes: pyle,hand,weap,afld,hpad, hq
 		SiloTypes: silo
 		BuildingLimits:
+            proc: 75
             weap: 15
             nuk2: 8
 			afld: 15
