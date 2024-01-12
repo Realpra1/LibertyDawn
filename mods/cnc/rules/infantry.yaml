@@ -41,7 +41,7 @@ E2:
 		AddToArmyValue: true
 	Buildable:
 		BuildPaletteOrder: 40
-		Prerequisites: upgrade.economy1, ~techlevel.medium
+		Prerequisites: upgrade.covert1, ~techlevel.medium
 		Queue: Infantry.GDI, Infantry.Nod
 		Description: Fast infantry armed with grenades. \n  Strong vs Buildings, slow-moving targets
 	Mobile:

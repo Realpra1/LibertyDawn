@@ -4,7 +4,7 @@ FACT:
 	Selectable:
 		Bounds: 3072, 2048
 	Valued:
-		Cost: 3000
+		Cost: 4000
 	Tooltip:
 		Name: Construction Yard
 	Building:
@@ -1198,18 +1198,19 @@ RESONATOR:
 SBAG:
 	Inherits: ^Wall
 	Valued:
-		Cost: 25
+		Cost: 100
 	CustomSellValue:
 		Value: 0
 	Tooltip:
 		Name: Sandbag Barrier
 	Buildable:
 		BuildPaletteOrder: 20
-		Prerequisites: upgrade.recon1
+		BuildDuration: 150
+		Prerequisites: sbagunlock
 		Queue: Defence.GDI, Defence.Nod
 		Description: Stops infantry and light vehicles.\nBlocks some projectiles.\nCan be crushed by tanks.
 	Health:
-		HP: 25000
+		HP: 35000
     Armor:
 		Type: Heavy
 	BlocksProjectiles:
@@ -1223,18 +1224,19 @@ SBAG:
 CYCL:
 	Inherits: ^Wall
 	Valued:
-		Cost: 20
+		Cost: 75
 	CustomSellValue:
 		Value: 0
 	Tooltip:
 		Name: Chain Link Barrier
 	Buildable:
 		BuildPaletteOrder: 20
+		BuildDuration: 100
 		Prerequisites: ~upgrade.covert1
 		Queue: Defence.Nod, Defence.GDI
 		Description: Stops infantry and light vehicles.\nCan be crushed by tanks.
 	Health:
-		HP: 15000
+		HP: 20000
     Armor:
 		Type: Heavy
 	LineBuild:

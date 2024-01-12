@@ -133,7 +133,7 @@ TiberiumMeteor:
 	Report: toss1.aud
 	Projectile: Bullet
 		Speed: 140
-		Blockable: false
+		Blockable: true
 		LaunchAngle: 62
 		Inaccuracy: 813
 		Image: BOMB

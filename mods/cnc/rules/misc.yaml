@@ -328,6 +328,12 @@ HPADUNLOCK:
     Tooltip:
 		Name: covert II or recon II specialization
 
+SBAGUNLOCK:
+	AlwaysVisible:
+	Interactable:
+    Tooltip:
+		Name: recon I or economy II specialization
+
 upgrade.recon1:
 	Inherits: ^MaxUpgrades
 	ScriptTriggers:
@@ -359,6 +365,8 @@ upgrade.recon1:
 		Prerequisite: anyrecon
     ProvidesPrerequisite@afldunlock:
 		Prerequisite: afldunlock
+    ProvidesPrerequisite@sbagunlock:
+		Prerequisite: sbagunlock
     Interactable:
 	AlwaysVisible:
     OwnerLostAction:
@@ -479,7 +487,7 @@ upgrade.economy1:
 		Condition: upgrade.economy2
 		Prerequisites: upgrade.economy2
 	RenderSprites:
-		Image: NUK2
+		Image: MTNK
 	ProvidesPrerequisite@upgradename:
     ProvidesPrerequisite:
 		Prerequisite: anyeconomy
@@ -515,10 +523,12 @@ upgrade.economy2:
 		Condition: upgrade.economy3
 		Prerequisites: upgrade.economy3
 	RenderSprites:
-		Image: MTNK
+		Image: NUK2
 	ProvidesPrerequisite@upgradename:
     ProvidesPrerequisite:
 		Prerequisite: anyeconomy
+    ProvidesPrerequisite@sbagunlock:
+		Prerequisite: sbagunlock
     Interactable:
 	AlwaysVisible:
     OwnerLostAction:

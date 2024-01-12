@@ -525,7 +525,7 @@ Player:
 			tmpl: 1
 			fix: 2
 			silo: 1
-            resonator: 20
+            resonator: 75
         BuildingDelays:
             proc: 0
 			pyle: 2000
@@ -585,7 +585,7 @@ Player:
 			e4: 15
 			e5: 15
             rmbo: 2
-			harv: 100
+			harv: 50
 			ltnk: 11
 			ftnk: 6
             ctnk: 0
@@ -618,7 +618,7 @@ Player:
 			bike: 25
             jeep: 25
 			htnk: 50
-            harv: 100
+            harv: 50
 			mlrs: 4
 			heli: 6
 			orca: 5
@@ -651,8 +651,8 @@ Player:
 		RequiresCondition: enable-viki-ai
 		BuildingQueues: Building.Nod, Building.GDI
 		DefenseQueues: Defence.Nod, Defence.GDI
-		MinimumExcessPower: 1
-		MaximumExcessPower: 600
+		MinimumExcessPower: 151
+		MaximumExcessPower: 700
 		ExcessPowerIncrement: 5
 		ExcessPowerIncreaseThreshold: 1
         MinBaseRadius: 6
@@ -686,7 +686,7 @@ Player:
             proc: 0
 			pyle: 2000
 			hand: 2000
-			hq: 5000
+			hq: 4000
 			weap: 0
 			afld: 0
 			gtwr: 2000
@@ -719,7 +719,7 @@ Player:
 		SquadSize: 30
 		ExcludeFromSquadsTypes: harv, sharv, mcv, a10
 		ConstructionYardTypes: fact
-        AirUnitsTypes: heli, orca, stnk
+        AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
 	UnitBuilderBotModule@viki:
 		RequiresCondition: enable-viki-ai
@@ -736,7 +736,7 @@ Player:
 			sharv: 60
 			arty: 39
 			msam: 39
-            stnk: 5
+            stnk: 15
             mlrs: 1
             ctnk: 2
 			bggy: 1
@@ -768,8 +768,8 @@ Player:
 			orca: 5000
             mcv: 5000
 		UnitLimits:
-			harv: 4
-			sharv: 100
+			harv: 10
+			sharv: 50
 			mlrs: 0
 			heli: 0
 			orca: 0
@@ -901,7 +901,7 @@ Player:
 			orca: 5000
             mcv: 3000
 		UnitLimits:
-            harv: 100
+            harv: 50
             ltnk: 25
 			ftnk: 25
             ctnk: 25
