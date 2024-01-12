@@ -511,7 +511,7 @@ Player:
 		ProductionTypes: pyle,hand,weap,afld,hpad,hq
 		SiloTypes: silo
 		BuildingLimits:
-            proc: 75
+            proc: 25
             weap: 15
             nuk2: 8
 			afld: 15
@@ -552,8 +552,8 @@ Player:
 			afld: 25
 			gtwr: 3
 			gun: 11
-			atwr: 11
-			obli: 10
+			atwr: 100
+			obli: 100
 			sam: 1
 			eye: 5
 			tmpl: 5
@@ -569,7 +569,7 @@ Player:
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
     SquadManagerBotModule@wavemaker:
 		RequiresCondition: enable-wavemaker-ai
-		SquadSize: 100
+		SquadSize: 120
 		ExcludeFromSquadsTypes: harv, mcv, a10
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca, stnk
@@ -665,7 +665,7 @@ Player:
 		ProductionTypes: pyle,hand,weap,afld,hpad,hq
 		SiloTypes: silo
 		BuildingLimits:
-            proc: 75
+            proc: 25
             weap: 15
             nuk2: 8
 			afld: 1
@@ -732,8 +732,8 @@ Player:
 			e4: 15
 			e5: 20
             rmbo: 2
-			harv: 1
-			sharv: 60
+			harv: 100
+			sharv: 100
 			arty: 39
 			msam: 39
             stnk: 15
@@ -786,7 +786,8 @@ Player:
         MinBaseRadius: 6
         MaxBaseRadius: 49
         MaximumDefenseRadius: 49
-        PlaceDefenseTowardsEnemyChance: 25
+        PlaceAsDefenses: nuke, hand, pyle, weap, afld, proc, fix
+        PlaceDefenseTowardsEnemyChance: 33
 		ConstructionYardTypes: fact
 		RefineryTypes: proc
 		PowerTypes: nuke,nuk2
@@ -795,7 +796,7 @@ Player:
 		ProductionTypes: pyle,hand,weap,afld,hpad,hq
 		SiloTypes: silo
 		BuildingLimits:
-            proc: 75
+            proc: 25
 			pyle: 3
 			hand: 3
 			hq: 1
@@ -836,7 +837,7 @@ Player:
 			afld: 56
 			gtwr: 1
 			gun: 1
-			atwr: 4
+			atwr: 50
 			obli: 1
 			sam: 1
 			eye: 1
@@ -861,7 +862,7 @@ Player:
 			e4: 15
 			e5: 15
             rmbo: 2
-			harv: 50
+			harv: 100
 			ltnk: 10
 			ftnk: 10
             ctnk: 0
@@ -940,26 +941,26 @@ Player:
 		ConstructionYardTypes: fact
 		RefineryTypes: proc, resonator
 		PowerTypes: nuke, nuk2
-        PlaceAsDefenses: nuke, hand, pyle, weap, afld, proc
+        PlaceAsDefenses: nuke, hand, pyle, weap, afld, proc, fix
         PlaceAsDefenseChance: 33
 		BarracksTypes: pyle,hand
 		VehiclesFactoryTypes: weap,afld
 		ProductionTypes: pyle,hand,weap,afld,hpad, hq
 		SiloTypes: silo
 		BuildingLimits:
-            proc: 75
+            proc: 25
             weap: 15
             nuk2: 8
 			afld: 15
 			pyle: 6
 			hand: 6
 			hq: 1
-			hpad: 0
+			hpad: 6
 			eye: 1
 			tmpl: 1
 			fix: 2
-			silo: 1
-            resonator: 20
+			silo: 3
+            resonator: 80
         BuildingDelays:
             proc: 0
 			pyle: 2000
@@ -985,13 +986,14 @@ Player:
 			afld: 25
 			gtwr: 11
 			gun: 11
-			atwr: 11
-			obli: 10
+			atwr: 100
+			obli: 100
+            hpad: 20
 			sam: 1
 			eye: 5
 			tmpl: 5
 			fix: 5
-            resonator: 5
+            resonator: 20
     SquadManagerBotModule@ironreaper:
 		RequiresCondition: enable-ironreaper-ai
 		SquadSize: 20
@@ -1024,13 +1026,18 @@ Player:
 			bike: 1
             jeep: 5
 			mlrs: 0
-			htnk: 14
+			htnk: 20
 			heli: 1
 			orca: 1
+            mhq: 5
             mcv: 0
             upgrade.economy1: 1
             upgrade.economy2: 1
+            upgrade.economy3: 1
+            downgrade.economy: 1
             upgrade.recon1: 1
+            upgrade.recon2: 1
+            upgrade.recon3: 1
 		UnitLimits:
             ltnk: 25
 			ftnk: 25
@@ -1044,10 +1051,11 @@ Player:
 			bike: 25
             jeep: 25
 			htnk: 50
-            harv: 100
+            harv: 50
 			mlrs: 4
-			heli: 6
-			orca: 5
+            mhq: 2
+			heli: 20
+			orca: 30
             e1: 50
 			e2: 50
 			e3: 50
@@ -1073,6 +1081,10 @@ Player:
 			heli: 5000
 			orca: 5000
             mcv: 3000
+            downgrade.economy: 32000
+            upgrade.recon1: 32000
+            upgrade.recon2: 32000
+            upgrade.recon3: 32000
     BaseBuilderBotModule@Easy:
 		RequiresCondition: enable-Easy-ai
 		BuildingQueues: Building.Nod, Building.GDI
