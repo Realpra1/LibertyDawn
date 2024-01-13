@@ -1027,8 +1027,8 @@ Player:
             jeep: 5
 			mlrs: 0
 			htnk: 20
-			heli: 1
-			orca: 1
+			heli: 2
+			orca: 5
             mhq: 5
             mcv: 0
             upgrade.economy1: 1
