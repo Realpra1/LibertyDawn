@@ -256,6 +256,9 @@ APC:
 		MaxWeight: 10
 		UnloadVoice: Unload
 		LoadingCondition: notmobile
+	AutoTarget:
+		InitialStance: HoldFire
+		InitialStanceAI: ReturnFire
     Selectable:
 		DecorationBounds: 1280, 1024
 	Explodes:
@@ -304,7 +307,8 @@ ARTY:
 		Voice: Attack
 	WithMuzzleOverlay:
 	AutoTarget:
-		InitialStanceAI: Defend
+		InitialStance: AttackAnything
+		InitialStanceAI: ReturnFire
 	SpawnActorOnDeath:
 		Actor: ARTY.Husk
 		OwnerType: InternalName
@@ -757,6 +761,9 @@ MSAM:
 		Voice: Attack
 	AttackMove:
 		Voice: Attack
+    AutoTarget:
+		InitialStance: AttackAnything
+		InitialStanceAI: ReturnFire
 	WithSpriteTurret:
 	Explodes:
 		Weapon: UnitExplodeMech

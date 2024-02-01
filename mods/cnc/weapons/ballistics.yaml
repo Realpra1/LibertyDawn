@@ -114,12 +114,12 @@ Grenade:
 		Spread: 1c0
 		Damage: 3600
 		Versus:
-			None: 100
-			Wood: 90
-			TiberiumWood: 90
-			Light: 50
-			Tiberium: 20
-			Heavy: 20
+			None: 90
+			Wood: 110
+			TiberiumWood: 110
+			Light: 75
+			Tiberium: 60
+			Heavy: 50
 		DamageTypes: Prone50Percent, TriggerProne, SmallExplosionDeath
 	Warhead@3Eff: CreateEffect
 		Explosions: small_poof

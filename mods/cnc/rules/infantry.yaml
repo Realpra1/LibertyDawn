@@ -4,7 +4,7 @@ E1:
 	Inherits@AUTOTARGET: ^AutoTargetGroundAssaultMove
 	Inherits@DECORATIONS: ^InfantryExperienceHospitalHazmatOverrides
 	Valued:
-		Cost: 90
+		Cost: 120
 	Tooltip:
 		Name: Minigunner
 	UpdatesPlayerStatistics:
@@ -34,7 +34,7 @@ E2:
 	Inherits@AUTOTARGET: ^AutoTargetGroundAssaultMove
 	Inherits@DECORATIONS: ^InfantryExperienceHospitalHazmatOverrides
 	Valued:
-		Cost: 160
+		Cost: 150
 	Tooltip:
 		Name: Grenadier
 	UpdatesPlayerStatistics:
@@ -47,7 +47,7 @@ E2:
 	Mobile:
 		Speed: 68
 	Health:
-		HP: 5500
+		HP: 6000
 	Armament:
 		Weapon: Grenade
 		LocalOffset: 0,0,427
@@ -63,7 +63,7 @@ E2:
 	Explodes:
 		Weapon: GrenadierExplode
 		EmptyWeapon: GrenadierExplode
-		Chance: 50
+		Chance: 15
 
 E3:
 	Inherits: ^Soldier
@@ -109,7 +109,7 @@ E4:
 	Inherits@AUTOTARGET: ^AutoTargetGroundAssaultMove
 	Inherits@DECORATIONS: ^InfantryExperienceHospitalHazmatOverrides
 	Valued:
-		Cost: 200
+		Cost: 120
 	Tooltip:
 		Name: Flamethrower
 	UpdatesPlayerStatistics:
@@ -148,7 +148,7 @@ E5:
 	Inherits@AUTOTARGET: ^AutoTargetGroundAssaultMove
 	Inherits@DECORATIONS: ^InfantryExperienceHospitalHazmatOverrides
 	Valued:
-		Cost: 225
+		Cost: 120
 	Tooltip:
 		Name: Chemical Warrior
 	UpdatesPlayerStatistics:
@@ -162,7 +162,7 @@ E5:
 		Speed: 54
 		Locomotor: chem
 	Health:
-		HP: 11000
+		HP: 12000
 	Armament:
 		Weapon: Chemspray
 		LocalOffset: 341,0,256
@@ -181,7 +181,7 @@ E5:
     Explodes:
 		Weapon: ChemWarriorExplode
 		EmptyWeapon: ChemWarriorExplode
-		Chance: 25
+		Chance: 5
 
 E6:
 	Inherits: ^Soldier

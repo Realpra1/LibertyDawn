@@ -63,11 +63,11 @@ Chemspray:
 		Damage: 6000
 		-InvalidTargets:
 		Versus:
-			None: 120
+			None: 150
 			Wood: 50
-            TiberiumWood: 120
+            TiberiumWood: 150
 			Light: 50
-			Tiberium: 120
+			Tiberium: 150
 			Heavy: 10
 		DamageTypes: Prone50Percent, TriggerProne, TiberiumDeath
 	Warhead@3Eff: CreateEffect
@@ -88,11 +88,11 @@ BigChem:
 		Damage: 13800
 		-InvalidTargets:
 		Versus:
-			None: 120
-			Wood: 50
-            TiberiumWood: 120
+			None: 150
+			Wood: 75
+            TiberiumWood: 150
 			Light: 50
-			Tiberium: 120
+			Tiberium: 150
 			Heavy: 10
 		DamageTypes: Prone50Percent, TriggerProne, TibGun
     Warhead@3Eff: CreateEffect
@@ -128,7 +128,7 @@ Napalm:
 
 Laser:
 	ReloadDelay: 36
-	Range: 8c0
+	Range: 7c0
 	Report: obelray1.aud
 	Projectile: LaserZap
 		Width: 85
