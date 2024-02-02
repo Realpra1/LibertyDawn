@@ -83,6 +83,13 @@ namespace OpenRA.Mods.Common.Traits
 			if (unitGroup == null)
 				throw new InvalidOperationException($"No starting units defined for faction {p.Faction.InternalName} with class {spawnClass}");
 
+			if (unitGroup.Upgrades != null)
+				foreach (var u in unitGroup.Upgrades)
+					w.CreateActor(u, new TypeDictionary
+					{
+						new OwnerInit(p)
+					});
+
 			if (unitGroup.BaseActor != null)
 			{
 				var facing = unitGroup.BaseActorFacing.HasValue ? unitGroup.BaseActorFacing.Value : new WAngle(w.SharedRandom.Next(1024));

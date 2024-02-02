@@ -47,7 +47,7 @@ Player:
 	LobbyPrerequisiteCheckbox@GLOBALC17STEALTH:
 		ID: C17-Stealth
 		Label: Stealth Deliveries
-		Description: Nod's delivery plane is cloaked
+		Description: Delivery plane is cloaked
 		Enabled: False
         Visible: False
         Locked: True

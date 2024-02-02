@@ -219,7 +219,6 @@ PROC:
 		Name: Tiberium Refinery
 	Buildable:
 		BuildPaletteOrder: 20
-		Prerequisites: anypower
 		Queue: Building.GDI, Building.Nod
 		Description: Processes raw Tiberium\ninto useable resources
 	Building:
@@ -320,7 +319,6 @@ PYLE:
 		Prerequisite: barracks
 	Buildable:
 		BuildPaletteOrder: 30
-		Prerequisites: anypower
 		Queue: Building.GDI
 		Description: Trains infantry
 	Building:
@@ -376,7 +374,6 @@ HAND:
 		Prerequisite: barracks
 	Buildable:
 		BuildPaletteOrder: 30
-		Prerequisites: anypower
 		Queue: Building.Nod
 		Description: Trains infantry
 	Building:
@@ -673,6 +670,8 @@ HQ:
     ProductionBar:
 		ProductionType: Upgrade
 	Exit:
+		SpawnOffset: -1024,0,0
+		ExitCell: 3000,3000
 	WithBuildingBib:
 	ProvidesRadar:
 		RequiresCondition: !lowpower

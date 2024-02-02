@@ -282,7 +282,7 @@ ARTY:
 		AddToArmyValue: true
 	Buildable:
 		BuildPaletteOrder: 60
-		Prerequisites: upgrade.covert2, ~techlevel.medium
+		Prerequisites: anyhq, upgrade.covert2, ~techlevel.medium
 		Queue: Vehicle.Nod, Vehicle.GDI
 		Description: Fast mid-range artillery.\n  Strong vs Infantry, Vehicles and Buildings
 	Mobile:
@@ -330,7 +330,7 @@ FTNK:
 		AddToArmyValue: true
 	Buildable:
 		BuildPaletteOrder: 50
-		Prerequisites: upgrade.recon2, ~!upgrade.covert2, ~techlevel.medium
+		Prerequisites: anyhq, upgrade.recon2, ~!upgrade.covert2, ~techlevel.medium
 		Queue: Vehicle.Nod, Vehicle.GDI
 		Description: Heavily armored flame-throwing vehicle.\n  Strong vs Infantry, Buildings and Vehicles\n  Weak vs Tanks
 	Mobile:
@@ -374,7 +374,7 @@ CTNK:
 		AddToArmyValue: true
 	Buildable:
 		BuildPaletteOrder: 55
-		Prerequisites: ~upgrade.covert2, ~techlevel.medium
+		Prerequisites: anyhq, ~upgrade.covert2, ~techlevel.medium
 		Queue: Vehicle.Nod, Vehicle.GDI
 		Description: Chemical-spewing vehicle.\n Strong vs Infantry and tiberium or nuclear related Stuctures and Units\n Weak vs Air and Tanks
 	Mobile:
@@ -599,7 +599,7 @@ MTNK:
 		AddToArmyValue: true
 	Buildable:
 		BuildPaletteOrder: 45
-		Prerequisites: upgrade.economy1, ~techlevel.medium
+		Prerequisites: anyhq, upgrade.economy1, ~techlevel.medium
 		Queue: Vehicle.GDI, Vehicle.Nod
 		Description: General-Purpose Tank.\n  Strong vs Tanks, Vehicles\n  Weak vs Infantry
 	Mobile:
@@ -650,7 +650,7 @@ HTNK:
 	Buildable:
         BuildDuration: 1200
 		BuildPaletteOrder: 85
-		Prerequisites: upgrade.economy3, ~techlevel.high
+		Prerequisites: anyhq, upgrade.economy3, ~techlevel.high
 		Queue: Vehicle.GDI, Vehicle.Nod
 		Description: Heavily armored Tank.\nCan attack Aircraft.\n  Strong vs Everything
 	Mobile:
@@ -719,7 +719,7 @@ MSAM:
 		AddToArmyValue: true
 	Buildable:
 		BuildPaletteOrder: 70
-		Prerequisites: upgrade.economy2, ~techlevel.medium
+		Prerequisites: anyhq, upgrade.economy2, ~techlevel.medium
 		Queue: Vehicle.GDI, Vehicle.Nod
 		Description: Very long range rocket artillery.\n  Strong vs all Ground units.
 	Mobile:
@@ -788,7 +788,7 @@ MLRS:
 		AddToArmyValue: true
 	Buildable:
 		BuildPaletteOrder: 80
-		Prerequisites: upgrade.economy2, ~techlevel.medium
+		Prerequisites: anyhq, upgrade.economy2, ~techlevel.medium
 		Queue: Vehicle.Nod, Vehicle.GDI
 		Description: Powerful anti-air unit.\nCannot attack Ground units.
 	Mobile:
@@ -848,7 +848,7 @@ STNK:
 		AddToArmyValue: true
 	Buildable:
 		BuildPaletteOrder: 100
-		Prerequisites: upgrade.covert3, ~techlevel.high
+		Prerequisites: anyhq, upgrade.covert3, ~techlevel.high
 		Queue: Vehicle.Nod, Vehicle.GDI
 		Description: Long-range missile tank that can cloak.\nCan attack Aircraft.\nHas weak armor. Can be spotted by infantry and defense structures.\n  Strong vs Tanks\n  Weak vs Infantry.
 	Mobile:
@@ -913,7 +913,7 @@ MHQ:
 	Buildable:
         Queue: Vehicle.GDI, Vehicle.Nod
 		BuildPaletteOrder: 75
-		Prerequisites: upgrade.recon3
+		Prerequisites: anyhq, upgrade.recon3
 		Description: Detects stealth
     SpawnActorOnDeath:
 		Actor: MHQ.Husk

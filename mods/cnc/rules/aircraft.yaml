@@ -137,7 +137,7 @@ ORCA:
 		AddToArmyValue: true
 	Buildable:
 		BuildPaletteOrder: 20
-		Prerequisites: upgrade.recon3, ~techlevel.medium
+		Prerequisites: anyhq, upgrade.recon3, ~techlevel.medium
 		Queue: Aircraft.GDI, Aircraft.Nod
 		Description: Helicopter Gunship with AG Missiles.\n  Strong vs Buildings, Tanks\n  Weak vs Infantry
 	Aircraft:

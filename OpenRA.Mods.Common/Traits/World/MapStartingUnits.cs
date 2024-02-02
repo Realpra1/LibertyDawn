@@ -50,6 +50,10 @@ namespace OpenRA.Mods.Common.Traits
 
 		[Desc("Initial facing of SupportActors. Leave undefined for random facings.")]
 		public readonly WAngle? SupportActorsFacing = null;
+
+		[Desc("Comma separated list of starting upgrades.")]
+		[ActorReference]
+		public readonly string[] Upgrades = Array.Empty<string>();
 	}
 
 	public class StartingUnits { }
