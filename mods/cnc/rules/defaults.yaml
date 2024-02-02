@@ -1287,7 +1287,7 @@
     ChangesHealth@RepairGen:
 		Step: 0
 		PercentageStep: 5
-		Delay: 108
+		Delay: 72
 		StartIfBelow: 100
         DamageCooldown: 0
         RequiresCondition: RepairGen
