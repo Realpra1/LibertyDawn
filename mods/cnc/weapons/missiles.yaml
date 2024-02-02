@@ -223,8 +223,8 @@ MammothMissiles:
 		Spread: 683
 		ValidTargets: Ground
 		Versus:
-			None: 10
-			Wood: 28
+			None: 15
+			Wood: 40
 			TiberiumWood: 28
 			Light: 100
 			Tiberium: 100
