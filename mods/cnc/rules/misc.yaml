@@ -207,6 +207,7 @@ upgrade.covert1:
     ProvidesPrerequisite:
 		Prerequisite: anycovert
     Interactable:
+	AlwaysVisible:
     OwnerLostAction:
 		Action: Dispose
     
@@ -242,6 +243,7 @@ upgrade.covert2:
     ProvidesPrerequisite@hpad:
 		Prerequisite: hpadunlock
     Interactable:
+	AlwaysVisible:
     OwnerLostAction:
 		Action: Dispose
     
@@ -272,6 +274,7 @@ upgrade.covert3:
     ProvidesPrerequisite:
 		Prerequisite: anycovert
     Interactable:
+	AlwaysVisible:
     OwnerLostAction:
 		Action: Dispose
     
@@ -296,6 +299,7 @@ downgrade.covert:
 		Image: downgrade
 	ProvidesPrerequisite@upgradename:
     Interactable:
+	AlwaysVisible:
     
 ANYCOVERT:
 	AlwaysVisible:
@@ -367,6 +371,7 @@ upgrade.recon1:
     ProvidesPrerequisite@sbagunlock:
 		Prerequisite: sbagunlock
     Interactable:
+	AlwaysVisible:
     OwnerLostAction:
 		Action: Dispose
 
@@ -402,6 +407,7 @@ upgrade.recon2:
     ProvidesPrerequisite@hpad:
 		Prerequisite: hpadunlock
     Interactable:
+	AlwaysVisible:
     OwnerLostAction:
 		Action: Dispose
  
@@ -432,6 +438,7 @@ upgrade.recon3:
     ProvidesPrerequisite:
 		Prerequisite: anyrecon
     Interactable:
+	AlwaysVisible:
     OwnerLostAction:
 		Action: Dispose
     
@@ -456,6 +463,7 @@ downgrade.recon:
 		Image: downgrade
 	ProvidesPrerequisite@upgradename:
     Interactable:
+	AlwaysVisible:
     
 upgrade.economy1:
 	Inherits: ^MaxUpgrades
@@ -489,6 +497,7 @@ upgrade.economy1:
     ProvidesPrerequisite@afldunlock:
 		Prerequisite: afldunlock
     Interactable:
+	AlwaysVisible:
     OwnerLostAction:
 		Action: Dispose
 
@@ -524,6 +533,7 @@ upgrade.economy2:
     ProvidesPrerequisite@sbagunlock:
 		Prerequisite: sbagunlock
     Interactable:
+	AlwaysVisible:
     OwnerLostAction:
 		Action: Dispose
  
@@ -554,6 +564,7 @@ upgrade.economy3:
     ProvidesPrerequisite:
 		Prerequisite: anyeconomy
     Interactable:
+	AlwaysVisible:
     OwnerLostAction:
 		Action: Dispose
     
@@ -578,3 +589,4 @@ downgrade.economy:
 		Image: downgrade
 	ProvidesPrerequisite@upgradename:
     Interactable:
+	AlwaysVisible:
