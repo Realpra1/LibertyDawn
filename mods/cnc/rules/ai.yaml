@@ -254,6 +254,7 @@ Player:
 		McvTypes: mcv
         RestrictMCVDeploymentFallbackToBase: false
         MaxBaseRadius: 49
+        MinBaseRadius: 20
 		ConstructionYardTypes: fact
 		McvFactoryTypes: weap,afld
 	BaseBuilderBotModule@cabal:
@@ -331,6 +332,7 @@ Player:
             upgrade.economy1: 1
             upgrade.economy2: 1
             upgrade.recon1: 1
+            downgrade.covert: 1
 		UnitLimits:
 			harv: 8
 	BaseBuilderBotModule@watson:
@@ -408,6 +410,7 @@ Player:
             upgrade.economy1: 1
             upgrade.economy2: 1
             upgrade.recon1: 1
+            downgrade.covert: 1
 		UnitLimits:
 			harv: 8
     BaseBuilderBotModule@hal9001:
@@ -487,6 +490,7 @@ Player:
             upgrade.economy1: 1
             upgrade.economy2: 1
             upgrade.recon1: 1
+            downgrade.covert: 1
 		UnitLimits:
 			harv: 8
     BaseBuilderBotModule@brutalis:
@@ -605,6 +609,8 @@ Player:
             upgrade.economy1: 1
             upgrade.economy2: 1
             upgrade.economy3: 1
+            downgrade.covert: 1
+            downgrade.recon: 1
 		UnitLimits:
             ltnk: 25
 			ftnk: 25
@@ -726,11 +732,11 @@ Player:
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
         IdleBaseUnitsMaximum: 999
 		UnitsToBuild:
-			e1: 25
+			e1: 10
 			e2: 25
 			e3: 50
-			e4: 15
-			e5: 20
+			e4: 25
+			e5: 50
             rmbo: 2
 			harv: 100
 			sharv: 100
@@ -748,6 +754,8 @@ Player:
             upgrade.covert1: 1
             upgrade.covert2: 1
             upgrade.covert3: 1
+            downgrade.recon: 1
+            downgrade.economy: 1
         UnitDelays:
 			harv: 0
 			sharv: 0
@@ -883,6 +891,8 @@ Player:
             upgrade.recon1: 1
             upgrade.recon2: 1
             upgrade.recon3: 1
+            downgrade.covert: 1
+            downgrade.economy: 1
         UnitDelays:
 			harv: 0
 			ltnk: 5000
@@ -1038,6 +1048,7 @@ Player:
             upgrade.recon1: 1
             upgrade.recon2: 1
             upgrade.recon3: 1
+            downgrade.covert: 1
 		UnitLimits:
             ltnk: 25
 			ftnk: 25
@@ -1187,6 +1198,7 @@ Player:
             upgrade.economy1: 1
             upgrade.economy2: 1
             upgrade.recon1: 1
+            downgrade.covert: 1
         UnitDelays:
 			harv: 0
 			ltnk: 5000
@@ -1314,6 +1326,7 @@ Player:
             upgrade.economy1: 1
             upgrade.economy2: 1
             upgrade.recon1: 1
+            downgrade.covert: 1
         UnitDelays:
             e1: 10000
 			e2: 10000

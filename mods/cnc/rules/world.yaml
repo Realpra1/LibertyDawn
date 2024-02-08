@@ -279,47 +279,55 @@ World:
 		ClassName: MCV Only
 		Factions: gdi
 		BaseActor: mcv
+        Upgrades: upgrade.economy1, upgrade.economy2, upgrade.economy3
     StartingUnits@mcvonlynod:
 		Class: none
 		ClassName: MCV Only
 		Factions: nod
 		BaseActor: mcv
+        Upgrades: upgrade.covert1, upgrade.covert2
 	StartingUnits@defaultgdia:
 		Class: light
 		ClassName: Light Support
 		Factions: gdi
 		BaseActor: mcv
 		SupportActors: e1,e1,e1,e1,e1,e3,e3,jeep
+        Upgrades: upgrade.economy1, upgrade.economy2, upgrade.economy3
 	StartingUnits@defaultnoda:
 		Class: light
 		ClassName: Light Support
 		Factions: nod
 		BaseActor: mcv
 		SupportActors: e1,e1,e1,e1,e1,e1,e3,e3,bggy
+        Upgrades: upgrade.covert1, upgrade.covert2
 	StartingUnits@heavynoda:
 		Class: heavy
 		ClassName: Heavy Support
 		Factions: nod
 		BaseActor: mcv
 		SupportActors: e1,e1,e1,e1,e3,e3,ltnk,ltnk,ftnk,ctnk,arty,bggy
+        Upgrades: upgrade.covert1, upgrade.covert2
 	StartingUnits@heavynodb:
 		Class: heavy
 		ClassName: Heavy Support
 		Factions: nod
 		BaseActor: mcv
 		SupportActors: e1,e1,e1,e1,e1,e3,e3,e3,ftnk,ftnk,stnk
+        Upgrades: upgrade.covert1, upgrade.covert2
 	StartingUnits@heavygdia:
 		Class: heavy
 		ClassName: Heavy Support
 		Factions: gdi
 		BaseActor: mcv
 		SupportActors: e1,e1,e1,e1,e3,e3,jeep,mtnk,mtnk,msam,msam
+        Upgrades: upgrade.economy1, upgrade.economy2, upgrade.economy3
 	StartingUnits@heavygdib:
 		Class: heavy
 		ClassName: Heavy Support
 		Factions: gdi
 		BaseActor: mcv
 		SupportActors: e1,e1,e1,e1,e1,e2,e2,e2,e3,e3,apc,mtnk,htnk
+        Upgrades: upgrade.economy1, upgrade.economy2, upgrade.economy3
 	SpawnStartingUnits:
 		DropdownDisplayOrder: 0
 	CrateSpawner:
