@@ -13,7 +13,7 @@
 		InvalidTargets: Wall
 		Versus:
 			None: 90
-			Wood: 100
+			Wood: 120
             TiberiumWood: 100
 			Light: 80
 			Tiberium: 20
@@ -47,7 +47,7 @@ BigFlamer:
 			None: 90
 			Wood: 120
             TiberiumWood: 120
-			Light: 80
+			Light: 90
 			Tiberium: 20
 			Heavy: 20
 	Warhead@3Eff: CreateEffect

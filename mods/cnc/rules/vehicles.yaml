@@ -341,7 +341,7 @@ FTNK:
 	Repairable:
 		HpPerStep: 2046
 	Armor:
-		Type: Heavy
+		Type: Light
 	RevealsShroud:
 		Range: 4c0
 	Armament:
@@ -385,7 +385,7 @@ CTNK:
 	Repairable:
 		HpPerStep: 2046
 	Armor:
-		Type: Heavy
+		Type: Light
 	RevealsShroud:
 		Range: 5c0
 	Armament:
