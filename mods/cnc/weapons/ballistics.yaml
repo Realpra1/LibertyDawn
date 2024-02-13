@@ -92,8 +92,8 @@ ArtilleryShell:
 			Wood: 110
             TiberiumWood: 110
 			Light: 90
-			Tiberium: 60
-			Heavy: 50
+			Tiberium: 50
+			Heavy: 30
 		DamageTypes: Prone50Percent, TriggerProne, SmallExplosionDeath
 	Warhead@3Eff: CreateEffect
 		Explosions: poof

@@ -162,7 +162,7 @@ E5:
 		Speed: 54
 		Locomotor: chem
 	Health:
-		HP: 12000
+		HP: 11000
 	Armament:
 		Weapon: Chemspray
 		LocalOffset: 341,0,256
@@ -220,13 +220,12 @@ RMBO:
 	Inherits@AUTOTARGET: ^AutoTargetGroundAssaultMove
 	Inherits@DECORATIONS: ^InfantryExperienceHospitalHazmatOverrides
 	Valued:
-		Cost: 1500
+		Cost: 750
 	Tooltip:
 		Name: Commando
 	UpdatesPlayerStatistics:
 		AddToArmyValue: true
 	Buildable:
-        BuildDuration: 1200
 		BuildPaletteOrder: 50
 		Prerequisites: upgrade.recon3, ~techlevel.high
 		Queue: Infantry.GDI, Infantry.Nod
@@ -234,7 +233,7 @@ RMBO:
 	Mobile:
 		Speed: 68
 	Health:
-		HP: 15000
+		HP: 12000
 	Passenger:
 		CustomPipType: red
 	RevealsShroud:

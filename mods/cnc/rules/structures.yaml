@@ -1076,7 +1076,7 @@ ATWR:
 		Prerequisites: upgrade.recon3, ~techlevel.medium
 		Queue: Defence.GDI, Defence.Nod
 		BuildDuration: 1920
-		Description: All-purpose defensive structure.\n  Strong vs Aircraft, Infantry\n  Weak vs Tanks
+		Description: All-purpose long range defensive structure.\n  Strong vs Aircraft, Infantry\n  Weak vs Tanks
 	Selectable:
 		Bounds: 1024, 1024
 		DecorationBounds: 938, 2048, 0, -512
@@ -1085,10 +1085,10 @@ ATWR:
 	Armor:
 		Type: Wood
 	RevealsShroud:
-		Range: 8c0
+		Range: 11c0
 	-RenderRangeCircle:
 	WithRangeCircle:
-		Range: 8c0
+		Range: 11c0
 		Color: FFFF0080
 	WithBuildingBib:
 		HasMinibib: true

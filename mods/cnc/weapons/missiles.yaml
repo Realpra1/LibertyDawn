@@ -98,7 +98,7 @@ AARockets:
     Inherits: Rockets
 	ValidTargets: Air
     Projectile: Missile
-		Inaccuracy: 1024
+		Inaccuracy: 1800
 		Blockable: false
 	Warhead@1Dam: SpreadDamage
 		Damage: 1500
@@ -129,7 +129,7 @@ BikeAARockets:
     Inherits: BikeRockets
     ValidTargets: Air
     Projectile: Missile
-		Inaccuracy: 1024
+		Inaccuracy: 1800
         Blockable: false
 	Warhead@1Dam: SpreadDamage
         Damage: 800
@@ -264,7 +264,7 @@ MammothMissiles:
 	MinRange: 2c512
 	ValidTargets: Air
     Projectile: Missile
-		Inaccuracy: 1024
+		Inaccuracy: 1800
 	Warhead@1Dam: SpreadDamage
         ValidTargets: Air
 		Damage: 4000
@@ -303,13 +303,13 @@ TowerMissile:
 	ReloadDelay: 30
 	Burst: 2
 	BurstDelays: 8
-	Range: 8c0
+	Range: 11c0
 	Report: rocket2.aud
 	ValidTargets: Ground, Water
 	Projectile: Missile
 		HorizontalRateOfTurn: 80
 		Speed: 298
-		RangeLimit: 8c409
+		RangeLimit: 11c409
 	Warhead@1Dam: SpreadDamage
 		Damage: 2750
 		Spread: 483
@@ -319,8 +319,8 @@ TowerMissile:
 			Wood: 50
 			TiberiumWood: 50
 			Light: 100
-			Tiberium: 50
-			Heavy: 50
+			Tiberium: 30
+			Heavy: 30
 		DamageTypes: Prone50Percent, TriggerProne, SmallExplosionDeath
 	Warhead@3Eff: CreateEffect
 		Explosions: big_frag
@@ -331,20 +331,20 @@ TowerAAMissile:
 	ReloadDelay: 30
 	Burst: 2
 	BurstDelays: 8
-	Range: 8c0
+	Range: 10c0
 	Report: rocket2.aud
 	ValidTargets: Air
 	Projectile: Missile
 		Image: MISSILE
 		HorizontalRateOfTurn: 80
 		Speed: 426
-		RangeLimit: 9c614
+		RangeLimit: 11c614
 		Inaccuracy: 0
 	Warhead@1Dam: SpreadDamage
-		Spread: 682
+		Spread: 483
 		ValidTargets: Air
 		Versus:
-			Light: 140
+			Light: 100
 	-Warhead@2Smu:
 	Warhead@4EffAir: CreateEffect
 		Explosions: small_building
