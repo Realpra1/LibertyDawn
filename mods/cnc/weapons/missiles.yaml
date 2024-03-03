@@ -43,18 +43,18 @@
 
 Dragon:
 	Inherits: ^MissileWeapon
-	ReloadDelay: 20
+	ReloadDelay: 40
 	Range: 10c0
 	Report: rocket2.aud
 	ValidTargets: Air
 	Burst: 2
 	BurstDelays: 5
 	Projectile: Missile
-		Speed: 426
-		HorizontalRateOfTurn: 80
+		Speed: 220
+		HorizontalRateOfTurn: 5
 		RangeLimit: 12c0
 	Warhead@1Dam: SpreadDamage
-		Damage: 2500
+		Damage: 5000
 		Spread: 1200
 		ValidTargets: Air
 		Versus:
@@ -152,8 +152,8 @@ OrcaAGMissiles:
 		ValidTargets: Ground
 		Versus:
 			None: 25
-			Wood: 75
-			TiberiumWood: 75
+			Wood: 80
+			TiberiumWood: 90
 			Light: 110
 			Tiberium: 121
 			Heavy: 121
@@ -178,8 +178,8 @@ MammothMissiles:
 	Burst: 2
 	BurstDelays: 15
 	Projectile: Missile
-		HorizontalRateOfTurn: 80
-		Speed: 341
+		HorizontalRateOfTurn: 15
+		Speed: 200
 		RangeLimit: 8c0
 	Warhead@1Dam: SpreadDamage
 		Spread: 350
@@ -336,8 +336,8 @@ TowerAAMissile:
 	ValidTargets: Air
 	Projectile: Missile
 		Image: MISSILE
-		HorizontalRateOfTurn: 80
-		Speed: 426
+		Speed: 200
+		HorizontalRateOfTurn: 15
 		RangeLimit: 11c614
 		Inaccuracy: 0
 	Warhead@1Dam: SpreadDamage
@@ -358,8 +358,8 @@ Patriot:
 	ValidTargets: Air
 	Projectile: Missile
 		Image: MISSILE
-		HorizontalRateOfTurn: 80
-		Speed: 300
+		Speed: 200
+		HorizontalRateOfTurn: 10
 		RangeLimit: 10c819
 		Inaccuracy: 0
 	Warhead@1Dam: SpreadDamage

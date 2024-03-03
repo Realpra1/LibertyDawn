@@ -81,11 +81,11 @@ HeliAGGun:
 		Damage: 2500
 		Versus:
 			None: 100
-			Wood: 50
-			TiberiumWood: 50
-			Light: 80
-			Tiberium: 35
-			Heavy: 35
+			Wood: 30
+			TiberiumWood: 30
+			Light: 50
+			Tiberium: 40
+			Heavy: 25
 		DamageTypes: Prone80Percent, TriggerProne, RippedApartDeath
 
 HeliAAGun:

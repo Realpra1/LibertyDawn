@@ -566,7 +566,6 @@ HPAD:
 		Name: Helipad
 	Buildable:
 		BuildPaletteOrder: 50
-		Prerequisites: hpadunlock
 		Queue: Building.GDI, Building.Nod
 		Description: Produces and repairs helicopters
 	Building:
@@ -1154,7 +1153,7 @@ RESONATOR:
 		Name: Tiberium Resonator
 	Buildable:
 		BuildPaletteOrder: 100
-		Prerequisites: upgrade.economy3, ~techlevel.high
+		Prerequisites: proc, upgrade.economy3, ~techlevel.high
 		Queue: Building.GDI, Building.Nod
 		Description: Accelerates tiberium spread by 750%.\nPrevents spontaneous red tiberium instability events.
 	Building:

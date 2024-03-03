@@ -599,7 +599,7 @@ MTNK:
 		AddToArmyValue: true
 	Buildable:
 		BuildPaletteOrder: 45
-		Prerequisites: anyhq, upgrade.economy1, ~techlevel.medium
+		Prerequisites: upgrade.economy1, ~techlevel.medium
 		Queue: Vehicle.GDI, Vehicle.Nod
 		Description: General-Purpose Tank.\n  Strong vs Tanks, Vehicles\n  Weak vs Infantry
 	Mobile:
@@ -788,7 +788,7 @@ MLRS:
 		AddToArmyValue: true
 	Buildable:
 		BuildPaletteOrder: 80
-		Prerequisites: anyhq, upgrade.economy2, ~techlevel.medium
+		Prerequisites: upgrade.economy2, ~techlevel.medium
 		Queue: Vehicle.Nod, Vehicle.GDI
 		Description: Powerful anti-air unit.\nCannot attack Ground units.
 	Mobile:
