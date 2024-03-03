@@ -535,8 +535,8 @@ Player:
 			pyle: 2000
 			hand: 2000
 			hq: 4500
-			weap: 0
-			afld: 0
+			weap: 500
+			afld: 500
 			gtwr: 2000
 			gun: 2000
 			atwr: 2000
@@ -546,7 +546,8 @@ Player:
 			tmpl: 9000
 			fix: 4500
 			silo: 2000
-			hpad: 7500
+            resonator: 7200
+			hpad: 2000
 		BuildingFractions:
 			proc: 20
 			pyle: 15
@@ -692,9 +693,9 @@ Player:
             proc: 0
 			pyle: 2000
 			hand: 2000
-			hq: 4000
-			weap: 0
-			afld: 0
+			hq: 4500
+			weap: 500
+			afld: 500
 			gtwr: 2000
 			gun: 2000
 			atwr: 2000
@@ -702,8 +703,10 @@ Player:
 			sam: 2000
 			eye: 9000
 			tmpl: 9000
-			fix: 5000
-			hpad: 9000
+			fix: 4500
+			silo: 2000
+            resonator: 7200
+			hpad: 2000
 		BuildingFractions:
 			proc: 31
 			pyle: 31
@@ -824,9 +827,9 @@ Player:
             proc: 0
 			pyle: 2000
 			hand: 2000
-			hq: 5000
-			weap: 0
-			afld: 0
+			hq: 4500
+			weap: 500
+			afld: 500
 			gtwr: 2000
 			gun: 2000
 			atwr: 2000
@@ -834,8 +837,10 @@ Player:
 			sam: 2000
 			eye: 9000
 			tmpl: 9000
-			fix: 5000
-			hpad: 9000
+			fix: 4500
+			silo: 2000
+            resonator: 7200
+			hpad: 2000
 		BuildingFractions:
 			proc: 30
 			pyle: 10
@@ -976,8 +981,8 @@ Player:
 			pyle: 2000
 			hand: 2000
 			hq: 4500
-			weap: 0
-			afld: 0
+			weap: 500
+			afld: 500
 			gtwr: 2000
 			gun: 2000
 			atwr: 2000
@@ -987,6 +992,7 @@ Player:
 			tmpl: 9000
 			fix: 4500
 			silo: 2000
+            resonator: 7200
 		BuildingFractions:
 			proc: 20
 			pyle: 15
