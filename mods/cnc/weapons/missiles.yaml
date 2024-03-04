@@ -50,9 +50,9 @@ Dragon:
 	Burst: 2
 	BurstDelays: 5
 	Projectile: Missile
-		Speed: 220
-		HorizontalRateOfTurn: 5
-		RangeLimit: 12c0
+		Speed: 210
+		HorizontalRateOfTurn: 7
+		RangeLimit: 15c0
 	Warhead@1Dam: SpreadDamage
 		Damage: 5000
 		Spread: 1200
@@ -178,8 +178,8 @@ MammothMissiles:
 	Burst: 2
 	BurstDelays: 15
 	Projectile: Missile
-		HorizontalRateOfTurn: 15
-		Speed: 200
+		HorizontalRateOfTurn: 20
+		Speed: 180
 		RangeLimit: 8c0
 	Warhead@1Dam: SpreadDamage
 		Spread: 350
@@ -359,8 +359,8 @@ Patriot:
 	Projectile: Missile
 		Image: MISSILE
 		Speed: 200
-		HorizontalRateOfTurn: 10
-		RangeLimit: 10c819
+		HorizontalRateOfTurn: 8
+		RangeLimit: 15c0
 		Inaccuracy: 0
 	Warhead@1Dam: SpreadDamage
 		Spread: 1200
