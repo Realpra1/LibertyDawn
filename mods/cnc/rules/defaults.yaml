@@ -139,6 +139,22 @@
 			rank-veteran && !hazmatsuits: Off, On
 			hazmatsuits: On, Off
 
+^AutoTargetInfantry:
+	Inherits: ^AutoTargetGround
+    AutoTargetPriority@INFANTRY:
+		RequiresCondition: !stance-attackanything
+		ValidTargets: Infantry
+        Priority: 2
+		InvalidTargets: NoAutoTarget, Vehicle
+        
+^AutoTargetVehicles:
+	Inherits: ^AutoTargetGround
+    AutoTargetPriority@VEHICLE:
+		RequiresCondition: !stance-attackanything
+		ValidTargets: Vehicle
+        Priority: 2
+		InvalidTargets: NoAutoTarget, Infantry
+
 ^AutoTargetGround:
 	AutoTarget:
 		AttackAnythingCondition: stance-attackanything
@@ -944,7 +960,7 @@
 	Targetable:
 		TargetTypes: Ground, Wall
 	Crushable:
-		CrushClasses: wall
+		CrushClasses: infantry
 		CrushSound: sandbag2.aud
 	LineBuild:
 		Range: 15
@@ -966,7 +982,7 @@
 		PercentageStep: 2
 		Delay: 25
 		StartIfBelow: 100
-        DamageCooldown: 250
+        DamageCooldown: 125
 	AppearsOnMapPreview:
 		Terrain: Wall
 	RadarColorFromTerrain:
@@ -1200,6 +1216,7 @@
 		Categories: System
 
 ^Defense:
+	Inherits@EXPERIENCE: ^GainsExperience
 	Inherits: ^BaseBuilding
 	Inherits@selection: ^SelectableCombatBuilding
 	RenderRangeCircle:

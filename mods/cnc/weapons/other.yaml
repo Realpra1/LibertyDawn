@@ -61,7 +61,6 @@ Chemspray:
 	ReloadDelay: 65
 	Warhead@1Dam: SpreadDamage
 		Damage: 6000
-		-InvalidTargets:
 		Versus:
 			None: 150
 			Wood: 50
@@ -77,7 +76,6 @@ Chemspray:
 BigChem:
 	Inherits: ^FlameWeapon
 	ReloadDelay: 65
-	-InvalidTargets:
 	Range: 3c512
 	Projectile: Bullet
 		Speed: 341
@@ -136,7 +134,7 @@ Laser:
 		ZOffset: 2047
 	Warhead@1Dam: SpreadDamage
 		Spread: 42
-		Damage: 39600
+		Damage: 45000
 		Versus:
 			Wood: 30
             TiberiumWood: 30

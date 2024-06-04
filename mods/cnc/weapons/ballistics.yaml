@@ -56,13 +56,13 @@
 
 TurretGun:
 	Inherits: ^BallisticWeapon
-	ReloadDelay: 20
+	ReloadDelay: 40
 	Range: 7c0
 	Projectile: Bullet
 		Blockable: false
 		Speed: 853
 	Warhead@1Dam: SpreadDamage
-		Damage: 4400
+		Damage: 8800
 		Versus:
 			None: 20
 			Wood: 25

@@ -69,6 +69,18 @@
 			BlueTiberium: 63
 			RedTiberium: 63
 			Beach: 50
+    Locomotor@LIGHTTRACKED:
+		Name: lighttracked
+		Crushes: crate, infantry
+		TerrainSpeeds:
+			Clear: 100
+			Rough: 95
+			Road: 105
+			Bridge: 105
+			Tiberium: 95
+			BlueTiberium: 95
+			RedTiberium: 95
+			Beach: 95
 	Locomotor@TRACKED:
 		Name: tracked
 		Crushes: wall, crate, infantry

@@ -880,7 +880,7 @@ TMPL:
 
 GUN:
 	Inherits: ^Defense
-	Inherits@AUTOTARGET: ^AutoTargetGround
+	Inherits@AUTOTARGET: ^AutoTargetVehicles
 	Selectable:
 		Bounds: 1024, 1024
 	Valued:
@@ -891,11 +891,10 @@ GUN:
 		BuildPaletteOrder: 45
 		Prerequisites: upgrade.recon1
 		Queue: Defence.GDI, Defence.Nod
-		BuildDuration: 960
 		Description: Basic Anti-Tank base defense.\n  Strong vs Tanks, vehicles\n  Weak vs Infantry
 	Building:
 	Health:
-		HP: 81500
+		HP: 90000
 	Armor:
 		Type: Wood
 	RevealsShroud:
@@ -946,7 +945,6 @@ SAM:
 		BuildPaletteOrder: 50
 		Prerequisites: upgrade.economy2
 		Queue: Defence.Nod, Defence.GDI
-		BuildDuration: 1130
 		Description: Anti-Aircraft base defense.\n  Strong vs Aircraft\n  Cannot target Ground units.
 	Building:
 		Footprint: xx
@@ -992,7 +990,6 @@ OBLI:
 		BuildPaletteOrder: 65
 		Prerequisites: upgrade.economy3, ~techlevel.high
 		Queue: Defence.Nod, Defence.GDI
-		BuildDuration: 2080
 		Description: Advanced base defense.\nRequires power to operate.\n  Strong vs all Ground units\n  Cannot target Aircraft
 	Selectable:
 		Bounds: 1024, 1024
@@ -1026,7 +1023,7 @@ OBLI:
 
 GTWR:
 	Inherits: ^Defense
-	Inherits@AUTOTARGET: ^AutoTargetGround
+	Inherits@AUTOTARGET: ^AutoTargetInfantry
 	Selectable:
 		Bounds: 1024, 1024
 	Valued:
@@ -1037,11 +1034,10 @@ GTWR:
 		BuildPaletteOrder: 40
 		Prerequisites: upgrade.recon2
 		Queue: Defence.GDI, Defence.Nod
-		BuildDuration: 960
 		Description: Basic defensive structure.\n  Strong vs Infantry\n  Weak vs Tanks
 	Building:
 	Health:
-		HP: 70000
+		HP: 80000
 	RevealsShroud:
 		Range: 7c0
 	WithBuildingBib:
@@ -1050,6 +1046,13 @@ GTWR:
 		Weapon: HighV
 		LocalOffset: 256,0,256
 		MuzzleSequence: muzzle
+		PauseOnCondition: !ammo
+    AmmoPool:
+		Ammo: 4
+		AmmoCondition: ammo
+	ReloadAmmoPool:
+		Delay: 50
+		Count: 4
 	AttackTurreted:
 		PauseOnCondition: build-incomplete
 	BodyOrientation:
@@ -1074,13 +1077,12 @@ ATWR:
 		BuildPaletteOrder: 60
 		Prerequisites: upgrade.recon3, ~techlevel.medium
 		Queue: Defence.GDI, Defence.Nod
-		BuildDuration: 1920
-		Description: All-purpose long range defensive structure.\n  Strong vs Aircraft, Infantry\n  Weak vs Tanks
+		Description: Weak, but long range defensive structure.\n  Decent vs light Vehicles and Infantry\n  Weak vs Tanks
 	Selectable:
 		Bounds: 1024, 1024
 		DecorationBounds: 938, 2048, 0, -512
 	Health:
-		HP: 102500
+		HP: 110000
 	Armor:
 		Type: Wood
 	RevealsShroud:
@@ -1107,7 +1109,7 @@ ATWR:
 	BodyOrientation:
 		QuantizedFacings: 8
 	DetectCloaked:
-		Range: 5c0
+		Range: 7c0
 		RequiresCondition: !lowpower
 	Power:
 		Amount: -50
@@ -1208,9 +1210,11 @@ SBAG:
 		Queue: Defence.GDI, Defence.Nod
 		Description: Stops infantry and light vehicles.\nBlocks some projectiles.\nCan be crushed by tanks.
 	Health:
-		HP: 35000
+		HP: 50000
     Armor:
 		Type: Heavy
+    Crushable:
+		CrushClasses: wall
 	BlocksProjectiles:
 	LineBuild:
 		NodeTypes: sandbag
@@ -1237,6 +1241,8 @@ CYCL:
 		HP: 20000
     Armor:
 		Type: Heavy
+	Crushable:
+		CrushClasses: infantry
 	LineBuild:
 		NodeTypes: chain
 	LineBuildNode:
@@ -1259,7 +1265,7 @@ BRIK:
 		BuildDuration: 250
 		Description: Stops infantry and most tanks.\nBlocks some projectiles.
 	Health:
-		HP: 75000
+		HP: 150000
 	Armor:
 		Type: Heavy
 	BlocksProjectiles:

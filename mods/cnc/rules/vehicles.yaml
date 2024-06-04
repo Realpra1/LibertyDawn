@@ -226,6 +226,7 @@ APC:
 		Queue: Vehicle.GDI, Vehicle.Nod
 		Description: Armored and stealthed infantry transport.\n  Decent vs Vehicles\n  Weak vs Infantry
 	Mobile:
+        Locomotor: lighttracked
 		TurnSpeed: 28
 		Speed: 110
 		PauseOnCondition: notmobile
@@ -234,7 +235,7 @@ APC:
 	Repairable:
 		HpPerStep: 1440
 	Armor:
-		Type: Heavy
+		Type: Light
 	RevealsShroud:
 		Range: 4c0
 	Turreted:
@@ -721,7 +722,7 @@ MSAM:
 		BuildPaletteOrder: 70
 		Prerequisites: anyhq, upgrade.economy2, ~techlevel.medium
 		Queue: Vehicle.GDI, Vehicle.Nod
-		Description: Very long range rocket artillery.\n  Strong vs all Ground units.
+		Description: Very long range rocket artillery.\n  Strong vs all Ground targets.
 	Mobile:
 		Speed: 40
 		TurnSpeed: 15
@@ -749,7 +750,7 @@ MSAM:
 		Ammo: 42
 		AmmoCondition: ammo
 	ReloadAmmoPool:
-		Delay: 375
+		Delay: 325
 		Count: 4
     WithAmmoPipsDecoration:
 		Position: BottomLeft

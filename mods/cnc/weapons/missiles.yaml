@@ -224,8 +224,8 @@ MammothMissiles:
 		ValidTargets: Ground
 		Versus:
 			None: 15
-			Wood: 40
-			TiberiumWood: 28
+			Wood: 50
+			TiberiumWood: 50
 			Light: 100
 			Tiberium: 100
 			Heavy: 100
@@ -307,15 +307,15 @@ TowerMissile:
 	Report: rocket2.aud
 	ValidTargets: Ground, Water
 	Projectile: Missile
-		HorizontalRateOfTurn: 80
-		Speed: 298
+		HorizontalRateOfTurn: 20
+		Speed: 180
 		RangeLimit: 11c409
 	Warhead@1Dam: SpreadDamage
-		Damage: 2750
-		Spread: 483
+		Damage: 2800
+		Spread: 600
 		ValidTargets: Ground
 		Versus:
-			None: 100
+			None: 110
 			Wood: 50
 			TiberiumWood: 50
 			Light: 100
@@ -336,15 +336,15 @@ TowerAAMissile:
 	ValidTargets: Air
 	Projectile: Missile
 		Image: MISSILE
-		Speed: 200
-		HorizontalRateOfTurn: 15
+		Speed: 180
+		HorizontalRateOfTurn: 20
 		RangeLimit: 11c614
 		Inaccuracy: 0
 	Warhead@1Dam: SpreadDamage
 		Spread: 483
 		ValidTargets: Air
 		Versus:
-			Light: 100
+			Light: 50
 	-Warhead@2Smu:
 	Warhead@4EffAir: CreateEffect
 		Explosions: small_building
