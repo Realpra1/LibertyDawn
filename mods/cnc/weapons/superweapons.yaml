@@ -189,6 +189,7 @@ IonCannon:
 		ValidTargets: Ground, Air, Trees
 		AffectsParent: True
 		DamageTypes: Prone50Percent, TriggerProne, FireDeath, Incendiary
+		Delay: 1
 	Warhead@2Smu_impact: LeaveSmudge
 		SmudgeType: Scorch
 		InvalidTargets: Vehicle, Structure, Wall, Husk, Trees, Creep
@@ -198,8 +199,7 @@ IonCannon:
 		Size: 1
 		Delay: 3
 	Warhead@4Res_area2: DestroyResource
-		Size: 2
-		Delay: 6
+		Size: 3
 	Warhead@5Smu_area2: LeaveSmudge
 		SmudgeType: Scorch
 		InvalidTargets: Vehicle, Structure, Wall, Husk, Trees, Creep

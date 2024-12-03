@@ -171,14 +171,14 @@ ORCA:
 		AttackType: Hover
 		Voice: Attack
 	AmmoPool:
-		Ammo: 18
+		Ammo: 8
 		AmmoCondition: ammo
 	SpawnActorOnDeath:
 		Actor: ORCA.Husk
 	WithMoveAnimation:
 		MoveSequence: move
 	ReloadAmmoPool:
-		Delay: 150
+		Delay: 300
 		Count: 2
 	Selectable:
 		DecorationBounds: 1280, 1024
@@ -186,7 +186,7 @@ ORCA:
 		Position: BottomLeft
 		Margin: 4, 3
 		RequiresSelection: true
-		PipCount: 5
+		PipCount: 4
 
 C17:
 	Inherits: ^Plane
@@ -234,7 +234,24 @@ C17:
 
 A10:
 	Inherits: ^Plane
-	Interactable:
+	Inherits@selecatble: ^Selectable
+	HitShape:
+    Targetable@AIRBORNE:
+		TargetTypes: Air
+	Health:
+		HP: 15000
+    Selectable:
+        DecorationBounds: 1749, 1749
+	Armor:
+		Type: Light
+	RevealsShroud:
+		Range: 6c0
+		Type: GroundPosition
+	Explodes:
+		Weapon: HeliExplode
+		EmptyWeapon: HeliExplode
+	SpawnActorOnDeath:
+		Actor: A10.Husk
 	Tooltip:
 		Name: A10 Bomber
 	Valued:
@@ -242,8 +259,8 @@ A10:
 	UpdatesPlayerStatistics:
 		AddToAssetsValue: false
 	Aircraft:
-		TurnSpeed: 16
-		Speed: 373
+		TurnSpeed: 8
+		Speed: 180
 		Repulsable: False
 	AttackBomber:
 		Armaments: gun, bombs
@@ -312,3 +329,16 @@ ORCA.Husk:
 		Type: GroundPosition
 	RenderSprites:
 		Image: orca
+        
+A10.Husk:
+	Inherits: ^PlaneHusk
+	Tooltip:
+		Name: A10
+	Aircraft:
+		TurnSpeed: 1
+		Speed: 90
+	RevealsShroud:
+		Range: 6c0
+		Type: GroundPosition
+	RenderSprites:
+		Image: a10

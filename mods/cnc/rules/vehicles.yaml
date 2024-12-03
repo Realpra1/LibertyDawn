@@ -355,8 +355,8 @@ FTNK:
 		Voice: Attack
 	WithMuzzleOverlay:
 	Explodes:
-		Weapon: FlametankExplode
-		EmptyWeapon: FlametankExplode
+		Weapon: ^FlametankExplode
+		EmptyWeapon: ^FlametankExplode
 	SpawnActorOnDeath:
 		Actor: FTNK.Husk
 		OwnerType: InternalName
@@ -399,8 +399,8 @@ CTNK:
 		Voice: Attack
 	WithMuzzleOverlay:
 	Explodes:
-		Weapon: ChemtankExplode
-		EmptyWeapon: ChemtankExplode
+		Weapon: ^ChemtankExplode
+		EmptyWeapon: ^ChemtankExplode
 	SpawnActorOnDeath:
 		Actor: CTNK.Husk
 		OwnerType: InternalName

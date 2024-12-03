@@ -1163,13 +1163,32 @@
 		ZOffset: -129
 	Aircraft:
 		CanHover: True
-		VTOL: true
+		VTOL: True
 		CanSlide: True
 	FallsToEarth:
 		Moves: False
 		Explosion: HeliCrash
 	Tooltip:
 		GenericName: Destroyed Helicopter
+	-MapEditorData:
+    
+^PlaneHusk:
+	Inherits: ^CommonHuskDefaults
+	WithShadow:
+		Offset: 43, 128, 0
+		ZOffset: -129
+	Aircraft:
+        Speed: 90
+		CanHover: False
+		VTOL: False
+		CanSlide: True
+	FallsToEarth:
+        MaximumSpinSpeed: 1
+        Velocity: 0c86
+		Moves: True
+		Explosion: HeliCrash
+	Tooltip:
+		GenericName: Destroyed Aircraft
 	-MapEditorData:
 
 ^Bridge:

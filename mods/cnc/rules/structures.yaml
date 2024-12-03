@@ -766,7 +766,7 @@ EYE:
 		Prerequisites: ~techlevel.superweapons
 		Icon: ioncannon
 		Cursor: ioncannon
-		ChargeInterval: 7500
+		ChargeInterval: 3750
 		Name: Ion Cannon
 		Description: Initiate an Ion Cannon strike.\nApplies instant damage to a small area.
 		BeginChargeSpeechNotification: IonCannonCharging
@@ -781,7 +781,7 @@ EYE:
 		PauseOnCondition: lowpower
 		Prerequisites: ~techlevel.superweapons
 		Icon: airstrike
-		ChargeInterval: 7500
+		ChargeInterval: 3750
 		SquadSize: 3
 		QuantizedFacings: 8
 		Name: Air Strike

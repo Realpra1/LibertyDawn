@@ -122,7 +122,7 @@ E4:
 	Mobile:
 		Speed: 54
 	Health:
-		HP: 9500
+		HP: 7500
 	Armament:
 		Weapon: Flamethrower
 		LocalOffset: 341,0,256
@@ -138,8 +138,8 @@ E4:
 	WithInfantryBody:
 		DefaultAttackSequence: shoot
     Explodes:
-		Weapon: FlamethrowerExplode
-		EmptyWeapon: FlamethrowerExplode
+		Weapon: ^FlamethrowerExplode
+		EmptyWeapon: ^FlamethrowerExplode
 		Chance: 50
 
 E5:
@@ -162,7 +162,7 @@ E5:
 		Speed: 54
 		Locomotor: chem
 	Health:
-		HP: 11000
+		HP: 8500
 	Armament:
 		Weapon: Chemspray
 		LocalOffset: 341,0,256
@@ -179,8 +179,8 @@ E5:
 	WithInfantryBody:
 		DefaultAttackSequence: shoot
     Explodes:
-		Weapon: ChemWarriorExplode
-		EmptyWeapon: ChemWarriorExplode
+		Weapon: ^ChemWarriorExplode
+		EmptyWeapon: ^ChemWarriorExplode
 		Chance: 5
 
 E6:

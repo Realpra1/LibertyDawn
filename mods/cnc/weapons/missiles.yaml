@@ -51,8 +51,9 @@ Dragon:
 	BurstDelays: 5
 	Projectile: Missile
 		Speed: 210
-		HorizontalRateOfTurn: 7
-		RangeLimit: 15c0
+		HorizontalRateOfTurn: 12
+		RangeLimit: 16c0
+        Width: 2c0
 	Warhead@1Dam: SpreadDamage
 		Damage: 5000
 		Spread: 1200
@@ -148,7 +149,7 @@ OrcaAGMissiles:
 		Speed: 256
 		RangeLimit: 6c0
 	Warhead@1Dam: SpreadDamage
-		Damage: 2700
+		Damage: 7600
 		ValidTargets: Ground
 		Versus:
 			None: 25
@@ -165,6 +166,7 @@ OrcaAAMissiles:
 		Arm: 0
 		Speed: 341
 	Warhead@1Dam: SpreadDamage
+		Damage: 5000
 		ValidTargets: Air
 		Versus:
 			Light: 84
@@ -178,7 +180,7 @@ MammothMissiles:
 	Burst: 2
 	BurstDelays: 15
 	Projectile: Missile
-		HorizontalRateOfTurn: 20
+		HorizontalRateOfTurn: 25
 		Speed: 180
 		RangeLimit: 8c0
 	Warhead@1Dam: SpreadDamage
@@ -307,7 +309,7 @@ TowerMissile:
 	Report: rocket2.aud
 	ValidTargets: Ground, Water
 	Projectile: Missile
-		HorizontalRateOfTurn: 20
+		HorizontalRateOfTurn: 25
 		Speed: 180
 		RangeLimit: 11c409
 	Warhead@1Dam: SpreadDamage
@@ -337,7 +339,7 @@ TowerAAMissile:
 	Projectile: Missile
 		Image: MISSILE
 		Speed: 180
-		HorizontalRateOfTurn: 20
+		HorizontalRateOfTurn: 25
 		RangeLimit: 11c614
 		Inaccuracy: 0
 	Warhead@1Dam: SpreadDamage

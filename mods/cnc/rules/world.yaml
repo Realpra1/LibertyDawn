@@ -227,9 +227,9 @@ World:
 				TerrainType: BlueTiberium
 				AllowedTerrainTypes: Clear, Road, Rough, Beach, Bridge
 				MaxStageEvolvesTo: RedTiberium
-                ExplosionChance: 30
-                MinimumDamage: 1000
-                Explosions: ChemtankExplode
+                ExplosionChance: 20
+                MinimumDamage: 100
+                Explosions: ChemtankExplodeOnce
                 ExplodeInto: BlueTiberium, BlueTiberium, BlueTiberium, Tiberium, Nothing
 				MaxDensity: 10
                 SpreadInterval: 1125
@@ -251,7 +251,7 @@ World:
                 BlinkWarningInterval: 750
                 BlinkColor: FFDDDD
                 ExplosionChance: 100
-                MinimumDamage: 1000
+                MinimumDamage: 100
                 Explosions: AtomicTib, TiberiumMeteor
                 ExplodeInto: BlueTiberium, Tiberium, Nothing
 				MaxDensity: 20
@@ -297,7 +297,7 @@ World:
 		ClassName: MCV Only
 		Factions: nod
 		BaseActor: mcv
-        Upgrades: upgrade.covert1, upgrade.covert2
+        Upgrades: upgrade.covert1
 	StartingUnits@defaultgdia:
 		Class: light
 		ClassName: Light Support
@@ -311,21 +311,21 @@ World:
 		Factions: nod
 		BaseActor: mcv
 		SupportActors: e1,e1,e1,e1,e1,e1,e3,e3,bggy
-        Upgrades: upgrade.covert1, upgrade.covert2
+        Upgrades: upgrade.covert1
 	StartingUnits@heavynoda:
 		Class: heavy
 		ClassName: Heavy Support
 		Factions: nod
 		BaseActor: mcv
 		SupportActors: e1,e1,e1,e1,e3,e3,ltnk,ltnk,ftnk,ctnk,arty,bggy
-        Upgrades: upgrade.covert1, upgrade.covert2
+        Upgrades: upgrade.covert1
 	StartingUnits@heavynodb:
 		Class: heavy
 		ClassName: Heavy Support
 		Factions: nod
 		BaseActor: mcv
 		SupportActors: e1,e1,e1,e1,e1,e3,e3,e3,ftnk,ftnk,stnk
-        Upgrades: upgrade.covert1, upgrade.covert2
+        Upgrades: upgrade.covert1
 	StartingUnits@heavygdia:
 		Class: heavy
 		ClassName: Heavy Support
@@ -397,9 +397,9 @@ EditorWorld:
 				TerrainType: BlueTiberium
 				AllowedTerrainTypes: Clear, Road, Rough, Beach, Bridge
 				MaxStageEvolvesTo: RedTiberium
-                ExplosionChance: 50
-                MinimumDamage: 1000
-                Explosions: ChemtankExplode
+                ExplosionChance: 20
+                MinimumDamage: 100
+                Explosions: ChemtankExplodeOnce
                 ExplodeInto: BlueTiberium, Tiberium, Nothing
 				MaxDensity: 10
                 SpreadInterval: 1125
@@ -419,7 +419,7 @@ EditorWorld:
 				AllowedTerrainTypes: Clear, Road, Rough, Beach, Bridge
                 MaxStageEvolvesTo: Explode
                 ExplosionChance: 100
-                MinimumDamage: 1000
+                MinimumDamage: 100
                 Explosions: AtomicTib, TiberiumMeteor
                 ExplodeInto: BlueTiberium, Tiberium, Nothing
 				MaxDensity: 20

@@ -7,8 +7,8 @@
 	Projectile: Bullet
 		Speed: 1c682
 	Warhead@1Dam: SpreadDamage
-		Spread: 1c0
-		Damage: 5000
+		Spread: 500
+		Damage: 786
 		ValidTargets: Ground, Water, Trees
 		InvalidTargets: Wall
 		Versus:
@@ -19,83 +19,40 @@
 			Tiberium: 20
 			Heavy: 20
 		DamageTypes: Prone50Percent, TriggerProne, FireDeath, Incendiary
-	Warhead@2Smu: LeaveSmudge
+	Warhead@1Smu: LeaveSmudge
 		SmudgeType: Scorch
 		InvalidTargets: Vehicle, Structure, Wall
-	Warhead@3Eff: CreateEffect
+	Warhead@1Eff: CreateEffect
 		Explosions: small_napalm
 		ImpactActors: false
     
 Flamethrower:
-	Inherits: ^FlameWeapon
-    Warhead@4Res_area: DestroyResource
-		Size: 0
-		Delay: 1
+    Inherits@FlameWeapon: ^FlameWeapon
+	Inherits@FlamethrowerExplode: ^FlamethrowerExplode
 
 BigFlamer:
-	Inherits: ^FlameWeapon
+    Inherits@FlameWeapon: ^FlameWeapon
+	Inherits@FlametankExplode: ^FlametankExplode
 	ReloadDelay: 65
 	Range: 3c512
 	Projectile: Bullet
 		Speed: 341
 	Burst: 2
 	BurstDelays: 10
-	Warhead@1Dam: SpreadDamage
-		Spread: 400
-		Damage: 11500
-		Versus:
-			None: 90
-			Wood: 120
-            TiberiumWood: 120
-			Light: 90
-			Tiberium: 20
-			Heavy: 20
-	Warhead@3Eff: CreateEffect
-		Explosions: med_napalm
-    Warhead@4Res_area: DestroyResource
-		Size: 1
-		Delay: 1
 
 Chemspray:
-	Inherits: ^FlameWeapon
-	ReloadDelay: 65
-	Warhead@1Dam: SpreadDamage
-		Damage: 6000
-		Versus:
-			None: 150
-			Wood: 50
-            TiberiumWood: 150
-			Light: 50
-			Tiberium: 150
-			Heavy: 10
-		DamageTypes: Prone50Percent, TriggerProne, TiberiumDeath
-	Warhead@3Eff: CreateEffect
-		Explosions: chemball
-		ImpactSounds: xplos.aud
+	Inherits@FlameWeapon: ^FlameWeapon
+	Inherits@ChemWarriorExplode: ^ChemWarriorExplode
 
 BigChem:
-	Inherits: ^FlameWeapon
+	Inherits@FlameWeapon: ^FlameWeapon
+	Inherits@ChemtankExplode: ^ChemtankExplode
 	ReloadDelay: 65
 	Range: 3c512
 	Projectile: Bullet
 		Speed: 341
 	Burst: 2
 	BurstDelays: 10
-	Warhead@1Dam: SpreadDamage
-		Spread: 400
-		Damage: 13800
-		-InvalidTargets:
-		Versus:
-			None: 150
-			Wood: 75
-            TiberiumWood: 150
-			Light: 50
-			Tiberium: 150
-			Heavy: 10
-		DamageTypes: Prone50Percent, TriggerProne, TibGun
-    Warhead@3Eff: CreateEffect
-		Explosions: bigchem
-		ImpactSounds: xplos.aud
 
 Napalm:
 	Inherits: ^FlameWeapon
@@ -118,9 +75,9 @@ Napalm:
 			Light: 50
 			Tiberium: 10
 			Heavy: 10
-	Warhead@3Eff: CreateEffect
+	Warhead@1Eff: CreateEffect
 		Explosions: med_napalm
-    Warhead@4Res_area: DestroyResource
+    Warhead@1Res_area: DestroyResource
 		Size: 1
 		Delay: 1
 
