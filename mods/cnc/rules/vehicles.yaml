@@ -104,7 +104,7 @@ HARV:
 		Weapon: TiberiumExplosion
     Explodes@unstable:
 		RequiresCondition: unstable-tiberium
-		Weapon: Atomic
+		Weapon: AtomicHarv
     Blink:
 		RequiresCondition: unstable-tiberium
         Interval: 13

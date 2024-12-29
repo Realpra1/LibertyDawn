@@ -347,7 +347,7 @@ World:
 		Maximum: 6
 		SpawnInterval: 1500
 		WaterChance: 0
-		InitialSpawnDelay: 1500
+		InitialSpawnDelay: 7500
 		CheckboxDisplayOrder: 1
 	PathFinder:
 	ValidateOrder:
