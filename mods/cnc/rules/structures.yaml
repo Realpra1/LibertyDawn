@@ -925,6 +925,10 @@ GUN:
 		Amount: -20
 	-BodyOrientation:
 	ClassicFacingBodyOrientation:
+    Crushable:
+        WarnProbability: 0
+		CrushClasses: heavywall
+        CrushSound: xplosml2.aud
 
 SAM:
 	Inherits: ^Defense
@@ -977,6 +981,10 @@ SAM:
 	SequencePlaceBuildingPreview:
 		Sequence: place
 		SequenceAlpha: 0.65
+    Crushable:
+        WarnProbability: 0
+		CrushClasses: heavywall
+        CrushSound: xplosml2.aud
 
 OBLI:
 	Inherits: ^Defense
@@ -1064,6 +1072,10 @@ GTWR:
 		TurnSpeed: 512
 	Power:
 		Amount: -20
+    Crushable:
+        WarnProbability: 0
+		CrushClasses: heavywall
+        CrushSound: xplosml2.aud
 
 ATWR:
 	Inherits: ^Defense
@@ -1210,7 +1222,7 @@ SBAG:
 		Queue: Defence.GDI, Defence.Nod
 		Description: Stops infantry and light vehicles.\nBlocks some projectiles.\nCan be crushed by tanks.
 	Health:
-		HP: 50000
+		HP: 100000
     Armor:
 		Type: Heavy
     Crushable:
@@ -1230,25 +1242,28 @@ CYCL:
 	CustomSellValue:
 		Value: 0
 	Tooltip:
-		Name: Chain Link Barrier
+		Name: Mined Chain Link Barrier
 	Buildable:
 		BuildPaletteOrder: 20
 		BuildDuration: 100
-		Prerequisites: ~upgrade.covert1
+		Prerequisites: upgrade.covert1
 		Queue: Defence.Nod, Defence.GDI
-		Description: Stops infantry and light vehicles.\nCan be crushed by tanks.
+		Description: Stops everything. Low health.
 	Health:
-		HP: 20000
+		HP: 10000
     Armor:
 		Type: Heavy
-	Crushable:
-		CrushClasses: infantry
 	LineBuild:
 		NodeTypes: chain
 	LineBuildNode:
 		Types: chain
 	WithWallSpriteBody:
 		Type: chain
+    -Crushable:
+    Explodes:
+		Weapon: GrenadierExplode
+		EmptyWeapon: GrenadierExplode
+		Chance: 100
 
 BRIK:
 	Inherits: ^Wall
@@ -1263,7 +1278,7 @@ BRIK:
 		Prerequisites: upgrade.recon2
 		Queue: Defence.GDI, Defence.Nod
 		BuildDuration: 250
-		Description: Stops infantry and most tanks.\nBlocks some projectiles.
+		Description: Stops infantry and most tanks.\nBlocks some projectiles.\nCan be crushed by mammoth tanks only.
 	Health:
 		HP: 150000
 	Armor:

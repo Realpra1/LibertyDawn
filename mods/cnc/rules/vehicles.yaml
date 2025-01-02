@@ -44,6 +44,7 @@ MCV:
 		Prerequisites: upgrade.covert3
     Cloak:
         RequiresCondition: upgrade.covert3 || StealthGen || cloak-crate-collected
+    -Crushable:
 
 HARV:
 	Inherits: ^Tank
@@ -269,6 +270,8 @@ APC:
 		Actor: APC.Husk
 		OwnerType: InternalName
 		EffectiveOwnerFromOwner: true
+    Crushable:
+        WarnProbability: 50
 
 ARTY:
 	Inherits: ^Tank
@@ -405,6 +408,8 @@ CTNK:
 		Actor: CTNK.Husk
 		OwnerType: InternalName
 		EffectiveOwnerFromOwner: true
+    Crushable:
+        WarnProbability: 80
         
 BGGY:
 	Inherits: ^Vehicle
@@ -450,6 +455,8 @@ BGGY:
 		Actor: BGGY.Husk
 		OwnerType: InternalName
 		EffectiveOwnerFromOwner: true
+    Crushable:
+        WarnProbability: 80
 
 BIKE:
 	Inherits: ^Vehicle
@@ -495,6 +502,8 @@ BIKE:
 		Actor: BIKE.Husk
 		OwnerType: InternalName
 		EffectiveOwnerFromOwner: true
+    Crushable:
+        WarnProbability: 80
 
 JEEP:
 	Inherits: ^Vehicle
@@ -706,6 +715,7 @@ HTNK:
 		EffectiveOwnerFromOwner: true
 	Selectable:
 		DecorationBounds: 1450, 1450, 0, -128
+    -Crushable:
 
 MSAM:
 	Inherits: ^Tank

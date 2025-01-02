@@ -279,6 +279,10 @@
         Prerequisites: upgrade.recon3
     Cloak:
         RequiresCondition: StealthGen || cloak-crate-collected
+    Crushable:
+        WarnProbability: 0
+		CrushClasses: heavywall
+        CrushSound: xplosml2.aud
 
 ^Tank:
 	Inherits: ^Vehicle
@@ -1148,6 +1152,9 @@
 		Step: -56001
 		StartIfBelow: 101
 		Delay: 3000
+    Crushable:
+		CrushClasses: wall
+        CrushSound: xplos.aud
 
 ^LightHusk:
 	Inherits: ^Husk
