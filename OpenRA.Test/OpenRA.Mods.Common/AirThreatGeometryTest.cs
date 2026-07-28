@@ -145,6 +145,108 @@ namespace OpenRA.Test
 			Assert.That(AirThreatGeometry.SafestCandidate(new List<WPos>(), new List<WPos>()), Is.EqualTo(-1));
 		}
 
+		[TestCase(TestName = "A squad of five breaks off for one anti-air actor; the uncapped squad did not")]
+		public void SquadSizeDecidesWhoRunsAway()
+		{
+			// AirThreatFleeMultiplier as wired into SquadManagerBotModule@skynet.
+			const int Multiplier = 8;
+
+			// SkyNet builds heli: 8 + orca: 12, and before the cap they all shared one squad. A single
+			// Sheep (SheepAA, Burst 2 x 6000 damage, enough to delete an 8500 HP Orca in one salvo) was
+			// therefore not enough to make the squad leave - it took three.
+			Assert.That(AirThreatGeometry.ShouldFleeAntiAir(1, Multiplier, 20), Is.False);
+			Assert.That(AirThreatGeometry.ShouldFleeAntiAir(2, Multiplier, 20), Is.False);
+			Assert.That(AirThreatGeometry.ShouldFleeAntiAir(3, Multiplier, 20), Is.True);
+
+			// Capped at AirSquadSize: 5, the first one is enough.
+			Assert.That(AirThreatGeometry.ShouldFleeAntiAir(1, Multiplier, 5), Is.True);
+
+			// Nothing seen is never a reason to run.
+			Assert.That(AirThreatGeometry.ShouldFleeAntiAir(0, Multiplier, 5), Is.False);
+		}
+
+		[TestCase(TestName = "A vector is rescaled to the requested length, keeping its direction")]
+		public void ScaleToLength()
+		{
+			// 3-4-5 triangle: (3072, 4096) has length 5120, rescale to 10240 and it doubles.
+			var scaled = AirThreatGeometry.ScaleToLength(new WVec(3072, 4096, 0), 10240);
+			Assert.That(scaled, Is.EqualTo(new WVec(6144, 8192, 0)));
+
+			// Shortening works the same way, and the sign of each component is preserved.
+			Assert.That(AirThreatGeometry.ScaleToLength(new WVec(-3072, 4096, 0), 5120 / 2),
+				Is.EqualTo(new WVec(-1536, 2048, 0)));
+
+			// Degenerate inputs.
+			Assert.That(AirThreatGeometry.ScaleToLength(WVec.Zero, 1024), Is.EqualTo(WVec.Zero));
+			Assert.That(AirThreatGeometry.ScaleToLength(new WVec(1024, 0, 0), 0), Is.EqualTo(WVec.Zero));
+		}
+
+		[TestCase(TestName = "Evasion moves directly away from the nearest threat, by the hop distance")]
+		public void EvadeMovesAwayFromNearestThreat()
+		{
+			var from = Cell(50, 50);
+
+			// Threat due west: the hop is due east.
+			var threats = new List<WPos> { Cell(40, 50) };
+			var to = AirThreatGeometry.EvadeDestination(from, threats, WDist.FromCells(12), WVec.Zero);
+
+			Assert.That(to.Y, Is.EqualTo(from.Y));
+			Assert.That(to.X - from.X, Is.EqualTo(12 * 1024));
+
+			// A second, closer threat to the north takes over and the hop turns south.
+			threats.Add(Cell(50, 46));
+			to = AirThreatGeometry.EvadeDestination(from, threats, WDist.FromCells(12), WVec.Zero);
+			Assert.That(to.X, Is.EqualTo(from.X));
+			Assert.That(to.Y - from.Y, Is.EqualTo(12 * 1024));
+		}
+
+		[TestCase(TestName = "Evasion hops are local: never further than the hop distance plus the jitter")]
+		public void EvadeStaysLocal()
+		{
+			// The whole point of round 3: this must be a short hop, not a flight home. A threat 70 cells
+			// away - the sort of distance the old retreat-to-a-building move covered - still only moves
+			// the squad AirEvadeDistance cells.
+			var from = Cell(100, 100);
+			var threats = new List<WPos> { Cell(30, 100) };
+
+			var hop = WDist.FromCells(12);
+			var jitter = new WVec(5 * 1024, -5 * 1024, 0);
+			var to = AirThreatGeometry.EvadeDestination(from, threats, hop, jitter);
+
+			var moved = (to - from).Length;
+			Assert.That(moved, Is.LessThanOrEqualTo(hop.Length + jitter.Length));
+			Assert.That(moved, Is.LessThan(WDist.FromCells(20).Length));
+		}
+
+		[TestCase(TestName = "With nothing to run from, evasion is just a nearby random reposition")]
+		public void EvadeWithoutThreatsIsPureJitter()
+		{
+			var from = Cell(50, 50);
+			var jitter = new WVec(3 * 1024, 2 * 1024, 0);
+
+			Assert.That(AirThreatGeometry.EvadeDestination(from, new List<WPos>(), WDist.FromCells(12), jitter),
+				Is.EqualTo(from + jitter));
+			Assert.That(AirThreatGeometry.EvadeDestination(from, null, WDist.FromCells(12), jitter),
+				Is.EqualTo(from + jitter));
+
+			// A threat we are sitting exactly on top of gives no direction to run in, so the jitter decides.
+			Assert.That(AirThreatGeometry.EvadeDestination(from, new List<WPos> { from }, WDist.FromCells(12), jitter),
+				Is.EqualTo(from + jitter));
+		}
+
+		[TestCase(TestName = "Evasion increases the distance to the threat it is running from")]
+		public void EvadeIncreasesThreatDistance()
+		{
+			var from = Cell(50, 50);
+			var threats = new List<WPos> { Cell(44, 43) };
+
+			var before = AirThreatGeometry.NearestThreatDistanceSquared(from, threats);
+			var to = AirThreatGeometry.EvadeDestination(from, threats, WDist.FromCells(12), WVec.Zero);
+			var after = AirThreatGeometry.NearestThreatDistanceSquared(to, threats);
+
+			Assert.That(after, Is.GreaterThan(before));
+		}
+
 		// The values below are the ones wired into SquadManagerBotModule@skynet in mods/cnc/rules/ai.yaml.
 		const int Harvester = 1000;
 		const int Unit = 450;

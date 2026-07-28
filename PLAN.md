@@ -401,7 +401,7 @@ with no wall, put a wall in front of it. That is the entire feature.*
 
 ## R3 · Air — local harassment loop, squad cap 5
 
-**Status:** `TODO` · **Branch:** `ai/air-targeting`
+**Status:** `IN PROGRESS` (code done, awaiting playtest) · **Branch:** `ai/air-targeting`
 
 Three observed failures:
 - Aircraft get too close to AA and die. The threat scan samples 40 of 441 map regions and only
@@ -412,15 +412,68 @@ Three observed failures:
   visibly stupid moves.
 - Squads are too large for harassment.
 
-1. `TODO` — **Local evasion replaces going home.** Threatened → short hop (10–15 cells) directly
-   away from the threat → re-scan for a soft target *from there* → strike → hop out. Circle the
-   enemy base rather than crossing the map. Only return to base to repair/rearm.
-2. `TODO` — If no target is reachable in a straight line, reposition around the enemy base and try
-   again. Simple logic is fine (move to a nearby offset point and re-scan); the requirement is that
-   moves stay *small and local*.
-3. `TODO` — **Cap air squads at 5.** This is the anti-harassment force, not the main push.
-4. `TODO` — Fix AA detection: check far more often, cover more area, and reliably include *mobile*
-   AA units, not just static SAMs.
+**Root causes found (round 3 recon):**
+
+- **The flee test scales with squad size and the squad was never capped.** `TickAirSafety` fled only
+  when `aaCount * AirThreatFleeMultiplier > Units.Count`. SkyNet builds `heli: 8` + `orca: 12` and
+  *all twenty* went into one squad, so at `AirThreatFleeMultiplier: 8` it took **three** anti-air
+  actors to make the squad leave. One Sheep (`SheepAA`, `Burst: 2` × 6000 damage) kills an 8500 HP
+  Orca in a single salvo. The squad stood there and died. This is the single biggest concrete bug.
+- **Detection was too sparse in both space and time.** `AirTargetScanSamples: 40` of 441 grid regions
+  is a ~8.7% chance of sampling any given region per scan, and `AirSafetyCheckInterval: 25` with
+  `AirThreatScanRadius: 12` gave almost no warning: an Orca (Speed 230) covers 5.6 cells and a Sheep
+  (Speed 120) 2.9 cells per interval, so a Sheep can go from 18 cells (unseen) to inside its 10-cell
+  `SheepAA` range between two consecutive checks.
+- **The players' "ordered away reads as empty" hypothesis: half right, wrong mechanism.**
+  `FindActorsInCircle` is *not* stale — `Mobile.SetCenterPosition` calls `World.UpdateMaps` every
+  tick a unit moves, `ActorMap.ITick.Tick` applies the queued bin moves in one pass, and
+  `ActorsInBox` re-filters on live `CenterPosition`. Worst case is one tick (40 ms) of lag. But the
+  squad's **threat memory stores positions, not actors** (`Squad.AirThreatPositions`), so a mobile AA
+  unit that moves leaves a ghost where it *was* (`AirThreatMemoryTicks: 900` = 36 s) and is unknown
+  where it *is* until a scan happens to cover it. The AI never tracked the Sheep, only a place.
+
+1. `DONE` — **Local evasion replaces going home.** New `AirStateBase.Evade` + pure
+   `AirThreatGeometry.EvadeDestination`: hop `AirEvadeDistance` (12) cells directly away from the
+   *nearest remembered threat*, plus a uniform ±`AirEvadeJitter` (5) cell lateral wander, clamped to
+   the map. Worst-case move is 12 + ~7 ≈ 19 cells versus the old ~70. `AirFleeState` and the safety
+   check both call it; going home is now only for aircraft that cannot rearm in the field
+   (`SendHomeToResupply`, unchanged stock ammo logic — note CNC Orcas have `ReloadAmmoPool` and no
+   `Rearmable`, so in practice they never go home at all). With `AirEvadeDistance: 0` the stock
+   retreat-to-an-own-building path is untouched, so `ra`/`ts`/`d2k` are unaffected.
+2. `DONE` — **Re-scan and strike from the new position.** `TickAirSafety` now scores candidate
+   targets in the *same* `FindActorsInCircle` pass it already ran for anti-air, so the squad can
+   re-target every `AirSafetyCheckInterval` (10 ticks) instead of every `AttackForceInterval` (75)
+   — at **zero extra world queries**. It only commits when that scan saw *no* anti-air at all inside
+   `AirThreatScanRadius`, so the fast path can never fly into cover it just measured. When the
+   map-wide scan finds nothing and the squad remembers threats (i.e. it is loitering by an enemy
+   base), `AirIdleState` hops to a nearby random point and tries again — the "move around the base"
+   behaviour, done the cheap way, as agreed.
+3. `DONE` — **Cap air squads at 5.** New `AirSquadSize` (0 = unlimited default) and
+   `MaximumAirSquads` (0 = unlimited default). `SquadSize: 10` is untouched, so ground squads are
+   unchanged. `FindNewUnits` calls the new `GetAirSquadWithRoom`, which fills existing air squads in
+   list order and opens a new one only while under `MaximumAirSquads`. Aircraft that fit nowhere are
+   left out of `activeUnits` so they wait at base and join the moment a slot frees up. skynet:
+   `AirSquadSize: 5`, `MaximumAirSquads: 2` — two independent five-plane harassment groups.
+4. `DONE` — **AA detection.** `AirSafetyCheckInterval` 25 → 10 and `AirThreatScanRadius` 12 → 16
+   (Sheep AA range is 10, so that is 6 cells of standoff and ~2 checks of warning at closing speed).
+   Mobile AA was already covered by `IsAntiAirCapable` — the failure was frequency, radius, and the
+   squad-size-scaled flee test, all three now fixed. `AirThreatMemoryTicks` 900 → 300 because a
+   36-second memory of a *position* is actively misleading for mobile AA.
+
+**Cost:** per bot per tick, per air squad — target scan `AirTargetScanSamples/AttackForceInterval`
+= 24/75 = 0.32 calls, safety check 1/10 = 0.1 calls. With `MaximumAirSquads: 2` that is 0.84
+calls/bot/tick, **~30 `FindActorsInCircle`/tick across 36 bots, up from ~21**. Area-weighted (cost
+scales with the box, and the safety scan grew from radius 12 to 16) it is ~34 `DangerScanRadius`
+-equivalents/tick versus ~21. The increase buys 2.5× the check frequency over 1.8× the area for
+*two* squads instead of one; it was paid for by cutting `AirTargetScanSamples` 40 → 24, which is
+affordable precisely because the safety scan now doubles as a local target search.
+`MaximumAirSquads` is the knob that bounds this — the cost no longer grows with aircraft built.
+
+5. `TODO` — **Needs human playtest.** Nobody has watched the new loop. Most likely to need tuning:
+   `AirEvadeDistance: 12` / `AirEvadeJitter: 5` (if the squad still gets shot, raise the hop; if it
+   wanders aimlessly, lower the jitter), `MaximumAirSquads: 2` (raise for more pressure, at linear
+   CPU cost; lower to 1 if the framerate suffers), and `AirRetreatOrderInterval: 50` which bounds how
+   fast the dip-in/slip-out cycle can oscillate.
 
 > Deferred, explicitly: a separate "big push" doctrine that masses aircraft against one high-value
 > structure when no exposed targets exist. Agreed to be a different behaviour for a later round.

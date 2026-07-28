@@ -138,6 +138,70 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		/// <summary>
+		/// Whether an air squad should break off, given the anti-air it can see around itself.
+		/// Note this scales with squad *size*: a big squad tolerates anti-air that a small one runs from.
+		/// That is why capping air squads matters for survival and not just for feel - at the stock
+		/// multiplier of 8, a twenty-aircraft squad shrugged off two anti-air actors that would each
+		/// individually delete an aircraft, while a squad of five breaks off for the first one.
+		/// </summary>
+		public static bool ShouldFleeAntiAir(int antiAirCount, int fleeMultiplier, int squadSize)
+		{
+			return antiAirCount > 0 && antiAirCount * fleeMultiplier > squadSize;
+		}
+
+		/// <summary>
+		/// <paramref name="v"/> rescaled to <paramref name="length"/> world units on the ground plane,
+		/// or zero when it has no direction to preserve. Integer only, so the result is within a unit or
+		/// two of the requested length - which is fine for "hop roughly this far".
+		/// </summary>
+		public static WVec ScaleToLength(WVec v, int length)
+		{
+			var currentSquared = (long)v.X * v.X + (long)v.Y * v.Y;
+			if (currentSquared == 0 || length <= 0)
+				return WVec.Zero;
+
+			var current = Exts.ISqrt(currentSquared);
+			if (current == 0)
+				return WVec.Zero;
+
+			return new WVec((int)(v.X * (long)length / current), (int)(v.Y * (long)length / current), 0);
+		}
+
+		/// <summary>
+		/// Where a threatened air squad should hop to: <paramref name="hopDistance"/> directly away from
+		/// the nearest remembered threat, plus <paramref name="jitter"/>. The jitter is what turns a
+		/// straight in-out shuttle into a squad that works its way around the outside of a base, and it
+		/// is the whole move when nothing is remembered - a random nearby point is a good enough
+		/// "try again from somewhere else".
+		/// The caller supplies the jitter so this stays deterministic and testable; bot code must draw it
+		/// from World.LocalRandom, never World.SharedRandom.
+		/// </summary>
+		public static WPos EvadeDestination(WPos from, IReadOnlyList<WPos> threats, WDist hopDistance, WVec jitter)
+		{
+			var away = WVec.Zero;
+			var nearestSquared = long.MaxValue;
+
+			if (threats != null)
+			{
+				for (var i = 0; i < threats.Count; i++)
+				{
+					long dx = from.X - threats[i].X;
+					long dy = from.Y - threats[i].Y;
+					var d = dx * dx + dy * dy;
+
+					// d == 0 means we are exactly on top of it and there is no direction to run in.
+					if (d == 0 || d >= nearestSquared)
+						continue;
+
+					nearestSquared = d;
+					away = new WVec((int)dx, (int)dy, 0);
+				}
+			}
+
+			return from + ScaleToLength(away, hopDistance.Length) + jitter;
+		}
+
+		/// <summary>
 		/// Score of a candidate air target. Soft mobile targets are meant to win: the class value plus
 		/// the defenceless bonus (awarded when the target itself cannot shoot back at aircraft) has to
 		/// outweigh the anti-air cover on top of it and along the way there.
