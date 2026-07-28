@@ -54,3 +54,7 @@ update.log
 
 # IntelliJ files
 .idea
+
+# Local dev
+/vendor-libs/
+/.worktrees/
