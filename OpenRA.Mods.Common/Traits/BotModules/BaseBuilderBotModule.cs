@@ -129,86 +129,18 @@ namespace OpenRA.Mods.Common.Traits
 			"on a free cell somewhere in the base. Leave empty to disable wall building.")]
 		public readonly HashSet<string> WallTypes = new HashSet<string>();
 
-		[Desc("Defensive building types that are sited behind a wall the AI plans first, instead of",
-			"being dropped on any free cell near the enemy. Usually the defensive structures.")]
-		public readonly HashSet<string> ShieldedDefenseTypes = new HashSet<string>();
+		[Desc("Defensive building types the AI puts a wall in front of. Usually its towers.")]
+		public readonly HashSet<string> WalledDefenseTypes = new HashSet<string>();
 
-		[Desc("Distance in cells between a shielded defensive structure and the wall ring around it.")]
-		public readonly int WallRingRadius = 2;
+		[Desc("How many cells in front of a tower, on its enemy facing side, its wall is placed.")]
+		public readonly int WallDistanceFromTower = 3;
 
-		[Desc("How many of the four sides of a wall ring to build. Clamped to 3, so a ring can never",
-			"be closed. The sides that get dropped are always the ones facing the middle of our own base.")]
-		public readonly int WallRingSides = 3;
-
-		[Desc("How far behind a choke wall a shielded defensive structure is placed.")]
-		public readonly int WallTurretSetback = 2;
-
-		[Desc("Ticks to wait before planning walls again after a planning pass found nothing usable.")]
-		public readonly int WallPlanRetryDelay = 500;
-
-		[Desc("Shortest run of consecutive placeable cells that is still worth walling.")]
-		public readonly int MinimumWallLineLength = 3;
-
-		[Desc("Hard cap on the number of wall actors the AI will own. Zero disables wall building.")]
+		[Desc("Hard cap on the number of wall actors the AI will own. Zero disables wall building,",
+			"which is the default so other mods and bots are unaffected.")]
 		public readonly int MaximumWallSegments = 0;
 
 		[Desc("Name of the locomotor used to verify the AI can still move around after walling.")]
 		public readonly string WallPathCheckLocomotor = "wheeled";
-
-		[Desc("Cell budget for the flood fill that verifies walls do not seal the base in.")]
-		public readonly int WallPathCheckMaxCells = 2000;
-
-		[Desc("Distance in cells from the construction yard that must stay reachable after walling.")]
-		public readonly int WallEscapeDistance = 20;
-
-		[Desc("Percentage of the pre-wall reachable area that must survive placing a wall ring.")]
-		public readonly int WallPathCheckTolerance = 90;
-
-		[Desc("How many candidate sites to consider each time a wall is planned.")]
-		public readonly int WallPlanAttempts = 3;
-
-		[Desc("How many map choke points the AI will wall. Zero disables choke walling entirely,",
-			"which is the default so other mods and bots are unaffected.")]
-		public readonly int MaximumWalledChokes = 0;
-
-		[Desc("Closest distance in cells from the base centre at which choke points are looked for.")]
-		public readonly int ChokeScanMinRadius = 6;
-
-		[Desc("Furthest distance in cells from the base centre at which choke points are looked for.",
-			"Keep this small: the scan cost scales with the area, and walls still have to satisfy",
-			"the buildable area adjacency rule, so distant chokes are not placeable anyway.")]
-		public readonly int ChokeScanRadius = 24;
-
-		[Desc("Hard cap on how many cells a single choke point scan may examine.")]
-		public readonly int ChokeScanMaxCells = 1200;
-
-		[Desc("Widest passable gap between two blockers that still counts as a choke point.")]
-		public readonly int ChokeMaxWidth = 6;
-
-		[Desc("How far the corridor through a choke point must be open on either side for it to count",
-			"as a choke rather than a dead end pocket.")]
-		public readonly int ChokeMinCorridorLength = 4;
-
-		[Desc("Cells of a choke point that are always left unwalled. Clamped to at least one, so a",
-			"choke can never be sealed shut.")]
-		public readonly int ChokeGapCells = 1;
-
-		[Desc("How many choke points a single scan keeps.")]
-		public readonly int MaximumCachedChokes = 8;
-
-		[Desc("How far the base centre has to move before choke points are scanned for again.")]
-		public readonly int ChokeRescanDistance = 10;
-
-		[Desc("Ticks before a choke point that could not be walled is considered again.")]
-		public readonly int ChokeReconsiderDelay = 6000;
-
-		[Desc("Distance in cells that must stay reachable after walling a choke. Should be at least",
-			"MaxBaseRadius, so the AI cannot wall itself out of ground it is about to expand onto.")]
-		public readonly int ChokeEscapeDistance = 50;
-
-		[Desc("Cell budget for the flood fill that verifies a choke wall does not seal the base in.",
-			"Has to be large enough for the flood to actually travel ChokeEscapeDistance cells.")]
-		public readonly int ChokePathCheckMaxCells = 8000;
 
 		[Desc("What buildings to the AI should build.", "What integer percentage of the total base must be this type of building.")]
 		public readonly Dictionary<string, int> BuildingFractions = null;
@@ -262,7 +194,7 @@ namespace OpenRA.Mods.Common.Traits
 			playerResources = self.Owner.PlayerActor.Trait<PlayerResources>();
 			resourceLayer = self.World.WorldActor.TraitOrDefault<IResourceLayer>();
 			positionsUpdatedModules = self.Owner.PlayerActor.TraitsImplementing<IBotPositionsUpdated>().ToArray();
-			WallPlanner = new BaseBuilderWallPlanner(this, player, resourceLayer);
+			WallPlanner = new BaseBuilderWallPlanner(this, player);
 		}
 
 		protected override void TraitEnabled(Actor self)
