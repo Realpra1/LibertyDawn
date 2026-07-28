@@ -31,6 +31,17 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		internal Target Target;
 		internal StateMachine FuzzyStateMachine;
 
+		// Where this squad last saw enemy anti-air, and the tick each sighting is forgotten on.
+		// Purely advisory bot state: it never touches the synced simulation, is not saved with the
+		// game, and is only ever written from the host-only bot tick. Kept as two parallel lists so
+		// the positions can be handed to AirThreatGeometry without copying.
+		internal readonly List<WPos> AirThreatPositions = new List<WPos>();
+		readonly List<int> airThreatExpiry = new List<int>();
+
+		// Earliest tick at which the squad may issue another retreat. Stops an air squad sitting in
+		// anti-air cover from re-issuing move orders on every safety check.
+		internal int NextAirRetreatTick;
+
 		public Squad(IBot bot, SquadManagerBotModule squadManager, SquadType type)
 			: this(bot, squadManager, type, null) { }
 
@@ -66,6 +77,69 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		{
 			if (IsValid)
 				FuzzyStateMachine.Update(this);
+		}
+
+		/// <summary>
+		/// Short-interval anti-air awareness for air squads, run independently of the squad state
+		/// machine so danger is noticed on approach, mid-attack and on the way home alike.
+		/// </summary>
+		public void TickAirSafety()
+		{
+			if (IsValid && Type == SquadType.Air)
+				AirStateBase.TickAirSafety(this);
+		}
+
+		/// <summary>Drops sightings that have aged out. Called before the memory is read or written.</summary>
+		internal void ForgetExpiredAirThreats(int tick)
+		{
+			for (var i = AirThreatPositions.Count - 1; i >= 0; i--)
+			{
+				if (airThreatExpiry[i] > tick)
+					continue;
+
+				AirThreatPositions.RemoveAt(i);
+				airThreatExpiry.RemoveAt(i);
+			}
+		}
+
+		/// <summary>
+		/// Records an anti-air sighting. Sightings closer together than <paramref name="mergeRadius"/>
+		/// collapse into one entry so a cluster of SAMs cannot flood the (small, bounded) memory.
+		/// </summary>
+		internal void RememberAirThreat(WPos pos, int expiryTick, WDist mergeRadius, int maxCount)
+		{
+			if (maxCount <= 0)
+				return;
+
+			var mergeSquared = (long)mergeRadius.Length * mergeRadius.Length;
+			for (var i = 0; i < AirThreatPositions.Count; i++)
+			{
+				long dx = AirThreatPositions[i].X - pos.X;
+				long dy = AirThreatPositions[i].Y - pos.Y;
+				if (dx * dx + dy * dy > mergeSquared)
+					continue;
+
+				// Refresh the existing sighting rather than adding a near-duplicate.
+				if (airThreatExpiry[i] < expiryTick)
+					airThreatExpiry[i] = expiryTick;
+
+				return;
+			}
+
+			// Evict the oldest sighting when full.
+			if (AirThreatPositions.Count >= maxCount)
+			{
+				var oldest = 0;
+				for (var i = 1; i < airThreatExpiry.Count; i++)
+					if (airThreatExpiry[i] < airThreatExpiry[oldest])
+						oldest = i;
+
+				AirThreatPositions.RemoveAt(oldest);
+				airThreatExpiry.RemoveAt(oldest);
+			}
+
+			AirThreatPositions.Add(pos);
+			airThreatExpiry.Add(expiryTick);
 		}
 
 		public bool IsValid => Units.Any();

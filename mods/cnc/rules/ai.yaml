@@ -878,14 +878,24 @@ Player:
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
-		AirTargetHarvesterValue: 500
-		AirTargetProductionValue: 350
-		AirTargetBuildingValue: 150
-		AirTargetUnitValue: 100
-		AirTargetAntiAirPenalty: 300
-		AirTargetDistancePenalty: 1
-		AirTargetMinimumScore: 1
+		AirTargetHarvesterValue: 1000
+		AirTargetUnitValue: 450
+		AirTargetProductionValue: 300
+		AirTargetBuildingValue: 100
+		AirTargetDefencelessBonus: 250
+		AirTargetAntiAirPenalty: 700
+		AirTargetDistancePenalty: 3
+		AirTargetMinimumScore: 200
 		AirTargetScanSamples: 40
+		AirSafetyCheckInterval: 25
+		AirThreatScanRadius: 12
+		AirThreatFleeMultiplier: 8
+		AirThreatMemoryTicks: 900
+		AirThreatMemorySize: 12
+		AirThreatMemoryMergeRadius: 3
+		AirRetreatOrderInterval: 50
+		AirRouteThreatPenalty: 200
+		AirRouteThreatRadius: 8
 	UnitBuilderBotModule@skynet:
 		RequiresCondition: enable-skynet-ai
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
