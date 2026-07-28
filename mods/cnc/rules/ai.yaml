@@ -806,6 +806,17 @@ Player:
 		VehiclesFactoryTypes: weap,afld
 		ProductionTypes: pyle,hand,weap,afld,hpad,hq
 		SiloTypes: silo
+		WallTypes: brik
+		WallRingTypes: gtwr, gun, atwr, obli, sam
+		WallRingRadius: 2
+		WallRingSides: 3
+		MinimumWallLineLength: 3
+		MaximumWallSegments: 60
+		WallPathCheckLocomotor: wheeled
+		WallPathCheckMaxCells: 2000
+		WallEscapeDistance: 20
+		WallPathCheckTolerance: 90
+		WallPlanAttempts: 3
 		BuildingLimits:
             proc: 25
 			pyle: 3
@@ -818,11 +829,12 @@ Player:
 			tmpl: 1
 			fix: 1
 			silo: 1
-			gtwr: 1
-            gun: 1
+			gtwr: 25
+			gun: 25
 			atwr: 40
 			obli: 4
 			sam: 2
+			brik: 60
         BuildingDelays:
             proc: 0
 			pyle: 2000
@@ -841,6 +853,7 @@ Player:
 			silo: 2000
             resonator: 7200
 			hpad: 2000
+			brik: 6000
 		BuildingFractions:
 			proc: 30
 			pyle: 10
@@ -848,8 +861,8 @@ Player:
 			hq: 1
 			weap: 56
 			afld: 56
-			gtwr: 1
-			gun: 1
+			gtwr: 20
+			gun: 20
 			atwr: 50
 			obli: 1
 			sam: 1
@@ -857,6 +870,7 @@ Player:
 			tmpl: 1
 			fix: 1
 			hpad: 10
+			brik: 25
     SquadManagerBotModule@skynet:
 		RequiresCondition: enable-skynet-ai
 		SquadSize: 10

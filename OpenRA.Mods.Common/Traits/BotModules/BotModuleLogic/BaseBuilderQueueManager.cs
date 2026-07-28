@@ -152,6 +152,13 @@ namespace OpenRA.Mods.Common.Traits
 						location = possibleBuilding.Actor.Location + possibleBuilding.Trait.Info.Offset;
 					}
 				}
+				else if (baseBuilder.WallPlanner != null && baseBuilder.WallPlanner.IsWallType(actorInfo.Name))
+				{
+					// Walls are laid out in lines by the wall planner rather than dropped on some
+					// free cell in the base like an ordinary building.
+					orderString = "LineBuild";
+					location = baseBuilder.WallPlanner.TakeWallCell(actorInfo.Name);
+				}
 				else
 				{
 					// Check if Building is a defense and if we should place it towards the enemy or not.
@@ -345,6 +352,12 @@ namespace OpenRA.Mods.Common.Traits
 
 				// Can we build this structure?
 				if (!buildableThings.Any(b => b.Name == name))
+					continue;
+
+				// Walls are only worth queueing if the planner has a line ready for them, and only
+				// until we hit the segment cap. Everything about where they go is decided there.
+				if (baseBuilder.WallPlanner != null && baseBuilder.WallPlanner.IsWallType(name)
+					&& !baseBuilder.WallPlanner.WantsToBuildWall(name, playerBuildings))
 					continue;
 
 				// Do we want to build this structure?

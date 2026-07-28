@@ -86,7 +86,7 @@ multiplayer desyncs. Use `World.SharedRandom` only — never `Math.Random`.
 
 ## Workstream 2 — SkyNet walls its base and towers
 
-**Status:** `TODO` · **Branch:** `ai/walls` · **Worktree:** `../ld-walls`
+**Status:** `IN PROGRESS` (code done, awaiting playtest) · **Branch:** `ai/walls` · **Worktree:** `../ld-walls`
 
 SkyNet builds no walls at all. `sbag` / `cycl` / `brik` appear nowhere in its `BuildingLimits`,
 `BuildingFractions`, or `DefenseQueues`.
@@ -95,28 +95,34 @@ SkyNet builds no walls at all. `sbag` / `cycl` / `brik` appear nowhere in its `B
 
 ### Steps
 
-1. `TODO` — **Recon.** Confirm `brik` prerequisites and which production queue it belongs to.
-   Read `BaseBuilderQueueManager.cs` (the fork has already modified it, +31 lines) to see how
-   placement currently works.
-2. `TODO` — Establish whether `BaseBuilderBotModule` can place walls usefully at all. It places
-   buildings on a grid; walls need *line* placement to be worth anything. Expect this to need new
-   C# — likely a `WallTypes` config plus a placement routine that rings an existing defense.
-3. `TODO` — Implement placement: ring each finished tower, then close obvious gaps in the base
-   perimeter. Cap total wall segments so it doesn't bankrupt itself.
-4. `TODO` — **Leave gates.** Walls must never fully enclose the base or the AI seals itself in and
-   its own harvesters, MCVs and attack squads can't get out. Requirements:
-   - Every ring leaves at least one deliberate gap, sized for the widest unit footprint.
-   - Gaps face outward toward the map, not into a cliff or the sea.
-   - After placement, verify a path still exists from the construction yard to the nearest
-     tiberium field and to the map edge. If it doesn't, don't place the segment.
-   - This is the single most likely way this workstream makes the AI *worse*. Test it explicitly.
-5. `TODO` — Add `brik` to SkyNet's build config in `ai.yaml` with sane limits and delays.
-6. `TODO` — **More towers.** SkyNet's `BuildingLimits` currently allows `gtwr: 1` and `gun: 1`
-   against `atwr: 40`. Raise the cheap towers to match the spirit of the thing — the AI should be
-   allowed to spam defences the way we spam everything else. Suggested `gtwr: 25`, `gun: 25`, and
-   nudge their `BuildingFractions` up from `1` so it actually picks them. Tune after playtest.
-7. `TODO` — Verify: build, `--check-yaml`, skirmish on Empire Earth, screenshot the AI base and
-   confirm the walls form lines rather than confetti — and that harvesters still reach tiberium.
+1. `DONE` — **Recon.** `brik` needs `upgrade.recon2` (which SkyNet already buys via
+   `UnitsToBuild`) and lives in the `Defence.GDI` / `Defence.Nod` queues that
+   `BaseBuilderBotModule@skynet` already drives. Placement went through
+   `BaseBuilderQueueManager.ChooseBuildLocation` — a single random cell, i.e. confetti.
+2. `DONE` — `BaseBuilderBotModule` could not place walls usefully. Walls are `LineBuild` actors:
+   the engine fills the cells between two anchors for free when the order string is `LineBuild`
+   rather than `PlaceBuilding`. New C#: `WallTypes` / `WallRingTypes` config plus
+   `BaseBuilderWallPlanner` + `BotWallGeometry`.
+3. `DONE` — Rings each defensive tower with 5x5 wall lines, anchored corner to corner so LineBuild
+   fills them. Capped by `MaximumWallSegments` (60) and by `BuildingLimits: brik` / the
+   `BuildingFractions` share, which in practice settles around 25 segments.
+4. `DONE` — **Gates.** Two independent guarantees:
+   - Structural: `OrderRingSides` clamps to **3 of 4 sides**, so a ring can never be closed, and
+     the side dropped first is always the one facing our own base centre — a 3-cell gap on the
+     side our units actually need.
+   - Behavioural: before a ring is accepted the area reachable from the construction yard is
+     flood filled twice, with and without the planned walls. If the second flood loses tiberium
+     access, loses the ability to get 20 cells clear of the yard, or loses >10% of its reachable
+     area, the ring is discarded and the next candidate is tried.
+   Covered by 8 unit tests in `OpenRA.Test/OpenRA.Mods.Common/BotWallGeometryTest.cs`, including
+   a case where a wall closes the last gap in a cliff line and is correctly rejected.
+5. `DONE` — `brik` added to `BaseBuilderBotModule@skynet`: limit 60, fraction 25, delay 6000.
+6. `DONE` — `gtwr` and `gun` raised from limit 1 / fraction 1 to **limit 25 / fraction 20**.
+7. `IN PROGRESS` — `make all` 0 errors, `./utility.sh cnc --check-yaml` exit 0, 63/63 unit tests
+   pass. **Still needs a human skirmish on Empire Earth**: confirm the walls form lines, that
+   enough of them get placed at all (the `Adjacent: 5` buildable-area rule may reject ring cells
+   around isolated towers), and watch for `brik`'s `BlocksProjectiles` stopping the ringed tower's
+   own shots — if that bites, drop `WallRingSides` to 1 or 2 in `ai.yaml`.
 
 **Risks:** an AI that spends its whole income on walls is a worse opponent, not a better one — the
 budget cap is not optional. And an AI that walls itself in is a *dead* opponent. Gaps are a hard
