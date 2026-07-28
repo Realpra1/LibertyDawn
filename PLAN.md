@@ -103,7 +103,8 @@ SkyNet builds no walls at all. `sbag` / `cycl` / `brik` appear nowhere in its `B
 2. `DONE` — `BaseBuilderBotModule` could not place walls usefully. Walls are `LineBuild` actors:
    the engine fills the cells between two anchors for free when the order string is `LineBuild`
    rather than `PlaceBuilding`. New C#: `WallTypes` / `WallRingTypes` config plus
-   `BaseBuilderWallPlanner` + `BotWallGeometry`.
+   `BaseBuilderWallPlanner` + `BotWallGeometry`. (`WallRingTypes` was renamed to
+   `ShieldedDefenseTypes` in round 2 — see *R2 · Walls*.)
 3. `DONE` — Rings each defensive tower with 5x5 wall lines, anchored corner to corner so LineBuild
    fills them. Capped by `MaximumWallSegments` (60) and by `BuildingLimits: brik` / the
    `BuildingFractions` share, which in practice settles around 25 segments.
@@ -250,16 +251,56 @@ The Sheep is underpowered. It stays at **50 credits** but becomes a genuinely st
 
 ## R2 · Walls — turrets behind the walls, walls at chokes
 
-**Status:** `TODO` · **Branch:** `ai/walls`
+**Status:** `IN PROGRESS` (code done, awaiting playtest) · **Branch:** `ai/walls` · **Worktree:** `../ld-walls`
 
 Walls are being built reasonably. Two changes:
 
-1. `TODO` — **Invert the relationship.** Currently walls ring an existing tower. Instead, place
-   *turrets behind walls* so the wall shields the turret from incoming fire.
-2. `TODO` — **Choke points.** Identify map chokes and wall them to blunt enemy harassment, rather
-   than only walling around the base.
-
-Existing gap/pathability guarantees still apply and must not regress.
+1. `DONE` — **Invert the relationship.** Round 1's "ring an existing tower" pass is **superseded**,
+   not kept alongside. `BaseBuilderWallPlanner` now picks a *site* on the enemy-facing side of the
+   base precisely because a wall ring fits around it, queues the ring first, and **reserves the
+   centre cell** for the next defensive structure the build queue produces.
+   `BaseBuilderQueueManager` asks `WallPlanner.TakeDefenseCell()` before falling back to the stock
+   `ChooseBuildLocation`. A reserved cell only unlocks once every anchor of the wall in front of it
+   has been ordered, so the concrete is always queued before the thing it protects.
+   `WallRingTypes` was renamed `ShieldedDefenseTypes` to match (same value: `gtwr, gun, atwr, obli, sam`).
+2. `DONE` — **Choke points.** `BotWallGeometry.TryFindChoke` recognises a choke as a short pinch of
+   passable ground between two blockers sitting on a corridor that is open in the perpendicular
+   direction (dead-end pockets are rejected). `BaseBuilderWallPlanner.ScanChokes` runs the detection
+   **once per base location** — cached, invalidated only when the base centre moves more than
+   `ChokeRescanDistance` cells — over a bounded annulus, capped at `ChokeScanMaxCells` cells and
+   stopping early at `MaximumCachedChokes` finds. Upper bound with the shipped numbers: ~1200 cells
+   × ~40 `Locomotor.MovementCostForCell` array lookups ≈ 48k lookups, once. Never per tick.
+   Chokes are walled narrowest-first, up to `MaximumWalledChokes` (4), and turret slots are reserved
+   `WallTurretSetback` cells behind the wall on our own side.
+3. `DONE` — **Gap and pathability guarantees, extended.** Three independent guarantees now:
+   - Structural, rings: unchanged — `OrderRingSides` clamps to 3 of 4 sides, gap faces our base.
+   - Structural, chokes: `ChokeGapCells` is clamped to **at least one**, so a choke can never be
+     sealed shut however the yaml is configured.
+   - Behavioural: the before/after flood fill now also carries a set of **waypoints** — our own
+     construction yards and refineries, plus both mouths of the choke's corridor. Losing any of them
+     rejects the plan. Choke checks use `ChokeEscapeDistance: 50` (≥ `MaxBaseRadius: 49`, so the bot
+     cannot wall itself out of ground it is about to expand onto) and a correspondingly larger
+     `ChokePathCheckMaxCells: 8000` so the flood can actually travel that far.
+4. `DONE` — **`BlocksProjectiles` risk from round 1 is resolved: it does not apply.** Every weapon
+   the five shielded defences fire is unblockable. `HighV` (`gtwr`) and `TurretGun` (`gun`) both set
+   `Blockable: false` explicitly; `^MissileWeapon` sets `Blockable: false`, covering `TowerMissile` /
+   `TowerAAMissile` (`atwr`) and `Dragon` (`sam`); `obli`'s `Laser` is a `LaserZap`, whose `Blockable`
+   defaults to false. A `brik` in front of a SkyNet turret therefore blocks enemy fire without
+   blocking the turret's own. Nothing else was changed to accommodate this.
+5. `DONE` — Throttling. A planning pass that finds nothing usable puts the planner to sleep for
+   `WallPlanRetryDelay` (500) ticks; sites and chokes that failed are remembered so they are not
+   re-evaluated on every queue tick.
+6. `DONE` — 15 new `[Desc]`-annotated yaml fields, all defaulting to off/neutral
+   (`MaximumWalledChokes: 0` by default), so no other mod or bot is affected. Configured on
+   `BaseBuilderBotModule@skynet` only.
+7. `IN PROGRESS` — `make all` 0 errors, `./utility.sh cnc --check-yaml` exit 0, **72/72** unit tests
+   pass (63 existing + 9 new, covering choke detection, the always-a-gap invariant, turret slot
+   placement, and a choke whose walling would trap the base being rejected).
+   **Still needs a human skirmish on Empire Earth.** Unverified in-game: that choke walls are
+   actually placeable at all (walls are `Adjacent: 5` and do not themselves give buildable area, so
+   only chokes hugging the base envelope can be built), and that reserved turret slots are taken up
+   rather than expiring — `TakeDefenseCell` re-checks placement with the real defence actor
+   (`Adjacent: 4`) and drops the slot if it no longer fits, silently falling back to stock placement.
 
 ## R2 · Air — permanent AA avoidance, soft targets first
 

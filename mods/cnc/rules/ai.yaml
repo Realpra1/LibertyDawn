@@ -807,9 +807,10 @@ Player:
 		ProductionTypes: pyle,hand,weap,afld,hpad,hq
 		SiloTypes: silo
 		WallTypes: brik
-		WallRingTypes: gtwr, gun, atwr, obli, sam
+		ShieldedDefenseTypes: gtwr, gun, atwr, obli, sam
 		WallRingRadius: 2
 		WallRingSides: 3
+		WallTurretSetback: 2
 		MinimumWallLineLength: 3
 		MaximumWallSegments: 60
 		WallPathCheckLocomotor: wheeled
@@ -817,6 +818,19 @@ Player:
 		WallEscapeDistance: 20
 		WallPathCheckTolerance: 90
 		WallPlanAttempts: 3
+		WallPlanRetryDelay: 500
+		MaximumWalledChokes: 4
+		ChokeScanMinRadius: 6
+		ChokeScanRadius: 24
+		ChokeScanMaxCells: 1200
+		ChokeMaxWidth: 6
+		ChokeMinCorridorLength: 4
+		ChokeGapCells: 1
+		MaximumCachedChokes: 8
+		ChokeRescanDistance: 10
+		ChokeReconsiderDelay: 6000
+		ChokeEscapeDistance: 50
+		ChokePathCheckMaxCells: 8000
 		BuildingLimits:
             proc: 25
 			pyle: 3
