@@ -200,3 +200,53 @@ make all                          # must be 0 errors
 ./utility.sh cnc --check-yaml     # must be exit 0
 ./launch-game.sh Game.Mod=cnc     # skirmish vs SkyNet, eyeball the change
 ```
+
+---
+
+# ROUND 2 — post-playtest feedback
+
+First playtest done. Everything built and ran. Feedback below is from the players, and overrides
+earlier specs where they conflict.
+
+## R2 · Sheep — "sheep are the power of the universe"
+
+**Status:** `TODO` · **Branch:** `unit/sheep`
+
+The Sheep is underpowered. It stays at **50 credits** but becomes a genuinely strong unit.
+
+1. `TODO` — Give it a **machine gun** (anti-ground) and a **separate anti-air weapon**. Both, on the
+   same actor, at the same price.
+2. `TODO` — **The 25-Sheep Rule.** When a player has *exactly* **25** living sheep, the entire map
+   is revealed to them. At 24 it does not work. At 26 it does not work. Exactly 25, or nothing.
+   This is deliberate and is not to be "fixed" into a threshold.
+
+> Balance note, recorded and overruled: a 50-credit unit with 2000 HP, a machine gun and AA is
+> strictly better than an E1 Minigunner at 120 credits. This was raised and the players want it
+> anyway. Build it as specified.
+
+## R2 · Walls — turrets behind the walls, walls at chokes
+
+**Status:** `TODO` · **Branch:** `ai/walls`
+
+Walls are being built reasonably. Two changes:
+
+1. `TODO` — **Invert the relationship.** Currently walls ring an existing tower. Instead, place
+   *turrets behind walls* so the wall shields the turret from incoming fire.
+2. `TODO` — **Choke points.** Identify map chokes and wall them to blunt enemy harassment, rather
+   than only walling around the base.
+
+Existing gap/pathability guarantees still apply and must not regress.
+
+## R2 · Air — permanent AA avoidance, soft targets first
+
+**Status:** `TODO` · **Branch:** `ai/air-targeting`
+
+Three changes, in priority order:
+
+1. `TODO` — **Continuous AA avoidance.** Right now AA is checked only when a target is *selected*.
+   If AA arrives while the squad is mid-attack, it does not flee. It is also unclear whether the
+   route to a target avoids AA at all. Aircraft must continuously avoid anti-air in their vicinity
+   throughout a harassment run — on approach, during the attack, and on the way home.
+2. `TODO` — **Defenceless units over structures.** Aircraft do low damage to buildings. Harvesters
+   and undefended units must outrank structures, not merely score near them.
+3. `TODO` — **Raise harvester weight** further on top of the above.
