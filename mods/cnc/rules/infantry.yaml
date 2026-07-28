@@ -327,9 +327,9 @@ SHEEP:
 	Mobile:
 		Speed: 120
 	Health:
-		HP: 60
+		HP: 600
 	RevealsShroud:
-		Range: 10c0
+		Range: 16c0
 	Selectable:
 		Bounds: 1024, 1024
 		DecorationBounds: 1450, 1024, 0, 85
