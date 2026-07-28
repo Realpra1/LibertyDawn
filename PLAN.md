@@ -101,7 +101,7 @@ requirement, not a nice-to-have.
 
 ## Workstream 3 — The Sheep
 
-**Status:** `TODO` · **Branch:** `unit/sheep` · **Worktree:** `../ld-sheep`
+**Status:** `DONE` (pending playtest) · **Branch:** `unit/sheep` · **Worktree:** `../ld-sheep`
 
 One deliberately stupid unit. Agreed spec:
 
@@ -120,19 +120,19 @@ Explicitly **not** game-breaking — it has no weapon and dies to everything.
 
 ### Steps
 
-1. `TODO` — **Art decision.** There is no sheep sprite. Options, cheapest first:
-   (a) reuse an existing civilian infantry `.shp` with a white/pale remap palette;
-   (b) reuse one of the CNC Funpark dinosaur sprites (`steg`, `tric`) — arguably weirder;
-   (c) import a sprite the way the fork did for `stealth.shp` / `ctnk.shp`.
-   **Bring me the options with a screenshot before committing to one.**
-2. `TODO` — Actor definition in `mods/cnc/rules/infantry.yaml`. Infantry locomotor, no weapon,
-   high `RevealsShroud`.
-3. `TODO` — Sequence definition in `mods/cnc/sequences/` for whichever sprite we pick.
-4. `TODO` — "Steak" death effect in `mods/cnc/weapons/explosions.yaml` — zero damage, cosmetic only.
-5. `TODO` — Add to the `Infantry.GDI` and `Infantry.Nod` build queues. No prerequisites.
-6. `TODO` — **Do not** add it to SkyNet's `UnitsToBuild`. The AI building sheep is not the joke.
-7. `TODO` — Verify: build, `--check-yaml`, then buy one and confirm it renders, moves, scouts,
-   and dies correctly.
+1. `DONE` — **Art decision:** option (b), the CNC Funpark **triceratops** (`tric.shp`). It ships in
+   the base game content (verified with `--extract`), is a pale, player-remappable quadruped that
+   reads as a woolly animal at gameplay zoom, and a cameo (`bits/tricicnh.shp`) is already in the
+   repo. Zero new art.
+2. `DONE` — Actor `SHEEP` in `mods/cnc/rules/infantry.yaml` (inherits `^Soldier`, no `Armament`,
+   `-AttackFrontal`, `-TakeCover`, `-MustBeDestroyed`, `-SpawnActorOnDeath`).
+3. `DONE` — `sheep:` sequence appended to `mods/cnc/sequences/infantry.yaml`, sourcing `tric` frames.
+4. `DONE` — `SteakSplat` in `mods/cnc/weapons/explosions.yaml` — `CreateEffect` + `LeaveSmudge` only,
+   no `SpreadDamage` warhead at all.
+5. `DONE` — `Buildable: Queue: Infantry.GDI, Infantry.Nod` with the `Prerequisites` line omitted.
+6. `DONE` — `ai.yaml` untouched; `UnitBuilderBotModule` only builds names in `UnitsToBuild`.
+7. `DONE` (partial) — `make all` 0 errors, `--check-yaml` exit 0, `--dump-sequence-sheets` loads every
+   sheep frame. **In-game render/move/scout/death still unplayed.**
 
 **Naming note:** it's `SHEEP` in the files. Renaming an actor is a find-and-replace across four
 files if you change your mind later.
