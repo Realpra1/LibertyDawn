@@ -880,16 +880,20 @@ Player:
 		AirTargetAntiAirPenalty: 700
 		AirTargetDistancePenalty: 3
 		AirTargetMinimumScore: 200
-		AirTargetScanSamples: 40
-		AirSafetyCheckInterval: 25
-		AirThreatScanRadius: 12
+		AirTargetScanSamples: 24
+		AirSafetyCheckInterval: 10
+		AirThreatScanRadius: 16
 		AirThreatFleeMultiplier: 8
-		AirThreatMemoryTicks: 900
+		AirThreatMemoryTicks: 300
 		AirThreatMemorySize: 12
 		AirThreatMemoryMergeRadius: 3
 		AirRetreatOrderInterval: 50
 		AirRouteThreatPenalty: 200
 		AirRouteThreatRadius: 8
+		AirSquadSize: 5
+		MaximumAirSquads: 2
+		AirEvadeDistance: 12
+		AirEvadeJitter: 5
 	UnitBuilderBotModule@skynet:
 		RequiresCondition: enable-skynet-ai
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade

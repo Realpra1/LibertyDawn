@@ -150,6 +150,29 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Half-width in cells of the flight corridor checked for anti-air by AirRouteThreatPenalty.")]
 		public readonly int AirRouteThreatRadius = 8;
 
+		[Desc("Maximum number of aircraft in one air squad. Air squads are a harassment force, not the main",
+			"push, so they want to be small. Aircraft beyond the cap join another air squad if one has room",
+			"and MaximumAirSquads allows it, otherwise they wait at base until a slot frees up.",
+			"Zero means unlimited, which is the stock behaviour.")]
+		public readonly int AirSquadSize = 0;
+
+		[Desc("Maximum number of air squads that may exist at once. Zero means unlimited.",
+			"Each air squad costs its own target scan and anti-air safety check, so this is the knob that",
+			"bounds the CPU cost of air behaviour regardless of how many aircraft the bot builds.")]
+		public readonly int MaximumAirSquads = 0;
+
+		[Desc("Distance in cells an air squad hops away from the nearest anti-air it knows about when it",
+			"breaks off a run. Small values keep harassment local - the squad slips out, re-scans and comes",
+			"straight back in, instead of flying across the map to one of its own buildings.",
+			"Zero restores the stock behaviour of retreating to an own building.")]
+		public readonly int AirEvadeDistance = 0;
+
+		[Desc("Random lateral spread in cells added to every evasion hop, so successive hops work their way",
+			"around the outside of an enemy base instead of shuttling along the same line. It is also the",
+			"whole move when the squad has no remembered threat to run from and just wants to re-scan from",
+			"somewhere else. Zero disables the wander.")]
+		public readonly int AirEvadeJitter = 0;
+
 		public override void RulesetLoaded(Ruleset rules, ActorInfo ai)
 		{
 			base.RulesetLoaded(rules, ai);
@@ -171,6 +194,18 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (AirRouteThreatPenalty != 0 && AirRouteThreatRadius <= 0)
 				throw new YamlException("AirRouteThreatRadius must be greater than zero when AirRouteThreatPenalty is set.");
+
+			if (AirSquadSize < 0)
+				throw new YamlException("AirSquadSize must not be negative.");
+
+			if (MaximumAirSquads < 0)
+				throw new YamlException("MaximumAirSquads must not be negative.");
+
+			if (AirEvadeDistance < 0)
+				throw new YamlException("AirEvadeDistance must not be negative.");
+
+			if (AirEvadeJitter < 0)
+				throw new YamlException("AirEvadeJitter must not be negative.");
 		}
 
 		public override object Create(ActorInitializer init) { return new SquadManagerBotModule(init.Self, this); }
@@ -300,6 +335,31 @@ namespace OpenRA.Mods.Common.Traits
 			return Squads.FirstOrDefault(s => s.Type == type);
 		}
 
+		/// <summary>
+		/// The air squad a newly built aircraft should join, honouring AirSquadSize and MaximumAirSquads.
+		/// Returns null when every air squad is full and no more are allowed - the caller then leaves the
+		/// aircraft unassigned, so it waits at base and is reconsidered on the next AssignRolesInterval.
+		/// Deterministic: Squads is an ordered list and is walked in order.
+		/// </summary>
+		Squad GetAirSquadWithRoom(IBot bot)
+		{
+			var squadCount = 0;
+			foreach (var s in Squads)
+			{
+				if (s.Type != SquadType.Air)
+					continue;
+
+				squadCount++;
+				if (Info.AirSquadSize <= 0 || s.Units.Count < Info.AirSquadSize)
+					return s;
+			}
+
+			if (Info.MaximumAirSquads > 0 && squadCount >= Info.MaximumAirSquads)
+				return null;
+
+			return RegisterNewSquad(bot, SquadType.Air);
+		}
+
 		Squad RegisterNewSquad(IBot bot, SquadType type, Actor target = null)
 		{
 			var ret = new Squad(bot, this, type, target);
@@ -363,9 +423,13 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				if (Info.AirUnitsTypes.Contains(a.Info.Name))
 				{
-					var air = GetSquadOfType(SquadType.Air);
+					var air = GetAirSquadWithRoom(bot);
+
+					// Every air squad is full and we may not start another. Leave the aircraft out of
+					// activeUnits so it stays at base and is picked up as soon as a slot frees up, rather
+					// than oversizing a harassment squad.
 					if (air == null)
-						air = RegisterNewSquad(bot, SquadType.Air);
+						continue;
 
 					air.Units.Add(a);
 				}

@@ -252,8 +252,15 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		/// <summary>
 		/// Squad-local anti-air awareness, driven by <see cref="SquadManagerBotModuleInfo.AirSafetyCheckInterval"/>
 		/// rather than by the squad state machine. Because it looks around the squad's own position it covers
-		/// the whole harassment run - approach, attack and the flight home - instead of only the moment a
+		/// the whole harassment run - approach, attack and the way out - instead of only the moment a
 		/// target is chosen. Disabled (and behaviour unchanged) when the interval is zero.
+		///
+		/// It doubles as the squad's local target search. The actors worth shooting are the same actors we
+		/// are already enumerating for anti-air, so scoring them here costs nothing extra and lets the squad
+		/// strike again as soon as an evasion hop lands, instead of idling until the next state machine tick
+		/// (AttackForceInterval, typically three times slower). This is the "dip in, hit something, slip out,
+		/// come back" half of the harassment loop.
+		///
 		/// PERF: exactly one FindActorsInCircle per air squad per interval, bounded by AirThreatScanRadius.
 		/// </summary>
 		internal static void TickAirSafety(Squad owner)
@@ -267,12 +274,16 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 			var mergeRadius = WDist.FromCells(info.AirThreatMemoryMergeRadius);
 			var expiry = tick + info.AirThreatMemoryTicks;
+			var squadCenter = owner.CenterPosition;
 
 			var antiAirCount = 0;
 			var ownBuildingNear = false;
 
+			Actor localTarget = null;
+			var localScore = int.MinValue;
+
 			// PERF: single bounded scan, no intermediate list, no LINQ.
-			foreach (var a in owner.World.FindActorsInCircle(owner.CenterPosition, WDist.FromCells(info.AirThreatScanRadius)))
+			foreach (var a in owner.World.FindActorsInCircle(squadCenter, WDist.FromCells(info.AirThreatScanRadius)))
 			{
 				if (a.Owner == owner.Bot.Player)
 				{
@@ -282,37 +293,137 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					continue;
 				}
 
-				if (!owner.SquadManager.IsPreferredEnemyUnit(a) || !IsAntiAirCapable(a))
+				if (!owner.SquadManager.IsPreferredEnemyUnit(a))
 					continue;
 
-				antiAirCount++;
-				owner.RememberAirThreat(a.CenterPosition, expiry, mergeRadius, info.AirThreatMemorySize);
+				if (IsAntiAirCapable(a))
+				{
+					antiAirCount++;
+					owner.RememberAirThreat(a.CenterPosition, expiry, mergeRadius, info.AirThreatMemorySize);
+					continue;
+				}
+
+				if (!owner.SquadManager.IsNotHiddenUnit(a))
+					continue;
+
+				// Everything reaching here failed IsAntiAirCapable, so the defenceless bonus always applies.
+				// No anti-air or route penalty: whether this candidate is safe is decided below, by the same
+				// scan's anti-air count, rather than per candidate.
+				var distanceInCells = (a.CenterPosition - squadCenter).Length / 1024;
+				var score = AirThreatGeometry.TargetScore(
+					TargetValue(a, info), true, info.AirTargetDefencelessBonus,
+					0, 0, 0, 0,
+					distanceInCells, info.AirTargetDistancePenalty);
+
+				if (localTarget == null || score > localScore)
+				{
+					localTarget = a;
+					localScore = score;
+				}
 			}
 
 			// Over our own base there is nowhere safer to run to, and our own defences are the answer.
-			if (antiAirCount == 0 || ownBuildingNear)
+			if (!ownBuildingNear && AirThreatGeometry.ShouldFleeAntiAir(antiAirCount, info.AirThreatFleeMultiplier, owner.Units.Count))
+			{
+				// Drop the target so the squad re-evaluates from scratch once it is clear; the threat we
+				// just remembered will make the route back through here look expensive.
+				// The state change happens even when Evade declines to re-order (rate limit), so the squad
+				// cannot keep pressing an attack run it has already decided to abandon.
+				owner.TargetActor = null;
+				Evade(owner);
+				owner.FuzzyStateMachine.ChangeState(owner, new AirFleeState(), true);
+				return;
+			}
+
+			// Only ever commit to a local target when this scan saw no anti-air at all within
+			// AirThreatScanRadius, so the fast path can never walk the squad into cover it just measured.
+			if (antiAirCount > 0 || localTarget == null || localScore < info.AirTargetMinimumScore || owner.IsTargetValid)
 				return;
 
-			if (antiAirCount * info.AirThreatFleeMultiplier <= owner.Units.Count)
-				return;
+			owner.TargetActor = localTarget;
+			owner.FuzzyStateMachine.ChangeState(owner, new AirAttackState(), true);
+		}
 
-			// Rate limit: an air squad parked next to a SAM must not re-order a retreat every check.
+		/// <summary>
+		/// Breaks off a run. With <see cref="SquadManagerBotModuleInfo.AirEvadeDistance"/> set this is a short
+		/// hop directly away from the nearest anti-air the squad remembers, plus a random lateral wander, so
+		/// the squad stays next to the enemy base and can turn straight back in - rather than the flight all
+		/// the way home that the players (rightly) called out as enormous and stupid. Going home is reserved
+		/// for aircraft that actually need to rearm.
+		/// With AirEvadeDistance at zero this falls back to the stock retreat to an own building, so other
+		/// mods and bots are unaffected.
+		/// Rate limited by <see cref="SquadManagerBotModuleInfo.AirRetreatOrderInterval"/>: within that window
+		/// it does nothing and the squad keeps flying the hop it was already given.
+		/// </summary>
+		protected static void Evade(Squad owner)
+		{
+			var info = owner.SquadManager.Info;
+			var tick = owner.World.WorldTick;
+
+			// An air squad sitting in anti-air cover must not re-issue move orders on every safety check.
 			if (tick < owner.NextAirRetreatTick)
 				return;
 
 			owner.NextAirRetreatTick = tick + info.AirRetreatOrderInterval;
 
-			// Drop the target so the squad re-evaluates from scratch once it is clear; the threat we
-			// just remembered will make the route back through here look expensive.
-			owner.TargetActor = null;
-			Retreat(owner);
-			owner.FuzzyStateMachine.ChangeState(owner, new AirFleeState(), true);
+			if (info.AirEvadeDistance <= 0)
+			{
+				Retreat(owner);
+				return;
+			}
+
+			var destination = EvadeDestination(owner);
+			foreach (var a in owner.Units)
+			{
+				if (SendHomeToResupply(owner, a))
+					continue;
+
+				owner.Bot.QueueOrder(new Order("Move", a, Target.FromCell(owner.World, destination), false));
+			}
+		}
+
+		/// <summary>Picks the cell for a local evasion hop and keeps it on the map.</summary>
+		static CPos EvadeDestination(Squad owner)
+		{
+			var info = owner.SquadManager.Info;
+			var map = owner.World.Map;
+
+			owner.ForgetExpiredAirThreats(owner.World.WorldTick);
+
+			// NOTE: Bot code runs on the host only and must never touch World.SharedRandom.
+			var jitter = WVec.Zero;
+			if (info.AirEvadeJitter > 0)
+			{
+				var spread = info.AirEvadeJitter * 1024;
+				jitter = new WVec(owner.Random.Next(-spread, spread + 1), owner.Random.Next(-spread, spread + 1), 0);
+			}
+
+			var destination = AirThreatGeometry.EvadeDestination(
+				owner.CenterPosition, owner.AirThreatPositions, WDist.FromCells(info.AirEvadeDistance), jitter);
+
+			return map.Clamp(map.CellContaining(destination));
+		}
+
+		/// <summary>
+		/// Sends one aircraft home when it has run dry and cannot reload in the field. True when it did,
+		/// in which case the caller must not also give it a move order.
+		/// </summary>
+		static bool SendHomeToResupply(Squad owner, Actor a)
+		{
+			var ammoPools = a.TraitsImplementing<AmmoPool>().ToArray();
+			if (ReloadsAutomatically(ammoPools, a.TraitOrDefault<Rearmable>()) || FullAmmo(ammoPools))
+				return false;
+
+			if (!IsRearming(a))
+				owner.Bot.QueueOrder(new Order("ReturnToBase", a, false));
+
+			return true;
 		}
 
 		/// <summary>
 		/// Sends the squad home: rearming whoever needs it, and moving everyone else to the one of our
 		/// own buildings that sits furthest from the anti-air the squad remembers. Falls back to the
-		/// stock random building when nothing is remembered.
+		/// stock random building when nothing is remembered. Only reached when AirEvadeDistance is zero.
 		/// </summary>
 		protected static void Retreat(Squad owner)
 		{
@@ -320,15 +431,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 			foreach (var a in owner.Units)
 			{
-				var ammoPools = a.TraitsImplementing<AmmoPool>().ToArray();
-				if (!ReloadsAutomatically(ammoPools, a.TraitOrDefault<Rearmable>()) && !FullAmmo(ammoPools))
-				{
-					if (IsRearming(a))
-						continue;
-
-					owner.Bot.QueueOrder(new Order("ReturnToBase", a, false));
+				if (SendHomeToResupply(owner, a))
 					continue;
-				}
 
 				owner.Bot.QueueOrder(new Order("Move", a, Target.FromCell(owner.World, destination), false));
 			}
@@ -413,7 +517,16 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 			var e = FindDefenselessTarget(owner);
 			if (e == null)
+			{
+				// Nothing worth hitting from where we are standing. If the squad remembers anti-air it is
+				// loitering next to an enemy base, so shuffle to a nearby point and try the scan again from
+				// there instead of hovering: this is the "if it cannot get there in a straight line, move
+				// around the base and try again" half of the loop, done the cheap way.
+				if (owner.SquadManager.Info.AirEvadeDistance > 0 && owner.AirThreatPositions.Count > 0)
+					Evade(owner);
+
 				return;
+			}
 
 			owner.TargetActor = e;
 			owner.FuzzyStateMachine.ChangeState(owner, new AirAttackState(), true);
@@ -486,8 +599,10 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			if (!owner.IsValid)
 				return;
 
-			Retreat(owner);
+			Evade(owner);
 
+			// Straight back to idle: the next scan - whichever of the state machine or the much faster
+			// safety check gets there first - re-targets from wherever the hop put us.
 			owner.FuzzyStateMachine.ChangeState(owner, new AirIdleState(), true);
 		}
 
