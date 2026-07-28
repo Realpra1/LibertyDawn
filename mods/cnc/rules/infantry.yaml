@@ -310,3 +310,41 @@ RAPT:
 		Weapon: claw
 	Buildable:
 		Description: Bipedal with enlarged sickle-shaped claw on each hindfoot
+
+SHEEP:
+	Inherits: ^Soldier
+	Valued:
+		Cost: 50
+	Tooltip:
+		Name: Sheep
+		GenericName: Sheep
+	Buildable:
+		BuildPaletteOrder: 90
+		Queue: Infantry.GDI, Infantry.Nod
+		Description: Cheap, fast, unarmed scout.\n  Reveals a wide area\n  Cannot fight anything at all
+	RenderSprites:
+		Image: sheep
+	Mobile:
+		Speed: 120
+	Health:
+		HP: 2000
+	RevealsShroud:
+		Range: 16c0
+	Selectable:
+		Bounds: 1024, 1024
+		DecorationBounds: 1450, 1024, 0, 85
+	Passenger:
+		CustomPipType: gray
+	WithDeathAnimation:
+		UseDeathTypeSuffix: false
+	Explodes:
+		Weapon: SteakSplat
+		EmptyWeapon: SteakSplat
+		Chance: 100
+	Voiced:
+		VoiceSet: SheepVoice
+	-TakeCover:
+	-MustBeDestroyed:
+	-AttackFrontal:
+	-SpawnActorOnDeath:
+	-SpawnActorOnDeath@TibGun:
