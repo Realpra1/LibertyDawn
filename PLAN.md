@@ -79,8 +79,9 @@ the tiberium field, production buildings on the unprotected side of a base.
    (exit 0) both pass. Nobody has yet run a skirmish with an exposed harvester to confirm the orcas
    go for it, or checked the framerate impact on Empire Earth with 36 bots.
 
-**Risk:** bot code runs inside the deterministic simulation. Anything non-deterministic here causes
-multiplayer desyncs. Use `World.SharedRandom` only — never `Math.Random`.
+**Risk:** see the determinism note above. Bot code must use `World.LocalRandom` / `Squad.Random` to
+match the rest of `BotModules/` — never `System.Random`, never `DateTime`, and never
+`World.SharedRandom` (which would desync, since bots run host-only).
 
 ---
 
