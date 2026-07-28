@@ -361,6 +361,7 @@ SHEEP:
 		Chance: 100
 	Voiced:
 		VoiceSet: SheepVoice
+	-DamagedByTerrain:
 	-TakeCover:
 	-MustBeDestroyed:
 	-SpawnActorOnDeath:
