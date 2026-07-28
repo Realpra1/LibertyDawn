@@ -263,14 +263,68 @@ Existing gap/pathability guarantees still apply and must not regress.
 
 ## R2 · Air — permanent AA avoidance, soft targets first
 
-**Status:** `TODO` · **Branch:** `ai/air-targeting`
+**Status:** `IN PROGRESS` (code done, awaiting playtest) · **Branch:** `ai/air-targeting`
 
 Three changes, in priority order:
 
-1. `TODO` — **Continuous AA avoidance.** Right now AA is checked only when a target is *selected*.
+1. `DONE` — **Continuous AA avoidance.** Right now AA is checked only when a target is *selected*.
    If AA arrives while the squad is mid-attack, it does not flee. It is also unclear whether the
    route to a target avoids AA at all. Aircraft must continuously avoid anti-air in their vicinity
    throughout a harassment run — on approach, during the attack, and on the way home.
-2. `TODO` — **Defenceless units over structures.** Aircraft do low damage to buildings. Harvesters
-   and undefended units must outrank structures, not merely score near them.
-3. `TODO` — **Raise harvester weight** further on top of the above.
+
+   **What already existed:** `AirIdleState` called `StateBase.ShouldFlee` (one scan around a random
+   squad unit, every `AttackForceInterval` = 75 ticks); `AirAttackState` re-checked
+   `NearToPosSafely` around *the target's* position each update; `AirFleeState` issued a move to a
+   *random* own building and immediately reverted to idle. Nothing ever looked at the AA around the
+   squad's own position while it was in transit or mid-attack, and nothing considered the route.
+
+   **What was added:**
+   - `SquadManagerBotModule` gained an `airSafetyTicks` counter that calls `Squad.TickAirSafety()`
+     on air squads every `AirSafetyCheckInterval` ticks, independent of the squad state machine.
+     One bounded `FindActorsInCircle` (`AirThreatScanRadius`) around the squad's own centre. This is
+     what makes the check continuous: it fires on approach, mid-attack and on the way home alike.
+     When it trips (`aaCount * AirThreatFleeMultiplier > squad size`, suppressed over our own
+     buildings, rate limited by `AirRetreatOrderInterval`) the squad drops its target, retreats and
+     switches to `AirFleeState`.
+   - Per-squad **threat memory**: up to `AirThreatMemorySize` anti-air positions, merged within
+     `AirThreatMemoryMergeRadius` and expiring after `AirThreatMemoryTicks`. Advisory bot-only
+     state; never saved, never synced.
+   - **Route avoidance at target selection.** `FindBestAirTarget` now also charges
+     `AirRouteThreatPenalty` per known anti-air position within `AirRouteThreatRadius` of the
+     straight line the squad would fly, ignoring anything within `DangerScanRadius` of the
+     destination (already priced by the anti-air penalty). Threat positions come from the grid
+     samples the scan already takes plus the squad's memory — **zero extra world queries**.
+   - **Retreat is directed**: `AirFleeState` now flies to the own building furthest from the
+     remembered threats instead of a random one. Falls back to the stock random building when
+     nothing is remembered.
+   - `AirIdleState`'s duplicate `ShouldFlee` scan is skipped when the continuous check is on.
+
+   Aircraft still fly a straight line — the engine has no threat-aware air pathfinder and adding
+   one was out of scope. "Avoids AA en route" therefore means *picks routes that avoid known AA*
+   plus *bails out when AA appears along the way*, not *flies around it*.
+2. `DONE` — **Defenceless units over structures.** New `AirTargetDefencelessBonus` awarded to any
+   candidate with no armament able to target `Air`, plus a reshaped class table. At skynet's values
+   an undefended tank (450 + 250 = 700) now clearly beats a refinery (300 + 250 = 550) and an
+   ordinary building (100 + 250 = 350). `AirTargetAntiAirPenalty` went 300 → 700 and
+   `AirTargetMinimumScore` 1 → 200, so a single SAM is enough to veto a unit target outright.
+3. `DONE` — **Raise harvester weight**: `AirTargetHarvesterValue` 500 → 1000, which with the
+   defenceless bonus is 1250 — still worth one SAM's worth of risk, but not two.
+
+**Cost:** per bot, per tick, worst case — target scan `41/75` + safety check `1/25` ≈ **0.59
+`FindActorsInCircle` calls**, versus round 1's `42/75` ≈ 0.56. Across 36 bots that is **~21
+circle scans/tick, up from ~20**. There is at most one air squad per bot
+(`GetSquadOfType` is a singleton lookup), so this does not scale with aircraft count. The new
+scoring work is pure arithmetic bounded by `AirTargetScanSamples × (samples + memory)` ≈ 40 × 52.
+
+**Verification:** `make all` 0 errors, Debug build with `-warnaserror
+-p:EnforceCodeStyleInBuild=true` 0 warnings, `./utility.sh cnc --check-yaml` exit 0, 78/78 unit
+tests pass (63 pre-existing + 15 new in
+`OpenRA.Test/OpenRA.Mods.Common/AirThreatGeometryTest.cs` covering segment distance, corridor
+counting, destination exclusion, retreat-point choice and the score ordering).
+
+4. `TODO` — **Needs human playtest.** Nobody has watched a squad actually break off a run. The
+   numbers most likely to need tuning: `AirThreatFleeMultiplier: 8` (with 12 aircraft, two AA
+   actors nearby trigger a retreat — may be too twitchy, or not twitchy enough),
+   `AirTargetMinimumScore: 200` combined with `AirTargetAntiAirPenalty: 700` (if SkyNet's orcas
+   never leave home, this pair is too cowardly), and `AirTargetDistancePenalty: 1 → 3` (harassment
+   should now stay local; if the air squad ignores a juicy far harvester, lower it).

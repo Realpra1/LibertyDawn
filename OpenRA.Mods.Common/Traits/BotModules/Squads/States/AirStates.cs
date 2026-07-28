@@ -23,37 +23,44 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 		protected const int MissileUnitMultiplier = 3;
 
-		protected static int CountAntiAirUnits(IEnumerable<Actor> units)
+		/// <summary>True if this actor has a live armament that can shoot at aircraft.</summary>
+		protected static bool IsAntiAirCapable(Actor unit)
 		{
-			if (!units.Any())
-				return 0;
+			if (unit == null || unit.Info.HasTraitInfo<AircraftInfo>())
+				return false;
 
-			var missileUnitsCount = 0;
-			foreach (var unit in units)
+			// PERF: Avoid LINQ.
+			foreach (var ab in unit.TraitsImplementing<AttackBase>())
 			{
-				if (unit == null || unit.Info.HasTraitInfo<AircraftInfo>())
+				if (ab.IsTraitDisabled || ab.IsTraitPaused)
 					continue;
 
-				foreach (var ab in unit.TraitsImplementing<AttackBase>())
-				{
-					if (ab.IsTraitDisabled || ab.IsTraitPaused)
-						continue;
-
-					foreach (var a in ab.Armaments)
-					{
-						if (a.Weapon.IsValidTarget(AirTargetTypes))
-						{
-							missileUnitsCount++;
-							break;
-						}
-					}
-				}
+				foreach (var a in ab.Armaments)
+					if (a.Weapon.IsValidTarget(AirTargetTypes))
+						return true;
 			}
+
+			return false;
+		}
+
+		protected static int CountAntiAirUnits(IEnumerable<Actor> units)
+		{
+			var missileUnitsCount = 0;
+			foreach (var unit in units)
+				if (IsAntiAirCapable(unit))
+					missileUnitsCount++;
 
 			return missileUnitsCount;
 		}
 
 		enum AirTargetClass { Unit, Building, Production, Harvester }
+
+		/// <summary>A finalist from one sampled grid cell: the best actor there and its pre-route score.</summary>
+		struct AirTargetCandidate
+		{
+			public Actor Actor;
+			public int PartialScore;
+		}
 
 		protected static Actor FindDefenselessTarget(Squad owner)
 		{
@@ -61,9 +68,12 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		}
 
 		/// <summary>
-		/// Samples a bounded number of grid cells across the map, scores every enemy actor found in them
-		/// and returns the most attractive one. Soft economic and production targets outrank generic units,
-		/// while anything sitting under enemy anti-air cover is penalised heavily and usually rejected outright.
+		/// Samples a bounded number of grid cells across the map, scores every enemy actor it finds and
+		/// returns the most attractive one. Soft mobile targets are meant to beat structures outright:
+		/// aircraft do poor damage to buildings, so harvesters and undefended units carry both a higher
+		/// class value and a "cannot shoot back" bonus. Anti-air on top of a candidate is penalised, and
+		/// so is anti-air anywhere along the straight line the squad would fly to reach it - the squad
+		/// should not have to fly through a SAM belt to reach an undefended harvester.
 		/// Returns null when nothing scores above <see cref="SquadManagerBotModuleInfo.AirTargetMinimumScore"/>.
 		/// </summary>
 		protected static Actor FindBestAirTarget(Squad owner)
@@ -81,12 +91,24 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var squadCenter = owner.CenterPosition;
 			var scanRadius = WDist.FromCells(dangerRadius);
 
-			Actor bestTarget = null;
-			var bestScore = int.MinValue;
-
-			// PERF: Reused across every sample so the scan allocates twice per call rather than twice per sample.
+			// PERF: Reused across every sample so the scan allocates a handful of lists per call
+			// rather than a handful per sample.
 			var actorsAround = new List<Actor>();
 			var candidates = new List<Actor>();
+
+			// PERF: parallel to candidates, so IsAntiAirCapable (a trait lookup) runs once per actor.
+			var candidateIsAntiAir = new List<bool>();
+			var finalists = new List<AirTargetCandidate>();
+
+			// Anti-air we know about: whatever this scan happens to uncover, plus whatever the squad
+			// has personally run into recently. Used to price the flight path, not the destination.
+			// Sampled grid circles overlap, so sightings are merged by position - otherwise one SAM
+			// found by three samples would be charged to the route three times.
+			var threats = new List<WPos>();
+			var threatMergeSquared = (long)WDist.FromCells(info.AirThreatMemoryMergeRadius).Length * WDist.FromCells(info.AirThreatMemoryMergeRadius).Length;
+			var threatLimit = info.AirTargetScanSamples + info.AirThreatMemorySize;
+			owner.ForgetExpiredAirThreats(owner.World.WorldTick);
+			threats.AddRange(owner.AirThreatPositions);
 
 			// PERF: Sampling a fixed number of grid cells keeps the cost of this scan independent of map size.
 			// The scan repeats every AttackForceInterval ticks, so over time the whole map still gets covered.
@@ -99,38 +121,107 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 				actorsAround.Clear();
 				candidates.Clear();
+				candidateIsAntiAir.Clear();
 				actorsAround.AddRange(owner.World.FindActorsInCircle(map.CenterOfCell(pos), scanRadius));
 
 				// PERF: Avoid LINQ.
+				var antiAirCount = 0;
 				foreach (var a in actorsAround)
-					if (owner.SquadManager.IsPreferredEnemyUnit(a))
-						candidates.Add(a);
+				{
+					if (!owner.SquadManager.IsPreferredEnemyUnit(a))
+						continue;
+
+					var antiAir = IsAntiAirCapable(a);
+					candidates.Add(a);
+					candidateIsAntiAir.Add(antiAir);
+
+					if (antiAir)
+					{
+						antiAirCount++;
+						AddDistinctThreat(threats, a.CenterPosition, threatMergeSquared, threatLimit);
+					}
+				}
 
 				if (candidates.Count == 0)
 					continue;
 
-				var antiAirPenalty = CountAntiAirUnits(candidates) * info.AirTargetAntiAirPenalty;
-
-				foreach (var a in candidates)
+				// Only the best actor in this cell can win overall, and every actor in the cell shares
+				// the same anti-air cover - so keep one finalist per cell and route-check those.
+				// PERF: bounds the second pass to AirTargetScanSamples entries.
+				Actor bestHere = null;
+				var bestPartial = 0;
+				for (var c = 0; c < candidates.Count; c++)
 				{
+					var a = candidates[c];
 					if (!owner.SquadManager.IsNotHiddenUnit(a))
 						continue;
 
 					var distanceInCells = (a.CenterPosition - squadCenter).Length / 1024;
-					var score = TargetValue(a, info) - antiAirPenalty - distanceInCells * info.AirTargetDistancePenalty;
+					var partial = AirThreatGeometry.TargetScore(
+						TargetValue(a, info), !candidateIsAntiAir[c], info.AirTargetDefencelessBonus,
+						antiAirCount, info.AirTargetAntiAirPenalty,
+						0, 0,
+						distanceInCells, info.AirTargetDistancePenalty);
 
-					if (score > bestScore)
+					if (bestHere == null || partial > bestPartial)
 					{
-						bestScore = score;
-						bestTarget = a;
+						bestHere = a;
+						bestPartial = partial;
 					}
+				}
+
+				if (bestHere != null)
+					finalists.Add(new AirTargetCandidate { Actor = bestHere, PartialScore = bestPartial });
+			}
+
+			// Second pass: charge each finalist for the anti-air it would have to fly past on the way.
+			// PERF: pure arithmetic over at most AirTargetScanSamples x (samples + memory) pairs, no world queries.
+			var corridorRadius = WDist.FromCells(info.AirRouteThreatRadius);
+			var destinationExclusion = scanRadius;
+
+			Actor bestTarget = null;
+			var bestScore = int.MinValue;
+			foreach (var f in finalists)
+			{
+				var score = f.PartialScore;
+				if (info.AirRouteThreatPenalty != 0)
+				{
+					var routeThreats = AirThreatGeometry.CountThreatsNearRoute(
+						threats, squadCenter, f.Actor.CenterPosition, corridorRadius, destinationExclusion);
+					score -= routeThreats * info.AirRouteThreatPenalty;
+				}
+
+				if (bestTarget == null || score > bestScore)
+				{
+					bestScore = score;
+					bestTarget = f.Actor;
 				}
 			}
 
-			if (bestScore < info.AirTargetMinimumScore)
+			if (bestTarget == null || bestScore < info.AirTargetMinimumScore)
 				return null;
 
 			return bestTarget;
+		}
+
+		/// <summary>
+		/// Appends a threat position unless an equivalent one is already listed, and never grows the list
+		/// past <paramref name="limit"/> so the route check stays O(finalists x limit).
+		/// </summary>
+		static void AddDistinctThreat(List<WPos> threats, WPos pos, long mergeSquared, int limit)
+		{
+			if (threats.Count >= limit)
+				return;
+
+			for (var i = 0; i < threats.Count; i++)
+			{
+				long dx = threats[i].X - pos.X;
+				long dy = threats[i].Y - pos.Y;
+				if (dx * dx + dy * dy <= mergeSquared)
+					return;
+			}
+
+			threats.Add(pos);
 		}
 
 		static int TargetValue(Actor a, SquadManagerBotModuleInfo info)
@@ -158,6 +249,120 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			return AirTargetClass.Building;
 		}
 
+		/// <summary>
+		/// Squad-local anti-air awareness, driven by <see cref="SquadManagerBotModuleInfo.AirSafetyCheckInterval"/>
+		/// rather than by the squad state machine. Because it looks around the squad's own position it covers
+		/// the whole harassment run - approach, attack and the flight home - instead of only the moment a
+		/// target is chosen. Disabled (and behaviour unchanged) when the interval is zero.
+		/// PERF: exactly one FindActorsInCircle per air squad per interval, bounded by AirThreatScanRadius.
+		/// </summary>
+		internal static void TickAirSafety(Squad owner)
+		{
+			var info = owner.SquadManager.Info;
+			if (info.AirSafetyCheckInterval <= 0 || !owner.IsValid)
+				return;
+
+			var tick = owner.World.WorldTick;
+			owner.ForgetExpiredAirThreats(tick);
+
+			var mergeRadius = WDist.FromCells(info.AirThreatMemoryMergeRadius);
+			var expiry = tick + info.AirThreatMemoryTicks;
+
+			var antiAirCount = 0;
+			var ownBuildingNear = false;
+
+			// PERF: single bounded scan, no intermediate list, no LINQ.
+			foreach (var a in owner.World.FindActorsInCircle(owner.CenterPosition, WDist.FromCells(info.AirThreatScanRadius)))
+			{
+				if (a.Owner == owner.Bot.Player)
+				{
+					if (!ownBuildingNear && a.Info.HasTraitInfo<BuildingInfo>())
+						ownBuildingNear = true;
+
+					continue;
+				}
+
+				if (!owner.SquadManager.IsPreferredEnemyUnit(a) || !IsAntiAirCapable(a))
+					continue;
+
+				antiAirCount++;
+				owner.RememberAirThreat(a.CenterPosition, expiry, mergeRadius, info.AirThreatMemorySize);
+			}
+
+			// Over our own base there is nowhere safer to run to, and our own defences are the answer.
+			if (antiAirCount == 0 || ownBuildingNear)
+				return;
+
+			if (antiAirCount * info.AirThreatFleeMultiplier <= owner.Units.Count)
+				return;
+
+			// Rate limit: an air squad parked next to a SAM must not re-order a retreat every check.
+			if (tick < owner.NextAirRetreatTick)
+				return;
+
+			owner.NextAirRetreatTick = tick + info.AirRetreatOrderInterval;
+
+			// Drop the target so the squad re-evaluates from scratch once it is clear; the threat we
+			// just remembered will make the route back through here look expensive.
+			owner.TargetActor = null;
+			Retreat(owner);
+			owner.FuzzyStateMachine.ChangeState(owner, new AirFleeState(), true);
+		}
+
+		/// <summary>
+		/// Sends the squad home: rearming whoever needs it, and moving everyone else to the one of our
+		/// own buildings that sits furthest from the anti-air the squad remembers. Falls back to the
+		/// stock random building when nothing is remembered.
+		/// </summary>
+		protected static void Retreat(Squad owner)
+		{
+			var destination = SafeRetreatLocation(owner);
+
+			foreach (var a in owner.Units)
+			{
+				var ammoPools = a.TraitsImplementing<AmmoPool>().ToArray();
+				if (!ReloadsAutomatically(ammoPools, a.TraitOrDefault<Rearmable>()) && !FullAmmo(ammoPools))
+				{
+					if (IsRearming(a))
+						continue;
+
+					owner.Bot.QueueOrder(new Order("ReturnToBase", a, false));
+					continue;
+				}
+
+				owner.Bot.QueueOrder(new Order("Move", a, Target.FromCell(owner.World, destination), false));
+			}
+		}
+
+		static CPos SafeRetreatLocation(Squad owner)
+		{
+			var threats = owner.AirThreatPositions;
+			if (threats.Count == 0)
+				return RandomBuildingLocation(owner);
+
+			// PERF: no world queries beyond the trait lookup the stock RandomBuildingLocation already did,
+			// and the inner comparison is bounded by AirThreatMemorySize.
+			var found = false;
+			var best = owner.SquadManager.GetRandomBaseCenter();
+			var bestDistance = long.MinValue;
+
+			foreach (var b in owner.World.ActorsHavingTrait<Building>())
+			{
+				if (b.Owner != owner.Bot.Player)
+					continue;
+
+				var distance = AirThreatGeometry.NearestThreatDistanceSquared(b.CenterPosition, threats);
+				if (!found || distance > bestDistance)
+				{
+					found = true;
+					bestDistance = distance;
+					best = b.Location;
+				}
+			}
+
+			return best;
+		}
+
 		protected static bool NearToPosSafely(Squad owner, WPos loc)
 		{
 			return NearToPosSafely(owner, loc, out _);
@@ -173,7 +378,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			if (!unitsAroundPos.Any())
 				return true;
 
-			if (CountAntiAirUnits(unitsAroundPos) * MissileUnitMultiplier < owner.Units.Count)
+			if (CountAntiAirUnits(unitsAroundPos) * owner.SquadManager.Info.AirThreatFleeMultiplier < owner.Units.Count)
 			{
 				detectedEnemyTarget = unitsAroundPos.Random(owner.Random);
 				return true;
@@ -198,7 +403,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			if (!owner.IsValid)
 				return;
 
-			if (ShouldFlee(owner))
+			// The continuous safety check watches the squad's surroundings on its own, much shorter
+			// interval, so this scan is pure duplicated work whenever that is switched on.
+			if (owner.SquadManager.Info.AirSafetyCheckInterval <= 0 && ShouldFlee(owner))
 			{
 				owner.FuzzyStateMachine.ChangeState(owner, new AirFleeState(), true);
 				return;
@@ -279,20 +486,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			if (!owner.IsValid)
 				return;
 
-			foreach (var a in owner.Units)
-			{
-				var ammoPools = a.TraitsImplementing<AmmoPool>().ToArray();
-				if (!ReloadsAutomatically(ammoPools, a.TraitOrDefault<Rearmable>()) && !FullAmmo(ammoPools))
-				{
-					if (IsRearming(a))
-						continue;
-
-					owner.Bot.QueueOrder(new Order("ReturnToBase", a, false));
-					continue;
-				}
-
-				owner.Bot.QueueOrder(new Order("Move", a, Target.FromCell(owner.World, RandomBuildingLocation(owner)), false));
-			}
+			Retreat(owner);
 
 			owner.FuzzyStateMachine.ChangeState(owner, new AirIdleState(), true);
 		}

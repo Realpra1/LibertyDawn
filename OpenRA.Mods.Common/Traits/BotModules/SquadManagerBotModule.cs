@@ -111,6 +111,45 @@ namespace OpenRA.Mods.Common.Traits
 			"independently of map size; lowering it trades responsiveness for CPU time on large maps.")]
 		public readonly int AirTargetScanSamples = 24;
 
+		[Desc("Extra score for a candidate that has no weapon able to shoot at aircraft.",
+			"Aircraft do poor damage to structures, so this is what makes an undefended harvester or tank",
+			"outrank a building rather than merely score near it. Zero keeps the stock behaviour.")]
+		public readonly int AirTargetDefencelessBonus = 0;
+
+		[Desc("Delay (in ticks) between anti-air safety checks for air squads. Unlike target scoring this",
+			"runs regardless of squad state, so aircraft keep watching for anti-air while approaching a",
+			"target, while attacking it and on the way home. Zero disables it and restores the stock",
+			"behaviour of only checking when a target is selected.")]
+		public readonly int AirSafetyCheckInterval = 0;
+
+		[Desc("Radius in cells around an air squad that is scanned for anti-air by the safety check.")]
+		public readonly int AirThreatScanRadius = 12;
+
+		[Desc("An air squad retreats when the number of anti-air actors near it, multiplied by this,",
+			"exceeds the number of aircraft in the squad. Higher values make air squads more cowardly.")]
+		public readonly int AirThreatFleeMultiplier = 3;
+
+		[Desc("How long (in ticks) an air squad remembers where it saw enemy anti-air.")]
+		public readonly int AirThreatMemoryTicks = 900;
+
+		[Desc("Maximum number of remembered anti-air sightings per air squad.")]
+		public readonly int AirThreatMemorySize = 12;
+
+		[Desc("Anti-air sightings closer together than this many cells are merged into one remembered",
+			"threat, so a cluster of SAM sites cannot flood the memory.")]
+		public readonly int AirThreatMemoryMergeRadius = 3;
+
+		[Desc("Minimum delay (in ticks) between successive retreat orders for the same air squad.")]
+		public readonly int AirRetreatOrderInterval = 50;
+
+		[Desc("Score deducted per known anti-air position within AirRouteThreatRadius of the straight line",
+			"an air squad would fly to reach a candidate target. This is what stops squads picking a soft",
+			"target on the far side of a SAM belt. Zero disables route scoring.")]
+		public readonly int AirRouteThreatPenalty = 0;
+
+		[Desc("Half-width in cells of the flight corridor checked for anti-air by AirRouteThreatPenalty.")]
+		public readonly int AirRouteThreatRadius = 8;
+
 		public override void RulesetLoaded(Ruleset rules, ActorInfo ai)
 		{
 			base.RulesetLoaded(rules, ai);
@@ -120,6 +159,18 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (AirTargetScanSamples <= 0)
 				throw new YamlException("AirTargetScanSamples must be greater than zero.");
+
+			if (AirSafetyCheckInterval > 0 && AirThreatScanRadius <= 0)
+				throw new YamlException("AirThreatScanRadius must be greater than zero when AirSafetyCheckInterval is set.");
+
+			if (AirThreatFleeMultiplier <= 0)
+				throw new YamlException("AirThreatFleeMultiplier must be greater than zero.");
+
+			if (AirThreatMemorySize < 0)
+				throw new YamlException("AirThreatMemorySize must not be negative.");
+
+			if (AirRouteThreatPenalty != 0 && AirRouteThreatRadius <= 0)
+				throw new YamlException("AirRouteThreatRadius must be greater than zero when AirRouteThreatPenalty is set.");
 		}
 
 		public override object Create(ActorInitializer init) { return new SquadManagerBotModule(init.Self, this); }
@@ -157,6 +208,7 @@ namespace OpenRA.Mods.Common.Traits
 		int assignRolesTicks;
 		int attackForceTicks;
 		int minAttackForceDelayTicks;
+		int airSafetyTicks;
 
 		public SquadManagerBotModule(Actor self, SquadManagerBotModuleInfo info)
 			: base(info)
@@ -208,6 +260,10 @@ namespace OpenRA.Mods.Common.Traits
 			assignRolesTicks = World.LocalRandom.Next(0, Info.AssignRolesInterval);
 			attackForceTicks = World.LocalRandom.Next(0, Info.AttackForceInterval);
 			minAttackForceDelayTicks = World.LocalRandom.Next(0, Info.MinimumAttackForceDelay);
+
+			// Spread the air safety checks of all the bots across the interval instead of spiking on one tick.
+			if (Info.AirSafetyCheckInterval > 0)
+				airSafetyTicks = World.LocalRandom.Next(0, Info.AirSafetyCheckInterval);
 		}
 
 		void IBotEnabled.BotEnabled(IBot bot)
@@ -271,6 +327,16 @@ namespace OpenRA.Mods.Common.Traits
 				attackForceTicks = Info.AttackForceInterval;
 				foreach (var s in Squads)
 					s.Update();
+			}
+
+			// Air squads re-check the anti-air around themselves far more often than the state machine
+			// runs, so they can break off a run that has become lethal instead of dying on it.
+			// PERF: one bounded circle scan per air squad per interval, and there is at most one air squad.
+			if (Info.AirSafetyCheckInterval > 0 && --airSafetyTicks <= 0)
+			{
+				airSafetyTicks = Info.AirSafetyCheckInterval;
+				foreach (var s in Squads)
+					s.TickAirSafety();
 			}
 
 			if (--assignRolesTicks <= 0)
