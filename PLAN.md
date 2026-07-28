@@ -384,20 +384,26 @@ because it was buggy. Round 3 deletes it.
 
 ## R3 · Walls — gut it (KISS)
 
-**Status:** `TODO` · **Branch:** `ai/walls`
+**Status:** `DONE` · **Branch:** `ai/walls`
 
 The players' own strategy, which is the spec: *you pay for the two endpoints and the engine fills
 the line between them for free, so long walls are cheap and one-at-a-time is waste. Find a tower
 with no wall, put a wall in front of it. That is the entire feature.*
 
-1. `TODO` — **Delete** choke detection (`TryFindChoke`, `ScanChokes`, caching, choke config/tests).
-2. `TODO` — **Delete** turret-behind-wall siting (`PlanShieldedDefenseSite`, slot reservation, the
-   `consumedAnchors` counter, `TakeDefenseCell`). Turret placement reverts to stock.
-3. `TODO` — **Keep only:** find a defensive tower that has no wall in front of it → place ONE long
-   wall line on its enemy-facing side, as two anchors so `LineBuild` fills the rest free.
-4. `TODO` — Keep a cheap reachability check so it still cannot seal itself in. Much less critical
-   now: single lines in front of towers are far harder to seal a base with than choke walls were.
-5. `TODO` — Config target: ~4 yaml fields, down from 17.
+1. `DONE` — **Deleted** choke detection (`TryFindChoke`, `ScanChokes`, caching, choke config/tests).
+2. `DONE` — **Deleted** turret-behind-wall siting (`PlanShieldedDefenseSite`, slot reservation, the
+   `consumedAnchors` counter, `TakeDefenseCell`). Turret placement is stock `ChooseBuildLocation`.
+3. `DONE` — Planner is now one idea: the unwalled tower nearest the enemy gets the longest placeable
+   run in a 15-cell window three cells off its enemy-facing side, queued as two `LineBuild` anchors.
+4. `DONE` — Reachability is one bounded flood fill: with the line solid, a unit beside the
+   construction yard must still get 20 cells clear. No baseline pass, no multi-target counting.
+5. `DONE` — 17 yaml fields → 5: `WallTypes`, `WalledDefenseTypes`, `WallDistanceFromTower`,
+   `MaximumWallSegments`, `WallPathCheckLocomotor`. Everything else is a constant in the planner.
+
+Net −870 lines. Cost: the once-per-base 1200-cell choke scan is gone entirely; a planning pass is
+now ≤4 towers × 15 placement checks plus ≤4 floods capped at 3000 cells, ≥500 ticks apart.
+`MaximumWallSegments` raised 60 → 150, because a 15-cell line spends 15 of them and 60 only covered
+four towers.
 
 ## R3 · Air — local harassment loop, squad cap 5
 

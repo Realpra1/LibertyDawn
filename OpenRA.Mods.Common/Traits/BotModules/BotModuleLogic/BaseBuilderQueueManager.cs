@@ -161,24 +161,15 @@ namespace OpenRA.Mods.Common.Traits
 				}
 				else
 				{
-					// Defensive structures the wall planner shields go into a cell it reserved behind a
-					// wall it has already queued, so the concrete takes the hits instead of the turret.
-					// If it has no slot ready we fall through to the ordinary placement logic.
-					if (baseBuilder.WallPlanner != null)
-						location = baseBuilder.WallPlanner.TakeDefenseCell(actorInfo.Name);
+					// Check if Building is a defense and if we should place it towards the enemy or not.
+					if (actorInfo.HasTraitInfo<AttackBaseInfo>() && world.LocalRandom.Next(100) < baseBuilder.Info.PlaceDefenseTowardsEnemyChance)
+						type = BuildingType.Defense;
+					else if (baseBuilder.Info.PlaceAsDefenses.Contains(actorInfo.Name) && world.LocalRandom.Next(100) < baseBuilder.Info.PlaceAsDefenseChance)
+						type = BuildingType.Defense;
+					else if (baseBuilder.Info.RefineryTypes.Contains(actorInfo.Name))
+						type = BuildingType.Refinery;
 
-					if (location == null)
-					{
-						// Check if Building is a defense and if we should place it towards the enemy or not.
-						if (actorInfo.HasTraitInfo<AttackBaseInfo>() && world.LocalRandom.Next(100) < baseBuilder.Info.PlaceDefenseTowardsEnemyChance)
-							type = BuildingType.Defense;
-						else if (baseBuilder.Info.PlaceAsDefenses.Contains(actorInfo.Name) && world.LocalRandom.Next(100) < baseBuilder.Info.PlaceAsDefenseChance)
-							type = BuildingType.Defense;
-						else if (baseBuilder.Info.RefineryTypes.Contains(actorInfo.Name))
-							type = BuildingType.Refinery;
-
-						location = ChooseBuildLocation(currentBuilding.Item, true, type);
-					}
+					location = ChooseBuildLocation(currentBuilding.Item, true, type);
 				}
 
 				if (location == null)
