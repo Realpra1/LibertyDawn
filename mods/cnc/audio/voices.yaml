@@ -70,3 +70,16 @@ DinoVoice:
 		Burned: dinodie1
 		Zapped: dinodie1
 		Poisoned: dinodie1
+
+# The Sheep bleats in dinosaur. Kept separate from DinoVoice so the funpark
+# critters are not affected.
+SheepVoice:
+	Voices:
+		Select: dinoyes
+		Action: dinomout
+		Move: dinomout
+		Attack: dinoatk1
+		Die: dinodie1
+		Burned: dinodie1
+		Zapped: dinodie1
+		Poisoned: dinodie1

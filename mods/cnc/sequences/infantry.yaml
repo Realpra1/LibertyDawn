@@ -748,3 +748,31 @@ rmbo:
 		ZOffset: -511
 	icon: rmboicnh.tem
 		AddExtension: False
+
+# The Sheep. Reuses the unused CNC Funpark triceratops sprite (tric.shp) --
+# a pale, player-remappable quadruped that reads as a woolly animal at gameplay zoom.
+sheep:
+	stand: tric
+		Facings: 8
+	stand2: tric
+		Start: 8
+		Facings: 8
+	idle1: tric
+		Start: 8
+		Facings: 8
+	idle2: tric
+		Start: 0
+		Facings: 8
+	run: tric
+		Start: 16
+		Length: 8
+		Facings: 8
+	die: tric
+		Start: 176
+		Length: 20
+	die-crushed: tric
+		Start: 176
+		Length: 20
+		Tick: 1600
+		ZOffset: -511
+	icon: tricicnh
