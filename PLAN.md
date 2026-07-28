@@ -32,27 +32,52 @@ bleed                    (upstream fork, untouched)
 
 ## Workstream 1 — SkyNet air units hunt soft targets
 
-**Status:** `TODO` · **Branch:** `ai/air-targeting` · **Worktree:** `../ld-air`
+**Status:** `IN PROGRESS` · **Branch:** `ai/air-targeting` · **Worktree:** `../ld-air`
 
 Right now SkyNet's orcas and helis (`AirUnitsTypes: heli, orca`) get folded into generic attack
 squads and fly at whatever the squad is fighting — usually straight into SAM sites.
+
+**Recon correction (step 1):** the premise above was wrong. `AirUnitsTypes: heli, orca` *is* set on
+`SquadManagerBotModule@skynet`, and `SquadManagerBotModule.FindNewUnits` already routes those units
+into a dedicated `SquadType.Air` squad — they are never folded into the assault squad. The real
+causes of suicide runs were:
+
+- `AirStateBase.FindSafePlace` picked the **first** shuffled map grid cell that was "safe" and then
+  a **random** enemy from it. No preference for harvesters or production, no scoring at all.
+- `AirAttackState` fell back to `SquadManagerBotModule.FindClosestEnemy` (unbounded, whole-`World.Actors`
+  scan) the moment its target died — the closest enemy is almost always the defended base, so every
+  air squad ended its life flying into SAMs.
+- The grid scan was `O(map area / DangerScanRadius²)` `FindActorsInCircle` calls — 441 on a 202×202
+  map, per air squad, per bot.
+
+Note on determinism: bot logic runs **host-only** (`OpenRA.Game/Player.cs:215`, `if (IsBot && Game.IsHost)`)
+inside `Sync.RunUnsynced`. Touching `World.SharedRandom` from bot code would advance the shared RNG
+on the host alone and *cause* a desync. All bot code here uses `World.LocalRandom` (`Squad.Random`),
+and the new code does the same.
 
 **We want:** air units that pick off *undefended* things. Lone tanks out of AA cover, harvesters at
 the tiberium field, production buildings on the unprotected side of a base.
 
 ### Steps
 
-1. `TODO` — **Recon.** Read `OpenRA.Mods.Common/Traits/BotModules/Squads/States/AirStateBase.cs`
-   and `AirStates.cs`. The engine already ships `FindDefenselessTarget()` and AA-proximity scanning;
-   establish exactly what it does today and why SkyNet isn't benefiting. **Report before writing
-   code** — this may be more of a tuning problem than a code problem.
-2. `TODO` — Add target *scoring* rather than first-match: weight harvesters and undamaged
-   production buildings above generic units, and penalise anything within AA range.
-3. `TODO` — Expose the weights as yaml fields on `SquadManagerBotModule` so we can tune without
-   recompiling.
-4. `TODO` — Wire the new fields into `SquadManagerBotModule@skynet` in `mods/cnc/rules/ai.yaml`.
-5. `TODO` — Verify: build, `--check-yaml`, then a skirmish where we leave a harvester exposed and
-   confirm the orcas go for it.
+1. `DONE` — **Recon.** See the correction above. There is no `AirStateBase.cs` in this fork;
+   `AirStateBase` lives at the top of `AirStates.cs`.
+2. `DONE` — Target *scoring* replaces first-match. `AirStateBase.FindBestAirTarget` samples a
+   bounded number of grid cells, classifies every enemy actor it finds
+   (harvester / production+refinery / other building / unit) and picks the highest scorer after
+   subtracting an anti-air penalty and a per-cell distance penalty. Candidates below
+   `AirTargetMinimumScore` are rejected, so the squad stays home rather than suiciding.
+   `AirAttackState`'s `FindClosestEnemy` fallback now re-runs the scored scan instead.
+   Damage level is *not* part of the score — dropped as scope creep.
+3. `DONE` — Eight new yaml fields on `SquadManagerBotModuleInfo`: `AirTargetHarvesterValue` (500),
+   `AirTargetProductionValue` (350), `AirTargetBuildingValue` (150), `AirTargetUnitValue` (100),
+   `AirTargetAntiAirPenalty` (300), `AirTargetDistancePenalty` (1/cell), `AirTargetMinimumScore` (1),
+   `AirTargetScanSamples` (24).
+4. `DONE` — Wired into `SquadManagerBotModule@skynet` in `mods/cnc/rules/ai.yaml`
+   (`AirTargetScanSamples: 40` there; the rest at their defaults, written out explicitly for tuning).
+5. `TODO` — **Needs human playtest.** Build (`make all`, 0 errors) and `./utility.sh cnc --check-yaml`
+   (exit 0) both pass. Nobody has yet run a skirmish with an exposed harvester to confirm the orcas
+   go for it, or checked the framerate impact on Empire Earth with 36 bots.
 
 **Risk:** bot code runs inside the deterministic simulation. Anything non-deterministic here causes
 multiplayer desyncs. Use `World.SharedRandom` only — never `Math.Random`.

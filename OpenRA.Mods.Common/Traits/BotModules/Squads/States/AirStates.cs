@@ -9,6 +9,7 @@
  */
 #endregion
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using OpenRA.Primitives;
@@ -52,37 +53,109 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			return missileUnitsCount;
 		}
 
+		enum AirTargetClass { Unit, Building, Production, Harvester }
+
 		protected static Actor FindDefenselessTarget(Squad owner)
 		{
-			Actor target = null;
-			FindSafePlace(owner, out target, true);
-			return target;
+			return FindBestAirTarget(owner);
 		}
 
-		protected static CPos? FindSafePlace(Squad owner, out Actor detectedEnemyTarget, bool needTarget)
+		/// <summary>
+		/// Samples a bounded number of grid cells across the map, scores every enemy actor found in them
+		/// and returns the most attractive one. Soft economic and production targets outrank generic units,
+		/// while anything sitting under enemy anti-air cover is penalised heavily and usually rejected outright.
+		/// Returns null when nothing scores above <see cref="SquadManagerBotModuleInfo.AirTargetMinimumScore"/>.
+		/// </summary>
+		protected static Actor FindBestAirTarget(Squad owner)
 		{
 			var map = owner.World.Map;
-			var dangerRadius = owner.SquadManager.Info.DangerScanRadius;
-			detectedEnemyTarget = null;
+			var info = owner.SquadManager.Info;
+			var dangerRadius = info.DangerScanRadius;
 
 			var columnCount = (map.MapSize.X + dangerRadius - 1) / dangerRadius;
 			var rowCount = (map.MapSize.Y + dangerRadius - 1) / dangerRadius;
+			var cellCount = columnCount * rowCount;
+			if (cellCount <= 0)
+				return null;
 
-			var checkIndices = Exts.MakeArray(columnCount * rowCount, i => i).Shuffle(owner.World.LocalRandom);
-			foreach (var i in checkIndices)
+			var squadCenter = owner.CenterPosition;
+			var scanRadius = WDist.FromCells(dangerRadius);
+
+			Actor bestTarget = null;
+			var bestScore = int.MinValue;
+
+			// PERF: Reused across every sample so the scan allocates twice per call rather than twice per sample.
+			var actorsAround = new List<Actor>();
+			var candidates = new List<Actor>();
+
+			// PERF: Sampling a fixed number of grid cells keeps the cost of this scan independent of map size.
+			// The scan repeats every AttackForceInterval ticks, so over time the whole map still gets covered.
+			var samples = Math.Min(info.AirTargetScanSamples, cellCount);
+			for (var s = 0; s < samples; s++)
 			{
+				// NOTE: Bot code runs on the host only and must never touch World.SharedRandom.
+				var i = owner.Random.Next(cellCount);
 				var pos = new MPos((i % columnCount) * dangerRadius + dangerRadius / 2, (i / columnCount) * dangerRadius + dangerRadius / 2).ToCPos(map);
 
-				if (NearToPosSafely(owner, map.CenterOfCell(pos), out detectedEnemyTarget))
+				actorsAround.Clear();
+				candidates.Clear();
+				actorsAround.AddRange(owner.World.FindActorsInCircle(map.CenterOfCell(pos), scanRadius));
+
+				// PERF: Avoid LINQ.
+				foreach (var a in actorsAround)
+					if (owner.SquadManager.IsPreferredEnemyUnit(a))
+						candidates.Add(a);
+
+				if (candidates.Count == 0)
+					continue;
+
+				var antiAirPenalty = CountAntiAirUnits(candidates) * info.AirTargetAntiAirPenalty;
+
+				foreach (var a in candidates)
 				{
-					if (needTarget && detectedEnemyTarget == null)
+					if (!owner.SquadManager.IsNotHiddenUnit(a))
 						continue;
 
-					return pos;
+					var distanceInCells = (a.CenterPosition - squadCenter).Length / 1024;
+					var score = TargetValue(a, info) - antiAirPenalty - distanceInCells * info.AirTargetDistancePenalty;
+
+					if (score > bestScore)
+					{
+						bestScore = score;
+						bestTarget = a;
+					}
 				}
 			}
 
-			return null;
+			if (bestScore < info.AirTargetMinimumScore)
+				return null;
+
+			return bestTarget;
+		}
+
+		static int TargetValue(Actor a, SquadManagerBotModuleInfo info)
+		{
+			switch (Classify(a))
+			{
+				case AirTargetClass.Harvester: return info.AirTargetHarvesterValue;
+				case AirTargetClass.Production: return info.AirTargetProductionValue;
+				case AirTargetClass.Building: return info.AirTargetBuildingValue;
+				default: return info.AirTargetUnitValue;
+			}
+		}
+
+		static AirTargetClass Classify(Actor a)
+		{
+			if (a.Info.HasTraitInfo<HarvesterInfo>())
+				return AirTargetClass.Harvester;
+
+			if (!a.Info.HasTraitInfo<BuildingInfo>())
+				return AirTargetClass.Unit;
+
+			if (a.Info.HasTraitInfo<ProductionInfo>() || a.Info.HasTraitInfo<RefineryInfo>())
+				return AirTargetClass.Production;
+
+			return AirTargetClass.Building;
 		}
 
 		protected static bool NearToPosSafely(Squad owner, WPos loc)
@@ -153,10 +226,11 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 			if (!owner.IsTargetValid)
 			{
-				var a = owner.Units.Random(owner.Random);
-				var closestEnemy = owner.SquadManager.FindClosestEnemy(a.CenterPosition);
-				if (closestEnemy != null)
-					owner.TargetActor = closestEnemy;
+				// Re-run the scored scan rather than falling back to the closest enemy:
+				// the closest enemy is usually the defended base we just flew past.
+				var nextTarget = FindBestAirTarget(owner);
+				if (nextTarget != null)
+					owner.TargetActor = nextTarget;
 				else
 				{
 					owner.FuzzyStateMachine.ChangeState(owner, new AirFleeState(), true);

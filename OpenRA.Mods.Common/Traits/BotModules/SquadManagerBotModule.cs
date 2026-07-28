@@ -82,12 +82,44 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Enemy target types to never target.")]
 		public readonly BitSet<TargetableType> IgnoredEnemyTargetTypes = default(BitSet<TargetableType>);
 
+		[Desc("Air squads score every enemy actor they find and attack the highest scoring one.",
+			"Score awarded to an enemy harvester. Harvesters are the softest worthwhile target,",
+			"so this should normally be the highest of the AirTarget*Value fields.")]
+		public readonly int AirTargetHarvesterValue = 500;
+
+		[Desc("Score awarded to an enemy production building or refinery.")]
+		public readonly int AirTargetProductionValue = 350;
+
+		[Desc("Score awarded to any other enemy building.")]
+		public readonly int AirTargetBuildingValue = 150;
+
+		[Desc("Score awarded to an enemy mobile unit.")]
+		public readonly int AirTargetUnitValue = 100;
+
+		[Desc("Score deducted per enemy anti-air capable actor sharing a scanned area (DangerScanRadius) with a candidate target.",
+			"Raise this to make air squads more scared of SAM sites and mobile AA.")]
+		public readonly int AirTargetAntiAirPenalty = 300;
+
+		[Desc("Score deducted per cell of distance between the air squad and a candidate target.")]
+		public readonly int AirTargetDistancePenalty = 1;
+
+		[Desc("Minimum score a candidate must reach before an air squad commits to attacking it.",
+			"Candidates scoring below this are ignored and the squad stays idle.")]
+		public readonly int AirTargetMinimumScore = 1;
+
+		[Desc("Number of map grid cells sampled per air target scan. Bounds the cost of the scan",
+			"independently of map size; lowering it trades responsiveness for CPU time on large maps.")]
+		public readonly int AirTargetScanSamples = 24;
+
 		public override void RulesetLoaded(Ruleset rules, ActorInfo ai)
 		{
 			base.RulesetLoaded(rules, ai);
 
 			if (DangerScanRadius <= 0)
 				throw new YamlException("DangerScanRadius must be greater than zero.");
+
+			if (AirTargetScanSamples <= 0)
+				throw new YamlException("AirTargetScanSamples must be greater than zero.");
 		}
 
 		public override object Create(ActorInitializer init) { return new SquadManagerBotModule(init.Self, this); }
