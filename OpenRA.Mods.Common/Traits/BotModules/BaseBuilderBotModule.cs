@@ -125,6 +125,41 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Terrain types which are considered water for base building purposes.")]
 		public readonly HashSet<string> WaterTerrainTypes = new HashSet<string> { "Water" };
 
+		[Desc("Building types that are placed as walls using line building instead of being dropped",
+			"on a free cell somewhere in the base. Leave empty to disable wall building.")]
+		public readonly HashSet<string> WallTypes = new HashSet<string>();
+
+		[Desc("Building types that the AI rings with walls. Usually the defensive structures.")]
+		public readonly HashSet<string> WallRingTypes = new HashSet<string>();
+
+		[Desc("Distance in cells between a ringed structure and its wall ring.")]
+		public readonly int WallRingRadius = 2;
+
+		[Desc("How many of the four sides of a wall ring to build. Clamped to 3, so a ring can never",
+			"be closed. The sides that get dropped are always the ones facing the middle of our own base.")]
+		public readonly int WallRingSides = 3;
+
+		[Desc("Shortest run of consecutive placeable cells that is still worth walling.")]
+		public readonly int MinimumWallLineLength = 3;
+
+		[Desc("Hard cap on the number of wall actors the AI will own. Zero disables wall building.")]
+		public readonly int MaximumWallSegments = 0;
+
+		[Desc("Name of the locomotor used to verify the AI can still move around after walling.")]
+		public readonly string WallPathCheckLocomotor = "wheeled";
+
+		[Desc("Cell budget for the flood fill that verifies walls do not seal the base in.")]
+		public readonly int WallPathCheckMaxCells = 2000;
+
+		[Desc("Distance in cells from the construction yard that must stay reachable after walling.")]
+		public readonly int WallEscapeDistance = 20;
+
+		[Desc("Percentage of the pre-wall reachable area that must survive placing a wall ring.")]
+		public readonly int WallPathCheckTolerance = 90;
+
+		[Desc("How many candidate structures to consider each time a wall ring is planned.")]
+		public readonly int WallPlanAttempts = 3;
+
 		[Desc("What buildings to the AI should build.", "What integer percentage of the total base must be this type of building.")]
 		public readonly Dictionary<string, int> BuildingFractions = null;
 
@@ -151,6 +186,8 @@ namespace OpenRA.Mods.Common.Traits
 
 		public CPos DefenseCenter => defenseCenter;
 
+		internal BaseBuilderWallPlanner WallPlanner { get; private set; }
+
 		readonly World world;
 		readonly Player player;
 		PowerManager playerPower;
@@ -175,6 +212,7 @@ namespace OpenRA.Mods.Common.Traits
 			playerResources = self.Owner.PlayerActor.Trait<PlayerResources>();
 			resourceLayer = self.World.WorldActor.TraitOrDefault<IResourceLayer>();
 			positionsUpdatedModules = self.Owner.PlayerActor.TraitsImplementing<IBotPositionsUpdated>().ToArray();
+			WallPlanner = new BaseBuilderWallPlanner(this, player, resourceLayer);
 		}
 
 		protected override void TraitEnabled(Actor self)
