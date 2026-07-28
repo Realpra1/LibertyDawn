@@ -369,3 +369,72 @@ counting, destination exclusion, retreat-point choice and the score ordering).
    `AirTargetMinimumScore: 200` combined with `AirTargetAntiAirPenalty: 700` (if SkyNet's orcas
    never leave home, this pair is too cowardly), and `AirTargetDistancePenalty: 1 → 3` (harassment
    should now stay local; if the air squad ignores a juicy far harvester, lower it).
+
+---
+
+# ROUND 3 — second playtest feedback
+
+Second playtest. Verdict: the Sheep saved the game, the walls made no strategic sense, and the air
+units still fly into anti-air and then retreat across the entire map.
+
+**Key diagnosis:** the walls were not random. The cluster blocking one entrance *was* the round-2
+choke-point feature working as designed. Chokes are terrain features, so the AI walled one and
+correctly found nothing else qualifying. The behaviour was wrong because the design was wrong, not
+because it was buggy. Round 3 deletes it.
+
+## R3 · Walls — gut it (KISS)
+
+**Status:** `TODO` · **Branch:** `ai/walls`
+
+The players' own strategy, which is the spec: *you pay for the two endpoints and the engine fills
+the line between them for free, so long walls are cheap and one-at-a-time is waste. Find a tower
+with no wall, put a wall in front of it. That is the entire feature.*
+
+1. `TODO` — **Delete** choke detection (`TryFindChoke`, `ScanChokes`, caching, choke config/tests).
+2. `TODO` — **Delete** turret-behind-wall siting (`PlanShieldedDefenseSite`, slot reservation, the
+   `consumedAnchors` counter, `TakeDefenseCell`). Turret placement reverts to stock.
+3. `TODO` — **Keep only:** find a defensive tower that has no wall in front of it → place ONE long
+   wall line on its enemy-facing side, as two anchors so `LineBuild` fills the rest free.
+4. `TODO` — Keep a cheap reachability check so it still cannot seal itself in. Much less critical
+   now: single lines in front of towers are far harder to seal a base with than choke walls were.
+5. `TODO` — Config target: ~4 yaml fields, down from 17.
+
+## R3 · Air — local harassment loop, squad cap 5
+
+**Status:** `TODO` · **Branch:** `ai/air-targeting`
+
+Three observed failures:
+- Aircraft get too close to AA and die. The threat scan samples 40 of 441 map regions and only
+  re-checks around the squad every 25 ticks, so mobile AA that arrives after a scan is invisible.
+  **The Sheep now has anti-air**, which is a large part of why orcas are dying.
+- On being threatened they flee to one of their own buildings — which on a 202x202 map with
+  expansions is routinely ~70 tiles away — then fly a straight line back in. Enormous, useless,
+  visibly stupid moves.
+- Squads are too large for harassment.
+
+1. `TODO` — **Local evasion replaces going home.** Threatened → short hop (10–15 cells) directly
+   away from the threat → re-scan for a soft target *from there* → strike → hop out. Circle the
+   enemy base rather than crossing the map. Only return to base to repair/rearm.
+2. `TODO` — If no target is reachable in a straight line, reposition around the enemy base and try
+   again. Simple logic is fine (move to a nearby offset point and re-scan); the requirement is that
+   moves stay *small and local*.
+3. `TODO` — **Cap air squads at 5.** This is the anti-harassment force, not the main push.
+4. `TODO` — Fix AA detection: check far more often, cover more area, and reliably include *mobile*
+   AA units, not just static SAMs.
+
+> Deferred, explicitly: a separate "big push" doctrine that masses aircraft against one high-value
+> structure when no exposed targets exist. Agreed to be a different behaviour for a later round.
+
+## R3 · Sheep — more HP
+
+**Status:** `TODO`
+
+Sheep die too fast to defensive structures (`GTWR` fires 3300 damage every 4 ticks at range 7).
+Chosen fix: raise HP substantially. Blunt, but it covers every damage source rather than only
+machine guns. HP 2000 → 6000. Range, armour type and cost unchanged.
+
+## Deferred to Round 4 — adaptive AI
+
+Track value-killed vs value-lost per actor type; build more of what performs and less of what
+doesn't, clamped so nothing reaches zero. Deliberately sequenced *after* the above so it measures
+the AI we intend to ship rather than behaviour that is about to be replaced.

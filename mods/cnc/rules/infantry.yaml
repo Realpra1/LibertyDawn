@@ -330,7 +330,7 @@ SHEEP:
 	Mobile:
 		Speed: 120
 	Health:
-		HP: 2000
+		HP: 6000
 	RevealsShroud:
 		Range: 16c0
 	Armament@PRIMARY:
