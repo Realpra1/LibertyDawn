@@ -767,6 +767,10 @@ sheep:
 		Start: 16
 		Length: 8
 		Facings: 8
+	attack: tric
+		Start: 80
+		Length: 12
+		Facings: 8
 	die: tric
 		Start: 176
 		Length: 20

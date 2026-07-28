@@ -313,15 +313,18 @@ RAPT:
 
 SHEEP:
 	Inherits: ^Soldier
+	Inherits@AUTOTARGET: ^AutoTargetAllAssaultMove
 	Valued:
 		Cost: 50
 	Tooltip:
 		Name: Sheep
 		GenericName: Sheep
+	UpdatesPlayerStatistics:
+		AddToArmyValue: true
 	Buildable:
 		BuildPaletteOrder: 90
 		Queue: Infantry.GDI, Infantry.Nod
-		Description: Cheap, fast, unarmed scout.\n  Reveals a wide area\n  Cannot fight anything at all
+		Description: Cheap, fast, heavily armed scout.\n  Reveals a wide area\n  Machine gun and anti-air missiles\n  Twenty-five of them reveal the whole map
 	RenderSprites:
 		Image: sheep
 	Mobile:
@@ -330,6 +333,21 @@ SHEEP:
 		HP: 2000
 	RevealsShroud:
 		Range: 16c0
+	Armament@PRIMARY:
+		Weapon: SheepMG
+		LocalOffset: 300,0,300
+		FireDelay: 2
+	Armament@AA:
+		Name: secondary
+		Weapon: SheepAA
+		LocalOffset: 300,0,430
+		FireDelay: 2
+	AttackFrontal:
+		Voice: Attack
+	AttackMove:
+		Voice: Attack
+	WithInfantryBody:
+		DefaultAttackSequence: attack
 	Selectable:
 		Bounds: 1024, 1024
 		DecorationBounds: 1450, 1024, 0, 85
@@ -345,6 +363,5 @@ SHEEP:
 		VoiceSet: SheepVoice
 	-TakeCover:
 	-MustBeDestroyed:
-	-AttackFrontal:
 	-SpawnActorOnDeath:
 	-SpawnActorOnDeath@TibGun:

@@ -378,3 +378,31 @@ Patriot:
 	-Warhead@2Smu:
 	Warhead@4EffAir: CreateEffect
 		Explosions: poof
+
+# The Sheep's anti-air battery. Separate weapon from SheepMG so the Sheep can
+# engage ground and air targets independently, exactly like the E3 Rocket Soldier.
+SheepAA:
+	Inherits: AARockets
+	ReloadDelay: 30
+	Range: 10c0
+	Burst: 2
+	BurstDelays: 6
+	Report: rocket2.aud
+	ValidTargets: Air
+	Projectile: Missile
+		Speed: 400
+		HorizontalRateOfTurn: 90
+		Inaccuracy: 256
+		RangeLimit: 11c0
+		Blockable: false
+	Warhead@1Dam: SpreadDamage
+		Spread: 512
+		Damage: 6000
+		ValidTargets: Air
+		Versus:
+			None: 100
+			Wood: 100
+			TiberiumWood: 100
+			Light: 140
+			Tiberium: 100
+			Heavy: 100

@@ -210,19 +210,43 @@ earlier specs where they conflict.
 
 ## R2 · Sheep — "sheep are the power of the universe"
 
-**Status:** `TODO` · **Branch:** `unit/sheep`
+**Status:** `DONE` · **Branch:** `unit/sheep`
 
 The Sheep is underpowered. It stays at **50 credits** but becomes a genuinely strong unit.
 
-1. `TODO` — Give it a **machine gun** (anti-ground) and a **separate anti-air weapon**. Both, on the
+1. `DONE` — Give it a **machine gun** (anti-ground) and a **separate anti-air weapon**. Both, on the
    same actor, at the same price.
-2. `TODO` — **The 25-Sheep Rule.** When a player has *exactly* **25** living sheep, the entire map
+   `SHEEP` now carries `Armament@PRIMARY: SheepMG` and `Armament@AA: SheepAA` (named `secondary`),
+   with `AttackFrontal` restored and `^AutoTargetAllAssaultMove` so it engages air and ground on its
+   own. `SheepMG` (`weapons/smallcaliber.yaml`, inherits `^HeavyMG`): 8c0 range, burst 3,
+   `ReloadDelay: 12`, 4000 damage. `SheepAA` (`weapons/missiles.yaml`, inherits `AARockets`):
+   10c0 range, burst 2, `ReloadDelay: 30`, 6000 damage, `ValidTargets: Air`. Cost 50, HP 2000,
+   Speed 120, `RevealsShroud: 16c0` all unchanged. An `attack` sequence was added to the `sheep`
+   sequence block (reusing the `tric` attack frames) so it animates while firing.
+2. `DONE` — **The 25-Sheep Rule.** When a player has *exactly* **25** living sheep, the entire map
    is revealed to them. At 24 it does not work. At 26 it does not work. Exactly 25, or nothing.
    This is deliberate and is not to be "fixed" into a threshold.
+   Two new general-purpose player traits, both wired up in `rules/player.yaml`:
+   - `GrantConditionOnActorCount` (`Traits/Player/GrantConditionOnActorCount.cs`) — counts owned,
+     in-world actors of the configured type(s) and grants a condition while the count is *exactly*
+     equal to `Count`. The count is maintained incrementally from `World.ActorAdded` /
+     `World.ActorRemoved` (which also cover ownership changes, since `ChangeOwnerSync` re-adds the
+     actor), so nothing is ever rescanned per tick.
+   - `RevealsMapOnCondition` (`Traits/Player/RevealsMapOnCondition.cs`) — registers **one** shroud
+     source over `Map.ProjectedCells` when its condition is enabled and drops it again when it is
+     not, so the whole-map reveal costs one pass per on/off transition regardless of how many
+     sheep caused it.
+   The exact-count logic is factored into `ExactCountTracker`; 18 boundary tests (24/25/26 and
+   repeated flips) live in `OpenRA.Test/OpenRA.Mods.Common/ExactCountTrackerTest.cs`.
 
 > Balance note, recorded and overruled: a 50-credit unit with 2000 HP, a machine gun and AA is
 > strictly better than an E1 Minigunner at 120 credits. This was raised and the players want it
 > anyway. Build it as specified.
+
+> Known limitation of the reveal: map *exploration* is permanent in OpenRA, so dropping off 25
+> restores fog of war over the whole map but does not re-shroud terrain that was uncovered while
+> the rule was active. With this mod's default `ExploredMapCheckboxEnabled: True` the map already
+> starts explored anyway, so in practice the observable effect is full fog removal on and off.
 
 ## R2 · Walls — turrets behind the walls, walls at chokes
 
