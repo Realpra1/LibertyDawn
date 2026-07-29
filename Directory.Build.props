@@ -19,6 +19,13 @@
   <PropertyGroup>
     <TargetFramework Condition="'$(Mono)' == ''">net6.0</TargetFramework>
     <TargetFramework Condition="'$(Mono)' != ''">netstandard2.1</TargetFramework>
+
+    <!-- net6.0 went EOL in Nov 2024; newer SDK feature bands escalate NETSDK1138 from a warning to
+         a hard build error, which is what broke CI (both bleed's own build and every attempt on
+         Realpra1-patch-1) without any code change involved. Suppressing this is the officially
+         supported opt-out for the check - not a fix for net6.0 being EOL, just stops CI failing on
+         it until an actual framework upgrade happens. -->
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
   </PropertyGroup>
 
   <PropertyGroup>
