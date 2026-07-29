@@ -155,6 +155,14 @@ namespace OpenRA.Mods.Common.Traits
 			}
 		}
 
+		// BotDebug is read by humans watching a match, not tuned against by other code, so trade the
+		// exact yaml key for something legible: "Minigunner (e1)" instead of just "e1".
+		string DisplayName(string type)
+		{
+			var tooltip = world.Map.Rules.Actors[type].TraitInfoOrDefault<TooltipInfo>();
+			return !string.IsNullOrEmpty(tooltip?.Name) ? $"{tooltip.Name} ({type})" : type;
+		}
+
 		void RefreshAdaptiveCounts()
 		{
 			cachedDeployedConstructionYards = 0;
@@ -194,7 +202,7 @@ namespace OpenRA.Mods.Common.Traits
 
 				if (Math.Abs(stats.DecayedScore - previous) > 0.05)
 					AIUtils.BotDebug("{0} adaptive score for {1}: {2:0.00} -> {3:0.00} (built {4}, killed {5}, lost {6})",
-						player, kv.Key, previous, stats.DecayedScore, stats.BuiltCount, stats.KillsCount, stats.LossesCount);
+						player, DisplayName(kv.Key), previous, stats.DecayedScore, stats.BuiltCount, stats.KillsCount, stats.LossesCount);
 			}
 
 			if (Info.AdaptiveTypes.Count > 0)
@@ -205,7 +213,7 @@ namespace OpenRA.Mods.Common.Traits
 					var confidence = AdaptiveWeighting.Confidence(stats.KillsCount + stats.LossesCount, Info.AdaptiveConfidenceSamples);
 					var authored = Info.UnitsToBuild.TryGetValue(t, out var w) ? w : 0;
 					var adapted = AdaptiveWeighting.AdaptedWeight(authored, stats.DecayedScore, confidence);
-					return FormattableString.Invariant($"{t}={adapted:0.0}(authored {authored}, score {stats.DecayedScore:0.00}, conf {confidence:0.00})");
+					return FormattableString.Invariant($"{DisplayName(t)}={adapted:0.0}(authored {authored}, score {stats.DecayedScore:0.00}, conf {confidence:0.00})");
 				});
 				AIUtils.BotDebug("{0} adaptive weights: {1}", player, string.Join(", ", table));
 			}
@@ -281,7 +289,7 @@ namespace OpenRA.Mods.Common.Traits
 			if (queue != null)
 			{
 				bot.QueueOrder(Order.StartProduction(queue.Actor, name, 1));
-				AIUtils.BotDebug("{0} decided to build {1} (external request)", queue.Actor.Owner, name);
+				AIUtils.BotDebug("{0} decided to build {1} (external request)", queue.Actor.Owner, DisplayName(name));
 			}
 		}
 
