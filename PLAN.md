@@ -18,15 +18,15 @@ enough to make that fun.
 |---|---|
 | Integration branch | **`spam-fork`** — everything is merged here |
 | Base branch | `bleed` (the untouched LibertyDawn fork) |
-| Commits ahead of `bleed` | 23 |
-| Diff vs `bleed` | 26 files, +3522 / −57 |
+| Commits ahead of `bleed` | 26 |
+| Diff vs `bleed` | 30 files, +4580 / −79 |
 | Build | `make all` → **0 errors** |
 | Rules lint | `./utility.sh cnc --check-yaml` → **exit 0** |
-| Tests | `dotnet test OpenRA.Test/OpenRA.Test.csproj` → **105 / 105 pass** |
+| Tests | `dotnet test OpenRA.Test/OpenRA.Test.csproj` → **122 / 122 pass** |
 | Remote | **None.** Local git only. Nothing has ever been pushed. |
 | Working tree | Clean |
 
-Three rounds are complete. Round 4 (adaptive AI) is designed but not started.
+Four rounds are complete.
 
 ### Branches and worktrees
 
@@ -35,10 +35,11 @@ bleed                    untouched fork base
 └── spam-fork            integration branch — merge everything here
     ├── ai/air-targeting  → worktree .worktrees/ld-air
     ├── ai/walls          → worktree .worktrees/ld-walls
-    └── unit/sheep        → worktree .worktrees/ld-sheep
+    ├── unit/sheep        → worktree .worktrees/ld-sheep
+    └── ai/adaptive        → worktree .worktrees/ld-adaptive
 ```
 
-All three feature branches are **merged into `spam-fork` and level with it**. The worktrees still
+All four feature branches are **merged into `spam-fork` and level with it**. The worktrees still
 exist and are ready to reuse. `.worktrees/` and `vendor-libs/` are gitignored.
 
 ### How to resume
@@ -175,10 +176,43 @@ SHEEP  "Sheep"   (mods/cnc/rules/infantry.yaml:314+)
 
 ---
 
-## 4. Round 4 — the adaptive AI (NEXT)
+## 4. Round 4 — the adaptive AI
 
-**Status:** `TODO` — designed, not started. Read **`ADAPTIVE-AI-DESIGN.md`** (repo root, 330 lines)
-before doing anything.
+**Status:** `DONE` — implemented, merged into `spam-fork` (`3f58b811c0`, `22b2659233`), **not yet
+observed in a running game** (see "Round 4" in §5). The 11 questions in `ADAPTIVE-AI-DESIGN.md`
+(repo root) were all answered by the players before implementation started, in-line after each
+question — the doc's own *(Recommended)* markers were frequently overridden by their actual
+answers (custom clamp values, per-minute decay instead of whole-match cumulative, turrets included).
+Implemented against those answers, in worktree `.worktrees/ld-adaptive` / branch `ai/adaptive`,
+following this doc's §2 working method.
+
+### What shipped
+
+- **`AdaptiveWeighting.cs`** (new, 198 lines) — pure score/decay/confidence/clamp math, no
+  Actor/World dependency, same shape as `AirThreatGeometry.cs`/`BotWallGeometry.cs`. Backed by
+  **`AdaptiveWeightingTest.cs`** (new, 163 lines, 17 NUnit cases: cold start, zero losses,
+  confidence-ramp bounds, clamp floor/roof, minute-rollover blending).
+- **`PlayerStatistics.cs`** — new per-actor-type ledger (`Cache<string, AdaptiveTypeStats>`):
+  built/killed/lost value and count, fed by `UpdatesPlayerStatistics.Created`/`Killed` (last-hit
+  attribution, victim-side hook, matching the design doc's Q3-A). Now implements
+  `IGameSaveTraitData` — no stats-related trait persisted across save/load before this.
+- **`UnitBuilderBotModule.cs`** — `WeightedUnitSelection` replaces the uniform
+  `ChooseRandomUnitToBuild` draw with a real weighted pick over `UnitsToBuild` once enabled (this
+  alone is a balance change, independent of adaptation — the numbers finally mean something).
+  50/50 economy/combat split gated by an income-vs-spend + harvester-floor check, a dedicated MCV
+  priority rule (deployed-`fact`-count based, not adaptively scored), `BotDebug` on-change plus a
+  periodic full-table dump.
+- **`BaseBuilderBotModule.cs` / `BaseBuilderQueueManager.cs`** — turrets (`gtwr, gun, atwr, obli,
+  sam`, the existing `WalledDefenseTypes` list) adapt the same way, nudging `BuildingFractions`'
+  existing ceiling instead of replacing its shuffle-and-ceiling mechanic.
+- **`mods/cnc/rules/ai.yaml`** — wired up on **SkyNet only**. `ctnk`/`mlrs`/`mcv` raised off their
+  no-op `0` weight to `10`; `AdaptiveTypes` covers all 20 weapon-bearing units; `EconomyTypes: harv`;
+  `AdaptiveBuildingTypes: gtwr, gun, atwr, obli, sam`. Brutalis/VIKI/IronReaper untouched — same
+  rollout pattern as air/walls, tune the hard bot first.
+- BotDebug lines resolve `TooltipInfo.Name` now (`Minigunner (e1)` instead of bare `e1`) — added
+  after a first playtest attempt found the raw yaml keys unreadable in the chat feed.
+
+Verified: `make all` 0 errors, `--check-yaml` exit 0, `dotnet test` 122/122 (105 baseline + 17 new).
 
 ### What the players asked for
 
@@ -277,7 +311,10 @@ process-wide. Adapted weights must live in a per-module copy and be registered w
 ## 5. Open risks and unverified work
 
 None of the round-3 behaviour has been observed in a running game. It is static reasoning plus unit
-tests.
+tests. **Round 4 (adaptive AI) hasn't either** — a real skirmish was attempted but the game process
+was killed by the operating agent mid-session before SkyNet's army got far enough to generate
+adaptive samples; it was not a genuine in-game crash (no exception log). Round 4 is unit-tested
+(17 new cases) and code-reviewed, not playtested.
 
 | Risk | Where | Cheap fix if it bites |
 |---|---|---|
@@ -287,6 +324,9 @@ tests.
 | **Orcas too timid** — if they never leave home the score floor is too high | `ai.yaml` | Lower `AirTargetMinimumScore: 200` |
 | **Sheep attack animation** reuses triceratops frames 80–91; never seen on screen | `sequences/infantry.yaml` | — |
 | **25-Sheep Rule** verified only at `ExactCountTracker` level; event wiring and shroud source never observed in play | `GrantConditionOnActorCount.cs` | — |
+| **Adaptive AI: artillery/msam may sag toward the weight floor** — last-hit attribution (Q3-A) systematically undervalues support units that soften targets someone else finishes | `UpdatesPlayerStatistics.Killed` | Move to damage-share attribution (Q3-B, deferred) |
+| **Adaptive AI: real army composition and performance cost unverified** — one extra `world.Actors` scan per bot per ~1.2s when `WeightedUnitSelection` is on, only enabled for SkyNet; never profiled in a real match | `UnitBuilderBotModule.cs` | Disable `WeightedUnitSelection` on SkyNet if framerate drops |
+| **Adaptive AI: mid-match save/load path untested** — `IGameSaveTraitData` round-trip exists but was never exercised against a live save | `PlayerStatistics.cs` | Save/load once mid-match and diff `AdaptiveStats` |
 
 **`BlocksProjectiles` is resolved, not a risk.** `brik` blocks projectiles, but all five walled
 defence types shoot through it: `HighV` (`gtwr`) and `TurretGun` (`gun`) set `Blockable: false`
