@@ -1,0 +1,160 @@
+Container@OPS_GRID_HOST:
+	Logic: OpsGridLogic
+		ToggleOpsGridKey: ToggleOpsGrid
+	Children:
+		LogicKeyListener@OPS_GRID_KEYHANDLER:
+		Background@OPS_GRID_PANEL:
+			Visible: false
+			X: 30
+			Y: 30
+			Width: WINDOW_RIGHT - 60
+			Height: WINDOW_BOTTOM - 60
+			Background: panel-black
+			Children:
+				Label@TITLE:
+					X: 10
+					Y: 6
+					Width: 300
+					Height: 20
+					Font: Bold
+					Text: Ops Grid
+				Label@HINT:
+					X: 320
+					Y: 8
+					Width: PARENT_RIGHT - 330
+					Height: 16
+					Font: Tiny
+					Align: Right
+					Text: O to close - click +1 - Ctrl/Cmd+click or right-click +100
+				Container@TAB_STRIP:
+					X: 10
+					Y: 30
+					Width: PARENT_RIGHT - 20
+					Height: 24
+					Children:
+						Button@TAB_CONYARD:
+							X: 0
+							Width: 140
+							Height: 24
+							Text: Construction Yard
+						Button@TAB_DEFENSE:
+							X: 142
+							Width: 90
+							Height: 24
+							Text: Defense
+						Button@TAB_WARFACTORY:
+							X: 234
+							Width: 130
+							Height: 24
+							Text: War Factory
+						Button@TAB_BARRACKS:
+							X: 366
+							Width: 110
+							Height: 24
+							Text: Barracks
+						Button@TAB_HELIPAD:
+							X: 478
+							Width: 100
+							Height: 24
+							Text: Helipad
+				# X:280 = GRID_BODY.X(10) + ROW_TEMPLATE.X(0) + ROW_CELLS.X(270) - must match where a
+				# row's own cells actually start, or headers/bulk actions drift out of alignment with
+				# the columns they label.
+				Container@COLUMN_HEADER_ROW:
+					X: 280
+					Y: 60
+					Width: PARENT_RIGHT - 290
+					Height: 18
+				Container@BULK_ROW:
+					X: 280
+					Y: 80
+					Width: PARENT_RIGHT - 290
+					Height: 24
+				ScrollPanel@GRID_BODY:
+					X: 10
+					Y: 108
+					Width: PARENT_RIGHT - 20
+					Height: PARENT_BOTTOM - 118
+					TopBottomSpacing: 2
+					ItemSpacing: 2
+					Children:
+						ScrollItem@ROW_TEMPLATE:
+							X: 0
+							Y: 0
+							Width: 2400
+							Height: 40
+							Children:
+								Label@ROW_NAME:
+									X: 4
+									Y: 2
+									Width: 210
+									Height: 16
+									Font: Bold
+								Label@ROW_STATUS:
+									X: 4
+									Y: 20
+									Width: 150
+									Height: 14
+									Font: Tiny
+								Button@ROW_PAUSE:
+									X: 154
+									Y: 19
+									Width: 55
+									Height: 18
+									Font: Tiny
+									Text: Pause
+								Button@ROW_CLEAR:
+									X: 212
+									Y: 19
+									Width: 50
+									Height: 18
+									Font: Tiny
+									Text: Clear
+								Container@ROW_CELLS:
+									X: 270
+									Y: 0
+									Width: 2100
+									Height: 40
+		# Hidden prototypes cloned at runtime - never shown directly, so kept out of the panel's
+		# normal layout flow. Visible: false is set explicitly because only ScrollItemWidget forces
+		# its own invisibility by default; plain Label/Container/Button templates do not. Nested
+		# inside OPS_GRID_HOST (not a separate top-level container) so OpsGridLogic's widget.Get(...)
+		# - which only ever searches its own descendants, never siblings - can actually find it.
+		Container@OPS_GRID_TEMPLATES:
+			Visible: false
+			Children:
+				Label@OPS_GRID_COLUMN_HEADER_TEMPLATE:
+					Visible: false
+					Width: 84
+					Height: 16
+					Font: Tiny
+					Align: Center
+				Container@OPS_GRID_BULK_CELL_TEMPLATE:
+					Visible: false
+					Width: 84
+					Height: 22
+					Children:
+						Button@BULK_QUEUE:
+							X: 0
+							Width: 26
+							Height: 22
+							Font: Tiny
+							Text: +
+						Button@BULK_PAUSE:
+							X: 28
+							Width: 26
+							Height: 22
+							Font: Tiny
+							Text: ||
+						Button@BULK_CLEAR:
+							X: 56
+							Width: 26
+							Height: 22
+							Font: Tiny
+							Text: x
+				Button@OPS_GRID_CELL_TEMPLATE:
+					Visible: false
+					Width: 84
+					Height: 36
+					Font: Tiny
+					Text: ""

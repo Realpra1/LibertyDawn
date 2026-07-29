@@ -1,5 +1,5 @@
 Container@INGAME_ROOT:
-	Logic: LoadIngamePlayerOrObserverUILogic
+	Logic: LoadIngamePlayerOrObserverUILogic, LoadOpsGridLogic
 	Children:
 		LogicKeyListener@GLOBAL_KEYHANDLER:
 			Logic: MusicHotkeyLogic, ScreenshotHotkeyLogic, MuteHotkeyLogic

@@ -17,3 +17,7 @@ ProductionTypeVehicle: Y
 ProductionTypeAircraft: U
 	Description: Aircraft Tab
 	Types: Production, Player
+
+ToggleOpsGrid: O
+	Description: Toggle Ops Grid
+	Types: Player
