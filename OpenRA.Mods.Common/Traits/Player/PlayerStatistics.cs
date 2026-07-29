@@ -9,7 +9,9 @@
  */
 #endregion
 
+using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using OpenRA.Graphics;
 using OpenRA.Mods.Common.Traits.Render;
@@ -25,7 +27,7 @@ namespace OpenRA.Mods.Common.Traits
 		public override object Create(ActorInitializer init) { return new PlayerStatistics(init.Self); }
 	}
 
-	public class PlayerStatistics : ITick, IResolveOrder, INotifyCreated, IWorldLoaded
+	public class PlayerStatistics : ITick, IResolveOrder, INotifyCreated, IWorldLoaded, IGameSaveTraitData
 	{
 		PlayerResources resources;
 		PlayerExperience experience;
@@ -64,9 +66,22 @@ namespace OpenRA.Mods.Common.Traits
 		bool incomeGraphDisabled;
 		public readonly Cache<string, ArmyUnit> Units;
 
+		// Per actor-type built/kills/losses ledger for the adaptive-AI build weighting (see
+		// AdaptiveWeighting.cs). Lives here rather than on a bot module because it is per-player
+		// state shared by every bot module attached to that player (unit and building queues alike),
+		// and because the *Info config objects those modules read are shared by reference across every
+		// player using the same bot personality - mutable learned state can never live there.
+		public readonly Cache<string, AdaptiveTypeStats> AdaptiveStats;
+
+		// World tick the adaptive ledger's per-minute window is next due to roll into DecayedScore.
+		// Owned here, not per-bot-module, so it is only ever rolled once per minute even though both
+		// UnitBuilderBotModule and BaseBuilderQueueManager read from AdaptiveStats.
+		public int NextAdaptiveRolloverTick;
+
 		public PlayerStatistics(Actor self)
 		{
 			Units = new Cache<string, ArmyUnit>(name => new ArmyUnit(self.World.Map.Rules.Actors[name], self.Owner));
+			AdaptiveStats = new Cache<string, AdaptiveTypeStats>(name => new AdaptiveTypeStats());
 		}
 
 		void INotifyCreated.Created(Actor self)
@@ -130,6 +145,74 @@ namespace OpenRA.Mods.Common.Traits
 			if (!incomeGraphDisabled)
 				IncomeSamples.Add(Income);
 		}
+
+		List<MiniYamlNode> IGameSaveTraitData.IssueTraitData(Actor self)
+		{
+			var entries = new List<MiniYamlNode>();
+			foreach (var kv in AdaptiveStats.OrderBy(kv => kv.Key, StringComparer.Ordinal))
+			{
+				var s = kv.Value;
+				var packed = FieldSaver.FormatValue(new[] { s.BuiltCount, s.BuiltValue, s.KillsCount, s.KillsValue, s.LossesCount, s.LossesValue, s.MinuteKillsValue, s.MinuteLossesValue })
+					+ "|" + s.DecayedScore.ToString("R", CultureInfo.InvariantCulture);
+				entries.Add(new MiniYamlNode(kv.Key, packed));
+			}
+
+			return new List<MiniYamlNode>()
+			{
+				new MiniYamlNode("AdaptiveStats", null, entries),
+				new MiniYamlNode("NextAdaptiveRolloverTick", FieldSaver.FormatValue(NextAdaptiveRolloverTick)),
+			};
+		}
+
+		void IGameSaveTraitData.ResolveTraitData(Actor self, List<MiniYamlNode> data)
+		{
+			var adaptiveNode = data.FirstOrDefault(n => n.Key == "AdaptiveStats");
+			if (adaptiveNode != null)
+			{
+				foreach (var entry in adaptiveNode.Value.Nodes)
+				{
+					var parts = entry.Value.Value.Split('|');
+					var ints = FieldLoader.GetValue<int[]>("AdaptiveStats", parts[0]);
+					var stats = AdaptiveStats[entry.Key];
+					stats.BuiltCount = ints[0];
+					stats.BuiltValue = ints[1];
+					stats.KillsCount = ints[2];
+					stats.KillsValue = ints[3];
+					stats.LossesCount = ints[4];
+					stats.LossesValue = ints[5];
+					stats.MinuteKillsValue = ints[6];
+					stats.MinuteLossesValue = ints[7];
+					stats.DecayedScore = double.Parse(parts[1], CultureInfo.InvariantCulture);
+				}
+			}
+
+			var rolloverNode = data.FirstOrDefault(n => n.Key == "NextAdaptiveRolloverTick");
+			if (rolloverNode != null)
+				NextAdaptiveRolloverTick = FieldLoader.GetValue<int>("NextAdaptiveRolloverTick", rolloverNode.Value.Value);
+		}
+	}
+
+	// Cumulative built/kills/losses ledger for one actor type, owned by the player that built/lost/killed
+	// it. See AdaptiveWeighting.cs for the (pure, unit-tested) math that turns this into a build weight.
+	public class AdaptiveTypeStats
+	{
+		public int BuiltCount;
+		public int BuiltValue;
+
+		public int KillsCount;
+		public int KillsValue;
+
+		public int LossesCount;
+		public int LossesValue;
+
+		// Current adaptive-rollover window (see PlayerStatistics.NextAdaptiveRolloverTick); rolled into
+		// DecayedScore and reset by UnitBuilderBotModule's periodic check.
+		public int MinuteKillsValue;
+		public int MinuteLossesValue;
+
+		// Exponentially-decayed kills/losses value ratio, blended once per rollover window. Starts at 1
+		// ("break-even") so an untested type neither boosts nor suppresses its own authored weight.
+		public double DecayedScore = 1;
 	}
 
 	public class ArmyUnit
@@ -227,6 +310,14 @@ namespace OpenRA.Mods.Common.Traits
 
 			playerStats.DeathsCost += cost;
 
+			if (!self.Owner.NonCombatant)
+			{
+				var lossStats = playerStats.AdaptiveStats[actorName];
+				lossStats.LossesCount++;
+				lossStats.LossesValue += cost;
+				lossStats.MinuteLossesValue += cost;
+			}
+
 			if (e.Attacker == self)
 				return;
 
@@ -247,7 +338,14 @@ namespace OpenRA.Mods.Common.Traits
 			}
 
 			if (!self.Owner.NonCombatant)
+			{
 				attackerStats.KillsCost += cost;
+
+				var killStats = attackerStats.AdaptiveStats[e.Attacker.Info.Name];
+				killStats.KillsCount++;
+				killStats.KillsValue += cost;
+				killStats.MinuteKillsValue += cost;
+			}
 		}
 
 		void INotifyCreated.Created(Actor self)
@@ -262,6 +360,10 @@ namespace OpenRA.Mods.Common.Traits
 			includedInAssetsValue = info.AddToAssetsValue;
 			if (includedInAssetsValue)
 				playerStats.AssetsValue += cost;
+
+			var builtStats = playerStats.AdaptiveStats[actorName];
+			builtStats.BuiltCount++;
+			builtStats.BuiltValue += cost;
 		}
 
 		void INotifyOwnerChanged.OnOwnerChanged(Actor self, Player oldOwner, Player newOwner)

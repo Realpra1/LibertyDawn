@@ -132,6 +132,18 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Defensive building types the AI puts a wall in front of. Usually its towers.")]
 		public readonly HashSet<string> WalledDefenseTypes = new HashSet<string>();
 
+		[Desc("Defensive building types whose BuildingFractions ceiling adapts based on their measured kills-value/losses-value ratio",
+			"(see AdaptiveWeighting). proc/nuke/silo/production buildings are already priority-overridden earlier in",
+			"ChooseBuildingToBuild and must never be listed here - adaptation would fight that logic.")]
+		public readonly HashSet<string> AdaptiveBuildingTypes = new HashSet<string>();
+
+		[Desc("Combat samples (kills+losses) an adaptive defense type needs before its decayed score is fully trusted.")]
+		public readonly int AdaptiveConfidenceSamples = 10;
+
+		[Desc("Minimum/maximum share (0-1) of the base an adaptive defense type's ceiling may be nudged to.")]
+		public readonly float AdaptiveWeightFloor = 0.01f;
+		public readonly float AdaptiveWeightCeiling = 0.5f;
+
 		[Desc("How many cells in front of a tower, on its enemy facing side, its wall is placed.")]
 		public readonly int WallDistanceFromTower = 3;
 

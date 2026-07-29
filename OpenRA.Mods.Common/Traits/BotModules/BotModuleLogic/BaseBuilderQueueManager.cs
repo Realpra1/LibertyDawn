@@ -25,6 +25,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly Player player;
 		readonly PowerManager playerPower;
 		readonly PlayerResources playerResources;
+		readonly PlayerStatistics playerStats;
 		readonly IResourceLayer resourceLayer;
 
 		int waitTicks;
@@ -47,6 +48,7 @@ namespace OpenRA.Mods.Common.Traits
 			player = p;
 			playerPower = pm;
 			playerResources = pr;
+			playerStats = p.PlayerActor.Trait<PlayerStatistics>();
 			resourceLayer = rl;
 			this.category = category;
 			failRetryTicks = baseBuilder.Info.StructureProductionResumeDelay;
@@ -360,9 +362,11 @@ namespace OpenRA.Mods.Common.Traits
 					&& !baseBuilder.WallPlanner.WantsToBuildWall(name, playerBuildings))
 					continue;
 
-				// Do we want to build this structure?
+				// Do we want to build this structure? Adaptive defense types get their authored ceiling
+				// nudged by measured kills-value/losses-value performance instead of using it as-is.
 				var count = playerBuildings.Count(a => a.Info.Name == name);
-				if (count * 100 > (frac.Value + totalLimitedFrac) * playerBuildings.Length)
+				var fractionValue = baseBuilder.Info.AdaptiveBuildingTypes.Contains(name) ? AdaptiveFraction(name, frac.Value) : frac.Value;
+				if (count * 100 > (fractionValue + totalLimitedFrac) * playerBuildings.Length)
 					continue;
 
 				// If we're considering to build a naval structure, check whether there is enough water inside the base perimeter
@@ -398,6 +402,22 @@ namespace OpenRA.Mods.Common.Traits
 			// Too spammy to keep enabled all the time, but very useful when debugging specific issues.
 			// AIUtils.BotDebug("{0} couldn't decide what to build for queue {1}.", queue.Actor.Owner, queue.Info.Group);
 			return null;
+		}
+
+		// BuildingFractions is already a percentage ceiling, so the adaptive floor/ceiling (Q6: "1%/50%")
+		// applies directly to it - no need for the probability-share normalization UnitBuilderBotModule
+		// uses, since that model doesn't fit this ceiling-and-shuffle selection at all.
+		int AdaptiveFraction(string name, int authoredFraction)
+		{
+			var stats = playerStats.AdaptiveStats[name];
+			var confidence = AdaptiveWeighting.Confidence(stats.KillsCount + stats.LossesCount, baseBuilder.Info.AdaptiveConfidenceSamples);
+			var adapted = AdaptiveWeighting.AdaptedWeight(authoredFraction, stats.DecayedScore, confidence);
+
+			var floor = baseBuilder.Info.AdaptiveWeightFloor * 100;
+			var ceiling = baseBuilder.Info.AdaptiveWeightCeiling * 100;
+			adapted = Math.Clamp(adapted, floor, ceiling);
+
+			return (int)Math.Round(adapted);
 		}
 
 		CPos? ChooseBuildLocation(string actorType, bool distanceToBaseIsImportant, BuildingType type)

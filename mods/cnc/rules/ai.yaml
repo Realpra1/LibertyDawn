@@ -808,6 +808,7 @@ Player:
 		SiloTypes: silo
 		WallTypes: brik
 		WalledDefenseTypes: gtwr, gun, atwr, obli, sam
+		AdaptiveBuildingTypes: gtwr, gun, atwr, obli, sam
 		WallDistanceFromTower: 3
 		MaximumWallSegments: 150
 		WallPathCheckLocomotor: wheeled
@@ -898,6 +899,9 @@ Player:
 		RequiresCondition: enable-skynet-ai
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
         IdleBaseUnitsMaximum: 999
+		WeightedUnitSelection: true
+		AdaptiveTypes: e1, e2, e3, e4, e5, rmbo, ltnk, ftnk, ctnk, arty, mtnk, msam, stnk, apc, bggy, bike, jeep, htnk, heli, orca
+		EconomyTypes: harv
 		UnitsToBuild:
 			e1: 65
 			e2: 25
@@ -908,7 +912,7 @@ Player:
 			harv: 100
 			ltnk: 10
 			ftnk: 10
-            ctnk: 0
+			ctnk: 10
 			arty: 28
 			mtnk: 1
 			msam: 30
@@ -917,12 +921,12 @@ Player:
 			bggy: 1
 			bike: 1
             jeep: 5
-			mlrs: 0
+			mlrs: 10
 			htnk: 9
 			heli: 8
 			orca: 12
             mhq: 10
-            mcv: 0
+            mcv: 10
             upgrade.recon1: 1
             upgrade.recon2: 1
             upgrade.recon3: 1
