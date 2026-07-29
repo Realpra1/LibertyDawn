@@ -63,7 +63,10 @@ jobs:
 
   macos:
     name: macOS Disk Image
-    runs-on: macos-11
+    # macos-11 was removed from GitHub's hosted runner images; this job could never be
+    # scheduled. macos-latest tracks whatever GitHub currently supports instead of pinning
+    # a version that will eventually be deprecated the same way.
+    runs-on: macos-latest
     steps:
       - name: Clone Repository
         uses: actions/checkout@v3
