@@ -3,127 +3,166 @@ name: Release Packaging
 on:
   push:
     tags:
-    - 'release-*'
-    - 'playtest-*'
-    - 'devtest-*'
+      - 'release-*'
+      - 'playtest-*'
+      - 'devtest-*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: package-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  GIT_TAG: ${{ github.ref_name }}
 
 jobs:
+  create-release:
+    name: Create Draft Release
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Create Release If Missing
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if gh release view "${GIT_TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            echo "Release ${GIT_TAG} already exists."
+            exit 0
+          fi
+
+          PRERELEASE_FLAG=""
+          if [[ "${GIT_TAG}" == playtest-* || "${GIT_TAG}" == devtest-* ]]; then
+            PRERELEASE_FLAG="--prerelease"
+          fi
+
+          gh release create "${GIT_TAG}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "${GIT_TAG}" \
+            --draft \
+            ${PRERELEASE_FLAG}
+
   source:
     name: Source Tarball
-    runs-on: ubuntu-20.04
+    needs: create-release
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+
     steps:
       - name: Clone Repository
-        uses: actions/checkout@v2
-
-      - name: Prepare Environment
-        run: echo "GIT_TAG=${GITHUB_REF#refs/tags/}" >> ${GITHUB_ENV}
+        uses: actions/checkout@v7
 
       - name: Package Source
         run: |
+          set -euo pipefail
           mkdir -p build/source
           ./packaging/source/buildpackage.sh "${GIT_TAG}" "${PWD}/build/source"
 
       - name: Upload Packages
-        uses: svenstaro/upload-release-action@v2
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ github.ref }}
-          overwrite: true
-          file_glob: true
-          file: build/source/*
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: gh release upload "${GIT_TAG}" build/source/* --clobber
 
   linux:
     name: Linux AppImages
-    runs-on: ubuntu-20.04
+    needs: create-release
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+
     steps:
       - name: Clone Repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v7
 
       - name: Install .NET 6.0
-        uses: actions/setup-dotnet@v1
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '6.0.x'
 
-      - name: Prepare Environment
-        run: echo "GIT_TAG=${GITHUB_REF#refs/tags/}" >> ${GITHUB_ENV}
+      - name: Install Packaging Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y desktop-file-utils
 
       - name: Package AppImages
         run: |
+          set -euo pipefail
           mkdir -p build/linux
           ./packaging/linux/buildpackage.sh "${GIT_TAG}" "${PWD}/build/linux"
 
       - name: Upload Packages
-        uses: svenstaro/upload-release-action@v2
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ github.ref }}
-          overwrite: true
-          file_glob: true
-          file: build/linux/*
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: gh release upload "${GIT_TAG}" build/linux/* --clobber
 
   macos:
     name: macOS Disk Image
-    runs-on: macos-11
+    needs: create-release
+    runs-on: macos-15-intel
+    timeout-minutes: 60
+
     steps:
       - name: Clone Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
 
       - name: Install .NET 6.0
-        uses: actions/setup-dotnet@v3
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '6.0.x'
-
-      - name: Prepare Environment
-        run: echo "GIT_TAG=${GITHUB_REF#refs/tags/}" >> ${GITHUB_ENV}
 
       - name: Package Disk Image
         env:
           MACOS_DEVELOPER_IDENTITY: ${{ secrets.MACOS_DEVELOPER_IDENTITY }}
+          MACOS_DEVELOPER_TEAM_ID: ${{ secrets.MACOS_DEVELOPER_TEAM_ID }}
           MACOS_DEVELOPER_CERTIFICATE_BASE64: ${{ secrets.MACOS_DEVELOPER_CERTIFICATE_BASE64 }}
           MACOS_DEVELOPER_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_DEVELOPER_CERTIFICATE_PASSWORD }}
           MACOS_DEVELOPER_USERNAME: ${{ secrets.MACOS_DEVELOPER_USERNAME }}
           MACOS_DEVELOPER_PASSWORD: ${{ secrets.MACOS_DEVELOPER_PASSWORD }}
         run: |
+          set -euo pipefail
           mkdir -p build/macos
           ./packaging/macos/buildpackage.sh "${GIT_TAG}" "${PWD}/build/macos"
 
       - name: Upload Package
-        uses: svenstaro/upload-release-action@v2
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ github.ref }}
-          overwrite: true
-          file_glob: true
-          file: build/macos/*
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: gh release upload "${GIT_TAG}" build/macos/* --clobber
 
   windows:
     name: Windows Installers
-    runs-on: ubuntu-20.04
+    needs: create-release
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+
     steps:
       - name: Clone Repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v7
 
       - name: Install .NET 6.0
-        uses: actions/setup-dotnet@v1
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '6.0.x'
 
-      - name: Prepare Environment
+      - name: Install Packaging Dependencies
         run: |
-          echo "GIT_TAG=${GITHUB_REF#refs/tags/}" >> ${GITHUB_ENV}
           sudo apt-get update
-          sudo apt-get install nsis wine64
+          sudo apt-get install -y nsis wine64
 
       - name: Package Installers
         run: |
+          set -euo pipefail
           mkdir -p build/windows
           ./packaging/windows/buildpackage.sh "${GIT_TAG}" "${PWD}/build/windows"
 
       - name: Upload Packages
-        uses: svenstaro/upload-release-action@v2
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ github.ref }}
-          overwrite: true
-          file_glob: true
-          file: build/windows/*
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: gh release upload "${GIT_TAG}" build/windows/* --clobber
