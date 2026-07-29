@@ -806,6 +806,12 @@ Player:
 		VehiclesFactoryTypes: weap,afld
 		ProductionTypes: pyle,hand,weap,afld,hpad,hq
 		SiloTypes: silo
+		WallTypes: brik
+		WalledDefenseTypes: gtwr, gun, atwr, obli, sam
+		AdaptiveBuildingTypes: gtwr, gun, atwr, obli, sam
+		WallDistanceFromTower: 3
+		MaximumWallSegments: 150
+		WallPathCheckLocomotor: wheeled
 		BuildingLimits:
             proc: 25
 			pyle: 3
@@ -818,11 +824,12 @@ Player:
 			tmpl: 1
 			fix: 1
 			silo: 1
-			gtwr: 1
-            gun: 1
+			gtwr: 25
+			gun: 25
 			atwr: 40
 			obli: 4
 			sam: 2
+			brik: 60
         BuildingDelays:
             proc: 0
 			pyle: 2000
@@ -841,6 +848,7 @@ Player:
 			silo: 2000
             resonator: 7200
 			hpad: 2000
+			brik: 6000
 		BuildingFractions:
 			proc: 30
 			pyle: 10
@@ -848,8 +856,8 @@ Player:
 			hq: 1
 			weap: 56
 			afld: 56
-			gtwr: 1
-			gun: 1
+			gtwr: 20
+			gun: 20
 			atwr: 50
 			obli: 1
 			sam: 1
@@ -857,6 +865,7 @@ Player:
 			tmpl: 1
 			fix: 1
 			hpad: 10
+			brik: 25
     SquadManagerBotModule@skynet:
 		RequiresCondition: enable-skynet-ai
 		SquadSize: 10
@@ -864,10 +873,35 @@ Player:
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
+		AirTargetHarvesterValue: 1000
+		AirTargetUnitValue: 450
+		AirTargetProductionValue: 300
+		AirTargetBuildingValue: 100
+		AirTargetDefencelessBonus: 250
+		AirTargetAntiAirPenalty: 700
+		AirTargetDistancePenalty: 3
+		AirTargetMinimumScore: 200
+		AirTargetScanSamples: 24
+		AirSafetyCheckInterval: 10
+		AirThreatScanRadius: 16
+		AirThreatFleeMultiplier: 8
+		AirThreatMemoryTicks: 300
+		AirThreatMemorySize: 12
+		AirThreatMemoryMergeRadius: 3
+		AirRetreatOrderInterval: 50
+		AirRouteThreatPenalty: 200
+		AirRouteThreatRadius: 8
+		AirSquadSize: 5
+		MaximumAirSquads: 2
+		AirEvadeDistance: 12
+		AirEvadeJitter: 5
 	UnitBuilderBotModule@skynet:
 		RequiresCondition: enable-skynet-ai
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
         IdleBaseUnitsMaximum: 999
+		WeightedUnitSelection: true
+		AdaptiveTypes: e1, e2, e3, e4, e5, rmbo, ltnk, ftnk, ctnk, arty, mtnk, msam, stnk, apc, bggy, bike, jeep, htnk, heli, orca
+		EconomyTypes: harv
 		UnitsToBuild:
 			e1: 65
 			e2: 25
@@ -878,7 +912,7 @@ Player:
 			harv: 100
 			ltnk: 10
 			ftnk: 10
-            ctnk: 0
+			ctnk: 10
 			arty: 28
 			mtnk: 1
 			msam: 30
@@ -887,12 +921,12 @@ Player:
 			bggy: 1
 			bike: 1
             jeep: 5
-			mlrs: 0
+			mlrs: 10
 			htnk: 9
 			heli: 8
 			orca: 12
             mhq: 10
-            mcv: 0
+            mcv: 10
             upgrade.recon1: 1
             upgrade.recon2: 1
             upgrade.recon3: 1

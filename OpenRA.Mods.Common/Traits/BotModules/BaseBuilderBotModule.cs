@@ -125,6 +125,35 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Terrain types which are considered water for base building purposes.")]
 		public readonly HashSet<string> WaterTerrainTypes = new HashSet<string> { "Water" };
 
+		[Desc("Building types that are placed as walls using line building instead of being dropped",
+			"on a free cell somewhere in the base. Leave empty to disable wall building.")]
+		public readonly HashSet<string> WallTypes = new HashSet<string>();
+
+		[Desc("Defensive building types the AI puts a wall in front of. Usually its towers.")]
+		public readonly HashSet<string> WalledDefenseTypes = new HashSet<string>();
+
+		[Desc("Defensive building types whose BuildingFractions ceiling adapts based on their measured kills-value/losses-value ratio",
+			"(see AdaptiveWeighting). proc/nuke/silo/production buildings are already priority-overridden earlier in",
+			"ChooseBuildingToBuild and must never be listed here - adaptation would fight that logic.")]
+		public readonly HashSet<string> AdaptiveBuildingTypes = new HashSet<string>();
+
+		[Desc("Combat samples (kills+losses) an adaptive defense type needs before its decayed score is fully trusted.")]
+		public readonly int AdaptiveConfidenceSamples = 10;
+
+		[Desc("Minimum/maximum share (0-1) of the base an adaptive defense type's ceiling may be nudged to.")]
+		public readonly float AdaptiveWeightFloor = 0.01f;
+		public readonly float AdaptiveWeightCeiling = 0.5f;
+
+		[Desc("How many cells in front of a tower, on its enemy facing side, its wall is placed.")]
+		public readonly int WallDistanceFromTower = 3;
+
+		[Desc("Hard cap on the number of wall actors the AI will own. Zero disables wall building,",
+			"which is the default so other mods and bots are unaffected.")]
+		public readonly int MaximumWallSegments = 0;
+
+		[Desc("Name of the locomotor used to verify the AI can still move around after walling.")]
+		public readonly string WallPathCheckLocomotor = "wheeled";
+
 		[Desc("What buildings to the AI should build.", "What integer percentage of the total base must be this type of building.")]
 		public readonly Dictionary<string, int> BuildingFractions = null;
 
@@ -151,6 +180,8 @@ namespace OpenRA.Mods.Common.Traits
 
 		public CPos DefenseCenter => defenseCenter;
 
+		internal BaseBuilderWallPlanner WallPlanner { get; private set; }
+
 		readonly World world;
 		readonly Player player;
 		PowerManager playerPower;
@@ -175,6 +206,7 @@ namespace OpenRA.Mods.Common.Traits
 			playerResources = self.Owner.PlayerActor.Trait<PlayerResources>();
 			resourceLayer = self.World.WorldActor.TraitOrDefault<IResourceLayer>();
 			positionsUpdatedModules = self.Owner.PlayerActor.TraitsImplementing<IBotPositionsUpdated>().ToArray();
+			WallPlanner = new BaseBuilderWallPlanner(this, player);
 		}
 
 		protected override void TraitEnabled(Actor self)

@@ -25,6 +25,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly Player player;
 		readonly PowerManager playerPower;
 		readonly PlayerResources playerResources;
+		readonly PlayerStatistics playerStats;
 		readonly IResourceLayer resourceLayer;
 
 		int waitTicks;
@@ -47,12 +48,21 @@ namespace OpenRA.Mods.Common.Traits
 			player = p;
 			playerPower = pm;
 			playerResources = pr;
+			playerStats = p.PlayerActor.Trait<PlayerStatistics>();
 			resourceLayer = rl;
 			this.category = category;
 			failRetryTicks = baseBuilder.Info.StructureProductionResumeDelay;
 			minimumExcessPower = baseBuilder.Info.MinimumExcessPower;
 			if (!baseBuilder.Info.NavalProductionTypes.Any())
 				waterState = WaterCheck.DontCheck;
+		}
+
+		// BotDebug is read by humans watching a match, so trade the exact yaml key for something
+		// legible: "Guard Tower (gtwr)" instead of just "gtwr".
+		string DisplayName(string type)
+		{
+			var tooltip = world.Map.Rules.Actors[type].TraitInfoOrDefault<TooltipInfo>();
+			return !string.IsNullOrEmpty(tooltip?.Name) ? $"{tooltip.Name} ({type})" : type;
 		}
 
 		public void Tick(IBot bot)
@@ -152,6 +162,13 @@ namespace OpenRA.Mods.Common.Traits
 						location = possibleBuilding.Actor.Location + possibleBuilding.Trait.Info.Offset;
 					}
 				}
+				else if (baseBuilder.WallPlanner != null && baseBuilder.WallPlanner.IsWallType(actorInfo.Name))
+				{
+					// Walls are laid out in lines by the wall planner rather than dropped on some
+					// free cell in the base like an ordinary building.
+					orderString = "LineBuild";
+					location = baseBuilder.WallPlanner.TakeWallCell(actorInfo.Name);
+				}
 				else
 				{
 					// Check if Building is a defense and if we should place it towards the enemy or not.
@@ -167,7 +184,7 @@ namespace OpenRA.Mods.Common.Traits
 
 				if (location == null)
 				{
-					AIUtils.BotDebug($"{player} has nowhere to place {currentBuilding.Item}");
+					AIUtils.BotDebug($"{player} has nowhere to place {DisplayName(currentBuilding.Item)}");
 					bot.QueueOrder(Order.CancelProduction(queue.Actor, currentBuilding.Item, 1));
 					failCount += failCount;
 
@@ -238,7 +255,7 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				if (power != null && power.TraitInfos<PowerInfo>().Where(i => i.EnabledByDefault).Sum(p => p.Amount) > 0)
 				{
-					AIUtils.BotDebug("{0} decided to build {1}: Priority override (low power)", queue.Actor.Owner, power.Name);
+					AIUtils.BotDebug("{0} decided to build {1}: Priority override (low power)", queue.Actor.Owner, DisplayName(power.Name));
 					return power;
 				}
 			}
@@ -249,13 +266,13 @@ namespace OpenRA.Mods.Common.Traits
 				var refinery = GetProducibleBuilding(baseBuilder.Info.RefineryTypes, buildableThings);
 				if (refinery != null && HasSufficientPowerForActor(refinery))
 				{
-					AIUtils.BotDebug("{0} decided to build {1}: Priority override (refinery)", queue.Actor.Owner, refinery.Name);
+					AIUtils.BotDebug("{0} decided to build {1}: Priority override (refinery)", queue.Actor.Owner, DisplayName(refinery.Name));
 					return refinery;
 				}
 
 				if (power != null && refinery != null && !HasSufficientPowerForActor(refinery))
 				{
-					AIUtils.BotDebug("{0} decided to build {1}: Priority override (would be low power)", queue.Actor.Owner, power.Name);
+					AIUtils.BotDebug("{0} decided to build {1}: Priority override (would be low power)", queue.Actor.Owner, DisplayName(power.Name));
 					return power;
 				}
 			}
@@ -266,13 +283,13 @@ namespace OpenRA.Mods.Common.Traits
 				var production = GetProducibleBuilding(baseBuilder.Info.ProductionTypes, buildableThings);
 				if (production != null && HasSufficientPowerForActor(production))
 				{
-					AIUtils.BotDebug("{0} decided to build {1}: Priority override (production)", queue.Actor.Owner, production.Name);
+					AIUtils.BotDebug("{0} decided to build {1}: Priority override (production)", queue.Actor.Owner, DisplayName(production.Name));
 					return production;
 				}
 
 				if (power != null && production != null && !HasSufficientPowerForActor(production))
 				{
-					AIUtils.BotDebug("{0} decided to build {1}: Priority override (would be low power)", queue.Actor.Owner, power.Name);
+					AIUtils.BotDebug("{0} decided to build {1}: Priority override (would be low power)", queue.Actor.Owner, DisplayName(power.Name));
 					return power;
 				}
 			}
@@ -285,13 +302,13 @@ namespace OpenRA.Mods.Common.Traits
 				var navalproduction = GetProducibleBuilding(baseBuilder.Info.NavalProductionTypes, buildableThings);
 				if (navalproduction != null && HasSufficientPowerForActor(navalproduction))
 				{
-					AIUtils.BotDebug("{0} decided to build {1}: Priority override (navalproduction)", queue.Actor.Owner, navalproduction.Name);
+					AIUtils.BotDebug("{0} decided to build {1}: Priority override (navalproduction)", queue.Actor.Owner, DisplayName(navalproduction.Name));
 					return navalproduction;
 				}
 
 				if (power != null && navalproduction != null && !HasSufficientPowerForActor(navalproduction))
 				{
-					AIUtils.BotDebug("{0} decided to build {1}: Priority override (would be low power)", queue.Actor.Owner, power.Name);
+					AIUtils.BotDebug("{0} decided to build {1}: Priority override (would be low power)", queue.Actor.Owner, DisplayName(power.Name));
 					return power;
 				}
 			}
@@ -302,13 +319,13 @@ namespace OpenRA.Mods.Common.Traits
 				var silo = GetProducibleBuilding(baseBuilder.Info.SiloTypes, buildableThings);
 				if (silo != null && HasSufficientPowerForActor(silo))
 				{
-					AIUtils.BotDebug("{0} decided to build {1}: Priority override (silo)", queue.Actor.Owner, silo.Name);
+					AIUtils.BotDebug("{0} decided to build {1}: Priority override (silo)", queue.Actor.Owner, DisplayName(silo.Name));
 					return silo;
 				}
 
 				if (power != null && silo != null && !HasSufficientPowerForActor(silo))
 				{
-					AIUtils.BotDebug("{0} decided to build {1}: Priority override (would be low power)", queue.Actor.Owner, power.Name);
+					AIUtils.BotDebug("{0} decided to build {1}: Priority override (would be low power)", queue.Actor.Owner, DisplayName(power.Name));
 					return power;
 				}
 			}
@@ -347,9 +364,17 @@ namespace OpenRA.Mods.Common.Traits
 				if (!buildableThings.Any(b => b.Name == name))
 					continue;
 
-				// Do we want to build this structure?
+				// Walls are only worth queueing if the planner has a line ready for them, and only
+				// until we hit the segment cap. Everything about where they go is decided there.
+				if (baseBuilder.WallPlanner != null && baseBuilder.WallPlanner.IsWallType(name)
+					&& !baseBuilder.WallPlanner.WantsToBuildWall(name, playerBuildings))
+					continue;
+
+				// Do we want to build this structure? Adaptive defense types get their authored ceiling
+				// nudged by measured kills-value/losses-value performance instead of using it as-is.
 				var count = playerBuildings.Count(a => a.Info.Name == name);
-				if (count * 100 > (frac.Value + totalLimitedFrac) * playerBuildings.Length)
+				var fractionValue = baseBuilder.Info.AdaptiveBuildingTypes.Contains(name) ? AdaptiveFraction(name, frac.Value) : frac.Value;
+				if (count * 100 > (fractionValue + totalLimitedFrac) * playerBuildings.Length)
 					continue;
 
 				// If we're considering to build a naval structure, check whether there is enough water inside the base perimeter
@@ -368,9 +393,9 @@ namespace OpenRA.Mods.Common.Traits
 					if (power != null && power.TraitInfos<PowerInfo>().Where(i => i.EnabledByDefault).Sum(pi => pi.Amount) > 0)
 					{
 						if (playerPower.PowerOutageRemainingTicks > 0)
-							AIUtils.BotDebug("{0} decided to build {1}: Priority override (is low power)", queue.Actor.Owner, power.Name);
+							AIUtils.BotDebug("{0} decided to build {1}: Priority override (is low power)", queue.Actor.Owner, DisplayName(power.Name));
 						else
-							AIUtils.BotDebug("{0} decided to build {1}: Priority override (would be low power)", queue.Actor.Owner, power.Name);
+							AIUtils.BotDebug("{0} decided to build {1}: Priority override (would be low power)", queue.Actor.Owner, DisplayName(power.Name));
 
 						return power;
 					}
@@ -378,13 +403,29 @@ namespace OpenRA.Mods.Common.Traits
 
 				// Lets build this
 				AIUtils.BotDebug("{0} decided to build {1}: Desired is {2} ({3} / {4}); current is {5} / {4}",
-					queue.Actor.Owner, name, frac.Value, frac.Value * playerBuildings.Length, playerBuildings.Length, count);
+					queue.Actor.Owner, DisplayName(name), frac.Value, frac.Value * playerBuildings.Length, playerBuildings.Length, count);
 				return actor;
 			}
 
 			// Too spammy to keep enabled all the time, but very useful when debugging specific issues.
 			// AIUtils.BotDebug("{0} couldn't decide what to build for queue {1}.", queue.Actor.Owner, queue.Info.Group);
 			return null;
+		}
+
+		// BuildingFractions is already a percentage ceiling, so the adaptive floor/ceiling (Q6: "1%/50%")
+		// applies directly to it - no need for the probability-share normalization UnitBuilderBotModule
+		// uses, since that model doesn't fit this ceiling-and-shuffle selection at all.
+		int AdaptiveFraction(string name, int authoredFraction)
+		{
+			var stats = playerStats.AdaptiveStats[name];
+			var confidence = AdaptiveWeighting.Confidence(stats.KillsCount + stats.LossesCount, baseBuilder.Info.AdaptiveConfidenceSamples);
+			var adapted = AdaptiveWeighting.AdaptedWeight(authoredFraction, stats.DecayedScore, confidence);
+
+			var floor = baseBuilder.Info.AdaptiveWeightFloor * 100;
+			var ceiling = baseBuilder.Info.AdaptiveWeightCeiling * 100;
+			adapted = Math.Clamp(adapted, floor, ceiling);
+
+			return (int)Math.Round(adapted);
 		}
 
 		CPos? ChooseBuildLocation(string actorType, bool distanceToBaseIsImportant, BuildingType type)

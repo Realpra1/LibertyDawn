@@ -196,3 +196,29 @@ APCGun.AA:
 			Light: 140
 	Warhead@2Eff: CreateEffect
 		Explosions: small_poof
+
+# The Sheep's wool-mounted machine gun. Anti-ground only -- the Sheep carries
+# SheepAA alongside it for anything in the air. Deliberately far above the
+# weight class its 50-credit price tag suggests; the players asked for this.
+SheepMG:
+	Inherits: ^HeavyMG
+	ReloadDelay: 12
+	Range: 8c0
+	Burst: 3
+	BurstDelays: 3
+	Report: mgun11.aud
+	ValidTargets: Ground, Water
+	Projectile: Bullet
+		Speed: 2c0
+	Warhead@1Dam: SpreadDamage
+		Spread: 256
+		Damage: 4000
+		ValidTargets: Ground, Water
+		Versus:
+			None: 100
+			Wood: 60
+			TiberiumWood: 60
+			Light: 100
+			Tiberium: 60
+			Heavy: 80
+		DamageTypes: Prone50Percent, TriggerProne, RippedApartDeath

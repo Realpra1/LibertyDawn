@@ -82,12 +82,130 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Enemy target types to never target.")]
 		public readonly BitSet<TargetableType> IgnoredEnemyTargetTypes = default(BitSet<TargetableType>);
 
+		[Desc("Air squads score every enemy actor they find and attack the highest scoring one.",
+			"Score awarded to an enemy harvester. Harvesters are the softest worthwhile target,",
+			"so this should normally be the highest of the AirTarget*Value fields.")]
+		public readonly int AirTargetHarvesterValue = 500;
+
+		[Desc("Score awarded to an enemy production building or refinery.")]
+		public readonly int AirTargetProductionValue = 350;
+
+		[Desc("Score awarded to any other enemy building.")]
+		public readonly int AirTargetBuildingValue = 150;
+
+		[Desc("Score awarded to an enemy mobile unit.")]
+		public readonly int AirTargetUnitValue = 100;
+
+		[Desc("Score deducted per enemy anti-air capable actor sharing a scanned area (DangerScanRadius) with a candidate target.",
+			"Raise this to make air squads more scared of SAM sites and mobile AA.")]
+		public readonly int AirTargetAntiAirPenalty = 300;
+
+		[Desc("Score deducted per cell of distance between the air squad and a candidate target.")]
+		public readonly int AirTargetDistancePenalty = 1;
+
+		[Desc("Minimum score a candidate must reach before an air squad commits to attacking it.",
+			"Candidates scoring below this are ignored and the squad stays idle.")]
+		public readonly int AirTargetMinimumScore = 1;
+
+		[Desc("Number of map grid cells sampled per air target scan. Bounds the cost of the scan",
+			"independently of map size; lowering it trades responsiveness for CPU time on large maps.")]
+		public readonly int AirTargetScanSamples = 24;
+
+		[Desc("Extra score for a candidate that has no weapon able to shoot at aircraft.",
+			"Aircraft do poor damage to structures, so this is what makes an undefended harvester or tank",
+			"outrank a building rather than merely score near it. Zero keeps the stock behaviour.")]
+		public readonly int AirTargetDefencelessBonus = 0;
+
+		[Desc("Delay (in ticks) between anti-air safety checks for air squads. Unlike target scoring this",
+			"runs regardless of squad state, so aircraft keep watching for anti-air while approaching a",
+			"target, while attacking it and on the way home. Zero disables it and restores the stock",
+			"behaviour of only checking when a target is selected.")]
+		public readonly int AirSafetyCheckInterval = 0;
+
+		[Desc("Radius in cells around an air squad that is scanned for anti-air by the safety check.")]
+		public readonly int AirThreatScanRadius = 12;
+
+		[Desc("An air squad retreats when the number of anti-air actors near it, multiplied by this,",
+			"exceeds the number of aircraft in the squad. Higher values make air squads more cowardly.")]
+		public readonly int AirThreatFleeMultiplier = 3;
+
+		[Desc("How long (in ticks) an air squad remembers where it saw enemy anti-air.")]
+		public readonly int AirThreatMemoryTicks = 900;
+
+		[Desc("Maximum number of remembered anti-air sightings per air squad.")]
+		public readonly int AirThreatMemorySize = 12;
+
+		[Desc("Anti-air sightings closer together than this many cells are merged into one remembered",
+			"threat, so a cluster of SAM sites cannot flood the memory.")]
+		public readonly int AirThreatMemoryMergeRadius = 3;
+
+		[Desc("Minimum delay (in ticks) between successive retreat orders for the same air squad.")]
+		public readonly int AirRetreatOrderInterval = 50;
+
+		[Desc("Score deducted per known anti-air position within AirRouteThreatRadius of the straight line",
+			"an air squad would fly to reach a candidate target. This is what stops squads picking a soft",
+			"target on the far side of a SAM belt. Zero disables route scoring.")]
+		public readonly int AirRouteThreatPenalty = 0;
+
+		[Desc("Half-width in cells of the flight corridor checked for anti-air by AirRouteThreatPenalty.")]
+		public readonly int AirRouteThreatRadius = 8;
+
+		[Desc("Maximum number of aircraft in one air squad. Air squads are a harassment force, not the main",
+			"push, so they want to be small. Aircraft beyond the cap join another air squad if one has room",
+			"and MaximumAirSquads allows it, otherwise they wait at base until a slot frees up.",
+			"Zero means unlimited, which is the stock behaviour.")]
+		public readonly int AirSquadSize = 0;
+
+		[Desc("Maximum number of air squads that may exist at once. Zero means unlimited.",
+			"Each air squad costs its own target scan and anti-air safety check, so this is the knob that",
+			"bounds the CPU cost of air behaviour regardless of how many aircraft the bot builds.")]
+		public readonly int MaximumAirSquads = 0;
+
+		[Desc("Distance in cells an air squad hops away from the nearest anti-air it knows about when it",
+			"breaks off a run. Small values keep harassment local - the squad slips out, re-scans and comes",
+			"straight back in, instead of flying across the map to one of its own buildings.",
+			"Zero restores the stock behaviour of retreating to an own building.")]
+		public readonly int AirEvadeDistance = 0;
+
+		[Desc("Random lateral spread in cells added to every evasion hop, so successive hops work their way",
+			"around the outside of an enemy base instead of shuttling along the same line. It is also the",
+			"whole move when the squad has no remembered threat to run from and just wants to re-scan from",
+			"somewhere else. Zero disables the wander.")]
+		public readonly int AirEvadeJitter = 0;
+
 		public override void RulesetLoaded(Ruleset rules, ActorInfo ai)
 		{
 			base.RulesetLoaded(rules, ai);
 
 			if (DangerScanRadius <= 0)
 				throw new YamlException("DangerScanRadius must be greater than zero.");
+
+			if (AirTargetScanSamples <= 0)
+				throw new YamlException("AirTargetScanSamples must be greater than zero.");
+
+			if (AirSafetyCheckInterval > 0 && AirThreatScanRadius <= 0)
+				throw new YamlException("AirThreatScanRadius must be greater than zero when AirSafetyCheckInterval is set.");
+
+			if (AirThreatFleeMultiplier <= 0)
+				throw new YamlException("AirThreatFleeMultiplier must be greater than zero.");
+
+			if (AirThreatMemorySize < 0)
+				throw new YamlException("AirThreatMemorySize must not be negative.");
+
+			if (AirRouteThreatPenalty != 0 && AirRouteThreatRadius <= 0)
+				throw new YamlException("AirRouteThreatRadius must be greater than zero when AirRouteThreatPenalty is set.");
+
+			if (AirSquadSize < 0)
+				throw new YamlException("AirSquadSize must not be negative.");
+
+			if (MaximumAirSquads < 0)
+				throw new YamlException("MaximumAirSquads must not be negative.");
+
+			if (AirEvadeDistance < 0)
+				throw new YamlException("AirEvadeDistance must not be negative.");
+
+			if (AirEvadeJitter < 0)
+				throw new YamlException("AirEvadeJitter must not be negative.");
 		}
 
 		public override object Create(ActorInitializer init) { return new SquadManagerBotModule(init.Self, this); }
@@ -125,6 +243,7 @@ namespace OpenRA.Mods.Common.Traits
 		int assignRolesTicks;
 		int attackForceTicks;
 		int minAttackForceDelayTicks;
+		int airSafetyTicks;
 
 		public SquadManagerBotModule(Actor self, SquadManagerBotModuleInfo info)
 			: base(info)
@@ -176,6 +295,10 @@ namespace OpenRA.Mods.Common.Traits
 			assignRolesTicks = World.LocalRandom.Next(0, Info.AssignRolesInterval);
 			attackForceTicks = World.LocalRandom.Next(0, Info.AttackForceInterval);
 			minAttackForceDelayTicks = World.LocalRandom.Next(0, Info.MinimumAttackForceDelay);
+
+			// Spread the air safety checks of all the bots across the interval instead of spiking on one tick.
+			if (Info.AirSafetyCheckInterval > 0)
+				airSafetyTicks = World.LocalRandom.Next(0, Info.AirSafetyCheckInterval);
 		}
 
 		void IBotEnabled.BotEnabled(IBot bot)
@@ -212,6 +335,31 @@ namespace OpenRA.Mods.Common.Traits
 			return Squads.FirstOrDefault(s => s.Type == type);
 		}
 
+		/// <summary>
+		/// The air squad a newly built aircraft should join, honouring AirSquadSize and MaximumAirSquads.
+		/// Returns null when every air squad is full and no more are allowed - the caller then leaves the
+		/// aircraft unassigned, so it waits at base and is reconsidered on the next AssignRolesInterval.
+		/// Deterministic: Squads is an ordered list and is walked in order.
+		/// </summary>
+		Squad GetAirSquadWithRoom(IBot bot)
+		{
+			var squadCount = 0;
+			foreach (var s in Squads)
+			{
+				if (s.Type != SquadType.Air)
+					continue;
+
+				squadCount++;
+				if (Info.AirSquadSize <= 0 || s.Units.Count < Info.AirSquadSize)
+					return s;
+			}
+
+			if (Info.MaximumAirSquads > 0 && squadCount >= Info.MaximumAirSquads)
+				return null;
+
+			return RegisterNewSquad(bot, SquadType.Air);
+		}
+
 		Squad RegisterNewSquad(IBot bot, SquadType type, Actor target = null)
 		{
 			var ret = new Squad(bot, this, type, target);
@@ -241,6 +389,16 @@ namespace OpenRA.Mods.Common.Traits
 					s.Update();
 			}
 
+			// Air squads re-check the anti-air around themselves far more often than the state machine
+			// runs, so they can break off a run that has become lethal instead of dying on it.
+			// PERF: one bounded circle scan per air squad per interval, and there is at most one air squad.
+			if (Info.AirSafetyCheckInterval > 0 && --airSafetyTicks <= 0)
+			{
+				airSafetyTicks = Info.AirSafetyCheckInterval;
+				foreach (var s in Squads)
+					s.TickAirSafety();
+			}
+
 			if (--assignRolesTicks <= 0)
 			{
 				assignRolesTicks = Info.AssignRolesInterval;
@@ -265,9 +423,13 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				if (Info.AirUnitsTypes.Contains(a.Info.Name))
 				{
-					var air = GetSquadOfType(SquadType.Air);
+					var air = GetAirSquadWithRoom(bot);
+
+					// Every air squad is full and we may not start another. Leave the aircraft out of
+					// activeUnits so it stays at base and is picked up as soon as a slot frees up, rather
+					// than oversizing a harassment squad.
 					if (air == null)
-						air = RegisterNewSquad(bot, SquadType.Air);
+						continue;
 
 					air.Units.Add(a);
 				}

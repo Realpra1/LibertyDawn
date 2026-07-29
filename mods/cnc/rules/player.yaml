@@ -81,3 +81,12 @@ Player:
 	PlayerExperience:
 	GameSaveViewportManager:
 	PlayerRadarTerrain:
+	# The 25-Sheep Rule. Exactly twenty-five living sheep -- not twenty-four, not
+	# twenty-six -- reveal the entire map. Losing or building one switches it off
+	# again, and getting back to twenty-five switches it back on.
+	GrantConditionOnActorCount@SHEEP:
+		ActorTypes: sheep
+		Count: 25
+		Condition: exactly-25-sheep
+	RevealsMapOnCondition@SHEEP:
+		RequiresCondition: exactly-25-sheep
