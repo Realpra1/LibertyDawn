@@ -19,11 +19,12 @@ using OpenRA.Widgets;
 
 namespace OpenRA.Mods.Common.Widgets.Logic
 {
-	enum OpsGridTab { ConstructionYard, WarFactory, Barracks, Helipad }
+	enum OpsGridTab { ConstructionYard, Defense, WarFactory, Barracks, Helipad }
 
 	// Hidden (hotkey-only, no menu entry) per-instance production manager. Lets a player see and
-	// act on every Construction Yard / War Factory / Barracks / Helipad they own at once, instead
-	// of the stock production palette's one-queue-at-a-time view. No Sell - deliberately excluded.
+	// act on every Construction Yard / Defense structure / War Factory / Barracks / Helipad they
+	// own at once, instead of the stock production palette's one-queue-at-a-time view. No Sell -
+	// deliberately excluded.
 	[ChromeLogicArgsHotkeys("ToggleOpsGridKey")]
 	public class OpsGridLogic : ChromeLogic
 	{
@@ -32,9 +33,16 @@ namespace OpenRA.Mods.Common.Widgets.Logic
 		const int ColumnWidth = 84;
 		const int ColumnGap = 4;
 
+		// Semantic state colors, independent of the chrome skin's own accent - matches the
+		// idle/building/paused language from the approved mockup.
+		static readonly Color IdleColor = Color.FromArgb(87, 207, 152);
+		static readonly Color BuildingColor = Color.FromArgb(73, 172, 214);
+		static readonly Color PausedColor = Color.FromArgb(230, 163, 57);
+
 		static readonly Dictionary<OpsGridTab, string[]> TabGroups = new Dictionary<OpsGridTab, string[]>
 		{
-			{ OpsGridTab.ConstructionYard, new[] { "Building", "Defence" } },
+			{ OpsGridTab.ConstructionYard, new[] { "Building" } },
+			{ OpsGridTab.Defense, new[] { "Defence" } },
 			{ OpsGridTab.WarFactory, new[] { "Vehicle" } },
 			{ OpsGridTab.Barracks, new[] { "Infantry" } },
 			{ OpsGridTab.Helipad, new[] { "Aircraft" } },
@@ -43,6 +51,7 @@ namespace OpenRA.Mods.Common.Widgets.Logic
 		static readonly (OpsGridTab Tab, string Id)[] TabButtonIds =
 		{
 			(OpsGridTab.ConstructionYard, "TAB_CONYARD"),
+			(OpsGridTab.Defense, "TAB_DEFENSE"),
 			(OpsGridTab.WarFactory, "TAB_WARFACTORY"),
 			(OpsGridTab.Barracks, "TAB_BARRACKS"),
 			(OpsGridTab.Helipad, "TAB_HELIPAD"),
@@ -143,11 +152,14 @@ namespace OpenRA.Mods.Common.Widgets.Logic
 		// buildable set for a given tab is effectively static for the match's ruleset.
 		void RebuildColumns()
 		{
+			// Same sort key the stock production palette itself uses
+			// (ProductionPaletteWidget.cs: `AllItems().OrderBy(a => a.TraitInfo<BuildableInfo>().BuildPaletteOrder)`)
+			// so column order matches what the player already expects from the normal sidebar.
 			activeColumns = MatchingRows()
 				.SelectMany(r => r.Queues.SelectMany(q => q.AllItems()))
 				.GroupBy(a => a.Name)
 				.Select(g => g.First())
-				.OrderBy(a => DisplayName(a))
+				.OrderBy(a => a.TraitInfo<BuildableInfo>().BuildPaletteOrder)
 				.ToList();
 
 			columnHeaderRow.Children.Clear();
@@ -160,13 +172,27 @@ namespace OpenRA.Mods.Common.Widgets.Logic
 
 				var header = (LabelWidget)columnHeaderTemplate.Clone();
 				header.Visible = true;
+
+				// Clone() copies the template's IsVisible closure verbatim (Widget's copy ctor does
+				// `IsVisible = widget.IsVisible`), which still reads the TEMPLATE's own Visible field
+				// - so setting .Visible on the clone alone has no effect on what IsVisible() reports.
+				// Must rebind it to the clone itself.
+				header.IsVisible = () => header.Visible;
 				header.Bounds = new Rectangle(x, header.Bounds.Y, ColumnWidth, header.Bounds.Height);
-				var name = DisplayName(actor);
+
+				// Full names routinely exceed a single column's width (e.g. "Advanced
+				// Communications Center") and LabelWidget never clips its own text, so an
+				// un-truncated header bleeds into its neighbours. Truncating - rather than
+				// widening columns - keeps every tab's full column set on screen at once; this
+				// grid has no horizontal scroll, and 16+ columns already nearly fill the panel
+				// width at the current size.
+				var name = WidgetUtils.TruncateText(DisplayName(actor), ColumnWidth - 4, Game.Renderer.Fonts[header.Font]);
 				header.GetText = () => name;
 				columnHeaderRow.AddChild(header);
 
 				var bulkCell = (ContainerWidget)bulkCellTemplate.Clone();
 				bulkCell.Visible = true;
+				bulkCell.IsVisible = () => bulkCell.Visible;
 				bulkCell.Bounds = new Rectangle(x, bulkCell.Bounds.Y, ColumnWidth, bulkCell.Bounds.Height);
 				WireBulkCell(bulkCell, actor.Name);
 				bulkRow.AddChild(bulkCell);
@@ -234,13 +260,17 @@ namespace OpenRA.Mods.Common.Widgets.Logic
 
 				var statusLabel = clone.Get<LabelWidget>("ROW_STATUS");
 				if (isIdle)
+				{
 					statusLabel.GetText = () => "Idle";
+					statusLabel.GetColor = () => IdleColor;
+				}
 				else
 				{
 					var percent = current.TotalTime <= 1 ? 100 : 100 - 100 * current.RemainingTime / current.TotalTime;
 					var itemName = DisplayName(world.Map.Rules.Actors[current.Item]);
 					var pausedSuffix = current.Paused ? " (paused)" : "";
 					statusLabel.GetText = () => $"{itemName} {percent}%{pausedSuffix}";
+					statusLabel.GetColor = () => current.Paused ? PausedColor : BuildingColor;
 				}
 
 				var pauseButton = clone.Get<ButtonWidget>("ROW_PAUSE");
@@ -275,6 +305,7 @@ namespace OpenRA.Mods.Common.Widgets.Logic
 
 					var cell = (ButtonWidget)cellTemplate.Clone();
 					cell.Visible = true;
+					cell.IsVisible = () => cell.Visible;
 					cell.Bounds = new Rectangle(i * (ColumnWidth + ColumnGap), cell.Bounds.Y, ColumnWidth, cell.Bounds.Height);
 					cell.Highlighted = isCurrent;
 
