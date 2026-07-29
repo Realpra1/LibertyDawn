@@ -13,9 +13,8 @@
 #   MACOS_DEVELOPER_USERNAME: Email address for the developer account
 #   MACOS_DEVELOPER_PASSWORD: App-specific password for the developer account
 #
-set -e
 
-MONO_TAG="osx-launcher-20201222"
+set -o errexit -o pipefail
 
 if [ $# -ne "2" ]; then
 	echo "Usage: $(basename "$0") tag outputdir"
@@ -274,18 +273,13 @@ finalize_package() {
 }
 
 build_platform "standard" "build.dmg"
-build_platform "mono" "build-mono.dmg"
 
 if [ -n "${MACOS_DEVELOPER_CERTIFICATE_BASE64}" ] && [ -n "${MACOS_DEVELOPER_CERTIFICATE_PASSWORD}" ] && [ -n "${MACOS_DEVELOPER_IDENTITY}" ]; then
 	security delete-keychain build.keychain
 fi
 
-if [ -n "${MACOS_DEVELOPER_USERNAME}" ] && [ -n "${MACOS_DEVELOPER_PASSWORD}" ]; then
-	# Parallelize processing
-	(notarize_package "build.dmg") &
-	(notarize_package "build-mono.dmg") &
-	wait
+if [ -n "${MACOS_DEVELOPER_USERNAME}" ] && [ -n "${MACOS_DEVELOPER_PASSWORD}" ] && [ -n "${MACOS_DEVELOPER_IDENTITY}" ] && [ -n "${MACOS_DEVELOPER_TEAM_ID}" ]; then
+	notarize_package "build.dmg"
 fi
 
 finalize_package "standard" "build.dmg" "${OUTPUTDIR}/OpenRA-${TAG}.dmg"
-finalize_package "mono" "build-mono.dmg" "${OUTPUTDIR}/OpenRA-${TAG}-mono.dmg"
