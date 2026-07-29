@@ -1,3 +1,334 @@
+# LibertyDawn — Spam Fork
+
+**Handoff document.** Written at the end of session 1. If you are picking this up cold, read this
+file top to bottom before touching anything. The round-by-round working log is preserved verbatim
+in the Appendix at the bottom.
+
+**Goal:** a fork where we don't have to think. Play the economy branch (already fully unlocked from
+turn one), spam construction yards and units across a huge map, and fight a SkyNet AI competent
+enough to make that fun.
+
+**Status legend:** `TODO` · `IN PROGRESS` · `BLOCKED` · `DONE`
+
+---
+
+## 1. Where we are right now
+
+| | |
+|---|---|
+| Integration branch | **`spam-fork`** — everything is merged here |
+| Base branch | `bleed` (the untouched LibertyDawn fork) |
+| Commits ahead of `bleed` | 23 |
+| Diff vs `bleed` | 26 files, +3522 / −57 |
+| Build | `make all` → **0 errors** |
+| Rules lint | `./utility.sh cnc --check-yaml` → **exit 0** |
+| Tests | `dotnet test OpenRA.Test/OpenRA.Test.csproj` → **105 / 105 pass** |
+| Remote | **None.** Local git only. Nothing has ever been pushed. |
+| Working tree | Clean |
+
+Three rounds are complete. Round 4 (adaptive AI) is designed but not started.
+
+### Branches and worktrees
+
+```
+bleed                    untouched fork base
+└── spam-fork            integration branch — merge everything here
+    ├── ai/air-targeting  → worktree .worktrees/ld-air
+    ├── ai/walls          → worktree .worktrees/ld-walls
+    └── unit/sheep        → worktree .worktrees/ld-sheep
+```
+
+All three feature branches are **merged into `spam-fork` and level with it**. The worktrees still
+exist and are ready to reuse. `.worktrees/` and `vendor-libs/` are gitignored.
+
+### How to resume
+
+```bash
+cd /Users/larsholdgaard/Dev/Prototypes/LibertyDawnGayGame
+git checkout spam-fork
+
+# sync a worktree before handing it to an agent
+git -C .worktrees/ld-air merge --ff-only spam-fork
+
+# ... agent works, commits to its own branch ...
+
+git merge --no-edit ai/air-targeting
+make all && ./utility.sh cnc --check-yaml && dotnet test OpenRA.Test/OpenRA.Test.csproj
+```
+
+### Working method that has worked
+
+- One subagent per workstream, each in its own `git worktree`, all running concurrently.
+- Every agent must pass `make all`, `--check-yaml` and `dotnet test` before handing back.
+- Agents are told **not** to launch the GUI — the humans playtest after the merge.
+- Playtest → feedback → next round. Three rounds so far, each driven by a real playtest.
+- Agents are told to report honestly on what they could **not** verify. This has repeatedly caught
+  real problems, including two features that would have silently done nothing.
+
+---
+
+## 2. Ground rules — do not violate these
+
+| Rule | Detail |
+|---|---|
+| **Never touch the upgrade system** | No changes to `upgrade.*` / `downgrade.*` actors, nor to any `Prerequisites` line referencing them. The players sidestep it by playing econ, which starts fully unlocked. A hard boundary they set explicitly and repeated. |
+| **CNC only** | `mods/cnc/` plus shared engine code. `ra`, `ts`, `d2k`, `modcontent` are off limits. |
+| **Local git only** | No remote, no push, unless the players say otherwise. |
+| **TABS in yaml** | The repo is tab-indented. A previous author left ~843 space-indented lines. Do not add more. |
+| **Bot determinism** | Bot logic runs **host-only** (`OpenRA.Game/Player.cs:215`, `if (IsBot && Game.IsHost)`) inside `Sync.RunUnsynced`. Use `World.LocalRandom` / `Squad.Random`. **Never `World.SharedRandom`** — it advances the shared RNG on the host alone and *causes* the desync you were trying to avoid. Never `System.Random`, never `DateTime`, no unordered dictionary iteration. |
+| **Performance** | Test map is Empire Earth: **202×202, 36 spawns**. Anything added to a bot runs once per bot per tick, up to 36 times over. Throttle by tick interval, bound every scan by radius, reuse buffers. Always state the new cost. |
+| **Verify before blaming** | Several tempting "fork bugs" turned out to be upstream OpenRA (`failCount += failCount;`, the `configure-system-libraries.sh` early exit, `global mix database.dat`, the 100× HP scale). Diff against the fork point `74cced319c` (2022-01-29) before attributing anything. |
+
+---
+
+## 3. What we built (rounds 1–3)
+
+### Round 1 — foundations
+- **Sheep** created: 50 credits, unarmed scout, using the Funpark triceratops sprite (`tric.shp`)
+  remapped to player colour — already in base content, reads as a woolly animal at gameplay zoom,
+  and sits in the player-colour remap range.
+- **Air targeting**: scoring replaced first-match selection. Crucially killed the
+  `AirAttackState` → `FindClosestEnemy` fallback, an unbounded scan with no danger check that sent
+  every air squad into the enemy's defended base the moment its target died.
+- **Walls**: SkyNet learned to build `brik` at all. `gtwr`/`gun` limits raised 1 → 25.
+
+### Round 2 — after playtest 1
+- **Sheep armed** (players explicitly overruled "not game-breaking"): `SheepMG` + `SheepAA`
+  simultaneously, still 50 credits. Plus **the 25-Sheep Rule** — exactly 25 living sheep reveals the
+  map; 24 does nothing, 26 does nothing.
+- **Air**: continuous AA checking independent of the state machine, per-squad threat memory, route
+  threat penalty, directed retreat. Units scored above structures.
+- **Walls**: turret-behind-wall siting and choke-point walling. **Both deleted in round 3.**
+
+### Round 3 — after playtest 2
+- **Sheep HP 2000 → 6000** (more than an E1 Minigunner's 5000, at 50 credits) and **immune to
+  tiberium** via `-DamagedByTerrain:`.
+- **Walls gutted.** Net **−864 lines**. Choke detection, turret siting, ring geometry and the
+  elaborate flood fill all deleted; config 17 fields → 5. What remains is exactly the players'
+  stated strategy: find a tower with no wall, take a 15-cell window 3 cells in front, place the
+  **longest** contiguous run as two anchors so `LineBuild` fills the middle free.
+- **Air harassment loop.** Squads capped at 5. Evade = hop 12 cells away + ≤5 jitter (~19 cells
+  worst case, versus the old ~70). Re-targets every 10 ticks inside the scan it already runs for AA,
+  at zero extra world queries. Threat memory life cut 900 → 300 ticks.
+
+### Engine code we now own
+
+**New files**
+
+| File | Lines | Purpose |
+|---|---|---|
+| `.../BotModules/BotModuleLogic/AirThreatGeometry.cs` | 226 | Pure air threat / evade maths |
+| `.../BotModuleLogic/BaseBuilderWallPlanner.cs` | 354 | Picks the tower and the wall line |
+| `.../BotModuleLogic/BotWallGeometry.cs` | 159 | Pure wall geometry + escape flood |
+| `.../Traits/Player/GrantConditionOnActorCount.cs` | 177 | Condition at an **exact** owned-actor count |
+| `.../Traits/Player/RevealsMapOnCondition.cs` | 74 | Whole-map reveal while a condition holds |
+| `OpenRA.Test/OpenRA.Mods.Common/AirThreatGeometryTest.cs` | 315 | |
+| `OpenRA.Test/OpenRA.Mods.Common/BotWallGeometryTest.cs` | 185 | |
+| `OpenRA.Test/OpenRA.Mods.Common/ExactCountTrackerTest.cs` | 144 | 24/25/26 boundary coverage |
+
+**Modified:** `BaseBuilderBotModule.cs` (+20), `BaseBuilderQueueManager.cs` (+13),
+`SquadManagerBotModule.cs` (+166), `Squad.cs` (+74), `AirStates.cs` (+485/−53).
+
+`OpenRA.Test.csproj` gained `NUnit3TestAdapter` — the project had NUnit but no adapter, so
+`dotnet test` previously discovered **zero** tests.
+
+### Current tuning — `mods/cnc/rules/ai.yaml`
+
+Air, on `SquadManagerBotModule@skynet`:
+
+```
+AirTargetHarvesterValue: 1000     AirSafetyCheckInterval: 10
+AirTargetUnitValue: 450           AirThreatScanRadius: 16
+AirTargetProductionValue: 300     AirThreatFleeMultiplier: 8
+AirTargetBuildingValue: 100       AirThreatMemoryTicks: 300
+AirTargetDefencelessBonus: 250    AirThreatMemorySize: 12
+AirTargetAntiAirPenalty: 700      AirThreatMemoryMergeRadius: 3
+AirTargetDistancePenalty: 3       AirRetreatOrderInterval: 50
+AirTargetMinimumScore: 200        AirRouteThreatPenalty: 200
+AirTargetScanSamples: 24          AirRouteThreatRadius: 8
+AirSquadSize: 5                   AirEvadeDistance: 12
+MaximumAirSquads: 2               AirEvadeJitter: 5
+```
+
+Walls, on `BaseBuilderBotModule@skynet` (`ai.yaml:809–813`):
+
+```
+WallTypes: brik
+WalledDefenseTypes: gtwr, gun, atwr, obli, sam
+WallDistanceFromTower: 3
+MaximumWallSegments: 150
+WallPathCheckLocomotor: wheeled
+```
+
+### Sheep, as shipped
+
+```
+SHEEP  "Sheep"   (mods/cnc/rules/infantry.yaml:314+)
+  Cost 50 · HP 6000 · Speed 120 · RevealsShroud 16c0 · no prerequisites
+  Armament@PRIMARY  SheepMG — range 8c0,  burst 3, 4000 dmg (weapons/smallcaliber.yaml)
+  Armament@AA       SheepAA — range 10c0, burst 2, 6000 dmg, air only (weapons/missiles.yaml)
+  -DamagedByTerrain (tiberium immune) · -TakeCover · -MustBeDestroyed · -SpawnActorOnDeath ×2
+  Explodes: SteakSplat — cosmetic, no damage warhead at all
+  Sprite: tric.shp via the `sheep:` sequence · VoiceSet SheepVoice
+  Deliberately absent from every bot's UnitsToBuild — the AI cannot build sheep.
+```
+
+---
+
+## 4. Round 4 — the adaptive AI (NEXT)
+
+**Status:** `TODO` — designed, not started. Read **`ADAPTIVE-AI-DESIGN.md`** (repo root, 330 lines)
+before doing anything.
+
+### What the players asked for
+
+> *"If the AI could track the value kill ratio of units and turrets, and then if the AI sees that
+> something is underperforming, it will build less of that. And if something is performing really
+> well, it will start to use that more."*
+
+Later refined to: k/d ratio **and** economy ratio.
+
+### How to work on it
+
+1. **Read `ADAPTIVE-AI-DESIGN.md`.** 11 questions, each with 2–3 options and one marked
+   *(Recommended)*, grounded in this codebase with file and line citations. It was produced
+   deliberately as a design document with **zero code written**.
+2. **Get the players to pick options** — especially Q1, which is a blocker. Do not start
+   implementing before they have chosen. Rounds 2 and 3 both had work partly undone because
+   implementation ran ahead of agreement; round 3 deleted 864 lines for exactly this reason.
+3. Then implement in `.worktrees/ld-sheep` (currently idle) or a fresh worktree, under §2's rules.
+
+### Question headlines
+
+1. `IdleBaseUnitsMaximum: 999` makes the weights inert. What do we do about it? **(blocker)**
+2. What exactly is the score?
+3. How do we attribute a kill?
+4. What does "economy ratio" mean concretely?
+5. Which actor types are eligible for adaptation at all?
+6. How far may a weight move?
+7. Exploration vs exploitation — how do we avoid the death spiral?
+8. Window and cold start
+9. Per-match only, or persisted across matches?
+10. How is this observable?
+11. Do defensive structures adapt, and what is a turret's "value destroyed"?
+
+### The three findings that constrain the design
+
+**1. The build weights are dead code. This blocks the whole feature.**
+
+`UnitBuilderBotModule.cs:90`:
+
+```csharp
+BuildUnit(bot, q, idleUnitCount < Info.IdleBaseUnitsMaximum);
+//                └──────── this argument is the `buildRandom` flag ────────┘
+```
+
+When `buildRandom` is true, `BuildUnit` calls `ChooseRandomUnitToBuild` —
+`buildableThings.Random(world.LocalRandom)`, a **uniform** pick. The weighted `ChooseUnitToBuild`
+only runs when it is false.
+
+The engine default for `IdleBaseUnitsMaximum` is **12**. This fork sets it to **999** on six bots
+(`ai.yaml:585, 736, 916, 1070, 1226, 1354`), and the field appears **zero** times in upstream's
+`ai.yaml`. So the condition is effectively always true and the weighted path never executes.
+
+`UnitsToBuild` is then read at `:120` purely as a whitelist:
+
+```csharp
+if (Info.UnitsToBuild != null && !Info.UnitsToBuild.ContainsKey(name))
+    return;
+```
+
+Only the **key** matters; the number is decoration. That is why `ctnk: 0`, `mlrs: 0` and `mcv: 0`
+are still built. Adapting these weights as they stand would change literally nothing.
+
+Note also that even on the weighted path a weight is a *share ceiling*
+(`myUnits.Count(a => a == unit.Key) * 100 < unit.Value * myUnits.Count`, `:188`), not a share. So
+`harv: 100` means "never capped" — raising it does nothing, lowering it bites hard. The scale is
+asymmetric.
+
+**Fixing this is one field per bot and it substantially changes how the AI plays.** That is a
+gameplay decision for the players, not a technical one. It has been flagged to them and left open.
+
+**2. Kill attribution is last-hit only, but the plumbing is nearly free.**
+
+`AttackInfo` carries a single `Attacker` (`OpenRA.Game/Traits/TraitsInterfaces.cs:89-95`); there is
+no damage ledger. But `UpdatesPlayerStatistics` (`PlayerStatistics.cs:210-251`) already credits
+`KillsCost`/`DeathsCost` cross-player on `INotifyKilled`, is attached to `^ExistsInWorld`
+(`defaults.yaml:3` — every unit, building and turret), prices everything via `ValuedInfo.Cost`, and
+dedupes overkill (`Health.cs:162`). Bucketing that by `e.Attacker.Info.Name` is ~30 lines.
+
+Use the **victim-side** hook, not `INotifyAppliedDamage` — the latter is skipped when the attacker
+is already dead (`Health.cs:210`). Consequence: artillery and rocket support units will be
+systematically undervalued under last-hit attribution.
+
+**3. Economy is per-refinery, never per-harvester; and the Info dicts are shared.**
+
+`INotifyResourceAccepted` reports the refinery, not the harvester (`Refinery.cs:127`,
+`TraitsInterfaces.cs:163`), so `harv` cannot be compared against `sharv` without modifying
+`Refinery.cs` — part of the resource simulation this fork already heavily rewrote.
+
+Separately, `UnitsToBuild` / `BuildingFractions` are `readonly Dictionary` fields on the **shared**
+`...BotModuleInfo`. Two SkyNet players in one match share the instance, and it persists
+process-wide. Adapted weights must live in a per-module copy and be registered with
+`IGameSaveTraitData` (`UnitBuilderBotModule.cs:215-242`), or a save/load will silently revert them.
+
+---
+
+## 5. Open risks and unverified work
+
+None of the round-3 behaviour has been observed in a running game. It is static reasoning plus unit
+tests.
+
+| Risk | Where | Cheap fix if it bites |
+|---|---|---|
+| **Air squads oscillate** — after an evade hop the squad re-targets back toward the same AA and bounces | `AirStates.cs` | Raise `AirRetreatOrderInterval` above 50 |
+| **Framerate with 36 bots.** Air cost went ~21 → ~30 `FindActorsInCircle`/tick — estimated from call counts, never profiled | `SquadManagerBotModule.cs` | `MaximumAirSquads: 2` → `1` |
+| **Too few walls appear.** `brik` is `Adjacent: 5` and `^Wall` gives no buildable area, so towers far from regular buildings never get one | `BaseBuilderWallPlanner.cs` | Lower `WallDistanceFromTower` |
+| **Orcas too timid** — if they never leave home the score floor is too high | `ai.yaml` | Lower `AirTargetMinimumScore: 200` |
+| **Sheep attack animation** reuses triceratops frames 80–91; never seen on screen | `sequences/infantry.yaml` | — |
+| **25-Sheep Rule** verified only at `ExactCountTracker` level; event wiring and shroud source never observed in play | `GrantConditionOnActorCount.cs` | — |
+
+**`BlocksProjectiles` is resolved, not a risk.** `brik` blocks projectiles, but all five walled
+defence types shoot through it: `HighV` (`gtwr`) and `TurretGun` (`gun`) set `Blockable: false`
+explicitly; `atwr`/`sam` inherit `^MissileWeapon`, which sets it false; and `LaserZap.Blockable`
+defaults to `false` in the engine (`LaserZap.cs:59`), with `Laser` never overriding it.
+
+### Deferred features
+
+- **Air "big push" doctrine** — mass aircraft against one high-value structure when no exposed
+  targets exist. Agreed to be a distinct behaviour from harassment. Not started.
+- **Fog of war.** `player.yaml:38` sets `ExploredMapCheckboxEnabled: True` (engine default is
+  `false`), so every game starts with the map already revealed. This blunts both the Sheep's 16-cell
+  vision and the 25-Sheep Rule, which can then only lift *fog*, not shroud. The players were told;
+  unticking **"Initial map shroud is revealed"** in the lobby restores both. No code change made.
+
+---
+
+## 6. Build and run
+
+```bash
+make all                        # ~17s
+./launch-game.sh Game.Mod=cnc
+./utility.sh cnc --check-yaml   # lints every rule and every map
+dotnet test OpenRA.Test/OpenRA.Test.csproj
+```
+
+Native library setup and the Lua 5.1 build are documented in **`CLAUDE.md`** — `make` does not wire
+these up, and `configure-system-libraries.sh` bails on the first missing library so nothing gets
+linked. The prebuilt `vendor-libs/liblua5.1.dylib` is gitignored but present on this machine.
+
+**Test map:** `mods/cnc/maps/Empire-Earth.oramap` — "Empire Earth4", 36 spawns, 202×202, authored by
+Realpra1. This is the map the players actually use.
+
+---
+---
+
+# Appendix — original round-by-round working log
+
+*Everything below is the working log as it was written during the session, preserved verbatim.
+Section 3 above supersedes it where they disagree — in particular, the round-2 wall features
+described below were deleted in round 3.*
+
 # LibertyDawn — Spam Fork Plan
 
 **Goal:** Make a fork where we don't have to think. We play the economy branch (already fully
