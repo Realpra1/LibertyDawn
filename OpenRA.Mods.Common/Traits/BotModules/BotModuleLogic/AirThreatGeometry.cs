@@ -92,6 +92,76 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		/// <summary>
+		/// Removes unnecessary coarse-grid turns without cutting across threatened cells. The returned
+		/// route excludes the start and includes the original destination.
+		/// </summary>
+		public static List<CPos> SmoothCoarseRoute(
+			float[] danger, int width, int height, int startX, int startY, IReadOnlyList<CPos> route)
+		{
+			if (danger == null || width <= 0 || height <= 0 || danger.Length != width * height || route == null)
+				return null;
+
+			if (route.Count <= 1)
+				return route.ToList();
+
+			var points = new List<CPos>(route.Count + 1) { new CPos(startX, startY) };
+			points.AddRange(route);
+			var result = new List<CPos>();
+			var anchor = 0;
+			while (anchor < points.Count - 1)
+			{
+				var next = points.Count - 1;
+				while (next > anchor + 1 && !ClearCoarseSegment(danger, width, height, points[anchor], points[next]))
+					next--;
+
+				result.Add(points[next]);
+				anchor = next;
+			}
+
+			return result;
+		}
+
+		static bool ClearCoarseSegment(float[] danger, int width, int height, CPos from, CPos to)
+		{
+			var dx = to.X - from.X;
+			var dy = to.Y - from.Y;
+			var samples = Math.Max(Math.Abs(dx), Math.Abs(dy)) * 2;
+			if (samples == 0)
+				return true;
+
+			// The endpoints may be occupied by the squad or target. Only crossed cells decide whether
+			// a shortcut would cut through danger.
+			for (var i = 1; i < samples; i++)
+			{
+				var x = from.X + (int)Math.Round(dx * i / (double)samples);
+				var y = from.Y + (int)Math.Round(dy * i / (double)samples);
+				if (x < 0 || y < 0 || x >= width || y >= height || danger[y * width + x] > 0)
+					return false;
+			}
+
+			return true;
+		}
+
+		/// <summary>
+		/// Deterministically selects the deduplicated union of the nearest and highest-utility candidates.
+		/// </summary>
+		public static List<int> SelectTargetCandidates(
+			IReadOnlyList<long> distances, IReadOnlyList<int> utilities, int closestCount, int highestValueCount)
+		{
+			if (distances == null || utilities == null || distances.Count != utilities.Count)
+				return null;
+
+			var result = new List<int>();
+			var selected = new HashSet<int>();
+			foreach (var i in Enumerable.Range(0, distances.Count).OrderBy(i => distances[i]).ThenBy(i => i).Take(closestCount)
+				.Concat(Enumerable.Range(0, utilities.Count).OrderByDescending(i => utilities[i]).ThenBy(i => i).Take(highestValueCount)))
+				if (selected.Add(i))
+					result.Add(i);
+
+			return result;
+		}
+
+		/// <summary>
 		/// Squared distance (in world units) from <paramref name="p"/> to the segment
 		/// <paramref name="a"/>-<paramref name="b"/>, measured on the ground plane.
 		/// Aircraft fly in a straight line, so the segment is the flight path.

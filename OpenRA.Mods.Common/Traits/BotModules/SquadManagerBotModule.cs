@@ -139,9 +139,15 @@ namespace OpenRA.Mods.Common.Traits
 			"Candidates scoring below this are ignored and the squad stays idle.")]
 		public readonly int AirTargetMinimumScore = 1;
 
-		[Desc("Number of nearest air target candidates routed per strategic scan. The influence map still",
-			"considers every enemy actor; lowering this bounds A* work on large maps.")]
-		public readonly int AirTargetScanSamples = 24;
+		[Desc("Number of nearest air target candidates routed per strategic scan.")]
+		public readonly int AirTargetClosestCandidates = 15;
+
+		[Desc("Number of highest-value air target candidates routed per strategic scan. These are combined",
+			"with AirTargetClosestCandidates and deduplicated, so distant opportunities remain eligible.")]
+		public readonly int AirTargetHighestValueCandidates = 10;
+
+		[Desc("Write air target scores and route decisions to debug.log.")]
+		public readonly bool AirTargetDebugLogging = false;
 
 		[Desc("Width and height in map cells of one coarse air influence-map cell.")]
 		public readonly int AirInfluenceCellSize = 6;
@@ -250,8 +256,9 @@ namespace OpenRA.Mods.Common.Traits
 			if (DangerScanRadius <= 0)
 				throw new YamlException("DangerScanRadius must be greater than zero.");
 
-			if (AirTargetScanSamples <= 0)
-				throw new YamlException("AirTargetScanSamples must be greater than zero.");
+			if (AirTargetClosestCandidates < 0 || AirTargetHighestValueCandidates < 0 ||
+				AirTargetClosestCandidates + AirTargetHighestValueCandidates <= 0)
+				throw new YamlException("At least one air target candidate count must be greater than zero.");
 
 			if (AirInfluenceCellSize <= 0)
 				throw new YamlException("AirInfluenceCellSize must be greater than zero.");
