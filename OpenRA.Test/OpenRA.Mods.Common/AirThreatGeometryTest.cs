@@ -28,6 +28,24 @@ namespace OpenRA.Test
 			return (long)(cells * 1024) * (cells * 1024);
 		}
 
+		[TestCase(TestName = "Coarse A* detours around expensive anti-air cells")]
+		public void CoarseRouteAvoidsThreat()
+		{
+			var danger = new float[15];
+			danger[2] = 10;
+			var route = AirThreatGeometry.FindCoarseRoute(danger, 5, 3, 0, 0, 4, 0, 100);
+			Assert.That(route, Is.Not.Null);
+			Assert.That(route, Does.Not.Contain(new CPos(2, 0)));
+		}
+
+		[TestCase(TestName = "Coarse A* crosses finite danger when no detour exists")]
+		public void CoarseRouteCanAcceptDanger()
+		{
+			var danger = new[] { 0f, 10f, 0f };
+			var route = AirThreatGeometry.FindCoarseRoute(danger, 3, 1, 0, 0, 2, 0, 100);
+			Assert.That(route, Does.Contain(new CPos(1, 0)));
+		}
+
 		[TestCase(TestName = "Distance to a segment uses the perpendicular when the foot is inside it")]
 		public void PerpendicularDistance()
 		{

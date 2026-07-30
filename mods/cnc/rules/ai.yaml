@@ -869,6 +869,7 @@ Player:
     SquadManagerBotModule@skynet:
 		RequiresCondition: enable-skynet-ai
 		SquadSize: 10
+		AttackForceInterval: 50
 		ExcludeFromSquadsTypes: harv, mcv, a10
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
@@ -882,7 +883,8 @@ Player:
 		AirTargetDistancePenalty: 3
 		AirTargetMinimumScore: 200
 		AirTargetScanSamples: 24
-		AirSafetyCheckInterval: 10
+		AirInfluenceCellSize: 6
+		AirSafetyCheckInterval: 25
 		AirThreatScanRadius: 16
 		AirThreatFleeMultiplier: 8
 		AirThreatMemoryTicks: 300
@@ -891,8 +893,17 @@ Player:
 		AirRetreatOrderInterval: 50
 		AirRouteThreatPenalty: 200
 		AirRouteThreatRadius: 8
-		AirSquadSize: 5
-		MaximumAirSquads: 2
+		AirSquadSize: 0
+		MaximumAirSquads: 4
+		AirSquadDefinitions:
+			Orca:
+				UnitTypes: orca
+				SquadCount: 2
+				Profile: Orca
+			Apache:
+				UnitTypes: heli
+				SquadCount: 2
+				Profile: Apache
 		AirEvadeDistance: 12
 		AirEvadeJitter: 5
 		AirThreatRangeBuffer: 1.5
@@ -904,26 +915,29 @@ Player:
 			sharv: 900
 			nuk2: 800
 			proc: 700
-			nuke: 600
-			fact: 500
-			fact.gdi: 500
-			fact.nod: 500
+			fact: 600
+			fact.gdi: 600
+			fact.nod: 600
 			hq: 500
+			nuke: 400
+			obli: 0
 		AirTargetPriorityHeli:
 			mcv: 1000
 			harv: 900
 			sharv: 900
-			e1: 800
-			e2: 800
-			e3: 800
-			e4: 800
-			e5: 800
-			rmbo: 800
-			bggy: 700
-			bike: 700
-			ltnk: 700
+			e1: 550
+			e2: 550
+			e3: 650
+			e4: 550
+			e5: 550
+			rmbo: 650
+			bggy: 600
+			bike: 650
+			stnk: 650
+			ltnk: 600
 			nuk2: 600
 			proc: 500
+			obli: 0
 	UnitBuilderBotModule@skynet:
 		RequiresCondition: enable-skynet-ai
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade

@@ -11,6 +11,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace OpenRA.Mods.Common.Traits
 {
@@ -18,11 +19,78 @@ namespace OpenRA.Mods.Common.Traits
 	/// The world-independent half of the bot's air threat avoidance: how far a remembered anti-air
 	/// position is from a flight path, which retreat point sits furthest from danger, and how a
 	/// candidate air target scores. Kept free of World and Actor so it can be unit tested.
-	/// Everything here is deterministic - no randomness, no floating point, no iteration over
+	/// Everything here is deterministic - no randomness and no iteration over
 	/// unordered collections. Ties always resolve to the lowest index.
 	/// </summary>
 	public static class AirThreatGeometry
 	{
+		/// <summary>Bounded-grid A* used by air squads to route around graduated threat costs.</summary>
+		public static List<CPos> FindCoarseRoute(
+			float[] danger, int width, int height, int startX, int startY, int goalX, int goalY, float dangerCost)
+		{
+			if (danger == null || width <= 0 || height <= 0 || danger.Length != width * height)
+				return null;
+
+			var cost = Enumerable.Repeat(float.MaxValue, danger.Length).ToArray();
+			var previous = Enumerable.Repeat(-1, danger.Length).ToArray();
+			var open = new List<int>();
+			var start = startY * width + startX;
+			var goal = goalY * width + goalX;
+			cost[start] = 0;
+			open.Add(start);
+
+			while (open.Count > 0)
+			{
+				var bestOpen = 0;
+				var bestEstimate = float.MaxValue;
+				for (var i = 0; i < open.Count; i++)
+				{
+					var x = open[i] % width;
+					var y = open[i] / width;
+					var estimate = cost[open[i]] + Math.Abs(goalX - x) + Math.Abs(goalY - y);
+					if (estimate < bestEstimate)
+					{
+						bestEstimate = estimate;
+						bestOpen = i;
+					}
+				}
+
+				var current = open[bestOpen];
+				open.RemoveAt(bestOpen);
+				if (current == goal)
+					break;
+
+				var cx = current % width;
+				var cy = current / width;
+				for (var d = 0; d < 4; d++)
+				{
+					var nx = cx + (d == 0 ? -1 : d == 1 ? 1 : 0);
+					var ny = cy + (d == 2 ? -1 : d == 3 ? 1 : 0);
+					if (nx < 0 || ny < 0 || nx >= width || ny >= height)
+						continue;
+
+					var next = ny * width + nx;
+					var nextCost = cost[current] + 1 + danger[next] * dangerCost;
+					if (nextCost >= cost[next])
+						continue;
+
+					cost[next] = nextCost;
+					previous[next] = current;
+					if (!open.Contains(next))
+						open.Add(next);
+				}
+			}
+
+			if (cost[goal] == float.MaxValue)
+				return null;
+
+			var result = new List<CPos>();
+			for (var at = goal; at != start && at >= 0; at = previous[at])
+				result.Add(new CPos(at % width, at / width));
+			result.Reverse();
+			return result;
+		}
+
 		/// <summary>
 		/// Squared distance (in world units) from <paramref name="p"/> to the segment
 		/// <paramref name="a"/>-<paramref name="b"/>, measured on the ground plane.
