@@ -299,80 +299,126 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			List<CPos> bestRoute = null;
 			var bestIsUndefended = false;
 
-			var liveCandidates = candidates.Where(c => !c.Actor.IsDead).OrderBy(c => c.Actor.ActorID).ToList();
+			var liveCandidates = candidates.Where(c => !c.Actor.IsDead &&
+				combatUnits.Any(u => CanAttackTarget(u, c.Actor))).OrderBy(c => c.Actor.ActorID).ToList();
 			var cellUtility = new Dictionary<CPos, long>();
-			foreach (var candidate in liveCandidates)
+			var cellActors = new Dictionary<CPos, List<int>>();
+			for (var i = 0; i < liveCandidates.Count; i++)
 			{
+				var candidate = liveCandidates[i];
 				var cell = new CPos(candidate.Actor.Location.X / coarseSize, candidate.Actor.Location.Y / coarseSize);
 				cellUtility.TryGetValue(cell, out var total);
 				cellUtility[cell] = total + candidate.Utility;
+				if (!cellActors.TryGetValue(cell, out var actors))
+				{
+					actors = new List<int>();
+					cellActors.Add(cell, actors);
+				}
+
+				actors.Add(i);
 			}
 
-			var candidateIndices = AirThreatGeometry.SelectTargetCandidates(
-				liveCandidates.Select(c => (c.Actor.CenterPosition - planningCenter).LengthSquared).ToList(),
-				liveCandidates.Select(c =>
+			// Select unique strategic locations before individual actors. Otherwise a single crowded,
+			// defended cell can consume every nearest/high-value slot and hide safe targets elsewhere.
+			var candidateCells = cellActors.Keys.OrderBy(c => c.Y).ThenBy(c => c.X).ToList();
+			var selectedCellIndices = AirThreatGeometry.SelectTargetCandidates(
+				candidateCells.Select(c =>
 				{
-					var cell = new CPos(c.Actor.Location.X / coarseSize, c.Actor.Location.Y / coarseSize);
-					return (int)Math.Min(int.MaxValue, cellUtility[cell]);
+					var center = map.CenterOfCell(map.Clamp(new CPos(
+						c.X * coarseSize + coarseSize / 2, c.Y * coarseSize + coarseSize / 2)));
+					return (center - planningCenter).LengthSquared;
 				}).ToList(),
+				candidateCells.Select(c => (int)Math.Min(int.MaxValue, cellUtility[c])).ToList(),
 				info.AirTargetClosestCandidates, info.AirTargetHighestValueCandidates);
 
-			foreach (var candidateIndex in candidateIndices)
+			foreach (var selectedCellIndex in selectedCellIndices)
 			{
-				var candidate = liveCandidates[candidateIndex];
-				var goalX = Math.Clamp(candidate.Actor.Location.X / coarseSize, 0, width - 1);
-				var goalY = Math.Clamp(candidate.Actor.Location.Y / coarseSize, 0, height - 1);
-				var opportunityValue = cellUtility[new CPos(goalX, goalY)];
+				var cell = candidateCells[selectedCellIndex];
+				var goalX = Math.Clamp(cell.X, 0, width - 1);
+				var goalY = Math.Clamp(cell.Y, 0, height - 1);
+				var opportunityValue = cellUtility[cell];
 				var route = AirThreatGeometry.FindCoarseRoute(danger, width, height, startX, startY, goalX, goalY,
 					info.AirRouteThreatPenalty / riskScale);
 				if (route == null)
 				{
 					if (info.AirTargetDebugLogging)
-						Log.Write("debug", "Air target [{0}] {1}#{2} rejected: no coarse route.",
-							owner.AirProfile, candidate.Actor.Info.Name, candidate.Actor.ActorID);
+						Log.Write("debug", "Air cell [{0}] {1} rejected: no coarse route.",
+							owner.AirProfile, cell);
 
 					continue;
 				}
 
 				var exposureCost = route.Sum(p => danger[p.Y * width + p.X]) * info.AirRouteThreatPenalty / riskScale;
-				var destinationDanger = 0f;
-				foreach (var threat in threats)
-				{
-					if (threat.Actor.IsDead)
-						continue;
+				var distanceCost = route.Count * coarseSize * info.AirTargetDistancePenalty;
+				Actor cellTarget = null;
+				var cellTargetScore = int.MinValue;
+				var cellTargetDanger = 0f;
+				var cellTargetIsUndefended = false;
 
-					var distance = (threat.Actor.CenterPosition - candidate.Actor.CenterPosition).Length / 1024;
-					if (distance <= threat.RangeCells)
-						destinationDanger += threat.Weight;
+				// The cell sum ranks the location. The actor's own utility and exact AA coverage choose
+				// the victim inside that location, so a SAM or power plant cannot inherit a harvester
+				// cluster's full value merely by sharing its coarse tile.
+				foreach (var candidateIndex in cellActors[cell])
+				{
+					var candidate = liveCandidates[candidateIndex];
+					var destinationDanger = 0f;
+					foreach (var threat in threats)
+					{
+						if (threat.Actor.IsDead)
+							continue;
+
+						var distance = (threat.Actor.CenterPosition - candidate.Actor.CenterPosition).Length / 1024;
+						if (distance <= threat.RangeCells)
+							destinationDanger += threat.Weight;
+					}
+
+					var stoppingCost = (int)(destinationDanger * info.AirTargetAntiAirPenalty / riskScale);
+					var isUndefended = destinationDanger <= 0;
+					var targetScore = (long)candidate.Utility * 1024 / Math.Max(1, 1024 + stoppingCost);
+					var finalTargetScore = (int)Math.Clamp(targetScore, int.MinValue, int.MaxValue);
+
+					if (info.AirTargetDebugLogging)
+						Log.Write("debug", "Air target [{0}] {1}#{2}: cell={3} utility={4} cell-utility={5} destination-danger={6:0.##} target-score={7} relaxed={8}",
+							owner.AirProfile, candidate.Actor.Info.Name, candidate.Actor.ActorID, cell,
+							candidate.Utility, opportunityValue, destinationDanger, finalTargetScore, relaxed);
+
+					if (cellTarget == null || (isUndefended && !cellTargetIsUndefended) ||
+						(isUndefended == cellTargetIsUndefended && finalTargetScore > cellTargetScore))
+					{
+						cellTarget = candidate.Actor;
+						cellTargetScore = finalTargetScore;
+						cellTargetDanger = destinationDanger;
+						cellTargetIsUndefended = isUndefended;
+					}
 				}
 
-				var distanceCost = route.Count * coarseSize * info.AirTargetDistancePenalty;
-				var stoppingCost = (int)(destinationDanger * info.AirTargetAntiAirPenalty / riskScale);
-				var isUndefended = destinationDanger <= 0;
+				if (cellTarget == null)
+					continue;
 
-				// Each independent liability scales the target value down instead of participating in a
-				// binary veto. This preserves meaningful tradeoffs: speed can justify a distant harvester,
-				// while route and destination AA still compound to make defended targets unattractive.
+				// Each independent liability scales the location value down. Defended locations remain
+				// finite choices, but only after every selected undefended location has been considered.
+				var stoppingCostForCell = (int)(cellTargetDanger * info.AirTargetAntiAirPenalty / riskScale);
 				var score = opportunityValue;
 				score = score * 1024 / Math.Max(1, 1024 + distanceCost);
 				score = score * 1024 / Math.Max(1, 1024 + (int)exposureCost);
-				score = score * 1024 / Math.Max(1, 1024 + stoppingCost);
+				score = score * 1024 / Math.Max(1, 1024 + stoppingCostForCell);
 				var finalScore = (int)Math.Clamp(score, int.MinValue, int.MaxValue);
 
 				if (info.AirTargetDebugLogging)
-					Log.Write("debug", "Air target [{0}] {1}#{2}: utility={3} cell-utility={4} route={5} exposure={6:0.##} destination-danger={7:0.##} score={8} relaxed={9}",
-						owner.AirProfile, candidate.Actor.Info.Name, candidate.Actor.ActorID, candidate.Utility, opportunityValue,
-						route.Count, exposureCost, destinationDanger, finalScore, relaxed);
+					Log.Write("debug", "Air cell [{0}] {1}: utility={2} route={3} exposure={4:0.##} target={5}#{6} destination-danger={7:0.##} score={8} undefended={9} relaxed={10}",
+						owner.AirProfile, cell, opportunityValue, route.Count, exposureCost,
+						cellTarget.Info.Name, cellTarget.ActorID, cellTargetDanger, finalScore,
+						cellTargetIsUndefended, relaxed);
 
 				// Undefended targets form the first selection tier. A defended target remains eligible,
-				// but only when this bounded candidate pool contains no undefended destination at all.
+				// but only when this bounded strategic-cell pool contains no undefended destination at all.
 				// Route and distance costs still rank candidates within each tier.
-				if (best == null || (isUndefended && !bestIsUndefended) ||
-					(isUndefended == bestIsUndefended && finalScore > bestScore))
+				if (best == null || (cellTargetIsUndefended && !bestIsUndefended) ||
+					(cellTargetIsUndefended == bestIsUndefended && finalScore > bestScore))
 				{
-					best = candidate.Actor;
+					best = cellTarget;
 					bestScore = finalScore;
-					bestIsUndefended = isUndefended;
+					bestIsUndefended = cellTargetIsUndefended;
 					bestRoute = AirThreatGeometry.SmoothCoarseRoute(danger, width, height, startX, startY, route)
 						.Select(p => map.Clamp(new CPos(p.X * coarseSize + coarseSize / 2, p.Y * coarseSize + coarseSize / 2))).ToList();
 				}
@@ -381,8 +427,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			if (best == null || (!relaxed && bestScore < info.AirTargetMinimumScore))
 			{
 				if (info.AirTargetDebugLogging)
-					Log.Write("debug", "Air target [{0}] scan found no eligible target: candidates={1} best-score={2} minimum={3} relaxed={4}.",
-						owner.AirProfile, candidateIndices.Count, bestScore, info.AirTargetMinimumScore, relaxed);
+					Log.Write("debug", "Air target [{0}] scan found no eligible target: cells={1} best-score={2} minimum={3} relaxed={4}.",
+						owner.AirProfile, selectedCellIndices.Count, bestScore, info.AirTargetMinimumScore, relaxed);
 
 				return null;
 			}
@@ -902,21 +948,6 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var e = FindDefenselessTarget(owner);
 			if (e == null)
 			{
-				var nearbyTarget = FindClosestAttackableEnemy(owner);
-				if (nearbyTarget != null)
-				{
-					if (owner.SquadManager.Info.AirTargetDebugLogging)
-						Log.Write("debug", "Air target [{0}] strategic scan failed; immediately using closest {1}#{2}.",
-							owner.AirProfile, nearbyTarget.Info.Name, nearbyTarget.ActorID);
-
-					owner.AirConsecutiveNoTargetScans = 0;
-					owner.AirRoute.Clear();
-					owner.AirRouteQueued = false;
-					owner.TargetActor = nearbyTarget;
-					owner.FuzzyStateMachine.ChangeState(owner, new AirAttackState(), true);
-					return;
-				}
-
 				// Given up waiting for a positive score: accept the best finite-cost route instead of idling
 				// forever. Threat costs remain intact, and squad size already scales acceptable risk.
 				var threshold = owner.SquadManager.Info.AirMassedAttackIdleThreshold;
@@ -1026,9 +1057,6 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				if (nextTarget == null && !owner.Units.Any(a =>
 					!owner.AirUnitsRepairing.Contains(a.ActorID) && HasAmmo(a.TraitsImplementing<AmmoPool>())))
 					return;
-
-				if (nextTarget == null)
-					nextTarget = FindClosestAttackableEnemy(owner);
 
 				if (nextTarget == null)
 				{
