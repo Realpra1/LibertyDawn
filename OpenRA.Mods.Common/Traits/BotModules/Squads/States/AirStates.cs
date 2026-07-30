@@ -194,8 +194,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			if (!profileCaches.TryGetValue(cacheKey, out var cache) || cache.Width != width || cache.Height != height ||
 				owner.World.WorldTick - cache.Tick >= info.AttackForceInterval)
 			{
-				var danger = new float[width * height];
-				var candidates = new List<(Actor Actor, int Utility)>();
+				var rebuiltDanger = new float[width * height];
+				var rebuiltCandidates = new List<(Actor Actor, int Utility)>();
 				foreach (var actor in owner.World.Actors)
 				{
 					if (!owner.SquadManager.IsPreferredEnemyUnit(actor))
@@ -221,7 +221,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 								var cell = new CPos(x * coarseSize + coarseSize / 2, y * coarseSize + coarseSize / 2);
 								var distance = (map.CenterOfCell(map.Clamp(cell)) - actor.CenterPosition).Length / 1024;
 								if (distance <= range)
-									danger[y * width + x] += weight;
+									rebuiltDanger[y * width + x] += weight;
 							}
 					}
 
@@ -238,7 +238,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 						value -= health.HP / 100;
 
 					value -= (int)(profile.Weight * info.AirTargetAntiAirPenalty);
-					candidates.Add((actor, value));
+					rebuiltCandidates.Add((actor, value));
 				}
 
 				cache = new AirInfluenceCache
@@ -246,8 +246,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					Tick = owner.World.WorldTick,
 					Width = width,
 					Height = height,
-					Danger = danger,
-					Candidates = candidates,
+					Danger = rebuiltDanger,
+					Candidates = rebuiltCandidates,
 				};
 				profileCaches[cacheKey] = cache;
 			}
