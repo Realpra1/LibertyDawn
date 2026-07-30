@@ -170,6 +170,19 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		}
 
 		/// <summary>
+		/// Stock-style tactical fallback: the nearest enemy that at least one squad member can attack.
+		/// Unlike the strategic scan this deliberately ignores route utility so an aircraft already in
+		/// contact never retreats across the map merely because strategic planning found no good option.
+		/// </summary>
+		protected static Actor FindClosestAttackableEnemy(Squad owner)
+		{
+			return owner.World.Actors
+				.Where(a => owner.SquadManager.IsPreferredEnemyUnit(a) &&
+					owner.Units.Any(u => CanAttackTarget(u, a)))
+				.ClosestTo(owner.CenterPosition);
+		}
+
+		/// <summary>
 		/// Builds a deterministic coarse influence grid, then uses bounded A* route costs to compare the
 		/// best targets. Unlike the old random sampler this considers every known actor, can value a safe
 		/// detour, and keeps AA as a finite cost whose importance falls gradually as the squad grows.
@@ -304,7 +317,6 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				}
 
 				var exposureCost = route.Sum(p => danger[p.Y * width + p.X]) * info.AirRouteThreatPenalty / riskScale;
-				var routeCost = route.Count * coarseSize * info.AirTargetDistancePenalty + (int)exposureCost;
 				var destinationDanger = 0f;
 				foreach (var threat in threats)
 				{
@@ -316,29 +328,27 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 						destinationDanger += threat.Weight;
 				}
 
+				var distanceCost = route.Count * coarseSize * info.AirTargetDistancePenalty;
 				var stoppingCost = (int)(destinationDanger * info.AirTargetAntiAirPenalty / riskScale);
-				var score = candidate.Utility * 1024 / Math.Max(1, 1024 + routeCost + stoppingCost);
+
+				// Each independent liability scales the target value down instead of participating in a
+				// binary veto. This preserves meaningful tradeoffs: speed can justify a distant harvester,
+				// while route and destination AA still compound to make defended targets unattractive.
+				var score = (long)candidate.Utility;
+				score = score * 1024 / Math.Max(1, 1024 + distanceCost);
+				score = score * 1024 / Math.Max(1, 1024 + (int)exposureCost);
+				score = score * 1024 / Math.Max(1, 1024 + stoppingCost);
+				var finalScore = (int)Math.Clamp(score, int.MinValue, int.MaxValue);
 
 				if (info.AirTargetDebugLogging)
 					Log.Write("debug", "Air target [{0}] {1}#{2}: utility={3} route={4} exposure={5:0.##} destination-danger={6:0.##} score={7} relaxed={8}",
 						owner.AirProfile, candidate.Actor.Info.Name, candidate.Actor.ActorID, candidate.Utility,
-						route.Count, exposureCost, destinationDanger, score, relaxed);
+						route.Count, exposureCost, destinationDanger, finalScore, relaxed);
 
-				// Do not loiter inside AA coverage merely because it is nearby. Defended destinations
-				// become eligible only through the existing last-resort relaxed scan.
-				if (!relaxed && destinationDanger > 0)
-				{
-					if (info.AirTargetDebugLogging)
-						Log.Write("debug", "Air target [{0}] {1}#{2} deferred: exact destination AA danger={3:0.##}.",
-							owner.AirProfile, candidate.Actor.Info.Name, candidate.Actor.ActorID, destinationDanger);
-
-					continue;
-				}
-
-				if (best == null || score > bestScore)
+				if (best == null || finalScore > bestScore)
 				{
 					best = candidate.Actor;
-					bestScore = score;
+					bestScore = finalScore;
 					bestRoute = AirThreatGeometry.SmoothCoarseRoute(danger, width, height, startX, startY, route)
 						.Select(p => map.Clamp(new CPos(p.X * coarseSize + coarseSize / 2, p.Y * coarseSize + coarseSize / 2))).ToList();
 				}
@@ -800,6 +810,10 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			if (!owner.IsValid)
 				return;
 
+			if (owner.SquadManager.Info.AirTargetDebugLogging)
+				Log.Write("debug", "Air state [{0}] idle tick: units={1} no-target-scans={2}.",
+					owner.AirProfile, owner.Units.Count, owner.AirConsecutiveNoTargetScans);
+
 			// The continuous safety check watches the squad's surroundings on its own, much shorter
 			// interval, so this scan is pure duplicated work whenever that is switched on.
 			if (owner.SquadManager.Info.AirSafetyCheckInterval <= 0 && ShouldFlee(owner))
@@ -811,6 +825,21 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var e = FindDefenselessTarget(owner);
 			if (e == null)
 			{
+				var nearbyTarget = FindClosestAttackableEnemy(owner);
+				if (nearbyTarget != null)
+				{
+					if (owner.SquadManager.Info.AirTargetDebugLogging)
+						Log.Write("debug", "Air target [{0}] strategic scan failed; immediately using closest {1}#{2}.",
+							owner.AirProfile, nearbyTarget.Info.Name, nearbyTarget.ActorID);
+
+					owner.AirConsecutiveNoTargetScans = 0;
+					owner.AirRoute.Clear();
+					owner.AirRouteQueued = false;
+					owner.TargetActor = nearbyTarget;
+					owner.FuzzyStateMachine.ChangeState(owner, new AirAttackState(), true);
+					return;
+				}
+
 				// Given up waiting for a positive score: accept the best finite-cost route instead of idling
 				// forever. Threat costs remain intact, and squad size already scales acceptable risk.
 				var threshold = owner.SquadManager.Info.AirMassedAttackIdleThreshold;
@@ -857,18 +886,23 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			if (!owner.IsValid)
 				return;
 
+			if (owner.SquadManager.Info.AirTargetDebugLogging)
+				Log.Write("debug", "Air state [{0}] attack tick: units={1} target-valid={2} route-queued={3}.",
+					owner.AirProfile, owner.Units.Count, owner.IsTargetValid, owner.AirRouteQueued);
+
 			if (!owner.IsTargetValid)
 			{
-				// Re-run the scored scan rather than falling back to the closest enemy:
-				// the closest enemy is usually the defended base we just flew past.
 				var nextTarget = FindBestAirTarget(owner);
-				if (nextTarget != null)
-					owner.TargetActor = nextTarget;
-				else
+				if (nextTarget == null)
+					nextTarget = FindClosestAttackableEnemy(owner);
+
+				if (nextTarget == null)
 				{
 					owner.FuzzyStateMachine.ChangeState(owner, new AirFleeState(), true);
 					return;
 				}
+
+				owner.TargetActor = nextTarget;
 			}
 
 			if (owner.AirProfile == "Generic" && !NearToPosSafely(owner, owner.TargetActor.CenterPosition))
@@ -911,10 +945,11 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				return;
 			}
 
-			if (owner.AirRouteQueued && owner.Units.Any(a => !owner.AirUnitsRepairing.Contains(a.ActorID) && !a.IsIdle))
-				return;
-
-			owner.AirRouteQueued = false;
+			// A queued route belongs to each aircraft, not to the squad as a blocking transaction. One
+			// aircraft may still be flying while another has finished or become idle; only the former waits.
+			if (owner.AirRouteQueued &&
+				!owner.Units.Any(a => !owner.AirUnitsRepairing.Contains(a.ActorID) && !a.IsIdle))
+				owner.AirRouteQueued = false;
 
 			// Lazily computed: only needed if a self-reloading aircraft actually turns out to be dry,
 			// which is the uncommon case, and shared across every unit that needs it this tick rather
@@ -923,6 +958,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 			foreach (var a in owner.Units)
 			{
+				if (owner.AirRouteQueued && !a.IsIdle)
+					continue;
+
 				if (BusyAttack(a))
 					continue;
 
