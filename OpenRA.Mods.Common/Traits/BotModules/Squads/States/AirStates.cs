@@ -31,6 +31,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			public int Height;
 			public float[] Danger;
 			public List<(Actor Actor, int Utility)> Candidates;
+			public List<(Actor Actor, float Weight, int RangeCells)> Threats;
 		}
 
 		// Bot logic is host-only. Sharing one cache per manager/profile prevents two same-type squads
@@ -186,7 +187,13 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var combatUnits = owner.Units.Where(a => !owner.AirUnitsRepairing.Contains(a.ActorID) &&
 				HasAmmo(a.TraitsImplementing<AmmoPool>())).ToList();
 			if (combatUnits.Count == 0)
+			{
+				if (info.AirTargetDebugLogging)
+					Log.Write("debug", "Air target [{0}] scan stopped: no armed non-repairing aircraft in squad of {1}.",
+						owner.AirProfile, owner.Units.Count);
+
 				return null;
+			}
 
 			var squadSpeed = combatUnits.Select(a => a.Info.TraitInfoOrDefault<AircraftInfo>())
 				.Where(a => a != null).Min(a => a.Speed);
@@ -202,6 +209,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			{
 				var rebuiltDanger = new float[width * height];
 				var rebuiltCandidates = new List<(Actor Actor, int Utility)>();
+				var rebuiltThreats = new List<(Actor Actor, float Weight, int RangeCells)>();
 				foreach (var actor in owner.World.Actors)
 				{
 					if (!owner.SquadManager.IsPreferredEnemyUnit(actor))
@@ -221,6 +229,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 						else if (orca && AirThreatGeometry.CanOutrun(squadSpeed, profile.FastestProjectileSpeed))
 							weight *= .2f;
 
+						rebuiltThreats.Add((actor, weight, range));
 						for (var y = minY; y <= maxY; y++)
 							for (var x = minX; x <= maxX; x++)
 							{
@@ -254,12 +263,14 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					Height = height,
 					Danger = rebuiltDanger,
 					Candidates = rebuiltCandidates,
+					Threats = rebuiltThreats,
 				};
 				profileCaches[cacheKey] = cache;
 			}
 
 			var danger = cache.Danger;
 			var candidates = cache.Candidates;
+			var threats = cache.Threats;
 
 			var planningCenter = combatUnits.Select(a => a.CenterPosition).Average();
 			var startCell = map.CellContaining(planningCenter);
@@ -284,11 +295,27 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				var route = AirThreatGeometry.FindCoarseRoute(danger, width, height, startX, startY, goalX, goalY,
 					info.AirRouteThreatPenalty / riskScale);
 				if (route == null)
+				{
+					if (info.AirTargetDebugLogging)
+						Log.Write("debug", "Air target [{0}] {1}#{2} rejected: no coarse route.",
+							owner.AirProfile, candidate.Actor.Info.Name, candidate.Actor.ActorID);
+
 					continue;
+				}
 
 				var exposureCost = route.Sum(p => danger[p.Y * width + p.X]) * info.AirRouteThreatPenalty / riskScale;
 				var routeCost = route.Count * coarseSize * info.AirTargetDistancePenalty + (int)exposureCost;
-				var destinationDanger = danger[goalY * width + goalX];
+				var destinationDanger = 0f;
+				foreach (var threat in threats)
+				{
+					if (threat.Actor.IsDead)
+						continue;
+
+					var distance = (threat.Actor.CenterPosition - candidate.Actor.CenterPosition).Length / 1024;
+					if (distance <= threat.RangeCells)
+						destinationDanger += threat.Weight;
+				}
+
 				var stoppingCost = (int)(destinationDanger * info.AirTargetAntiAirPenalty / riskScale);
 				var score = candidate.Utility * 1024 / Math.Max(1, 1024 + routeCost + stoppingCost);
 
@@ -300,7 +327,13 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				// Do not loiter inside AA coverage merely because it is nearby. Defended destinations
 				// become eligible only through the existing last-resort relaxed scan.
 				if (!relaxed && destinationDanger > 0)
+				{
+					if (info.AirTargetDebugLogging)
+						Log.Write("debug", "Air target [{0}] {1}#{2} deferred: exact destination AA danger={3:0.##}.",
+							owner.AirProfile, candidate.Actor.Info.Name, candidate.Actor.ActorID, destinationDanger);
+
 					continue;
+				}
 
 				if (best == null || score > bestScore)
 				{
@@ -312,7 +345,13 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			}
 
 			if (best == null || (!relaxed && bestScore < info.AirTargetMinimumScore))
+			{
+				if (info.AirTargetDebugLogging)
+					Log.Write("debug", "Air target [{0}] scan found no eligible target: candidates={1} best-score={2} minimum={3} relaxed={4}.",
+						owner.AirProfile, candidateIndices.Count, bestScore, info.AirTargetMinimumScore, relaxed);
+
 				return null;
+			}
 
 			if (info.AirTargetDebugLogging)
 				Log.Write("debug", "Air target [{0}] selected {1}#{2}: score={3} waypoints={4} relaxed={5}",
@@ -856,7 +895,15 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					}
 
 					if (CanAttackTarget(a, owner.TargetActor))
+					{
 						owner.Bot.QueueOrder(new Order("Attack", a, Target.FromActor(owner.TargetActor), true));
+						if (owner.SquadManager.Info.AirTargetDebugLogging)
+							Log.Write("debug", "Air order [{0}] {1}#{2}: queued route attack on {3}#{4}.",
+								owner.AirProfile, a.Info.Name, a.ActorID, owner.TargetActor.Info.Name, owner.TargetActor.ActorID);
+					}
+					else if (owner.SquadManager.Info.AirTargetDebugLogging)
+						Log.Write("debug", "Air order [{0}] {1}#{2}: cannot attack selected {3}#{4}.",
+							owner.AirProfile, a.Info.Name, a.ActorID, owner.TargetActor.Info.Name, owner.TargetActor.ActorID);
 				}
 
 				owner.AirRouteQueued = true;
@@ -908,7 +955,15 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				}
 
 				if (CanAttackTarget(a, owner.TargetActor))
+				{
 					owner.Bot.QueueOrder(new Order("Attack", a, Target.FromActor(owner.TargetActor), false));
+					if (owner.SquadManager.Info.AirTargetDebugLogging)
+						Log.Write("debug", "Air order [{0}] {1}#{2}: attack {3}#{4}.",
+							owner.AirProfile, a.Info.Name, a.ActorID, owner.TargetActor.Info.Name, owner.TargetActor.ActorID);
+				}
+				else if (owner.SquadManager.Info.AirTargetDebugLogging)
+					Log.Write("debug", "Air order [{0}] {1}#{2}: cannot attack selected {3}#{4}.",
+						owner.AirProfile, a.Info.Name, a.ActorID, owner.TargetActor.Info.Name, owner.TargetActor.ActorID);
 			}
 		}
 
