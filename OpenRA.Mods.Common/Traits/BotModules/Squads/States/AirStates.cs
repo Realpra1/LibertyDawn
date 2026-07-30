@@ -232,10 +232,14 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					if (profile.Weight > 0)
 					{
 						var range = Math.Max(1, (int)Math.Ceiling(profile.RangeCells * info.AirThreatRangeBuffer));
-						var minX = Math.Max(0, (actor.Location.X - range) / coarseSize);
-						var maxX = Math.Min(width - 1, (actor.Location.X + range) / coarseSize);
-						var minY = Math.Max(0, (actor.Location.Y - range) / coarseSize);
-						var maxY = Math.Min(height - 1, (actor.Location.Y + range) / coarseSize);
+						var mobile = actor.Info.TraitInfoOrDefault<MobileInfo>();
+						var movementBuffer = mobile == null ? 0 :
+							AirThreatGeometry.MobileThreatBufferCells(mobile.Speed, info.AirInfluenceCacheInterval);
+						var influenceRange = range + movementBuffer;
+						var minX = Math.Max(0, (actor.Location.X - influenceRange) / coarseSize);
+						var maxX = Math.Min(width - 1, (actor.Location.X + influenceRange) / coarseSize);
+						var minY = Math.Max(0, (actor.Location.Y - influenceRange) / coarseSize);
+						var maxY = Math.Min(height - 1, (actor.Location.Y + influenceRange) / coarseSize);
 						var weight = profile.Weight;
 						if (apache && profile.Weight >= .75f)
 							weight *= 4f;
@@ -248,7 +252,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 							{
 								var cell = new CPos(x * coarseSize + coarseSize / 2, y * coarseSize + coarseSize / 2);
 								var distance = (map.CenterOfCell(map.Clamp(cell)) - actor.CenterPosition).Length / 1024;
-								if (distance <= range)
+								if (distance <= influenceRange)
 									rebuiltDanger[y * width + x] += weight;
 							}
 					}
@@ -671,6 +675,10 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			if (repairing && health.HP >= health.MaxHP)
 			{
 				owner.AirUnitsRepairing.Remove(a.ActorID);
+				if (owner.SquadManager.Info.AirTargetDebugLogging)
+					Log.Write("debug", "Air repair [{0}] {1}#{2}: recovery complete.",
+						owner.AirProfile, a.Info.Name, a.ActorID);
+
 				return false;
 			}
 
@@ -690,16 +698,41 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			if (repairable == null || repairable.RepairActors.Count == 0)
 				return false;
 
-			var nearest = FindNearestRepairBuilding(owner, a, repairable);
-			if (nearest == null)
-				return repairing;
+			var nearest = FindNearestRepairBuilding(owner, a, repairable, requireAvailable: true);
+			if (nearest != null)
+			{
+				owner.Bot.QueueOrder(new Order("Repair", a, Target.FromActor(nearest), false));
+				owner.AirUnitsRepairing.Add(a.ActorID);
+				if (owner.SquadManager.Info.AirTargetDebugLogging)
+					Log.Write("debug", "Air repair [{0}] {1}#{2}: {3}/{4} HP, ordered to available {5}#{6}.",
+						owner.AirProfile, a.Info.Name, a.ActorID, health.HP, health.MaxHP,
+						nearest.Info.Name, nearest.ActorID);
 
-			owner.Bot.QueueOrder(new Order("Repair", a, Target.FromActor(nearest), false));
+				return true;
+			}
+
+			// Commit to recovery even when every pad is occupied. Waiting at the nearest compatible
+			// facility keeps the aircraft out of combat, lets repair auras help where present, and retries
+			// reservation on every safety update once it becomes idle.
 			owner.AirUnitsRepairing.Add(a.ActorID);
+			var waitingAt = FindNearestRepairBuilding(owner, a, repairable, requireAvailable: false);
+			if (waitingAt != null)
+			{
+				owner.Bot.QueueOrder(new Order("Move", a, Target.FromCell(owner.World, waitingAt.Location), false));
+				if (owner.SquadManager.Info.AirTargetDebugLogging)
+					Log.Write("debug", "Air repair [{0}] {1}#{2}: {3}/{4} HP, all pads occupied; waiting near {5}#{6}.",
+						owner.AirProfile, a.Info.Name, a.ActorID, health.HP, health.MaxHP,
+						waitingAt.Info.Name, waitingAt.ActorID);
+			}
+			else if (owner.SquadManager.Info.AirTargetDebugLogging)
+				Log.Write("debug", "Air repair [{0}] {1}#{2}: {3}/{4} HP, no compatible repair facility.",
+					owner.AirProfile, a.Info.Name, a.ActorID, health.HP, health.MaxHP);
+
 			return true;
 		}
 
-		static Actor FindNearestRepairBuilding(Squad owner, Actor aircraft, RepairableInfo repairable)
+		static Actor FindNearestRepairBuilding(
+			Squad owner, Actor aircraft, RepairableInfo repairable, bool requireAvailable)
 		{
 			Actor nearest = null;
 			var nearestDistanceSquared = long.MaxValue;
@@ -708,6 +741,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			foreach (var b in owner.World.ActorsHavingTrait<RepairsUnits>())
 			{
 				if (b.Owner != owner.Bot.Player || !repairable.RepairActors.Contains(b.Info.Name))
+					continue;
+
+				if (requireAvailable && !Reservable.IsAvailableFor(b, aircraft))
 					continue;
 
 				long dx = b.CenterPosition.X - aircraft.CenterPosition.X;

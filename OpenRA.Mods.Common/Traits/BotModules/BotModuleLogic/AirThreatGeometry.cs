@@ -161,6 +161,15 @@ namespace OpenRA.Mods.Common.Traits
 			return result;
 		}
 
+		/// <summary>Maximum whole cells a mobile threat can traverse before an influence cache expires.</summary>
+		public static int MobileThreatBufferCells(int speed, int cacheTicks)
+		{
+			if (speed <= 0 || cacheTicks <= 0)
+				return 0;
+
+			return (int)Math.Ceiling(speed * (long)cacheTicks / 1024d);
+		}
+
 		/// <summary>
 		/// Squared distance (in world units) from <paramref name="p"/> to the segment
 		/// <paramref name="a"/>-<paramref name="b"/>, measured on the ground plane.

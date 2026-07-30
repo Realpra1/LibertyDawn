@@ -534,6 +534,11 @@ namespace OpenRA.Mods.Common.Traits
 
 		void FindNewUnits(IBot bot)
 		{
+			// activeUnits is bookkeeping, not proof of squad membership. Recover any live aircraft whose
+			// squad entry was lost so it can never remain permanently idle at the base.
+			var assignedAircraft = new HashSet<Actor>(Squads.Where(s => s.Type == SquadType.Air).SelectMany(s => s.Units));
+			activeUnits.RemoveAll(a => a != null && Info.AirUnitsTypes.Contains(a.Info.Name) && !assignedAircraft.Contains(a));
+
 			var newUnits = World.ActorsHavingTrait<IPositionable>()
 				.Where(a => a.Owner == Player &&
 					!Info.ExcludeFromSquadsTypes.Contains(a.Info.Name) &&
