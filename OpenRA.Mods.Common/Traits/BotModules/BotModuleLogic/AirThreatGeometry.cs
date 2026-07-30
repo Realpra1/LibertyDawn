@@ -9,6 +9,7 @@
  */
 #endregion
 
+using System;
 using System.Collections.Generic;
 
 namespace OpenRA.Mods.Common.Traits
@@ -143,10 +144,64 @@ namespace OpenRA.Mods.Common.Traits
 		/// That is why capping air squads matters for survival and not just for feel - at the stock
 		/// multiplier of 8, a twenty-aircraft squad shrugged off two anti-air actors that would each
 		/// individually delete an aircraft, while a squad of five breaks off for the first one.
+		/// <paramref name="antiAirWeight"/> is a sum of <see cref="AaEffectiveness"/> weights, not a
+		/// raw headcount - a Guard Tower and a Rocket Soldier both being "anti-air capable" no longer
+		/// means they are equally dangerous.
 		/// </summary>
-		public static bool ShouldFleeAntiAir(int antiAirCount, int fleeMultiplier, int squadSize)
+		public static bool ShouldFleeAntiAir(float antiAirWeight, int fleeMultiplier, int squadSize)
 		{
-			return antiAirCount > 0 && antiAirCount * fleeMultiplier > squadSize;
+			return antiAirWeight > 0 && antiAirWeight * fleeMultiplier > squadSize;
+		}
+
+		/// <summary>
+		/// Whether a weapon's real target range should be treated as reaching <paramref name="distanceInCells"/>
+		/// away, once padded by <paramref name="buffer"/>. The bot's own scans are flat radii unrelated to
+		/// any specific weapon's range; this is the per-defender check applied to candidates the scan already
+		/// found, so a long-range SAM is respected further out than a short-range machine gun even though both
+		/// were discovered by the same circular scan.
+		/// </summary>
+		public static bool IsWithinBufferedRange(int distanceInCells, int weaponRangeCells, float buffer)
+		{
+			return distanceInCells <= weaponRangeCells * buffer;
+		}
+
+		/// <summary>
+		/// Whether an aircraft moving at <paramref name="aircraftSpeed"/> can simply outrun a projectile
+		/// moving at <paramref name="projectileSpeed"/> (both in WDist/tick, the same scale
+		/// <c>AircraftInfo.Speed</c> and <c>MissileInfo.Speed</c>/<c>BulletInfo.Speed</c> already use) - so it
+		/// never has to stop to avoid this specific threat, only keep moving through it. A tie is not an
+		/// outrun: the projectile catches up eventually.
+		/// </summary>
+		public static bool CanOutrun(int aircraftSpeed, int projectileSpeed)
+		{
+			return aircraftSpeed > projectileSpeed;
+		}
+
+		/// <summary>
+		/// How dangerous a unit's anti-air weapon really is, from 0 (harmless) to 1 (as dangerous as its
+		/// own primary/ground weapon, or a dedicated single-purpose AA weapon with nothing to compare
+		/// against). Derived from the AA weapon's <c>Inaccuracy</c> and <c>Damage</c> relative to the same
+		/// unit's primary weapon, rather than a hardcoded list of "units that are bad at AA" - the recorded
+		/// pattern in this mod's own weapon yaml is that a weak secondary AA weapon inherits its unit's
+		/// primary weapon and overrides Inaccuracy sharply upward (e.g. 128 to 1800) alongside a damage cut,
+		/// so both ratios genuinely carry signal. Floored above zero so a weak AA unit is never treated as
+		/// entirely harmless (and never silently vanishes from every threat calculation), capped at 1 so a
+		/// weapon that turns out to be more accurate/damaging than its own "primary" doesn't overweight.
+		/// </summary>
+		public static float AaEffectiveness(int aaInaccuracy, int aaDamage, int primaryInaccuracy, int primaryDamage)
+		{
+			// No baseline to compare against - either a dedicated single-purpose AA unit (nothing else to
+			// judge it by) or malformed data. Either way, treat it as a full, undiscounted threat.
+			if (primaryInaccuracy <= 0 || primaryDamage <= 0)
+				return 1f;
+
+			// Larger Inaccuracy is worse, so the ratio is baseline-over-actual: 1 when equally accurate,
+			// shrinking as the AA weapon scatters more than its own primary weapon does.
+			var accuracyRatio = (float)primaryInaccuracy / Math.Max(aaInaccuracy, 1);
+			var damageRatio = (float)aaDamage / primaryDamage;
+
+			var effectiveness = (accuracyRatio + damageRatio) / 2f;
+			return Math.Clamp(effectiveness, 0.05f, 1f);
 		}
 
 		/// <summary>
@@ -207,7 +262,7 @@ namespace OpenRA.Mods.Common.Traits
 		/// outweigh the anti-air cover on top of it and along the way there.
 		/// </summary>
 		public static int TargetScore(int classValue, bool defenceless, int defencelessBonus,
-			int antiAirCount, int antiAirPenalty,
+			float antiAirWeight, int antiAirPenalty,
 			int routeThreatCount, int routeThreatPenalty,
 			int distanceInCells, int distancePenalty)
 		{
@@ -216,7 +271,7 @@ namespace OpenRA.Mods.Common.Traits
 			if (defenceless)
 				score += defencelessBonus;
 
-			score -= antiAirCount * antiAirPenalty;
+			score -= (int)Math.Round(antiAirWeight * antiAirPenalty);
 			score -= routeThreatCount * routeThreatPenalty;
 			score -= distanceInCells * distancePenalty;
 

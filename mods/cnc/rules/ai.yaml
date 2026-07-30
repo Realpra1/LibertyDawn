@@ -895,6 +895,35 @@ Player:
 		MaximumAirSquads: 2
 		AirEvadeDistance: 12
 		AirEvadeJitter: 5
+		AirThreatRangeBuffer: 1.5
+		AirMassedAttackIdleThreshold: 6
+		HealthRetreatThreshold: 0.5
+		AirTargetPriorityOrca:
+			mcv: 1000
+			harv: 900
+			sharv: 900
+			nuk2: 800
+			proc: 700
+			nuke: 600
+			fact: 500
+			fact.gdi: 500
+			fact.nod: 500
+			hq: 500
+		AirTargetPriorityHeli:
+			mcv: 1000
+			harv: 900
+			sharv: 900
+			e1: 800
+			e2: 800
+			e3: 800
+			e4: 800
+			e5: 800
+			rmbo: 800
+			bggy: 700
+			bike: 700
+			ltnk: 700
+			nuk2: 600
+			proc: 500
 	UnitBuilderBotModule@skynet:
 		RequiresCondition: enable-skynet-ai
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade

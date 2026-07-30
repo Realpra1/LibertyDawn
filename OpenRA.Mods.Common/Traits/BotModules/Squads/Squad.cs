@@ -42,6 +42,12 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		// anti-air cover from re-issuing move orders on every safety check.
 		internal int NextAirRetreatTick;
 
+		// Consecutive AirIdleState scans that found no valid (safe-enough) target. Drives the massed-
+		// attack fallback: past SquadManagerBotModuleInfo.AirMassedAttackIdleThreshold, the squad stops
+		// waiting for something undefended to show up and instead forces an attack on whatever scores
+		// best with the anti-air/route penalties relaxed. Reset to zero the moment a target is found.
+		internal int AirConsecutiveNoTargetScans;
+
 		public Squad(IBot bot, SquadManagerBotModule squadManager, SquadType type)
 			: this(bot, squadManager, type, null) { }
 

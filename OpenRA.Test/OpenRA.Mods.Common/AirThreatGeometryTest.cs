@@ -311,5 +311,82 @@ namespace OpenRA.Test
 			Assert.That(clearRoute, Is.GreaterThan(throughSams));
 			Assert.That(clearRoute - throughSams, Is.EqualTo(3 * RoutePenalty));
 		}
+
+		[TestCase(TestName = "A weapon's range is respected further out once padded by the buffer, but no further")]
+		public void BufferedRangeExtendsCoverage()
+		{
+			// A TowerAAMissile site: Range 10c0, AirThreatRangeBuffer 1.5 as wired into
+			// SquadManagerBotModule@skynet.
+			Assert.That(AirThreatGeometry.IsWithinBufferedRange(10, 10, 1.5f), Is.True);
+			Assert.That(AirThreatGeometry.IsWithinBufferedRange(15, 10, 1.5f), Is.True);
+			Assert.That(AirThreatGeometry.IsWithinBufferedRange(16, 10, 1.5f), Is.False);
+
+			// No buffer at all is just the raw range.
+			Assert.That(AirThreatGeometry.IsWithinBufferedRange(11, 10, 1f), Is.False);
+		}
+
+		[TestCase(TestName = "An Orca outruns everything except the two fastest AA missiles it can meet")]
+		public void OrcaOutrunsMostAntiAir()
+		{
+			// Real speeds (WDist/tick) from mods/cnc/rules/aircraft.yaml and
+			// mods/cnc/weapons/missiles.yaml.
+			const int OrcaSpeed = 230;
+			const int ApacheSpeed = 160;
+
+			const int OrcaAaMissileSpeed = 341;
+			const int AaRocketsSpeed = 350;
+			const int TowerAaMissileSpeed = 180;
+			const int BikeAaRocketsSpeed = 213;
+			const int StealthTankAaSpeed = 213; // 227mm.stnkAA
+			const int DragonSpeed = 210;
+
+			// The two the feedback specifically called out as too fast to outrun.
+			Assert.That(AirThreatGeometry.CanOutrun(OrcaSpeed, OrcaAaMissileSpeed), Is.False);
+			Assert.That(AirThreatGeometry.CanOutrun(OrcaSpeed, AaRocketsSpeed), Is.False);
+
+			// Everything else, the Orca can fly straight through without stopping.
+			Assert.That(AirThreatGeometry.CanOutrun(OrcaSpeed, TowerAaMissileSpeed), Is.True);
+			Assert.That(AirThreatGeometry.CanOutrun(OrcaSpeed, BikeAaRocketsSpeed), Is.True);
+			Assert.That(AirThreatGeometry.CanOutrun(OrcaSpeed, StealthTankAaSpeed), Is.True);
+			Assert.That(AirThreatGeometry.CanOutrun(OrcaSpeed, DragonSpeed), Is.True);
+
+			// The slower Apache cannot outrun anything an Orca can - not even the Dragon.
+			Assert.That(AirThreatGeometry.CanOutrun(ApacheSpeed, DragonSpeed), Is.False);
+
+			// A tie is not an outrun: the projectile still catches up eventually.
+			Assert.That(AirThreatGeometry.CanOutrun(200, 200), Is.False);
+		}
+
+		[TestCase(TestName = "Units that are bad at anti-air score well below a dedicated AA weapon")]
+		public void AaEffectivenessReflectsHowBadTheUnitActuallyIs()
+		{
+			// Real Inaccuracy/Damage from mods/cnc/weapons/missiles.yaml. In each case the AA weapon
+			// inherits its unit's primary ground weapon and overrides Inaccuracy sharply upward
+			// alongside a damage cut - exactly the pattern AaEffectiveness is meant to discount.
+
+			// E3 Rocket Soldier: Rockets (Inaccuracy 128, Damage 4000) vs AARockets (1800, 1500).
+			var rocketSoldier = AirThreatGeometry.AaEffectiveness(1800, 1500, 128, 4000);
+			Assert.That(rocketSoldier, Is.EqualTo(0.2231f).Within(0.001f));
+
+			// Recon Bike: BikeRockets (128, 2500 - inherited from ^MissileWeapon) vs BikeAARockets (1800, 800).
+			var bike = AirThreatGeometry.AaEffectiveness(1800, 800, 128, 2500);
+			Assert.That(bike, Is.EqualTo(0.1956f).Within(0.001f));
+
+			// Stealth Tank: 227mm.stnk (213, 10000) vs 227mm.stnkAA (1800, 4000).
+			var stealthTank = AirThreatGeometry.AaEffectiveness(1800, 4000, 213, 10000);
+			Assert.That(stealthTank, Is.EqualTo(0.2592f).Within(0.001f));
+
+			// All three are clearly worse than a dedicated AA weapon, but never treated as harmless.
+			Assert.That(rocketSoldier, Is.LessThan(0.5f));
+			Assert.That(bike, Is.LessThan(0.5f));
+			Assert.That(stealthTank, Is.LessThan(0.5f));
+
+			// A dedicated single-purpose AA unit - nothing to compare against - is a full threat.
+			Assert.That(AirThreatGeometry.AaEffectiveness(0, 5000, 0, 0), Is.EqualTo(1f));
+
+			// Never entirely harmless, never overweighted past a genuine full threat.
+			Assert.That(AirThreatGeometry.AaEffectiveness(100000, 1, 128, 4000), Is.EqualTo(0.05f));
+			Assert.That(AirThreatGeometry.AaEffectiveness(1, 100000, 128, 4000), Is.EqualTo(1f));
+		}
 	}
 }
