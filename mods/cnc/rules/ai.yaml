@@ -884,7 +884,7 @@ Player:
 		AirTargetMinimumScore: 1
 		AirTargetClosestCandidates: 15
 		AirTargetHighestValueCandidates: 10
-		AirTargetDebugLogging: false
+		AirTargetDebugLogging: true
 		AirInfluenceCellSize: 6
 		AirInfluenceCacheInterval: 125
 		AirSafetyCheckInterval: 25
