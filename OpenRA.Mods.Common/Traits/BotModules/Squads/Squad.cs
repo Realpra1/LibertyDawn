@@ -54,6 +54,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		internal int AirTargetLastDistanceCells = int.MaxValue;
 		internal int AirTargetLastHP = int.MaxValue;
 		internal float AirLocalThreatWeight;
+		internal int AirNextTargetReviewTick;
 
 		public Squad(IBot bot, SquadManagerBotModule squadManager, SquadType type)
 			: this(bot, squadManager, type, null) { }

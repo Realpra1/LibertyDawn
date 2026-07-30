@@ -880,10 +880,11 @@ Player:
 		AirTargetBuildingValue: 100
 		AirTargetDefencelessBonus: 250
 		AirTargetAntiAirPenalty: 700
-		AirTargetDistancePenalty: 3
+		AirTargetDistancePenalty: 12
 		AirTargetMinimumScore: 1
 		AirTargetClosestCandidates: 15
 		AirTargetHighestValueCandidates: 10
+		AirTargetHarvesterCandidates: 10
 		AirTargetDebugLogging: true
 		AirInfluenceCellSize: 6
 		AirInfluenceCacheInterval: 125
@@ -917,27 +918,36 @@ Player:
 			harv: 5000
 			sharv: 5000
 			nuk2: 2500
+			htnk: 2500
+			mtnk: 2000
+			ltnk: 1250
+			stnk: 1250
 			proc: 1250
 			fact: 625
 			fact.gdi: 625
 			fact.nod: 625
 			hq: 312
 			nuke: 156
+			e1: 100
+			e2: 100
+			e3: 100
+			e4: 100
+			e5: 100
 			obli: 1
 		AirTargetPriorityHeli:
 			mcv: 10000
 			harv: 5000
 			sharv: 5000
-			e3: 2500
+			e3: 4000
 			bike: 2500
 			stnk: 2500
 			rmbo: 1250
 			bggy: 1250
 			ltnk: 1250
-			e1: 625
-			e2: 625
-			e4: 625
-			e5: 625
+			e1: 1500
+			e2: 1500
+			e4: 1500
+			e5: 1500
 			nuk2: 312
 			proc: 156
 			obli: 1

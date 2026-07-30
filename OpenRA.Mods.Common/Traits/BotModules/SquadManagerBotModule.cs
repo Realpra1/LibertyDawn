@@ -146,6 +146,9 @@ namespace OpenRA.Mods.Common.Traits
 			"with AirTargetClosestCandidates and deduplicated, so distant opportunities remain eligible.")]
 		public readonly int AirTargetHighestValueCandidates = 10;
 
+		[Desc("Additional nearest strategic cells containing harvesters that are always included in air target evaluation.")]
+		public readonly int AirTargetHarvesterCandidates = 0;
+
 		[Desc("Write air target scores and route decisions to debug.log.")]
 		public readonly bool AirTargetDebugLogging = false;
 
@@ -259,6 +262,9 @@ namespace OpenRA.Mods.Common.Traits
 			if (AirTargetClosestCandidates < 0 || AirTargetHighestValueCandidates < 0 ||
 				AirTargetClosestCandidates + AirTargetHighestValueCandidates <= 0)
 				throw new YamlException("At least one air target candidate count must be greater than zero.");
+
+			if (AirTargetHarvesterCandidates < 0)
+				throw new YamlException("AirTargetHarvesterCandidates must not be negative.");
 
 			if (AirInfluenceCellSize <= 0)
 				throw new YamlException("AirInfluenceCellSize must be greater than zero.");

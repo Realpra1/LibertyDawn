@@ -82,6 +82,61 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			return best;
 		}
 
+		/// <summary>
+		/// Conservative host-side estimate of whether fully loaded squad members can destroy a target
+		/// with their current magazines. This intentionally uses rules data only: target HP and armor,
+		/// weapon damage/versus/burst, and actual ammo state. It is used to recognize disposable AA
+		/// such as rocket infantry without actor-name exceptions.
+		/// </summary>
+		static bool CanEliminateWithFullAmmo(IEnumerable<Actor> units, Actor target)
+		{
+			var health = target.TraitOrDefault<IHealth>();
+			if (health == null)
+				return false;
+
+			var armorType = target.Info.TraitInfoOrDefault<ArmorInfo>()?.Type;
+			long availableDamage = 0;
+			var hasAttacker = false;
+			foreach (var unit in units)
+			{
+				if (!CanAttackTarget(unit, target))
+					continue;
+
+				var ammoPools = unit.TraitsImplementing<AmmoPool>().ToArray();
+				if (!FullAmmo(ammoPools))
+					return false;
+
+				var attacks = ammoPools.Length == 0 ? 1 : ammoPools.Min(a => a.CurrentAmmoCount);
+				var bestAttackDamage = 0;
+				foreach (var armament in unit.TraitsImplementing<Armament>())
+				{
+					if (armament.IsTraitDisabled || armament.IsTraitPaused ||
+						!armament.Weapon.IsValidTarget(target.GetEnabledTargetTypes()))
+						continue;
+
+					var attackDamage = 0;
+					foreach (var warhead in armament.Weapon.Warheads)
+						if (warhead is DamageWarhead damage && damage.Damage > 0)
+						{
+							var versus = armorType != null && damage.Versus.TryGetValue(armorType, out var modifier) ?
+								modifier : 100;
+							attackDamage += damage.Damage * versus / 100;
+						}
+
+					bestAttackDamage = Math.Max(bestAttackDamage, attackDamage * armament.Weapon.Burst);
+				}
+
+				if (bestAttackDamage <= 0)
+					continue;
+
+				hasAttacker = true;
+				availableDamage += (long)bestAttackDamage * attacks;
+			}
+
+			// Leave margin for misses, overkill between aircraft, and conditional damage modifiers.
+			return hasAttacker && availableDamage >= health.HP * 2L;
+		}
+
 		/// <summary>Inaccuracy of a weapon's projectile, or 0 when the projectile type carries none.</summary>
 		static int WeaponInaccuracy(WeaponInfo weapon)
 		{
@@ -197,18 +252,18 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var archetypePriority = ArchetypePriority(owner);
 			var apache = owner.AirProfile.Equals("Apache", StringComparison.OrdinalIgnoreCase);
 			var orca = owner.AirProfile.Equals("Orca", StringComparison.OrdinalIgnoreCase);
-			var combatUnits = owner.Units.Where(a => !owner.AirUnitsRepairing.Contains(a.ActorID) &&
-				HasAmmo(a.TraitsImplementing<AmmoPool>())).ToList();
-			if (combatUnits.Count == 0)
+			var planningUnits = owner.Units.Where(a => !owner.AirUnitsRepairing.Contains(a.ActorID)).ToList();
+			if (planningUnits.Count == 0)
 			{
 				if (info.AirTargetDebugLogging)
-					Log.Write("debug", "Air target [{0}] scan stopped: no armed non-repairing aircraft in squad of {1}.",
+					Log.Write("debug", "Air target [{0}] scan stopped: no non-repairing aircraft in squad of {1}.",
 						owner.AirProfile, owner.Units.Count);
 
 				return null;
 			}
 
-			var squadSpeed = combatUnits.Select(a => a.Info.TraitInfoOrDefault<AircraftInfo>())
+			var armedUnits = planningUnits.Where(a => HasAmmo(a.TraitsImplementing<AmmoPool>())).ToList();
+			var squadSpeed = planningUnits.Select(a => a.Info.TraitInfoOrDefault<AircraftInfo>())
 				.Where(a => a != null).Min(a => a.Speed);
 			if (!InfluenceCaches.TryGetValue(owner.SquadManager, out var profileCaches))
 			{
@@ -289,18 +344,18 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var candidates = cache.Candidates;
 			var threats = cache.Threats;
 
-			var planningCenter = combatUnits.Select(a => a.CenterPosition).Average();
+			var planningCenter = planningUnits.Select(a => a.CenterPosition).Average();
 			var startCell = map.CellContaining(planningCenter);
 			var startX = Math.Clamp(startCell.X / coarseSize, 0, width - 1);
 			var startY = Math.Clamp(startCell.Y / coarseSize, 0, height - 1);
-			var riskScale = Math.Max(1f, combatUnits.Count / 3f);
+			var riskScale = Math.Max(1f, armedUnits.Count / 3f);
 			var bestScore = int.MinValue;
 			Actor best = null;
 			List<CPos> bestRoute = null;
 			var bestIsUndefended = false;
 
 			var liveCandidates = candidates.Where(c => !c.Actor.IsDead &&
-				combatUnits.Any(u => CanAttackTarget(u, c.Actor))).OrderBy(c => c.Actor.ActorID).ToList();
+				planningUnits.Any(u => CanAttackTarget(u, c.Actor))).OrderBy(c => c.Actor.ActorID).ToList();
 			var cellUtility = new Dictionary<CPos, long>();
 			var cellActors = new Dictionary<CPos, List<int>>();
 			for (var i = 0; i < liveCandidates.Count; i++)
@@ -330,6 +385,26 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				}).ToList(),
 				candidateCells.Select(c => (int)Math.Min(int.MaxValue, cellUtility[c])).ToList(),
 				info.AirTargetClosestCandidates, info.AirTargetHighestValueCandidates);
+
+			if (info.AirTargetHarvesterCandidates > 0)
+			{
+				var selected = new HashSet<int>(selectedCellIndices);
+				foreach (var index in Enumerable.Range(0, candidateCells.Count)
+					.Where(i => cellActors[candidateCells[i]].Any(a =>
+						liveCandidates[a].Actor.Info.HasTraitInfo<HarvesterInfo>()))
+					.OrderBy(i =>
+					{
+						var c = candidateCells[i];
+						var center = map.CenterOfCell(map.Clamp(new CPos(
+							c.X * coarseSize + coarseSize / 2, c.Y * coarseSize + coarseSize / 2)));
+						return (center - planningCenter).LengthSquared;
+					})
+					.ThenBy(i => i)
+					.Take(info.AirTargetHarvesterCandidates))
+					selected.Add(index);
+
+				selectedCellIndices = selected.OrderBy(i => i).ToList();
+			}
 
 			foreach (var selectedCellIndex in selectedCellIndices)
 			{
@@ -365,6 +440,12 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					foreach (var threat in threats)
 					{
 						if (threat.Actor.IsDead)
+							continue;
+
+						// A fully loaded squad may treat an AA actor it can eliminate in one magazine
+						// as the target to clear, but every other defender around it remains in force.
+						if (threat.Actor == candidate.Actor &&
+							CanEliminateWithFullAmmo(planningUnits, candidate.Actor))
 							continue;
 
 						var distance = (threat.Actor.CenterPosition - candidate.Actor.CenterPosition).Length / 1024;
@@ -445,6 +526,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			owner.AirTargetLastDistanceCells = (best.CenterPosition - planningCenter).Length / 1024;
 			var bestHealth = best.TraitOrDefault<IHealth>();
 			owner.AirTargetLastHP = bestHealth?.HP ?? int.MaxValue;
+			owner.AirNextTargetReviewTick = owner.World.WorldTick + info.AirInfluenceCacheInterval;
 			if (bestRoute != null)
 				owner.AirRoute.AddRange(bestRoute);
 			return best;
@@ -998,6 +1080,26 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			if (owner.SquadManager.Info.AirTargetDebugLogging)
 				Log.Write("debug", "Air state [{0}] attack tick: units={1} target-valid={2} route-queued={3}.",
 					owner.AirProfile, owner.Units.Count, owner.IsTargetValid, owner.AirRouteQueued);
+
+			if (owner.IsTargetValid && owner.World.WorldTick >= owner.AirNextTargetReviewTick)
+			{
+				var hasArmedUnit = owner.Units.Any(a => !owner.AirUnitsRepairing.Contains(a.ActorID) &&
+					HasAmmo(a.TraitsImplementing<AmmoPool>()));
+				if (!hasArmedUnit || owner.TargetActor.Info.HasTraitInfo<BuildingInfo>())
+				{
+					if (info.AirTargetDebugLogging)
+						Log.Write("debug", "Air target [{0}] reviewing {1}#{2}: building={3} armed={4}.",
+							owner.AirProfile, owner.TargetActor.Info.Name, owner.TargetActor.ActorID,
+							owner.TargetActor.Info.HasTraitInfo<BuildingInfo>(), hasArmedUnit);
+
+					owner.TargetActor = null;
+					owner.AirTargetStrategicCell = null;
+					owner.AirRoute.Clear();
+					owner.AirRouteQueued = false;
+				}
+				else
+					owner.AirNextTargetReviewTick = owner.World.WorldTick + info.AirInfluenceCacheInterval;
+			}
 
 			if (owner.IsTargetValid)
 			{
