@@ -242,9 +242,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 						var maxY = Math.Min(height - 1, (actor.Location.Y + influenceRange) / coarseSize);
 						var weight = profile.Weight;
 						if (apache && profile.Weight >= .75f)
-							weight *= 4f;
+							weight *= mobile == null ? 8f : 4f;
 						else if (orca && AirThreatGeometry.CanOutrun(squadSpeed, profile.FastestProjectileSpeed))
-							weight *= .2f;
+							weight *= .5f;
 
 						rebuiltThreats.Add((actor, weight, range));
 						for (var y = minY; y <= maxY; y++)
@@ -299,9 +299,21 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			List<CPos> bestRoute = null;
 
 			var liveCandidates = candidates.Where(c => !c.Actor.IsDead).OrderBy(c => c.Actor.ActorID).ToList();
+			var cellUtility = new Dictionary<CPos, long>();
+			foreach (var candidate in liveCandidates)
+			{
+				var cell = new CPos(candidate.Actor.Location.X / coarseSize, candidate.Actor.Location.Y / coarseSize);
+				cellUtility.TryGetValue(cell, out var total);
+				cellUtility[cell] = total + candidate.Utility;
+			}
+
 			var candidateIndices = AirThreatGeometry.SelectTargetCandidates(
 				liveCandidates.Select(c => (c.Actor.CenterPosition - planningCenter).LengthSquared).ToList(),
-				liveCandidates.Select(c => c.Utility).ToList(),
+				liveCandidates.Select(c =>
+				{
+					var cell = new CPos(c.Actor.Location.X / coarseSize, c.Actor.Location.Y / coarseSize);
+					return (int)Math.Min(int.MaxValue, cellUtility[cell]);
+				}).ToList(),
 				info.AirTargetClosestCandidates, info.AirTargetHighestValueCandidates);
 
 			foreach (var candidateIndex in candidateIndices)
@@ -309,6 +321,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				var candidate = liveCandidates[candidateIndex];
 				var goalX = Math.Clamp(candidate.Actor.Location.X / coarseSize, 0, width - 1);
 				var goalY = Math.Clamp(candidate.Actor.Location.Y / coarseSize, 0, height - 1);
+				var opportunityValue = cellUtility[new CPos(goalX, goalY)];
 				var route = AirThreatGeometry.FindCoarseRoute(danger, width, height, startX, startY, goalX, goalY,
 					info.AirRouteThreatPenalty / riskScale);
 				if (route == null)
@@ -338,15 +351,15 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				// Each independent liability scales the target value down instead of participating in a
 				// binary veto. This preserves meaningful tradeoffs: speed can justify a distant harvester,
 				// while route and destination AA still compound to make defended targets unattractive.
-				var score = (long)candidate.Utility;
+				var score = opportunityValue;
 				score = score * 1024 / Math.Max(1, 1024 + distanceCost);
 				score = score * 1024 / Math.Max(1, 1024 + (int)exposureCost);
 				score = score * 1024 / Math.Max(1, 1024 + stoppingCost);
 				var finalScore = (int)Math.Clamp(score, int.MinValue, int.MaxValue);
 
 				if (info.AirTargetDebugLogging)
-					Log.Write("debug", "Air target [{0}] {1}#{2}: utility={3} route={4} exposure={5:0.##} destination-danger={6:0.##} score={7} relaxed={8}",
-						owner.AirProfile, candidate.Actor.Info.Name, candidate.Actor.ActorID, candidate.Utility,
+					Log.Write("debug", "Air target [{0}] {1}#{2}: utility={3} cell-utility={4} route={5} exposure={6:0.##} destination-danger={7:0.##} score={8} relaxed={9}",
+						owner.AirProfile, candidate.Actor.Info.Name, candidate.Actor.ActorID, candidate.Utility, opportunityValue,
 						route.Count, exposureCost, destinationDanger, finalScore, relaxed);
 
 				if (best == null || finalScore > bestScore)
@@ -373,6 +386,11 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 			owner.AirRoute.Clear();
 			owner.AirRouteQueued = false;
+			owner.AirTargetStrategicCell = new CPos(best.Location.X / coarseSize, best.Location.Y / coarseSize);
+			owner.AirTargetLastProgressTick = owner.World.WorldTick;
+			owner.AirTargetLastDistanceCells = (best.CenterPosition - planningCenter).Length / 1024;
+			var bestHealth = best.TraitOrDefault<IHealth>();
+			owner.AirTargetLastHP = bestHealth?.HP ?? int.MaxValue;
 			if (bestRoute != null)
 				owner.AirRoute.AddRange(bestRoute);
 			return best;
@@ -469,6 +487,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var expiry = tick + info.AirThreatMemoryTicks;
 			var squadCenter = owner.CenterPosition;
 			var archetypePriority = ArchetypePriority(owner);
+			var apache = owner.AirProfile.Equals("Apache", StringComparison.OrdinalIgnoreCase);
+			var orca = owner.AirProfile.Equals("Orca", StringComparison.OrdinalIgnoreCase);
 
 			// Only while already committed to a target (i.e. actually flying somewhere, not idling and
 			// scanning in place) may a threat every unit in the squad can outrun be flown through instead
@@ -512,8 +532,23 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					var withinRange = AirThreatGeometry.IsWithinBufferedRange(distanceInCells, profile.RangeCells, info.AirThreatRangeBuffer);
 					var outrunnable = committed && AirThreatGeometry.CanOutrun(squadSpeed, profile.FastestProjectileSpeed);
 
-					if (withinRange && !outrunnable)
-						antiAirWeight += profile.Weight;
+					if (withinRange)
+					{
+						var localWeight = profile.Weight;
+						var mobile = a.Info.TraitInfoOrDefault<MobileInfo>();
+						if (apache)
+							localWeight *= mobile == null ? 8f : 4f;
+						else if (orca && outrunnable)
+							localWeight *= .5f;
+
+						// A squad of at least two aircraft may deliberately finish a mobile AA unit.
+						// This exemption applies only to that selected actor: flying past or loitering
+						// near any other mobile defender remains dangerous, and static SAMs never qualify.
+						if (a == owner.TargetActor && mobile != null && owner.Units.Count >= 2)
+							localWeight = 0;
+
+						antiAirWeight += localWeight;
+					}
 
 					continue;
 				}
@@ -922,12 +957,65 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			if (!owner.IsValid)
 				return;
 
+			var info = owner.SquadManager.Info;
 			if (owner.SquadManager.Info.AirTargetDebugLogging)
 				Log.Write("debug", "Air state [{0}] attack tick: units={1} target-valid={2} route-queued={3}.",
 					owner.AirProfile, owner.Units.Count, owner.IsTargetValid, owner.AirRouteQueued);
 
+			if (owner.IsTargetValid)
+			{
+				var currentCell = new CPos(
+					owner.TargetActor.Location.X / info.AirInfluenceCellSize,
+					owner.TargetActor.Location.Y / info.AirInfluenceCellSize);
+				if (owner.AirTargetStrategicCell == null)
+				{
+					owner.AirTargetStrategicCell = currentCell;
+					owner.AirTargetLastProgressTick = owner.World.WorldTick;
+					owner.AirTargetLastDistanceCells =
+						(owner.TargetActor.CenterPosition - owner.CenterPosition).Length / 1024;
+					owner.AirTargetLastHP = owner.TargetActor.TraitOrDefault<IHealth>()?.HP ?? int.MaxValue;
+				}
+				else if (currentCell != owner.AirTargetStrategicCell.Value)
+				{
+					if (info.AirTargetDebugLogging)
+						Log.Write("debug", "Air target [{0}] {1}#{2} left strategic cell {3}; rescanning in {4}.",
+							owner.AirProfile, owner.TargetActor.Info.Name, owner.TargetActor.ActorID,
+							owner.AirTargetStrategicCell.Value, currentCell);
+
+					owner.TargetActor = null;
+					owner.AirTargetStrategicCell = null;
+					owner.AirRoute.Clear();
+					owner.AirRouteQueued = false;
+				}
+				else
+				{
+					var distanceCells = (owner.TargetActor.CenterPosition - owner.CenterPosition).Length / 1024;
+					var targetHP = owner.TargetActor.TraitOrDefault<IHealth>()?.HP ?? int.MaxValue;
+					if (distanceCells + 1 < owner.AirTargetLastDistanceCells || targetHP < owner.AirTargetLastHP)
+					{
+						owner.AirTargetLastProgressTick = owner.World.WorldTick;
+						owner.AirTargetLastDistanceCells = distanceCells;
+						owner.AirTargetLastHP = targetHP;
+					}
+					else if (owner.World.WorldTick - owner.AirTargetLastProgressTick >= 150 &&
+						owner.Units.Any(a => !owner.AirUnitsRepairing.Contains(a.ActorID) &&
+							HasAmmo(a.TraitsImplementing<AmmoPool>())))
+					{
+						if (info.AirTargetDebugLogging)
+							Log.Write("debug", "Air target [{0}] {1}#{2} stalled for 150 ticks at distance {3}; rescanning.",
+								owner.AirProfile, owner.TargetActor.Info.Name, owner.TargetActor.ActorID, distanceCells);
+
+						owner.TargetActor = null;
+						owner.AirTargetStrategicCell = null;
+						owner.AirRoute.Clear();
+						owner.AirRouteQueued = false;
+					}
+				}
+			}
+
 			if (!owner.IsTargetValid)
 			{
+				owner.AirTargetStrategicCell = null;
 				var nextTarget = FindBestAirTarget(owner);
 				if (nextTarget == null)
 					nextTarget = FindClosestAttackableEnemy(owner);
