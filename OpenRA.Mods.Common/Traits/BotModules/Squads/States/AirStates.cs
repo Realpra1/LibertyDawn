@@ -270,12 +270,15 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			Actor best = null;
 			List<CPos> bestRoute = null;
 
-			// Search outwards first. Only the nearest configured number of opportunities receive the more
-			// expensive route calculation, preventing remote buildings from crowding out nearby targets.
-			foreach (var candidate in candidates.Where(c => !c.Actor.IsDead)
-				.OrderBy(c => (c.Actor.CenterPosition - planningCenter).LengthSquared)
-				.ThenByDescending(c => c.Utility).ThenBy(c => c.Actor.ActorID).Take(info.AirTargetScanSamples))
+			var liveCandidates = candidates.Where(c => !c.Actor.IsDead).OrderBy(c => c.Actor.ActorID).ToList();
+			var candidateIndices = AirThreatGeometry.SelectTargetCandidates(
+				liveCandidates.Select(c => (c.Actor.CenterPosition - planningCenter).LengthSquared).ToList(),
+				liveCandidates.Select(c => c.Utility).ToList(),
+				info.AirTargetClosestCandidates, info.AirTargetHighestValueCandidates);
+
+			foreach (var candidateIndex in candidateIndices)
 			{
+				var candidate = liveCandidates[candidateIndex];
 				var goalX = Math.Clamp(candidate.Actor.Location.X / coarseSize, 0, width - 1);
 				var goalY = Math.Clamp(candidate.Actor.Location.Y / coarseSize, 0, height - 1);
 				var route = AirThreatGeometry.FindCoarseRoute(danger, width, height, startX, startY, goalX, goalY,
@@ -285,19 +288,35 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 				var exposureCost = route.Sum(p => danger[p.Y * width + p.X]) * info.AirRouteThreatPenalty / riskScale;
 				var routeCost = route.Count * coarseSize * info.AirTargetDistancePenalty + (int)exposureCost;
-				var stoppingCost = (int)(danger[goalY * width + goalX] * info.AirTargetAntiAirPenalty / riskScale);
+				var destinationDanger = danger[goalY * width + goalX];
+				var stoppingCost = (int)(destinationDanger * info.AirTargetAntiAirPenalty / riskScale);
 				var score = candidate.Utility * 1024 / Math.Max(1, 1024 + routeCost + stoppingCost);
+
+				if (info.AirTargetDebugLogging)
+					Log.Write("debug", "Air target [{0}] {1}#{2}: utility={3} route={4} exposure={5:0.##} destination-danger={6:0.##} score={7} relaxed={8}",
+						owner.AirProfile, candidate.Actor.Info.Name, candidate.Actor.ActorID, candidate.Utility,
+						route.Count, exposureCost, destinationDanger, score, relaxed);
+
+				// Do not loiter inside AA coverage merely because it is nearby. Defended destinations
+				// become eligible only through the existing last-resort relaxed scan.
+				if (!relaxed && destinationDanger > 0)
+					continue;
 
 				if (best == null || score > bestScore)
 				{
 					best = candidate.Actor;
 					bestScore = score;
-					bestRoute = route.Select(p => map.Clamp(new CPos(p.X * coarseSize + coarseSize / 2, p.Y * coarseSize + coarseSize / 2))).ToList();
+					bestRoute = AirThreatGeometry.SmoothCoarseRoute(danger, width, height, startX, startY, route)
+						.Select(p => map.Clamp(new CPos(p.X * coarseSize + coarseSize / 2, p.Y * coarseSize + coarseSize / 2))).ToList();
 				}
 			}
 
 			if (best == null || (!relaxed && bestScore < info.AirTargetMinimumScore))
 				return null;
+
+			if (info.AirTargetDebugLogging)
+				Log.Write("debug", "Air target [{0}] selected {1}#{2}: score={3} waypoints={4} relaxed={5}",
+					owner.AirProfile, best.Info.Name, best.ActorID, bestScore, bestRoute?.Count ?? 0, relaxed);
 
 			owner.AirRoute.Clear();
 			owner.AirRouteQueued = false;

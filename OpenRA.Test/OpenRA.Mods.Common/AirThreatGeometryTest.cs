@@ -406,5 +406,40 @@ namespace OpenRA.Test
 			Assert.That(AirThreatGeometry.AaEffectiveness(100000, 1, 128, 4000), Is.EqualTo(0.05f));
 			Assert.That(AirThreatGeometry.AaEffectiveness(1, 100000, 128, 4000), Is.EqualTo(1f));
 		}
+
+		[Test]
+		public void SmoothRouteCollapsesSafeGridPathToStraightFlight()
+		{
+			var danger = new float[25];
+			var route = new[] { new CPos(1, 0), new CPos(2, 0), new CPos(2, 1), new CPos(2, 2), new CPos(3, 2), new CPos(4, 2) };
+
+			var smoothed = AirThreatGeometry.SmoothCoarseRoute(danger, 5, 5, 0, 0, route);
+
+			Assert.That(smoothed, Is.EqualTo(new[] { new CPos(4, 2) }));
+		}
+
+		[Test]
+		public void SmoothRouteKeepsDetourAroundDanger()
+		{
+			var danger = new float[25];
+			danger[2 * 5 + 2] = 1;
+			var route = new[] { new CPos(1, 1), new CPos(2, 1), new CPos(3, 1), new CPos(4, 2) };
+
+			var smoothed = AirThreatGeometry.SmoothCoarseRoute(danger, 5, 5, 0, 2, route);
+
+			Assert.That(smoothed.Count, Is.GreaterThan(1));
+			Assert.That(smoothed[smoothed.Count - 1], Is.EqualTo(new CPos(4, 2)));
+		}
+
+		[Test]
+		public void TargetCandidatesCombineNearestAndHighestValue()
+		{
+			var selected = AirThreatGeometry.SelectTargetCandidates(
+				new long[] { 1, 2, 3, 100, 200 },
+				new[] { 10, 20, 30, 1000, 900 },
+				closestCount: 3, highestValueCount: 2);
+
+			Assert.That(selected, Is.EqualTo(new[] { 0, 1, 2, 3, 4 }));
+		}
 	}
 }

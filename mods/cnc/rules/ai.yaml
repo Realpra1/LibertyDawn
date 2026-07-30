@@ -882,7 +882,9 @@ Player:
 		AirTargetAntiAirPenalty: 700
 		AirTargetDistancePenalty: 3
 		AirTargetMinimumScore: 1
-		AirTargetScanSamples: 10
+		AirTargetClosestCandidates: 15
+		AirTargetHighestValueCandidates: 10
+		AirTargetDebugLogging: false
 		AirInfluenceCellSize: 6
 		AirInfluenceCacheInterval: 125
 		AirSafetyCheckInterval: 25
