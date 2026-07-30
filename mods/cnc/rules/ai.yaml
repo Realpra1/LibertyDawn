@@ -881,9 +881,10 @@ Player:
 		AirTargetDefencelessBonus: 250
 		AirTargetAntiAirPenalty: 700
 		AirTargetDistancePenalty: 3
-		AirTargetMinimumScore: 200
-		AirTargetScanSamples: 24
+		AirTargetMinimumScore: 1
+		AirTargetScanSamples: 10
 		AirInfluenceCellSize: 6
+		AirInfluenceCacheInterval: 125
 		AirSafetyCheckInterval: 25
 		AirThreatScanRadius: 16
 		AirThreatFleeMultiplier: 8
@@ -910,34 +911,34 @@ Player:
 		AirMassedAttackIdleThreshold: 6
 		HealthRetreatThreshold: 0.5
 		AirTargetPriorityOrca:
-			mcv: 1000
-			harv: 900
-			sharv: 900
-			nuk2: 800
-			proc: 700
-			fact: 600
-			fact.gdi: 600
-			fact.nod: 600
-			hq: 500
-			nuke: 400
-			obli: 0
+			mcv: 10000
+			harv: 5000
+			sharv: 5000
+			nuk2: 2500
+			proc: 1250
+			fact: 625
+			fact.gdi: 625
+			fact.nod: 625
+			hq: 312
+			nuke: 156
+			obli: 1
 		AirTargetPriorityHeli:
-			mcv: 1000
-			harv: 900
-			sharv: 900
-			e1: 550
-			e2: 550
-			e3: 650
-			e4: 550
-			e5: 550
-			rmbo: 650
-			bggy: 600
-			bike: 650
-			stnk: 650
-			ltnk: 600
-			nuk2: 600
-			proc: 500
-			obli: 0
+			mcv: 10000
+			harv: 5000
+			sharv: 5000
+			e3: 2500
+			bike: 2500
+			stnk: 2500
+			rmbo: 1250
+			bggy: 1250
+			ltnk: 1250
+			e1: 625
+			e2: 625
+			e4: 625
+			e5: 625
+			nuk2: 312
+			proc: 156
+			obli: 1
 	UnitBuilderBotModule@skynet:
 		RequiresCondition: enable-skynet-ai
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade

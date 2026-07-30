@@ -139,12 +139,15 @@ namespace OpenRA.Mods.Common.Traits
 			"Candidates scoring below this are ignored and the squad stays idle.")]
 		public readonly int AirTargetMinimumScore = 1;
 
-		[Desc("Maximum high-value air target candidates routed per strategic scan. The influence map still",
+		[Desc("Number of nearest air target candidates routed per strategic scan. The influence map still",
 			"considers every enemy actor; lowering this bounds A* work on large maps.")]
 		public readonly int AirTargetScanSamples = 24;
 
 		[Desc("Width and height in map cells of one coarse air influence-map cell.")]
 		public readonly int AirInfluenceCellSize = 6;
+
+		[Desc("Ticks between rebuilding the shared strategic air influence map.")]
+		public readonly int AirInfluenceCacheInterval = 125;
 
 		[Desc("Extra score for a candidate that has no weapon able to shoot at aircraft.",
 			"Aircraft do poor damage to structures, so this is what makes an undefended harvester or tank",
@@ -252,6 +255,9 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (AirInfluenceCellSize <= 0)
 				throw new YamlException("AirInfluenceCellSize must be greater than zero.");
+
+			if (AirInfluenceCacheInterval <= 0)
+				throw new YamlException("AirInfluenceCacheInterval must be greater than zero.");
 
 			if (AirSafetyCheckInterval > 0 && AirThreatScanRadius <= 0)
 				throw new YamlException("AirThreatScanRadius must be greater than zero when AirSafetyCheckInterval is set.");

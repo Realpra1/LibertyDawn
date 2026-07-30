@@ -34,7 +34,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		}
 
 		// Bot logic is host-only. Sharing one cache per manager/profile prevents two same-type squads
-		// rebuilding the same world influence map during the same 50-tick strategic planning interval.
+		// rebuilding the same world influence map during the configured strategic cache interval.
 		static readonly Dictionary<SquadManagerBotModule, Dictionary<string, AirInfluenceCache>> InfluenceCaches =
 			new Dictionary<SquadManagerBotModule, Dictionary<string, AirInfluenceCache>>();
 
@@ -183,7 +183,13 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var archetypePriority = ArchetypePriority(owner);
 			var apache = owner.AirProfile.Equals("Apache", StringComparison.OrdinalIgnoreCase);
 			var orca = owner.AirProfile.Equals("Orca", StringComparison.OrdinalIgnoreCase);
-			var squadSpeed = SquadSlowestAircraftSpeed(owner);
+			var combatUnits = owner.Units.Where(a => !owner.AirUnitsRepairing.Contains(a.ActorID) &&
+				HasAmmo(a.TraitsImplementing<AmmoPool>())).ToList();
+			if (combatUnits.Count == 0)
+				return null;
+
+			var squadSpeed = combatUnits.Select(a => a.Info.TraitInfoOrDefault<AircraftInfo>())
+				.Where(a => a != null).Min(a => a.Speed);
 			if (!InfluenceCaches.TryGetValue(owner.SquadManager, out var profileCaches))
 			{
 				profileCaches = new Dictionary<string, AirInfluenceCache>();
@@ -192,7 +198,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 			var cacheKey = owner.AirProfile + ":" + squadSpeed;
 			if (!profileCaches.TryGetValue(cacheKey, out var cache) || cache.Width != width || cache.Height != height ||
-				owner.World.WorldTick - cache.Tick >= info.AttackForceInterval)
+				owner.World.WorldTick - cache.Tick >= info.AirInfluenceCacheInterval)
 			{
 				var rebuiltDanger = new float[width * height];
 				var rebuiltCandidates = new List<(Actor Actor, int Utility)>();
@@ -228,17 +234,17 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					if (!owner.SquadManager.IsNotHiddenUnit(actor))
 						continue;
 
-					var value = TargetValue(actor, info, archetypePriority);
+					var value = (long)Math.Max(1, TargetValue(actor, info, archetypePriority));
 					var valued = actor.Info.TraitInfoOrDefault<ValuedInfo>();
 					if (valued != null)
-						value += valued.Cost / 4;
+						value = value * (100 + Math.Min(valued.Cost / 100, 100)) / 100;
 
 					var health = actor.TraitOrDefault<IHealth>();
 					if (health != null && health.MaxHP > 0)
-						value -= health.HP / 100;
+						value = value * 10000 / (10000 + health.HP);
 
-					value -= (int)(profile.Weight * info.AirTargetAntiAirPenalty);
-					rebuiltCandidates.Add((actor, value));
+					value = value * 100 / (100 + (int)(profile.Weight * info.AirTargetAntiAirPenalty));
+					rebuiltCandidates.Add((actor, Math.Max(1, (int)Math.Min(int.MaxValue, value))));
 				}
 
 				cache = new AirInfluenceCache
@@ -255,16 +261,20 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var danger = cache.Danger;
 			var candidates = cache.Candidates;
 
-			var startCell = map.CellContaining(owner.CenterPosition);
+			var planningCenter = combatUnits.Select(a => a.CenterPosition).Average();
+			var startCell = map.CellContaining(planningCenter);
 			var startX = Math.Clamp(startCell.X / coarseSize, 0, width - 1);
 			var startY = Math.Clamp(startCell.Y / coarseSize, 0, height - 1);
-			var riskScale = Math.Max(1f, owner.Units.Count / 3f);
+			var riskScale = Math.Max(1f, combatUnits.Count / 3f);
 			var bestScore = int.MinValue;
 			Actor best = null;
 			List<CPos> bestRoute = null;
 
-			foreach (var candidate in candidates.Where(c => !c.Actor.IsDead).OrderByDescending(c => c.Utility)
-				.ThenBy(c => c.Actor.ActorID).Take(info.AirTargetScanSamples))
+			// Search outwards first. Only the nearest configured number of opportunities receive the more
+			// expensive route calculation, preventing remote buildings from crowding out nearby targets.
+			foreach (var candidate in candidates.Where(c => !c.Actor.IsDead)
+				.OrderBy(c => (c.Actor.CenterPosition - planningCenter).LengthSquared)
+				.ThenByDescending(c => c.Utility).ThenBy(c => c.Actor.ActorID).Take(info.AirTargetScanSamples))
 			{
 				var goalX = Math.Clamp(candidate.Actor.Location.X / coarseSize, 0, width - 1);
 				var goalY = Math.Clamp(candidate.Actor.Location.Y / coarseSize, 0, height - 1);
@@ -276,9 +286,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				var exposureCost = route.Sum(p => danger[p.Y * width + p.X]) * info.AirRouteThreatPenalty / riskScale;
 				var routeCost = route.Count * coarseSize * info.AirTargetDistancePenalty + (int)exposureCost;
 				var stoppingCost = (int)(danger[goalY * width + goalX] * info.AirTargetAntiAirPenalty / riskScale);
-				var score = candidate.Utility - routeCost - stoppingCost;
-				if (relaxed)
-					score += owner.AirConsecutiveNoTargetScans * 10;
+				var score = candidate.Utility * 1024 / Math.Max(1, 1024 + routeCost + stoppingCost);
 
 				if (best == null || score > bestScore)
 				{
@@ -292,6 +300,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				return null;
 
 			owner.AirRoute.Clear();
+			owner.AirRouteQueued = false;
 			if (bestRoute != null)
 				owner.AirRoute.AddRange(bestRoute);
 			return best;
@@ -589,6 +598,13 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var health = a.TraitOrDefault<IHealth>();
 			if (health == null)
 				return false;
+			}
+
+			if (!repairing && health.HP >= health.MaxHP * threshold)
+				return false;
+
+			if (repairing && !a.IsIdle)
+				return true;
 
 			var repairing = owner.AirUnitsRepairing.Contains(a.ActorID);
 			if (repairing && health.HP >= health.MaxHP)
@@ -804,25 +820,36 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				return;
 			}
 
-			// Follow the coarse A* route before committing to the engine's direct Attack activity. Drop
-			// waypoints already reached so a fast Orca always continues beyond a crossed threat instead of
-			// stopping inside it to wait for the next strategic update.
-			while (owner.AirRoute.Count > 0 && (owner.World.Map.CenterOfCell(owner.AirRoute[0]) - owner.CenterPosition).Length < WDist.FromCells(3).Length)
-				owner.AirRoute.RemoveAt(0);
-
-			if (owner.AirRoute.Count > 1)
+			// The engine already supports shift-queued movement. Submit the complete planned route in one
+			// pass instead of waiting for a strategic tick at each coarse cell, then queue the attack behind
+			// it. This keeps the influence grid a planning detail rather than a series of visible pauses.
+			if (owner.AirRoute.Count > 1 && !owner.AirRouteQueued)
 			{
-				var waypoint = owner.AirRoute[0];
 				foreach (var a in owner.Units)
 				{
 					if (SendHomeToRepair(owner, a))
 						continue;
 
-					owner.Bot.QueueOrder(new Order("Move", a, Target.FromCell(owner.World, waypoint), false));
+					var queued = false;
+					foreach (var waypoint in owner.AirRoute)
+					{
+						owner.Bot.QueueOrder(new Order("Move", a, Target.FromCell(owner.World, waypoint), queued));
+						queued = true;
+					}
+
+					if (CanAttackTarget(a, owner.TargetActor))
+						owner.Bot.QueueOrder(new Order("Attack", a, Target.FromActor(owner.TargetActor), true));
 				}
 
+				owner.AirRouteQueued = true;
+				owner.AirRoute.Clear();
 				return;
 			}
+
+			if (owner.AirRouteQueued && owner.Units.Any(a => !owner.AirUnitsRepairing.Contains(a.ActorID) && !a.IsIdle))
+				return;
+
+			owner.AirRouteQueued = false;
 
 			// Lazily computed: only needed if a self-reloading aircraft actually turns out to be dry,
 			// which is the uncommon case, and shared across every unit that needs it this tick rather
