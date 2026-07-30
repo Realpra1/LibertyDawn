@@ -24,6 +24,20 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 	{
 		static readonly BitSet<TargetableType> AirTargetTypes = new BitSet<TargetableType>("Air");
 
+		sealed class AirInfluenceCache
+		{
+			public int Tick;
+			public int Width;
+			public int Height;
+			public float[] Danger;
+			public List<(Actor Actor, int Utility)> Candidates;
+		}
+
+		// Bot logic is host-only. Sharing one cache per manager/profile prevents two same-type squads
+		// rebuilding the same world influence map during the configured strategic cache interval.
+		static readonly Dictionary<SquadManagerBotModule, Dictionary<string, AirInfluenceCache>> InfluenceCaches =
+			new Dictionary<SquadManagerBotModule, Dictionary<string, AirInfluenceCache>>();
+
 		protected const int MissileUnitMultiplier = 3;
 
 		/// <summary>True if this actor has a live armament that can shoot at aircraft.</summary>
@@ -149,190 +163,147 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 		enum AirTargetClass { Unit, Building, Production, Harvester }
 
-		/// <summary>A finalist from one sampled grid cell: the best actor there and its pre-route score.</summary>
-		struct AirTargetCandidate
-		{
-			public Actor Actor;
-			public int PartialScore;
-		}
-
 		protected static Actor FindDefenselessTarget(Squad owner)
 		{
 			return FindBestAirTarget(owner);
 		}
 
 		/// <summary>
-		/// Samples a bounded number of grid cells across the map, scores every enemy actor it finds and
-		/// returns the most attractive one. Soft mobile targets are meant to beat structures outright:
-		/// aircraft do poor damage to buildings, so harvesters and undefended units carry both a higher
-		/// class value and a "cannot shoot back" bonus. Anti-air on top of a candidate is penalised, and
-		/// so is anti-air anywhere along the straight line the squad would fly to reach it - the squad
-		/// should not have to fly through a SAM belt to reach an undefended harvester.
-		/// A defender only counts toward a cell's anti-air weight when this specific cell is within
-		/// AirThreatRangeBuffer times its own AA weapon's range - two defenders found by the same flat scan
-		/// are not equally dangerous just because the scan does not know their range.
-		/// With <paramref name="relaxed"/> the anti-air and route-threat penalties are dropped entirely and
-		/// the AirTargetMinimumScore floor is skipped: this is the massed-attack fallback (see
-		/// SquadManagerBotModuleInfo.AirMassedAttackIdleThreshold) for when nothing scores acceptably and the
-		/// squad has given up waiting for something undefended to show up.
-		/// Returns null when nothing scores above <see cref="SquadManagerBotModuleInfo.AirTargetMinimumScore"/>
-		/// (not relaxed), or when there is nothing to attack at all (relaxed).
+		/// Builds a deterministic coarse influence grid, then uses bounded A* route costs to compare the
+		/// best targets. Unlike the old random sampler this considers every known actor, can value a safe
+		/// detour, and keeps AA as a finite cost whose importance falls gradually as the squad grows.
 		/// </summary>
 		protected static Actor FindBestAirTarget(Squad owner, bool relaxed = false)
 		{
 			var map = owner.World.Map;
 			var info = owner.SquadManager.Info;
-			var dangerRadius = info.DangerScanRadius;
+			var coarseSize = info.AirInfluenceCellSize;
+			var width = (map.MapSize.X + coarseSize - 1) / coarseSize;
+			var height = (map.MapSize.Y + coarseSize - 1) / coarseSize;
 			var archetypePriority = ArchetypePriority(owner);
-
-			var columnCount = (map.MapSize.X + dangerRadius - 1) / dangerRadius;
-			var rowCount = (map.MapSize.Y + dangerRadius - 1) / dangerRadius;
-			var cellCount = columnCount * rowCount;
-			if (cellCount <= 0)
+			var apache = owner.AirProfile.Equals("Apache", StringComparison.OrdinalIgnoreCase);
+			var orca = owner.AirProfile.Equals("Orca", StringComparison.OrdinalIgnoreCase);
+			var combatUnits = owner.Units.Where(a => !owner.AirUnitsRepairing.Contains(a.ActorID) &&
+				HasAmmo(a.TraitsImplementing<AmmoPool>())).ToList();
+			if (combatUnits.Count == 0)
 				return null;
 
-			var squadCenter = owner.CenterPosition;
-			var scanRadius = WDist.FromCells(dangerRadius);
-
-			// PERF: Reused across every sample so the scan allocates a handful of lists per call
-			// rather than a handful per sample.
-			var actorsAround = new List<Actor>();
-			var candidates = new List<Actor>();
-
-			// PERF: parallel to candidates, so IsAntiAirCapable (a trait lookup) runs once per actor.
-			var candidateIsAntiAir = new List<bool>();
-			var finalists = new List<AirTargetCandidate>();
-
-			// Anti-air we know about: whatever this scan happens to uncover, plus whatever the squad
-			// has personally run into recently. Used to price the flight path, not the destination.
-			// Sampled grid circles overlap, so sightings are merged by position - otherwise one SAM
-			// found by three samples would be charged to the route three times.
-			var threats = new List<WPos>();
-			var threatMergeSquared = (long)WDist.FromCells(info.AirThreatMemoryMergeRadius).Length * WDist.FromCells(info.AirThreatMemoryMergeRadius).Length;
-			var threatLimit = info.AirTargetScanSamples + info.AirThreatMemorySize;
-			owner.ForgetExpiredAirThreats(owner.World.WorldTick);
-			threats.AddRange(owner.AirThreatPositions);
-
-			// PERF: Sampling a fixed number of grid cells keeps the cost of this scan independent of map size.
-			// The scan repeats every AttackForceInterval ticks, so over time the whole map still gets covered.
-			var samples = Math.Min(info.AirTargetScanSamples, cellCount);
-			for (var s = 0; s < samples; s++)
+			var squadSpeed = combatUnits.Select(a => a.Info.TraitInfoOrDefault<AircraftInfo>())
+				.Where(a => a != null).Min(a => a.Speed);
+			if (!InfluenceCaches.TryGetValue(owner.SquadManager, out var profileCaches))
 			{
-				// NOTE: Bot code runs on the host only and must never touch World.SharedRandom.
-				var i = owner.Random.Next(cellCount);
-				var pos = new MPos((i % columnCount) * dangerRadius + dangerRadius / 2, (i / columnCount) * dangerRadius + dangerRadius / 2).ToCPos(map);
+				profileCaches = new Dictionary<string, AirInfluenceCache>();
+				InfluenceCaches.Add(owner.SquadManager, profileCaches);
+			}
 
-				actorsAround.Clear();
-				candidates.Clear();
-				candidateIsAntiAir.Clear();
-				var cellCenter = map.CenterOfCell(pos);
-				actorsAround.AddRange(owner.World.FindActorsInCircle(cellCenter, scanRadius));
-
-				// PERF: Avoid LINQ.
-				var antiAirWeight = 0f;
-				foreach (var a in actorsAround)
+			var cacheKey = owner.AirProfile + ":" + squadSpeed;
+			if (!profileCaches.TryGetValue(cacheKey, out var cache) || cache.Width != width || cache.Height != height ||
+				owner.World.WorldTick - cache.Tick >= info.AirInfluenceCacheInterval)
+			{
+				var rebuiltDanger = new float[width * height];
+				var rebuiltCandidates = new List<(Actor Actor, int Utility)>();
+				foreach (var actor in owner.World.Actors)
 				{
-					if (!owner.SquadManager.IsPreferredEnemyUnit(a))
+					if (!owner.SquadManager.IsPreferredEnemyUnit(actor))
 						continue;
 
-					var profile = AntiAirProfile(a);
-					var antiAir = profile.Weight > 0;
-					candidates.Add(a);
-					candidateIsAntiAir.Add(antiAir);
-
-					if (antiAir)
+					var profile = AntiAirProfile(actor);
+					if (profile.Weight > 0)
 					{
-						AddDistinctThreat(threats, a.CenterPosition, threatMergeSquared, threatLimit);
+						var range = Math.Max(1, (int)Math.Ceiling(profile.RangeCells * info.AirThreatRangeBuffer));
+						var minX = Math.Max(0, (actor.Location.X - range) / coarseSize);
+						var maxX = Math.Min(width - 1, (actor.Location.X + range) / coarseSize);
+						var minY = Math.Max(0, (actor.Location.Y - range) / coarseSize);
+						var maxY = Math.Min(height - 1, (actor.Location.Y + range) / coarseSize);
+						var weight = profile.Weight;
+						if (apache && profile.Weight >= .75f)
+							weight *= 4f;
+						else if (orca && AirThreatGeometry.CanOutrun(squadSpeed, profile.FastestProjectileSpeed))
+							weight *= .2f;
 
-						// "Every actor in the cell shares the same anti-air cover" (see below) already
-						// approximates position within the cell, so the buffered-range check is made
-						// against the cell centre rather than the eventual winning candidate.
-						var distanceToCellCenter = (a.CenterPosition - cellCenter).Length / 1024;
-						if (!relaxed && AirThreatGeometry.IsWithinBufferedRange(distanceToCellCenter, profile.RangeCells, info.AirThreatRangeBuffer))
-							antiAirWeight += profile.Weight;
+						for (var y = minY; y <= maxY; y++)
+							for (var x = minX; x <= maxX; x++)
+							{
+								var cell = new CPos(x * coarseSize + coarseSize / 2, y * coarseSize + coarseSize / 2);
+								var distance = (map.CenterOfCell(map.Clamp(cell)) - actor.CenterPosition).Length / 1024;
+								if (distance <= range)
+									rebuiltDanger[y * width + x] += weight;
+							}
 					}
+
+					if (!owner.SquadManager.IsNotHiddenUnit(actor))
+						continue;
+
+					var value = (long)Math.Max(1, TargetValue(actor, info, archetypePriority));
+					var valued = actor.Info.TraitInfoOrDefault<ValuedInfo>();
+					if (valued != null)
+						value = value * (100 + Math.Min(valued.Cost / 100, 100)) / 100;
+
+					var health = actor.TraitOrDefault<IHealth>();
+					if (health != null && health.MaxHP > 0)
+						value = value * 10000 / (10000 + health.HP);
+
+					value = value * 100 / (100 + (int)(profile.Weight * info.AirTargetAntiAirPenalty));
+					rebuiltCandidates.Add((actor, Math.Max(1, (int)Math.Min(int.MaxValue, value))));
 				}
 
-				if (candidates.Count == 0)
+				cache = new AirInfluenceCache
+				{
+					Tick = owner.World.WorldTick,
+					Width = width,
+					Height = height,
+					Danger = rebuiltDanger,
+					Candidates = rebuiltCandidates,
+				};
+				profileCaches[cacheKey] = cache;
+			}
+
+			var danger = cache.Danger;
+			var candidates = cache.Candidates;
+
+			var planningCenter = combatUnits.Select(a => a.CenterPosition).Average();
+			var startCell = map.CellContaining(planningCenter);
+			var startX = Math.Clamp(startCell.X / coarseSize, 0, width - 1);
+			var startY = Math.Clamp(startCell.Y / coarseSize, 0, height - 1);
+			var riskScale = Math.Max(1f, combatUnits.Count / 3f);
+			var bestScore = int.MinValue;
+			Actor best = null;
+			List<CPos> bestRoute = null;
+
+			// Search outwards first. Only the nearest configured number of opportunities receive the more
+			// expensive route calculation, preventing remote buildings from crowding out nearby targets.
+			foreach (var candidate in candidates.Where(c => !c.Actor.IsDead)
+				.OrderBy(c => (c.Actor.CenterPosition - planningCenter).LengthSquared)
+				.ThenByDescending(c => c.Utility).ThenBy(c => c.Actor.ActorID).Take(info.AirTargetScanSamples))
+			{
+				var goalX = Math.Clamp(candidate.Actor.Location.X / coarseSize, 0, width - 1);
+				var goalY = Math.Clamp(candidate.Actor.Location.Y / coarseSize, 0, height - 1);
+				var route = AirThreatGeometry.FindCoarseRoute(danger, width, height, startX, startY, goalX, goalY,
+					info.AirRouteThreatPenalty / riskScale);
+				if (route == null)
 					continue;
 
-				// Only the best actor in this cell can win overall, and every actor in the cell shares
-				// the same anti-air cover - so keep one finalist per cell and route-check those.
-				// PERF: bounds the second pass to AirTargetScanSamples entries.
-				Actor bestHere = null;
-				var bestPartial = 0;
-				for (var c = 0; c < candidates.Count; c++)
+				var exposureCost = route.Sum(p => danger[p.Y * width + p.X]) * info.AirRouteThreatPenalty / riskScale;
+				var routeCost = route.Count * coarseSize * info.AirTargetDistancePenalty + (int)exposureCost;
+				var stoppingCost = (int)(danger[goalY * width + goalX] * info.AirTargetAntiAirPenalty / riskScale);
+				var score = candidate.Utility * 1024 / Math.Max(1, 1024 + routeCost + stoppingCost);
+
+				if (best == null || score > bestScore)
 				{
-					var a = candidates[c];
-					if (!owner.SquadManager.IsNotHiddenUnit(a))
-						continue;
-
-					var distanceInCells = (a.CenterPosition - squadCenter).Length / 1024;
-					var partial = AirThreatGeometry.TargetScore(
-						TargetValue(a, info, archetypePriority), !candidateIsAntiAir[c], info.AirTargetDefencelessBonus,
-						antiAirWeight, info.AirTargetAntiAirPenalty,
-						0, 0,
-						distanceInCells, info.AirTargetDistancePenalty);
-
-					if (bestHere == null || partial > bestPartial)
-					{
-						bestHere = a;
-						bestPartial = partial;
-					}
-				}
-
-				if (bestHere != null)
-					finalists.Add(new AirTargetCandidate { Actor = bestHere, PartialScore = bestPartial });
-			}
-
-			// Second pass: charge each finalist for the anti-air it would have to fly past on the way.
-			// PERF: pure arithmetic over at most AirTargetScanSamples x (samples + memory) pairs, no world queries.
-			var corridorRadius = WDist.FromCells(info.AirRouteThreatRadius);
-			var destinationExclusion = scanRadius;
-
-			Actor bestTarget = null;
-			var bestScore = int.MinValue;
-			foreach (var f in finalists)
-			{
-				var score = f.PartialScore;
-				if (!relaxed && info.AirRouteThreatPenalty != 0)
-				{
-					var routeThreats = AirThreatGeometry.CountThreatsNearRoute(
-						threats, squadCenter, f.Actor.CenterPosition, corridorRadius, destinationExclusion);
-					score -= routeThreats * info.AirRouteThreatPenalty;
-				}
-
-				if (bestTarget == null || score > bestScore)
-				{
+					best = candidate.Actor;
 					bestScore = score;
-					bestTarget = f.Actor;
+					bestRoute = route.Select(p => map.Clamp(new CPos(p.X * coarseSize + coarseSize / 2, p.Y * coarseSize + coarseSize / 2))).ToList();
 				}
 			}
 
-			if (bestTarget == null || (!relaxed && bestScore < info.AirTargetMinimumScore))
+			if (best == null || (!relaxed && bestScore < info.AirTargetMinimumScore))
 				return null;
 
-			return bestTarget;
-		}
-
-		/// <summary>
-		/// Appends a threat position unless an equivalent one is already listed, and never grows the list
-		/// past <paramref name="limit"/> so the route check stays O(finalists x limit).
-		/// </summary>
-		static void AddDistinctThreat(List<WPos> threats, WPos pos, long mergeSquared, int limit)
-		{
-			if (threats.Count >= limit)
-				return;
-
-			for (var i = 0; i < threats.Count; i++)
-			{
-				long dx = threats[i].X - pos.X;
-				long dy = threats[i].Y - pos.Y;
-				if (dx * dx + dy * dy <= mergeSquared)
-					return;
-			}
-
-			threats.Add(pos);
+			owner.AirRoute.Clear();
+			owner.AirRouteQueued = false;
+			if (bestRoute != null)
+				owner.AirRoute.AddRange(bestRoute);
+			return best;
 		}
 
 		/// <summary>
@@ -347,7 +318,13 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			if (info.AirTargetPriorityOrca.Count == 0 && info.AirTargetPriorityHeli.Count == 0)
 				return null;
 
-			// PERF: Avoid LINQ.
+			if (owner.AirProfile.Equals("Orca", StringComparison.OrdinalIgnoreCase))
+				return info.AirTargetPriorityOrca;
+
+			if (owner.AirProfile.Equals("Apache", StringComparison.OrdinalIgnoreCase))
+				return info.AirTargetPriorityHeli;
+
+			// Legacy generic squads infer their profile from their members.
 			foreach (var u in owner.Units)
 			{
 				if (info.AirTargetPriorityOrca.Count > 0 && u.Info.Name == info.OrcaArchetypeActor)
@@ -407,6 +384,11 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var info = owner.SquadManager.Info;
 			if (info.AirSafetyCheckInterval <= 0 || !owner.IsValid)
 				return;
+
+			// Repair is an individual lifecycle decision, not a reason to retreat the entire squad.
+			// Running it here makes the configured safety cadence apply in every squad state.
+			foreach (var unit in owner.Units)
+				SendHomeToRepair(owner, unit);
 
 			var tick = owner.World.WorldTick;
 			owner.ForgetExpiredAirThreats(tick);
@@ -614,16 +596,43 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				return false;
 
 			var health = a.TraitOrDefault<IHealth>();
-			if (health == null || health.HP > health.MaxHP * threshold)
+			if (health == null)
 				return false;
 
-			if (IsRearming(a))
+			var repairing = owner.AirUnitsRepairing.Contains(a.ActorID);
+			if (repairing && health.HP >= health.MaxHP)
+			{
+				owner.AirUnitsRepairing.Remove(a.ActorID);
+				return false;
+			}
+
+			if (!repairing && health.HP >= health.MaxHP * threshold)
+				return false;
+
+			if (repairing && !a.IsIdle)
 				return true;
+
+			if (IsRearming(a))
+			{
+				owner.AirUnitsRepairing.Add(a.ActorID);
+				return true;
+			}
 
 			var repairable = a.Info.TraitInfoOrDefault<RepairableInfo>();
 			if (repairable == null || repairable.RepairActors.Count == 0)
 				return false;
 
+			var nearest = FindNearestRepairBuilding(owner, a, repairable);
+			if (nearest == null)
+				return repairing;
+
+			owner.Bot.QueueOrder(new Order("Repair", a, Target.FromActor(nearest), false));
+			owner.AirUnitsRepairing.Add(a.ActorID);
+			return true;
+		}
+
+		static Actor FindNearestRepairBuilding(Squad owner, Actor aircraft, RepairableInfo repairable)
+		{
 			Actor nearest = null;
 			var nearestDistanceSquared = long.MaxValue;
 
@@ -633,8 +642,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				if (b.Owner != owner.Bot.Player || !repairable.RepairActors.Contains(b.Info.Name))
 					continue;
 
-				long dx = b.CenterPosition.X - a.CenterPosition.X;
-				long dy = b.CenterPosition.Y - a.CenterPosition.Y;
+				long dx = b.CenterPosition.X - aircraft.CenterPosition.X;
+				long dy = b.CenterPosition.Y - aircraft.CenterPosition.Y;
 				var d = dx * dx + dy * dy;
 				if (nearest == null || d < nearestDistanceSquared)
 				{
@@ -643,11 +652,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				}
 			}
 
-			if (nearest == null)
-				return false;
-
-			owner.Bot.QueueOrder(new Order("Repair", a, Target.FromActor(nearest), false));
-			return true;
+			return nearest;
 		}
 
 		/// <summary>
@@ -748,9 +753,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var e = FindDefenselessTarget(owner);
 			if (e == null)
 			{
-				// Given up waiting for something undefended to show up: force an attack on whatever
-				// scores best with the anti-air/route penalties relaxed, rather than idling forever while
-				// the whole enemy base sits defended. Disabled (threshold zero) restores stock behaviour.
+				// Given up waiting for a positive score: accept the best finite-cost route instead of idling
+				// forever. Threat costs remain intact, and squad size already scales acceptable risk.
 				var threshold = owner.SquadManager.Info.AirMassedAttackIdleThreshold;
 				if (threshold > 0)
 				{
@@ -809,11 +813,42 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				}
 			}
 
-			if (!NearToPosSafely(owner, owner.TargetActor.CenterPosition))
+			if (owner.AirProfile == "Generic" && !NearToPosSafely(owner, owner.TargetActor.CenterPosition))
 			{
 				owner.FuzzyStateMachine.ChangeState(owner, new AirFleeState(), true);
 				return;
 			}
+
+			// The engine already supports shift-queued movement. Submit the complete planned route in one
+			// pass instead of waiting for a strategic tick at each coarse cell, then queue the attack behind
+			// it. This keeps the influence grid a planning detail rather than a series of visible pauses.
+			if (owner.AirRoute.Count > 1 && !owner.AirRouteQueued)
+			{
+				foreach (var a in owner.Units)
+				{
+					if (SendHomeToRepair(owner, a))
+						continue;
+
+					var queued = false;
+					foreach (var waypoint in owner.AirRoute)
+					{
+						owner.Bot.QueueOrder(new Order("Move", a, Target.FromCell(owner.World, waypoint), queued));
+						queued = true;
+					}
+
+					if (CanAttackTarget(a, owner.TargetActor))
+						owner.Bot.QueueOrder(new Order("Attack", a, Target.FromActor(owner.TargetActor), true));
+				}
+
+				owner.AirRouteQueued = true;
+				owner.AirRoute.Clear();
+				return;
+			}
+
+			if (owner.AirRouteQueued && owner.Units.Any(a => !owner.AirUnitsRepairing.Contains(a.ActorID) && !a.IsIdle))
+				return;
+
+			owner.AirRouteQueued = false;
 
 			// Lazily computed: only needed if a self-reloading aircraft actually turns out to be dry,
 			// which is the uncommon case, and shared across every unit that needs it this tick rather
