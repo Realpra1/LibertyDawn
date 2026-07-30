@@ -173,6 +173,41 @@ namespace OpenRA.Mods.Common.Traits
 			"somewhere else. Zero disables the wander.")]
 		public readonly int AirEvadeJitter = 0;
 
+		[Desc("Multiplier applied to a defender's own anti-air weapon range when deciding whether it is",
+			"close enough to count as covering a position. The bot's scans use flat radii unrelated to any",
+			"specific weapon's range, so this is what makes the danger zone around a long-range SAM wider",
+			"than the zone around a short-range gun, both discovered by the same scan. 1.5 means a squad",
+			"treats a defender as dangerous out to 150% of its actual weapon range.")]
+		public readonly float AirThreatRangeBuffer = 1.5f;
+
+		[Desc("Consecutive AirIdleState scans (each AttackForceInterval ticks apart) that find no target",
+			"scoring above AirTargetMinimumScore before the squad stops waiting for an undefended target",
+			"and instead forces an attack on whatever scores best with anti-air and route-threat penalties",
+			"relaxed - better than idling forever when the whole enemy base is defended. Zero disables this",
+			"and restores the stock behaviour of idling indefinitely.")]
+		public readonly int AirMassedAttackIdleThreshold = 0;
+
+		[Desc("An aircraft below this fraction of its maximum health (0-1) breaks off and returns to the",
+			"nearest building that can repair its type, the same way SendHomeToResupply already does for",
+			"ammo. Zero disables this.")]
+		public readonly float HealthRetreatThreshold = 0f;
+
+		[Desc("Per-actor-type target score overrides for Orca-type air squads (squads containing at least",
+			"one actor of type OrcaArchetypeActor), keyed by target ActorName - same shape as UnitsToBuild",
+			"elsewhere in this mod. Checked before the generic AirTarget*Value classification; actor types",
+			"not listed here still fall back to it. Empty disables per-archetype scoring for this squad type.")]
+		public readonly Dictionary<string, int> AirTargetPriorityOrca = new Dictionary<string, int>();
+
+		[Desc("As AirTargetPriorityOrca, for Heli-type air squads (squads containing at least one actor of",
+			"type HeliArchetypeActor).")]
+		public readonly Dictionary<string, int> AirTargetPriorityHeli = new Dictionary<string, int>();
+
+		[Desc("Actor type that identifies a squad as the \"Orca\" archetype for AirTargetPriorityOrca.")]
+		public readonly string OrcaArchetypeActor = "orca";
+
+		[Desc("Actor type that identifies a squad as the \"Heli\" archetype for AirTargetPriorityHeli.")]
+		public readonly string HeliArchetypeActor = "heli";
+
 		public override void RulesetLoaded(Ruleset rules, ActorInfo ai)
 		{
 			base.RulesetLoaded(rules, ai);
@@ -206,6 +241,15 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (AirEvadeJitter < 0)
 				throw new YamlException("AirEvadeJitter must not be negative.");
+
+			if (AirThreatRangeBuffer <= 0)
+				throw new YamlException("AirThreatRangeBuffer must be greater than zero.");
+
+			if (AirMassedAttackIdleThreshold < 0)
+				throw new YamlException("AirMassedAttackIdleThreshold must not be negative.");
+
+			if (HealthRetreatThreshold < 0 || HealthRetreatThreshold >= 1)
+				throw new YamlException("HealthRetreatThreshold must be at least zero and less than one.");
 		}
 
 		public override object Create(ActorInitializer init) { return new SquadManagerBotModule(init.Self, this); }
