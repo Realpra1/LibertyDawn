@@ -598,13 +598,6 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var health = a.TraitOrDefault<IHealth>();
 			if (health == null)
 				return false;
-			}
-
-			if (!repairing && health.HP >= health.MaxHP * threshold)
-				return false;
-
-			if (repairing && !a.IsIdle)
-				return true;
 
 			var repairing = owner.AirUnitsRepairing.Contains(a.ActorID);
 			if (repairing && health.HP >= health.MaxHP)
@@ -629,6 +622,17 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			if (repairable == null || repairable.RepairActors.Count == 0)
 				return false;
 
+			var nearest = FindNearestRepairBuilding(owner, a, repairable);
+			if (nearest == null)
+				return repairing;
+
+			owner.Bot.QueueOrder(new Order("Repair", a, Target.FromActor(nearest), false));
+			owner.AirUnitsRepairing.Add(a.ActorID);
+			return true;
+		}
+
+		static Actor FindNearestRepairBuilding(Squad owner, Actor aircraft, RepairableInfo repairable)
+		{
 			Actor nearest = null;
 			var nearestDistanceSquared = long.MaxValue;
 
@@ -638,8 +642,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				if (b.Owner != owner.Bot.Player || !repairable.RepairActors.Contains(b.Info.Name))
 					continue;
 
-				long dx = b.CenterPosition.X - a.CenterPosition.X;
-				long dy = b.CenterPosition.Y - a.CenterPosition.Y;
+				long dx = b.CenterPosition.X - aircraft.CenterPosition.X;
+				long dy = b.CenterPosition.Y - aircraft.CenterPosition.Y;
 				var d = dx * dx + dy * dy;
 				if (nearest == null || d < nearestDistanceSquared)
 				{
@@ -648,12 +652,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				}
 			}
 
-			if (nearest == null)
-				return repairing;
-
-			owner.Bot.QueueOrder(new Order("Repair", a, Target.FromActor(nearest), false));
-			owner.AirUnitsRepairing.Add(a.ActorID);
-			return true;
+			return nearest;
 		}
 
 		/// <summary>
