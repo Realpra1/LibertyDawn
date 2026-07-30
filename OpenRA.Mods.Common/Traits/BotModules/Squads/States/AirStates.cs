@@ -297,6 +297,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var bestScore = int.MinValue;
 			Actor best = null;
 			List<CPos> bestRoute = null;
+			var bestIsUndefended = false;
 
 			var liveCandidates = candidates.Where(c => !c.Actor.IsDead).OrderBy(c => c.Actor.ActorID).ToList();
 			var cellUtility = new Dictionary<CPos, long>();
@@ -347,6 +348,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 				var distanceCost = route.Count * coarseSize * info.AirTargetDistancePenalty;
 				var stoppingCost = (int)(destinationDanger * info.AirTargetAntiAirPenalty / riskScale);
+				var isUndefended = destinationDanger <= 0;
 
 				// Each independent liability scales the target value down instead of participating in a
 				// binary veto. This preserves meaningful tradeoffs: speed can justify a distant harvester,
@@ -362,10 +364,15 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 						owner.AirProfile, candidate.Actor.Info.Name, candidate.Actor.ActorID, candidate.Utility, opportunityValue,
 						route.Count, exposureCost, destinationDanger, finalScore, relaxed);
 
-				if (best == null || finalScore > bestScore)
+				// Undefended targets form the first selection tier. A defended target remains eligible,
+				// but only when this bounded candidate pool contains no undefended destination at all.
+				// Route and distance costs still rank candidates within each tier.
+				if (best == null || (isUndefended && !bestIsUndefended) ||
+					(isUndefended == bestIsUndefended && finalScore > bestScore))
 				{
 					best = candidate.Actor;
 					bestScore = finalScore;
+					bestIsUndefended = isUndefended;
 					bestRoute = AirThreatGeometry.SmoothCoarseRoute(danger, width, height, startX, startY, route)
 						.Select(p => map.Clamp(new CPos(p.X * coarseSize + coarseSize / 2, p.Y * coarseSize + coarseSize / 2))).ToList();
 				}
@@ -381,8 +388,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			}
 
 			if (info.AirTargetDebugLogging)
-				Log.Write("debug", "Air target [{0}] selected {1}#{2}: score={3} waypoints={4} relaxed={5}",
-					owner.AirProfile, best.Info.Name, best.ActorID, bestScore, bestRoute?.Count ?? 0, relaxed);
+				Log.Write("debug", "Air target [{0}] selected {1}#{2}: score={3} undefended={4} waypoints={5} relaxed={6}",
+					owner.AirProfile, best.Info.Name, best.ActorID, bestScore, bestIsUndefended,
+					bestRoute?.Count ?? 0, relaxed);
 
 			owner.AirRoute.Clear();
 			owner.AirRouteQueued = false;
@@ -541,12 +549,6 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 						else if (orca && outrunnable)
 							localWeight *= .5f;
 
-						// A squad of at least two aircraft may deliberately finish a mobile AA unit.
-						// This exemption applies only to that selected actor: flying past or loitering
-						// near any other mobile defender remains dangerous, and static SAMs never qualify.
-						if (a == owner.TargetActor && mobile != null && owner.Units.Count >= 2)
-							localWeight = 0;
-
 						antiAirWeight += localWeight;
 					}
 
@@ -571,6 +573,10 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					localScore = score;
 				}
 			}
+
+			// Empty self-reloading aircraft use this on their strategic tick to decide whether they can
+			// safely hold position and finish reloading instead of automatically abandoning the mission.
+			owner.AirLocalThreatWeight = ownBuildingNear ? 0 : antiAirWeight;
 
 			// Over our own base there is nowhere safer to run to, and our own defences are the answer.
 			if (!ownBuildingNear && AirThreatGeometry.ShouldFleeAntiAir(antiAirWeight, info.AirThreatFleeMultiplier, owner.Units.Count))
@@ -1017,6 +1023,10 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			{
 				owner.AirTargetStrategicCell = null;
 				var nextTarget = FindBestAirTarget(owner);
+				if (nextTarget == null && !owner.Units.Any(a =>
+					!owner.AirUnitsRepairing.Contains(a.ActorID) && HasAmmo(a.TraitsImplementing<AmmoPool>())))
+					return;
+
 				if (nextTarget == null)
 					nextTarget = FindClosestAttackableEnemy(owner);
 
@@ -1107,12 +1117,26 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				else if (!HasAmmo(ammoPools))
 				{
 					// Self-reloading (e.g. Orca/Apache): no dock needed, so don't send it home - just
-					// break off from the target while ammo passively recharges in the field, instead of
-					// continuing to issue Attack orders it cannot act on.
+					// hold a safe position until the magazines refill. Only break off when the local
+					// safety scan found AA exposure: abandoning an undefended victim after one volley
+					// wastes the aircraft's fast passive reload.
+					if (owner.AirLocalThreatWeight <= 0)
+					{
+						if (info.AirTargetDebugLogging)
+							Log.Write("debug", "Air order [{0}] {1}#{2}: empty but locally safe; holding to reload.",
+								owner.AirProfile, a.Info.Name, a.ActorID);
+
+						continue;
+					}
+
 					if (disengageDestination == null)
 						disengageDestination = EvadeDestination(owner);
 
 					owner.Bot.QueueOrder(new Order("Move", a, Target.FromCell(owner.World, disengageDestination.Value), false));
+					if (info.AirTargetDebugLogging)
+						Log.Write("debug", "Air order [{0}] {1}#{2}: empty under AA threat {3:0.##}; disengaging to reload.",
+							owner.AirProfile, a.Info.Name, a.ActorID, owner.AirLocalThreatWeight);
+
 					continue;
 				}
 
