@@ -598,6 +598,13 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var health = a.TraitOrDefault<IHealth>();
 			if (health == null)
 				return false;
+			}
+
+			if (!repairing && health.HP >= health.MaxHP * threshold)
+				return false;
+
+			if (repairing && !a.IsIdle)
+				return true;
 
 			var repairing = owner.AirUnitsRepairing.Contains(a.ActorID);
 			if (repairing && health.HP >= health.MaxHP)
