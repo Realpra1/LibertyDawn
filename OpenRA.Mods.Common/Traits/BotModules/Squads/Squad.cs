@@ -22,6 +22,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 	{
 		public List<Actor> Units = new List<Actor>();
 		public SquadType Type;
+		public string AirSquadDefinition;
 
 		internal IBot Bot;
 		internal World World;
@@ -42,11 +43,12 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		// anti-air cover from re-issuing move orders on every safety check.
 		internal int NextAirRetreatTick;
 
-		// Consecutive AirIdleState scans that found no valid (safe-enough) target. Drives the massed-
-		// attack fallback: past SquadManagerBotModuleInfo.AirMassedAttackIdleThreshold, the squad stops
-		// waiting for something undefended to show up and instead forces an attack on whatever scores
-		// best with the anti-air/route penalties relaxed. Reset to zero the moment a target is found.
+		// Consecutive AirIdleState scans that found no worthwhile target. This gradually increases the
+		// willingness to accept a low score, but coarse route danger always remains part of the cost.
 		internal int AirConsecutiveNoTargetScans;
+		internal readonly List<CPos> AirRoute = new List<CPos>();
+		internal bool AirRouteQueued;
+		internal readonly HashSet<uint> AirUnitsRepairing = new HashSet<uint>();
 
 		public Squad(IBot bot, SquadManagerBotModule squadManager, SquadType type)
 			: this(bot, squadManager, type, null) { }
@@ -162,6 +164,10 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 		public WPos CenterPosition { get { return Units.Select(u => u.CenterPosition).Average(); } }
 
+		internal string AirProfile => AirSquadDefinition != null &&
+			SquadManager.Info.AirSquadDefinitions.TryGetValue(AirSquadDefinition, out var definition) ?
+			definition.Profile : "Generic";
+
 		public MiniYaml Serialize()
 		{
 			var nodes = new MiniYaml("", new List<MiniYamlNode>()
@@ -172,6 +178,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 			if (Target.Type == TargetType.Actor)
 				nodes.Nodes.Add(new MiniYamlNode("Target", FieldSaver.FormatValue(Target.Actor.ActorID)));
+
+			if (AirSquadDefinition != null)
+				nodes.Nodes.Add(new MiniYamlNode("AirSquadDefinition", AirSquadDefinition));
 
 			return nodes;
 		}
@@ -190,6 +199,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				targetActor = squadManager.World.GetActorById(FieldLoader.GetValue<uint>("ActiveUnits", targetNode.Value.Value));
 
 			var squad = new Squad(bot, squadManager, type, targetActor);
+			var definitionNode = yaml.Nodes.FirstOrDefault(n => n.Key == "AirSquadDefinition");
+			if (definitionNode != null)
+				squad.AirSquadDefinition = definitionNode.Value.Value;
 
 			var unitsNode = yaml.Nodes.FirstOrDefault(n => n.Key == "Units");
 			if (unitsNode != null)

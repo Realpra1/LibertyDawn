@@ -21,6 +21,38 @@ namespace OpenRA.Mods.Common.Traits
 	[Desc("Manages AI squads.")]
 	public class SquadManagerBotModuleInfo : ConditionalTraitInfo
 	{
+		public class AirSquadDefinition
+		{
+			[Desc("Actor types accepted by this squad. Empty accepts any configured air unit.")]
+			public readonly HashSet<string> UnitTypes = new HashSet<string>();
+
+			[Desc("Number of independent squads of this archetype.")]
+			public readonly int SquadCount = 1;
+
+			[Desc("Target and threat profile used by this squad.")]
+			public readonly string Profile = "Generic";
+
+			[Desc("Maximum aircraft per squad. Zero means unlimited.")]
+			public readonly int MaximumSize = 0;
+
+			public AirSquadDefinition(MiniYaml yaml) { FieldLoader.Load(this, yaml); }
+		}
+
+		[FieldLoader.LoadUsing(nameof(LoadAirSquadDefinitions))]
+		[Desc("Named compatibility-aware air squad definitions. Empty preserves stock air squad assignment.")]
+		public readonly Dictionary<string, AirSquadDefinition> AirSquadDefinitions = new Dictionary<string, AirSquadDefinition>();
+
+		static object LoadAirSquadDefinitions(MiniYaml yaml)
+		{
+			var ret = new Dictionary<string, AirSquadDefinition>();
+			var definitions = yaml.Nodes.FirstOrDefault(n => n.Key == "AirSquadDefinitions");
+			if (definitions != null)
+				foreach (var d in definitions.Value.Nodes)
+					ret[d.Key] = new AirSquadDefinition(d.Value);
+
+			return ret;
+		}
+
 		[Desc("Actor types that are valid for naval squads.")]
 		public readonly HashSet<string> NavalUnitsTypes = new HashSet<string>();
 
@@ -107,9 +139,15 @@ namespace OpenRA.Mods.Common.Traits
 			"Candidates scoring below this are ignored and the squad stays idle.")]
 		public readonly int AirTargetMinimumScore = 1;
 
-		[Desc("Number of map grid cells sampled per air target scan. Bounds the cost of the scan",
-			"independently of map size; lowering it trades responsiveness for CPU time on large maps.")]
+		[Desc("Number of nearest air target candidates routed per strategic scan. The influence map still",
+			"considers every enemy actor; lowering this bounds A* work on large maps.")]
 		public readonly int AirTargetScanSamples = 24;
+
+		[Desc("Width and height in map cells of one coarse air influence-map cell.")]
+		public readonly int AirInfluenceCellSize = 6;
+
+		[Desc("Ticks between rebuilding the shared strategic air influence map.")]
+		public readonly int AirInfluenceCacheInterval = 125;
 
 		[Desc("Extra score for a candidate that has no weapon able to shoot at aircraft.",
 			"Aircraft do poor damage to structures, so this is what makes an undefended harvester or tank",
@@ -142,18 +180,15 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Minimum delay (in ticks) between successive retreat orders for the same air squad.")]
 		public readonly int AirRetreatOrderInterval = 50;
 
-		[Desc("Score deducted per known anti-air position within AirRouteThreatRadius of the straight line",
-			"an air squad would fly to reach a candidate target. This is what stops squads picking a soft",
-			"target on the far side of a SAM belt. Zero disables route scoring.")]
+		[Desc("Cost multiplier for anti-air influence encountered by coarse A* routes. Zero makes routes",
+			"prefer distance alone.")]
 		public readonly int AirRouteThreatPenalty = 0;
 
 		[Desc("Half-width in cells of the flight corridor checked for anti-air by AirRouteThreatPenalty.")]
 		public readonly int AirRouteThreatRadius = 8;
 
-		[Desc("Maximum number of aircraft in one air squad. Air squads are a harassment force, not the main",
-			"push, so they want to be small. Aircraft beyond the cap join another air squad if one has room",
-			"and MaximumAirSquads allows it, otherwise they wait at base until a slot frees up.",
-			"Zero means unlimited, which is the stock behaviour.")]
+		[Desc("Legacy maximum number of aircraft in one generic air squad. Named AirSquadDefinitions use",
+			"their own MaximumSize. Zero means unlimited.")]
 		public readonly int AirSquadSize = 0;
 
 		[Desc("Maximum number of air squads that may exist at once. Zero means unlimited.",
@@ -182,8 +217,8 @@ namespace OpenRA.Mods.Common.Traits
 
 		[Desc("Consecutive AirIdleState scans (each AttackForceInterval ticks apart) that find no target",
 			"scoring above AirTargetMinimumScore before the squad stops waiting for an undefended target",
-			"and instead forces an attack on whatever scores best with anti-air and route-threat penalties",
-			"relaxed - better than idling forever when the whole enemy base is defended. Zero disables this",
+			"and instead accepts the best finite-cost route. Anti-air costs remain in force, but this is better",
+			"than idling forever when the whole enemy base is defended. Zero disables this",
 			"and restores the stock behaviour of idling indefinitely.")]
 		public readonly int AirMassedAttackIdleThreshold = 0;
 
@@ -218,6 +253,12 @@ namespace OpenRA.Mods.Common.Traits
 			if (AirTargetScanSamples <= 0)
 				throw new YamlException("AirTargetScanSamples must be greater than zero.");
 
+			if (AirInfluenceCellSize <= 0)
+				throw new YamlException("AirInfluenceCellSize must be greater than zero.");
+
+			if (AirInfluenceCacheInterval <= 0)
+				throw new YamlException("AirInfluenceCacheInterval must be greater than zero.");
+
 			if (AirSafetyCheckInterval > 0 && AirThreatScanRadius <= 0)
 				throw new YamlException("AirThreatScanRadius must be greater than zero when AirSafetyCheckInterval is set.");
 
@@ -235,6 +276,14 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (MaximumAirSquads < 0)
 				throw new YamlException("MaximumAirSquads must not be negative.");
+
+			foreach (var definition in AirSquadDefinitions)
+			{
+				if (definition.Value.SquadCount <= 0)
+					throw new YamlException($"Air squad definition '{definition.Key}' must have a positive SquadCount.");
+				if (definition.Value.MaximumSize < 0)
+					throw new YamlException($"Air squad definition '{definition.Key}' must not have a negative MaximumSize.");
+			}
 
 			if (AirEvadeDistance < 0)
 				throw new YamlException("AirEvadeDistance must not be negative.");
@@ -380,13 +429,33 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		/// <summary>
-		/// The air squad a newly built aircraft should join, honouring AirSquadSize and MaximumAirSquads.
-		/// Returns null when every air squad is full and no more are allowed - the caller then leaves the
-		/// aircraft unassigned, so it waits at base and is reconsidered on the next AssignRolesInterval.
-		/// Deterministic: Squads is an ordered list and is walked in order.
+		/// The compatible air squad a newly built aircraft should join. Named definitions are matched
+		/// most-specific-first and balanced by current size; without definitions the stock caps apply.
 		/// </summary>
-		Squad GetAirSquadWithRoom(IBot bot)
+		Squad GetAirSquadWithRoom(IBot bot, Actor actor)
 		{
+			if (Info.AirSquadDefinitions.Count > 0)
+			{
+				var compatible = Info.AirSquadDefinitions
+					.Where(d => d.Value.UnitTypes.Count == 0 || d.Value.UnitTypes.Contains(actor.Info.Name))
+					.OrderBy(d => d.Value.UnitTypes.Count == 0 ? int.MaxValue : d.Value.UnitTypes.Count)
+					.ThenBy(d => d.Key).ToList();
+				if (compatible.Count == 0)
+					return null;
+
+				var selected = compatible[0];
+				var squads = Squads.Where(s => s.Type == SquadType.Air && s.AirSquadDefinition == selected.Key).ToList();
+				if (squads.Count < selected.Value.SquadCount)
+				{
+					var created = RegisterNewSquad(bot, SquadType.Air);
+					created.AirSquadDefinition = selected.Key;
+					return created;
+				}
+
+				return squads.Where(s => selected.Value.MaximumSize <= 0 || s.Units.Count < selected.Value.MaximumSize)
+					.OrderBy(s => s.Units.Count).FirstOrDefault();
+			}
+
 			var squadCount = 0;
 			foreach (var s in Squads)
 			{
@@ -467,7 +536,7 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				if (Info.AirUnitsTypes.Contains(a.Info.Name))
 				{
-					var air = GetAirSquadWithRoom(bot);
+					var air = GetAirSquadWithRoom(bot, a);
 
 					// Every air squad is full and we may not start another. Leave the aircraft out of
 					// activeUnits so it stays at base and is picked up as soon as a slot frees up, rather
