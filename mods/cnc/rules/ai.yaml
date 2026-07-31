@@ -889,6 +889,15 @@ Player:
 		AirTargetHighestValueCandidates: 10
 		AirTargetHarvesterCandidates: 10
 		AirTargetDebugLogging: true
+		AirAdaptiveRiskInterval: 125
+		AirAdaptiveRiskRollbackTicks: 1500
+		AirAdaptiveRiskMinimumUnits: 3
+		AirAdaptiveRiskApacheFullAmmoGrowth: 100
+		AirAdaptiveRiskOrcaFullAmmoGrowth: 50
+		AirAdaptiveRiskLowUnitDecay: 100
+		AirAdaptiveRiskApacheKillGrowth: 1
+		AirAdaptiveRiskOrcaKillGrowth: 1
+		AirAdaptiveRiskLossDecrement: 2500
 		AirInfluenceCellSize: 6
 		AirInfluenceCacheInterval: 125
 		AirSafetyCheckInterval: 25

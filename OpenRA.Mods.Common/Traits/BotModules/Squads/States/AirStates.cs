@@ -374,7 +374,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var startCell = map.CellContaining(planningCenter);
 			var startX = Math.Clamp(startCell.X / coarseSize, 0, width - 1);
 			var startY = Math.Clamp(startCell.Y / coarseSize, 0, height - 1);
-			var riskScale = Math.Max(1f, armedUnits.Count / 3f);
+			var adaptiveRisk = owner.SquadManager.AirRiskMultiplier(owner.AirProfile);
+			var riskScale = Math.Max(1f, armedUnits.Count / 3f) * adaptiveRisk;
 			var bestScore = int.MinValue;
 			Actor best = null;
 			List<CPos> bestRoute = null;
@@ -454,7 +455,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				// Compare travel time rather than raw cells. A full magazine increases the pressure to
 				// spend that readiness on a nearby opportunity instead of crossing the whole map.
 				var speedScale = info.AirTargetReferenceSpeed / (float)Math.Max(1, squadSpeed);
-				var ammoDistanceScale = 1f + ammoReadiness * info.AirTargetFullAmmoDistanceBonus / 100f;
+				var ammoDistanceScale = 1f + ammoReadiness * info.AirTargetFullAmmoDistanceBonus / 100f * adaptiveRisk;
 				var distanceCost = (int)(route.Count * coarseSize * info.AirTargetDistancePenalty *
 					speedScale * ammoDistanceScale);
 				Actor cellTarget = null;
@@ -760,7 +761,10 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			owner.AirLocalThreatWeight = ownBuildingNear ? 0 : antiAirWeight;
 
 			// Over our own base there is nowhere safer to run to, and our own defences are the answer.
-			if (!ownBuildingNear && AirThreatGeometry.ShouldFleeAntiAir(antiAirWeight, info.AirThreatFleeMultiplier, owner.Units.Count))
+			var adaptiveSquadStrength = (int)Math.Min(int.MaxValue,
+				Math.Ceiling(owner.Units.Count * owner.SquadManager.AirRiskMultiplier(owner.AirProfile)));
+			if (!ownBuildingNear && AirThreatGeometry.ShouldFleeAntiAir(
+				antiAirWeight, info.AirThreatFleeMultiplier, adaptiveSquadStrength))
 			{
 				// Drop the target so the squad re-evaluates from scratch once it is clear; the threat we
 				// just remembered will make the route back through here look expensive.
@@ -1130,7 +1134,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			if (!unitsAroundPos.Any())
 				return true;
 
-			if (CountAntiAirUnits(unitsAroundPos) * owner.SquadManager.Info.AirThreatFleeMultiplier < owner.Units.Count)
+			var adaptiveSquadStrength = owner.Units.Count * owner.SquadManager.AirRiskMultiplier(owner.AirProfile);
+			if (CountAntiAirUnits(unitsAroundPos) * owner.SquadManager.Info.AirThreatFleeMultiplier < adaptiveSquadStrength)
 			{
 				detectedEnemyTarget = unitsAroundPos.Random(owner.Random);
 				return true;
