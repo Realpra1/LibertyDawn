@@ -88,7 +88,7 @@ RMBO:
 	Buildable:
 		Prerequisites: ~disabled
 
-MLRS:
+MSAM:
 	Buildable:
 		Prerequisites: ~disabled
 

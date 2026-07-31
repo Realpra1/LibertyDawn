@@ -325,7 +325,7 @@ Player:
 			stnk: 40
 			jeep: 5
 			mtnk: 20
-			msam: 40
+			mlrs: 40
 			htnk: 50
 			heli: 5
 			orca: 5
@@ -403,7 +403,7 @@ Player:
 			ltnk: 40
 			stnk: 40
 			orca: 10
-			msam: 50
+			mlrs: 50
 			htnk: 50
 			jeep: 20
 			mtnk: 50
@@ -479,12 +479,12 @@ Player:
 			arty: 20
 			ftnk: 5
 			stnk: 40
-			mlrs: 5
+			msam: 5
 			heli: 10
 			jeep: 20
 			apc: 10
 			mtnk: 50
-			msam: 50
+			mlrs: 50
 			htnk: 50
 			orca: 10
             upgrade.economy1: 1
@@ -596,13 +596,13 @@ Player:
             ctnk: 0
 			arty: 57
 			mtnk: 1
-			msam: 59
+			mlrs: 59
 			stnk: 2
 			apc: 1
 			bggy: 1
 			bike: 1
             jeep: 5
-			mlrs: 0
+			msam: 0
 			htnk: 14
 			heli: 1
 			orca: 1
@@ -618,7 +618,7 @@ Player:
             ctnk: 25
 			arty: 25
 			mtnk: 25
-			msam: 25
+			mlrs: 25
 			stnk: 25
 			apc: 25
 			bggy: 25
@@ -626,7 +626,7 @@ Player:
             jeep: 25
 			htnk: 50
             harv: 50
-			mlrs: 4
+			msam: 4
 			heli: 6
 			orca: 5
             e1: 25
@@ -643,13 +643,13 @@ Player:
             ctnk: 5000
 			arty: 3000
 			mtnk: 5000
-			msam: 3000
+			mlrs: 3000
 			stnk: 5000
 			apc: 5000
 			bggy: 4000
 			bike: 5000
             jeep: 4000
-			mlrs: 5000
+			msam: 5000
 			htnk: 5000
 			heli: 5000
 			orca: 5000
@@ -744,9 +744,9 @@ Player:
 			harv: 100
 			sharv: 100
 			arty: 39
-			msam: 39
+			mlrs: 39
             stnk: 15
-            mlrs: 1
+            msam: 1
             ctnk: 2
 			bggy: 1
 			bike: 2
@@ -767,13 +767,13 @@ Player:
             ctnk: 5000
 			arty: 3000
 			mtnk: 5000
-			msam: 3000
+			mlrs: 3000
 			stnk: 5000
 			apc: 5000
 			bggy: 4000
 			bike: 5000
             jeep: 4000
-			mlrs: 5000
+			msam: 5000
 			htnk: 5000
 			heli: 5000
 			orca: 5000
@@ -781,7 +781,7 @@ Player:
 		UnitLimits:
 			harv: 10
 			sharv: 50
-			mlrs: 0
+			msam: 0
 			heli: 0
 			orca: 0
             rmbo: 2
@@ -974,7 +974,7 @@ Player:
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
         IdleBaseUnitsMaximum: 999
 		WeightedUnitSelection: true
-		AdaptiveTypes: e1, e2, e3, e4, e5, rmbo, ltnk, ftnk, ctnk, arty, mtnk, msam, stnk, apc, bggy, bike, jeep, htnk, heli, orca
+		AdaptiveTypes: e1, e2, e3, e4, e5, rmbo, ltnk, ftnk, ctnk, arty, mtnk, mlrs, stnk, apc, bggy, bike, jeep, htnk, heli, orca
 		EconomyTypes: harv
 		UnitsToBuild:
 			e1: 65
@@ -989,13 +989,13 @@ Player:
 			ctnk: 10
 			arty: 28
 			mtnk: 1
-			msam: 30
+			mlrs: 30
 			stnk: 3
 			apc: 1
 			bggy: 1
 			bike: 1
             jeep: 5
-			mlrs: 10
+			msam: 10
 			htnk: 9
 			heli: 8
 			orca: 12
@@ -1013,13 +1013,13 @@ Player:
             ctnk: 5000
 			arty: 3000
 			mtnk: 5000
-			msam: 3000
+			mlrs: 3000
 			stnk: 5000
 			apc: 5000
 			bggy: 4000
 			bike: 5000
             jeep: 4000
-			mlrs: 5000
+			msam: 5000
 			htnk: 5000
 			heli: 5000
 			orca: 5000
@@ -1031,14 +1031,14 @@ Player:
             ctnk: 25
 			arty: 25
 			mtnk: 25
-			msam: 25
+			mlrs: 25
 			stnk: 25
 			apc: 25
 			bggy: 25
 			bike: 25
             jeep: 25
 			htnk: 50
-			mlrs: 4
+			msam: 4
 			heli: 40
 			orca: 40
             e1: 50
@@ -1143,13 +1143,13 @@ Player:
             ctnk: 0
 			arty: 57
 			mtnk: 1
-			msam: 59
+			mlrs: 59
 			stnk: 2
 			apc: 1
 			bggy: 1
 			bike: 1
             jeep: 5
-			mlrs: 0
+			msam: 0
 			htnk: 20
 			heli: 2
 			orca: 5
@@ -1169,7 +1169,7 @@ Player:
             ctnk: 25
 			arty: 25
 			mtnk: 25
-			msam: 25
+			mlrs: 25
 			stnk: 25
 			apc: 25
 			bggy: 25
@@ -1177,7 +1177,7 @@ Player:
             jeep: 25
 			htnk: 50
             harv: 50
-			mlrs: 4
+			msam: 4
             mhq: 2
 			heli: 20
 			orca: 30
@@ -1195,13 +1195,13 @@ Player:
             ctnk: 5000
 			arty: 3000
 			mtnk: 5000
-			msam: 3000
+			mlrs: 3000
 			stnk: 5000
 			apc: 5000
 			bggy: 4000
 			bike: 5000
             jeep: 4000
-			mlrs: 5000
+			msam: 5000
 			htnk: 5000
 			heli: 5000
 			orca: 5000
@@ -1299,13 +1299,13 @@ Player:
             ctnk: 0
 			arty: 38
 			mtnk: 1
-			msam: 40
+			mlrs: 40
 			stnk: 3
 			apc: 1
 			bggy: 1
 			bike: 1
             jeep: 1
-			mlrs: 0
+			msam: 0
 			htnk: 9
 			heli: 0
 			orca: 0
@@ -1320,20 +1320,20 @@ Player:
             ctnk: 5000
 			arty: 3000
 			mtnk: 5000
-			msam: 3000
+			mlrs: 3000
 			stnk: 5000
 			apc: 5000
 			bggy: 4000
 			bike: 5000
             jeep: 4000
-			mlrs: 5000
+			msam: 5000
 			htnk: 5000
 			heli: 5000
 			orca: 5000
             mcv: 3000
 		UnitLimits:
 			harv: 1
-			mlrs: 4
+			msam: 4
 			heli: 1
 			orca: 1
             rmbo: 2
@@ -1427,13 +1427,13 @@ Player:
             ctnk: 100
 			arty: 100
 			mtnk: 100
-			msam: 100
+			mlrs: 100
 			stnk: 100
 			apc: 100
 			bggy: 100
 			bike: 100
             jeep: 100
-			mlrs: 0
+			msam: 0
 			htnk: 100
 			heli: 100
 			orca: 100
@@ -1454,20 +1454,20 @@ Player:
             ctnk: 5000
 			arty: 3000
 			mtnk: 5000
-			msam: 3000
+			mlrs: 3000
 			stnk: 5000
 			apc: 5000
 			bggy: 0
 			bike: 5000
             jeep: 0
-			mlrs: 5000
+			msam: 5000
 			htnk: 5000
 			heli: 5000
 			orca: 5000
             mcv: 3000
 		UnitLimits:
 			harv: 1
-			mlrs: 4
+			msam: 4
 			heli: 1
 			orca: 1
             rmbo: 2

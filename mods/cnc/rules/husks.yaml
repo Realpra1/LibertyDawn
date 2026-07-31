@@ -121,25 +121,25 @@ HTNK.Husk:
 	RenderSprites:
 		Image: htnk.destroyed
 
-MSAM.Husk:
+MLRS.Husk:
 	Inherits: ^Husk
 	Tooltip:
 		Name: Rocket Launcher (Destroyed)
 	ThrowsParticle@turret:
 		Anim: turret
 	TransformOnCapture:
-		IntoActor: msam
+		IntoActor: mlrs
 	RenderSprites:
 		Image: msam.destroyed
 
-MLRS.Husk:
+MSAM.Husk:
 	Inherits: ^Husk
 	Tooltip:
 		Name: Mobile S.A.M. (Destroyed)
 	ThrowsParticle@turret:
 		Anim: turret
 	TransformOnCapture:
-		IntoActor: mlrs
+		IntoActor: msam
 	RenderSprites:
 		Image: mlrs.destroyed
 

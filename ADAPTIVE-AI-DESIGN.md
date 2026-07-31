@@ -47,7 +47,7 @@ if (Info.UnitsToBuild != null && !Info.UnitsToBuild.ContainsKey(name))
     return;
 ```
 
-Only the key is read; the value is ignored. This is why `ctnk: 0`, `mlrs: 0` and `mcv: 0`
+Only the key is read; the value is ignored. This is why `ctnk: 0`, `msam: 0` and `mcv: 0`
 (`ai.yaml:917-946`) are still built — a weight of `0` is still a key. What actually shapes SkyNet's
 army today is `UnitLimits` (`:965`) and `UnitDelays` (`:947`), not `UnitsToBuild`.
 
@@ -171,7 +171,7 @@ SkyNet's army composition **on its own**, before any adaptation — so it needs 
 | C | Leave selection alone and adapt `UnitLimits` / `UnitDelays` instead, since those are what actually bite today. | Honest about current behaviour, but limits are hard caps — adaptation would be coarse and would fight the balance intent of the authored numbers. |
 
 If B is chosen, note the authored numbers need a re-read as *relative shares*, and the `: 0` entries
-(`ctnk`, `mlrs`, `mcv`) become genuine bans rather than the no-ops they are now.
+(`ctnk`, `msam`, `mcv`) become genuine bans rather than the no-ops they are now.
 
 ### Q2. What exactly is the score?
 
@@ -195,7 +195,7 @@ debug output in Q10.
 | C | Last hit, but **also** credit a fixed fraction to every friendly type that damaged the victim in the last N ticks. | Middle ground, more moving parts and one more magic number. |
 
 Be honest about A's bias: **artillery, rocket launchers and anything that softens targets will
-under-score, and whoever lands the final shot will over-score.** With `arty: 28` and `msam: 30`
+under-score, and whoever lands the final shot will over-score.** With `arty: 28` and `mlrs: 30`
 being large SkyNet weights, this is not a hypothetical. If we ship A, we should watch specifically
 for artillery weights collapsing.
 
@@ -307,7 +307,7 @@ Roughly 150–200 lines of C# and ~6 yaml fields:
    yaml, already attached to every actor via `defaults.yaml:3`.
 3. **ROI score** (Q2-B), **whole-match with warm-up** (Q8-A), **confidence ramp** (Q7-B),
    **clamped `[0.5x, 2x]`** (Q6-B), applied to a **per-module copy** of the weights (finding 5).
-4. **Opt-in `AdaptiveTypes`** (Q5-B), starting with a handful: `e1, e3, arty, msam, ltnk, htnk,
+4. **Opt-in `AdaptiveTypes`** (Q5-B), starting with a handful: `e1, e3, arty, mlrs, ltnk, htnk,
    orca`. Everything else — economy, upgrades, `mcv`/`mhq` — untouched.
 5. **Player-level economy gate** (Q4-A) using `PlayerResources.Earned`.
 6. **BotDebug on change + 60s table dump** (Q10-B).
@@ -325,6 +325,6 @@ pressure to fix the real bug and hides the symptom from us. `PLAN.md:436-440` al
 this by sequencing adaptation after the walls/air rework; the sequencing needs to hold.
 
 Second-order: with last-hit attribution (Q3-A), **support units are structurally undervalued**.
-Artillery and rocket launchers soften targets that someone else finishes. Watch `arty` and `msam`
+Artillery and rocket launchers soften targets that someone else finishes. Watch `arty` and `mlrs`
 specifically — if their weights sag toward the floor across several matches while the bot's actual
 performance drops, that is the tell that we need Q3-B.

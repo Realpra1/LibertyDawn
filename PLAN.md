@@ -205,7 +205,7 @@ following this doc's §2 working method.
 - **`BaseBuilderBotModule.cs` / `BaseBuilderQueueManager.cs`** — turrets (`gtwr, gun, atwr, obli,
   sam`, the existing `WalledDefenseTypes` list) adapt the same way, nudging `BuildingFractions`'
   existing ceiling instead of replacing its shuffle-and-ceiling mechanic.
-- **`mods/cnc/rules/ai.yaml`** — wired up on **SkyNet only**. `ctnk`/`mlrs`/`mcv` raised off their
+- **`mods/cnc/rules/ai.yaml`** — wired up on **SkyNet only**. `ctnk`/`msam`/`mcv` raised off their
   no-op `0` weight to `10`; `AdaptiveTypes` covers all 20 weapon-bearing units; `EconomyTypes: harv`;
   `AdaptiveBuildingTypes: gtwr, gun, atwr, obli, sam`. Brutalis/VIKI/IronReaper untouched — same
   rollout pattern as air/walls, tune the hard bot first.
@@ -272,7 +272,7 @@ if (Info.UnitsToBuild != null && !Info.UnitsToBuild.ContainsKey(name))
     return;
 ```
 
-Only the **key** matters; the number is decoration. That is why `ctnk: 0`, `mlrs: 0` and `mcv: 0`
+Only the **key** matters; the number is decoration. That is why `ctnk: 0`, `msam: 0` and `mcv: 0`
 are still built. Adapting these weights as they stand would change literally nothing.
 
 Note also that even on the weighted path a weight is a *share ceiling*
@@ -324,7 +324,7 @@ adaptive samples; it was not a genuine in-game crash (no exception log). Round 4
 | **Orcas too timid** — if they never leave home the score floor is too high | `ai.yaml` | Lower `AirTargetMinimumScore: 200` |
 | **Sheep attack animation** reuses triceratops frames 80–91; never seen on screen | `sequences/infantry.yaml` | — |
 | **25-Sheep Rule** verified only at `ExactCountTracker` level; event wiring and shroud source never observed in play | `GrantConditionOnActorCount.cs` | — |
-| **Adaptive AI: artillery/msam may sag toward the weight floor** — last-hit attribution (Q3-A) systematically undervalues support units that soften targets someone else finishes | `UpdatesPlayerStatistics.Killed` | Move to damage-share attribution (Q3-B, deferred) |
+| **Adaptive AI: artillery/mlrs may sag toward the weight floor** — last-hit attribution (Q3-A) systematically undervalues support units that soften targets someone else finishes | `UpdatesPlayerStatistics.Killed` | Move to damage-share attribution (Q3-B, deferred) |
 | **Adaptive AI: real army composition and performance cost unverified** — one extra `world.Actors` scan per bot per ~1.2s when `WeightedUnitSelection` is on, only enabled for SkyNet; never profiled in a real match | `UnitBuilderBotModule.cs` | Disable `WeightedUnitSelection` on SkyNet if framerate drops |
 | **Adaptive AI: mid-match save/load path untested** — `IGameSaveTraitData` round-trip exists but was never exercised against a live save | `PlayerStatistics.cs` | Save/load once mid-match and diff `AdaptiveStats` |
 

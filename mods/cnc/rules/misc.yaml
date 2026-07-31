@@ -47,7 +47,7 @@ CRATE:
 		SelectionShares: 4
 		ValidFactions: gdi
     GiveUnitCrateAction@gtnks:
-		Units: mtnk, msam
+		Units: mtnk, mlrs
 		SelectionShares: 1
 		ValidFactions: gdi
     GiveUnitCrateAction@ntnks1:

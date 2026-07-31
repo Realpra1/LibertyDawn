@@ -717,7 +717,7 @@ HTNK:
 		DecorationBounds: 1450, 1450, 0, -128
     -Crushable:
 
-MSAM:
+MLRS:
 	Inherits: ^Tank
 	Inherits@EXPERIENCE: ^GainsExperience
 	Inherits@CLOAK: ^AcceptsCloakCrate
@@ -780,13 +780,16 @@ MSAM:
 		Weapon: UnitExplodeMech
 		EmptyWeapon: UnitExplodeMech
 	SpawnActorOnDeath:
-		Actor: MSAM.Husk
+		Actor: MLRS.Husk
 		OwnerType: InternalName
 		EffectiveOwnerFromOwner: true
 	WithTurretAimAnimation:
 		Sequence: aim
+	# The shipped sprite archive retains the legacy internal filename.
+	RenderSprites:
+		Image: msam
 
-MLRS:
+MSAM:
 	Inherits: ^Tank
 	Inherits@EXPERIENCE: ^GainsExperience
 	Inherits@CLOAK: ^AcceptsCloakCrate
@@ -836,12 +839,15 @@ MLRS:
 		InitialStanceAI: Defend
 	RenderRangeCircle:
 	SpawnActorOnDeath:
-		Actor: MLRS.Husk
+		Actor: MSAM.Husk
 		OwnerType: InternalName
 		EffectiveOwnerFromOwner: true
 	ReloadAmmoPool:
 		Delay: 45
 		Count: 1
+	# The shipped sprite archive retains the legacy internal filename.
+	RenderSprites:
+		Image: mlrs
 
 STNK:
 	Inherits: ^Vehicle

@@ -566,17 +566,17 @@ Actors:
 		Owner: GDI
 		Health: 45
 		Facing: 508
-	Actor164: msam
+	Actor164: mlrs
 		Location: 42,49
 		Owner: GDI
 		Health: 40
 		Facing: 380
-	Actor165: msam
+	Actor165: mlrs
 		Location: 41,51
 		Owner: GDI
 		Health: 50
 		Facing: 636
-	Actor166: msam
+	Actor166: mlrs
 		Location: 33,48
 		Owner: GDI
 		Health: 65

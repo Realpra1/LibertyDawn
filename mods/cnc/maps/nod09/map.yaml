@@ -691,7 +691,7 @@ Actors:
 		Location: 56,14
 		Owner: GDI
 		SubCell: 3
-	Actor244: msam
+	Actor244: mlrs
 		Owner: GDI
 		Location: 54,6
 		Facing: 368

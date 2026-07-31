@@ -21,7 +21,7 @@ HarvesterProductionType = { "harv" }
 VehicleAttackGroup = { }
 VehicleGroupSize = 5
 VehicleProductionCooldown = DateTime.Minutes(3)
-VehicleProductionTypes = { "jeep", "jeep", "mtnk", "mtnk", "mtnk", "msam" }
+VehicleProductionTypes = { "jeep", "jeep", "mtnk", "mtnk", "mtnk", "mlrs" }
 
 StartingCash = 4000
 
