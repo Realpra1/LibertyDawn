@@ -300,6 +300,25 @@ namespace OpenRA.Mods.Common.Traits
 			return antiAirWeight > 0 && antiAirWeight * fleeMultiplier > squadSize;
 		}
 
+		public static bool ShouldSwitchTarget(bool makingProgress, bool currentUndefended, int currentScore,
+			bool challengerValid, bool challengerUndefended, int challengerScore, int minimumImprovementPercent)
+		{
+			if (makingProgress || !challengerValid)
+				return false;
+
+			if (currentUndefended != challengerUndefended)
+				return challengerUndefended;
+
+			var requiredScore = (long)Math.Max(0, currentScore) * (100 + Math.Max(0, minimumImprovementPercent));
+			return (long)Math.Max(0, challengerScore) * 100 >= requiredScore;
+		}
+
+		public static bool ShouldRescanStalledTarget(int ticksSinceProgress, int stallTicks,
+			bool routeQueued, bool anyUnitBusy, bool hasArmedUnit)
+		{
+			return hasArmedUnit && !routeQueued && !anyUnitBusy && ticksSinceProgress >= stallTicks;
+		}
+
 		/// <summary>
 		/// Whether a weapon's real target range should be treated as reaching <paramref name="distanceInCells"/>
 		/// away, once padded by <paramref name="buffer"/>. The bot's own scans are flat radii unrelated to

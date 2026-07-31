@@ -885,6 +885,9 @@ Player:
 		AirTargetFullAmmoDistanceBonus: 100
 		AirTargetAaClearUnlockPercent: 125
 		AirTargetMinimumScore: 1
+		AirTargetSwitchImprovementPercent: 50
+		AirTargetCommitmentTicks: 250
+		AirTargetStallTicks: 300
 		AirTargetClosestCandidates: 15
 		AirTargetHighestValueCandidates: 10
 		AirTargetHarvesterCandidates: 10

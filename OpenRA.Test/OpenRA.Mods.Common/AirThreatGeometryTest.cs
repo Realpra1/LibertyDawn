@@ -449,5 +449,38 @@ namespace OpenRA.Test
 		{
 			Assert.That(AirThreatGeometry.MobileThreatBufferCells(speed, cacheTicks), Is.EqualTo(expectedCells));
 		}
+
+		[Test]
+		public void TargetCommitmentRequiresMaterialImprovement()
+		{
+			Assert.That(AirThreatGeometry.ShouldSwitchTarget(false, true, 100, true, true, 149, 50), Is.False);
+			Assert.That(AirThreatGeometry.ShouldSwitchTarget(false, true, 100, true, true, 150, 50), Is.True);
+			Assert.That(AirThreatGeometry.ShouldSwitchTarget(true, true, 100, true, true, 10000, 50), Is.False);
+			Assert.That(AirThreatGeometry.ShouldSwitchTarget(false, true, 100, false, true, 10000, 50), Is.False);
+		}
+
+		[Test]
+		public void TargetCommitmentPreservesUndefendedTier()
+		{
+			Assert.That(AirThreatGeometry.ShouldSwitchTarget(false, true, 1, true, false, int.MaxValue, 0), Is.False);
+			Assert.That(AirThreatGeometry.ShouldSwitchTarget(false, false, int.MaxValue, true, true, 1, 100), Is.True);
+		}
+
+		[Test]
+		public void TargetCommitmentScoreComparisonDoesNotOverflow()
+		{
+			Assert.That(AirThreatGeometry.ShouldSwitchTarget(
+				false, true, int.MaxValue - 1, true, true, int.MaxValue, 50), Is.False);
+		}
+
+		[Test]
+		public void StallRescanRequiresIdleArmedSquadWithoutQueuedRoute()
+		{
+			Assert.That(AirThreatGeometry.ShouldRescanStalledTarget(299, 300, false, false, true), Is.False);
+			Assert.That(AirThreatGeometry.ShouldRescanStalledTarget(300, 300, false, false, true), Is.True);
+			Assert.That(AirThreatGeometry.ShouldRescanStalledTarget(300, 300, true, false, true), Is.False);
+			Assert.That(AirThreatGeometry.ShouldRescanStalledTarget(300, 300, false, true, true), Is.False);
+			Assert.That(AirThreatGeometry.ShouldRescanStalledTarget(300, 300, false, false, false), Is.False);
+		}
 	}
 }

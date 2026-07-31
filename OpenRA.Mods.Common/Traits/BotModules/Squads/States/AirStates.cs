@@ -244,7 +244,23 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 		enum AirTargetClass { Unit, Building, Production, Harvester }
 
-		protected static Actor FindDefenselessTarget(Squad owner)
+		protected sealed class AirTargetPlan
+		{
+			public readonly Actor Actor;
+			public readonly int Score;
+			public readonly bool IsUndefended;
+			public readonly List<CPos> Route;
+
+			public AirTargetPlan(Actor actor, int score, bool isUndefended, List<CPos> route)
+			{
+				Actor = actor;
+				Score = score;
+				IsUndefended = isUndefended;
+				Route = route;
+			}
+		}
+
+		protected static AirTargetPlan FindDefenselessTarget(Squad owner)
 		{
 			return FindBestAirTarget(owner);
 		}
@@ -267,7 +283,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		/// best targets. Unlike the old random sampler this considers every known actor, can value a safe
 		/// detour, and keeps AA as a finite cost whose importance falls gradually as the squad grows.
 		/// </summary>
-		protected static Actor FindBestAirTarget(Squad owner, bool relaxed = false)
+		protected static AirTargetPlan FindBestAirTarget(Squad owner, bool relaxed = false)
 		{
 			var map = owner.World.Map;
 			var info = owner.SquadManager.Info;
@@ -573,17 +589,26 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					owner.AirProfile, best.Info.Name, best.ActorID, bestScore, bestIsUndefended,
 					bestRoute?.Count ?? 0, relaxed);
 
+			return new AirTargetPlan(best, bestScore, bestIsUndefended, bestRoute);
+		}
+
+		protected static void ApplyAirTargetPlan(Squad owner, AirTargetPlan plan)
+		{
+			var info = owner.SquadManager.Info;
+			owner.TargetActor = plan.Actor;
 			owner.AirRoute.Clear();
 			owner.AirRouteQueued = false;
-			owner.AirTargetStrategicCell = new CPos(best.Location.X / coarseSize, best.Location.Y / coarseSize);
+			owner.AirTargetStrategicCell = new CPos(
+				plan.Actor.Location.X / info.AirInfluenceCellSize,
+				plan.Actor.Location.Y / info.AirInfluenceCellSize);
 			owner.AirTargetLastProgressTick = owner.World.WorldTick;
-			owner.AirTargetLastDistanceCells = (best.CenterPosition - planningCenter).Length / 1024;
-			var bestHealth = best.TraitOrDefault<IHealth>();
-			owner.AirTargetLastHP = bestHealth?.HP ?? int.MaxValue;
+			owner.AirTargetLastDistanceCells = (plan.Actor.CenterPosition - owner.CenterPosition).Length / 1024;
+			owner.AirTargetLastHP = plan.Actor.TraitOrDefault<IHealth>()?.HP ?? int.MaxValue;
+			owner.AirTargetScore = plan.Score;
+			owner.AirTargetIsUndefended = plan.IsUndefended;
 			owner.AirNextTargetReviewTick = owner.World.WorldTick + info.AirInfluenceCacheInterval;
-			if (bestRoute != null)
-				owner.AirRoute.AddRange(bestRoute);
-			return best;
+			if (plan.Route != null)
+				owner.AirRoute.AddRange(plan.Route);
 		}
 
 		/// <summary>
@@ -766,12 +791,18 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			if (!ownBuildingNear && AirThreatGeometry.ShouldFleeAntiAir(
 				antiAirWeight, info.AirThreatFleeMultiplier, adaptiveSquadStrength))
 			{
+				if (info.AirTargetDebugLogging)
+					Log.Write("debug", "Air evade [{0}] local AA safety: threat={1:0.##} flee-multiplier={2} adaptive-strength={3} risk={4:0.00} target={5}.",
+						owner.AirProfile, antiAirWeight, info.AirThreatFleeMultiplier, adaptiveSquadStrength,
+						owner.SquadManager.AirRiskMultiplier(owner.AirProfile), owner.IsTargetValid ?
+						owner.TargetActor.Info.Name + "#" + owner.TargetActor.ActorID : "none");
+
 				// Drop the target so the squad re-evaluates from scratch once it is clear; the threat we
 				// just remembered will make the route back through here look expensive.
 				// The state change happens even when Evade declines to re-order (rate limit), so the squad
 				// cannot keep pressing an attack run it has already decided to abandon.
 				owner.TargetActor = null;
-				Evade(owner);
+				Evade(owner, "local AA safety");
 				owner.FuzzyStateMachine.ChangeState(owner, new AirFleeState(), true);
 				return;
 			}
@@ -781,7 +812,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			if (antiAirWeight > 0 || localTarget == null || localScore < info.AirTargetMinimumScore || owner.IsTargetValid)
 				return;
 
-			owner.TargetActor = localTarget;
+			ApplyAirTargetPlan(owner, new AirTargetPlan(localTarget, localScore, true, null));
 			owner.FuzzyStateMachine.ChangeState(owner, new AirAttackState(), true);
 		}
 
@@ -812,24 +843,36 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		/// Rate limited by <see cref="SquadManagerBotModuleInfo.AirRetreatOrderInterval"/>: within that window
 		/// it does nothing and the squad keeps flying the hop it was already given.
 		/// </summary>
-		protected static void Evade(Squad owner)
+		protected static void Evade(Squad owner, string reason)
 		{
 			var info = owner.SquadManager.Info;
 			var tick = owner.World.WorldTick;
 
 			// An air squad sitting in anti-air cover must not re-issue move orders on every safety check.
 			if (tick < owner.NextAirRetreatTick)
+			{
+				if (info.AirTargetDebugLogging)
+					Log.Write("debug", "Air evade [{0}] suppressed by rate limit for {1} ticks: reason={2}.",
+						owner.AirProfile, owner.NextAirRetreatTick - tick, reason);
+
 				return;
+			}
 
 			owner.NextAirRetreatTick = tick + info.AirRetreatOrderInterval;
 
 			if (info.AirEvadeDistance <= 0)
 			{
+				if (info.AirTargetDebugLogging)
+					Log.Write("debug", "Air evade [{0}] falling back to base retreat: reason={1}.", owner.AirProfile, reason);
+
 				Retreat(owner);
 				return;
 			}
 
 			var destination = EvadeDestination(owner);
+			if (info.AirTargetDebugLogging)
+				Log.Write("debug", "Air evade [{0}] moving to {1}: reason={2} remembered-threats={3}.",
+					owner.AirProfile, destination, reason, owner.AirThreatPositions.Count);
 			foreach (var a in owner.Units)
 			{
 				if (SendHomeToResupply(owner, a) || SendHomeToRepair(owner, a))
@@ -1187,7 +1230,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 						if (massedTarget != null)
 						{
 							owner.AirConsecutiveNoTargetScans = 0;
-							owner.TargetActor = massedTarget;
+							ApplyAirTargetPlan(owner, massedTarget);
 							owner.FuzzyStateMachine.ChangeState(owner, new AirAttackState(), true);
 							return;
 						}
@@ -1199,13 +1242,13 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				// there instead of hovering: this is the "if it cannot get there in a straight line, move
 				// around the base and try again" half of the loop, done the cheap way.
 				if (owner.SquadManager.Info.AirEvadeDistance > 0 && owner.AirThreatPositions.Count > 0)
-					Evade(owner);
+					Evade(owner, "no eligible target near remembered AA");
 
 				return;
 			}
 
 			owner.AirConsecutiveNoTargetScans = 0;
-			owner.TargetActor = e;
+			ApplyAirTargetPlan(owner, e);
 			owner.FuzzyStateMachine.ChangeState(owner, new AirAttackState(), true);
 		}
 
@@ -1226,24 +1269,41 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				Log.Write("debug", "Air state [{0}] attack tick: units={1} target-valid={2} route-queued={3}.",
 					owner.AirProfile, owner.Units.Count, owner.IsTargetValid, owner.AirRouteQueued);
 
+			var hasArmedUnit = owner.Units.Any(a => !owner.AirUnitsRepairing.Contains(a.ActorID) &&
+				HasAmmo(a.TraitsImplementing<AmmoPool>()));
+			var anyUnitBusy = owner.Units.Any(a => !owner.AirUnitsRepairing.Contains(a.ActorID) &&
+				(BusyAttack(a) || !a.IsIdle));
+			var ticksSinceProgress = owner.World.WorldTick - owner.AirTargetLastProgressTick;
+			var makingProgress = ticksSinceProgress < info.AirTargetCommitmentTicks;
+
 			if (owner.IsTargetValid && owner.World.WorldTick >= owner.AirNextTargetReviewTick)
 			{
-				var hasArmedUnit = owner.Units.Any(a => !owner.AirUnitsRepairing.Contains(a.ActorID) &&
-					HasAmmo(a.TraitsImplementing<AmmoPool>()));
-				if (!hasArmedUnit || owner.TargetActor.Info.HasTraitInfo<BuildingInfo>())
+				owner.AirNextTargetReviewTick = owner.World.WorldTick + info.AirInfluenceCacheInterval;
+				if (owner.TargetActor.Info.HasTraitInfo<BuildingInfo>() && hasArmedUnit &&
+					!makingProgress && !owner.AirRouteQueued && !anyUnitBusy)
 				{
-					if (info.AirTargetDebugLogging)
-						Log.Write("debug", "Air target [{0}] reviewing {1}#{2}: building={3} armed={4}.",
-							owner.AirProfile, owner.TargetActor.Info.Name, owner.TargetActor.ActorID,
-							owner.TargetActor.Info.HasTraitInfo<BuildingInfo>(), hasArmedUnit);
+					var incumbent = owner.TargetActor;
+					var challenger = FindBestAirTarget(owner);
+					var switchTarget = challenger != null && challenger.Actor != incumbent &&
+						AirThreatGeometry.ShouldSwitchTarget(false, owner.AirTargetIsUndefended,
+							owner.AirTargetScore, true, challenger.IsUndefended, challenger.Score,
+							info.AirTargetSwitchImprovementPercent);
+					if (switchTarget)
+					{
+						if (info.AirTargetDebugLogging)
+							Log.Write("debug", "Air target [{0}] switching building {1}#{2} score={3} to {4}#{5} score={6}: improvement threshold={7}%.",
+								owner.AirProfile, incumbent.Info.Name, incumbent.ActorID, owner.AirTargetScore,
+								challenger.Actor.Info.Name, challenger.Actor.ActorID, challenger.Score,
+								info.AirTargetSwitchImprovementPercent);
 
-					owner.TargetActor = null;
-					owner.AirTargetStrategicCell = null;
-					owner.AirRoute.Clear();
-					owner.AirRouteQueued = false;
+						ApplyAirTargetPlan(owner, challenger);
+					}
+					else if (info.AirTargetDebugLogging)
+						Log.Write("debug", "Air target [{0}] retaining building {1}#{2}: challenger={3} current-score={4} challenger-score={5}.",
+							owner.AirProfile, incumbent.Info.Name, incumbent.ActorID,
+							challenger == null ? "none" : challenger.Actor.Info.Name + "#" + challenger.Actor.ActorID,
+							owner.AirTargetScore, challenger?.Score ?? int.MinValue);
 				}
-				else
-					owner.AirNextTargetReviewTick = owner.World.WorldTick + info.AirInfluenceCacheInterval;
 			}
 
 			if (owner.IsTargetValid)
@@ -1261,15 +1321,38 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				}
 				else if (currentCell != owner.AirTargetStrategicCell.Value)
 				{
+					var previousCell = owner.AirTargetStrategicCell.Value;
+					owner.AirTargetStrategicCell = currentCell;
+					var committed = makingProgress || owner.AirRouteQueued || anyUnitBusy;
 					if (info.AirTargetDebugLogging)
-						Log.Write("debug", "Air target [{0}] {1}#{2} left strategic cell {3}; rescanning in {4}.",
+						Log.Write("debug", "Air target [{0}] {1}#{2} moved strategic cell {3}->{4}; committed={5} progress-age={6} route-queued={7}.",
 							owner.AirProfile, owner.TargetActor.Info.Name, owner.TargetActor.ActorID,
-							owner.AirTargetStrategicCell.Value, currentCell);
+							previousCell, currentCell, committed,
+							ticksSinceProgress, owner.AirRouteQueued);
 
-					owner.TargetActor = null;
-					owner.AirTargetStrategicCell = null;
-					owner.AirRoute.Clear();
-					owner.AirRouteQueued = false;
+					if (!committed)
+					{
+						var incumbent = owner.TargetActor;
+						var challenger = FindBestAirTarget(owner);
+						var accept = challenger != null && (challenger.Actor == incumbent ||
+							AirThreatGeometry.ShouldSwitchTarget(false, owner.AirTargetIsUndefended,
+								owner.AirTargetScore, true, challenger.IsUndefended, challenger.Score,
+								info.AirTargetSwitchImprovementPercent));
+						if (accept)
+						{
+							if (info.AirTargetDebugLogging)
+								Log.Write("debug", "Air target [{0}] cell-change replan accepted: {1}#{2}->{3}#{4} score={5}.",
+									owner.AirProfile, incumbent.Info.Name, incumbent.ActorID,
+									challenger.Actor.Info.Name, challenger.Actor.ActorID, challenger.Score);
+
+							ApplyAirTargetPlan(owner, challenger);
+						}
+						else if (info.AirTargetDebugLogging)
+							Log.Write("debug", "Air target [{0}] cell-change replan rejected; retaining {1}#{2} score={3}, challenger={4} score={5}.",
+								owner.AirProfile, incumbent.Info.Name, incumbent.ActorID, owner.AirTargetScore,
+								challenger == null ? "none" : challenger.Actor.Info.Name + "#" + challenger.Actor.ActorID,
+								challenger?.Score ?? int.MinValue);
+					}
 				}
 				else
 				{
@@ -1281,13 +1364,14 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 						owner.AirTargetLastDistanceCells = distanceCells;
 						owner.AirTargetLastHP = targetHP;
 					}
-					else if (owner.World.WorldTick - owner.AirTargetLastProgressTick >= 150 &&
-						owner.Units.Any(a => !owner.AirUnitsRepairing.Contains(a.ActorID) &&
-							HasAmmo(a.TraitsImplementing<AmmoPool>())))
+					else if (AirThreatGeometry.ShouldRescanStalledTarget(
+						owner.World.WorldTick - owner.AirTargetLastProgressTick, info.AirTargetStallTicks,
+						owner.AirRouteQueued, anyUnitBusy, hasArmedUnit))
 					{
 						if (info.AirTargetDebugLogging)
-							Log.Write("debug", "Air target [{0}] {1}#{2} stalled for 150 ticks at distance {3}; rescanning.",
-								owner.AirProfile, owner.TargetActor.Info.Name, owner.TargetActor.ActorID, distanceCells);
+							Log.Write("debug", "Air target [{0}] {1}#{2} genuinely stalled for {3} ticks at distance {4}; rescanning.",
+								owner.AirProfile, owner.TargetActor.Info.Name, owner.TargetActor.ActorID,
+								owner.World.WorldTick - owner.AirTargetLastProgressTick, distanceCells);
 
 						owner.TargetActor = null;
 						owner.AirTargetStrategicCell = null;
@@ -1307,15 +1391,23 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 				if (nextTarget == null)
 				{
+					if (info.AirTargetDebugLogging)
+						Log.Write("debug", "Air evade [{0}] attack state found no eligible target with armed aircraft; entering flee state.",
+							owner.AirProfile);
+
 					owner.FuzzyStateMachine.ChangeState(owner, new AirFleeState(), true);
 					return;
 				}
 
-				owner.TargetActor = nextTarget;
+				ApplyAirTargetPlan(owner, nextTarget);
 			}
 
 			if (owner.AirProfile == "Generic" && !NearToPosSafely(owner, owner.TargetActor.CenterPosition))
 			{
+				if (info.AirTargetDebugLogging)
+					Log.Write("debug", "Air evade [{0}] generic proximity safety rejected target {1}#{2}.",
+						owner.AirProfile, owner.TargetActor.Info.Name, owner.TargetActor.ActorID);
+
 				owner.FuzzyStateMachine.ChangeState(owner, new AirFleeState(), true);
 				return;
 			}
@@ -1409,8 +1501,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 					owner.Bot.QueueOrder(new Order("Move", a, Target.FromCell(owner.World, disengageDestination.Value), false));
 					if (info.AirTargetDebugLogging)
-						Log.Write("debug", "Air order [{0}] {1}#{2}: empty under AA threat {3:0.##}; disengaging to reload.",
-							owner.AirProfile, a.Info.Name, a.ActorID, owner.AirLocalThreatWeight);
+						Log.Write("debug", "Air order [{0}] {1}#{2}: empty under AA threat {3:0.##}; disengaging to {4} to reload.",
+							owner.AirProfile, a.Info.Name, a.ActorID, owner.AirLocalThreatWeight, disengageDestination.Value);
 
 					continue;
 				}
@@ -1440,7 +1532,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			if (!owner.IsValid)
 				return;
 
-			Evade(owner);
+			Evade(owner, "flee-state continuation");
 
 			// Straight back to idle: the next scan - whichever of the state machine or the much faster
 			// safety check gets there first - re-targets from wherever the hop put us.

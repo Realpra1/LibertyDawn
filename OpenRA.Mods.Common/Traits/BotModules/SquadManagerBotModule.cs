@@ -152,6 +152,15 @@ namespace OpenRA.Mods.Common.Traits
 			"Candidates scoring below this are ignored and the squad stays idle.")]
 		public readonly int AirTargetMinimumScore = 1;
 
+		[Desc("Minimum percentage by which a periodic replacement target must outscore the current target.")]
+		public readonly int AirTargetSwitchImprovementPercent = 50;
+
+		[Desc("Ticks after approaching or damaging a target during which an air squad will not reconsider it.")]
+		public readonly int AirTargetCommitmentTicks = 250;
+
+		[Desc("Ticks without route, distance, or damage progress before an air target is considered stalled.")]
+		public readonly int AirTargetStallTicks = 300;
+
 		[Desc("Number of nearest air target candidates routed per strategic scan.")]
 		public readonly int AirTargetClosestCandidates = 15;
 
@@ -317,6 +326,9 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (AirTargetFullAmmoDistanceBonus < 0 || AirTargetAaClearUnlockPercent < 0)
 				throw new YamlException("Air target ammo-distance and AA-clear modifiers must not be negative.");
+
+			if (AirTargetSwitchImprovementPercent < 0 || AirTargetCommitmentTicks < 0 || AirTargetStallTicks <= 0)
+				throw new YamlException("Air target commitment settings must be non-negative and AirTargetStallTicks must be positive.");
 
 			if (AirAdaptiveRiskInterval < 0 || AirAdaptiveRiskRollbackTicks < 0 || AirAdaptiveRiskMinimumUnits < 0 ||
 				AirAdaptiveRiskApacheFullAmmoGrowth < 0 || AirAdaptiveRiskOrcaFullAmmoGrowth < 0 ||

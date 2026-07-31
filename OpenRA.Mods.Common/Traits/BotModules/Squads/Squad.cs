@@ -53,6 +53,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		internal int AirTargetLastProgressTick;
 		internal int AirTargetLastDistanceCells = int.MaxValue;
 		internal int AirTargetLastHP = int.MaxValue;
+		internal int AirTargetScore = int.MinValue;
+		internal bool AirTargetIsUndefended;
 		internal float AirLocalThreatWeight;
 		internal int AirNextTargetReviewTick;
 
