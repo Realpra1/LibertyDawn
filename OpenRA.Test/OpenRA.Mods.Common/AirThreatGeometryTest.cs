@@ -441,5 +441,13 @@ namespace OpenRA.Test
 
 			Assert.That(selected, Is.EqualTo(new[] { 0, 1, 2, 3, 4 }));
 		}
+
+		[TestCase(92, 125, 12)]
+		[TestCase(40, 125, 5)]
+		[TestCase(0, 125, 0)]
+		public void MobileThreatBufferCoversCacheLifetime(int speed, int cacheTicks, int expectedCells)
+		{
+			Assert.That(AirThreatGeometry.MobileThreatBufferCells(speed, cacheTicks), Is.EqualTo(expectedCells));
+		}
 	}
 }

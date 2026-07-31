@@ -49,6 +49,12 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		internal readonly List<CPos> AirRoute = new List<CPos>();
 		internal bool AirRouteQueued;
 		internal readonly HashSet<uint> AirUnitsRepairing = new HashSet<uint>();
+		internal CPos? AirTargetStrategicCell;
+		internal int AirTargetLastProgressTick;
+		internal int AirTargetLastDistanceCells = int.MaxValue;
+		internal int AirTargetLastHP = int.MaxValue;
+		internal float AirLocalThreatWeight;
+		internal int AirNextTargetReviewTick;
 
 		public Squad(IBot bot, SquadManagerBotModule squadManager, SquadType type)
 			: this(bot, squadManager, type, null) { }
