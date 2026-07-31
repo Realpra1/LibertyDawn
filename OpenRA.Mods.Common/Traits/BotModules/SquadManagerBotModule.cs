@@ -161,6 +161,9 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Ticks without route, distance, or damage progress before an air target is considered stalled.")]
 		public readonly int AirTargetStallTicks = 300;
 
+		[Desc("Maximum ticks a queued air route can suppress stall recovery when it makes no progress.")]
+		public readonly int AirTargetRouteTimeoutTicks = 750;
+
 		[Desc("Number of nearest air target candidates routed per strategic scan.")]
 		public readonly int AirTargetClosestCandidates = 15;
 
@@ -327,8 +330,9 @@ namespace OpenRA.Mods.Common.Traits
 			if (AirTargetFullAmmoDistanceBonus < 0 || AirTargetAaClearUnlockPercent < 0)
 				throw new YamlException("Air target ammo-distance and AA-clear modifiers must not be negative.");
 
-			if (AirTargetSwitchImprovementPercent < 0 || AirTargetCommitmentTicks < 0 || AirTargetStallTicks <= 0)
-				throw new YamlException("Air target commitment settings must be non-negative and AirTargetStallTicks must be positive.");
+			if (AirTargetSwitchImprovementPercent < 0 || AirTargetCommitmentTicks < 0 ||
+				AirTargetStallTicks <= 0 || AirTargetRouteTimeoutTicks <= 0)
+				throw new YamlException("Air target commitment settings must be non-negative and timeout settings must be positive.");
 
 			if (AirAdaptiveRiskInterval < 0 || AirAdaptiveRiskRollbackTicks < 0 || AirAdaptiveRiskMinimumUnits < 0 ||
 				AirAdaptiveRiskApacheFullAmmoGrowth < 0 || AirAdaptiveRiskOrcaFullAmmoGrowth < 0 ||
@@ -810,8 +814,12 @@ namespace OpenRA.Mods.Common.Traits
 			if (profile == null || !adaptiveAirRisk.TryGetValue(profile, out var controller))
 				return;
 
+			var growth = KillGrowth(profile);
+			if (growth <= 0)
+				return;
+
 			var value = damaged.Info.TraitInfoOrDefault<ValuedInfo>()?.Cost ?? 0;
-			controller.RecordKill(value, KillGrowth(profile));
+			controller.RecordKill(value, growth);
 			if (Info.AirTargetDebugLogging)
 				Log.Write("debug", "Air adaptive [{0}]: credited {1} value for killing {2}#{3}.",
 					profile, value, damaged.Info.Name, damaged.ActorID);

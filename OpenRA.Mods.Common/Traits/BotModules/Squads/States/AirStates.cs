@@ -391,7 +391,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var startX = Math.Clamp(startCell.X / coarseSize, 0, width - 1);
 			var startY = Math.Clamp(startCell.Y / coarseSize, 0, height - 1);
 			var adaptiveRisk = owner.SquadManager.AirRiskMultiplier(owner.AirProfile);
-			var riskScale = Math.Max(1f, armedUnits.Count / 3f) * adaptiveRisk;
+			var attackRiskScale = Math.Max(1f, armedUnits.Count / 3f) * adaptiveRisk;
 			var bestScore = int.MinValue;
 			Actor best = null;
 			List<CPos> bestRoute = null;
@@ -456,7 +456,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				var goalY = Math.Clamp(cell.Y, 0, height - 1);
 				var opportunityValue = cellUtility[cell];
 				var route = AirThreatGeometry.FindCoarseRoute(danger, width, height, startX, startY, goalX, goalY,
-					info.AirRouteThreatPenalty / riskScale);
+					info.AirRouteThreatPenalty);
 				if (route == null)
 				{
 					if (info.AirTargetDebugLogging)
@@ -466,7 +466,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					continue;
 				}
 
-				var exposureCost = route.Sum(p => danger[p.Y * width + p.X]) * info.AirRouteThreatPenalty / riskScale;
+				var exposureCost = route.Sum(p => danger[p.Y * width + p.X]) * info.AirRouteThreatPenalty;
 
 				// Compare travel time rather than raw cells. A full magazine increases the pressure to
 				// spend that readiness on a nearby opportunity instead of crossing the whole map.
@@ -510,7 +510,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 					var quickStrike = !clearsAa && destinationDanger > 0 &&
 						CanEliminateWithFullAmmo(planningUnits, candidate.Actor);
-					var stoppingCost = (int)(destinationDanger * info.AirTargetAntiAirPenalty / riskScale);
+					var stoppingCost = (int)(destinationDanger * info.AirTargetAntiAirPenalty / attackRiskScale);
 					if (quickStrike)
 						stoppingCost /= 2;
 
@@ -597,7 +597,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var info = owner.SquadManager.Info;
 			owner.TargetActor = plan.Actor;
 			owner.AirRoute.Clear();
-			owner.AirRouteQueued = false;
+			owner.AirRouteAssignedUnits.Clear();
+			owner.AirRoutePlanTick = owner.World.WorldTick;
 			owner.AirTargetStrategicCell = new CPos(
 				plan.Actor.Location.X / info.AirInfluenceCellSize,
 				plan.Actor.Location.Y / info.AirInfluenceCellSize);
@@ -609,6 +610,32 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			owner.AirNextTargetReviewTick = owner.World.WorldTick + info.AirInfluenceCacheInterval;
 			if (plan.Route != null)
 				owner.AirRoute.AddRange(plan.Route);
+		}
+
+		protected static List<CPos> SafeRouteForAircraft(Squad owner, Actor aircraft, Actor target)
+		{
+			var info = owner.SquadManager.Info;
+			var speed = aircraft.Info.TraitInfoOrDefault<AircraftInfo>()?.Speed ?? info.AirTargetReferenceSpeed;
+			if (!InfluenceCaches.TryGetValue(owner.SquadManager, out var profileCaches) ||
+				!profileCaches.TryGetValue(owner.AirProfile + ":" + speed, out var cache))
+				return owner.AirRoute.ToList();
+
+			var map = owner.World.Map;
+			var coarseSize = info.AirInfluenceCellSize;
+			var start = map.CellContaining(aircraft.CenterPosition);
+			var startX = Math.Clamp(start.X / coarseSize, 0, cache.Width - 1);
+			var startY = Math.Clamp(start.Y / coarseSize, 0, cache.Height - 1);
+			var goalX = Math.Clamp(target.Location.X / coarseSize, 0, cache.Width - 1);
+			var goalY = Math.Clamp(target.Location.Y / coarseSize, 0, cache.Height - 1);
+			var route = AirThreatGeometry.FindCoarseRoute(cache.Danger, cache.Width, cache.Height,
+				startX, startY, goalX, goalY, info.AirRouteThreatPenalty);
+			if (route == null)
+				return new List<CPos>();
+
+			return AirThreatGeometry.SmoothCoarseRoute(
+				cache.Danger, cache.Width, cache.Height, startX, startY, route)
+				.Select(p => map.Clamp(new CPos(
+					p.X * coarseSize + coarseSize / 2, p.Y * coarseSize + coarseSize / 2))).ToList();
 		}
 
 		/// <summary>
@@ -809,8 +836,21 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 			// Only ever commit to a local target when this scan saw no anti-air at all within
 			// AirThreatScanRadius, so the fast path can never walk the squad into cover it just measured.
-			if (antiAirWeight > 0 || localTarget == null || localScore < info.AirTargetMinimumScore || owner.IsTargetValid)
+			var hasFullyLoadedUnit = owner.Units.Any(a =>
+			{
+				if (owner.AirUnitsRepairing.Contains(a.ActorID))
+					return false;
+
+				var pools = a.TraitsImplementing<AmmoPool>().ToArray();
+				return pools.Length > 0 && FullAmmo(pools);
+			});
+			if (antiAirWeight > 0 || localTarget == null || localScore < info.AirTargetMinimumScore ||
+				owner.IsTargetValid || !hasFullyLoadedUnit)
 				return;
+
+			if (info.AirTargetDebugLogging)
+				Log.Write("debug", "Air target [{0}] local opportunity selected {1}#{2}: score={3} full-ammo=True local-AA=0.",
+					owner.AirProfile, localTarget.Info.Name, localTarget.ActorID, localScore);
 
 			ApplyAirTargetPlan(owner, new AirTargetPlan(localTarget, localScore, true, null));
 			owner.FuzzyStateMachine.ChangeState(owner, new AirAttackState(), true);
@@ -1266,21 +1306,23 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 			var info = owner.SquadManager.Info;
 			if (owner.SquadManager.Info.AirTargetDebugLogging)
-				Log.Write("debug", "Air state [{0}] attack tick: units={1} target-valid={2} route-queued={3}.",
-					owner.AirProfile, owner.Units.Count, owner.IsTargetValid, owner.AirRouteQueued);
+				Log.Write("debug", "Air state [{0}] attack tick: units={1} target-valid={2} routed-units={3}.",
+					owner.AirProfile, owner.Units.Count, owner.IsTargetValid, owner.AirRouteAssignedUnits.Count);
 
 			var hasArmedUnit = owner.Units.Any(a => !owner.AirUnitsRepairing.Contains(a.ActorID) &&
 				HasAmmo(a.TraitsImplementing<AmmoPool>()));
 			var anyUnitBusy = owner.Units.Any(a => !owner.AirUnitsRepairing.Contains(a.ActorID) &&
 				(BusyAttack(a) || !a.IsIdle));
+			var routeTraveling = owner.Units.Any(a => owner.AirRouteAssignedUnits.Contains(a.ActorID) &&
+				!a.IsIdle && !BusyAttack(a));
+			var routeExpired = owner.World.WorldTick - owner.AirRoutePlanTick >= info.AirTargetRouteTimeoutTicks;
 			var ticksSinceProgress = owner.World.WorldTick - owner.AirTargetLastProgressTick;
 			var makingProgress = ticksSinceProgress < info.AirTargetCommitmentTicks;
 
 			if (owner.IsTargetValid && owner.World.WorldTick >= owner.AirNextTargetReviewTick)
 			{
 				owner.AirNextTargetReviewTick = owner.World.WorldTick + info.AirInfluenceCacheInterval;
-				if (owner.TargetActor.Info.HasTraitInfo<BuildingInfo>() && hasArmedUnit &&
-					!makingProgress && !owner.AirRouteQueued && !anyUnitBusy)
+				if (owner.TargetActor.Info.HasTraitInfo<BuildingInfo>() && hasArmedUnit && !makingProgress)
 				{
 					var incumbent = owner.TargetActor;
 					var challenger = FindBestAirTarget(owner);
@@ -1323,12 +1365,12 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				{
 					var previousCell = owner.AirTargetStrategicCell.Value;
 					owner.AirTargetStrategicCell = currentCell;
-					var committed = makingProgress || owner.AirRouteQueued || anyUnitBusy;
+					var committed = makingProgress;
 					if (info.AirTargetDebugLogging)
-						Log.Write("debug", "Air target [{0}] {1}#{2} moved strategic cell {3}->{4}; committed={5} progress-age={6} route-queued={7}.",
+						Log.Write("debug", "Air target [{0}] {1}#{2} moved strategic cell {3}->{4}; committed={5} progress-age={6} routed-units={7}.",
 							owner.AirProfile, owner.TargetActor.Info.Name, owner.TargetActor.ActorID,
 							previousCell, currentCell, committed,
-							ticksSinceProgress, owner.AirRouteQueued);
+							ticksSinceProgress, owner.AirRouteAssignedUnits.Count);
 
 					if (!committed)
 					{
@@ -1366,7 +1408,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					}
 					else if (AirThreatGeometry.ShouldRescanStalledTarget(
 						owner.World.WorldTick - owner.AirTargetLastProgressTick, info.AirTargetStallTicks,
-						owner.AirRouteQueued, anyUnitBusy, hasArmedUnit))
+						routeTraveling && !routeExpired, anyUnitBusy && !routeExpired, hasArmedUnit))
 					{
 						if (info.AirTargetDebugLogging)
 							Log.Write("debug", "Air target [{0}] {1}#{2} genuinely stalled for {3} ticks at distance {4}; rescanning.",
@@ -1376,7 +1418,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 						owner.TargetActor = null;
 						owner.AirTargetStrategicCell = null;
 						owner.AirRoute.Clear();
-						owner.AirRouteQueued = false;
+						owner.AirRouteAssignedUnits.Clear();
 					}
 				}
 			}
@@ -1412,45 +1454,36 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				return;
 			}
 
-			// The engine already supports shift-queued movement. Submit the complete planned route in one
-			// pass instead of waiting for a strategic tick at each coarse cell, then queue the attack behind
-			// it. This keeps the influence grid a planning detail rather than a series of visible pauses.
-			if (owner.AirRoute.Count > 1 && !owner.AirRouteQueued)
+			// Route assignment belongs to each aircraft. Existing and newly produced squad members each
+			// receive a safe route from their own current position, so one aircraft that remains active can
+			// never leave the rest of a large squad permanently latched behind a squad-wide queued flag.
+			owner.AirRouteAssignedUnits.RemoveWhere(id => !owner.Units.Any(a => a.ActorID == id));
+			foreach (var a in owner.Units)
 			{
-				foreach (var a in owner.Units)
+				if (owner.AirRouteAssignedUnits.Contains(a.ActorID) || SendHomeToRepair(owner, a))
+					continue;
+
+				var route = SafeRouteForAircraft(owner, a, owner.TargetActor);
+				owner.AirRouteAssignedUnits.Add(a.ActorID);
+				if (route.Count <= 1)
+					continue;
+
+				var queued = false;
+				foreach (var waypoint in route)
 				{
-					if (SendHomeToRepair(owner, a))
-						continue;
-
-					var queued = false;
-					foreach (var waypoint in owner.AirRoute)
-					{
-						owner.Bot.QueueOrder(new Order("Move", a, Target.FromCell(owner.World, waypoint), queued));
-						queued = true;
-					}
-
-					if (CanAttackTarget(a, owner.TargetActor))
-					{
-						owner.Bot.QueueOrder(new Order("Attack", a, Target.FromActor(owner.TargetActor), true));
-						if (owner.SquadManager.Info.AirTargetDebugLogging)
-							Log.Write("debug", "Air order [{0}] {1}#{2}: queued route attack on {3}#{4}.",
-								owner.AirProfile, a.Info.Name, a.ActorID, owner.TargetActor.Info.Name, owner.TargetActor.ActorID);
-					}
-					else if (owner.SquadManager.Info.AirTargetDebugLogging)
-						Log.Write("debug", "Air order [{0}] {1}#{2}: cannot attack selected {3}#{4}.",
-							owner.AirProfile, a.Info.Name, a.ActorID, owner.TargetActor.Info.Name, owner.TargetActor.ActorID);
+					owner.Bot.QueueOrder(new Order("Move", a, Target.FromCell(owner.World, waypoint), queued));
+					queued = true;
 				}
 
-				owner.AirRouteQueued = true;
-				owner.AirRoute.Clear();
-				return;
+				if (CanAttackTarget(a, owner.TargetActor))
+				{
+					owner.Bot.QueueOrder(new Order("Attack", a, Target.FromActor(owner.TargetActor), true));
+					if (info.AirTargetDebugLogging)
+						Log.Write("debug", "Air order [{0}] {1}#{2}: queued individual safe route ({3} waypoints) to {4}#{5}.",
+							owner.AirProfile, a.Info.Name, a.ActorID, route.Count,
+							owner.TargetActor.Info.Name, owner.TargetActor.ActorID);
+				}
 			}
-
-			// A queued route belongs to each aircraft, not to the squad as a blocking transaction. One
-			// aircraft may still be flying while another has finished or become idle; only the former waits.
-			if (owner.AirRouteQueued &&
-				!owner.Units.Any(a => !owner.AirUnitsRepairing.Contains(a.ActorID) && !a.IsIdle))
-				owner.AirRouteQueued = false;
 
 			// Lazily computed: only needed if a self-reloading aircraft actually turns out to be dry,
 			// which is the uncommon case, and shared across every unit that needs it this tick rather
@@ -1459,7 +1492,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 			foreach (var a in owner.Units)
 			{
-				if (owner.AirRouteQueued && !a.IsIdle)
+				if (owner.AirRouteAssignedUnits.Contains(a.ActorID) && !a.IsIdle && !BusyAttack(a))
 					continue;
 
 				if (BusyAttack(a))
