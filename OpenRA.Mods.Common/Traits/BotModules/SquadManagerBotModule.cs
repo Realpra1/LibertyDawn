@@ -135,6 +135,19 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Score deducted per cell of distance between the air squad and a candidate target.")]
 		public readonly int AirTargetDistancePenalty = 1;
 
+		[Desc("Aircraft speed used as the neutral point for air-target travel-time scoring.",
+			"Slower squads pay proportionally more distance cost and faster squads pay less.")]
+		public readonly int AirTargetReferenceSpeed = 160;
+
+		[Desc("Additional percentage of distance cost applied at full ammo, scaled linearly by magazine fullness.",
+			"This makes ready aircraft prefer nearby targets they can engage immediately.")]
+		public readonly int AirTargetFullAmmoDistanceBonus = 100;
+
+		[Desc("Percentage of a defended strategic cell's total target value credited to a killable AA actor.",
+			"The credit is divided by remaining AA danger, so removing a small screen can unlock a rich cell",
+			"without making dense SAM clusters attractive.")]
+		public readonly int AirTargetAaClearUnlockPercent = 100;
+
 		[Desc("Minimum score a candidate must reach before an air squad commits to attacking it.",
 			"Candidates scoring below this are ignored and the squad stays idle.")]
 		public readonly int AirTargetMinimumScore = 1;
@@ -271,6 +284,12 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (AirInfluenceCacheInterval <= 0)
 				throw new YamlException("AirInfluenceCacheInterval must be greater than zero.");
+
+			if (AirTargetReferenceSpeed <= 0)
+				throw new YamlException("AirTargetReferenceSpeed must be greater than zero.");
+
+			if (AirTargetFullAmmoDistanceBonus < 0 || AirTargetAaClearUnlockPercent < 0)
+				throw new YamlException("Air target ammo-distance and AA-clear modifiers must not be negative.");
 
 			if (AirSafetyCheckInterval > 0 && AirThreatScanRadius <= 0)
 				throw new YamlException("AirThreatScanRadius must be greater than zero when AirSafetyCheckInterval is set.");
