@@ -888,6 +888,7 @@ Player:
 		AirTargetSwitchImprovementPercent: 50
 		AirTargetCommitmentTicks: 250
 		AirTargetStallTicks: 300
+		AirTargetRouteTimeoutTicks: 750
 		AirTargetClosestCandidates: 15
 		AirTargetHighestValueCandidates: 10
 		AirTargetHarvesterCandidates: 10
@@ -898,8 +899,8 @@ Player:
 		AirAdaptiveRiskApacheFullAmmoGrowth: 100
 		AirAdaptiveRiskOrcaFullAmmoGrowth: 50
 		AirAdaptiveRiskLowUnitDecay: 100
-		AirAdaptiveRiskApacheKillGrowth: 1
-		AirAdaptiveRiskOrcaKillGrowth: 1
+		AirAdaptiveRiskApacheKillGrowth: 0
+		AirAdaptiveRiskOrcaKillGrowth: 0
 		AirAdaptiveRiskLossDecrement: 2500
 		AirInfluenceCellSize: 6
 		AirInfluenceCacheInterval: 125
