@@ -55,6 +55,11 @@ namespace OpenRA.Mods.Common.Traits
 	/// <summary>Pure deterministic policy for allied emergency supply production.</summary>
 	public static class AlliedSupplyProductionPolicy
 	{
+		public static int RemainingGlobalQuota(int availableProductionQueues, int requestsInWindow)
+		{
+			return Math.Max(0, Math.Max(0, availableProductionQueues) - Math.Max(0, requestsInWindow));
+		}
+
 		public static AlliedSupplyProductionDecision Evaluate(AlliedSupplyProductionState state,
 			in AlliedSupplyProductionObservation observation, int tick, int quotaIntervalTicks)
 		{

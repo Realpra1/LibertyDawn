@@ -17,6 +17,15 @@ namespace OpenRA.Test
 	[TestFixture]
 	public class AlliedSupplyProductionPolicyTest
 	{
+		[TestCase(3, 0, 3)]
+		[TestCase(3, 2, 1)]
+		[TestCase(3, 3, 0)]
+		[TestCase(3, 5, 0)]
+		public void GlobalQuotaIsSharedAcrossAllAllies(int queues, int requested, int expected)
+		{
+			Assert.That(AlliedSupplyProductionPolicy.RemainingGlobalQuota(queues, requested), Is.EqualTo(expected));
+		}
+
 		[Test]
 		public void QuotaIsOneRequestPerAvailableQueuePerWindow()
 		{

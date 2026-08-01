@@ -82,6 +82,8 @@ namespace OpenRA.Mods.Common.Traits
 		readonly Dictionary<string, AlliedSupplyProductionState> alliedSupplyStates =
 			new Dictionary<string, AlliedSupplyProductionState>(StringComparer.Ordinal);
 		IBotRequestTaggedUnitProduction[] taggedProduction;
+		int alliedSupplyWindowStartTick = -1;
+		int alliedSupplyRequestsInWindow;
 		int scanTicks;
 		int nextEmergencySaleTick;
 
@@ -125,6 +127,13 @@ namespace OpenRA.Mods.Common.Traits
 			if (requester == null)
 				return;
 			var availableQueues = AvailableSupplyProductionQueues();
+			if (alliedSupplyWindowStartTick < 0 || world.WorldTick < alliedSupplyWindowStartTick ||
+				world.WorldTick - alliedSupplyWindowStartTick >= Info.AlliedSupplyProductionQuotaInterval)
+			{
+				alliedSupplyWindowStartTick = world.WorldTick;
+				alliedSupplyRequestsInWindow = 0;
+			}
+
 			var ownNeedsSupply = resources != null && resources.Cash + resources.Resources <= Info.AlliedRescueCashThreshold &&
 				HasCashDeliveryTarget(player);
 
@@ -142,8 +151,11 @@ namespace OpenRA.Mods.Common.Traits
 				var needsSupply = lowCash && !hasEconomy && !hasMcv;
 				var hasProduction = actors.Any(a => Info.AlliedSupplyProductionActorTypes.Contains(a.Info.Name));
 				var hasMobile = actors.Any(a => a.Info.HasTraitInfo<MobileInfo>());
+				var remainingGlobalQuota = AlliedSupplyProductionPolicy.RemainingGlobalQuota(
+					availableQueues, alliedSupplyRequestsInWindow);
+				var perAllyCeiling = state.RequestsInWindow + remainingGlobalQuota;
 				var observation = new AlliedSupplyProductionObservation(needsSupply,
-					hasProduction || hasMcv || hasMobile, ownNeedsSupply, availableQueues);
+					hasProduction || hasMcv || hasMobile, ownNeedsSupply, perAllyCeiling);
 				var hadGivenUp = state.GaveUp;
 				var decision = AlliedSupplyProductionPolicy.Evaluate(state, observation, world.WorldTick,
 					Info.AlliedSupplyProductionQuotaInterval);
@@ -153,8 +165,10 @@ namespace OpenRA.Mods.Common.Traits
 				{
 					case AlliedSupplyProductionAction.Request:
 						requester.RequestUnitProduction(bot, Info.AlliedSupplyProductionActor, requestTag, decision.RequestCount);
+						alliedSupplyRequestsInWindow += decision.RequestCount;
 						Debug("requested {0} x{1} for stranded ally {2}; queues={3}, window={4}",
-							Info.AlliedSupplyProductionActor, decision.RequestCount, ally.PlayerName, availableQueues, state.WindowStartTick);
+							Info.AlliedSupplyProductionActor, decision.RequestCount, ally.PlayerName, availableQueues,
+							alliedSupplyWindowStartTick);
 						break;
 					case AlliedSupplyProductionAction.Cancel:
 					case AlliedSupplyProductionAction.GiveUp:
@@ -337,6 +351,8 @@ namespace OpenRA.Mods.Common.Traits
 			var states = alliedSupplyStates.OrderBy(kv => kv.Key, StringComparer.Ordinal).ToArray();
 			return new List<MiniYamlNode>
 			{
+				new MiniYamlNode("AlliedSupplyGlobalWindowStart", FieldSaver.FormatValue(alliedSupplyWindowStartTick)),
+				new MiniYamlNode("AlliedSupplyGlobalRequestCount", FieldSaver.FormatValue(alliedSupplyRequestsInWindow)),
 				new MiniYamlNode("AlliedSupplyPlayers", FieldSaver.FormatValue(states.Select(kv => kv.Key).ToArray())),
 				new MiniYamlNode("AlliedSupplyWindowStarts", FieldSaver.FormatValue(states.Select(kv => kv.Value.WindowStartTick).ToArray())),
 				new MiniYamlNode("AlliedSupplyRequestCounts", FieldSaver.FormatValue(states.Select(kv => kv.Value.RequestsInWindow).ToArray())),
@@ -348,6 +364,13 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			if (self.World.IsReplay)
 				return;
+
+			var globalStartNode = data.FirstOrDefault(n => n.Key == "AlliedSupplyGlobalWindowStart");
+			if (globalStartNode != null)
+				alliedSupplyWindowStartTick = FieldLoader.GetValue<int>(globalStartNode.Key, globalStartNode.Value.Value);
+			var globalCountNode = data.FirstOrDefault(n => n.Key == "AlliedSupplyGlobalRequestCount");
+			if (globalCountNode != null)
+				alliedSupplyRequestsInWindow = FieldLoader.GetValue<int>(globalCountNode.Key, globalCountNode.Value.Value);
 
 			var playersNode = data.FirstOrDefault(n => n.Key == "AlliedSupplyPlayers");
 			if (playersNode == null)
