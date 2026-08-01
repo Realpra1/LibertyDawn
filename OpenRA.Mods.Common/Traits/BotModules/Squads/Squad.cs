@@ -16,7 +16,7 @@ using OpenRA.Traits;
 
 namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 {
-	public enum SquadType { Assault, Air, Rush, Protection, Naval }
+	public enum SquadType { Assault, Air, Rush, Protection, Naval, StealthHarassment }
 
 	public class Squad
 	{
@@ -76,6 +76,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			{
 				case SquadType.Assault:
 				case SquadType.Rush:
+				case SquadType.StealthHarassment:
 					FuzzyStateMachine.ChangeState(this, new GroundUnitsIdleState(), true);
 					break;
 				case SquadType.Air:

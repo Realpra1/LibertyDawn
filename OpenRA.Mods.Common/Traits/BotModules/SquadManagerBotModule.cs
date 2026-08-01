@@ -288,6 +288,59 @@ namespace OpenRA.Mods.Common.Traits
 			"ammo. Zero disables this.")]
 		public readonly float HealthRetreatThreshold = 0f;
 
+		[Desc("Use bounded strategic-cell target selection for normal ground assault squads.")]
+		public readonly bool UseStrategicGroundTargeting = false;
+
+		[Desc("Keep one established mixed ground assault squad and add later reinforcements to it.")]
+		public readonly bool UseCohesiveGroundSquads = false;
+
+		[Desc("Width and height in map cells of one coarse ground strategic cell.")]
+		public readonly int GroundInfluenceCellSize = 6;
+
+		[Desc("Ticks between rebuilding the shared enemy list used by strategic ground squads.")]
+		public readonly int GroundInfluenceCacheInterval = 125;
+
+		[Desc("Nearest and highest-value strategic cells evaluated by each ground target scan.")]
+		public readonly int GroundTargetClosestCandidates = 12;
+		public readonly int GroundTargetHighestValueCandidates = 8;
+
+		[Desc("Generic strategic target values. Per-actor values in GroundTargetPriority override these.")]
+		public readonly int GroundTargetHarvesterValue = 5000;
+		public readonly int GroundTargetProductionValue = 2000;
+		public readonly int GroundTargetBuildingValue = 750;
+		public readonly int GroundTargetUnitValue = 1000;
+
+		[Desc("Per-actor strategic ground target values. Values in one coarse cell are summed.")]
+		public readonly Dictionary<string, int> GroundTargetPriority = new Dictionary<string, int>();
+
+		[Desc("Distance cost per cell, reference movement speed, geometric defender decay percentage,",
+			"and the attacker-to-defender ratio considered effectively undefended.")]
+		public readonly int GroundTargetDistancePenalty = 8;
+		public readonly int GroundTargetReferenceSpeed = 100;
+		public readonly int GroundDefenderOvermatchDecayPercent = 50;
+		public readonly int GroundEffectivelyUndefendedRatio = 5;
+
+		[Desc("Write bounded strategic ground target decisions to debug.log.")]
+		public readonly bool GroundTargetDebugLogging = false;
+
+		[Desc("Create specialist harassment squads from StealthHarassmentUnitTypes.")]
+		public readonly bool EnableStealthHarassment = false;
+
+		[Desc("Actor types eligible for stealth harassment. Surplus actors still join the normal assault squad.")]
+		public readonly HashSet<string> StealthHarassmentUnitTypes = new HashSet<string>();
+
+		[Desc("Number of stealth harassment squads and units per squad. Squad size must be one or two.")]
+		public readonly int StealthHarassmentSquadCount = 0;
+		public readonly int StealthHarassmentSquadSize = 1;
+
+		[Desc("Per-actor target values for stealth harassment. Empty falls back to GroundTargetPriority.")]
+		public readonly Dictionary<string, int> StealthHarassmentTargetPriority = new Dictionary<string, int>();
+
+		[Desc("Extra defender value assigned to cloak detectors, and largest weak screen as a percentage",
+			"of harassment squad value. Screens are targeted only if all bounded prize cells are defended.")]
+		public readonly int StealthHarassmentDetectorValue = 3000;
+		public readonly int StealthHarassmentWeakScreenPercent = 50;
+
 		[Desc("Per-actor-type target score overrides for Orca-type air squads (squads containing at least",
 			"one actor of type OrcaArchetypeActor), keyed by target ActorName - same shape as UnitsToBuild",
 			"elsewhere in this mod. Checked before the generic AirTarget*Value classification; actor types",
@@ -380,6 +433,22 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (HealthRetreatThreshold < 0 || HealthRetreatThreshold >= 1)
 				throw new YamlException("HealthRetreatThreshold must be at least zero and less than one.");
+
+			if (GroundInfluenceCellSize <= 0 || GroundInfluenceCacheInterval <= 0 || GroundTargetReferenceSpeed <= 0 ||
+				GroundEffectivelyUndefendedRatio <= 0)
+				throw new YamlException("Ground strategic cell size, cache interval, reference speed and overmatch ratio must be positive.");
+
+			if (GroundTargetClosestCandidates < 0 || GroundTargetHighestValueCandidates < 0 ||
+				GroundTargetClosestCandidates + GroundTargetHighestValueCandidates <= 0)
+				throw new YamlException("At least one ground target candidate count must be greater than zero.");
+
+			if (GroundTargetDistancePenalty < 0 || GroundDefenderOvermatchDecayPercent < 0 ||
+				GroundDefenderOvermatchDecayPercent > 100 || StealthHarassmentDetectorValue < 0 ||
+				StealthHarassmentWeakScreenPercent < 0)
+				throw new YamlException("Ground strategic penalties and percentages are invalid.");
+
+			if (StealthHarassmentSquadCount < 0 || StealthHarassmentSquadSize < 1 || StealthHarassmentSquadSize > 2)
+				throw new YamlException("Stealth harassment squad count must be non-negative and squad size must be one or two.");
 		}
 
 		public override object Create(ActorInitializer init) { return new SquadManagerBotModule(init.Self, this); }
@@ -581,6 +650,20 @@ namespace OpenRA.Mods.Common.Traits
 			return RegisterNewSquad(bot, SquadType.Air);
 		}
 
+		Squad GetStealthHarassmentSquadWithRoom(IBot bot, Actor actor)
+		{
+			if (!Info.EnableStealthHarassment || Info.StealthHarassmentSquadCount <= 0 ||
+				!Info.StealthHarassmentUnitTypes.Contains(actor.Info.Name))
+				return null;
+
+			var squads = Squads.Where(s => s.Type == SquadType.StealthHarassment)
+				.OrderBy(s => s.Units.Count).ToList();
+			if (squads.Count < Info.StealthHarassmentSquadCount)
+				return RegisterNewSquad(bot, SquadType.StealthHarassment);
+
+			return squads.FirstOrDefault(s => s.Units.Count < Info.StealthHarassmentSquadSize);
+		}
+
 		Squad RegisterNewSquad(IBot bot, SquadType type, Actor target = null)
 		{
 			var ret = new Squad(bot, this, type, target);
@@ -677,7 +760,21 @@ namespace OpenRA.Mods.Common.Traits
 					ships.Units.Add(a);
 				}
 				else
-					unitsHangingAroundTheBase.Add(a);
+				{
+					var harassment = GetStealthHarassmentSquadWithRoom(bot, a);
+					if (harassment != null)
+						harassment.Units.Add(a);
+					else if (Info.UseCohesiveGroundSquads)
+					{
+						var assault = GetSquadOfType(SquadType.Assault);
+						if (assault != null)
+							assault.Units.Add(a);
+						else
+							unitsHangingAroundTheBase.Add(a);
+					}
+					else
+						unitsHangingAroundTheBase.Add(a);
+				}
 
 				activeUnits.Add(a);
 			}
@@ -691,11 +788,14 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			// Create an attack force when we have enough units around our base.
 			// (don't bother leaving any behind for defense)
-			var randomizedSquadSize = Info.SquadSize + World.LocalRandom.Next(Info.SquadSizeRandomBonus);
+			var randomizedSquadSize = Info.UseCohesiveGroundSquads ? Info.SquadSize :
+				Info.SquadSize + World.LocalRandom.Next(Info.SquadSizeRandomBonus);
 
 			if (unitsHangingAroundTheBase.Count >= randomizedSquadSize)
 			{
-				var attackForce = RegisterNewSquad(bot, SquadType.Assault);
+				var attackForce = Info.UseCohesiveGroundSquads ? GetSquadOfType(SquadType.Assault) : null;
+				if (attackForce == null)
+					attackForce = RegisterNewSquad(bot, SquadType.Assault);
 
 				foreach (var a in unitsHangingAroundTheBase)
 					attackForce.Units.Add(a);

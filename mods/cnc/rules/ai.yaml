@@ -923,10 +923,67 @@ Player:
 		RequiresCondition: enable-skynet-ai
 		SquadSize: 10
 		AttackForceInterval: 50
-		ExcludeFromSquadsTypes: harv, mcv, a10
+		ExcludeFromSquadsTypes: harv, sharv, mcv, a10, tran, lst, e6, truck
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
+		NavalUnitsTypes: boat
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
+		UseStrategicGroundTargeting: true
+		UseCohesiveGroundSquads: true
+		GroundInfluenceCellSize: 6
+		GroundInfluenceCacheInterval: 125
+		GroundTargetClosestCandidates: 12
+		GroundTargetHighestValueCandidates: 8
+		GroundTargetHarvesterValue: 5000
+		GroundTargetProductionValue: 2000
+		GroundTargetBuildingValue: 750
+		GroundTargetUnitValue: 1000
+		GroundTargetDistancePenalty: 8
+		GroundTargetReferenceSpeed: 100
+		GroundDefenderOvermatchDecayPercent: 50
+		GroundEffectivelyUndefendedRatio: 5
+		GroundTargetDebugLogging: true
+		GroundTargetPriority:
+			harv: 7000
+			sharv: 7000
+			mcv: 6500
+			arty: 5500
+			msam: 5500
+			mlrs: 4000
+			nuk2: 4000
+			weap: 3000
+			afld: 3000
+			proc: 2750
+			fact: 2500
+			fact.gdi: 2500
+			fact.nod: 2500
+			tmpl: 2250
+			eye: 2250
+			nuke: 1500
+			hq: 1250
+		EnableStealthHarassment: true
+		StealthHarassmentUnitTypes: stnk
+		StealthHarassmentSquadCount: 2
+		StealthHarassmentSquadSize: 2
+		StealthHarassmentDetectorValue: 3000
+		StealthHarassmentWeakScreenPercent: 125
+		StealthHarassmentTargetPriority:
+			harv: 8000
+			sharv: 8000
+			nuk2: 5000
+			htnk: 1800
+			mtnk: 1600
+			ltnk: 1400
+			ftnk: 1400
+			ctnk: 1400
+			jeep: 1200
+			bggy: 1200
+			bike: 1200
+			e1: 600
+			e2: 600
+			e3: 600
+			e4: 600
+			e5: 600
 		AirTargetHarvesterValue: 1000
 		AirTargetUnitValue: 450
 		AirTargetProductionValue: 300
