@@ -151,9 +151,16 @@ namespace OpenRA.Mods.Common.Traits
 				var buildRequest = queuedBuildRequests.FirstOrDefault();
 				if (buildRequest != null)
 				{
-					BuildUnit(bot, buildRequest);
-					queuedBuildRequests.RemoveAt(0);
-					queuedBuildRequestTags.RemoveAt(0);
+					var accepted = BuildUnit(bot, buildRequest);
+
+					// Preserve tagged policy requests until a production queue actually accepts them.
+					// Untagged legacy requests retain their one-shot behavior so an unavailable actor
+					// cannot block the existing MCV/harvester request queue indefinitely.
+					if (accepted || string.IsNullOrEmpty(queuedBuildRequestTags[0]))
+					{
+						queuedBuildRequests.RemoveAt(0);
+						queuedBuildRequestTags.RemoveAt(0);
+					}
 				}
 
 				foreach (var q in Info.UnitQueues)
@@ -304,15 +311,15 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		// In cases where we want to build a specific unit but don't know the queue name (because there's more than one possibility)
-		void BuildUnit(IBot bot, string name)
+		bool BuildUnit(IBot bot, string name)
 		{
 			var actorInfo = world.Map.Rules.Actors[name];
 			if (actorInfo == null)
-				return;
+				return false;
 
 			var buildableInfo = actorInfo.TraitInfoOrDefault<BuildableInfo>();
 			if (buildableInfo == null)
-				return;
+				return false;
 
 			ProductionQueue queue = null;
 			foreach (var pq in buildableInfo.Queue)
@@ -326,7 +333,10 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				bot.QueueOrder(Order.StartProduction(queue.Actor, name, 1));
 				AIUtils.BotDebug("{0} decided to build {1} (external request)", queue.Actor.Owner, DisplayName(name));
+				return true;
 			}
+
+			return false;
 		}
 
 		ActorInfo ChooseRandomUnitToBuild(ProductionQueue queue)
