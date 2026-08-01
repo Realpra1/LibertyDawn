@@ -9,6 +9,7 @@
  */
 #endregion
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using OpenRA.Traits;
@@ -26,6 +27,15 @@ namespace OpenRA.Mods.Common.Traits
 
 		[Desc("Tells the AI what building types are considered refineries.")]
 		public readonly HashSet<string> RefineryTypes = new HashSet<string>();
+
+		[Desc("Harvester types used by the conservative refinery-congestion proxy.")]
+		public readonly HashSet<string> HarvesterTypes = new HashSet<string>();
+
+		[Desc("When positive, maintain one refinery per this many harvesters, in addition to the normal opening minimum.")]
+		public readonly int CongestionHarvestersPerRefinery = 0;
+
+		[Desc("Maximum refineries the congestion proxy may add above the normal minimum.")]
+		public readonly int MaximumCongestionRefineries = 0;
 
 		[Desc("Tells the AI what building types are considered power plants.")]
 		public readonly HashSet<string> PowerTypes = new HashSet<string>();
@@ -47,6 +57,9 @@ namespace OpenRA.Mods.Common.Traits
 
 		[Desc("Tells the AI what building types are considered silos (resource storage).")]
 		public readonly HashSet<string> SiloTypes = new HashSet<string>();
+
+		[Desc("Stored-resource percentage that triggers silo construction.")]
+		public readonly int SiloBuildResourcePercent = 80;
 
 		[Desc("Production queues AI uses for buildings.")]
 		public readonly HashSet<string> BuildingQueues = new HashSet<string> { "Building" };
@@ -298,7 +311,27 @@ namespace OpenRA.Mods.Common.Traits
 			AIUtils.CountBuildingByCommonName(Info.PowerTypes, player) == 0 ||
 			AIUtils.CountBuildingByCommonName(Info.ConstructionYardTypes, player) == 0;
 
-		int MinimumRefineryCount => AIUtils.CountBuildingByCommonName(Info.BarracksTypes, player) > 0 ? Info.InititalMinimumRefineryCount + Info.AdditionalMinimumRefineryCount : Info.InititalMinimumRefineryCount;
+		internal int CongestionRefineryShortfall
+		{
+			get
+			{
+				var harvesters = AIUtils.CountActorByCommonName(Info.HarvesterTypes, player);
+				var refineries = AIUtils.CountBuildingByCommonName(Info.RefineryTypes, player);
+				return HarvesterRaidLogic.AdditionalRefineries(harvesters, refineries,
+					Info.CongestionHarvestersPerRefinery, Info.MaximumCongestionRefineries);
+			}
+		}
+
+		int MinimumRefineryCount
+		{
+			get
+			{
+				var normal = AIUtils.CountBuildingByCommonName(Info.BarracksTypes, player) > 0 ?
+					Info.InititalMinimumRefineryCount + Info.AdditionalMinimumRefineryCount : Info.InititalMinimumRefineryCount;
+				var refineries = AIUtils.CountBuildingByCommonName(Info.RefineryTypes, player);
+				return Math.Max(normal, refineries + CongestionRefineryShortfall);
+			}
+		}
 
 		List<MiniYamlNode> IGameSaveTraitData.IssueTraitData(Actor self)
 		{

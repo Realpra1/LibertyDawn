@@ -242,6 +242,15 @@ Player:
 		HarvesterTypes: harv, sharv
         HarvesterEnemyAvoidanceRadius: 15c0
 		RefineryTypes: proc
+	HarvesterRaidBotModule@stealth:
+		RequiresCondition: enable-viki-ai
+		RaiderTypes: sharv
+		RaidResourceType: RedTiberium
+		MaximumRaidPercent: 5
+		RaidInterval: 1500
+		MaximumTargetOptions: 15
+		CheckTargetVisibility: false
+		DebugLogging: true
 	BuildingRepairBotModule:
 		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai || enable-Easiest-ai
 	CaptureManagerBotModule:
@@ -688,6 +697,10 @@ Player:
         MaxBaseRadius: 49
 		ConstructionYardTypes: fact
 		RefineryTypes: proc
+		HarvesterTypes: harv, sharv
+		CongestionHarvestersPerRefinery: 4
+		MaximumCongestionRefineries: 3
+		SiloBuildResourcePercent: 75
 		PowerTypes: nuke,nuk2
 		BarracksTypes: pyle,hand
 		VehiclesFactoryTypes: weap,afld
@@ -1091,6 +1104,10 @@ Player:
         PlaceDefenseTowardsEnemyChance: 90
 		ConstructionYardTypes: fact
 		RefineryTypes: proc, resonator
+		HarvesterTypes: harv, sharv
+		CongestionHarvestersPerRefinery: 4
+		MaximumCongestionRefineries: 3
+		SiloBuildResourcePercent: 75
 		PowerTypes: nuke, nuk2
         PlaceAsDefenses: nuke, hand, pyle, weap, afld, proc, fix
         PlaceAsDefenseChance: 33

@@ -10,6 +10,6 @@
 ## Insane AI strategic economy follow-ups
 
 - Location: `HarvesterBotModule`, `BaseBuilderBotModule`, and their queue managers.
-- Impact: IronReaper counter-technology switching is implemented, but stealth-harvester red-tiberium raids, refinery unload-congestion feedback, and a strict cross-queue opening build script remain unchanged.
-- Evidence: harvest activities do not currently expose carried resource composition to a bot module; base construction prioritizes refinery/storage capacity and excess-cash production independently, without an unload-delay signal or one shared opening-order cursor.
-- Next action: expose a read-only harvester cargo summary and refinery wait metric, then add deterministic policy helpers and saved per-player state before wiring existing Move/Harvest and production orders. Implement opening-order coordination above individual building queues so Building and Defense queues cannot advance the same sequence independently.
+- Impact: Red-tiberium stealth-harvester raids and a conservative harvester-per-refinery congestion proxy are implemented. Exact refinery wait-time measurement, excess-cash MCV requests, and a strict cross-queue opening build script remain unchanged.
+- Evidence: `Harvester.Contents` and `LinkedProc` are readable, but nested current/queued activities do not expose a stable public delivery-wait duration. Building, defense, and unit production are owned by independent queues without one shared opening-order cursor.
+- Next action: add a read-only refinery wait-duration signal maintained by `DeliverResources`, then compare measured wait pressure against the proxy during playtesting. Add expansion requests through the existing `IBotRequestUnitProduction` interface with a saved cash cooldown. Implement opening-order coordination above individual queues so Building and Defense queues cannot advance the same sequence independently.

@@ -266,7 +266,8 @@ namespace OpenRA.Mods.Common.Traits
 				var refinery = GetProducibleBuilding(baseBuilder.Info.RefineryTypes, buildableThings);
 				if (refinery != null && HasSufficientPowerForActor(refinery))
 				{
-					AIUtils.BotDebug("{0} decided to build {1}: Priority override (refinery)", queue.Actor.Owner, DisplayName(refinery.Name));
+					AIUtils.BotDebug("{0} decided to build {1}: Priority override ({2})", queue.Actor.Owner,
+						DisplayName(refinery.Name), baseBuilder.CongestionRefineryShortfall > 0 ? "harvester congestion" : "refinery");
 					return refinery;
 				}
 
@@ -278,7 +279,8 @@ namespace OpenRA.Mods.Common.Traits
 			}
 
 			// Make sure that we can spend as fast as we are earning
-			if (baseBuilder.Info.NewProductionCashThreshold > 0 && playerResources.Resources > baseBuilder.Info.NewProductionCashThreshold)
+			if (baseBuilder.Info.NewProductionCashThreshold > 0 &&
+				playerResources.Cash + playerResources.Resources > baseBuilder.Info.NewProductionCashThreshold)
 			{
 				var production = GetProducibleBuilding(baseBuilder.Info.ProductionTypes, buildableThings);
 				if (production != null && HasSufficientPowerForActor(production))
@@ -296,7 +298,7 @@ namespace OpenRA.Mods.Common.Traits
 
 			// Only consider building this if there is enough water inside the base perimeter and there are close enough adjacent buildings
 			if (waterState == WaterCheck.EnoughWater && baseBuilder.Info.NewProductionCashThreshold > 0
-				&& playerResources.Resources > baseBuilder.Info.NewProductionCashThreshold
+				&& playerResources.Cash + playerResources.Resources > baseBuilder.Info.NewProductionCashThreshold
 				&& AIUtils.IsAreaAvailable<GivesBuildableArea>(world, player, world.Map, baseBuilder.Info.CheckForWaterRadius, baseBuilder.Info.WaterTerrainTypes))
 			{
 				var navalproduction = GetProducibleBuilding(baseBuilder.Info.NavalProductionTypes, buildableThings);
@@ -314,7 +316,8 @@ namespace OpenRA.Mods.Common.Traits
 			}
 
 			// Create some head room for resource storage if we really need it
-			if (playerResources.Resources > 0.8 * playerResources.ResourceCapacity)
+			if (playerResources.ResourceCapacity > 0 && baseBuilder.Info.SiloBuildResourcePercent > 0 &&
+				playerResources.Resources * 100L >= playerResources.ResourceCapacity * (long)baseBuilder.Info.SiloBuildResourcePercent)
 			{
 				var silo = GetProducibleBuilding(baseBuilder.Info.SiloTypes, buildableThings);
 				if (silo != null && HasSufficientPowerForActor(silo))
