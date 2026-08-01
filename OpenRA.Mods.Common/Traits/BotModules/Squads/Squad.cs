@@ -47,8 +47,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		// willingness to accept a low score, but coarse route danger always remains part of the cost.
 		internal int AirConsecutiveNoTargetScans;
 		internal readonly List<CPos> AirRoute = new List<CPos>();
-		internal readonly HashSet<uint> AirRouteAssignedUnits = new HashSet<uint>();
-		internal int AirRoutePlanTick;
+		internal bool AirRouteQueued;
 		internal readonly HashSet<uint> AirUnitsRepairing = new HashSet<uint>();
 		internal CPos? AirTargetStrategicCell;
 		internal int AirTargetLastProgressTick;

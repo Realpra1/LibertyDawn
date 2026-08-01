@@ -656,8 +656,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var info = owner.SquadManager.Info;
 			owner.TargetActor = plan.Actor;
 			owner.AirRoute.Clear();
-			owner.AirRouteAssignedUnits.Clear();
-			owner.AirRoutePlanTick = owner.World.WorldTick;
+			owner.AirRouteQueued = false;
 			owner.AirTargetStrategicCell = new CPos(
 				plan.Actor.Location.X / info.AirInfluenceCellSize,
 				plan.Actor.Location.Y / info.AirInfluenceCellSize);
@@ -677,7 +676,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var speed = aircraft.Info.TraitInfoOrDefault<AircraftInfo>()?.Speed ?? info.AirTargetReferenceSpeed;
 			if (!InfluenceCaches.TryGetValue(owner.SquadManager, out var profileCaches) ||
 				!profileCaches.TryGetValue(owner.AirProfile + ":" + speed, out var cache))
-				return owner.AirRoute.ToList();
+				return owner.AirRoute.Count > 0 ? owner.AirRoute.ToList() : null;
 
 			var map = owner.World.Map;
 			var coarseSize = info.AirInfluenceCellSize;
@@ -689,12 +688,48 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var route = AirThreatGeometry.FindCoarseRoute(cache.Danger, cache.Width, cache.Height,
 				startX, startY, goalX, goalY, info.AirRouteThreatPenalty);
 			if (route == null)
-				return new List<CPos>();
+				return null;
 
 			return AirThreatGeometry.SmoothCoarseRoute(
 				cache.Danger, cache.Width, cache.Height, startX, startY, route)
 				.Select(p => map.Clamp(new CPos(
 					p.X * coarseSize + coarseSize / 2, p.Y * coarseSize + coarseSize / 2))).ToList();
+		}
+
+		// Idle aircraft can join a squad after its shared route was submitted, or return from repair while
+		// the rest are already attacking. Replan from that aircraft's current position instead of issuing a
+		// direct long-distance attack that bypasses the threat map. There is deliberately no persistent
+		// per-aircraft latch: once the orders finish and the actor becomes idle, its route is evaluated again.
+		protected static bool QueueSafeRouteForIdleAircraft(Squad owner, Actor aircraft, Actor target)
+		{
+			var route = SafeRouteForAircraft(owner, aircraft, target);
+			if (route == null)
+			{
+				if (owner.SquadManager.Info.AirTargetDebugLogging)
+					Log.Write("debug", "Air route [{0}] {1}#{2}: withholding direct attack on {3}#{4}; no current-position safe route is available.",
+						owner.AirProfile, aircraft.Info.Name, aircraft.ActorID, target.Info.Name, target.ActorID);
+
+				return true;
+			}
+
+			if (route.Count <= 1)
+				return false;
+
+			var queued = false;
+			foreach (var waypoint in route)
+			{
+				owner.Bot.QueueOrder(new Order("Move", aircraft, Target.FromCell(owner.World, waypoint), queued));
+				queued = true;
+			}
+
+			if (CanAttackTarget(aircraft, target))
+				owner.Bot.QueueOrder(new Order("Attack", aircraft, Target.FromActor(target), true));
+
+			if (owner.SquadManager.Info.AirTargetDebugLogging)
+				Log.Write("debug", "Air route [{0}] {1}#{2}: queued current-position safe route ({3} waypoints) to {4}#{5}.",
+					owner.AirProfile, aircraft.Info.Name, aircraft.ActorID, route.Count, target.Info.Name, target.ActorID);
+
+			return true;
 		}
 
 		/// <summary>
@@ -871,16 +906,29 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			// safely hold position and finish reloading instead of automatically abandoning the mission.
 			owner.AirLocalThreatWeight = ownBuildingNear ? 0 : antiAirWeight;
 
-			// Over our own base there is nowhere safer to run to, and our own defences are the answer.
-			var adaptiveSquadStrength = (int)Math.Min(int.MaxValue,
-				Math.Ceiling(owner.Units.Count * owner.SquadManager.AirRiskMultiplier(owner.AirProfile)));
+			// Adaptive aggression may help finish an attack after the squad has reached the selected
+			// strategic cell. It must never make the approach, withdrawal, repair, or evasion less safe.
+			var inTargetCell = false;
+			if (owner.IsTargetValid)
+			{
+				var coarseSize = info.AirInfluenceCellSize;
+				var squadCell = owner.World.Map.CellContaining(owner.CenterPosition);
+				var targetCell = owner.TargetActor.Location;
+				inTargetCell = squadCell.X / coarseSize == targetCell.X / coarseSize &&
+					squadCell.Y / coarseSize == targetCell.Y / coarseSize;
+			}
+
+			var localRisk = AirThreatGeometry.LocalAirRiskMultiplier(inTargetCell,
+				owner.SquadManager.AirRiskMultiplier(owner.AirProfile));
+			var effectiveSquadStrength = (int)Math.Min(int.MaxValue,
+				Math.Ceiling(owner.Units.Count * localRisk));
 			if (!ownBuildingNear && AirThreatGeometry.ShouldFleeAntiAir(
-				antiAirWeight, info.AirThreatFleeMultiplier, adaptiveSquadStrength))
+				antiAirWeight, info.AirThreatFleeMultiplier, effectiveSquadStrength))
 			{
 				if (info.AirTargetDebugLogging)
-					Log.Write("debug", "Air evade [{0}] local AA safety: threat={1:0.##} flee-multiplier={2} adaptive-strength={3} risk={4:0.00} target={5}.",
-						owner.AirProfile, antiAirWeight, info.AirThreatFleeMultiplier, adaptiveSquadStrength,
-						owner.SquadManager.AirRiskMultiplier(owner.AirProfile), owner.IsTargetValid ?
+					Log.Write("debug", "Air evade [{0}] local AA safety: threat={1:0.##} flee-multiplier={2} effective-strength={3} risk={4:0.00} in-target-cell={5} target={6}.",
+						owner.AirProfile, antiAirWeight, info.AirThreatFleeMultiplier, effectiveSquadStrength,
+						localRisk, inTargetCell, owner.IsTargetValid ?
 						owner.TargetActor.Info.Name + "#" + owner.TargetActor.ActorID : "none");
 
 				// Drop the target so the squad re-evaluates from scratch once it is clear; the threat we
@@ -1276,8 +1324,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			if (!unitsAroundPos.Any())
 				return true;
 
-			var adaptiveSquadStrength = owner.Units.Count * owner.SquadManager.AirRiskMultiplier(owner.AirProfile);
-			if (CountAntiAirUnits(unitsAroundPos) * owner.SquadManager.Info.AirThreatFleeMultiplier < adaptiveSquadStrength)
+			if (CountAntiAirUnits(unitsAroundPos) * owner.SquadManager.Info.AirThreatFleeMultiplier < owner.Units.Count)
 			{
 				detectedEnemyTarget = unitsAroundPos.Random(owner.Random);
 				return true;
@@ -1365,16 +1412,15 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 			var info = owner.SquadManager.Info;
 			if (owner.SquadManager.Info.AirTargetDebugLogging)
-				Log.Write("debug", "Air state [{0}] attack tick: units={1} target-valid={2} routed-units={3}.",
-					owner.AirProfile, owner.Units.Count, owner.IsTargetValid, owner.AirRouteAssignedUnits.Count);
+				Log.Write("debug", "Air state [{0}] attack tick: units={1} target-valid={2} route-queued={3}.",
+					owner.AirProfile, owner.Units.Count, owner.IsTargetValid, owner.AirRouteQueued);
 
 			var hasArmedUnit = owner.Units.Any(a => !owner.AirUnitsRepairing.Contains(a.ActorID) &&
 				HasAmmo(a.TraitsImplementing<AmmoPool>()));
 			var anyUnitBusy = owner.Units.Any(a => !owner.AirUnitsRepairing.Contains(a.ActorID) &&
 				(BusyAttack(a) || !a.IsIdle));
-			var routeTraveling = owner.Units.Any(a => owner.AirRouteAssignedUnits.Contains(a.ActorID) &&
-				!a.IsIdle && !BusyAttack(a));
-			var routeExpired = owner.World.WorldTick - owner.AirRoutePlanTick >= info.AirTargetRouteTimeoutTicks;
+			var routeTraveling = owner.AirRouteQueued && owner.Units.Any(a =>
+				!owner.AirUnitsRepairing.Contains(a.ActorID) && !a.IsIdle && !BusyAttack(a));
 			var ticksSinceProgress = owner.World.WorldTick - owner.AirTargetLastProgressTick;
 			var makingProgress = ticksSinceProgress < info.AirTargetCommitmentTicks;
 
@@ -1461,7 +1507,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 						owner.TargetActor = null;
 						owner.AirTargetStrategicCell = null;
 						owner.AirRoute.Clear();
-						owner.AirRouteAssignedUnits.Clear();
+						owner.AirRouteQueued = false;
 					}
 				}
 				else
@@ -1475,18 +1521,18 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 						owner.AirTargetLastHP = targetHP;
 					}
 					else if (AirThreatGeometry.ShouldRescanStalledTarget(
-						owner.World.WorldTick - owner.AirTargetLastProgressTick, info.AirTargetStallTicks,
-						routeTraveling && !routeExpired, anyUnitBusy && !routeExpired, hasArmedUnit))
+						owner.World.WorldTick - owner.AirTargetLastProgressTick, info.AirTargetStallTicks, hasArmedUnit))
 					{
 						if (info.AirTargetDebugLogging)
-							Log.Write("debug", "Air target [{0}] {1}#{2} genuinely stalled for {3} ticks at distance {4}; rescanning.",
+							Log.Write("debug", "Air target [{0}] {1}#{2} stalled for {3} ticks at distance {4}; rescanning (route-queued={5}, route-traveling={6}, any-busy={7}, armed={8}).",
 								owner.AirProfile, owner.TargetActor.Info.Name, owner.TargetActor.ActorID,
-								owner.World.WorldTick - owner.AirTargetLastProgressTick, distanceCells);
+								owner.World.WorldTick - owner.AirTargetLastProgressTick, distanceCells,
+								owner.AirRouteQueued, routeTraveling, anyUnitBusy, hasArmedUnit);
 
 						owner.TargetActor = null;
 						owner.AirTargetStrategicCell = null;
 						owner.AirRoute.Clear();
-						owner.AirRouteAssignedUnits.Clear();
+						owner.AirRouteQueued = false;
 					}
 				}
 			}
@@ -1522,35 +1568,44 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				return;
 			}
 
-			// Route assignment belongs to each aircraft. Existing and newly produced squad members each
-			// receive a safe route from their own current position, so one aircraft that remains active can
-			// never leave the rest of a large squad permanently latched behind a squad-wide queued flag.
-			owner.AirRouteAssignedUnits.RemoveWhere(id => !owner.Units.Any(a => a.ActorID == id));
-			foreach (var a in owner.Units)
+			// Submit the selected shared route once for the current squad. This restores the stable bleed
+			// lifecycle: the route is a transient order batch, not a target-lifetime per-aircraft latch.
+			if (owner.AirRoute.Count > 1 && !owner.AirRouteQueued)
 			{
-				if (owner.AirRouteAssignedUnits.Contains(a.ActorID) || SendHomeToRepair(owner, a))
-					continue;
-
-				var route = SafeRouteForAircraft(owner, a, owner.TargetActor);
-				owner.AirRouteAssignedUnits.Add(a.ActorID);
-				if (route.Count <= 1)
-					continue;
-
-				var queued = false;
-				foreach (var waypoint in route)
+				foreach (var a in owner.Units)
 				{
-					owner.Bot.QueueOrder(new Order("Move", a, Target.FromCell(owner.World, waypoint), queued));
-					queued = true;
-				}
+					if (SendHomeToRepair(owner, a))
+						continue;
 
-				if (CanAttackTarget(a, owner.TargetActor))
-				{
-					owner.Bot.QueueOrder(new Order("Attack", a, Target.FromActor(owner.TargetActor), true));
+					var queued = false;
+					foreach (var waypoint in owner.AirRoute)
+					{
+						owner.Bot.QueueOrder(new Order("Move", a, Target.FromCell(owner.World, waypoint), queued));
+						queued = true;
+					}
+
+					if (CanAttackTarget(a, owner.TargetActor))
+						owner.Bot.QueueOrder(new Order("Attack", a, Target.FromActor(owner.TargetActor), true));
+
 					if (info.AirTargetDebugLogging)
-						Log.Write("debug", "Air order [{0}] {1}#{2}: queued individual safe route ({3} waypoints) to {4}#{5}.",
-							owner.AirProfile, a.Info.Name, a.ActorID, route.Count,
+						Log.Write("debug", "Air route [{0}] {1}#{2}: queued shared safe route ({3} waypoints) to {4}#{5}.",
+							owner.AirProfile, a.Info.Name, a.ActorID, owner.AirRoute.Count,
 							owner.TargetActor.Info.Name, owner.TargetActor.ActorID);
 				}
+
+				owner.AirRouteQueued = true;
+				owner.AirRoute.Clear();
+				return;
+			}
+
+			// Once no aircraft is still traveling the shared route, release the transient flag. Busy attack
+			// orders do not keep it latched, and repaired/new idle aircraft are replanned below.
+			if (owner.AirRouteQueued && !routeTraveling)
+			{
+				owner.AirRouteQueued = false;
+				if (info.AirTargetDebugLogging)
+					Log.Write("debug", "Air route [{0}] shared route completed; idle joiners will replan from their current position.",
+						owner.AirProfile);
 			}
 
 			// Lazily computed: only needed if a self-reloading aircraft actually turns out to be dry,
@@ -1560,7 +1615,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 			foreach (var a in owner.Units)
 			{
-				if (owner.AirRouteAssignedUnits.Contains(a.ActorID) && !a.IsIdle && !BusyAttack(a))
+				if (owner.AirRouteQueued && !a.IsIdle && !BusyAttack(a))
 					continue;
 
 				if (BusyAttack(a))
@@ -1607,6 +1662,11 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 					continue;
 				}
+
+				// A newly produced or repaired idle aircraft was not necessarily present when the shared route
+				// was submitted. Give it a fresh safe route rather than a direct map-crossing attack.
+				if (a.IsIdle && QueueSafeRouteForIdleAircraft(owner, a, owner.TargetActor))
+					continue;
 
 				if (CanAttackTarget(a, owner.TargetActor))
 				{

@@ -158,11 +158,8 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Ticks after approaching or damaging a target during which an air squad will not reconsider it.")]
 		public readonly int AirTargetCommitmentTicks = 250;
 
-		[Desc("Ticks without route, distance, or damage progress before an air target is considered stalled.")]
-		public readonly int AirTargetStallTicks = 300;
-
-		[Desc("Maximum ticks a queued air route can suppress stall recovery when it makes no progress.")]
-		public readonly int AirTargetRouteTimeoutTicks = 750;
+		[Desc("Ticks without distance or damage progress before an armed air squad replans its target.")]
+		public readonly int AirTargetStallTicks = 150;
 
 		[Desc("Number of nearest air target candidates routed per strategic scan.")]
 		public readonly int AirTargetClosestCandidates = 15;
@@ -330,9 +327,8 @@ namespace OpenRA.Mods.Common.Traits
 			if (AirTargetFullAmmoDistanceBonus < 0 || AirTargetAaClearUnlockPercent < 0)
 				throw new YamlException("Air target ammo-distance and AA-clear modifiers must not be negative.");
 
-			if (AirTargetSwitchImprovementPercent < 0 || AirTargetCommitmentTicks < 0 ||
-				AirTargetStallTicks <= 0 || AirTargetRouteTimeoutTicks <= 0)
-				throw new YamlException("Air target commitment settings must be non-negative and timeout settings must be positive.");
+			if (AirTargetSwitchImprovementPercent < 0 || AirTargetCommitmentTicks < 0 || AirTargetStallTicks <= 0)
+				throw new YamlException("Air target commitment settings must be non-negative and the stall timeout must be positive.");
 
 			if (AirAdaptiveRiskInterval < 0 || AirAdaptiveRiskRollbackTicks < 0 || AirAdaptiveRiskMinimumUnits < 0 ||
 				AirAdaptiveRiskApacheFullAmmoGrowth < 0 || AirAdaptiveRiskOrcaFullAmmoGrowth < 0 ||

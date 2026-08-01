@@ -503,13 +503,19 @@ namespace OpenRA.Test
 		}
 
 		[Test]
-		public void StallRescanRequiresIdleArmedSquadWithoutQueuedRoute()
+		public void StallRescanDoesNotWaitForUnrelatedBusyUnits()
 		{
-			Assert.That(AirThreatGeometry.ShouldRescanStalledTarget(299, 300, false, false, true), Is.False);
-			Assert.That(AirThreatGeometry.ShouldRescanStalledTarget(300, 300, false, false, true), Is.True);
-			Assert.That(AirThreatGeometry.ShouldRescanStalledTarget(300, 300, true, false, true), Is.False);
-			Assert.That(AirThreatGeometry.ShouldRescanStalledTarget(300, 300, false, true, true), Is.False);
-			Assert.That(AirThreatGeometry.ShouldRescanStalledTarget(300, 300, false, false, false), Is.False);
+			Assert.That(AirThreatGeometry.ShouldRescanStalledTarget(149, 150, true), Is.False);
+			Assert.That(AirThreatGeometry.ShouldRescanStalledTarget(150, 150, true), Is.True);
+			Assert.That(AirThreatGeometry.ShouldRescanStalledTarget(150, 150, false), Is.False);
+		}
+
+		[Test]
+		public void AdaptiveLocalRiskOnlyAppliesInsideTargetCell()
+		{
+			Assert.That(AirThreatGeometry.LocalAirRiskMultiplier(false, 4f), Is.EqualTo(1f));
+			Assert.That(AirThreatGeometry.LocalAirRiskMultiplier(true, 4f), Is.EqualTo(4f));
+			Assert.That(AirThreatGeometry.LocalAirRiskMultiplier(true, 0.5f), Is.EqualTo(1f));
 		}
 	}
 }

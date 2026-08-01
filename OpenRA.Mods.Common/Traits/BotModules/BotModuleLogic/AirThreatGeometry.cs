@@ -333,10 +333,14 @@ namespace OpenRA.Mods.Common.Traits
 			return (long)Math.Max(0, challengerScore) * 100 >= requiredScore;
 		}
 
-		public static bool ShouldRescanStalledTarget(int ticksSinceProgress, int stallTicks,
-			bool routeQueued, bool anyUnitBusy, bool hasArmedUnit)
+		public static bool ShouldRescanStalledTarget(int ticksSinceProgress, int stallTicks, bool hasArmedUnit)
 		{
-			return hasArmedUnit && !routeQueued && !anyUnitBusy && ticksSinceProgress >= stallTicks;
+			return hasArmedUnit && ticksSinceProgress >= stallTicks;
+		}
+
+		public static float LocalAirRiskMultiplier(bool inTargetCell, float adaptiveRiskMultiplier)
+		{
+			return inTargetCell ? Math.Max(1f, adaptiveRiskMultiplier) : 1f;
 		}
 
 		/// <summary>
