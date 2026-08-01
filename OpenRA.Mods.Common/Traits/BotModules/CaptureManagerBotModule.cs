@@ -40,6 +40,12 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Player relationships that capturers should attempt to target.")]
 		public readonly PlayerRelationship CapturableRelationships = PlayerRelationship.Enemy | PlayerRelationship.Neutral;
 
+		[Desc("Actor types that may use the existing C4 order against enemy buildings.")]
+		public readonly HashSet<string> DemolitionActorTypes = new HashSet<string>();
+
+		[Desc("Minimum delay (in ticks) between C4 assignment scans.")]
+		public readonly int MinimumDemolitionDelay = 375;
+
 		public override object Create(ActorInitializer init) { return new CaptureManagerBotModule(init.Self, this); }
 	}
 
@@ -51,9 +57,11 @@ namespace OpenRA.Mods.Common.Traits
 		readonly Predicate<Actor> unitCannotBeOrderedOrIsIdle;
 		readonly int maximumCaptureTargetOptions;
 		int minCaptureDelayTicks;
+		int minDemolitionDelayTicks;
 
 		// Units that the bot already knows about and has given a capture order. Any unit not on this list needs to be given a new order.
 		readonly List<Actor> activeCapturers = new List<Actor>();
+		readonly List<Actor> activeDemolitionUnits = new List<Actor>();
 
 		public CaptureManagerBotModule(Actor self, CaptureManagerBotModuleInfo info)
 			: base(info)
@@ -78,6 +86,7 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			// Avoid all AIs reevaluating assignments on the same tick, randomize their initial evaluation delay.
 			minCaptureDelayTicks = world.LocalRandom.Next(0, Info.MinimumCaptureDelay);
+			minDemolitionDelayTicks = world.LocalRandom.Next(0, Info.MinimumDemolitionDelay);
 		}
 
 		void IBotTick.BotTick(IBot bot)
@@ -86,6 +95,12 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				minCaptureDelayTicks = Info.MinimumCaptureDelay;
 				QueueCaptureOrders(bot);
+			}
+
+			if (--minDemolitionDelayTicks <= 0)
+			{
+				minDemolitionDelayTicks = Info.MinimumDemolitionDelay;
+				QueueDemolitionOrders(bot);
 			}
 		}
 
@@ -132,12 +147,10 @@ namespace OpenRA.Mods.Common.Traits
 			if (capturers.Length == 0)
 				return;
 
-			var randPlayer = world.Players.Where(p => !p.Spectating
-				&& Info.CapturableRelationships.HasRelationship(player.RelationshipWith(p))).Random(world.LocalRandom);
-
-			var targetOptions = Info.CheckCaptureTargetsForVisibility
-				? GetVisibleActorsBelongingToPlayer(randPlayer)
-				: GetActorsThatCanBeOrderedByPlayer(randPlayer);
+			var targetOptions = world.Players.Where(p => !p.Spectating
+					&& Info.CapturableRelationships.HasRelationship(player.RelationshipWith(p)))
+				.SelectMany(p => Info.CheckCaptureTargetsForVisibility
+					? GetVisibleActorsBelongingToPlayer(p) : GetActorsThatCanBeOrderedByPlayer(p));
 
 			var capturableTargetOptions = targetOptions
 				.Where(target =>
@@ -166,6 +179,36 @@ namespace OpenRA.Mods.Common.Traits
 				bot.QueueOrder(new Order("CaptureActor", capturer.Actor, Target.FromActor(targetActor), true));
 				AIUtils.BotDebug("AI ({0}): Ordered {1} to capture {2}", player.ClientIndex, capturer.Actor, targetActor);
 				activeCapturers.Add(capturer.Actor);
+			}
+		}
+
+		void QueueDemolitionOrders(IBot bot)
+		{
+			if (Info.DemolitionActorTypes.Count == 0 || player.WinState != WinState.Undefined)
+				return;
+
+			activeDemolitionUnits.RemoveAll(unitCannotBeOrderedOrIsIdle);
+			var demolitionUnits = world.Actors.Where(a => a.Owner == player && a.IsIdle &&
+				Info.DemolitionActorTypes.Contains(a.Info.Name) && a.Info.HasTraitInfo<DemolitionInfo>() &&
+				!activeDemolitionUnits.Contains(a)).ToArray();
+			if (demolitionUnits.Length == 0)
+				return;
+
+			var targets = world.Actors.Where(a => !a.IsDead && a.IsInWorld &&
+				player.RelationshipWith(a.Owner) == PlayerRelationship.Enemy &&
+				a.Info.HasTraitInfo<BuildingInfo>() && a.Info.TraitInfos<IDemolishableInfo>().Any() &&
+				(!Info.CheckCaptureTargetsForVisibility || a.CanBeViewedByPlayer(player)))
+				.OrderByDescending(a => a.GetSellValue()).Take(maximumCaptureTargetOptions).ToArray();
+
+			foreach (var unit in demolitionUnits)
+			{
+				var target = targets.MinByOrDefault(a => (a.CenterPosition - unit.CenterPosition).LengthSquared);
+				if (target == null)
+					continue;
+
+				bot.QueueOrder(new Order("C4", unit, Target.FromActor(target), false));
+				AIUtils.BotDebug("AI ({0}): Ordered {1} to demolish {2}", player.ClientIndex, unit, target);
+				activeDemolitionUnits.Add(unit);
 			}
 		}
 	}
