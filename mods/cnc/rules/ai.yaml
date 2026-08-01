@@ -963,7 +963,7 @@ Player:
 			sharv: 5000
 			arty: 5000
 			mlrs: 5000
-			e3: 5000
+			e3: 2000
 			msam: 6500
 			stnk: 5000
 			bike: 5000
