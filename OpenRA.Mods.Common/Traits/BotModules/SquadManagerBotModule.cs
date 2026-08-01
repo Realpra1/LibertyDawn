@@ -294,6 +294,10 @@ namespace OpenRA.Mods.Common.Traits
 			"ammo. Zero disables this.")]
 		public readonly float HealthRetreatThreshold = 0f;
 
+		[Desc("Allied actor types whose passive repair aura may be used by damaged air units.",
+			"Allied actors are never entered or reserved; the aircraft waits within their configured aura instead.")]
+		public readonly HashSet<string> AirPassiveRepairActors = new HashSet<string>();
+
 		[Desc("Per-actor-type target score overrides for Orca-type air squads (squads containing at least",
 			"one actor of type OrcaArchetypeActor), keyed by target ActorName - same shape as UnitsToBuild",
 			"elsewhere in this mod. Checked before the generic AirTarget*Value classification; actor types",
@@ -389,6 +393,14 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (HealthRetreatThreshold < 0 || HealthRetreatThreshold >= 1)
 				throw new YamlException("HealthRetreatThreshold must be at least zero and less than one.");
+
+			foreach (var actorName in AirPassiveRepairActors)
+			{
+				if (!rules.Actors.TryGetValue(actorName, out var actor) ||
+					!actor.TraitInfos<GrantConditionInRangeInfo>().Any(t => t.Granter &&
+						t.ValidRelationships.HasRelationship(PlayerRelationship.Ally)))
+					throw new YamlException($"AirPassiveRepairActors actor '{actorName}' must grant an allied condition in range.");
+			}
 		}
 
 		public override object Create(ActorInitializer init) { return new SquadManagerBotModule(init.Self, this); }

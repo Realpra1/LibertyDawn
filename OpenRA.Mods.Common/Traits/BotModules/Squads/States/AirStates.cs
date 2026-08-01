@@ -34,6 +34,14 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			public List<(Actor Actor, float StoppingWeight, int RangeCells)> Threats;
 		}
 
+		sealed class AirRepairPlan
+		{
+			public Actor Building;
+			public List<CPos> Route;
+			public bool RepairAtEnd;
+			public int RejectedByAa;
+		}
+
 		// Bot logic is host-only. Sharing one cache per manager/profile prevents two same-type squads
 		// rebuilding the same world influence map during the configured strategic cache interval.
 		static readonly Dictionary<SquadManagerBotModule, Dictionary<string, AirInfluenceCache>> InfluenceCaches =
@@ -1251,8 +1259,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		/// Sends one aircraft to repair when it drops below <see cref="SquadManagerBotModuleInfo.HealthRetreatThreshold"/>.
 		/// True when it did (or is already en route), in which case the caller must not also give it a
 		/// move/attack order.
-		/// Targets the nearest owned actor matching the unit's own <see cref="RepairableInfo.RepairActors"/>
-		/// directly, via a "Repair" order rather than "ReturnToBase" - the literal ReturnToBase order string
+		/// Scores safe owned repair actors and configured allied passive-repair auras. Owned actors receive
+		/// a direct "Repair" order; allied actors are approached but never entered. The literal ReturnToBase order string
 		/// requires a Rearmable trait (see Aircraft.cs's own order handling) which neither Orca nor Apache
 		/// have, but "Repair" (alongside "Enter"/"ForceEnter") accepts an explicit destination actor and is
 		/// gated on Repairable instead, which both of them do have.
@@ -1271,6 +1279,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			if (repairing && health.HP >= health.MaxHP)
 			{
 				owner.AirUnitsRepairing.Remove(a.ActorID);
+				owner.AirRepairTargets.Remove(a.ActorID);
+				owner.AirRepairUnavailable.Remove(a.ActorID);
 				if (owner.Units.Count == 1)
 					owner.JoinAirFormation(a);
 
@@ -1282,30 +1292,57 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			}
 
 			if (!repairing && health.HP >= health.MaxHP * threshold)
-				return false;
-
-			if (repairing && !a.IsIdle)
-				return true;
-
-			if (IsRearming(a))
 			{
-				owner.MarkAirRepairing(a);
-				return true;
+				owner.AirRepairUnavailable.Remove(a.ActorID);
+				return false;
 			}
 
 			var repairable = a.Info.TraitInfoOrDefault<RepairableInfo>();
 			if (repairable == null || repairable.RepairActors.Count == 0)
 				return false;
 
-			var recovery = FindSafestRepairBuilding(owner, a, repairable, requireAvailable: true);
+			var threats = LiveRepairThreats(owner);
+			if (repairing && owner.AirRepairTargets.TryGetValue(a.ActorID, out var repairTargetId))
+			{
+				var repairTarget = owner.World.GetActorById(repairTargetId);
+				var passiveRange = PassiveRepairRange(owner, repairTarget);
+				var targetEligible = repairTarget != null && !repairTarget.IsDead && repairTarget.IsInWorld &&
+					repairable.RepairActors.Contains(repairTarget.Info.Name) &&
+					(repairTarget.Owner == owner.Bot.Player || passiveRange > WDist.Zero);
+				var targetDanger = !targetEligible ?
+					float.MaxValue : RepairDestinationDanger(repairTarget.CenterPosition, threats);
+				if (targetDanger <= 0)
+				{
+					if (!a.IsIdle)
+						return true;
+
+					if (passiveRange > WDist.Zero &&
+						(repairTarget.CenterPosition - a.CenterPosition).HorizontalLength <= passiveRange.Length)
+						return true;
+				}
+
+				owner.AirRepairTargets.Remove(a.ActorID);
+				if (owner.SquadManager.Info.AirTargetDebugLogging)
+					Log.Write("debug", "Air repair [{0}] {1}#{2}: previous destination {3} became {4}; replanning.",
+						owner.AirProfile, a.Info.Name, a.ActorID,
+						repairTarget == null ? "unavailable" : repairTarget.Info.Name + "#" + repairTarget.ActorID,
+						targetDanger > 0 && targetDanger < float.MaxValue ? "AA-covered (danger " + targetDanger.ToString("0.##") + ")" : "unavailable");
+			}
+
+			var recovery = FindSafestRepairBuilding(owner, a, repairable, threats, requireAvailable: true);
 			if (recovery.Building != null)
 			{
-				QueueRecoveryRoute(owner, a, recovery.Route, recovery.Building, repairAtEnd: true);
-				owner.MarkAirRepairing(a);
+				var passiveRange = PassiveRepairRange(owner, recovery.Building);
+				if (recovery.RepairAtEnd || passiveRange <= WDist.Zero ||
+					(recovery.Building.CenterPosition - a.CenterPosition).HorizontalLength > passiveRange.Length)
+					QueueRecoveryRoute(owner, a, recovery.Route, recovery.Building, recovery.RepairAtEnd);
+
+				owner.MarkAirRepairing(a, recovery.Building);
 				if (owner.SquadManager.Info.AirTargetDebugLogging)
-					Log.Write("debug", "Air repair [{0}] {1}#{2}: {3}/{4} HP, safe route ({5} waypoints) to available {6}#{7}.",
+					Log.Write("debug", "Air repair [{0}] {1}#{2}: {3}/{4} HP, safe route ({5} waypoints) to {6} {7}#{8}.",
 						owner.AirProfile, a.Info.Name, a.ActorID, health.HP, health.MaxHP,
-						recovery.Route?.Count ?? 0, recovery.Building.Info.Name, recovery.Building.ActorID);
+						recovery.Route?.Count ?? 0, recovery.RepairAtEnd ? "owned active" : "allied passive",
+						recovery.Building.Info.Name, recovery.Building.ActorID);
 
 				return true;
 			}
@@ -1313,48 +1350,36 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			// Commit to recovery even when every pad is occupied. Waiting at the nearest compatible
 			// facility keeps the aircraft out of combat, lets repair auras help where present, and retries
 			// reservation on every safety update once it becomes idle.
-			owner.MarkAirRepairing(a);
-			var waitingAt = FindSafestRepairBuilding(owner, a, repairable, requireAvailable: false);
+			var waitingAt = FindSafestRepairBuilding(owner, a, repairable, threats, requireAvailable: false);
 			if (waitingAt.Building != null)
 			{
 				QueueRecoveryRoute(owner, a, waitingAt.Route, waitingAt.Building, repairAtEnd: false);
+				owner.MarkAirRepairing(a, waitingAt.Building);
 				if (owner.SquadManager.Info.AirTargetDebugLogging)
 					Log.Write("debug", "Air repair [{0}] {1}#{2}: {3}/{4} HP, all pads occupied; safe wait route ({5} waypoints) to {6}#{7}.",
 						owner.AirProfile, a.Info.Name, a.ActorID, health.HP, health.MaxHP,
 						waitingAt.Route?.Count ?? 0, waitingAt.Building.Info.Name, waitingAt.Building.ActorID);
-			}
-			else if (owner.SquadManager.Info.AirTargetDebugLogging)
-				Log.Write("debug", "Air repair [{0}] {1}#{2}: {3}/{4} HP, no compatible repair facility.",
-					owner.AirProfile, a.Info.Name, a.ActorID, health.HP, health.MaxHP);
 
-			return true;
+				return true;
+			}
+
+			owner.AirUnitsRepairing.Remove(a.ActorID);
+			owner.AirRepairTargets.Remove(a.ActorID);
+			if (owner.Units.Count == 1)
+				owner.JoinAirFormation(a);
+
+			var rejectedByAa = Math.Max(recovery.RejectedByAa, waitingAt.RejectedByAa);
+			if (owner.SquadManager.Info.AirTargetDebugLogging && owner.AirRepairUnavailable.Add(a.ActorID))
+				Log.Write("debug", "Air repair [{0}] {1}#{2}: {3}/{4} HP, no safe recovery destination ({5} AA-covered); staying with squad.",
+					owner.AirProfile, a.Info.Name, a.ActorID, health.HP, health.MaxHP, rejectedByAa);
+
+			return false;
 		}
 
-		static (Actor Building, List<CPos> Route) FindSafestRepairBuilding(
-			Squad owner, Actor aircraft, RepairableInfo repairable, bool requireAvailable)
+		static List<(Actor Actor, float Weight, int RangeCells)> LiveRepairThreats(Squad owner)
 		{
-			var candidates = new List<Actor>();
-			foreach (var b in owner.World.ActorsHavingTrait<RepairsUnits>())
-			{
-				if (b.Owner != owner.Bot.Player || !repairable.RepairActors.Contains(b.Info.Name))
-					continue;
-
-				if (requireAvailable && !Reservable.IsAvailableFor(b, aircraft))
-					continue;
-
-				candidates.Add(b);
-			}
-
-			if (candidates.Count == 0)
-				return (null, null);
-
+			var threats = new List<(Actor Actor, float Weight, int RangeCells)>();
 			var info = owner.SquadManager.Info;
-			var map = owner.World.Map;
-			var coarseSize = info.AirInfluenceCellSize;
-			var width = (map.MapSize.X + coarseSize - 1) / coarseSize;
-			var height = (map.MapSize.Y + coarseSize - 1) / coarseSize;
-			var danger = new float[width * height];
-			var aircraftSpeed = aircraft.Info.TraitInfoOrDefault<AircraftInfo>()?.Speed ?? info.AirTargetReferenceSpeed;
 			foreach (var enemy in owner.World.Actors)
 			{
 				if (!owner.SquadManager.IsPreferredEnemyUnit(enemy))
@@ -1369,18 +1394,83 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				var mobile = enemy.Info.TraitInfoOrDefault<MobileInfo>();
 				var movementBuffer = mobile == null ? 0 :
 					AirThreatGeometry.MobileThreatBufferCells(mobile.Speed, info.AirInfluenceCacheInterval);
-				var influenceRange = range + movementBuffer;
-				var minX = Math.Max(0, (enemy.Location.X - influenceRange) / coarseSize);
-				var maxX = Math.Min(width - 1, (enemy.Location.X + influenceRange) / coarseSize);
-				var minY = Math.Max(0, (enemy.Location.Y - influenceRange) / coarseSize);
-				var maxY = Math.Min(height - 1, (enemy.Location.Y + influenceRange) / coarseSize);
+				threats.Add((enemy, weight, range + movementBuffer));
+			}
+
+			return threats;
+		}
+
+		static float RepairDestinationDanger(WPos destination,
+			IEnumerable<(Actor Actor, float Weight, int RangeCells)> threats)
+		{
+			var danger = 0f;
+			foreach (var threat in threats)
+				if ((threat.Actor.CenterPosition - destination).Length / 1024f <= threat.RangeCells)
+					danger += threat.Weight;
+
+			return danger;
+		}
+
+		static WDist PassiveRepairRange(Squad owner, Actor building)
+		{
+			if (building == null || building.Owner == owner.Bot.Player ||
+				!building.Owner.IsAlliedWith(owner.Bot.Player) ||
+				!owner.SquadManager.Info.AirPassiveRepairActors.Contains(building.Info.Name))
+				return WDist.Zero;
+
+			var range = WDist.Zero;
+			foreach (var aura in building.TraitsImplementing<GrantConditionInRange>())
+				if (!aura.IsTraitDisabled && aura.Info.Granter &&
+					aura.Info.ValidRelationships.HasRelationship(PlayerRelationship.Ally) && aura.Info.Range > range)
+					range = aura.Info.Range;
+
+			return range;
+		}
+
+		static AirRepairPlan FindSafestRepairBuilding(
+			Squad owner, Actor aircraft, RepairableInfo repairable,
+			List<(Actor Actor, float Weight, int RangeCells)> threats, bool requireAvailable)
+		{
+			var candidates = new List<(Actor Building, bool RepairAtEnd)>();
+			foreach (var b in owner.World.ActorsHavingTrait<RepairsUnits>())
+			{
+				if (!repairable.RepairActors.Contains(b.Info.Name))
+					continue;
+
+				var owned = b.Owner == owner.Bot.Player;
+				var alliedPassive = !owned && PassiveRepairRange(owner, b) > WDist.Zero;
+				if (!owned && !alliedPassive)
+					continue;
+
+				if (owned && requireAvailable && !Reservable.IsAvailableFor(b, aircraft))
+					continue;
+
+				candidates.Add((b, owned && requireAvailable));
+			}
+
+			if (candidates.Count == 0)
+				return new AirRepairPlan();
+
+			var info = owner.SquadManager.Info;
+			var map = owner.World.Map;
+			var coarseSize = info.AirInfluenceCellSize;
+			var width = (map.MapSize.X + coarseSize - 1) / coarseSize;
+			var height = (map.MapSize.Y + coarseSize - 1) / coarseSize;
+			var danger = new float[width * height];
+			var aircraftSpeed = aircraft.Info.TraitInfoOrDefault<AircraftInfo>()?.Speed ?? info.AirTargetReferenceSpeed;
+			foreach (var threat in threats)
+			{
+				var minX = Math.Max(0, (threat.Actor.Location.X - threat.RangeCells) / coarseSize);
+				var maxX = Math.Min(width - 1, (threat.Actor.Location.X + threat.RangeCells) / coarseSize);
+				var minY = Math.Max(0, (threat.Actor.Location.Y - threat.RangeCells) / coarseSize);
+				var maxY = Math.Min(height - 1, (threat.Actor.Location.Y + threat.RangeCells) / coarseSize);
 				for (var y = minY; y <= maxY; y++)
 					for (var x = minX; x <= maxX; x++)
 					{
 						var cell = new CPos(x * coarseSize + coarseSize / 2, y * coarseSize + coarseSize / 2);
-						var distance = (map.CenterOfCell(map.Clamp(cell)) - enemy.CenterPosition).Length / 1024;
-						if (distance <= influenceRange)
-							danger[y * width + x] += weight;
+						var distance = (map.CenterOfCell(map.Clamp(cell)) - threat.Actor.CenterPosition).Length / 1024;
+						if (distance <= threat.RangeCells)
+							danger[y * width + x] += threat.Weight;
 					}
 			}
 
@@ -1389,11 +1479,20 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var startY = Math.Clamp(start.Y / coarseSize, 0, height - 1);
 			Actor best = null;
 			List<CPos> bestRoute = null;
+			var bestRepairAtEnd = false;
 			var bestCost = float.MaxValue;
-			foreach (var candidate in candidates.OrderBy(a => a.ActorID))
+			var rejectedByAa = 0;
+			foreach (var candidate in candidates.OrderBy(a => a.Building.ActorID))
 			{
-				var goalX = Math.Clamp(candidate.Location.X / coarseSize, 0, width - 1);
-				var goalY = Math.Clamp(candidate.Location.Y / coarseSize, 0, height - 1);
+				var goalX = Math.Clamp(candidate.Building.Location.X / coarseSize, 0, width - 1);
+				var goalY = Math.Clamp(candidate.Building.Location.Y / coarseSize, 0, height - 1);
+				if (RepairDestinationDanger(candidate.Building.CenterPosition, threats) > 0 ||
+					danger[goalY * width + goalX] > 0)
+				{
+					rejectedByAa++;
+					continue;
+				}
+
 				var route = AirThreatGeometry.FindCoarseRoute(
 					danger, width, height, startX, startY, goalX, goalY, info.AirRouteThreatPenalty);
 				if (route == null)
@@ -1406,7 +1505,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				if (cost >= bestCost)
 					continue;
 
-				best = candidate;
+				best = candidate.Building;
+				bestRepairAtEnd = candidate.RepairAtEnd;
 				bestCost = cost;
 				bestRoute = AirThreatGeometry.SmoothCoarseRoute(
 					danger, width, height, startX, startY, route)
@@ -1414,7 +1514,13 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 						p.X * coarseSize + coarseSize / 2, p.Y * coarseSize + coarseSize / 2))).ToList();
 			}
 
-			return (best, bestRoute);
+			return new AirRepairPlan
+			{
+				Building = best,
+				Route = bestRoute,
+				RepairAtEnd = bestRepairAtEnd,
+				RejectedByAa = rejectedByAa,
+			};
 		}
 
 		static void QueueRecoveryRoute(

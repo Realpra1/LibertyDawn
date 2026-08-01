@@ -50,6 +50,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		internal readonly List<CPos> AirRoute = new List<CPos>();
 		internal bool AirRouteQueued;
 		internal readonly HashSet<uint> AirUnitsRepairing = new HashSet<uint>();
+		internal readonly Dictionary<uint, uint> AirRepairTargets = new Dictionary<uint, uint>();
+		internal readonly HashSet<uint> AirRepairUnavailable = new HashSet<uint>();
 		internal readonly HashSet<uint> AirReinforcements = new HashSet<uint>();
 		internal readonly Dictionary<uint, uint> AirReinforcementTargets = new Dictionary<uint, uint>();
 		WPos airLastFormationCenter;
@@ -216,7 +218,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			AirReinforcementTargets.Remove(actor.ActorID);
 		}
 
-		internal void MarkAirRepairing(Actor actor)
+		internal void MarkAirRepairing(Actor actor, Actor destination = null)
 		{
 			if (!hasAirFormationCenter && !AirReinforcements.Contains(actor.ActorID))
 			{
@@ -225,6 +227,12 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			}
 
 			AirUnitsRepairing.Add(actor.ActorID);
+			AirRepairUnavailable.Remove(actor.ActorID);
+			if (destination == null)
+				AirRepairTargets.Remove(actor.ActorID);
+			else
+				AirRepairTargets[actor.ActorID] = destination.ActorID;
+
 			MarkAirReinforcement(actor);
 		}
 
@@ -240,6 +248,10 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		{
 			var live = new HashSet<uint>(Units.Select(a => a.ActorID));
 			AirUnitsRepairing.RemoveWhere(id => !live.Contains(id));
+			AirRepairUnavailable.RemoveWhere(id => !live.Contains(id));
+			foreach (var id in AirRepairTargets.Keys.Where(id => !live.Contains(id)).ToList())
+				AirRepairTargets.Remove(id);
+
 			AirReinforcements.RemoveWhere(id => !live.Contains(id));
 			foreach (var id in AirReinforcementTargets.Keys.Where(id => !live.Contains(id)).ToList())
 				AirReinforcementTargets.Remove(id);

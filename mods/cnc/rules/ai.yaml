@@ -933,6 +933,7 @@ Player:
 			stnk: 0
 		AirMassedAttackIdleThreshold: 6
 		HealthRetreatThreshold: 0.5
+		AirPassiveRepairActors: fix
 		AirTargetPriorityOrca:
 			mcv: 10000
 			harv: 5000
