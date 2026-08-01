@@ -203,7 +203,12 @@ namespace OpenRA.Mods.Common.Traits
 			if (world.Actors.Any(a => a.Owner == player && !a.IsDead && a.IsInWorld && a.Info.HasTraitInfo<MobileInfo>()))
 				return;
 
-			var building = world.Actors.Where(a => a.Owner == player && !a.IsDead && a.IsInWorld &&
+			var ownBuildings = world.Actors.Where(a => a.Owner == player && !a.IsDead && a.IsInWorld &&
+				a.Info.HasTraitInfo<BuildingInfo>()).ToArray();
+			if (ownBuildings.Length <= 1)
+				return;
+
+			var building = ownBuildings.Where(a =>
 				Info.EmergencySellActorTypes.Contains(a.Info.Name) && a.Info.HasTraitInfo<SellableInfo>())
 				.OrderBy(a => a.GetSellValue()).ThenBy(a => a.ActorID).FirstOrDefault();
 			if (building == null)
