@@ -266,6 +266,9 @@ Player:
 		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai
 		ScanInterval: 125
 		SupplyActorTypes: truck
+		AlliedSupplyProductionActor: truck
+		AlliedSupplyProductionActorTypes: weap, afld
+		AlliedSupplyProductionQuotaInterval: 7500
 		AlliedRescueCashThreshold: 0
 		AlliedEconomyActorTypes: harv, sharv, proc
 		AlliedRecoveryActorTypes: fact, mcv, weap, afld, pyle, hand, e1, e2, e3, e4, e5, e6, rmbo, harv, sharv, truck
@@ -1213,7 +1216,7 @@ Player:
 		RequiresCondition: enable-ironreaper-ai
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
         IdleBaseUnitsMaximum: 999
-		ExternallyManagedTypes: upgrade.covert1, upgrade.covert2, upgrade.covert3, downgrade.covert, upgrade.recon1, upgrade.recon2, upgrade.recon3, downgrade.recon, upgrade.economy1, upgrade.economy2, upgrade.economy3, downgrade.economy
+		ExternallyManagedTypes: truck, upgrade.covert1, upgrade.covert2, upgrade.covert3, downgrade.covert, upgrade.recon1, upgrade.recon2, upgrade.recon3, downgrade.recon, upgrade.economy1, upgrade.economy2, upgrade.economy3, downgrade.economy
         UnitsToBuild:
 			e1: 25
 			e2: 25

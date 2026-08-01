@@ -83,7 +83,8 @@ namespace OpenRA.Mods.Common.Traits
 		public override object Create(ActorInitializer init) { return new UnitBuilderBotModule(init.Self, this); }
 	}
 
-	public class UnitBuilderBotModule : ConditionalTrait<UnitBuilderBotModuleInfo>, IBotTick, IBotNotifyIdleBaseUnits, IBotRequestUnitProduction, IGameSaveTraitData
+	public class UnitBuilderBotModule : ConditionalTrait<UnitBuilderBotModuleInfo>, IBotTick, IBotNotifyIdleBaseUnits,
+		IBotRequestUnitProduction, IBotRequestTaggedUnitProduction, IGameSaveTraitData
 	{
 		public const int FeedbackTime = 30; // ticks; = a bit over 1s. must be >= netlag.
 
@@ -91,6 +92,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly Player player;
 
 		readonly List<string> queuedBuildRequests = new List<string>();
+		readonly List<string> queuedBuildRequestTags = new List<string>();
 
 		IBotRequestPauseUnitProduction[] requestPause;
 		PlayerResources playerResources;
@@ -150,7 +152,8 @@ namespace OpenRA.Mods.Common.Traits
 				if (buildRequest != null)
 				{
 					BuildUnit(bot, buildRequest);
-					queuedBuildRequests.Remove(buildRequest);
+					queuedBuildRequests.RemoveAt(0);
+					queuedBuildRequestTags.RemoveAt(0);
 				}
 
 				foreach (var q in Info.UnitQueues)
@@ -228,11 +231,41 @@ namespace OpenRA.Mods.Common.Traits
 		void IBotRequestUnitProduction.RequestUnitProduction(IBot bot, string requestedActor)
 		{
 			queuedBuildRequests.Add(requestedActor);
+			queuedBuildRequestTags.Add(string.Empty);
 		}
 
 		int IBotRequestUnitProduction.RequestedProductionCount(IBot bot, string requestedActor)
 		{
 			return queuedBuildRequests.Count(r => r == requestedActor);
+		}
+
+		void IBotRequestTaggedUnitProduction.RequestUnitProduction(IBot bot, string requestedActor, string requestTag, int count)
+		{
+			if (string.IsNullOrEmpty(requestTag))
+				throw new ArgumentException("Tagged production requests require a non-empty tag.", nameof(requestTag));
+
+			for (var i = 0; i < Math.Max(0, count); i++)
+			{
+				queuedBuildRequests.Add(requestedActor);
+				queuedBuildRequestTags.Add(requestTag);
+			}
+		}
+
+		int IBotRequestTaggedUnitProduction.RequestedProductionCount(IBot bot, string requestTag)
+		{
+			return queuedBuildRequestTags.Count(t => t == requestTag);
+		}
+
+		void IBotRequestTaggedUnitProduction.CancelUnitProduction(IBot bot, string requestTag)
+		{
+			for (var i = queuedBuildRequestTags.Count - 1; i >= 0; i--)
+			{
+				if (queuedBuildRequestTags[i] != requestTag)
+					continue;
+
+				queuedBuildRequestTags.RemoveAt(i);
+				queuedBuildRequests.RemoveAt(i);
+			}
 		}
 
 		void BuildUnit(IBot bot, string category, bool buildRandom)
@@ -422,6 +455,7 @@ namespace OpenRA.Mods.Common.Traits
 			return new List<MiniYamlNode>()
 			{
 				new MiniYamlNode("QueuedBuildRequests", FieldSaver.FormatValue(queuedBuildRequests.ToArray())),
+				new MiniYamlNode("QueuedBuildRequestTags", FieldSaver.FormatValue(queuedBuildRequestTags.ToArray())),
 				new MiniYamlNode("IdleUnitCount", FieldSaver.FormatValue(idleUnitCount))
 			};
 		}
@@ -436,6 +470,15 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				queuedBuildRequests.Clear();
 				queuedBuildRequests.AddRange(FieldLoader.GetValue<string[]>("QueuedBuildRequests", queuedBuildRequestsNode.Value.Value));
+				queuedBuildRequestTags.Clear();
+				var tagsNode = data.FirstOrDefault(n => n.Key == "QueuedBuildRequestTags");
+				if (tagsNode != null)
+					queuedBuildRequestTags.AddRange(FieldLoader.GetValue<string[]>("QueuedBuildRequestTags", tagsNode.Value.Value));
+
+				while (queuedBuildRequestTags.Count < queuedBuildRequests.Count)
+					queuedBuildRequestTags.Add(string.Empty);
+				if (queuedBuildRequestTags.Count > queuedBuildRequests.Count)
+					queuedBuildRequestTags.RemoveRange(queuedBuildRequests.Count, queuedBuildRequestTags.Count - queuedBuildRequests.Count);
 			}
 
 			var idleUnitCountNode = data.FirstOrDefault(n => n.Key == "IdleUnitCount");

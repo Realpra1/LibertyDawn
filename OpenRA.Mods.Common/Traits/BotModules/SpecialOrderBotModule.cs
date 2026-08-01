@@ -25,6 +25,17 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Actor types that deliver cash using the existing DeliverCash order.")]
 		public readonly HashSet<string> SupplyActorTypes = new HashSet<string>();
 
+		[ActorReference]
+		[Desc("Supply actor requested from UnitBuilder for an economically stranded ally. Empty disables allied supply production.")]
+		public readonly string AlliedSupplyProductionActor = null;
+
+		[ActorReference]
+		[Desc("Factory/airfield equivalents that each grant one allied supply request per quota window.")]
+		public readonly HashSet<string> AlliedSupplyProductionActorTypes = new HashSet<string>();
+
+		[Desc("Ticks between allied supply production requests per currently available production actor/queue.")]
+		public readonly int AlliedSupplyProductionQuotaInterval = 7500;
+
 		[Desc("Cash at or below which an allied player may receive an available supply unit.")]
 		public readonly int AlliedRescueCashThreshold = 0;
 
@@ -52,15 +63,25 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Write special-order assignments to debug.log.")]
 		public readonly bool DebugLogging = false;
 
+		public override void RulesetLoaded(Ruleset rules, ActorInfo ai)
+		{
+			base.RulesetLoaded(rules, ai);
+			if (AlliedSupplyProductionQuotaInterval <= 0)
+				throw new YamlException("AlliedSupplyProductionQuotaInterval must be positive.");
+		}
+
 		public override object Create(ActorInitializer init) { return new SpecialOrderBotModule(init.Self, this); }
 	}
 
-	public class SpecialOrderBotModule : ConditionalTrait<SpecialOrderBotModuleInfo>, IBotTick
+	public class SpecialOrderBotModule : ConditionalTrait<SpecialOrderBotModuleInfo>, IBotTick, IGameSaveTraitData
 	{
 		readonly World world;
 		readonly Player player;
 		readonly PlayerResources resources;
 		readonly Dictionary<uint, uint> assignments = new Dictionary<uint, uint>();
+		readonly Dictionary<string, AlliedSupplyProductionState> alliedSupplyStates =
+			new Dictionary<string, AlliedSupplyProductionState>(StringComparer.Ordinal);
+		IBotRequestTaggedUnitProduction[] taggedProduction;
 		int scanTicks;
 		int nextEmergencySaleTick;
 
@@ -77,6 +98,11 @@ namespace OpenRA.Mods.Common.Traits
 			scanTicks = world.LocalRandom.Next(0, Math.Max(1, Info.ScanInterval));
 		}
 
+		protected override void Created(Actor self)
+		{
+			taggedProduction = self.Owner.PlayerActor.TraitsImplementing<IBotRequestTaggedUnitProduction>().ToArray();
+		}
+
 		void IBotTick.BotTick(IBot bot)
 		{
 			if (Info.ScanInterval <= 0 || player.WinState != WinState.Undefined || --scanTicks > 0)
@@ -84,10 +110,88 @@ namespace OpenRA.Mods.Common.Traits
 
 			scanTicks = Info.ScanInterval;
 			CleanupAssignments();
+			UpdateAlliedSupplyProduction(bot);
 			AssignSupplyOrders(bot);
 			AssignCrateOrders(bot);
 			TryEmergencySale(bot);
 		}
+
+		void UpdateAlliedSupplyProduction(IBot bot)
+		{
+			if (string.IsNullOrEmpty(Info.AlliedSupplyProductionActor) || taggedProduction == null || taggedProduction.Length == 0)
+				return;
+
+			var requester = taggedProduction.FirstOrDefault(p => p.IsTraitEnabled());
+			if (requester == null)
+				return;
+			var availableQueues = AvailableSupplyProductionQueues();
+			var ownNeedsSupply = resources != null && resources.Cash + resources.Resources <= Info.AlliedRescueCashThreshold &&
+				HasCashDeliveryTarget(player);
+
+			foreach (var ally in world.Players.Where(p => !p.NonCombatant && !p.Spectating && p != player &&
+				player.RelationshipWith(p) == PlayerRelationship.Ally).OrderBy(p => p.ClientIndex))
+			{
+				if (!alliedSupplyStates.TryGetValue(ally.InternalName, out var state))
+					alliedSupplyStates.Add(ally.InternalName, state = new AlliedSupplyProductionState { WindowStartTick = -1 });
+
+				var actors = world.Actors.Where(a => a.Owner == ally && !a.IsDead && a.IsInWorld).ToArray();
+				var allyResources = ally.PlayerActor.TraitOrDefault<PlayerResources>();
+				var lowCash = allyResources != null && allyResources.Cash + allyResources.Resources <= Info.AlliedRescueCashThreshold;
+				var hasEconomy = actors.Any(a => Info.AlliedEconomyActorTypes.Contains(a.Info.Name));
+				var hasMcv = actors.Any(a => Info.McvActorTypes.Contains(a.Info.Name));
+				var needsSupply = lowCash && !hasEconomy && !hasMcv;
+				var hasProduction = actors.Any(a => Info.AlliedSupplyProductionActorTypes.Contains(a.Info.Name));
+				var hasMobile = actors.Any(a => a.Info.HasTraitInfo<MobileInfo>());
+				var observation = new AlliedSupplyProductionObservation(needsSupply,
+					hasProduction || hasMcv || hasMobile, ownNeedsSupply, availableQueues);
+				var hadGivenUp = state.GaveUp;
+				var decision = AlliedSupplyProductionPolicy.Evaluate(state, observation, world.WorldTick,
+					Info.AlliedSupplyProductionQuotaInterval);
+				var requestTag = SupplyRequestTag(ally);
+
+				switch (decision.Action)
+				{
+					case AlliedSupplyProductionAction.Request:
+						requester.RequestUnitProduction(bot, Info.AlliedSupplyProductionActor, requestTag, decision.RequestCount);
+						Debug("requested {0} x{1} for stranded ally {2}; queues={3}, window={4}",
+							Info.AlliedSupplyProductionActor, decision.RequestCount, ally.PlayerName, availableQueues, state.WindowStartTick);
+						break;
+					case AlliedSupplyProductionAction.Cancel:
+					case AlliedSupplyProductionAction.GiveUp:
+						var pending = requester.RequestedProductionCount(bot, requestTag);
+						if (pending > 0)
+						{
+							requester.CancelUnitProduction(bot, requestTag);
+							Debug("canceled {0} pending allied supply request(s) for {1}", pending, ally.PlayerName);
+						}
+
+						if (decision.Action == AlliedSupplyProductionAction.GiveUp && !hadGivenUp)
+							Debug("gave up allied supply production for terminal ally {0}", ally.PlayerName);
+						break;
+				}
+			}
+		}
+
+		int AvailableSupplyProductionQueues()
+		{
+			var actorInfo = world.Map.Rules.Actors[Info.AlliedSupplyProductionActor];
+			var buildable = actorInfo?.TraitInfoOrDefault<BuildableInfo>();
+			if (buildable == null)
+				return 0;
+
+			return buildable.Queue.SelectMany(q => AIUtils.FindQueues(player, q))
+				.Where(q => Info.AlliedSupplyProductionActorTypes.Contains(q.Actor.Info.Name) &&
+					q.BuildableItems().Any(a => a.Name == Info.AlliedSupplyProductionActor))
+				.Select(q => q.Actor.ActorID).Distinct().Count();
+		}
+
+		bool HasCashDeliveryTarget(Player owner)
+		{
+			return world.Actors.Any(a => a.Owner == owner && !a.IsDead && a.IsInWorld &&
+				a.Info.HasTraitInfo<AcceptsDeliveredCashInfo>());
+		}
+
+		static string SupplyRequestTag(Player ally) { return "allied-supply:" + ally.InternalName; }
 
 		void CleanupAssignments()
 		{
@@ -223,6 +327,50 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			if (Info.DebugLogging)
 				AIUtils.BotDebug("AI ({0}) special orders: {1}", player.ClientIndex, string.Format(format, args));
+		}
+
+		List<MiniYamlNode> IGameSaveTraitData.IssueTraitData(Actor self)
+		{
+			if (IsTraitDisabled)
+				return null;
+
+			var states = alliedSupplyStates.OrderBy(kv => kv.Key, StringComparer.Ordinal).ToArray();
+			return new List<MiniYamlNode>
+			{
+				new MiniYamlNode("AlliedSupplyPlayers", FieldSaver.FormatValue(states.Select(kv => kv.Key).ToArray())),
+				new MiniYamlNode("AlliedSupplyWindowStarts", FieldSaver.FormatValue(states.Select(kv => kv.Value.WindowStartTick).ToArray())),
+				new MiniYamlNode("AlliedSupplyRequestCounts", FieldSaver.FormatValue(states.Select(kv => kv.Value.RequestsInWindow).ToArray())),
+				new MiniYamlNode("AlliedSupplyGaveUp", FieldSaver.FormatValue(states.Select(kv => kv.Value.GaveUp).ToArray()))
+			};
+		}
+
+		void IGameSaveTraitData.ResolveTraitData(Actor self, List<MiniYamlNode> data)
+		{
+			if (self.World.IsReplay)
+				return;
+
+			var playersNode = data.FirstOrDefault(n => n.Key == "AlliedSupplyPlayers");
+			if (playersNode == null)
+				return;
+
+			var players = FieldLoader.GetValue<string[]>("AlliedSupplyPlayers", playersNode.Value.Value);
+			var starts = LoadStateArray<int>(data, "AlliedSupplyWindowStarts");
+			var counts = LoadStateArray<int>(data, "AlliedSupplyRequestCounts");
+			var gaveUp = LoadStateArray<bool>(data, "AlliedSupplyGaveUp");
+			alliedSupplyStates.Clear();
+			for (var i = 0; i < players.Length; i++)
+				alliedSupplyStates[players[i]] = new AlliedSupplyProductionState
+				{
+					WindowStartTick = i < starts.Length ? starts[i] : -1,
+					RequestsInWindow = i < counts.Length ? counts[i] : 0,
+					GaveUp = i < gaveUp.Length && gaveUp[i]
+				};
+		}
+
+		static T[] LoadStateArray<T>(List<MiniYamlNode> data, string key)
+		{
+			var node = data.FirstOrDefault(n => n.Key == key);
+			return node == null ? Array.Empty<T>() : FieldLoader.GetValue<T[]>(key, node.Value.Value);
 		}
 	}
 }
