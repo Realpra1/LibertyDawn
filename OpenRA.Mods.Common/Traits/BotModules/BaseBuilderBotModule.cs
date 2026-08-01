@@ -413,7 +413,8 @@ namespace OpenRA.Mods.Common.Traits
 			if (string.IsNullOrEmpty(type))
 				return false;
 
-			var requester = unitProduction.FirstOrDefault(r => r.RequestedProductionCount(bot, type) == 0);
+			var requester = unitProduction.FirstOrDefault(r => r.IsTraitEnabled() &&
+				r.RequestedProductionCount(bot, type) == 0);
 			if (requester == null)
 				return false;
 
