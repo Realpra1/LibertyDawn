@@ -933,11 +933,14 @@ Player:
 			mcv: 10000
 			harv: 5000
 			sharv: 5000
+			arty: 5000
+			mlrs: 5000
+			bike: 5000
+			stnk: 5000
 			nuk2: 5000
 			htnk: 2500
 			mtnk: 2000
 			ltnk: 1250
-			stnk: 1250
 			proc: 1250
 			fact: 625
 			fact.gdi: 625
@@ -954,10 +957,12 @@ Player:
 			mcv: 10000
 			harv: 5000
 			sharv: 5000
-			e3: 7500
+			arty: 5000
+			mlrs: 5000
+			e3: 5000
 			msam: 6500
 			stnk: 5000
-			bike: 2500
+			bike: 5000
 			rmbo: 1250
 			bggy: 2000
 			ltnk: 750
