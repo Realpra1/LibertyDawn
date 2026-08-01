@@ -636,6 +636,14 @@ namespace OpenRA.Mods.Common.Traits
 		Turn = 4
 	}
 
+	public enum MoveResult
+	{
+		InProgress,
+		CompleteCanceled,
+		CompleteDestinationReached,
+		CompleteDestinationBlocked,
+	}
+
 	[RequireExplicitImplementation]
 	public interface INotifyMoving
 	{

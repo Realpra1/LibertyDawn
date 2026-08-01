@@ -102,9 +102,17 @@ namespace OpenRA.Mods.Common.Activities
 			if (!IsCanceling && shouldRepath)
 				QueueChild(Mobile.MoveTo(check => CalculatePathToTarget(self, check)));
 
-			// The last queued childactivity is guaranteed to be the inner move, so if the childactivity
-			// queue is empty it means we have reached our destination.
-			return TickChild(self);
+			// The last queued child activity is guaranteed to be the inner move,
+			// so if the child activity queue is empty it means the move completed.
+			if (!TickChild(self))
+				return false;
+
+			if (Mobile.MoveResult == MoveResult.CompleteDestinationReached)
+				return true;
+
+			// The move completed but we didn't reach the destination, so Cancel.
+			Cancel(self);
+			return true;
 		}
 
 		readonly List<CPos> searchCells = new List<CPos>();
