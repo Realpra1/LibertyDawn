@@ -208,6 +208,7 @@ namespace OpenRA.Mods.Common.Traits
 						ExtraData = queue.Actor.ActorID,
 						SuppressVisualFeedback = true
 					});
+					baseBuilder.NotifyCombatTowerOrdered(actorInfo);
 
 					return true;
 				}
@@ -259,6 +260,16 @@ namespace OpenRA.Mods.Common.Traits
 					return power;
 				}
 			}
+
+			var opening = baseBuilder.OpeningBuilding(buildableThings);
+			if (opening != null)
+			{
+				AIUtils.BotDebug("{0} decided to build {1}: opening policy", queue.Actor.Owner, DisplayName(opening.Name));
+				return opening;
+			}
+
+			if (baseBuilder.OpeningActive)
+				return null;
 
 			// Next is to build up a strong economy
 			if (!baseBuilder.HasAdequateRefineryCount)

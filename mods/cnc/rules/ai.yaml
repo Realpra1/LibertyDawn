@@ -690,6 +690,21 @@ Player:
             mcv: 3000
     BaseBuilderBotModule@viki:
 		RequiresCondition: enable-viki-ai
+		EnableOpeningPolicy: true
+		OpeningPowerTypes: nuk2, nuke
+		OpeningBarracksTypes: pyle, hand
+		OpeningRefineryTypes: proc
+		OpeningFactoryTypes: weap, afld
+		OpeningHarvesterTypes: harv, sharv
+		OpeningRadarTypes: hq
+		OpeningSiloTypes: silo
+		OpeningMcvType: mcv
+		OpeningHarvesterCount: 5
+		OpeningConstructionYardCount: 2
+		FirstCombatTowerNearConstructionYard: true
+		ExcessCashExpansionThreshold: 15000
+		ExcessCashExpansionCooldown: 1500
+		ExcessCashConstructionYardTarget: 3
 		BuildingQueues: Building.Nod, Building.GDI
 		DefenseQueues: Defence.Nod, Defence.GDI
 		MinimumExcessPower: 151
@@ -1095,6 +1110,21 @@ Player:
             mhq: 1
     BaseBuilderBotModule@ironreaper:
 		RequiresCondition: enable-ironreaper-ai
+		EnableOpeningPolicy: true
+		OpeningPowerTypes: nuk2, nuke
+		OpeningBarracksTypes: pyle, hand
+		OpeningRefineryTypes: proc, resonator
+		OpeningFactoryTypes: weap, afld
+		OpeningHarvesterTypes: harv, sharv
+		OpeningRadarTypes: hq
+		OpeningSiloTypes: silo
+		OpeningMcvType: mcv
+		OpeningHarvesterCount: 5
+		OpeningConstructionYardCount: 2
+		FirstCombatTowerNearConstructionYard: true
+		ExcessCashExpansionThreshold: 15000
+		ExcessCashExpansionCooldown: 1500
+		ExcessCashConstructionYardTarget: 3
 		BuildingQueues: Building.Nod, Building.GDI
 		DefenseQueues: Defence.Nod, Defence.GDI
 		MinimumExcessPower: 1
