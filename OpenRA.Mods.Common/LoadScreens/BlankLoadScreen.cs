@@ -69,7 +69,7 @@ namespace OpenRA.Mods.Common.LoadScreens
 			// Start a map directly
 			if (!string.IsNullOrEmpty(Launch.Map))
 			{
-				Game.LoadMap(Launch.Map);
+				Game.LoadMap(Launch.Map, Launch.GetLobbyCommands());
 				return;
 			}
 
