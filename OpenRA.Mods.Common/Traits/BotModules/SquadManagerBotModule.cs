@@ -278,6 +278,10 @@ namespace OpenRA.Mods.Common.Traits
 			"treats a defender as dangerous out to 150% of its actual weapon range.")]
 		public readonly float AirThreatRangeBuffer = 1.5f;
 
+		[Desc("Optional actor-specific overrides for derived anti-air threat weight. Zero makes that actor",
+			"irrelevant to air routing, destination danger, and local flee checks.")]
+		public readonly Dictionary<string, float> AirThreatWeightOverrides = new Dictionary<string, float>();
+
 		[Desc("Consecutive AirIdleState scans (each AttackForceInterval ticks apart) that find no target",
 			"scoring above AirTargetMinimumScore before the squad stops waiting for an undefended target",
 			"and instead accepts the best finite-cost route. Anti-air costs remain in force, but this is better",
@@ -376,6 +380,9 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (AirThreatRangeBuffer <= 0)
 				throw new YamlException("AirThreatRangeBuffer must be greater than zero.");
+
+			if (AirThreatWeightOverrides.Any(kv => kv.Value < 0))
+				throw new YamlException("AirThreatWeightOverrides values must not be negative.");
 
 			if (AirMassedAttackIdleThreshold < 0)
 				throw new YamlException("AirMassedAttackIdleThreshold must not be negative.");

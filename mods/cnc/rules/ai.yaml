@@ -927,6 +927,10 @@ Player:
 		AirEvadeDistance: 12
 		AirEvadeJitter: 5
 		AirThreatRangeBuffer: 1.5
+		AirThreatWeightOverrides:
+			e3: 0
+			bike: 0
+			stnk: 0
 		AirMassedAttackIdleThreshold: 6
 		HealthRetreatThreshold: 0.5
 		AirTargetPriorityOrca:

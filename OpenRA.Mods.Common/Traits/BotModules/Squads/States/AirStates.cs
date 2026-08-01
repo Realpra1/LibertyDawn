@@ -31,7 +31,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			public int Height;
 			public float[] Danger;
 			public List<(Actor Actor, int Utility)> Candidates;
-			public List<(Actor Actor, float Weight, int RangeCells)> Threats;
+			public List<(Actor Actor, float StoppingWeight, int RangeCells)> Threats;
 		}
 
 		// Bot logic is host-only. Sharing one cache per manager/profile prevents two same-type squads
@@ -62,11 +62,40 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		}
 
 		/// <summary>Sum of <see cref="AirThreatGeometry.AaEffectiveness"/> weights, not a raw headcount.</summary>
-		protected static float CountAntiAirUnits(IEnumerable<Actor> units)
+		protected static float CountAntiAirUnits(Squad owner, IEnumerable<Actor> units)
 		{
 			var weight = 0f;
 			foreach (var unit in units)
-				weight += AntiAirProfile(unit).Weight;
+			{
+				var profile = AntiAirProfile(unit);
+				weight += StoppingThreatWeight(owner, unit, profile.Weight);
+			}
+
+			return weight;
+		}
+
+		static float ConfiguredThreatWeight(Squad owner, Actor actor, float derivedWeight)
+		{
+			return AirThreatGeometry.ConfiguredThreatWeight(actor.Info.Name, derivedWeight,
+				owner.SquadManager.Info.AirThreatWeightOverrides);
+		}
+
+		static float StoppingThreatWeight(Squad owner, Actor actor, float derivedWeight)
+		{
+			var weight = ConfiguredThreatWeight(owner, actor, derivedWeight);
+			if (owner.AirProfile.Equals("Apache", StringComparison.OrdinalIgnoreCase) && weight >= .75f)
+				weight *= actor.Info.TraitInfoOrDefault<MobileInfo>() == null ? 8f : 4f;
+
+			return weight;
+		}
+
+		static float TransitThreatWeight(Squad owner, Actor actor,
+			(float Weight, int RangeCells, int FastestProjectileSpeed) profile, int aircraftSpeed)
+		{
+			var weight = StoppingThreatWeight(owner, actor, profile.Weight);
+			if (owner.AirProfile.Equals("Orca", StringComparison.OrdinalIgnoreCase))
+				weight = AirThreatGeometry.OrcaTransitThreatWeight(weight,
+					AirThreatGeometry.CanOutrun(aircraftSpeed, profile.FastestProjectileSpeed));
 
 			return weight;
 		}
@@ -345,8 +374,6 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var width = (map.MapSize.X + coarseSize - 1) / coarseSize;
 			var height = (map.MapSize.Y + coarseSize - 1) / coarseSize;
 			var archetypePriority = ArchetypePriority(owner);
-			var apache = owner.AirProfile.Equals("Apache", StringComparison.OrdinalIgnoreCase);
-			var orca = owner.AirProfile.Equals("Orca", StringComparison.OrdinalIgnoreCase);
 			var planningUnits = owner.Units.Where(a => !owner.AirUnitsRepairing.Contains(a.ActorID)).ToList();
 			if (planningUnits.Count == 0)
 			{
@@ -372,14 +399,15 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			{
 				var rebuiltDanger = new float[width * height];
 				var rebuiltCandidates = new List<(Actor Actor, int Utility)>();
-				var rebuiltThreats = new List<(Actor Actor, float Weight, int RangeCells)>();
+				var rebuiltThreats = new List<(Actor Actor, float StoppingWeight, int RangeCells)>();
 				foreach (var actor in owner.World.Actors)
 				{
 					if (!owner.SquadManager.IsPreferredEnemyUnit(actor))
 						continue;
 
 					var profile = AntiAirProfile(actor);
-					if (profile.Weight > 0)
+					var stoppingWeight = StoppingThreatWeight(owner, actor, profile.Weight);
+					if (stoppingWeight > 0)
 					{
 						var range = Math.Max(1, (int)Math.Ceiling(profile.RangeCells * info.AirThreatRangeBuffer));
 						var mobile = actor.Info.TraitInfoOrDefault<MobileInfo>();
@@ -390,20 +418,16 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 						var maxX = Math.Min(width - 1, (actor.Location.X + influenceRange) / coarseSize);
 						var minY = Math.Max(0, (actor.Location.Y - influenceRange) / coarseSize);
 						var maxY = Math.Min(height - 1, (actor.Location.Y + influenceRange) / coarseSize);
-						var weight = profile.Weight;
-						if (apache && profile.Weight >= .75f)
-							weight *= mobile == null ? 8f : 4f;
-						else if (orca && AirThreatGeometry.CanOutrun(squadSpeed, profile.FastestProjectileSpeed))
-							weight *= .5f;
+						var transitWeight = TransitThreatWeight(owner, actor, profile, squadSpeed);
 
-						rebuiltThreats.Add((actor, weight, range));
+						rebuiltThreats.Add((actor, stoppingWeight, range));
 						for (var y = minY; y <= maxY; y++)
 							for (var x = minX; x <= maxX; x++)
 							{
 								var cell = new CPos(x * coarseSize + coarseSize / 2, y * coarseSize + coarseSize / 2);
 								var distance = (map.CenterOfCell(map.Clamp(cell)) - actor.CenterPosition).Length / 1024;
 								if (distance <= influenceRange)
-									rebuiltDanger[y * width + x] += weight;
+									rebuiltDanger[y * width + x] += transitWeight;
 							}
 					}
 
@@ -411,7 +435,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 						continue;
 
 					rebuiltCandidates.Add((actor,
-						BaseTargetUtility(actor, info, archetypePriority, profile.Weight)));
+						BaseTargetUtility(actor, info, archetypePriority,
+							ConfiguredThreatWeight(owner, actor, profile.Weight))));
 				}
 
 				cache = new AirInfluenceCache
@@ -454,7 +479,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				planningUnits.Any(u => CanAttackTarget(u, incumbent)))
 			{
 				var profile = AntiAirProfile(incumbent);
-				var baseUtility = BaseTargetUtility(incumbent, info, archetypePriority, profile.Weight);
+				var baseUtility = BaseTargetUtility(incumbent, info, archetypePriority,
+					ConfiguredThreatWeight(owner, incumbent, profile.Weight));
 				liveCandidates.Add((incumbent, CurrentTargetUtility(incumbent, baseUtility)));
 				liveCandidateActors.Add(incumbent);
 				liveCandidates.Sort((a, b) => a.Actor.ActorID.CompareTo(b.Actor.ActorID));
@@ -483,7 +509,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 						continue;
 
 					var profile = AntiAirProfile(actor);
-					var baseUtility = BaseTargetUtility(actor, info, archetypePriority, profile.Weight);
+					var baseUtility = BaseTargetUtility(actor, info, archetypePriority,
+						ConfiguredThreatWeight(owner, actor, profile.Weight));
 					liveCandidates.Add((actor, CurrentTargetUtility(actor, baseUtility)));
 					liveCandidateActors.Add(actor);
 				}
@@ -592,7 +619,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				{
 					var candidate = liveCandidates[candidateIndex];
 					var destinationDanger = 0f;
-					var candidateAa = AntiAirProfile(candidate.Actor).Weight > 0;
+					var candidateProfile = AntiAirProfile(candidate.Actor);
+					var candidateAa = ConfiguredThreatWeight(owner, candidate.Actor, candidateProfile.Weight) > 0;
 					var candidateAaCounted = false;
 					long targetCellAaValue = 0;
 					foreach (var threat in threats)
@@ -611,7 +639,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 							continue;
 						}
 
-						destinationDanger += threat.Weight;
+						destinationDanger += threat.StoppingWeight;
 					}
 
 					if (candidateAa && !candidateAaCounted)
@@ -935,14 +963,6 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var expiry = tick + info.AirThreatMemoryTicks;
 			var squadCenter = owner.CenterPosition;
 			var archetypePriority = ArchetypePriority(owner);
-			var apache = owner.AirProfile.Equals("Apache", StringComparison.OrdinalIgnoreCase);
-			var orca = owner.AirProfile.Equals("Orca", StringComparison.OrdinalIgnoreCase);
-
-			// Only while already committed to a target (i.e. actually flying somewhere, not idling and
-			// scanning in place) may a threat every unit in the squad can outrun be flown through instead
-			// of triggering a flee - this is "as long as they don't stop", not a standing immunity.
-			var committed = owner.IsTargetValid;
-			var squadSpeed = committed ? SquadSlowestAircraftSpeed(owner) : 0;
 
 			var antiAirWeight = 0f;
 			var ownBuildingNear = false;
@@ -970,27 +990,17 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					continue;
 
 				var profile = AntiAirProfile(a);
-				if (profile.Weight > 0)
+				var stoppingWeight = StoppingThreatWeight(owner, a, profile.Weight);
+				if (stoppingWeight > 0)
 				{
-					// Remembered regardless of range/outrun status - route-scoring elsewhere still
-					// benefits from knowing it is there even if it is not an immediate flee trigger.
+					// Local safety never receives the Orca transit discount. A fast aircraft may route
+					// past a slower missile, but hovering or attacking inside its range remains lethal.
 					owner.RememberAirThreat(a.CenterPosition, expiry, mergeRadius, info.AirThreatMemorySize);
 
 					var distanceInCells = (a.CenterPosition - squadCenter).Length / 1024;
 					var withinRange = AirThreatGeometry.IsWithinBufferedRange(distanceInCells, profile.RangeCells, info.AirThreatRangeBuffer);
-					var outrunnable = committed && AirThreatGeometry.CanOutrun(squadSpeed, profile.FastestProjectileSpeed);
-
 					if (withinRange)
-					{
-						var localWeight = profile.Weight;
-						var mobile = a.Info.TraitInfoOrDefault<MobileInfo>();
-						if (apache)
-							localWeight *= mobile == null ? 8f : 4f;
-						else if (orca && outrunnable)
-							localWeight *= .5f;
-
-						antiAirWeight += localWeight;
-					}
+						antiAirWeight += stoppingWeight;
 
 					continue;
 				}
@@ -998,7 +1008,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				if (!owner.SquadManager.IsNotHiddenUnit(a))
 					continue;
 
-				// Everything reaching here failed IsAntiAirCapable, so the defenceless bonus always applies.
+				// Everything reaching here has zero configured AA weight, so the defenceless bonus applies.
 				// No anti-air or route penalty: whether this candidate is safe is decided below, by the same
 				// scan's anti-air count, rather than per candidate.
 				var distanceInCellsToTarget = (a.CenterPosition - squadCenter).Length / 1024;
@@ -1073,22 +1083,6 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 			ApplyAirTargetPlan(owner, new AirTargetPlan(localTarget, localScore, true, null));
 			owner.FuzzyStateMachine.ChangeState(owner, new AirAttackState(), true);
-		}
-
-		/// <summary>Slowest AircraftInfo.Speed among a squad's units, or int.MaxValue for an empty squad.</summary>
-		static int SquadSlowestAircraftSpeed(Squad owner)
-		{
-			var slowest = int.MaxValue;
-
-			// PERF: Avoid LINQ.
-			foreach (var u in owner.Units)
-			{
-				var aircraft = u.Info.TraitInfoOrDefault<AircraftInfo>();
-				if (aircraft != null && aircraft.Speed < slowest)
-					slowest = aircraft.Speed;
-			}
-
-			return slowest;
 		}
 
 		/// <summary>
@@ -1283,17 +1277,15 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var width = (map.MapSize.X + coarseSize - 1) / coarseSize;
 			var height = (map.MapSize.Y + coarseSize - 1) / coarseSize;
 			var danger = new float[width * height];
-			var apache = owner.AirProfile.Equals("Apache", StringComparison.OrdinalIgnoreCase);
-			var orca = owner.AirProfile.Equals("Orca", StringComparison.OrdinalIgnoreCase);
 			var aircraftSpeed = aircraft.Info.TraitInfoOrDefault<AircraftInfo>()?.Speed ?? info.AirTargetReferenceSpeed;
-
 			foreach (var enemy in owner.World.Actors)
 			{
 				if (!owner.SquadManager.IsPreferredEnemyUnit(enemy))
 					continue;
 
 				var profile = AntiAirProfile(enemy);
-				if (profile.Weight <= 0)
+				var weight = StoppingThreatWeight(owner, enemy, profile.Weight);
+				if (weight <= 0)
 					continue;
 
 				var range = Math.Max(1, (int)Math.Ceiling(profile.RangeCells * info.AirThreatRangeBuffer));
@@ -1301,12 +1293,6 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				var movementBuffer = mobile == null ? 0 :
 					AirThreatGeometry.MobileThreatBufferCells(mobile.Speed, info.AirInfluenceCacheInterval);
 				var influenceRange = range + movementBuffer;
-				var weight = profile.Weight;
-				if (apache && profile.Weight >= .75f)
-					weight *= mobile == null ? 8f : 4f;
-				else if (orca && AirThreatGeometry.CanOutrun(aircraftSpeed, profile.FastestProjectileSpeed))
-					weight *= .5f;
-
 				var minX = Math.Max(0, (enemy.Location.X - influenceRange) / coarseSize);
 				var maxX = Math.Min(width - 1, (enemy.Location.X + influenceRange) / coarseSize);
 				var minY = Math.Max(0, (enemy.Location.Y - influenceRange) / coarseSize);
@@ -1436,7 +1422,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			if (!unitsAroundPos.Any())
 				return true;
 
-			if (CountAntiAirUnits(unitsAroundPos) * owner.SquadManager.Info.AirThreatFleeMultiplier < owner.Units.Count)
+			if (CountAntiAirUnits(owner, unitsAroundPos) * owner.SquadManager.Info.AirThreatFleeMultiplier < owner.Units.Count)
 			{
 				detectedEnemyTarget = unitsAroundPos.Random(owner.Random);
 				return true;
@@ -1448,7 +1434,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		// Checks the number of anti air enemies around units
 		protected virtual bool ShouldFlee(Squad owner)
 		{
-			return ShouldFlee(owner, enemies => CountAntiAirUnits(enemies) * MissileUnitMultiplier > owner.Units.Count);
+			return ShouldFlee(owner, enemies => CountAntiAirUnits(owner, enemies) * MissileUnitMultiplier > owner.Units.Count);
 		}
 	}
 

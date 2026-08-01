@@ -530,6 +530,23 @@ namespace OpenRA.Test
 		}
 
 		[Test]
+		public void ThreatWeightOverrideCanExplicitlyDisableWeakAa()
+		{
+			var overrides = new Dictionary<string, float> { { "e3", 0f } };
+			Assert.That(AirThreatGeometry.ConfiguredThreatWeight("e3", .223f, overrides), Is.Zero);
+			Assert.That(AirThreatGeometry.ConfiguredThreatWeight("sam", 1f, overrides), Is.EqualTo(1f));
+		}
+
+		[Test]
+		public void OrcaOutrunDiscountOnlyProducesASeparateTransitWeight()
+		{
+			const float StoppingWeight = 1f;
+			Assert.That(AirThreatGeometry.OrcaTransitThreatWeight(StoppingWeight, true), Is.EqualTo(.5f));
+			Assert.That(AirThreatGeometry.OrcaTransitThreatWeight(StoppingWeight, false), Is.EqualTo(StoppingWeight));
+			Assert.That(StoppingWeight, Is.EqualTo(1f));
+		}
+
+		[Test]
 		public void AdaptiveLocalRiskOnlyAppliesInsideTargetCell()
 		{
 			Assert.That(AirThreatGeometry.LocalAirRiskMultiplier(false, 4f), Is.EqualTo(1f));

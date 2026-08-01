@@ -411,6 +411,18 @@ namespace OpenRA.Mods.Common.Traits
 			return Math.Clamp(effectiveness, 0.05f, 1f);
 		}
 
+		public static float ConfiguredThreatWeight(string actorName, float derivedWeight,
+			IReadOnlyDictionary<string, float> overrides)
+		{
+			return overrides != null && actorName != null && overrides.TryGetValue(actorName, out var configured) ?
+				configured : derivedWeight;
+		}
+
+		public static float OrcaTransitThreatWeight(float stoppingWeight, bool canOutrun)
+		{
+			return canOutrun ? stoppingWeight * .5f : stoppingWeight;
+		}
+
 		/// <summary>
 		/// <paramref name="v"/> rescaled to <paramref name="length"/> world units on the ground plane,
 		/// or zero when it has no direction to preserve. Integer only, so the result is within a unit or
