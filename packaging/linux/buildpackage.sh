@@ -122,9 +122,7 @@ build_appimage() {
 	rm -rf "${APPDIR}"
 }
 
-build_appimage "ra" "Red Alert" "699222659766026240"
 build_appimage "cnc" "Tiberian Dawn" "699223250181292033"
-build_appimage "d2k" "Dune 2000" "712711732770111550"
 
 # Clean up
 rm -rf appimagetool-x86_64.AppImage "${BUILTDIR}"
