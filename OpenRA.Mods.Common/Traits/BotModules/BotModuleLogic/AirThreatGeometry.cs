@@ -144,9 +144,12 @@ namespace OpenRA.Mods.Common.Traits
 
 		/// <summary>
 		/// Deterministically selects the deduplicated union of the nearest and highest-utility candidates.
+		/// A valid <paramref name="requiredIndex"/> is always included so a moving incumbent cannot fall
+		/// outside both bounded sets during a mandatory reassessment.
 		/// </summary>
 		public static List<int> SelectTargetCandidates(
-			IReadOnlyList<long> distances, IReadOnlyList<int> utilities, int closestCount, int highestValueCount)
+			IReadOnlyList<long> distances, IReadOnlyList<int> utilities, int closestCount, int highestValueCount,
+			int requiredIndex = -1)
 		{
 			if (distances == null || utilities == null || distances.Count != utilities.Count)
 				return null;
@@ -158,7 +161,24 @@ namespace OpenRA.Mods.Common.Traits
 				if (selected.Add(i))
 					result.Add(i);
 
+			if (requiredIndex >= 0 && requiredIndex < distances.Count && selected.Add(requiredIndex))
+				result.Add(requiredIndex);
+
 			return result;
+		}
+
+		/// <summary>
+		/// Applies a finishing bonus based on the target's remaining health. Full health preserves the
+		/// authored priority, while half health doubles it. Zero health is clamped to one hit point so
+		/// transient alive-at-zero actors cannot overflow the score, and invalid health data is ignored.
+		/// </summary>
+		public static int RemainingHealthPriority(int priority, int hp, int maxHp)
+		{
+			if (priority <= 0 || maxHp <= 0)
+				return Math.Max(0, priority);
+
+			var remainingHp = Math.Clamp(hp, 1, maxHp);
+			return (int)Math.Min(int.MaxValue, (long)priority * maxHp / remainingHp);
 		}
 
 		/// <summary>Maximum whole cells a mobile threat can traverse before an influence cache expires.</summary>

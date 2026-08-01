@@ -265,6 +265,26 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			return FindBestAirTarget(owner);
 		}
 
+		static int BaseTargetUtility(Actor actor, SquadManagerBotModuleInfo info,
+			Dictionary<string, int> archetypePriority, float antiAirWeight)
+		{
+			var value = (long)Math.Max(1, TargetValue(actor, info, archetypePriority));
+			var valued = actor.Info.TraitInfoOrDefault<ValuedInfo>();
+			if (valued != null)
+				value = value * (100 + Math.Min(valued.Cost / 100, 100)) / 100;
+
+			value = value * 100 / (100 + (int)(antiAirWeight * info.AirTargetAntiAirPenalty));
+			return Math.Max(1, (int)Math.Min(int.MaxValue, value));
+		}
+
+		static int CurrentTargetUtility(Actor actor, int baseUtility)
+		{
+			var health = actor.TraitOrDefault<IHealth>();
+			return health == null
+				? baseUtility
+				: AirThreatGeometry.RemainingHealthPriority(baseUtility, health.HP, health.MaxHP);
+		}
+
 		/// <summary>
 		/// Stock-style tactical fallback: the nearest enemy that at least one squad member can attack.
 		/// Unlike the strategic scan this deliberately ignores route utility so an aircraft already in
@@ -285,6 +305,13 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		/// </summary>
 		protected static AirTargetPlan FindBestAirTarget(Squad owner, bool relaxed = false)
 		{
+			return FindBestAirTarget(owner, null, out _, relaxed);
+		}
+
+		protected static AirTargetPlan FindBestAirTarget(Squad owner, Actor incumbent,
+			out AirTargetPlan incumbentPlan, bool relaxed = false)
+		{
+			incumbentPlan = null;
 			var map = owner.World.Map;
 			var info = owner.SquadManager.Info;
 			var coarseSize = info.AirInfluenceCellSize;
@@ -356,17 +383,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					if (!owner.SquadManager.IsNotHiddenUnit(actor))
 						continue;
 
-					var value = (long)Math.Max(1, TargetValue(actor, info, archetypePriority));
-					var valued = actor.Info.TraitInfoOrDefault<ValuedInfo>();
-					if (valued != null)
-						value = value * (100 + Math.Min(valued.Cost / 100, 100)) / 100;
-
-					var health = actor.TraitOrDefault<IHealth>();
-					if (health != null && health.MaxHP > 0)
-						value = value * 10000 / (10000 + health.HP);
-
-					value = value * 100 / (100 + (int)(profile.Weight * info.AirTargetAntiAirPenalty));
-					rebuiltCandidates.Add((actor, Math.Max(1, (int)Math.Min(int.MaxValue, value))));
+					rebuiltCandidates.Add((actor,
+						BaseTargetUtility(actor, info, archetypePriority, profile.Weight)));
 				}
 
 				cache = new AirInfluenceCache
@@ -398,7 +416,20 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var bestIsUndefended = false;
 
 			var liveCandidates = candidates.Where(c => !c.Actor.IsDead &&
-				planningUnits.Any(u => CanAttackTarget(u, c.Actor))).OrderBy(c => c.Actor.ActorID).ToList();
+					planningUnits.Any(u => CanAttackTarget(u, c.Actor)))
+				.Select(c => (c.Actor, Utility: CurrentTargetUtility(c.Actor, c.Utility)))
+				.OrderBy(c => c.Actor.ActorID).ToList();
+			if (incumbent != null && !incumbent.IsDead &&
+				!liveCandidates.Any(c => c.Actor == incumbent) &&
+				owner.SquadManager.IsPreferredEnemyUnit(incumbent) &&
+				planningUnits.Any(u => CanAttackTarget(u, incumbent)))
+			{
+				var profile = AntiAirProfile(incumbent);
+				var baseUtility = BaseTargetUtility(incumbent, info, archetypePriority, profile.Weight);
+				liveCandidates.Add((incumbent, CurrentTargetUtility(incumbent, baseUtility)));
+				liveCandidates.Sort((a, b) => a.Actor.ActorID.CompareTo(b.Actor.ActorID));
+			}
+
 			var cellUtility = new Dictionary<CPos, long>();
 			var cellActors = new Dictionary<CPos, List<int>>();
 			for (var i = 0; i < liveCandidates.Count; i++)
@@ -419,6 +450,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			// Select unique strategic locations before individual actors. Otherwise a single crowded,
 			// defended cell can consume every nearest/high-value slot and hide safe targets elsewhere.
 			var candidateCells = cellActors.Keys.OrderBy(c => c.Y).ThenBy(c => c.X).ToList();
+			var incumbentCellIndex = incumbent == null ? -1 : candidateCells.FindIndex(c =>
+				cellActors[c].Any(i => liveCandidates[i].Actor == incumbent));
 			var selectedCellIndices = AirThreatGeometry.SelectTargetCandidates(
 				candidateCells.Select(c =>
 				{
@@ -427,7 +460,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					return (center - planningCenter).LengthSquared;
 				}).ToList(),
 				candidateCells.Select(c => (int)Math.Min(int.MaxValue, cellUtility[c])).ToList(),
-				info.AirTargetClosestCandidates, info.AirTargetHighestValueCandidates);
+				info.AirTargetClosestCandidates, info.AirTargetHighestValueCandidates, incumbentCellIndex);
 
 			if (info.AirTargetHarvesterCandidates > 0)
 			{
@@ -480,6 +513,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				var cellTargetStoppingCost = 0;
 				var cellTargetIsUndefended = false;
 				var cellTargetClearsAa = false;
+				var hasIncumbent = false;
+				var incumbentStoppingCost = 0;
+				var incumbentIsUndefended = false;
 
 				// The cell sum ranks the location. The actor's own utility and exact AA coverage choose
 				// the victim inside that location, so a SAM or power plant cannot inherit a harvester
@@ -525,6 +561,12 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					var isUndefended = destinationDanger <= 0 && !clearsAa;
 					var targetScore = targetValue * 1024 / Math.Max(1, 1024 + stoppingCost);
 					var finalTargetScore = (int)Math.Clamp(targetScore, int.MinValue, int.MaxValue);
+					if (candidate.Actor == incumbent)
+					{
+						hasIncumbent = true;
+						incumbentStoppingCost = stoppingCost;
+						incumbentIsUndefended = isUndefended;
+					}
 
 					if (info.AirTargetDebugLogging)
 						Log.Write("debug", "Air target [{0}] {1}#{2}: cell={3} utility={4} cell-utility={5} destination-danger={6:0.##} target-score={7} clears-aa={8} quick-strike={9} relaxed={10}",
@@ -554,6 +596,21 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				score = score * 1024 / Math.Max(1, 1024 + (int)exposureCost);
 				score = score * 1024 / Math.Max(1, 1024 + cellTargetStoppingCost);
 				var finalScore = (int)Math.Clamp(score, int.MinValue, int.MaxValue);
+				var smoothedRoute = AirThreatGeometry.SmoothCoarseRoute(
+					danger, width, height, startX, startY, route)
+					.Select(p => map.Clamp(new CPos(
+						p.X * coarseSize + coarseSize / 2, p.Y * coarseSize + coarseSize / 2))).ToList();
+
+				if (hasIncumbent)
+				{
+					var incumbentScore = opportunityValue;
+					incumbentScore = incumbentScore * 1024 / Math.Max(1, 1024 + distanceCost);
+					incumbentScore = incumbentScore * 1024 / Math.Max(1, 1024 + (int)exposureCost);
+					incumbentScore = incumbentScore * 1024 / Math.Max(1, 1024 + incumbentStoppingCost);
+					incumbentPlan = new AirTargetPlan(incumbent,
+						(int)Math.Clamp(incumbentScore, int.MinValue, int.MaxValue),
+						incumbentIsUndefended, new List<CPos>(smoothedRoute));
+				}
 
 				if (info.AirTargetDebugLogging)
 					Log.Write("debug", "Air cell [{0}] {1}: utility={2} route={3} exposure={4:0.##} target={5}#{6} destination-danger={7:0.##} score={8} undefended={9} clears-aa={10} ammo={11:0.##} relaxed={12}",
@@ -570,10 +627,12 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					best = cellTarget;
 					bestScore = finalScore;
 					bestIsUndefended = cellTargetIsUndefended;
-					bestRoute = AirThreatGeometry.SmoothCoarseRoute(danger, width, height, startX, startY, route)
-						.Select(p => map.Clamp(new CPos(p.X * coarseSize + coarseSize / 2, p.Y * coarseSize + coarseSize / 2))).ToList();
+					bestRoute = smoothedRoute;
 				}
 			}
+
+			if (incumbentPlan != null && !relaxed && incumbentPlan.Score < info.AirTargetMinimumScore)
+				incumbentPlan = null;
 
 			if (best == null || (!relaxed && bestScore < info.AirTargetMinimumScore))
 			{
@@ -1364,36 +1423,45 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				else if (currentCell != owner.AirTargetStrategicCell.Value)
 				{
 					var previousCell = owner.AirTargetStrategicCell.Value;
-					owner.AirTargetStrategicCell = currentCell;
-					var committed = makingProgress;
-					if (info.AirTargetDebugLogging)
-						Log.Write("debug", "Air target [{0}] {1}#{2} moved strategic cell {3}->{4}; committed={5} progress-age={6} routed-units={7}.",
-							owner.AirProfile, owner.TargetActor.Info.Name, owner.TargetActor.ActorID,
-							previousCell, currentCell, committed,
-							ticksSinceProgress, owner.AirRouteAssignedUnits.Count);
-
-					if (!committed)
+					var incumbent = owner.TargetActor;
+					var oldScore = owner.AirTargetScore;
+					var best = FindBestAirTarget(owner, incumbent, out var freshIncumbent);
+					AirTargetPlan selected;
+					string decision;
+					if (freshIncumbent == null)
 					{
-						var incumbent = owner.TargetActor;
-						var challenger = FindBestAirTarget(owner);
-						var accept = challenger != null && (challenger.Actor == incumbent ||
-							AirThreatGeometry.ShouldSwitchTarget(false, owner.AirTargetIsUndefended,
-								owner.AirTargetScore, true, challenger.IsUndefended, challenger.Score,
-								info.AirTargetSwitchImprovementPercent));
-						if (accept)
-						{
-							if (info.AirTargetDebugLogging)
-								Log.Write("debug", "Air target [{0}] cell-change replan accepted: {1}#{2}->{3}#{4} score={5}.",
-									owner.AirProfile, incumbent.Info.Name, incumbent.ActorID,
-									challenger.Actor.Info.Name, challenger.Actor.ActorID, challenger.Score);
+						selected = best;
+						decision = best == null ? "abandoned" : "switched-invalid-incumbent";
+					}
+					else if (best == null || best.Actor == incumbent ||
+						!AirThreatGeometry.ShouldSwitchTarget(false, freshIncumbent.IsUndefended,
+							freshIncumbent.Score, true, best.IsUndefended, best.Score,
+							info.AirTargetSwitchImprovementPercent))
+					{
+						selected = freshIncumbent;
+						decision = "retained";
+					}
+					else
+					{
+						selected = best;
+						decision = "switched";
+					}
 
-							ApplyAirTargetPlan(owner, challenger);
-						}
-						else if (info.AirTargetDebugLogging)
-							Log.Write("debug", "Air target [{0}] cell-change replan rejected; retaining {1}#{2} score={3}, challenger={4} score={5}.",
-								owner.AirProfile, incumbent.Info.Name, incumbent.ActorID, owner.AirTargetScore,
-								challenger == null ? "none" : challenger.Actor.Info.Name + "#" + challenger.Actor.ActorID,
-								challenger?.Score ?? int.MinValue);
+					if (info.AirTargetDebugLogging)
+						Log.Write("debug", "Air target [{0}] {1}#{2} moved strategic cell {3}->{4}; fresh reassessment={5} old-score={6} incumbent-score={7} best={8} best-score={9} progress-age={10}.",
+							owner.AirProfile, incumbent.Info.Name, incumbent.ActorID, previousCell, currentCell,
+							decision, oldScore, freshIncumbent?.Score ?? int.MinValue,
+							best == null ? "none" : best.Actor.Info.Name + "#" + best.Actor.ActorID,
+							best?.Score ?? int.MinValue, ticksSinceProgress);
+
+					if (selected != null)
+						ApplyAirTargetPlan(owner, selected);
+					else
+					{
+						owner.TargetActor = null;
+						owner.AirTargetStrategicCell = null;
+						owner.AirRoute.Clear();
+						owner.AirRouteAssignedUnits.Clear();
 					}
 				}
 				else

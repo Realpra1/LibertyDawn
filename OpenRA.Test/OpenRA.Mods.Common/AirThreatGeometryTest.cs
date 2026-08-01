@@ -442,6 +442,35 @@ namespace OpenRA.Test
 			Assert.That(selected, Is.EqualTo(new[] { 0, 1, 2, 3, 4 }));
 		}
 
+		[Test]
+		public void TargetCandidatesAlwaysIncludeMovingIncumbent()
+		{
+			var selected = AirThreatGeometry.SelectTargetCandidates(
+				new long[] { 1, 2, 3, 100 },
+				new[] { 40, 30, 20, 10 },
+				closestCount: 1, highestValueCount: 1, requiredIndex: 3);
+
+			Assert.That(selected, Is.EqualTo(new[] { 0, 3 }));
+		}
+
+		[TestCase(100, 100, 100, 100)]
+		[TestCase(100, 50, 100, 200)]
+		[TestCase(100, 25, 100, 400)]
+		[TestCase(100, 150, 100, 100)]
+		[TestCase(100, 1, 0, 100)]
+		public void RemainingHealthIncreasesTargetPriority(int priority, int hp, int maxHp, int expected)
+		{
+			Assert.That(AirThreatGeometry.RemainingHealthPriority(priority, hp, maxHp), Is.EqualTo(expected));
+		}
+
+		[Test]
+		public void RemainingHealthPrioritySafelyHandlesZeroAndOverflow()
+		{
+			Assert.That(AirThreatGeometry.RemainingHealthPriority(100, 0, 100), Is.EqualTo(10000));
+			Assert.That(AirThreatGeometry.RemainingHealthPriority(int.MaxValue, 1, int.MaxValue), Is.EqualTo(int.MaxValue));
+			Assert.That(AirThreatGeometry.RemainingHealthPriority(-1, 1, 100), Is.Zero);
+		}
+
 		[TestCase(92, 125, 12)]
 		[TestCase(40, 125, 5)]
 		[TestCase(0, 125, 0)]
