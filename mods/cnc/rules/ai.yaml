@@ -1164,11 +1164,31 @@ Player:
 			recon: downgrade.recon
 			economy: downgrade.economy
 		DebugLogging: true
-    SquadManagerBotModule@ironreaper:
+	TransportManagerBotModule@ironreaper:
+		RequiresCondition: enable-ironreaper-ai
+		TransportHelicopterTypes: tran
+		GroundTransportTypes: apc
+		InfantryPassengerTypes: e1, e2, e3, e4, e5, rmbo
+		RescuePassengerTypes: e1, e2, e3, e4, e5, rmbo, ltnk, ftnk, ctnk, arty, mtnk, mlrs, stnk, apc, bggy, bike, jeep, msam, htnk
+		HeavyDropPassengerTypes: htnk
+		DestinationTargetTypes: harv, sharv, proc, nuke, nuk2, fact, pyle, hand, afld, weap, hpad, hq, eye, tmpl
+		TransportHelicopterActor: tran
+		EnableUnroutableRescue: true
+		EnableGroundInfantryAssault: true
+		EnableLongDistanceInfantryTransport: true
+		EnableHeavyDrop: true
+		MaximumActiveMissions: 12
+		TransportHelicopterLimit: 10
+		MinimumAssaultPassengers: 3
+		MaximumAssaultPassengers: 8
+		LongDistancePassengerCount: 8
+		HeavyDropUnitCount: 10
+		DebugLogging: true
+	SquadManagerBotModule@ironreaper:
 		RequiresCondition: enable-ironreaper-ai
 		SquadSize: 20
         MaxBaseRadius: 49
-		ExcludeFromSquadsTypes: harv, mcv, a10
+		ExcludeFromSquadsTypes: harv, mcv, a10, tran
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
@@ -1200,6 +1220,7 @@ Player:
 			htnk: 20
 			heli: 2
 			orca: 5
+			tran: 1
             mhq: 5
             mcv: 0
             upgrade.economy1: 1
@@ -1228,6 +1249,7 @@ Player:
             mhq: 2
 			heli: 20
 			orca: 30
+			tran: 10
             e1: 50
 			e2: 50
 			e3: 50
@@ -1252,6 +1274,7 @@ Player:
 			htnk: 5000
 			heli: 5000
 			orca: 5000
+			tran: 5000
             mcv: 3000
             downgrade.economy: 32000
             upgrade.recon1: 32000

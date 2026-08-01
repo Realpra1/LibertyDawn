@@ -541,6 +541,13 @@ namespace OpenRA.Mods.Common.Traits
 		bool PauseUnitProduction { get; }
 	}
 
+	/// <summary>Coordinates temporary ownership of units assigned to AI transport missions.</summary>
+	[RequireExplicitImplementation]
+	public interface IBotTransportReservations
+	{
+		bool IsTransportReserved(Actor actor);
+	}
+
 	[RequireExplicitImplementation]
 	public interface IEditorActorOptions : ITraitInfoInterface
 	{

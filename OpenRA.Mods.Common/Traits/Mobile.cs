@@ -232,6 +232,17 @@ namespace OpenRA.Mods.Common.Traits
 
 		public IPathFinder Pathfinder { get; private set; }
 
+		// Advisory intent used by host-side bot helpers. This records an actual resolved move order,
+		// not an inferred idle destination, and deliberately remains unsynced gameplay metadata.
+		public CPos? LastMoveOrderDestination { get; private set; }
+		public int LastMoveOrderTick { get; private set; } = -1;
+
+		public void RecordMoveOrderIntent(CPos destination)
+		{
+			LastMoveOrderDestination = destination;
+			LastMoveOrderTick = self.World.WorldTick;
+		}
+
 		#region IOccupySpace
 
 		[Sync]
@@ -948,6 +959,7 @@ namespace OpenRA.Mods.Common.Traits
 				if (!Info.LocomotorInfo.MoveIntoShroud && !self.Owner.Shroud.IsExplored(cell))
 					return;
 
+				RecordMoveOrderIntent(cell);
 				self.QueueActivity(order.Queued, WrapMove(new Move(self, cell, WDist.FromCells(8), null, true, Info.TargetLineColor)));
 				self.ShowTargetLines();
 			}
