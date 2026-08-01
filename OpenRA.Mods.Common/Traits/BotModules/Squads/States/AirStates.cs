@@ -305,11 +305,11 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		/// </summary>
 		protected static AirTargetPlan FindBestAirTarget(Squad owner, bool relaxed = false)
 		{
-			return FindBestAirTarget(owner, null, out _, relaxed);
+			return FindBestAirTarget(owner, null, out _, null, relaxed);
 		}
 
 		protected static AirTargetPlan FindBestAirTarget(Squad owner, Actor incumbent,
-			out AirTargetPlan incumbentPlan, bool relaxed = false)
+			out AirTargetPlan incumbentPlan, CPos? requiredStrategicCell = null, bool relaxed = false)
 		{
 			incumbentPlan = null;
 			var map = owner.World.Map;
@@ -419,14 +419,47 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					planningUnits.Any(u => CanAttackTarget(u, c.Actor)))
 				.Select(c => (c.Actor, Utility: CurrentTargetUtility(c.Actor, c.Utility)))
 				.OrderBy(c => c.Actor.ActorID).ToList();
+			var liveCandidateActors = new HashSet<Actor>(liveCandidates.Select(c => c.Actor));
 			if (incumbent != null && !incumbent.IsDead &&
-				!liveCandidates.Any(c => c.Actor == incumbent) &&
+				!liveCandidateActors.Contains(incumbent) &&
 				owner.SquadManager.IsPreferredEnemyUnit(incumbent) &&
 				planningUnits.Any(u => CanAttackTarget(u, incumbent)))
 			{
 				var profile = AntiAirProfile(incumbent);
 				var baseUtility = BaseTargetUtility(incumbent, info, archetypePriority, profile.Weight);
 				liveCandidates.Add((incumbent, CurrentTargetUtility(incumbent, baseUtility)));
+				liveCandidateActors.Add(incumbent);
+				liveCandidates.Sort((a, b) => a.Actor.ActorID.CompareTo(b.Actor.ActorID));
+			}
+
+			if (incumbent != null && !incumbent.IsDead)
+				requiredStrategicCell = new CPos(
+					incumbent.Location.X / coarseSize, incumbent.Location.Y / coarseSize);
+
+			// The cached bounded scan may not yet contain an actor that has just transformed (for example,
+			// an MCV deploying into a Construction Yard). Refresh every attackable actor in the current
+			// target cell directly from the world and require that cell in the candidate set. This both
+			// preserves local opportunities and lets the remaining-health bonus finish transformed targets.
+			if (requiredStrategicCell != null)
+			{
+				foreach (var actor in owner.World.Actors)
+				{
+					if (actor.IsDead || liveCandidateActors.Contains(actor) ||
+						!owner.SquadManager.IsPreferredEnemyUnit(actor) ||
+						!owner.SquadManager.IsNotHiddenUnit(actor) ||
+						!planningUnits.Any(u => CanAttackTarget(u, actor)))
+						continue;
+
+					var actorCell = new CPos(actor.Location.X / coarseSize, actor.Location.Y / coarseSize);
+					if (actorCell != requiredStrategicCell.Value)
+						continue;
+
+					var profile = AntiAirProfile(actor);
+					var baseUtility = BaseTargetUtility(actor, info, archetypePriority, profile.Weight);
+					liveCandidates.Add((actor, CurrentTargetUtility(actor, baseUtility)));
+					liveCandidateActors.Add(actor);
+				}
+
 				liveCandidates.Sort((a, b) => a.Actor.ActorID.CompareTo(b.Actor.ActorID));
 			}
 
@@ -450,8 +483,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			// Select unique strategic locations before individual actors. Otherwise a single crowded,
 			// defended cell can consume every nearest/high-value slot and hide safe targets elsewhere.
 			var candidateCells = cellActors.Keys.OrderBy(c => c.Y).ThenBy(c => c.X).ToList();
-			var incumbentCellIndex = incumbent == null ? -1 : candidateCells.FindIndex(c =>
-				cellActors[c].Any(i => liveCandidates[i].Actor == incumbent));
+			var requiredCellIndex = requiredStrategicCell == null ? -1 :
+				candidateCells.FindIndex(c => c == requiredStrategicCell.Value);
 			var selectedCellIndices = AirThreatGeometry.SelectTargetCandidates(
 				candidateCells.Select(c =>
 				{
@@ -460,7 +493,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					return (center - planningCenter).LengthSquared;
 				}).ToList(),
 				candidateCells.Select(c => (int)Math.Min(int.MaxValue, cellUtility[c])).ToList(),
-				info.AirTargetClosestCandidates, info.AirTargetHighestValueCandidates, incumbentCellIndex);
+				info.AirTargetClosestCandidates, info.AirTargetHighestValueCandidates, requiredCellIndex);
 
 			if (info.AirTargetHarvesterCandidates > 0)
 			{
@@ -1554,8 +1587,11 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 			if (!owner.IsTargetValid)
 			{
+				var rememberedTargetCell = owner.AirTargetStrategicCell;
 				owner.AirTargetStrategicCell = null;
-				var nextTarget = FindBestAirTarget(owner);
+				var nextTarget = rememberedTargetCell == null
+					? FindBestAirTarget(owner)
+					: FindBestAirTarget(owner, null, out _, rememberedTargetCell);
 				if (nextTarget == null && !owner.Units.Any(a =>
 					!owner.AirUnitsRepairing.Contains(a.ActorID) && HasAmmo(a.TraitsImplementing<AmmoPool>())))
 					return;
