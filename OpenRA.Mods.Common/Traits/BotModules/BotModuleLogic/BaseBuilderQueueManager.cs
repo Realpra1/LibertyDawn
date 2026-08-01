@@ -479,6 +479,12 @@ namespace OpenRA.Mods.Common.Traits
 			switch (type)
 			{
 				case BuildingType.Defense:
+					if (baseBuilder.PlaceFirstCombatTowerByConstructionYard)
+					{
+						lastUsedDefenseLocation = findPos(baseCenter, baseCenter, baseBuilder.Info.MinBaseRadius,
+							Math.Max(baseBuilder.Info.MinBaseRadius, baseBuilder.Info.MinimumDefenseRadius));
+						return lastUsedDefenseLocation;
+					}
 
 					// Build near the closest enemy structure
 					var closestEnemy = world.ActorsHavingTrait<Building>().Where(a => !a.Disposed && player.RelationshipWith(a.Owner) == PlayerRelationship.Enemy)

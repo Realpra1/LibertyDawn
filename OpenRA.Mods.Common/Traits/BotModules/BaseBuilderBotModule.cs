@@ -232,7 +232,9 @@ namespace OpenRA.Mods.Common.Traits
 		CPos defenseCenter;
 		OpeningStage openingStage;
 		int openingUnavailableAttempts;
+		int openingBuildingPendingTick;
 		int nextExcessCashExpansionTick;
+		bool openingBuildingPending;
 		bool firstCombatTowerOrdered;
 		IBotRequestUnitProduction[] unitProduction;
 
@@ -286,6 +288,8 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		internal bool OpeningActive => Info.EnableOpeningPolicy && openingStage != OpeningStage.Complete;
+		internal bool PlaceFirstCombatTowerByConstructionYard =>
+			Info.FirstCombatTowerNearConstructionYard && !firstCombatTowerOrdered;
 
 		internal ActorInfo OpeningBuilding(IEnumerable<ActorInfo> buildables)
 		{
@@ -296,12 +300,28 @@ namespace OpenRA.Mods.Common.Traits
 			if (preferred == null)
 				return null;
 
+			if (openingBuildingPending)
+			{
+				var queued = Info.BuildingQueues.Concat(Info.DefenseQueues)
+					.SelectMany(q => AIUtils.FindQueues(player, q))
+					.Any(q => q.AllQueued().Any(item => preferred.Contains(item.Item)));
+				if (queued || world.WorldTick - openingBuildingPendingTick <
+					Math.Max(1, Info.StructureProductionInactiveDelay * 2))
+					return null;
+
+				// A queued order never appeared, or its production/placement was canceled.
+				// Release the cross-queue lock and let the same stage retry.
+				openingBuildingPending = false;
+			}
+
 			var buildableArray = buildables.ToArray();
 			var selected = OpeningPolicyLogic.FirstAvailable(preferred, buildableArray.Select(a => a.Name));
 			var actor = buildableArray.FirstOrDefault(a => a.Name == selected);
 			if (actor != null)
 			{
 				openingUnavailableAttempts = 0;
+				openingBuildingPending = true;
+				openingBuildingPendingTick = world.WorldTick;
 				return actor;
 			}
 
@@ -348,6 +368,7 @@ namespace OpenRA.Mods.Common.Traits
 				AIUtils.BotDebug("{0} completed opening stage {1}", player, openingStage);
 				openingStage++;
 				openingUnavailableAttempts = 0;
+				openingBuildingPending = false;
 			}
 
 			if (openingStage == OpeningStage.Harvesters)
@@ -506,6 +527,8 @@ namespace OpenRA.Mods.Common.Traits
 				new MiniYamlNode("DefenseCenter", FieldSaver.FormatValue(defenseCenter)),
 				new MiniYamlNode("OpeningStage", FieldSaver.FormatValue((int)openingStage)),
 				new MiniYamlNode("OpeningUnavailableAttempts", FieldSaver.FormatValue(openingUnavailableAttempts)),
+				new MiniYamlNode("OpeningBuildingPending", FieldSaver.FormatValue(openingBuildingPending)),
+				new MiniYamlNode("OpeningBuildingPendingTick", FieldSaver.FormatValue(openingBuildingPendingTick)),
 				new MiniYamlNode("NextExcessCashExpansionTick", FieldSaver.FormatValue(nextExcessCashExpansionTick)),
 				new MiniYamlNode("FirstCombatTowerOrdered", FieldSaver.FormatValue(firstCombatTowerOrdered))
 			};
@@ -530,6 +553,12 @@ namespace OpenRA.Mods.Common.Traits
 			var unavailableNode = data.FirstOrDefault(n => n.Key == "OpeningUnavailableAttempts");
 			if (unavailableNode != null)
 				openingUnavailableAttempts = FieldLoader.GetValue<int>("OpeningUnavailableAttempts", unavailableNode.Value.Value);
+			var pendingNode = data.FirstOrDefault(n => n.Key == "OpeningBuildingPending");
+			if (pendingNode != null)
+				openingBuildingPending = FieldLoader.GetValue<bool>("OpeningBuildingPending", pendingNode.Value.Value);
+			var pendingTickNode = data.FirstOrDefault(n => n.Key == "OpeningBuildingPendingTick");
+			if (pendingTickNode != null)
+				openingBuildingPendingTick = FieldLoader.GetValue<int>("OpeningBuildingPendingTick", pendingTickNode.Value.Value);
 			var expansionNode = data.FirstOrDefault(n => n.Key == "NextExcessCashExpansionTick");
 			if (expansionNode != null)
 				nextExcessCashExpansionTick = FieldLoader.GetValue<int>("NextExcessCashExpansionTick", expansionNode.Value.Value);
