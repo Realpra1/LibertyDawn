@@ -480,26 +480,25 @@ namespace OpenRA.Test
 		}
 
 		[Test]
-		public void TargetCommitmentRequiresMaterialImprovement()
+		public void TargetSwitchRequiresMaterialImprovement()
 		{
-			Assert.That(AirThreatGeometry.ShouldSwitchTarget(false, true, 100, true, true, 149, 50), Is.False);
-			Assert.That(AirThreatGeometry.ShouldSwitchTarget(false, true, 100, true, true, 150, 50), Is.True);
-			Assert.That(AirThreatGeometry.ShouldSwitchTarget(true, true, 100, true, true, 10000, 50), Is.False);
-			Assert.That(AirThreatGeometry.ShouldSwitchTarget(false, true, 100, false, true, 10000, 50), Is.False);
+			Assert.That(AirThreatGeometry.ShouldSwitchTarget(true, 100, true, true, 149, 50), Is.False);
+			Assert.That(AirThreatGeometry.ShouldSwitchTarget(true, 100, true, true, 150, 50), Is.True);
+			Assert.That(AirThreatGeometry.ShouldSwitchTarget(true, 100, false, true, 10000, 50), Is.False);
 		}
 
 		[Test]
-		public void TargetCommitmentPreservesUndefendedTier()
+		public void TargetSwitchPreservesUndefendedTier()
 		{
-			Assert.That(AirThreatGeometry.ShouldSwitchTarget(false, true, 1, true, false, int.MaxValue, 0), Is.False);
-			Assert.That(AirThreatGeometry.ShouldSwitchTarget(false, false, int.MaxValue, true, true, 1, 100), Is.True);
+			Assert.That(AirThreatGeometry.ShouldSwitchTarget(true, 1, true, false, int.MaxValue, 0), Is.False);
+			Assert.That(AirThreatGeometry.ShouldSwitchTarget(false, int.MaxValue, true, true, 1, 100), Is.True);
 		}
 
 		[Test]
-		public void TargetCommitmentScoreComparisonDoesNotOverflow()
+		public void TargetSwitchScoreComparisonDoesNotOverflow()
 		{
 			Assert.That(AirThreatGeometry.ShouldSwitchTarget(
-				false, true, int.MaxValue - 1, true, true, int.MaxValue, 50), Is.False);
+				true, int.MaxValue - 1, true, true, int.MaxValue, 50), Is.False);
 		}
 
 		[Test]

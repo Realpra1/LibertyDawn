@@ -1422,34 +1422,49 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var routeTraveling = owner.AirRouteQueued && owner.Units.Any(a =>
 				!owner.AirUnitsRepairing.Contains(a.ActorID) && !a.IsIdle && !BusyAttack(a));
 			var ticksSinceProgress = owner.World.WorldTick - owner.AirTargetLastProgressTick;
-			var makingProgress = ticksSinceProgress < info.AirTargetCommitmentTicks;
 
 			if (owner.IsTargetValid && owner.World.WorldTick >= owner.AirNextTargetReviewTick)
 			{
 				owner.AirNextTargetReviewTick = owner.World.WorldTick + info.AirInfluenceCacheInterval;
-				if (owner.TargetActor.Info.HasTraitInfo<BuildingInfo>() && hasArmedUnit && !makingProgress)
+				if (owner.TargetActor.Info.HasTraitInfo<BuildingInfo>() && hasArmedUnit)
 				{
 					var incumbent = owner.TargetActor;
-					var challenger = FindBestAirTarget(owner);
-					var switchTarget = challenger != null && challenger.Actor != incumbent &&
-						AirThreatGeometry.ShouldSwitchTarget(false, owner.AirTargetIsUndefended,
-							owner.AirTargetScore, true, challenger.IsUndefended, challenger.Score,
-							info.AirTargetSwitchImprovementPercent);
+					var previousScore = owner.AirTargetScore;
+					var challenger = FindBestAirTarget(owner, incumbent, out var freshIncumbent);
+					var switchTarget = freshIncumbent == null ||
+						(challenger != null && challenger.Actor != incumbent &&
+						AirThreatGeometry.ShouldSwitchTarget(freshIncumbent.IsUndefended,
+							freshIncumbent.Score, true, challenger.IsUndefended, challenger.Score,
+							info.AirTargetSwitchImprovementPercent));
 					if (switchTarget)
 					{
 						if (info.AirTargetDebugLogging)
-							Log.Write("debug", "Air target [{0}] switching building {1}#{2} score={3} to {4}#{5} score={6}: improvement threshold={7}%.",
-								owner.AirProfile, incumbent.Info.Name, incumbent.ActorID, owner.AirTargetScore,
-								challenger.Actor.Info.Name, challenger.Actor.ActorID, challenger.Score,
+							Log.Write("debug", "Air target [{0}] switching building {1}#{2} score={3} to {4} score={5}: improvement threshold={6}%.",
+								owner.AirProfile, incumbent.Info.Name, incumbent.ActorID, previousScore,
+								challenger == null ? "none" : challenger.Actor.Info.Name + "#" + challenger.Actor.ActorID,
+								challenger?.Score ?? int.MinValue,
 								info.AirTargetSwitchImprovementPercent);
 
-						ApplyAirTargetPlan(owner, challenger);
+						if (challenger != null)
+							ApplyAirTargetPlan(owner, challenger);
+						else
+						{
+							owner.TargetActor = null;
+							owner.AirTargetStrategicCell = null;
+							owner.AirRoute.Clear();
+							owner.AirRouteQueued = false;
+						}
 					}
-					else if (info.AirTargetDebugLogging)
-						Log.Write("debug", "Air target [{0}] retaining building {1}#{2}: challenger={3} current-score={4} challenger-score={5}.",
-							owner.AirProfile, incumbent.Info.Name, incumbent.ActorID,
-							challenger == null ? "none" : challenger.Actor.Info.Name + "#" + challenger.Actor.ActorID,
-							owner.AirTargetScore, challenger?.Score ?? int.MinValue);
+					else
+					{
+						owner.AirTargetScore = freshIncumbent.Score;
+						owner.AirTargetIsUndefended = freshIncumbent.IsUndefended;
+						if (info.AirTargetDebugLogging)
+							Log.Write("debug", "Air target [{0}] retaining building {1}#{2}: challenger={3} old-score={4} fresh-score={5} challenger-score={6}.",
+								owner.AirProfile, incumbent.Info.Name, incumbent.ActorID,
+								challenger == null ? "none" : challenger.Actor.Info.Name + "#" + challenger.Actor.ActorID,
+								previousScore, freshIncumbent.Score, challenger?.Score ?? int.MinValue);
+					}
 				}
 			}
 
@@ -1480,7 +1495,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 						decision = best == null ? "abandoned" : "switched-invalid-incumbent";
 					}
 					else if (best == null || best.Actor == incumbent ||
-						!AirThreatGeometry.ShouldSwitchTarget(false, freshIncumbent.IsUndefended,
+						!AirThreatGeometry.ShouldSwitchTarget(freshIncumbent.IsUndefended,
 							freshIncumbent.Score, true, best.IsUndefended, best.Score,
 							info.AirTargetSwitchImprovementPercent))
 					{

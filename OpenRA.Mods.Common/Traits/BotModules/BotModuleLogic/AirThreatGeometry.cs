@@ -320,10 +320,10 @@ namespace OpenRA.Mods.Common.Traits
 			return antiAirWeight > 0 && antiAirWeight * fleeMultiplier > squadSize;
 		}
 
-		public static bool ShouldSwitchTarget(bool makingProgress, bool currentUndefended, int currentScore,
+		public static bool ShouldSwitchTarget(bool currentUndefended, int currentScore,
 			bool challengerValid, bool challengerUndefended, int challengerScore, int minimumImprovementPercent)
 		{
-			if (makingProgress || !challengerValid)
+			if (!challengerValid)
 				return false;
 
 			if (currentUndefended != challengerUndefended)

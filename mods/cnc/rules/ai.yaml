@@ -886,7 +886,6 @@ Player:
 		AirTargetAaClearUnlockPercent: 125
 		AirTargetMinimumScore: 1
 		AirTargetSwitchImprovementPercent: 50
-		AirTargetCommitmentTicks: 250
 		AirTargetStallTicks: 150
 		AirTargetClosestCandidates: 15
 		AirTargetHighestValueCandidates: 10
