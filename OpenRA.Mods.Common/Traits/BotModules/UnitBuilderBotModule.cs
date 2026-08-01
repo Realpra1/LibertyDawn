@@ -49,6 +49,9 @@ namespace OpenRA.Mods.Common.Traits
 			"but bucketed into their own share of the weighted draw via EconomyCombatSplit and the harvester-floor economy gate.")]
 		public readonly HashSet<string> EconomyTypes = new HashSet<string>();
 
+		[Desc("Unit types controlled by another bot module and excluded from random weighted production.")]
+		public readonly HashSet<string> ExternallyManagedTypes = new HashSet<string>();
+
 		[Desc("Chance (0-1) of picking from EconomyTypes over the rest of the pool on a given build, when the economy gate hasn't forced it.")]
 		public readonly float EconomyCombatSplit = 0.5f;
 
@@ -295,7 +298,8 @@ namespace OpenRA.Mods.Common.Traits
 
 		ActorInfo ChooseRandomUnitToBuild(ProductionQueue queue)
 		{
-			var buildableThings = queue.BuildableItems();
+			var buildableThings = queue.BuildableItems()
+				.Where(a => !Info.ExternallyManagedTypes.Contains(a.Name)).ToArray();
 			if (!buildableThings.Any())
 				return null;
 
@@ -322,11 +326,11 @@ namespace OpenRA.Mods.Common.Traits
 			var buildableNames = new HashSet<string>(buildable.Select(b => b.Name));
 
 			var economyPool = Info.EconomyTypes
-				.Where(t => buildableNames.Contains(t) && Info.UnitsToBuild.ContainsKey(t))
+				.Where(t => buildableNames.Contains(t) && Info.UnitsToBuild.ContainsKey(t) && !Info.ExternallyManagedTypes.Contains(t))
 				.ToDictionary(t => t, t => (double)Info.UnitsToBuild[t]);
 
 			var combatPool = Info.UnitsToBuild.Keys
-				.Where(t => buildableNames.Contains(t) && !Info.EconomyTypes.Contains(t))
+				.Where(t => buildableNames.Contains(t) && !Info.EconomyTypes.Contains(t) && !Info.ExternallyManagedTypes.Contains(t))
 				.ToDictionary(t => t, AdaptiveTypeWeight);
 
 			var forceEconomy = economyPool.Count > 0 &&

@@ -1146,6 +1146,24 @@ Player:
 			tmpl: 5
 			fix: 5
             resonator: 20
+	TechnologyCounterBotModule@ironreaper:
+		RequiresCondition: enable-ironreaper-ai
+		ScanInterval: 125
+		SwitchDelay: 3000
+		InitialBranch: economy
+		CounterBranches:
+			covert: recon
+			recon: economy
+			economy: covert
+		BranchUpgradeActors:
+			covert: upgrade.covert1, upgrade.covert2, upgrade.covert3
+			recon: upgrade.recon1, upgrade.recon2, upgrade.recon3
+			economy: upgrade.economy1, upgrade.economy2, upgrade.economy3
+		BranchDowngradeActors:
+			covert: downgrade.covert
+			recon: downgrade.recon
+			economy: downgrade.economy
+		DebugLogging: true
     SquadManagerBotModule@ironreaper:
 		RequiresCondition: enable-ironreaper-ai
 		SquadSize: 20
@@ -1158,6 +1176,7 @@ Player:
 		RequiresCondition: enable-ironreaper-ai
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
         IdleBaseUnitsMaximum: 999
+		ExternallyManagedTypes: upgrade.covert1, upgrade.covert2, upgrade.covert3, downgrade.covert, upgrade.recon1, upgrade.recon2, upgrade.recon3, downgrade.recon, upgrade.economy1, upgrade.economy2, upgrade.economy3, downgrade.economy
         UnitsToBuild:
 			e1: 25
 			e2: 25
