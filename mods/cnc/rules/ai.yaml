@@ -963,15 +963,15 @@ Player:
 			msam: 6500
 			stnk: 5000
 			bike: 5000
-			rmbo: 1250
+			rmbo: 2000
 			bggy: 2000
 			ltnk: 750
 			mtnk: 250
 			htnk: 100
 			e1: 100
-			e2: 1500
-			e4: 1500
-			e5: 1500
+			e2: 2000
+			e4: 2000
+			e5: 2000
 			nuk2: 312
 			proc: 156
 			obli: 1
