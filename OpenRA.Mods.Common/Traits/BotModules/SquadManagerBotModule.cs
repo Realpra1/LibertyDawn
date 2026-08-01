@@ -148,6 +148,14 @@ namespace OpenRA.Mods.Common.Traits
 			"without making dense SAM clusters attractive.")]
 		public readonly int AirTargetAaClearUnlockPercent = 100;
 
+		[Desc("Completed target scans without an undefended cell before an air squad may consider deliberately",
+			"attacking an AA actor. Zero allows immediate consideration.")]
+		public readonly int AirTargetAaClearFallbackScans = 0;
+
+		[Desc("Minimum ratio of ammo-weighted aircraft cost to the summed cost of AA covering the target",
+			"before deliberate AA clearing is eligible. Zero disables the value-ratio requirement.")]
+		public readonly int AirTargetAaClearValueRatio = 0;
+
 		[Desc("Minimum score a candidate must reach before an air squad commits to attacking it.",
 			"Candidates scoring below this are ignored and the squad stays idle.")]
 		public readonly int AirTargetMinimumScore = 1;
@@ -321,7 +329,8 @@ namespace OpenRA.Mods.Common.Traits
 			if (AirTargetReferenceSpeed <= 0)
 				throw new YamlException("AirTargetReferenceSpeed must be greater than zero.");
 
-			if (AirTargetFullAmmoDistanceBonus < 0 || AirTargetAaClearUnlockPercent < 0)
+			if (AirTargetFullAmmoDistanceBonus < 0 || AirTargetAaClearUnlockPercent < 0 ||
+				AirTargetAaClearFallbackScans < 0 || AirTargetAaClearValueRatio < 0)
 				throw new YamlException("Air target ammo-distance and AA-clear modifiers must not be negative.");
 
 			if (AirTargetSwitchImprovementPercent < 0 || AirTargetStallTicks <= 0)

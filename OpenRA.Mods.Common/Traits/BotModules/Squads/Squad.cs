@@ -46,6 +46,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		// Consecutive AirIdleState scans that found no worthwhile target. This gradually increases the
 		// willingness to accept a low score, but coarse route danger always remains part of the cost.
 		internal int AirConsecutiveNoTargetScans;
+		internal int AirConsecutiveNoUndefendedScans;
 		internal readonly List<CPos> AirRoute = new List<CPos>();
 		internal bool AirRouteQueued;
 		internal readonly HashSet<uint> AirUnitsRepairing = new HashSet<uint>();

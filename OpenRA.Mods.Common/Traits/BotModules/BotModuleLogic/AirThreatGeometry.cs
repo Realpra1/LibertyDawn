@@ -338,6 +338,23 @@ namespace OpenRA.Mods.Common.Traits
 			return hasArmedUnit && ticksSinceProgress >= stallTicks;
 		}
 
+		public static bool UseClusterOpportunity(bool hasIncumbent, bool currentCellHasTargets)
+		{
+			return !hasIncumbent && !currentCellHasTargets;
+		}
+
+		public static bool CanAttemptAaClear(int consecutiveNoUndefendedScans, int requiredScans,
+			long ammoWeightedSquadValue, long targetCellAaValue, int requiredValueRatio)
+		{
+			if (consecutiveNoUndefendedScans < Math.Max(0, requiredScans))
+				return false;
+
+			if (requiredValueRatio <= 0)
+				return true;
+
+			return targetCellAaValue > 0 && ammoWeightedSquadValue / targetCellAaValue >= requiredValueRatio;
+		}
+
 		public static float LocalAirRiskMultiplier(bool inTargetCell, float adaptiveRiskMultiplier)
 		{
 			return inTargetCell ? Math.Max(1f, adaptiveRiskMultiplier) : 1f;

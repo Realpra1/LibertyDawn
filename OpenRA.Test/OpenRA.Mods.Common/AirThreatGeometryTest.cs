@@ -509,6 +509,26 @@ namespace OpenRA.Test
 			Assert.That(AirThreatGeometry.ShouldRescanStalledTarget(150, 150, false), Is.False);
 		}
 
+		[TestCase(false, false, true)]
+		[TestCase(true, false, false)]
+		[TestCase(false, true, false)]
+		public void ClusterOpportunityOnlyAppliesToFreshCellSearches(
+			bool hasIncumbent, bool currentCellHasTargets, bool expected)
+		{
+			Assert.That(AirThreatGeometry.UseClusterOpportunity(hasIncumbent, currentCellHasTargets),
+				Is.EqualTo(expected));
+		}
+
+		[Test]
+		public void AaClearRequiresSearchPatienceAndDynamicValueAdvantage()
+		{
+			Assert.That(AirThreatGeometry.CanAttemptAaClear(2, 3, 10000, 1000, 10), Is.False);
+			Assert.That(AirThreatGeometry.CanAttemptAaClear(3, 3, 9999, 1000, 10), Is.False);
+			Assert.That(AirThreatGeometry.CanAttemptAaClear(3, 3, 10000, 1000, 10), Is.True);
+			Assert.That(AirThreatGeometry.CanAttemptAaClear(3, 3, long.MaxValue, 0, 10), Is.False);
+			Assert.That(AirThreatGeometry.CanAttemptAaClear(0, 0, 0, 0, 0), Is.True);
+		}
+
 		[Test]
 		public void AdaptiveLocalRiskOnlyAppliesInsideTargetCell()
 		{
