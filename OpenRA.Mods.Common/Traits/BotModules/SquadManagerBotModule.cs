@@ -529,7 +529,11 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			Squads.RemoveAll(s => !s.IsValid);
 			foreach (var s in Squads)
+			{
 				s.Units.RemoveAll(unitCannotBeOrdered);
+				if (s.Type == SquadType.Air)
+					s.CleanAirMembership();
+			}
 		}
 
 		// HACK: Use of this function requires that there is one squad of this type.
@@ -666,6 +670,8 @@ namespace OpenRA.Mods.Common.Traits
 						continue;
 
 					air.Units.Add(a);
+					if (air.Units.Count > 1)
+						air.MarkAirReinforcement(a);
 				}
 				else if (Info.NavalUnitsTypes.Contains(a.Info.Name))
 				{

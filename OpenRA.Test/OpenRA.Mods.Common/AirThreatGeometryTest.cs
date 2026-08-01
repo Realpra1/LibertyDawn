@@ -333,7 +333,7 @@ namespace OpenRA.Test
 		[TestCase(TestName = "A weapon's range is respected further out once padded by the buffer, but no further")]
 		public void BufferedRangeExtendsCoverage()
 		{
-			// A TowerAAMissile site: Range 10c0, AirThreatRangeBuffer 1.5 as wired into
+			// A Dragon SAM site: Range 10c0, AirThreatRangeBuffer 1.5 as wired into
 			// SquadManagerBotModule@skynet.
 			Assert.That(AirThreatGeometry.IsWithinBufferedRange(10, 10, 1.5f), Is.True);
 			Assert.That(AirThreatGeometry.IsWithinBufferedRange(15, 10, 1.5f), Is.True);
@@ -341,6 +341,21 @@ namespace OpenRA.Test
 
 			// No buffer at all is just the raw range.
 			Assert.That(AirThreatGeometry.IsWithinBufferedRange(11, 10, 1f), Is.False);
+
+			// Elite SAMs have a live 125% range modifier. Preserve the half-cell rather than
+			// truncating 12.5 back to 12 before applying the existing margin.
+			Assert.That(AirThreatGeometry.IsWithinBufferedRange(18.75f, 12.5f, 1.5f), Is.True);
+			Assert.That(AirThreatGeometry.IsWithinBufferedRange(18.76f, 12.5f, 1.5f), Is.False);
+		}
+
+		[Test]
+		public void ReinforcementJoinsFromTargetOrNeighboringCoarseCell()
+		{
+			var target = new CPos(5, 5);
+			Assert.That(AirThreatGeometry.IsSameOrAdjacentCoarseCell(target, target), Is.True);
+			Assert.That(AirThreatGeometry.IsSameOrAdjacentCoarseCell(new CPos(4, 5), target), Is.True);
+			Assert.That(AirThreatGeometry.IsSameOrAdjacentCoarseCell(new CPos(6, 6), target), Is.True);
+			Assert.That(AirThreatGeometry.IsSameOrAdjacentCoarseCell(new CPos(7, 5), target), Is.False);
 		}
 
 		[TestCase(TestName = "An Orca outruns everything except the two fastest AA missiles it can meet")]

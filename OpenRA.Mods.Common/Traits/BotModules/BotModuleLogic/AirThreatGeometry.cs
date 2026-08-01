@@ -367,9 +367,15 @@ namespace OpenRA.Mods.Common.Traits
 		/// found, so a long-range SAM is respected further out than a short-range machine gun even though both
 		/// were discovered by the same circular scan.
 		/// </summary>
-		public static bool IsWithinBufferedRange(int distanceInCells, int weaponRangeCells, float buffer)
+		public static bool IsWithinBufferedRange(float distanceInCells, float weaponRangeCells, float buffer)
 		{
 			return distanceInCells <= weaponRangeCells * buffer;
+		}
+
+		/// <summary>Whether two strategic cells are the same or touch along an edge or corner.</summary>
+		public static bool IsSameOrAdjacentCoarseCell(CPos a, CPos b)
+		{
+			return Math.Abs(a.X - b.X) <= 1 && Math.Abs(a.Y - b.Y) <= 1;
 		}
 
 		/// <summary>
