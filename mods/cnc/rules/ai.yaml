@@ -259,6 +259,9 @@ Player:
 		McvFactoryTypes: weap,afld
 	BaseBuilderBotModule@cabal:
 		RequiresCondition: enable-cabal-ai
+		FirstTowerTypes: gtwr, gun, atwr, obli
+		FirstTowerSearchRadius: 20
+		FirstTowerDebugLogging: true
 		BuildingQueues: Building.Nod, Building.GDI
 		DefenseQueues: Defence.Nod, Defence.GDI
 		MinimumExcessPower: 30
@@ -337,6 +340,9 @@ Player:
 			harv: 8
 	BaseBuilderBotModule@watson:
 		RequiresCondition: enable-watson-ai
+		FirstTowerTypes: gtwr, gun, atwr, obli
+		FirstTowerSearchRadius: 20
+		FirstTowerDebugLogging: true
 		BuildingQueues: Building.Nod, Building.GDI
 		DefenseQueues: Defence.Nod, Defence.GDI
 		MinimumExcessPower: 30
@@ -415,6 +421,9 @@ Player:
 			harv: 8
     BaseBuilderBotModule@hal9001:
 		RequiresCondition: enable-hal9001-ai
+		FirstTowerTypes: gtwr, gun, atwr, obli
+		FirstTowerSearchRadius: 20
+		FirstTowerDebugLogging: true
 		BuildingQueues: Building.Nod, Building.GDI
 		DefenseQueues: Defence.Nod, Defence.GDI
 		MinimumExcessPower: 30
@@ -495,6 +504,9 @@ Player:
 			harv: 8
     BaseBuilderBotModule@brutalis:
 		RequiresCondition: enable-brutalis-ai || enable-wavemaker-ai
+		FirstTowerTypes: gtwr, gun, atwr, obli
+		FirstTowerSearchRadius: 20
+		FirstTowerDebugLogging: true
 		BuildingQueues: Building.Nod, Building.GDI
 		DefenseQueues: Defence.Nod, Defence.GDI
 		MinimumExcessPower: 1
@@ -656,6 +668,9 @@ Player:
             mcv: 3000
     BaseBuilderBotModule@viki:
 		RequiresCondition: enable-viki-ai
+		FirstTowerTypes: gtwr, gun, atwr, obli
+		FirstTowerSearchRadius: 20
+		FirstTowerDebugLogging: true
 		BuildingQueues: Building.Nod, Building.GDI
 		DefenseQueues: Defence.Nod, Defence.GDI
 		MinimumExcessPower: 151
@@ -788,6 +803,9 @@ Player:
             mcv: 1
     BaseBuilderBotModule@skynet:
 		RequiresCondition: enable-skynet-ai
+		FirstTowerTypes: gtwr, gun, atwr, obli
+		FirstTowerSearchRadius: 20
+		FirstTowerDebugLogging: true
 		BuildingQueues: Building.Nod, Building.GDI
 		DefenseQueues: Defence.Nod, Defence.GDI
         MinimumExcessPower: 1
@@ -1068,6 +1086,9 @@ Player:
             mhq: 1
     BaseBuilderBotModule@ironreaper:
 		RequiresCondition: enable-ironreaper-ai
+		FirstTowerTypes: gtwr, gun, atwr, obli
+		FirstTowerSearchRadius: 20
+		FirstTowerDebugLogging: true
 		BuildingQueues: Building.Nod, Building.GDI
 		DefenseQueues: Defence.Nod, Defence.GDI
 		MinimumExcessPower: 1
@@ -1229,6 +1250,9 @@ Player:
             upgrade.recon3: 32000
     BaseBuilderBotModule@Easy:
 		RequiresCondition: enable-Easy-ai
+		FirstTowerTypes: gtwr, gun, atwr, obli
+		FirstTowerSearchRadius: 20
+		FirstTowerDebugLogging: true
 		BuildingQueues: Building.Nod, Building.GDI
 		DefenseQueues: Defence.Nod, Defence.GDI
         AdditionalMinimumRefineryCount: 0
@@ -1356,6 +1380,9 @@ Player:
             rmbo: 2
     BaseBuilderBotModule@Easiest:
 		RequiresCondition: enable-Easiest-ai
+		FirstTowerTypes: gtwr, gun, atwr, obli
+		FirstTowerSearchRadius: 20
+		FirstTowerDebugLogging: true
 		BuildingQueues: Building.Nod, Building.GDI
 		DefenseQueues: Defence.Nod, Defence.GDI
         AdditionalMinimumRefineryCount: 0

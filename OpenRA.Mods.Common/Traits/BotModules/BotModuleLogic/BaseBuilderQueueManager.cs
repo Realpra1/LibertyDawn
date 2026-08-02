@@ -171,15 +171,21 @@ namespace OpenRA.Mods.Common.Traits
 				}
 				else
 				{
-					// Check if Building is a defense and if we should place it towards the enemy or not.
-					if (actorInfo.HasTraitInfo<AttackBaseInfo>() && world.LocalRandom.Next(100) < baseBuilder.Info.PlaceDefenseTowardsEnemyChance)
-						type = BuildingType.Defense;
-					else if (baseBuilder.Info.PlaceAsDefenses.Contains(actorInfo.Name) && world.LocalRandom.Next(100) < baseBuilder.Info.PlaceAsDefenseChance)
-						type = BuildingType.Defense;
-					else if (baseBuilder.Info.RefineryTypes.Contains(actorInfo.Name))
-						type = BuildingType.Refinery;
+					if (baseBuilder.FirstTowerPlanner.AppliesTo(actorInfo.Name))
+						location = baseBuilder.FirstTowerPlanner.ChooseLocation(actorInfo, actorInfo.TraitInfo<BuildingInfo>());
 
-					location = ChooseBuildLocation(currentBuilding.Item, true, type);
+					if (location == null)
+					{
+						// Check if Building is a defense and if we should place it towards the enemy or not.
+						if (actorInfo.HasTraitInfo<AttackBaseInfo>() && world.LocalRandom.Next(100) < baseBuilder.Info.PlaceDefenseTowardsEnemyChance)
+							type = BuildingType.Defense;
+						else if (baseBuilder.Info.PlaceAsDefenses.Contains(actorInfo.Name) && world.LocalRandom.Next(100) < baseBuilder.Info.PlaceAsDefenseChance)
+							type = BuildingType.Defense;
+						else if (baseBuilder.Info.RefineryTypes.Contains(actorInfo.Name))
+							type = BuildingType.Refinery;
+
+						location = ChooseBuildLocation(currentBuilding.Item, true, type);
+					}
 				}
 
 				if (location == null)

@@ -33,7 +33,6 @@ namespace OpenRA.Test
 		}
 
 		// --- facing -------------------------------------------------------------------------------
-
 		[TestCase(TestName = "The wall's facing snaps to an axis and never returns zero")]
 		public void DominantDirectionIsAlwaysAnAxis()
 		{
@@ -63,7 +62,6 @@ namespace OpenRA.Test
 		}
 
 		// --- the line -----------------------------------------------------------------------------
-
 		[TestCase(TestName = "A wall line is straight, contiguous and centred on the tower")]
 		public void LineIsStraightAndCentred()
 		{
@@ -121,7 +119,6 @@ namespace OpenRA.Test
 		}
 
 		// --- reachability -------------------------------------------------------------------------
-
 		[TestCase(TestName = "An open field is escapable")]
 		public void OpenFieldIsOpen()
 		{

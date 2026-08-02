@@ -33,6 +33,15 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Forces AI to treat these buildings as defenses and build them toward enemy.")]
 		public readonly HashSet<string> PlaceAsDefenses = new HashSet<string>();
 
+		[Desc("Anti-ground defense types whose first completed structure is placed beside the initial construction yard.")]
+		public readonly HashSet<string> FirstTowerTypes = new HashSet<string>();
+
+		[Desc("Maximum cells searched around the preferred first-tower position when it is blocked.")]
+		public readonly int FirstTowerSearchRadius = 20;
+
+		[Desc("Write first-tower planning and completion diagnostics to debug.log.")]
+		public readonly bool FirstTowerDebugLogging = false;
+
 		[Desc("Chance of forced placing as defense.")]
 		public readonly int PlaceAsDefenseChance = 50;
 
@@ -181,6 +190,7 @@ namespace OpenRA.Mods.Common.Traits
 		public CPos DefenseCenter => defenseCenter;
 
 		internal BaseBuilderWallPlanner WallPlanner { get; private set; }
+		internal BaseBuilderFirstTowerPlanner FirstTowerPlanner { get; private set; }
 
 		readonly World world;
 		readonly Player player;
@@ -207,6 +217,7 @@ namespace OpenRA.Mods.Common.Traits
 			resourceLayer = self.World.WorldActor.TraitOrDefault<IResourceLayer>();
 			positionsUpdatedModules = self.Owner.PlayerActor.TraitsImplementing<IBotPositionsUpdated>().ToArray();
 			WallPlanner = new BaseBuilderWallPlanner(this, player);
+			FirstTowerPlanner = new BaseBuilderFirstTowerPlanner(this, player);
 		}
 
 		protected override void TraitEnabled(Actor self)
@@ -231,6 +242,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		void IBotTick.BotTick(IBot bot)
 		{
+			FirstTowerPlanner.Update();
 			SetRallyPointsForNewProductionBuildings(bot);
 
 			foreach (var b in builders)
@@ -308,7 +320,8 @@ namespace OpenRA.Mods.Common.Traits
 			return new List<MiniYamlNode>()
 			{
 				new MiniYamlNode("InitialBaseCenter", FieldSaver.FormatValue(initialBaseCenter)),
-				new MiniYamlNode("DefenseCenter", FieldSaver.FormatValue(defenseCenter))
+				new MiniYamlNode("DefenseCenter", FieldSaver.FormatValue(defenseCenter)),
+				new MiniYamlNode("FirstTowerPlacementComplete", FieldSaver.FormatValue(FirstTowerPlanner.Complete))
 			};
 		}
 
@@ -324,6 +337,10 @@ namespace OpenRA.Mods.Common.Traits
 			var defenseCenterNode = data.FirstOrDefault(n => n.Key == "DefenseCenter");
 			if (defenseCenterNode != null)
 				defenseCenter = FieldLoader.GetValue<CPos>("DefenseCenter", defenseCenterNode.Value.Value);
+
+			var firstTowerNode = data.FirstOrDefault(n => n.Key == "FirstTowerPlacementComplete");
+			if (firstTowerNode != null)
+				FirstTowerPlanner.Complete = FieldLoader.GetValue<bool>("FirstTowerPlacementComplete", firstTowerNode.Value.Value);
 		}
 	}
 }
