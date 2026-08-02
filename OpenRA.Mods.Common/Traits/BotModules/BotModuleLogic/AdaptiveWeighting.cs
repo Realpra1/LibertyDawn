@@ -24,6 +24,39 @@ namespace OpenRA.Mods.Common.Traits
 	/// </summary>
 	public static class AdaptiveWeighting
 	{
+		public static IReadOnlyList<int> SelectAffordableOffers(
+			IReadOnlyList<double> scores, IReadOnlyList<int> costs, int budget)
+		{
+			if (scores == null || costs == null || scores.Count != costs.Count || scores.Count == 0)
+				return Array.Empty<int>();
+
+			var ranked = Enumerable.Range(0, scores.Count)
+				.OrderByDescending(i => scores[i]).ThenBy(i => costs[i]).ThenBy(i => i).ToList();
+			var selected = new List<int>();
+			var remaining = Math.Max(0, budget);
+			foreach (var index in ranked)
+			{
+				var cost = Math.Max(0, costs[index]);
+				if (cost > remaining)
+					continue;
+
+				selected.Add(index);
+				remaining -= cost;
+			}
+
+			// When nothing is currently affordable, reserve one queue for the most wanted option so income
+			// can accumulate instead of filling a cheaper, lower-value queue first.
+			if (selected.Count == 0)
+				selected.Add(ranked[0]);
+
+			return selected;
+		}
+
+		public static double ProductionBuildingScore(double demand, int ownedCount)
+		{
+			return Math.Max(0, demand) / (1 + Math.Max(0, ownedCount));
+		}
+
 		/// <summary>
 		/// Value destroyed vs value lost for a single rollover window. Losses are floored at 1 (not 0)
 		/// so a type that has killed something but lost nothing yet still gets a large, finite score -

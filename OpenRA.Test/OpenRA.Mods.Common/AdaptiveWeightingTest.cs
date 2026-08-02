@@ -18,6 +18,33 @@ namespace OpenRA.Test
 	[TestFixture]
 	public class AdaptiveWeightingTest
 	{
+		[Test]
+		public void AffordableOffersPreferHighestScoresAcrossQueues()
+		{
+			var selected = AdaptiveWeighting.SelectAffordableOffers(
+				new[] { 10d, 50d, 30d }, new[] { 100, 400, 200 }, 500);
+
+			Assert.That(selected, Is.EqualTo(new[] { 1, 0 }));
+		}
+
+		[Test]
+		public void UnaffordableOffersReserveOnlyTheMostWantedQueue()
+		{
+			var selected = AdaptiveWeighting.SelectAffordableOffers(
+				new[] { 20d, 60d, 40d }, new[] { 300, 500, 400 }, 100);
+
+			Assert.That(selected, Is.EqualTo(new[] { 1 }));
+		}
+
+		[Test]
+		public void ProductionBuildingScoreFavorsDemandAndExistingCapacity()
+		{
+			Assert.That(AdaptiveWeighting.ProductionBuildingScore(100, 0), Is.EqualTo(100));
+			Assert.That(AdaptiveWeighting.ProductionBuildingScore(100, 1), Is.EqualTo(50));
+			Assert.That(AdaptiveWeighting.ProductionBuildingScore(200, 3), Is.EqualTo(50));
+			Assert.That(AdaptiveWeighting.ProductionBuildingScore(-10, -1), Is.EqualTo(0));
+		}
+
 		[TestCase(TestName = "Minute score floors losses at 1, not 0")]
 		public void MinuteScoreFloorsLosses()
 		{
