@@ -156,6 +156,25 @@ namespace OpenRA.Mods.Common.Traits
 			"before deliberate AA clearing is eligible. Zero disables the value-ratio requirement.")]
 		public readonly int AirTargetAaClearValueRatio = 0;
 
+		[Desc("Number of eligible AA-clearing opportunities with the lowest summed effectiveness-times-value danger",
+			"that remain in contention. The one unlocking the most target value is selected from this shortlist.",
+			"Zero preserves ordinary score-only selection.")]
+		public readonly int AirTargetAaClearWeakestCandidates = 0;
+
+		[Desc("Maximum distance in cells between air-squad formation centers when combining their value",
+			"and orders for a deliberate AA-clearing attack. Zero keeps AA clearing squad-local.")]
+		public readonly int AirTargetAaClearSupportRadius = 0;
+
+		[Desc("Actor types whose air-target priority increases while most non-AA targets are covered by AA.")]
+		public readonly HashSet<string> AirTargetPowerActors = new HashSet<string>();
+
+		[Desc("Percentage of attackable non-AA targets that must be covered before power-target priority starts rising.",
+			"At or below this threshold the authored priority is used; at 100% coverage the configured maximum is used.")]
+		public readonly int AirTargetPowerCoverageThresholdPercent = 100;
+
+		[Desc("Maximum priority assigned to AirTargetPowerActors at 100% AA coverage. Zero disables the boost.")]
+		public readonly int AirTargetPowerPriorityMaximum = 0;
+
 		[Desc("Minimum score a candidate must reach before an air squad commits to attacking it.",
 			"Candidates scoring below this are ignored and the squad stays idle.")]
 		public readonly int AirTargetMinimumScore = 1;
@@ -338,8 +357,13 @@ namespace OpenRA.Mods.Common.Traits
 				throw new YamlException("AirTargetReferenceSpeed must be greater than zero.");
 
 			if (AirTargetFullAmmoDistanceBonus < 0 || AirTargetAaClearUnlockPercent < 0 ||
-				AirTargetAaClearFallbackScans < 0 || AirTargetAaClearValueRatio < 0)
+				AirTargetAaClearFallbackScans < 0 || AirTargetAaClearValueRatio < 0 ||
+				AirTargetAaClearWeakestCandidates < 0 || AirTargetAaClearSupportRadius < 0)
 				throw new YamlException("Air target ammo-distance and AA-clear modifiers must not be negative.");
+
+			if (AirTargetPowerCoverageThresholdPercent < 0 || AirTargetPowerCoverageThresholdPercent > 100 ||
+				AirTargetPowerPriorityMaximum < 0)
+				throw new YamlException("Air target power coverage settings must use a 0-100 threshold and non-negative priority.");
 
 			if (AirTargetSwitchImprovementPercent < 0 || AirTargetStallTicks <= 0)
 				throw new YamlException("Air target switch improvement must be non-negative and the stall timeout must be positive.");

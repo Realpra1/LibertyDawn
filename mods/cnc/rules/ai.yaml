@@ -886,6 +886,11 @@ Player:
 		AirTargetAaClearUnlockPercent: 125
 		AirTargetAaClearFallbackScans: 3
 		AirTargetAaClearValueRatio: 10
+		AirTargetAaClearWeakestCandidates: 3
+		AirTargetAaClearSupportRadius: 36
+		AirTargetPowerActors: nuke, nuk2
+		AirTargetPowerCoverageThresholdPercent: 90
+		AirTargetPowerPriorityMaximum: 10000
 		AirTargetMinimumScore: 1
 		AirTargetSwitchImprovementPercent: 50
 		AirTargetStallTicks: 150

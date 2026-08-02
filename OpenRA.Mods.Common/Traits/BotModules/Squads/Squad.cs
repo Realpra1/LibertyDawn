@@ -62,8 +62,13 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		internal int AirTargetLastHP = int.MaxValue;
 		internal int AirTargetScore = int.MinValue;
 		internal bool AirTargetIsUndefended;
+		internal bool AirTargetClearsAa;
+		internal CPos? AirAaClearProtectedCell;
+		internal readonly HashSet<uint> AirAaClearThreatIds = new HashSet<uint>();
+		internal bool AirAaClearEngaged;
 		internal float AirLocalThreatWeight;
 		internal int AirNextTargetReviewTick;
+		internal bool AirEscapingLocalAa;
 
 		public Squad(IBot bot, SquadManagerBotModule squadManager, SquadType type)
 			: this(bot, squadManager, type, null) { }
@@ -256,8 +261,30 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			foreach (var id in AirReinforcementTargets.Keys.Where(id => !live.Contains(id)).ToList())
 				AirReinforcementTargets.Remove(id);
 
-			if (Units.Count == 1 && !AirUnitsRepairing.Contains(Units[0].ActorID))
-				JoinAirFormation(Units[0]);
+			var formation = AirFormationUnits();
+			if (formation.Count == 0)
+			{
+				var replacements = Units.Where(a => !AirUnitsRepairing.Contains(a.ActorID))
+					.OrderBy(a => hasAirFormationCenter ?
+						(a.CenterPosition - airLastFormationCenter).LengthSquared : 0)
+					.ThenBy(a => a.ActorID).ToList();
+				if (replacements.Count > 0)
+				{
+					var restored = IsTargetValid ? replacements.Take(1) : replacements;
+					var restoredCount = 0;
+					foreach (var replacement in restored)
+					{
+						JoinAirFormation(replacement);
+						restoredCount++;
+					}
+
+					if (SquadManager.Info.AirTargetDebugLogging)
+						Log.Write("debug", "Air formation [{0}] restored core with {1} aircraft; target={2} remaining-reinforcements={3}.",
+							AirProfile, restoredCount, IsTargetValid ?
+								TargetActor.Info.Name + "#" + TargetActor.ActorID : "none",
+							AirReinforcements.Count);
+				}
+			}
 		}
 
 		internal string AirProfile => AirSquadDefinition != null &&

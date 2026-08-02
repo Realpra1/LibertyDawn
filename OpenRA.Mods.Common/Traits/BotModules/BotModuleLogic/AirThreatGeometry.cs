@@ -15,6 +15,9 @@ using System.Linq;
 
 namespace OpenRA.Mods.Common.Traits
 {
+	public enum DefendedAirAction { Reject, Sneak, ClearAa }
+	public enum LocalAaClearResponse { Flee, Continue, Recalculate }
+
 	/// <summary>
 	/// The world-independent half of the bot's air threat avoidance: how far a remembered anti-air
 	/// position is from a flight path, which retreat point sits furthest from danger, and how a
@@ -89,6 +92,85 @@ namespace OpenRA.Mods.Common.Traits
 				result.Add(new CPos(at % width, at / width));
 			result.Reverse();
 			return result;
+		}
+
+		/// <summary>
+		/// Finds the lowest-cost route from a threatened coarse cell to any safe cell. This is used by
+		/// damaged aircraft that must remain out of combat while every surviving repair facility is under
+		/// anti-air cover. The returned route excludes the start and is empty when the start is already safe.
+		/// </summary>
+		public static List<CPos> FindNearestSafeCoarseRoute(
+			float[] danger, int width, int height, int startX, int startY, float dangerCost)
+		{
+			if (danger == null || width <= 0 || height <= 0 || danger.Length != width * height ||
+				startX < 0 || startY < 0 || startX >= width || startY >= height)
+				return null;
+
+			var start = startY * width + startX;
+			if (danger[start] <= 0)
+				return new List<CPos>();
+
+			var cost = Enumerable.Repeat(float.MaxValue, danger.Length).ToArray();
+			var previous = Enumerable.Repeat(-1, danger.Length).ToArray();
+			var open = new List<int> { start };
+			cost[start] = 0;
+			var goal = -1;
+			while (open.Count > 0)
+			{
+				var bestOpen = 0;
+				for (var i = 1; i < open.Count; i++)
+					if (cost[open[i]] < cost[open[bestOpen]] ||
+						(cost[open[i]] == cost[open[bestOpen]] && open[i] < open[bestOpen]))
+						bestOpen = i;
+
+				var current = open[bestOpen];
+				open.RemoveAt(bestOpen);
+				if (danger[current] <= 0)
+				{
+					goal = current;
+					break;
+				}
+
+				var cx = current % width;
+				var cy = current / width;
+				for (var d = 0; d < 4; d++)
+				{
+					var nx = cx + (d == 0 ? -1 : d == 1 ? 1 : 0);
+					var ny = cy + (d == 2 ? -1 : d == 3 ? 1 : 0);
+					if (nx < 0 || ny < 0 || nx >= width || ny >= height)
+						continue;
+
+					var next = ny * width + nx;
+					var nextCost = cost[current] + 1 + Math.Max(0, danger[next]) * Math.Max(0, dangerCost);
+					if (nextCost >= cost[next])
+						continue;
+
+					cost[next] = nextCost;
+					previous[next] = current;
+					if (!open.Contains(next))
+						open.Add(next);
+				}
+			}
+
+			if (goal < 0)
+				return null;
+
+			var result = new List<CPos>();
+			for (var at = goal; at != start && at >= 0; at = previous[at])
+				result.Add(new CPos(at % width, at / width));
+			result.Reverse();
+			return result;
+		}
+
+		/// <summary>
+		/// True when another damaged aircraft has already selected a facility, including assignments made
+		/// earlier in the current bot tick before the engine has processed its reservation order.
+		/// </summary>
+		public static bool HasOtherRepairAssignment(IReadOnlyDictionary<uint, uint> assignments,
+			IReadOnlyCollection<uint> repairingAircraft, uint aircraftId, uint facilityId)
+		{
+			return assignments != null && repairingAircraft != null && assignments.Any(a =>
+				a.Key != aircraftId && a.Value == facilityId && repairingAircraft.Contains(a.Key));
 		}
 
 		/// <summary>
@@ -320,6 +402,16 @@ namespace OpenRA.Mods.Common.Traits
 			return antiAirWeight > 0 && antiAirWeight * fleeMultiplier > squadSize;
 		}
 
+		public static LocalAaClearResponse PlannedAaClearResponse(
+			bool clearsAa, bool selectedTargetInRange, bool allLocalThreatsPlanned)
+		{
+			if (!clearsAa)
+				return LocalAaClearResponse.Flee;
+
+			return selectedTargetInRange && allLocalThreatsPlanned ?
+				LocalAaClearResponse.Continue : LocalAaClearResponse.Recalculate;
+		}
+
 		public static bool ShouldSwitchTarget(bool currentUndefended, int currentScore,
 			bool challengerValid, bool challengerUndefended, int challengerScore, int minimumImprovementPercent)
 		{
@@ -344,7 +436,8 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		public static bool CanAttemptAaClear(int consecutiveNoUndefendedScans, int requiredScans,
-			long ammoWeightedSquadValue, long targetCellAaValue, int requiredValueRatio)
+			long ammoWeightedSquadValue, float referenceAaThreatWeight,
+			double targetCellAaDangerValue, int requiredValueRatio)
 		{
 			if (consecutiveNoUndefendedScans < Math.Max(0, requiredScans))
 				return false;
@@ -352,7 +445,123 @@ namespace OpenRA.Mods.Common.Traits
 			if (requiredValueRatio <= 0)
 				return true;
 
-			return targetCellAaValue > 0 && ammoWeightedSquadValue / targetCellAaValue >= requiredValueRatio;
+			return referenceAaThreatWeight > 0 && targetCellAaDangerValue > 0 &&
+				ammoWeightedSquadValue * (double)referenceAaThreatWeight >=
+				targetCellAaDangerValue * requiredValueRatio;
+		}
+
+		/// <summary>
+		/// Chooses the tactical response to a defended opportunity. The comparison deliberately uses
+		/// estimated time instead of target score: a quick pass may take a small exposed cell, while an AA
+		/// package is worth clearing when doing so is faster than destroying everything it protects.
+		/// An AA package that cannot be cleared, and tied estimates, are rejected rather than turning an
+		/// uncertain calculation into a charge. An unfinishable victim cell may still justify clearing AA.
+		/// </summary>
+		public static DefendedAirAction ChooseDefendedAction(long cellKillTicks, long protectedKillTicks,
+			long aaClearTicks, bool aaClearValueEligible)
+		{
+			if (cellKillTicks <= 0 || aaClearTicks <= 0 || aaClearTicks == long.MaxValue)
+				return DefendedAirAction.Reject;
+
+			if (cellKillTicks < aaClearTicks)
+				return DefendedAirAction.Sneak;
+			if (cellKillTicks == aaClearTicks)
+				return DefendedAirAction.Reject;
+
+			if (aaClearValueEligible && protectedKillTicks > aaClearTicks)
+				return DefendedAirAction.ClearAa;
+
+			return DefendedAirAction.Reject;
+		}
+
+		/// <summary>
+		/// Value used for the final location comparison. A target-rich cell may attract a fresh scan, but
+		/// an ordinary defended victim must not inherit the value of every other actor in that cell. An
+		/// eligible AA-clearing target is the exception: destroying it genuinely unlocks the surrounding
+		/// opportunity, so that credit remains part of its score even during incumbent reassessments.
+		/// </summary>
+		public static long AirTargetOpportunityValue(int individualValue, long clusteredValue,
+			bool useClusterOpportunity, bool isUndefended, bool clearsAa, int aaUnlockPercent)
+		{
+			var individual = Math.Max(0, individualValue);
+			var clustered = Math.Max(0, clusteredValue);
+			if (clearsAa)
+				return individual + clustered * Math.Max(0, aaUnlockPercent) / 100;
+
+			return useClusterOpportunity && isUndefended ? clustered : individual;
+		}
+
+		/// <summary>
+		/// Raises a target priority smoothly from its authored value at the coverage threshold to the
+		/// configured maximum at complete AA coverage. Dropping to or below the threshold restores the
+		/// authored value immediately.
+		/// </summary>
+		public static int CoverageAdjustedPriority(int authoredPriority, int coveredTargets, int totalTargets,
+			int thresholdPercent, int maximumPriority)
+		{
+			var authored = Math.Max(0, authoredPriority);
+			var maximum = Math.Max(authored, maximumPriority);
+			if (totalTargets <= 0 || maximum == authored)
+				return authored;
+
+			var threshold = Math.Clamp(thresholdPercent, 0, 100);
+			var covered = Math.Clamp(coveredTargets, 0, totalTargets);
+			var coveragePoints = (long)covered * 100;
+			var thresholdPoints = (long)totalTargets * threshold;
+			if (threshold >= 100 || coveragePoints <= thresholdPoints)
+				return authored;
+
+			var boostRange = (long)totalTargets * (100 - threshold);
+			var boostProgress = coveragePoints - thresholdPoints;
+			return (int)Math.Min(int.MaxValue,
+				authored + (long)(maximum - authored) * boostProgress / boostRange);
+		}
+
+		/// <summary>
+		/// Chooses an AA-clearing opportunity by first retaining only the configured number with the
+		/// lowest total effectiveness-times-value danger, then selecting the one that unlocks the most
+		/// target value. Location score and stable input order break ties.
+		/// </summary>
+		public static int SelectAaClearCandidate(IReadOnlyList<double> dangerValues,
+			IReadOnlyList<long> unlockedValues, IReadOnlyList<int> locationScores, int weakestCount)
+		{
+			if (dangerValues == null || unlockedValues == null || locationScores == null || weakestCount <= 0 ||
+				dangerValues.Count == 0 || dangerValues.Count != unlockedValues.Count ||
+				dangerValues.Count != locationScores.Count)
+				return -1;
+
+			return Enumerable.Range(0, dangerValues.Count)
+				.OrderBy(i => double.IsNaN(dangerValues[i]) ? double.MaxValue : Math.Max(0, dangerValues[i]))
+				.ThenBy(i => i)
+				.Take(weakestCount)
+				.OrderByDescending(i => unlockedValues[i])
+				.ThenByDescending(i => locationScores[i])
+				.ThenBy(i => i)
+				.First();
+		}
+
+		/// <summary>
+		/// Recovers the strongest complete AA-clearing plan for an incumbent target. This keeps periodic
+		/// reassessment comparable with the original selection: the incumbent retains the protected value
+		/// that justified clearing it instead of being rescored only from the AA actor's own coarse cell.
+		/// </summary>
+		public static int SelectAaClearCandidateForTarget(IReadOnlyList<uint> targetIds, uint targetId,
+			IReadOnlyList<double> dangerValues, IReadOnlyList<long> unlockedValues,
+			IReadOnlyList<int> locationScores)
+		{
+			if (targetIds == null || dangerValues == null || unlockedValues == null || locationScores == null ||
+				targetIds.Count == 0 || targetIds.Count != dangerValues.Count ||
+				targetIds.Count != unlockedValues.Count || targetIds.Count != locationScores.Count)
+				return -1;
+
+			return Enumerable.Range(0, targetIds.Count)
+				.Where(i => targetIds[i] == targetId)
+				.OrderByDescending(i => unlockedValues[i])
+				.ThenBy(i => double.IsNaN(dangerValues[i]) ? double.MaxValue : Math.Max(0, dangerValues[i]))
+				.ThenByDescending(i => locationScores[i])
+				.ThenBy(i => i)
+				.DefaultIfEmpty(-1)
+				.First();
 		}
 
 		public static float LocalAirRiskMultiplier(bool inTargetCell, float adaptiveRiskMultiplier)

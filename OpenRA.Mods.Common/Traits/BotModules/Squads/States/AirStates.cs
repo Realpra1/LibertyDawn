@@ -30,16 +30,25 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			public int Width;
 			public int Height;
 			public float[] Danger;
-			public List<(Actor Actor, int Utility)> Candidates;
+			public List<(Actor Actor, int Utility, float ConfiguredWeight)> Candidates;
 			public List<(Actor Actor, float StoppingWeight, int RangeCells)> Threats;
 		}
 
 		sealed class AirRepairPlan
 		{
 			public Actor Building;
+			public Actor FallbackBuilding;
 			public List<CPos> Route;
 			public bool RepairAtEnd;
+			public int CandidateCount;
 			public int RejectedByAa;
+		}
+
+		sealed class AirRepairHoldingPlan
+		{
+			public Actor Shelter;
+			public CPos Destination;
+			public List<CPos> Route;
 		}
 
 		// Bot logic is host-only. Sharing one cache per manager/profile prevents two same-type squads
@@ -48,6 +57,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			new Dictionary<SquadManagerBotModule, Dictionary<string, AirInfluenceCache>>();
 
 		protected const int MissileUnitMultiplier = 3;
+		const float ApacheMobileThreatMultiplier = 4f;
+		const float ApacheStaticThreatMultiplier = 8f;
 
 		/// <summary>True if this actor has a live armament that can shoot at aircraft.</summary>
 		protected static bool IsAntiAirCapable(Actor unit)
@@ -92,9 +103,23 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		{
 			var weight = ConfiguredThreatWeight(owner, actor, derivedWeight);
 			if (owner.AirProfile.Equals("Apache", StringComparison.OrdinalIgnoreCase) && weight >= .75f)
-				weight *= actor.Info.TraitInfoOrDefault<MobileInfo>() == null ? 8f : 4f;
+				weight *= actor.Info.TraitInfoOrDefault<MobileInfo>() == null ?
+					ApacheStaticThreatMultiplier : ApacheMobileThreatMultiplier;
 
 			return weight;
+		}
+
+		static float AaClearReferenceThreatWeight(Squad owner)
+		{
+			// Normalize clearing strength against the canonical building SAM. This preserves the authored
+			// 10x requirement for a full-strength SAM site, while proportionally reducing the aircraft value
+			// needed to clear less effective AA such as an MSAM.
+			var samWeight = AirThreatGeometry.ConfiguredThreatWeight("sam", 1f,
+				owner.SquadManager.Info.AirThreatWeightOverrides);
+			if (owner.AirProfile.Equals("Apache", StringComparison.OrdinalIgnoreCase) && samWeight >= .75f)
+				samWeight *= ApacheStaticThreatMultiplier;
+
+			return Math.Max(.01f, samWeight);
 		}
 
 		static float TransitThreatWeight(Squad owner, Actor actor,
@@ -113,31 +138,45 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			return owner.AirFormationUnits(bootstrapIfEmpty: true);
 		}
 
-		static bool IsInOrNextToTargetCell(Squad owner, Actor aircraft, Actor target)
+		static CPos CoarseCell(Squad owner, CPos cell)
 		{
 			var coarseSize = owner.SquadManager.Info.AirInfluenceCellSize;
-			var aircraftCell = new CPos(aircraft.Location.X / coarseSize, aircraft.Location.Y / coarseSize);
-			var targetCell = new CPos(target.Location.X / coarseSize, target.Location.Y / coarseSize);
-			return AirThreatGeometry.IsSameOrAdjacentCoarseCell(aircraftCell, targetCell);
+			return new CPos(cell.X / coarseSize, cell.Y / coarseSize);
 		}
 
 		protected static void PromoteArrivedAirReinforcements(Squad owner)
 		{
-			if (!owner.IsTargetValid || owner.AirReinforcements.Count == 0)
+			if (owner.AirReinforcements.Count == 0)
 				return;
+
+			// Snapshot these before promotion so a newly joined aircraft cannot move the center and cause a
+			// chain of increasingly distant reinforcements to join in the same tick.
+			var formation = owner.AirFormationUnits();
+			CPos? formationCell = formation.Count == 0 ? (CPos?)null :
+				CoarseCell(owner, owner.World.Map.CellContaining(owner.AirFormationCenter));
+			CPos? destinationCell = owner.IsTargetValid ? CoarseCell(owner, owner.TargetActor.Location) :
+				owner.AirTargetStrategicCell;
 
 			foreach (var aircraft in owner.Units)
 			{
 				if (!owner.AirReinforcements.Contains(aircraft.ActorID) ||
-					owner.AirUnitsRepairing.Contains(aircraft.ActorID) ||
-					!IsInOrNextToTargetCell(owner, aircraft, owner.TargetActor))
+					owner.AirUnitsRepairing.Contains(aircraft.ActorID))
+					continue;
+
+				var aircraftCell = CoarseCell(owner, aircraft.Location);
+				var nearFormation = formationCell != null &&
+					AirThreatGeometry.IsSameOrAdjacentCoarseCell(aircraftCell, formationCell.Value);
+				var nearDestination = destinationCell != null &&
+					AirThreatGeometry.IsSameOrAdjacentCoarseCell(aircraftCell, destinationCell.Value);
+				if (!nearFormation && !nearDestination)
 					continue;
 
 				owner.JoinAirFormation(aircraft);
 				if (owner.SquadManager.Info.AirTargetDebugLogging)
-					Log.Write("debug", "Air reinforcement [{0}] {1}#{2}: joined formation near {3}#{4}.",
+					Log.Write("debug", "Air reinforcement [{0}] {1}#{2}: joined formation near {3}; aircraft-cell={4} formation-cell={5} destination-cell={6}.",
 						owner.AirProfile, aircraft.Info.Name, aircraft.ActorID,
-						owner.TargetActor.Info.Name, owner.TargetActor.ActorID);
+						nearFormation ? "squad" : "destination", aircraftCell,
+						formationCell?.ToString() ?? "none", destinationCell?.ToString() ?? "none");
 			}
 		}
 
@@ -153,10 +192,11 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		}
 
 		/// <summary>
-		/// Conservative host-side estimate of whether fully loaded squad members can destroy a target
-		/// with their current magazines. This intentionally uses rules data only: target HP and armor,
-		/// weapon damage/versus/burst, and actual ammo state. It is used to recognize disposable AA
-		/// such as rocket infantry without actor-name exceptions.
+		/// Conservative host-side estimate of whether the fully loaded members of a squad can destroy a
+		/// target with their current magazines. Partially loaded members contribute nothing instead of
+		/// vetoing an otherwise ready formation. This intentionally uses rules data only: target HP and
+		/// armor, weapon damage/versus/burst, and actual ammo state. It is used to recognize disposable
+		/// AA such as rocket infantry without actor-name exceptions.
 		/// </summary>
 		static bool CanEliminateWithFullAmmo(IEnumerable<Actor> units, Actor target)
 		{
@@ -174,7 +214,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 				var ammoPools = unit.TraitsImplementing<AmmoPool>().ToArray();
 				if (!FullAmmo(ammoPools))
-					return false;
+					continue;
 
 				var attacks = ammoPools.Length == 0 ? 1 : ammoPools.Min(a => a.CurrentAmmoCount);
 				var bestAttackDamage = 0;
@@ -205,6 +245,93 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 			// Leave margin for misses, overkill between aircraft, and conditional damage modifiers.
 			return hasAttacker && availableDamage >= health.HP * 2L;
+		}
+
+		/// <summary>
+		/// Conservative time-to-kill estimate using current magazines. The two-times damage margin matches
+		/// <see cref="CanEliminateWithFullAmmo"/> and covers misses, overkill and conditional modifiers.
+		/// Returning <see cref="long.MaxValue"/> means the current force cannot reliably finish the set in
+		/// one exposed operation.
+		/// </summary>
+		static long EstimatedKillTicks(IEnumerable<Actor> units, IEnumerable<Actor> targets)
+		{
+			long totalTicks = 0;
+			foreach (var target in targets.Distinct().OrderBy(a => a.ActorID))
+			{
+				var health = target.TraitOrDefault<IHealth>();
+				if (health == null || health.HP <= 0)
+					continue;
+
+				var armorType = target.Info.TraitInfoOrDefault<ArmorInfo>()?.Type;
+				long availableDamage = 0;
+				var damagePerTick = 0d;
+				foreach (var unit in units)
+				{
+					if (!CanAttackTarget(unit, target))
+						continue;
+
+					var pools = unit.TraitsImplementing<AmmoPool>().ToArray();
+					var attacks = pools.Length == 0 ? int.MaxValue : pools.Min(a => a.CurrentAmmoCount);
+					if (attacks <= 0)
+						continue;
+
+					var bestVolleyDamage = 0;
+					var bestDamagePerTick = 0d;
+					foreach (var armament in unit.TraitsImplementing<Armament>())
+					{
+						if (armament.IsTraitDisabled || armament.IsTraitPaused ||
+							!armament.Weapon.IsValidTarget(target.GetEnabledTargetTypes()))
+							continue;
+
+						var shotDamage = 0;
+						foreach (var warhead in armament.Weapon.Warheads)
+							if (warhead is DamageWarhead damage && damage.Damage > 0)
+							{
+								var versus = armorType != null && damage.Versus.TryGetValue(armorType, out var modifier) ?
+									modifier : 100;
+								shotDamage += damage.Damage * versus / 100;
+							}
+
+						var volleyDamage = shotDamage * armament.Weapon.Burst;
+						var burstDelay = 0;
+						if (armament.Weapon.Burst > 1 && armament.Weapon.BurstDelays.Length > 0)
+							burstDelay = armament.Weapon.BurstDelays.Length == 1 ?
+								armament.Weapon.BurstDelays[0] * (armament.Weapon.Burst - 1) :
+								armament.Weapon.BurstDelays.Sum();
+
+						var cycleTicks = Math.Max(1, armament.Weapon.ReloadDelay + burstDelay);
+						var rate = volleyDamage / (double)cycleTicks;
+						if (rate <= bestDamagePerTick)
+							continue;
+
+						bestDamagePerTick = rate;
+						bestVolleyDamage = volleyDamage;
+					}
+
+					if (bestVolleyDamage <= 0)
+						continue;
+
+					damagePerTick += bestDamagePerTick;
+					if (availableDamage != long.MaxValue)
+					{
+						var contribution = (long)bestVolleyDamage * attacks;
+						availableDamage = attacks == int.MaxValue || long.MaxValue - availableDamage < contribution ?
+							long.MaxValue : availableDamage + contribution;
+					}
+				}
+
+				var requiredDamage = health.HP * 2L;
+				if (damagePerTick <= 0 || availableDamage < requiredDamage)
+					return long.MaxValue;
+
+				var targetTicks = (long)Math.Ceiling(requiredDamage / damagePerTick);
+				if (long.MaxValue - totalTicks < targetTicks)
+					return long.MaxValue;
+
+				totalTicks += targetTicks;
+			}
+
+			return Math.Max(1, totalTicks);
 		}
 
 		/// <summary>Average magazine fullness in the range 0..1. Units without ammo pools count as ready.</summary>
@@ -257,6 +384,22 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				value += (long)(EconomicValue(unit) * UnitAmmoReadiness(unit));
 
 			return value;
+		}
+
+		static bool IsCoveredByAa(Actor target,
+			IEnumerable<(Actor Actor, float StoppingWeight, int RangeCells)> threats)
+		{
+			foreach (var threat in threats)
+			{
+				if (threat.Actor.IsDead || threat.Actor == target)
+					continue;
+
+				var distance = (threat.Actor.CenterPosition - target.CenterPosition).Length / 1024;
+				if (distance <= threat.RangeCells)
+					return true;
+			}
+
+			return false;
 		}
 
 		/// <summary>Inaccuracy of a weapon's projectile, or 0 when the projectile type carries none.</summary>
@@ -348,14 +491,39 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			public readonly int Score;
 			public readonly bool IsUndefended;
 			public readonly List<CPos> Route;
+			public readonly bool ClearsAa;
+			public readonly List<Squad> SupportSquads;
+			public readonly CPos? AaProtectedCell;
+			public readonly IReadOnlyCollection<uint> AaThreatIds;
 
-			public AirTargetPlan(Actor actor, int score, bool isUndefended, List<CPos> route)
+			public AirTargetPlan(Actor actor, int score, bool isUndefended, List<CPos> route,
+				bool clearsAa = false, List<Squad> supportSquads = null, CPos? aaProtectedCell = null,
+				IReadOnlyCollection<uint> aaThreatIds = null)
 			{
 				Actor = actor;
 				Score = score;
 				IsUndefended = isUndefended;
 				Route = route;
+				ClearsAa = clearsAa;
+				SupportSquads = supportSquads;
+				AaProtectedCell = aaProtectedCell;
+				AaThreatIds = aaThreatIds;
 			}
+		}
+
+		sealed class DefendedCellPlan
+		{
+			public DefendedAirAction Action;
+			public Actor ClearTarget;
+			public List<Squad> SupportSquads;
+			public List<uint> AaThreatIds;
+			public double DangerValue;
+			public long UnlockedValue;
+			public long CellKillTicks;
+			public long ProtectedKillTicks;
+			public long AaClearTicks;
+			public long ClearAircraftValue;
+			public float ClearReferenceWeight;
 		}
 
 		protected static AirTargetPlan FindDefenselessTarget(Squad owner)
@@ -364,9 +532,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		}
 
 		static int BaseTargetUtility(Actor actor, SquadManagerBotModuleInfo info,
-			Dictionary<string, int> archetypePriority, float antiAirWeight)
+			Dictionary<string, int> archetypePriority, float antiAirWeight, int? priorityOverride = null)
 		{
-			var value = (long)Math.Max(1, TargetValue(actor, info, archetypePriority));
+			var value = (long)Math.Max(1, priorityOverride ?? TargetValue(actor, info, archetypePriority));
 			var valued = actor.Info.TraitInfoOrDefault<ValuedInfo>();
 			if (valued != null)
 				value = value * (100 + Math.Min(valued.Cost / 100, 100)) / 100;
@@ -381,6 +549,101 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			return health == null
 				? baseUtility
 				: AirThreatGeometry.RemainingHealthPriority(baseUtility, health.HP, health.MaxHP);
+		}
+
+		static bool ThreatCovers((Actor Actor, float StoppingWeight, int RangeCells) threat, Actor target)
+		{
+			return !threat.Actor.IsDead &&
+				(threat.Actor.CenterPosition - target.CenterPosition).Length / 1024 <= threat.RangeCells;
+		}
+
+		static List<Squad> NearbyAaSupportSquads(Squad owner, IEnumerable<Actor> aaTargets)
+		{
+			var radius = owner.SquadManager.Info.AirTargetAaClearSupportRadius;
+			if (radius <= 0)
+				return new List<Squad>();
+
+			var targets = aaTargets.ToList();
+			return owner.SquadManager.Squads
+				.Where(s => s != owner && s.IsValid && s.Type == SquadType.Air &&
+					(s.AirFormationCenter - owner.AirFormationCenter).Length / 1024 <= radius &&
+					targets.Any(t =>
+					{
+						var unit = s.AirFormationUnits(bootstrapIfEmpty: true)
+							.FirstOrDefault(u => CanAttackTarget(u, t));
+						return unit != null && SafeRouteForAircraft(s, unit, t, requireInfluenceCache: true) != null;
+					}))
+				.OrderBy(s => (s.AirFormationCenter - owner.AirFormationCenter).LengthSquared)
+				.ToList();
+		}
+
+		static DefendedCellPlan EvaluateDefendedCell(Squad owner, CPos cell,
+			List<int> actorIndices, List<(Actor Actor, int Utility, float ConfiguredWeight)> liveCandidates,
+			List<(Actor Actor, float StoppingWeight, int RangeCells)> threats, List<Actor> planningUnits)
+		{
+			var wantedInCell = actorIndices.Select(i => liveCandidates[i])
+				.Where(c => c.ConfiguredWeight <= 0 && c.Utility > 0).Select(c => c.Actor).ToList();
+			if (wantedInCell.Count == 0)
+				return null;
+
+			var coveringThreats = threats.Where(t => wantedInCell.Any(a => ThreatCovers(t, a)))
+				.GroupBy(t => t.Actor.ActorID).Select(g => g.First()).OrderBy(t => t.Actor.ActorID).ToList();
+			if (coveringThreats.Count == 0)
+				return null;
+
+			var aaTargets = coveringThreats.Select(t => t.Actor).ToList();
+
+			// Choose the first AA victim with the initiating squad, then only count nearby squads that can
+			// actually route to and attack that actor. This prevents paper strength from authorizing an
+			// operation that the supposed support formation never joins.
+			var clearTarget = aaTargets.OrderBy(a => EstimatedKillTicks(planningUnits, new[] { a }))
+				.ThenBy(a => a.ActorID).First();
+			var supportSquads = NearbyAaSupportSquads(owner, new[] { clearTarget });
+			var combinedUnits = planningUnits.Concat(supportSquads.SelectMany(s =>
+				s.AirFormationUnits(bootstrapIfEmpty: true))).Distinct().ToList();
+			var protectedTargets = liveCandidates
+				.Where(c => c.ConfiguredWeight <= 0 && c.Utility > 0 &&
+					coveringThreats.Any(t => ThreatCovers(t, c.Actor)))
+				.Select(c => c.Actor).Distinct().ToList();
+
+			var cellKillTicks = EstimatedKillTicks(planningUnits, wantedInCell);
+			var protectedKillTicks = EstimatedKillTicks(combinedUnits, protectedTargets);
+			var aaClearTicks = EstimatedKillTicks(combinedUnits, aaTargets);
+			var dangerValue = 0d;
+			foreach (var threat in coveringThreats)
+			{
+				var value = EconomicValue(threat.Actor);
+				dangerValue += value * threat.StoppingWeight;
+			}
+
+			var combinedValue = AmmoWeightedSquadValue(combinedUnits.Where(u =>
+				aaTargets.Any(t => CanAttackTarget(u, t))));
+			var info = owner.SquadManager.Info;
+			var referenceThreatWeight = AaClearReferenceThreatWeight(owner);
+			var clearEligible = AirThreatGeometry.CanAttemptAaClear(
+				owner.AirConsecutiveNoUndefendedScans, info.AirTargetAaClearFallbackScans,
+				combinedValue, referenceThreatWeight, dangerValue, info.AirTargetAaClearValueRatio);
+			var patientEnough = owner.AirConsecutiveNoUndefendedScans >= info.AirTargetAaClearFallbackScans;
+			var action = patientEnough ? AirThreatGeometry.ChooseDefendedAction(
+				cellKillTicks, protectedKillTicks, aaClearTicks, clearEligible) : DefendedAirAction.Reject;
+			if (action != DefendedAirAction.ClearAa)
+				clearTarget = null;
+
+			return new DefendedCellPlan
+			{
+				Action = action,
+				ClearTarget = clearTarget,
+				SupportSquads = supportSquads,
+				AaThreatIds = aaTargets.Select(a => a.ActorID).ToList(),
+				DangerValue = dangerValue,
+				UnlockedValue = protectedTargets.Sum(a =>
+					(long)liveCandidates.First(c => c.Actor == a).Utility),
+				CellKillTicks = cellKillTicks,
+				ProtectedKillTicks = protectedKillTicks,
+				AaClearTicks = aaClearTicks,
+				ClearAircraftValue = combinedValue,
+				ClearReferenceWeight = referenceThreatWeight,
+			};
 		}
 
 		/// <summary>
@@ -402,13 +665,14 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		/// best targets. Unlike the old random sampler this considers every known actor, can value a safe
 		/// detour, and keeps AA as a finite cost whose importance falls gradually as the squad grows.
 		/// </summary>
-		protected static AirTargetPlan FindBestAirTarget(Squad owner, bool relaxed = false)
+		protected static AirTargetPlan FindBestAirTarget(Squad owner, bool relaxed = false, bool escapeFromAa = false)
 		{
-			return FindBestAirTarget(owner, null, out _, null, relaxed);
+			return FindBestAirTarget(owner, null, out _, null, relaxed, escapeFromAa, null);
 		}
 
 		protected static AirTargetPlan FindBestAirTarget(Squad owner, Actor incumbent,
-			out AirTargetPlan incumbentPlan, CPos? requiredStrategicCell = null, bool relaxed = false)
+			out AirTargetPlan incumbentPlan, CPos? requiredStrategicCell = null, bool relaxed = false,
+			bool escapeFromAa = false, CPos? requiredAaProtectedCell = null)
 		{
 			incumbentPlan = null;
 			var map = owner.World.Map;
@@ -441,7 +705,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				owner.World.WorldTick - cache.Tick >= info.AirInfluenceCacheInterval)
 			{
 				var rebuiltDanger = new float[width * height];
-				var rebuiltCandidates = new List<(Actor Actor, int Utility)>();
+				var rebuiltCandidates = new List<(Actor Actor, int Utility, float ConfiguredWeight)>();
 				var rebuiltThreats = new List<(Actor Actor, float StoppingWeight, int RangeCells)>();
 				foreach (var actor in owner.World.Actors)
 				{
@@ -449,6 +713,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 						continue;
 
 					var profile = AntiAirProfile(actor);
+					var configuredWeight = ConfiguredThreatWeight(owner, actor, profile.Weight);
 					var stoppingWeight = StoppingThreatWeight(owner, actor, profile.Weight);
 					if (stoppingWeight > 0)
 					{
@@ -485,7 +750,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 					rebuiltCandidates.Add((actor,
 						BaseTargetUtility(actor, info, archetypePriority,
-							ConfiguredThreatWeight(owner, actor, profile.Weight))));
+							configuredWeight), configuredWeight));
 				}
 
 				cache = new AirInfluenceCache
@@ -506,7 +771,6 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 			var planningCenter = owner.AirFormationCenter;
 			var ammoReadiness = AmmoReadiness(planningUnits);
-			var ammoWeightedSquadValue = AmmoWeightedSquadValue(planningUnits);
 			var startCell = map.CellContaining(planningCenter);
 			var startX = Math.Clamp(startCell.X / coarseSize, 0, width - 1);
 			var startY = Math.Clamp(startCell.Y / coarseSize, 0, height - 1);
@@ -516,10 +780,39 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			Actor best = null;
 			List<CPos> bestRoute = null;
 			var bestIsUndefended = false;
+			var bestClearsAa = false;
+			List<Squad> bestSupportSquads = null;
+			CPos? bestAaProtectedCell = null;
+			IReadOnlyCollection<uint> bestAaThreatIds = null;
+			var bestEscapeExposure = float.MaxValue;
 
-			var liveCandidates = candidates.Where(c => !c.Actor.IsDead &&
-					planningUnits.Any(u => CanAttackTarget(u, c.Actor)))
-				.Select(c => (c.Actor, Utility: CurrentTargetUtility(c.Actor, c.Utility)))
+			var attackableCandidates = candidates.Where(c => !c.Actor.IsDead &&
+				planningUnits.Any(u => CanAttackTarget(u, c.Actor))).ToList();
+			var coverageTargets = attackableCandidates.Where(c => c.ConfiguredWeight <= 0).ToList();
+			var coveredTargets = coverageTargets.Count(c => IsCoveredByAa(c.Actor, threats));
+			if (info.AirTargetDebugLogging && info.AirTargetPowerActors.Count > 0 &&
+				info.AirTargetPowerPriorityMaximum > 0)
+				Log.Write("debug", "Air coverage [{0}]: covered={1}/{2} ({3:0.#}%) threshold={4}% power-maximum={5}.",
+					owner.AirProfile, coveredTargets, coverageTargets.Count,
+					coverageTargets.Count == 0 ? 0 : coveredTargets * 100f / coverageTargets.Count,
+					info.AirTargetPowerCoverageThresholdPercent, info.AirTargetPowerPriorityMaximum);
+
+			var liveCandidates = attackableCandidates.Select(c =>
+				{
+					var baseUtility = c.Utility;
+					if (info.AirTargetPowerActors.Contains(c.Actor.Info.Name) &&
+						info.AirTargetPowerPriorityMaximum > 0)
+					{
+						var authoredPriority = TargetValue(c.Actor, info, archetypePriority);
+						var adjustedPriority = AirThreatGeometry.CoverageAdjustedPriority(authoredPriority,
+							coveredTargets, coverageTargets.Count, info.AirTargetPowerCoverageThresholdPercent,
+							info.AirTargetPowerPriorityMaximum);
+						baseUtility = BaseTargetUtility(c.Actor, info, archetypePriority,
+							c.ConfiguredWeight, adjustedPriority);
+					}
+
+					return (c.Actor, Utility: CurrentTargetUtility(c.Actor, baseUtility), c.ConfiguredWeight);
+				})
 				.OrderBy(c => c.Actor.ActorID).ToList();
 			var liveCandidateActors = new HashSet<Actor>(liveCandidates.Select(c => c.Actor));
 			if (incumbent != null && !incumbent.IsDead &&
@@ -528,9 +821,16 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				planningUnits.Any(u => CanAttackTarget(u, incumbent)))
 			{
 				var profile = AntiAirProfile(incumbent);
+				var configuredWeight = ConfiguredThreatWeight(owner, incumbent, profile.Weight);
+				var priority = TargetValue(incumbent, info, archetypePriority);
+				if (info.AirTargetPowerActors.Contains(incumbent.Info.Name) && info.AirTargetPowerPriorityMaximum > 0)
+					priority = AirThreatGeometry.CoverageAdjustedPriority(priority, coveredTargets,
+						coverageTargets.Count, info.AirTargetPowerCoverageThresholdPercent,
+						info.AirTargetPowerPriorityMaximum);
+
 				var baseUtility = BaseTargetUtility(incumbent, info, archetypePriority,
-					ConfiguredThreatWeight(owner, incumbent, profile.Weight));
-				liveCandidates.Add((incumbent, CurrentTargetUtility(incumbent, baseUtility)));
+					configuredWeight, priority);
+				liveCandidates.Add((incumbent, CurrentTargetUtility(incumbent, baseUtility), configuredWeight));
 				liveCandidateActors.Add(incumbent);
 				liveCandidates.Sort((a, b) => a.Actor.ActorID.CompareTo(b.Actor.ActorID));
 			}
@@ -558,9 +858,16 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 						continue;
 
 					var profile = AntiAirProfile(actor);
+					var configuredWeight = ConfiguredThreatWeight(owner, actor, profile.Weight);
+					var priority = TargetValue(actor, info, archetypePriority);
+					if (info.AirTargetPowerActors.Contains(actor.Info.Name) && info.AirTargetPowerPriorityMaximum > 0)
+						priority = AirThreatGeometry.CoverageAdjustedPriority(priority, coveredTargets,
+							coverageTargets.Count, info.AirTargetPowerCoverageThresholdPercent,
+							info.AirTargetPowerPriorityMaximum);
+
 					var baseUtility = BaseTargetUtility(actor, info, archetypePriority,
-						ConfiguredThreatWeight(owner, actor, profile.Weight));
-					liveCandidates.Add((actor, CurrentTargetUtility(actor, baseUtility)));
+						configuredWeight, priority);
+					liveCandidates.Add((actor, CurrentTargetUtility(actor, baseUtility), configuredWeight));
 					liveCandidateActors.Add(actor);
 				}
 
@@ -568,6 +875,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			}
 
 			var cellUtility = new Dictionary<CPos, long>();
+			var cellUnlockUtility = new Dictionary<CPos, long>();
 			var cellActors = new Dictionary<CPos, List<int>>();
 			for (var i = 0; i < liveCandidates.Count; i++)
 			{
@@ -575,6 +883,12 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				var cell = new CPos(candidate.Actor.Location.X / coarseSize, candidate.Actor.Location.Y / coarseSize);
 				cellUtility.TryGetValue(cell, out var total);
 				cellUtility[cell] = total + candidate.Utility;
+				if (candidate.ConfiguredWeight <= 0)
+				{
+					cellUnlockUtility.TryGetValue(cell, out var unlockTotal);
+					cellUnlockUtility[cell] = unlockTotal + candidate.Utility;
+				}
+
 				if (!cellActors.TryGetValue(cell, out var actors))
 				{
 					actors = new List<int>();
@@ -623,7 +937,72 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				selectedCellIndices = selected.OrderBy(i => i).ToList();
 			}
 
+			if (requiredAaProtectedCell != null)
+			{
+				var protectedCellIndex = candidateCells.FindIndex(c => c == requiredAaProtectedCell.Value);
+				if (protectedCellIndex >= 0 && !selectedCellIndices.Contains(protectedCellIndex))
+					selectedCellIndices.Add(protectedCellIndex);
+			}
+
+			var defendedCellPlans = selectedCellIndices
+				.Select(i => candidateCells[i]).Distinct()
+				.Select(c => (Cell: c, Plan: EvaluateDefendedCell(
+					owner, c, cellActors[c], liveCandidates, threats, planningUnits)))
+				.Where(p => p.Plan != null)
+				.ToDictionary(p => p.Cell, p => p.Plan);
+			if (info.AirTargetDebugLogging)
+				foreach (var defended in defendedCellPlans.OrderBy(p => p.Key.Y).ThenBy(p => p.Key.X))
+					Log.Write("debug", "Air defended [{0}] cell={1}: action={2} cell-kill={3} protected-kill={4} AA-clear={5} clear-target={6} support-squads={7} aircraft-value={8} reference-weight={9:0.##} aircraft-strength={10:0.##} danger-value={11:0.##} required-ratio={12} unlocked={13}.",
+						owner.AirProfile, defended.Key, defended.Value.Action,
+						defended.Value.CellKillTicks, defended.Value.ProtectedKillTicks,
+						defended.Value.AaClearTicks, defended.Value.ClearTarget == null ? "none" :
+							defended.Value.ClearTarget.Info.Name + "#" + defended.Value.ClearTarget.ActorID,
+						defended.Value.SupportSquads.Count, defended.Value.ClearAircraftValue,
+						defended.Value.ClearReferenceWeight,
+						defended.Value.ClearAircraftValue * defended.Value.ClearReferenceWeight,
+						defended.Value.DangerValue, info.AirTargetAaClearValueRatio,
+						defended.Value.UnlockedValue);
 			var foundUndefendedTarget = false;
+			var aaClearPlans = new List<(Actor Actor, double DangerValue, long UnlockedValue,
+				int Score, List<CPos> Route, List<Squad> SupportSquads, CPos ProtectedCell,
+				List<uint> ThreatIds)>();
+			foreach (var defended in defendedCellPlans.OrderBy(p => p.Key.Y).ThenBy(p => p.Key.X))
+			{
+				var plan = defended.Value;
+				if (plan.Action != DefendedAirAction.ClearAa || plan.ClearTarget == null)
+					continue;
+
+				var clearCell = new CPos(plan.ClearTarget.Location.X / coarseSize,
+					plan.ClearTarget.Location.Y / coarseSize);
+				var route = AirThreatGeometry.FindCoarseRoute(danger, width, height, startX, startY,
+					Math.Clamp(clearCell.X, 0, width - 1), Math.Clamp(clearCell.Y, 0, height - 1),
+					info.AirRouteThreatPenalty);
+				if (route == null)
+					continue;
+
+				var exposureCost = route.Sum(p => danger[p.Y * width + p.X]) * info.AirRouteThreatPenalty;
+				var speedScale = info.AirTargetReferenceSpeed / (float)Math.Max(1, squadSpeed);
+				var ammoDistanceScale = 1f + ammoReadiness * info.AirTargetFullAmmoDistanceBonus / 100f * adaptiveRisk;
+				var distanceCost = (int)(route.Count * coarseSize * info.AirTargetDistancePenalty *
+					speedScale * ammoDistanceScale);
+				var clearCandidate = liveCandidates.FirstOrDefault(c => c.Actor == plan.ClearTarget);
+				var clearUtility = clearCandidate.Actor == null ? CurrentTargetUtility(plan.ClearTarget,
+					BaseTargetUtility(plan.ClearTarget, info, archetypePriority,
+						ConfiguredThreatWeight(owner, plan.ClearTarget, AntiAirProfile(plan.ClearTarget).Weight))) :
+					clearCandidate.Utility;
+				var opportunity = AirThreatGeometry.AirTargetOpportunityValue(clearUtility,
+					plan.UnlockedValue, false, false, true, info.AirTargetAaClearUnlockPercent);
+				var score = opportunity * 1024 / Math.Max(1, 1024 + distanceCost);
+				score = score * 1024 / Math.Max(1, 1024 + (int)exposureCost);
+				var smoothedRoute = AirThreatGeometry.SmoothCoarseRoute(
+					danger, width, height, startX, startY, route)
+					.Select(p => map.Clamp(new CPos(
+						p.X * coarseSize + coarseSize / 2, p.Y * coarseSize + coarseSize / 2))).ToList();
+				aaClearPlans.Add((plan.ClearTarget, plan.DangerValue, plan.UnlockedValue,
+					(int)Math.Clamp(score, int.MinValue, int.MaxValue), smoothedRoute,
+					plan.SupportSquads, defended.Key, plan.AaThreatIds));
+			}
+
 			foreach (var selectedCellIndex in selectedCellIndices)
 			{
 				var cell = candidateCells[selectedCellIndex];
@@ -649,17 +1028,21 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				var ammoDistanceScale = 1f + ammoReadiness * info.AirTargetFullAmmoDistanceBonus / 100f * adaptiveRisk;
 				var distanceCost = (int)(route.Count * coarseSize * info.AirTargetDistancePenalty *
 					speedScale * ammoDistanceScale);
+				var smoothedRoute = AirThreatGeometry.SmoothCoarseRoute(
+					danger, width, height, startX, startY, route)
+					.Select(p => map.Clamp(new CPos(
+						p.X * coarseSize + coarseSize / 2, p.Y * coarseSize + coarseSize / 2))).ToList();
 				Actor cellTarget = null;
 				var cellTargetScore = int.MinValue;
 				var cellTargetDanger = 0f;
 				var cellTargetStoppingCost = 0;
 				var cellTargetIsUndefended = false;
 				var cellTargetClearsAa = false;
-				var cellTargetUtility = 0;
+				long cellTargetOpportunityValue = 0;
 				var hasIncumbent = false;
 				var incumbentStoppingCost = 0;
 				var incumbentIsUndefended = false;
-				var incumbentUtility = 0;
+				long incumbentOpportunityValue = 0;
 
 				// The cell sum ranks the location. The actor's own utility and exact AA coverage choose
 				// the victim inside that location, so a SAM or power plant cannot inherit a harvester
@@ -668,10 +1051,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				{
 					var candidate = liveCandidates[candidateIndex];
 					var destinationDanger = 0f;
-					var candidateProfile = AntiAirProfile(candidate.Actor);
-					var candidateAa = ConfiguredThreatWeight(owner, candidate.Actor, candidateProfile.Weight) > 0;
-					var candidateAaCounted = false;
-					long targetCellAaValue = 0;
+					var candidateAa = candidate.ConfiguredWeight > 0;
 					foreach (var threat in threats)
 					{
 						if (threat.Actor.IsDead)
@@ -681,62 +1061,57 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 						if (distance > threat.RangeCells)
 							continue;
 
-						targetCellAaValue += EconomicValue(threat.Actor);
 						if (threat.Actor == candidate.Actor)
-						{
-							candidateAaCounted = true;
 							continue;
-						}
 
 						destinationDanger += threat.StoppingWeight;
 					}
 
-					if (candidateAa && !candidateAaCounted)
-						targetCellAaValue += EconomicValue(candidate.Actor);
-
 					var continuingAaClear = candidateAa && candidate.Actor == incumbent;
-					var aaClearValueEligible = AirThreatGeometry.CanAttemptAaClear(
-						owner.AirConsecutiveNoUndefendedScans, info.AirTargetAaClearFallbackScans,
-						ammoWeightedSquadValue, targetCellAaValue, info.AirTargetAaClearValueRatio);
-					var killableAa = candidateAa && CanEliminateWithFullAmmo(planningUnits, candidate.Actor);
-					var clearsAa = continuingAaClear || (killableAa && aaClearValueEligible);
-					if (candidateAa && info.AirTargetDebugLogging)
-						Log.Write("debug", "Air AA-clear [{0}] {1}#{2}: eligible={3} continuing={4} killable={5} value-eligible={6} no-undefended-scans={7}/{8} squad-value={9} target-cell-aa-value={10} required-ratio={11}x.",
-							owner.AirProfile, candidate.Actor.Info.Name, candidate.Actor.ActorID,
-							clearsAa, continuingAaClear, killableAa, aaClearValueEligible,
-							owner.AirConsecutiveNoUndefendedScans,
-							info.AirTargetAaClearFallbackScans, ammoWeightedSquadValue,
-							targetCellAaValue, info.AirTargetAaClearValueRatio);
+					var clearsAa = continuingAaClear;
 
 					// AA actors are deliberate clearing targets, never incidental victims of cell value.
 					if (candidateAa && !clearsAa)
 						continue;
 
-					var quickStrike = !clearsAa && destinationDanger > 0 &&
-						CanEliminateWithFullAmmo(planningUnits, candidate.Actor);
+					var quickStrike = false;
+					if (!candidateAa && destinationDanger > 0)
+					{
+						if (!defendedCellPlans.TryGetValue(cell, out var defendedPlan) ||
+							defendedPlan.Action != DefendedAirAction.Sneak)
+							continue;
+
+						quickStrike = true;
+					}
+
 					var stoppingCost = (int)(destinationDanger * info.AirTargetAntiAirPenalty / attackRiskScale);
 					if (quickStrike)
 						stoppingCost /= 2;
 
-					// AA actors only receive unlock credit in the defended tier. The credit comes from
-					// everything worth attacking in this cell and is divided by the other AA that would
-					// still be shooting, so one mobile SAM screening harvesters becomes compelling while
-					// a dense static SAM nest does not reward itself.
-					var candidateOpportunityValue = useClusterOpportunity ?
-						clusteredOpportunityValue : candidate.Utility;
-					var targetValue = (long)candidate.Utility;
-					if (clearsAa)
-						targetValue += candidateOpportunityValue * info.AirTargetAaClearUnlockPercent / 100;
-
 					var isUndefended = destinationDanger <= 0 && !clearsAa;
+					cellUnlockUtility.TryGetValue(cell, out var unlockedValue);
+					var candidateLocationValue = AirThreatGeometry.AirTargetOpportunityValue(
+						candidate.Utility, clusteredOpportunityValue, useClusterOpportunity,
+						isUndefended, clearsAa, info.AirTargetAaClearUnlockPercent);
+					var targetValue = clearsAa ? AirThreatGeometry.AirTargetOpportunityValue(
+						candidate.Utility, unlockedValue, false, false, true,
+						info.AirTargetAaClearUnlockPercent) : candidate.Utility;
+					if (clearsAa)
+						candidateLocationValue = targetValue;
+
 					var targetScore = targetValue * 1024 / Math.Max(1, 1024 + stoppingCost);
 					var finalTargetScore = (int)Math.Clamp(targetScore, int.MinValue, int.MaxValue);
+					var locationScore = candidateLocationValue;
+					locationScore = locationScore * 1024 / Math.Max(1, 1024 + distanceCost);
+					locationScore = locationScore * 1024 / Math.Max(1, 1024 + (int)exposureCost);
+					locationScore = locationScore * 1024 / Math.Max(1, 1024 + stoppingCost);
+					var finalLocationScore = (int)Math.Clamp(locationScore, int.MinValue, int.MaxValue);
 					if (candidate.Actor == incumbent)
 					{
 						hasIncumbent = true;
 						incumbentStoppingCost = stoppingCost;
 						incumbentIsUndefended = isUndefended;
-						incumbentUtility = candidate.Utility;
+						incumbentOpportunityValue = candidateLocationValue;
 					}
 
 					if (info.AirTargetDebugLogging)
@@ -754,7 +1129,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 						cellTargetStoppingCost = stoppingCost;
 						cellTargetIsUndefended = isUndefended;
 						cellTargetClearsAa = clearsAa;
-						cellTargetUtility = candidate.Utility;
+						cellTargetOpportunityValue = candidateLocationValue;
 					}
 				}
 
@@ -763,7 +1138,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 				// Each independent liability scales the location value down. Defended locations remain
 				// finite choices, but only after every selected undefended location has been considered.
-				var opportunityValue = useClusterOpportunity ? clusteredOpportunityValue : cellTargetUtility;
+				var opportunityValue = cellTargetOpportunityValue;
 				var score = opportunityValue;
 				score = score * 1024 / Math.Max(1, 1024 + distanceCost);
 				score = score * 1024 / Math.Max(1, 1024 + (int)exposureCost);
@@ -771,15 +1146,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				var finalScore = (int)Math.Clamp(score, int.MinValue, int.MaxValue);
 				if (cellTargetIsUndefended && (relaxed || finalScore >= info.AirTargetMinimumScore))
 					foundUndefendedTarget = true;
-				var smoothedRoute = AirThreatGeometry.SmoothCoarseRoute(
-					danger, width, height, startX, startY, route)
-					.Select(p => map.Clamp(new CPos(
-						p.X * coarseSize + coarseSize / 2, p.Y * coarseSize + coarseSize / 2))).ToList();
-
 				if (hasIncumbent)
 				{
-					var incumbentOpportunityValue = useClusterOpportunity ?
-						clusteredOpportunityValue : incumbentUtility;
 					var incumbentScore = incumbentOpportunityValue;
 					incumbentScore = incumbentScore * 1024 / Math.Max(1, 1024 + distanceCost);
 					incumbentScore = incumbentScore * 1024 / Math.Max(1, 1024 + (int)exposureCost);
@@ -799,13 +1167,77 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				// Undefended targets form the first selection tier. A defended target remains eligible,
 				// but only when this bounded strategic-cell pool contains no undefended destination at all.
 				// Route and distance costs still rank candidates within each tier.
-				if (best == null || (cellTargetIsUndefended && !bestIsUndefended) ||
-					(cellTargetIsUndefended == bestIsUndefended && finalScore > bestScore))
+				var betterEscape = escapeFromAa && cellTargetIsUndefended &&
+					(exposureCost < bestEscapeExposure ||
+						(exposureCost == bestEscapeExposure && finalScore > bestScore));
+				var betterNormal = !escapeFromAa && (best == null ||
+					(cellTargetIsUndefended && !bestIsUndefended) ||
+					(cellTargetIsUndefended == bestIsUndefended && finalScore > bestScore));
+				if (betterEscape || betterNormal)
 				{
 					best = cellTarget;
 					bestScore = finalScore;
 					bestIsUndefended = cellTargetIsUndefended;
 					bestRoute = smoothedRoute;
+					bestClearsAa = false;
+					bestSupportSquads = null;
+					bestAaProtectedCell = null;
+					bestAaThreatIds = null;
+					bestEscapeExposure = exposureCost;
+				}
+			}
+
+			var viableAaClearPlans = aaClearPlans
+				.Where(p => relaxed || p.Score >= info.AirTargetMinimumScore)
+				.GroupBy(p => p.Actor.ActorID)
+				.Select(g => g.OrderByDescending(p => p.UnlockedValue)
+					.ThenBy(p => p.DangerValue).ThenByDescending(p => p.Score).First())
+				.OrderBy(p => p.Actor.ActorID).ToList();
+			if (!escapeFromAa && incumbent != null)
+			{
+				var incumbentAaIndex = AirThreatGeometry.SelectAaClearCandidateForTarget(
+					viableAaClearPlans.Select(p => p.Actor.ActorID).ToList(), incumbent.ActorID,
+					viableAaClearPlans.Select(p => p.DangerValue).ToList(),
+					viableAaClearPlans.Select(p => p.UnlockedValue).ToList(),
+					viableAaClearPlans.Select(p => p.Score).ToList());
+				if (incumbentAaIndex >= 0)
+				{
+					var incumbentAa = viableAaClearPlans[incumbentAaIndex];
+					incumbentPlan = new AirTargetPlan(incumbentAa.Actor, incumbentAa.Score, false,
+						incumbentAa.Route, clearsAa: true, supportSquads: incumbentAa.SupportSquads,
+						aaProtectedCell: incumbentAa.ProtectedCell, aaThreatIds: incumbentAa.ThreatIds);
+					if (info.AirTargetDebugLogging)
+						Log.Write("debug", "Air AA-clear [{0}] recalculated incumbent {1}#{2}: protected-cell={3} danger-value={4:0.##} unlocked-value={5} score={6} support-squads={7}.",
+							owner.AirProfile, incumbent.Info.Name, incumbent.ActorID,
+							incumbentAa.ProtectedCell, incumbentAa.DangerValue,
+							incumbentAa.UnlockedValue, incumbentAa.Score,
+							incumbentAa.SupportSquads.Count);
+				}
+			}
+
+			if (!escapeFromAa && !foundUndefendedTarget && info.AirTargetAaClearWeakestCandidates > 0)
+			{
+				var aaClearIndex = AirThreatGeometry.SelectAaClearCandidate(
+					viableAaClearPlans.Select(p => p.DangerValue).ToList(),
+					viableAaClearPlans.Select(p => p.UnlockedValue).ToList(),
+					viableAaClearPlans.Select(p => p.Score).ToList(),
+					info.AirTargetAaClearWeakestCandidates);
+				if (aaClearIndex >= 0)
+				{
+					var aaClear = viableAaClearPlans[aaClearIndex];
+					best = aaClear.Actor;
+					bestScore = aaClear.Score;
+					bestIsUndefended = false;
+					bestRoute = aaClear.Route;
+					bestClearsAa = true;
+					bestSupportSquads = aaClear.SupportSquads;
+					bestAaProtectedCell = aaClear.ProtectedCell;
+					bestAaThreatIds = aaClear.ThreatIds;
+					if (info.AirTargetDebugLogging)
+						Log.Write("debug", "Air AA-clear [{0}] selected {1}#{2}: danger-value={3:0.##} unlocked-value={4} score={5} weakest-pool={6} eligible={7}.",
+							owner.AirProfile, best.Info.Name, best.ActorID, aaClear.DangerValue,
+							aaClear.UnlockedValue, bestScore, info.AirTargetAaClearWeakestCandidates,
+							viableAaClearPlans.Count);
 				}
 			}
 
@@ -837,7 +1269,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					owner.AirProfile, best.Info.Name, best.ActorID, bestScore, bestIsUndefended,
 					bestRoute?.Count ?? 0, relaxed);
 
-			return new AirTargetPlan(best, bestScore, bestIsUndefended, bestRoute);
+			return new AirTargetPlan(best, bestScore, bestIsUndefended, bestRoute,
+				bestClearsAa, bestSupportSquads, bestAaProtectedCell, bestAaThreatIds);
 		}
 
 		protected static void ApplyAirTargetPlan(Squad owner, AirTargetPlan plan)
@@ -855,23 +1288,68 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			owner.AirTargetLastHP = plan.Actor.TraitOrDefault<IHealth>()?.HP ?? int.MaxValue;
 			owner.AirTargetScore = plan.Score;
 			owner.AirTargetIsUndefended = plan.IsUndefended;
+			owner.AirTargetClearsAa = plan.ClearsAa;
+			owner.AirAaClearProtectedCell = plan.ClearsAa ? plan.AaProtectedCell : null;
+			owner.AirAaClearThreatIds.Clear();
+			if (plan.ClearsAa && plan.AaThreatIds != null)
+				owner.AirAaClearThreatIds.UnionWith(plan.AaThreatIds);
+			owner.AirAaClearEngaged = false;
+
 			owner.AirNextTargetReviewTick = owner.World.WorldTick + info.AirInfluenceCacheInterval;
 			if (plan.Route != null)
 				owner.AirRoute.AddRange(plan.Route);
+
+			if (!plan.ClearsAa || plan.SupportSquads == null)
+				return;
+
+			foreach (var support in plan.SupportSquads)
+			{
+				if (!support.IsValid || support == owner)
+					continue;
+
+				var supportUnits = AirDecisionUnits(support);
+				if (supportUnits.Count == 0 || !supportUnits.Any(a => CanAttackTarget(a, plan.Actor)))
+					continue;
+
+				var route = SafeRouteForAircraft(
+					support, supportUnits[0], plan.Actor, requireInfluenceCache: true);
+				if (route == null)
+					continue;
+
+				ApplyAirTargetPlan(support, new AirTargetPlan(
+					plan.Actor, plan.Score, false, route, clearsAa: true,
+					aaProtectedCell: plan.AaProtectedCell, aaThreatIds: plan.AaThreatIds));
+				support.FuzzyStateMachine.ChangeState(support, new AirAttackState(), true);
+				if (info.AirTargetDebugLogging)
+					Log.Write("debug", "Air AA-clear [{0}] coordinated support [{1}] with {2} aircraft against {3}#{4} via {5} waypoints.",
+						owner.AirProfile, support.AirProfile, supportUnits.Count,
+						plan.Actor.Info.Name, plan.Actor.ActorID, route.Count);
+			}
 		}
 
-		protected static List<CPos> SafeRouteForAircraft(Squad owner, Actor aircraft, Actor target)
+		protected static void ClearAaTargetContext(Squad owner)
 		{
-			return SafeRouteForAircraft(owner, aircraft, target.Location);
+			owner.AirTargetClearsAa = false;
+			owner.AirAaClearProtectedCell = null;
+			owner.AirAaClearThreatIds.Clear();
+			owner.AirAaClearEngaged = false;
 		}
 
-		static List<CPos> SafeRouteForAircraft(Squad owner, Actor aircraft, CPos targetCell)
+		protected static List<CPos> SafeRouteForAircraft(Squad owner, Actor aircraft, Actor target,
+			bool requireInfluenceCache = false)
+		{
+			return SafeRouteForAircraft(owner, aircraft, target.Location, requireInfluenceCache);
+		}
+
+		static List<CPos> SafeRouteForAircraft(Squad owner, Actor aircraft, CPos targetCell,
+			bool requireInfluenceCache = false)
 		{
 			var info = owner.SquadManager.Info;
 			var speed = aircraft.Info.TraitInfoOrDefault<AircraftInfo>()?.Speed ?? info.AirTargetReferenceSpeed;
 			if (!InfluenceCaches.TryGetValue(owner.SquadManager, out var profileCaches) ||
 				!profileCaches.TryGetValue(owner.AirProfile + ":" + speed, out var cache))
-				return owner.AirRoute.Count > 0 ? owner.AirRoute.ToList() : null;
+				return requireInfluenceCache ? null :
+					(owner.AirRoute.Count > 0 ? owner.AirRoute.ToList() : null);
 
 			var map = owner.World.Map;
 			var coarseSize = info.AirInfluenceCellSize;
@@ -889,6 +1367,98 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				cache.Danger, cache.Width, cache.Height, startX, startY, route)
 				.Select(p => map.Clamp(new CPos(
 					p.X * coarseSize + coarseSize / 2, p.Y * coarseSize + coarseSize / 2))).ToList();
+		}
+
+		static List<CPos> NearestSafeRouteFromFormation(Squad owner)
+		{
+			var info = owner.SquadManager.Info;
+			var units = AirDecisionUnits(owner);
+			if (units.Count == 0)
+				return null;
+
+			var speed = units.Select(a => a.Info.TraitInfoOrDefault<AircraftInfo>())
+				.Where(a => a != null).Min(a => a.Speed);
+			if (!InfluenceCaches.TryGetValue(owner.SquadManager, out var profileCaches) ||
+				!profileCaches.TryGetValue(owner.AirProfile + ":" + speed, out var cache))
+				return null;
+
+			var map = owner.World.Map;
+			var coarseSize = info.AirInfluenceCellSize;
+			var start = map.CellContaining(owner.AirFormationCenter);
+			var startX = Math.Clamp(start.X / coarseSize, 0, cache.Width - 1);
+			var startY = Math.Clamp(start.Y / coarseSize, 0, cache.Height - 1);
+			var route = AirThreatGeometry.FindNearestSafeCoarseRoute(
+				cache.Danger, cache.Width, cache.Height, startX, startY, info.AirRouteThreatPenalty);
+			if (route == null || route.Count == 0)
+				return route;
+
+			return AirThreatGeometry.SmoothCoarseRoute(
+				cache.Danger, cache.Width, cache.Height, startX, startY, route)
+				.Select(p => map.Clamp(new CPos(
+					p.X * coarseSize + coarseSize / 2, p.Y * coarseSize + coarseSize / 2))).ToList();
+		}
+
+		static bool BeginRoutedLocalAaEscape(Squad owner)
+		{
+			var info = owner.SquadManager.Info;
+
+			// Local safety runs more often than the strategic cache. Force this rare emergency replan to
+			// include the live AA actor that triggered it instead of escaping on a map up to five seconds old.
+			if (InfluenceCaches.TryGetValue(owner.SquadManager, out var profileCaches))
+				foreach (var key in profileCaches.Keys
+					.Where(k => k.StartsWith(owner.AirProfile + ":", StringComparison.OrdinalIgnoreCase)).ToList())
+					profileCaches.Remove(key);
+
+			var target = FindBestAirTarget(owner, escapeFromAa: true);
+			if (target != null && target.IsUndefended && target.Route != null && target.Route.Count > 1)
+			{
+				ApplyAirTargetPlan(owner, target);
+				owner.AirEscapingLocalAa = true;
+				owner.FuzzyStateMachine.ChangeState(owner, new AirAttackState(), true);
+				if (info.AirTargetDebugLogging)
+					Log.Write("debug", "Air escape [{0}] routed toward safe target {1}#{2}: waypoints={3} score={4}.",
+						owner.AirProfile, target.Actor.Info.Name, target.Actor.ActorID,
+						target.Route.Count, target.Score);
+
+				return true;
+			}
+
+			var route = NearestSafeRouteFromFormation(owner);
+			if (route == null || route.Count == 0)
+				return false;
+
+			owner.TargetActor = null;
+			ClearAaTargetContext(owner);
+			owner.AirRoute.Clear();
+			owner.AirRouteQueued = false;
+			var destination = route[route.Count - 1];
+			foreach (var aircraft in owner.Units)
+			{
+				if (SendHomeToResupply(owner, aircraft) || SendHomeToRepair(owner, aircraft))
+					continue;
+
+				if (owner.AirReinforcements.Contains(aircraft.ActorID))
+				{
+					QueueSafeMoveForReinforcement(owner, aircraft, destination);
+					continue;
+				}
+
+				var queued = false;
+				foreach (var waypoint in route)
+				{
+					owner.Bot.QueueOrder(new Order("Move", aircraft,
+						Target.FromCell(owner.World, waypoint), queued));
+					queued = true;
+				}
+			}
+
+			owner.AirEscapingLocalAa = true;
+			owner.FuzzyStateMachine.ChangeState(owner, new AirFleeState(), true);
+			if (info.AirTargetDebugLogging)
+				Log.Write("debug", "Air escape [{0}] routed to nearest safe cell {1}: waypoints={2}.",
+					owner.AirProfile, destination, route.Count);
+
+			return true;
 		}
 
 		// New and repaired aircraft remain reinforcements until they reach the target's coarse cell or one
@@ -1007,6 +1577,79 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			return AirTargetClass.Building;
 		}
 
+		static bool TryContinueLiveAaClear(Squad owner, List<Actor> localThreats)
+		{
+			if (!owner.IsTargetValid || localThreats.Count == 0)
+				return false;
+
+			var selectedTargetInRange = localThreats.Any(a => a == owner.TargetActor);
+			var allLocalThreatsPlanned = localThreats.All(a => owner.AirAaClearThreatIds.Contains(a.ActorID));
+			var response = AirThreatGeometry.PlannedAaClearResponse(
+				owner.AirTargetClearsAa, selectedTargetInRange, allLocalThreatsPlanned);
+			if (response == LocalAaClearResponse.Flee)
+				return false;
+
+			if (response == LocalAaClearResponse.Continue)
+				return true;
+
+			var targetId = owner.TargetActor.ActorID;
+			var participants = owner.SquadManager.Squads.Where(s =>
+				s.IsValid && s.Type == SquadType.Air && s.AirTargetClearsAa &&
+				s.IsTargetValid && s.TargetActor.ActorID == targetId).ToList();
+			if (!participants.Contains(owner))
+				participants.Add(owner);
+
+			var combinedUnits = participants.SelectMany(AirDecisionUnits).Distinct().ToList();
+			var distinctThreats = localThreats.Distinct().OrderBy(a => a.ActorID).ToList();
+			var attackUnits = combinedUnits.Where(u => distinctThreats.Any(t => CanAttackTarget(u, t))).ToList();
+			var combinedValue = AmmoWeightedSquadValue(attackUnits);
+			var dangerValue = distinctThreats.Sum(a =>
+				EconomicValue(a) * (double)StoppingThreatWeight(owner, a, AntiAirProfile(a).Weight));
+			var clearTicks = EstimatedKillTicks(combinedUnits, distinctThreats);
+			var noUndefendedScans = participants.Max(s => s.AirConsecutiveNoUndefendedScans);
+			var info = owner.SquadManager.Info;
+			var referenceThreatWeight = AaClearReferenceThreatWeight(owner);
+			var eligible = clearTicks != long.MaxValue && AirThreatGeometry.CanAttemptAaClear(
+				noUndefendedScans, info.AirTargetAaClearFallbackScans,
+				combinedValue, referenceThreatWeight, dangerValue, info.AirTargetAaClearValueRatio);
+
+			if (info.AirTargetDebugLogging)
+				Log.Write("debug", "Air AA-clear [{0}] live recalculation near {1}: selected-in-range={2} planned-threats={3}/{4} participants={5} aircraft={6} ammo-value={7} reference-weight={8:0.##} aircraft-strength={9:0.##} danger-value={10:0.##} required-ratio={11} clear-ticks={12} eligible={13}.",
+					owner.AirProfile, owner.TargetActor.Info.Name + "#" + owner.TargetActor.ActorID,
+					selectedTargetInRange, distinctThreats.Count(a => owner.AirAaClearThreatIds.Contains(a.ActorID)),
+					distinctThreats.Count, participants.Count, combinedUnits.Count,
+					combinedValue, referenceThreatWeight, combinedValue * referenceThreatWeight,
+					dangerValue, info.AirTargetAaClearValueRatio, clearTicks, eligible);
+
+			if (!eligible)
+				return false;
+
+			var threatIds = new HashSet<uint>(participants.SelectMany(s => s.AirAaClearThreatIds));
+			threatIds.UnionWith(distinctThreats.Select(a => a.ActorID));
+			var focus = selectedTargetInRange ? owner.TargetActor : distinctThreats
+				.OrderBy(a => EstimatedKillTicks(combinedUnits, new[] { a }))
+				.ThenBy(a => a.ActorID).First();
+			if (focus == owner.TargetActor)
+			{
+				foreach (var participant in participants)
+					participant.AirAaClearThreatIds.UnionWith(threatIds);
+
+				return true;
+			}
+
+			ApplyAirTargetPlan(owner, new AirTargetPlan(
+				focus, owner.AirTargetScore, false, null, clearsAa: true,
+				supportSquads: participants.Where(s => s != owner).ToList(),
+				aaProtectedCell: owner.AirAaClearProtectedCell, aaThreatIds: threatIds));
+			owner.FuzzyStateMachine.ChangeState(owner, new AirAttackState(), true);
+			if (info.AirTargetDebugLogging)
+				Log.Write("debug", "Air AA-clear [{0}] live recalculation focused local threat {1}#{2} before resuming protected cell {3}.",
+					owner.AirProfile, focus.Info.Name, focus.ActorID,
+					owner.AirAaClearProtectedCell?.ToString() ?? "none");
+
+			return true;
+		}
+
 		/// <summary>
 		/// Squad-local anti-air awareness, driven by <see cref="SquadManagerBotModuleInfo.AirSafetyCheckInterval"/>
 		/// rather than by the squad state machine. Because it looks around the squad's own position it covers
@@ -1043,6 +1686,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var archetypePriority = ArchetypePriority(owner);
 
 			var antiAirWeight = 0f;
+			var localThreats = new List<Actor>();
 			var ownBuildingNear = false;
 
 			Actor localTarget = null;
@@ -1078,7 +1722,10 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					var distanceInCells = (a.CenterPosition - squadCenter).Length / 1024f;
 					var withinRange = AirThreatGeometry.IsWithinBufferedRange(distanceInCells, profile.RangeCells, info.AirThreatRangeBuffer);
 					if (withinRange)
+					{
 						antiAirWeight += stoppingWeight;
+						localThreats.Add(a);
+					}
 
 					continue;
 				}
@@ -1105,6 +1752,19 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			// Empty self-reloading aircraft use this on their strategic tick to decide whether they can
 			// safely hold position and finish reloading instead of automatically abandoning the mission.
 			owner.AirLocalThreatWeight = ownBuildingNear ? 0 : antiAirWeight;
+			if (antiAirWeight <= 0)
+			{
+				owner.AirEscapingLocalAa = false;
+				owner.AirAaClearEngaged = false;
+			}
+			else if (owner.AirEscapingLocalAa && (owner.AirRoute.Count > 1 ||
+				owner.Units.Any(a => !owner.AirUnitsRepairing.Contains(a.ActorID) &&
+					!a.IsIdle && !BusyAttack(a))))
+			{
+				// The strategic escape route is already carrying the squad out of this pocket. Replacing it
+				// with another local reverse hop is the bounce loop this state is designed to prevent.
+				return;
+			}
 
 			// Adaptive aggression may help finish an attack after the squad has reached the selected
 			// strategic cell. It must never make the approach, withdrawal, repair, or evasion less safe.
@@ -1123,8 +1783,20 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var decisionUnits = AirDecisionUnits(owner);
 			var effectiveSquadStrength = (int)Math.Min(int.MaxValue,
 				Math.Ceiling(decisionUnits.Count * localRisk));
-			if (!ownBuildingNear && AirThreatGeometry.ShouldFleeAntiAir(
-				antiAirWeight, info.AirThreatFleeMultiplier, effectiveSquadStrength))
+			var shouldFlee = !ownBuildingNear && AirThreatGeometry.ShouldFleeAntiAir(
+				antiAirWeight, info.AirThreatFleeMultiplier, effectiveSquadStrength);
+			if (shouldFlee && TryContinueLiveAaClear(owner, localThreats))
+			{
+				if (!owner.AirAaClearEngaged && info.AirTargetDebugLogging)
+					Log.Write("debug", "Air AA-clear [{0}] entered coordinated engagement against {1}#{2}: planned-threats={3} local-threats={4}.",
+						owner.AirProfile, owner.TargetActor.Info.Name, owner.TargetActor.ActorID,
+						owner.AirAaClearThreatIds.Count, localThreats.Count);
+
+				owner.AirAaClearEngaged = true;
+				return;
+			}
+
+			if (shouldFlee)
 			{
 				if (info.AirTargetDebugLogging)
 					Log.Write("debug", "Air evade [{0}] local AA safety: threat={1:0.##} flee-multiplier={2} effective-strength={3} risk={4:0.00} in-target-cell={5} target={6}.",
@@ -1132,13 +1804,17 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 						localRisk, inTargetCell, owner.IsTargetValid ?
 						owner.TargetActor.Info.Name + "#" + owner.TargetActor.ActorID : "none");
 
-				// Drop the target so the squad re-evaluates from scratch once it is clear; the threat we
-				// just remembered will make the route back through here look expensive.
-				// The state change happens even when Evade declines to re-order (rate limit), so the squad
-				// cannot keep pressing an attack run it has already decided to abandon.
+				// Drop the unsafe target, then ask the strategic router for a lower-exposure target or at
+				// least the nearest safe coarse cell. The old direct reverse hop remains only as a fallback
+				// when the influence map has no usable route.
 				owner.TargetActor = null;
-				Evade(owner, "local AA safety");
-				owner.FuzzyStateMachine.ChangeState(owner, new AirFleeState(), true);
+				ClearAaTargetContext(owner);
+				if (!BeginRoutedLocalAaEscape(owner))
+				{
+					Evade(owner, "local AA safety route unavailable");
+					owner.FuzzyStateMachine.ChangeState(owner, new AirFleeState(), true);
+				}
+
 				return;
 			}
 
@@ -1302,6 +1978,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				return false;
 
 			var threats = LiveRepairThreats(owner);
+			Actor previousRepairTarget = null;
+			var previousTargetDanger = float.MaxValue;
 			if (repairing && owner.AirRepairTargets.TryGetValue(a.ActorID, out var repairTargetId))
 			{
 				var repairTarget = owner.World.GetActorById(repairTargetId);
@@ -1321,12 +1999,16 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 						return true;
 				}
 
-				owner.AirRepairTargets.Remove(a.ActorID);
-				if (owner.SquadManager.Info.AirTargetDebugLogging)
+				previousRepairTarget = targetEligible ? repairTarget : null;
+				previousTargetDanger = targetDanger;
+				if (!targetEligible)
+					owner.AirRepairTargets.Remove(a.ActorID);
+
+				if (owner.SquadManager.Info.AirTargetDebugLogging && !targetEligible)
 					Log.Write("debug", "Air repair [{0}] {1}#{2}: previous destination {3} became {4}; replanning.",
 						owner.AirProfile, a.Info.Name, a.ActorID,
 						repairTarget == null ? "unavailable" : repairTarget.Info.Name + "#" + repairTarget.ActorID,
-						targetDanger > 0 && targetDanger < float.MaxValue ? "AA-covered (danger " + targetDanger.ToString("0.##") + ")" : "unavailable");
+						"unavailable");
 			}
 
 			var recovery = FindSafestRepairBuilding(owner, a, repairable, threats, requireAvailable: true);
@@ -1360,6 +2042,35 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 						owner.AirProfile, a.Info.Name, a.ActorID, health.HP, health.MaxHP,
 						waitingAt.Route?.Count ?? 0, waitingAt.Building.Info.Name, waitingAt.Building.ActorID);
 
+				return true;
+			}
+
+			// A compatible facility still exists, but every option is currently inside AA cover. Keep the
+			// aircraft out of the formation and move it to a safe holding point. Re-evaluate on each safety
+			// update so it can claim the facility as soon as the AA disappears, or rejoin only after every
+			// compatible facility has actually been destroyed or lost.
+			if (waitingAt.CandidateCount > 0)
+			{
+				var compromisedTarget = waitingAt.FallbackBuilding ?? previousRepairTarget;
+				var alreadyHoldingForTarget = compromisedTarget != null && previousRepairTarget == compromisedTarget &&
+					previousTargetDanger > 0 && previousTargetDanger < float.MaxValue;
+				var currentlySafe = RepairDestinationDanger(a.CenterPosition, threats) <= 0;
+				if (!alreadyHoldingForTarget || (a.IsIdle && !currentlySafe))
+				{
+					var holding = FindSafeRepairHoldingLocation(owner, a, threats);
+					QueueRepairHoldingRoute(owner, a, holding?.Route, holding?.Destination ?? a.Location);
+
+					if (owner.SquadManager.Info.AirTargetDebugLogging)
+						Log.Write("debug", "Air repair [{0}] {1}#{2}: {3}/{4} HP, {5} repair option(s) AA-covered; " +
+							"holding safely at {6} while waiting for {7}#{8}.",
+							owner.AirProfile, a.Info.Name, a.ActorID, health.HP, health.MaxHP,
+							waitingAt.CandidateCount,
+							holding?.Shelter == null ? "cell " + (holding?.Destination.ToString() ?? a.Location.ToString()) :
+								holding.Shelter.Info.Name + "#" + holding.Shelter.ActorID,
+							compromisedTarget?.Info.Name ?? "facility", compromisedTarget?.ActorID ?? 0);
+				}
+
+				owner.MarkAirRepairing(a, compromisedTarget);
 				return true;
 			}
 
@@ -1442,8 +2153,13 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				if (!owned && !alliedPassive)
 					continue;
 
-				if (owned && requireAvailable && !Reservable.IsAvailableFor(b, aircraft))
-					continue;
+				if (owned && requireAvailable)
+				{
+					var assignedToOther = AirThreatGeometry.HasOtherRepairAssignment(owner.AirRepairTargets,
+						owner.AirUnitsRepairing, aircraft.ActorID, b.ActorID);
+					if (assignedToOther || !Reservable.IsAvailableFor(b, aircraft))
+						continue;
+				}
 
 				candidates.Add((b, owned && requireAvailable));
 			}
@@ -1454,26 +2170,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var info = owner.SquadManager.Info;
 			var map = owner.World.Map;
 			var coarseSize = info.AirInfluenceCellSize;
-			var width = (map.MapSize.X + coarseSize - 1) / coarseSize;
-			var height = (map.MapSize.Y + coarseSize - 1) / coarseSize;
-			var danger = new float[width * height];
+			var danger = BuildRepairDangerGrid(owner, threats, out var width, out var height);
 			var aircraftSpeed = aircraft.Info.TraitInfoOrDefault<AircraftInfo>()?.Speed ?? info.AirTargetReferenceSpeed;
-			foreach (var threat in threats)
-			{
-				var minX = Math.Max(0, (threat.Actor.Location.X - threat.RangeCells) / coarseSize);
-				var maxX = Math.Min(width - 1, (threat.Actor.Location.X + threat.RangeCells) / coarseSize);
-				var minY = Math.Max(0, (threat.Actor.Location.Y - threat.RangeCells) / coarseSize);
-				var maxY = Math.Min(height - 1, (threat.Actor.Location.Y + threat.RangeCells) / coarseSize);
-				for (var y = minY; y <= maxY; y++)
-					for (var x = minX; x <= maxX; x++)
-					{
-						var cell = new CPos(x * coarseSize + coarseSize / 2, y * coarseSize + coarseSize / 2);
-						var distance = (map.CenterOfCell(map.Clamp(cell)) - threat.Actor.CenterPosition).Length / 1024;
-						if (distance <= threat.RangeCells)
-							danger[y * width + x] += threat.Weight;
-					}
-			}
-
 			var start = map.CellContaining(aircraft.CenterPosition);
 			var startX = Math.Clamp(start.X / coarseSize, 0, width - 1);
 			var startY = Math.Clamp(start.Y / coarseSize, 0, height - 1);
@@ -1517,9 +2215,105 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			return new AirRepairPlan
 			{
 				Building = best,
+				FallbackBuilding = candidates
+					.OrderBy(c => RepairDestinationDanger(c.Building.CenterPosition, threats))
+					.ThenBy(c => (c.Building.CenterPosition - aircraft.CenterPosition).LengthSquared)
+					.ThenBy(c => c.Building.ActorID)
+					.First().Building,
 				Route = bestRoute,
 				RepairAtEnd = bestRepairAtEnd,
+				CandidateCount = candidates.Count,
 				RejectedByAa = rejectedByAa,
+			};
+		}
+
+		static float[] BuildRepairDangerGrid(Squad owner,
+			IEnumerable<(Actor Actor, float Weight, int RangeCells)> threats, out int width, out int height)
+		{
+			var info = owner.SquadManager.Info;
+			var map = owner.World.Map;
+			var coarseSize = info.AirInfluenceCellSize;
+			width = (map.MapSize.X + coarseSize - 1) / coarseSize;
+			height = (map.MapSize.Y + coarseSize - 1) / coarseSize;
+			var danger = new float[width * height];
+			foreach (var threat in threats)
+			{
+				var minX = Math.Max(0, (threat.Actor.Location.X - threat.RangeCells) / coarseSize);
+				var maxX = Math.Min(width - 1, (threat.Actor.Location.X + threat.RangeCells) / coarseSize);
+				var minY = Math.Max(0, (threat.Actor.Location.Y - threat.RangeCells) / coarseSize);
+				var maxY = Math.Min(height - 1, (threat.Actor.Location.Y + threat.RangeCells) / coarseSize);
+				for (var y = minY; y <= maxY; y++)
+					for (var x = minX; x <= maxX; x++)
+					{
+						var cell = new CPos(x * coarseSize + coarseSize / 2, y * coarseSize + coarseSize / 2);
+						var distance = (map.CenterOfCell(map.Clamp(cell)) - threat.Actor.CenterPosition).Length / 1024;
+						if (distance <= threat.RangeCells)
+							danger[y * width + x] += threat.Weight;
+					}
+			}
+
+			return danger;
+		}
+
+		static AirRepairHoldingPlan FindSafeRepairHoldingLocation(Squad owner, Actor aircraft,
+			List<(Actor Actor, float Weight, int RangeCells)> threats)
+		{
+			var info = owner.SquadManager.Info;
+			var map = owner.World.Map;
+			var coarseSize = info.AirInfluenceCellSize;
+			var danger = BuildRepairDangerGrid(owner, threats, out var width, out var height);
+			var start = map.CellContaining(aircraft.CenterPosition);
+			var startX = Math.Clamp(start.X / coarseSize, 0, width - 1);
+			var startY = Math.Clamp(start.Y / coarseSize, 0, height - 1);
+			var aircraftSpeed = aircraft.Info.TraitInfoOrDefault<AircraftInfo>()?.Speed ?? info.AirTargetReferenceSpeed;
+			Actor bestShelter = null;
+			List<CPos> bestRoute = null;
+			var bestCost = float.MaxValue;
+			foreach (var shelter in owner.World.ActorsHavingTrait<Building>()
+				.Where(b => b.Owner == owner.Bot.Player).OrderBy(b => b.ActorID))
+			{
+				var goalX = Math.Clamp(shelter.Location.X / coarseSize, 0, width - 1);
+				var goalY = Math.Clamp(shelter.Location.Y / coarseSize, 0, height - 1);
+				if (RepairDestinationDanger(shelter.CenterPosition, threats) > 0 ||
+					danger[goalY * width + goalX] > 0)
+					continue;
+
+				var route = AirThreatGeometry.FindCoarseRoute(
+					danger, width, height, startX, startY, goalX, goalY, info.AirRouteThreatPenalty);
+				if (route == null)
+					continue;
+
+				var exposure = route.Sum(p => danger[p.Y * width + p.X]) * info.AirRouteThreatPenalty;
+				var travel = route.Count * coarseSize * info.AirTargetDistancePenalty *
+					info.AirTargetReferenceSpeed / (float)Math.Max(1, aircraftSpeed);
+				var cost = exposure + travel;
+				if (cost >= bestCost)
+					continue;
+
+				bestShelter = shelter;
+				bestRoute = route;
+				bestCost = cost;
+			}
+
+			if (bestShelter == null)
+			{
+				bestRoute = AirThreatGeometry.FindNearestSafeCoarseRoute(
+					danger, width, height, startX, startY, info.AirRouteThreatPenalty);
+				if (bestRoute == null)
+					return null;
+			}
+
+			var smoothedRoute = AirThreatGeometry.SmoothCoarseRoute(
+				danger, width, height, startX, startY, bestRoute)
+				.Select(p => map.Clamp(new CPos(
+					p.X * coarseSize + coarseSize / 2, p.Y * coarseSize + coarseSize / 2))).ToList();
+			var destination = bestShelter?.Location ??
+				(smoothedRoute.Count > 0 ? smoothedRoute[smoothedRoute.Count - 1] : aircraft.Location);
+			return new AirRepairHoldingPlan
+			{
+				Shelter = bestShelter,
+				Destination = destination,
+				Route = smoothedRoute,
 			};
 		}
 
@@ -1541,6 +2335,22 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			else if (!queued)
 				owner.Bot.QueueOrder(new Order(
 					"Move", aircraft, Target.FromCell(owner.World, destination.Location), false));
+		}
+
+		static void QueueRepairHoldingRoute(Squad owner, Actor aircraft, List<CPos> route, CPos destination)
+		{
+			var queued = false;
+			if (route != null)
+				foreach (var waypoint in route)
+				{
+					owner.Bot.QueueOrder(new Order(
+						"Move", aircraft, Target.FromCell(owner.World, waypoint), queued));
+					queued = true;
+				}
+
+			if (!queued)
+				owner.Bot.QueueOrder(new Order(
+					"Move", aircraft, Target.FromCell(owner.World, destination), false));
 		}
 
 		/// <summary>
@@ -1722,11 +2532,14 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				{
 					var incumbent = owner.TargetActor;
 					var previousScore = owner.AirTargetScore;
-					var challenger = FindBestAirTarget(owner, incumbent, out var freshIncumbent);
-					var switchTarget = freshIncumbent == null ||
+					var challenger = FindBestAirTarget(owner, incumbent, out var freshIncumbent,
+						requiredAaProtectedCell: owner.AirTargetClearsAa ? owner.AirAaClearProtectedCell : null);
+					var recalculatedIncumbent = challenger != null && challenger.Actor == incumbent ?
+						challenger : freshIncumbent;
+					var switchTarget = recalculatedIncumbent == null ||
 						(challenger != null && challenger.Actor != incumbent &&
-						AirThreatGeometry.ShouldSwitchTarget(freshIncumbent.IsUndefended,
-							freshIncumbent.Score, true, challenger.IsUndefended, challenger.Score,
+						AirThreatGeometry.ShouldSwitchTarget(recalculatedIncumbent.IsUndefended,
+							recalculatedIncumbent.Score, true, challenger.IsUndefended, challenger.Score,
 							info.AirTargetSwitchImprovementPercent));
 					if (switchTarget)
 					{
@@ -1742,6 +2555,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 						else
 						{
 							owner.TargetActor = null;
+							ClearAaTargetContext(owner);
 							owner.AirTargetStrategicCell = null;
 							owner.AirRoute.Clear();
 							owner.AirRouteQueued = false;
@@ -1749,13 +2563,18 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					}
 					else
 					{
-						owner.AirTargetScore = freshIncumbent.Score;
-						owner.AirTargetIsUndefended = freshIncumbent.IsUndefended;
+						owner.AirTargetScore = recalculatedIncumbent.Score;
+						owner.AirTargetIsUndefended = recalculatedIncumbent.IsUndefended;
+						owner.AirTargetClearsAa = recalculatedIncumbent.ClearsAa;
+						owner.AirAaClearProtectedCell = recalculatedIncumbent.ClearsAa ?
+							recalculatedIncumbent.AaProtectedCell : null;
 						if (info.AirTargetDebugLogging)
-							Log.Write("debug", "Air target [{0}] retaining building {1}#{2}: challenger={3} old-score={4} fresh-score={5} challenger-score={6}.",
+							Log.Write("debug", "Air target [{0}] retaining building {1}#{2}: challenger={3} old-score={4} recalculated-score={5} challenger-score={6} clears-aa={7} protected-cell={8}.",
 								owner.AirProfile, incumbent.Info.Name, incumbent.ActorID,
 								challenger == null ? "none" : challenger.Actor.Info.Name + "#" + challenger.Actor.ActorID,
-								previousScore, freshIncumbent.Score, challenger?.Score ?? int.MinValue);
+								previousScore, recalculatedIncumbent.Score,
+								challenger?.Score ?? int.MinValue, recalculatedIncumbent.ClearsAa,
+								recalculatedIncumbent.AaProtectedCell?.ToString() ?? "none");
 					}
 				}
 			}
@@ -1778,20 +2597,22 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					var previousCell = owner.AirTargetStrategicCell.Value;
 					var incumbent = owner.TargetActor;
 					var oldScore = owner.AirTargetScore;
-					var best = FindBestAirTarget(owner, incumbent, out var freshIncumbent);
+					var best = FindBestAirTarget(owner, incumbent, out var freshIncumbent,
+						requiredAaProtectedCell: owner.AirTargetClearsAa ? owner.AirAaClearProtectedCell : null);
+					var recalculatedIncumbent = best != null && best.Actor == incumbent ? best : freshIncumbent;
 					AirTargetPlan selected;
 					string decision;
-					if (freshIncumbent == null)
+					if (recalculatedIncumbent == null)
 					{
 						selected = best;
 						decision = best == null ? "abandoned" : "switched-invalid-incumbent";
 					}
 					else if (best == null || best.Actor == incumbent ||
-						!AirThreatGeometry.ShouldSwitchTarget(freshIncumbent.IsUndefended,
-							freshIncumbent.Score, true, best.IsUndefended, best.Score,
+						!AirThreatGeometry.ShouldSwitchTarget(recalculatedIncumbent.IsUndefended,
+							recalculatedIncumbent.Score, true, best.IsUndefended, best.Score,
 							info.AirTargetSwitchImprovementPercent))
 					{
-						selected = freshIncumbent;
+						selected = recalculatedIncumbent;
 						decision = "retained";
 					}
 					else
@@ -1803,7 +2624,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					if (info.AirTargetDebugLogging)
 						Log.Write("debug", "Air target [{0}] {1}#{2} moved strategic cell {3}->{4}; fresh reassessment={5} old-score={6} incumbent-score={7} best={8} best-score={9} progress-age={10}.",
 							owner.AirProfile, incumbent.Info.Name, incumbent.ActorID, previousCell, currentCell,
-							decision, oldScore, freshIncumbent?.Score ?? int.MinValue,
+							decision, oldScore, recalculatedIncumbent?.Score ?? int.MinValue,
 							best == null ? "none" : best.Actor.Info.Name + "#" + best.Actor.ActorID,
 							best?.Score ?? int.MinValue, ticksSinceProgress);
 
@@ -1812,6 +2633,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					else
 					{
 						owner.TargetActor = null;
+						ClearAaTargetContext(owner);
 						owner.AirTargetStrategicCell = null;
 						owner.AirRoute.Clear();
 						owner.AirRouteQueued = false;
@@ -1837,6 +2659,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 								owner.AirRouteQueued, routeTraveling, anyUnitBusy, hasArmedUnit);
 
 						owner.TargetActor = null;
+						ClearAaTargetContext(owner);
 						owner.AirTargetStrategicCell = null;
 						owner.AirRoute.Clear();
 						owner.AirRouteQueued = false;
@@ -1846,7 +2669,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 			if (!owner.IsTargetValid)
 			{
-				var rememberedTargetCell = owner.AirTargetStrategicCell;
+				var rememberedTargetCell = owner.AirTargetClearsAa && owner.AirAaClearProtectedCell != null ?
+					owner.AirAaClearProtectedCell : owner.AirTargetStrategicCell;
+				ClearAaTargetContext(owner);
 				owner.AirTargetStrategicCell = null;
 				var nextTarget = rememberedTargetCell == null
 					? FindBestAirTarget(owner)
@@ -2011,6 +2836,16 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		{
 			if (!owner.IsValid)
 				return;
+
+			if (owner.AirEscapingLocalAa)
+			{
+				if (owner.Units.Any(a => !owner.AirUnitsRepairing.Contains(a.ActorID) && !a.IsIdle))
+					return;
+
+				owner.AirEscapingLocalAa = false;
+				owner.FuzzyStateMachine.ChangeState(owner, new AirIdleState(), true);
+				return;
+			}
 
 			Evade(owner, "flee-state continuation");
 
