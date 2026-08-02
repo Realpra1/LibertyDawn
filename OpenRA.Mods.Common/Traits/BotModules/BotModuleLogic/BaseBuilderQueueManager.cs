@@ -216,7 +216,7 @@ namespace OpenRA.Mods.Common.Traits
 			return true;
 		}
 
-		ActorInfo GetProducibleBuilding(HashSet<string> actors, IEnumerable<ActorInfo> buildables, Func<ActorInfo, int> orderBy = null)
+		ActorInfo GetProducibleBuilding(HashSet<string> actors, IEnumerable<ActorInfo> buildables, Func<ActorInfo, double> orderBy = null)
 		{
 			var available = buildables.Where(actor =>
 			{
@@ -280,10 +280,19 @@ namespace OpenRA.Mods.Common.Traits
 			// Make sure that we can spend as fast as we are earning
 			if (baseBuilder.Info.NewProductionCashThreshold > 0 && playerResources.Resources > baseBuilder.Info.NewProductionCashThreshold)
 			{
-				var production = GetProducibleBuilding(baseBuilder.Info.ProductionTypes, buildableThings);
+				var productionCandidates = buildableThings.Where(a => baseBuilder.Info.ProductionTypes.Contains(a.Name)).ToList();
+				var production = GetProducibleBuilding(baseBuilder.Info.ProductionTypes, productionCandidates,
+					a => baseBuilder.AdaptiveProductionBuildingDemand(a) /
+						(1 + playerBuildings.Count(b => b.Info.Name == a.Name)));
 				if (production != null && HasSufficientPowerForActor(production))
 				{
-					AIUtils.BotDebug("{0} decided to build {1}: Priority override (production)", queue.Actor.Owner, DisplayName(production.Name));
+					var demand = baseBuilder.AdaptiveProductionBuildingDemand(production);
+					AIUtils.BotDebug("{0} decided to build {1}: Priority override (production, adaptive demand {2:0.00})",
+						queue.Actor.Owner, DisplayName(production.Name), demand);
+					if (baseBuilder.AdaptiveProductionDebugLogging)
+						baseBuilder.LogAdaptiveProduction("{0} production-building scores: {1}", player,
+							string.Join(", ", productionCandidates.OrderBy(a => a.Name).Select(a =>
+								FormattableString.Invariant($"{DisplayName(a.Name)}={baseBuilder.AdaptiveProductionBuildingDemand(a):0.00}"))));
 					return production;
 				}
 

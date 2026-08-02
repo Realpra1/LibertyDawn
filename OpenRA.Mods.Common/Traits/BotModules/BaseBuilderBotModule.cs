@@ -192,6 +192,7 @@ namespace OpenRA.Mods.Common.Traits
 		CPos defenseCenter;
 
 		readonly List<BaseBuilderQueueManager> builders = new List<BaseBuilderQueueManager>();
+		UnitBuilderBotModule[] unitBuilders;
 
 		public BaseBuilderBotModule(Actor self, BaseBuilderBotModuleInfo info)
 			: base(info)
@@ -206,7 +207,23 @@ namespace OpenRA.Mods.Common.Traits
 			playerResources = self.Owner.PlayerActor.Trait<PlayerResources>();
 			resourceLayer = self.World.WorldActor.TraitOrDefault<IResourceLayer>();
 			positionsUpdatedModules = self.Owner.PlayerActor.TraitsImplementing<IBotPositionsUpdated>().ToArray();
+			unitBuilders = self.Owner.PlayerActor.TraitsImplementing<UnitBuilderBotModule>().ToArray();
 			WallPlanner = new BaseBuilderWallPlanner(this, player);
+		}
+
+		internal bool AdaptiveProductionDebugLogging => unitBuilders.Any(u =>
+			!u.IsTraitDisabled && u.Info.AdaptiveProductionDebugLogging);
+
+		internal void LogAdaptiveProduction(string format, params object[] args)
+		{
+			AIUtils.BotDebug(format, args);
+			Log.Write("debug", "AI adaptive production: " + format, args);
+		}
+
+		internal double AdaptiveProductionBuildingDemand(ActorInfo building)
+		{
+			return unitBuilders.Where(u => !u.IsTraitDisabled)
+				.Select(u => u.ProductionBuildingDemand(building)).DefaultIfEmpty(0).Max();
 		}
 
 		protected override void TraitEnabled(Actor self)

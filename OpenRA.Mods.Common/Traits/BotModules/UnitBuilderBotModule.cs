@@ -77,6 +77,12 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Actor type name of the mobile construction vehicle, exempted from adaptive scoring and boosted by McvPriorityThreshold.")]
 		public readonly string McvActor = "mcv";
 
+		[Desc("Write adaptive unit/building demand scores and cross-queue production decisions to debug.log.")]
+		public readonly bool AdaptiveProductionDebugLogging = false;
+
+		[Desc("Minimum ticks between full adaptive candidate-table log entries. Selection decisions are always logged.")]
+		public readonly int AdaptiveProductionLogInterval = 250;
+
 		public override object Create(ActorInitializer init) { return new UnitBuilderBotModule(init.Self, this); }
 	}
 
@@ -108,6 +114,17 @@ namespace OpenRA.Mods.Common.Traits
 		int lastWindowSpent;
 		int incomeThisWindow;
 		int spendThisWindow;
+		int nextAdaptiveProductionLogTick;
+		bool adaptiveInitializationLogged;
+
+		sealed class UnitBuildOffer
+		{
+			public ProductionQueue Queue;
+			public ActorInfo Unit;
+			public string Category;
+			public double Score;
+			public int Cost;
+		}
 
 		public UnitBuilderBotModule(Actor self, UnitBuilderBotModuleInfo info)
 			: base(info)
@@ -130,6 +147,13 @@ namespace OpenRA.Mods.Common.Traits
 
 		void IBotTick.BotTick(IBot bot)
 		{
+			if (Info.AdaptiveProductionDebugLogging && !adaptiveInitializationLogged)
+			{
+				adaptiveInitializationLogged = true;
+				LogAdaptiveProduction("{0} module active for queues: {1}", player,
+					string.Join(", ", Info.UnitQueues.OrderBy(q => q, StringComparer.Ordinal)));
+			}
+
 			if (requestPause.Any(rp => rp.PauseUnitProduction))
 				return;
 
@@ -150,8 +174,12 @@ namespace OpenRA.Mods.Common.Traits
 					queuedBuildRequests.Remove(buildRequest);
 				}
 
-				foreach (var q in Info.UnitQueues)
-					BuildUnit(bot, q, idleUnitCount < Info.IdleBaseUnitsMaximum);
+				if (Info.WeightedUnitSelection && Info.UnitsToBuild != null &&
+					idleUnitCount < Info.IdleBaseUnitsMaximum)
+					BuildAdaptiveUnitsAcrossQueues(bot);
+				else
+					foreach (var q in Info.UnitQueues)
+						BuildUnit(bot, q, idleUnitCount < Info.IdleBaseUnitsMaximum);
 			}
 		}
 
@@ -161,6 +189,12 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			var tooltip = world.Map.Rules.Actors[type].TraitInfoOrDefault<TooltipInfo>();
 			return !string.IsNullOrEmpty(tooltip?.Name) ? $"{tooltip.Name} ({type})" : type;
+		}
+
+		void LogAdaptiveProduction(string format, params object[] args)
+		{
+			AIUtils.BotDebug(format, args);
+			Log.Write("debug", "AI adaptive production: " + format, args);
 		}
 
 		void RefreshAdaptiveCounts()
@@ -201,8 +235,17 @@ namespace OpenRA.Mods.Common.Traits
 				stats.MinuteLossesValue = 0;
 
 				if (Math.Abs(stats.DecayedScore - previous) > 0.05)
-					AIUtils.BotDebug("{0} adaptive score for {1}: {2:0.00} -> {3:0.00} (built {4}, killed {5}, lost {6})",
-						player, DisplayName(kv.Key), previous, stats.DecayedScore, stats.BuiltCount, stats.KillsCount, stats.LossesCount);
+				{
+					var args = new object[]
+					{
+						player, DisplayName(kv.Key), previous, stats.DecayedScore,
+						stats.BuiltCount, stats.KillsCount, stats.LossesCount
+					};
+					if (Info.AdaptiveProductionDebugLogging)
+						LogAdaptiveProduction("{0} score for {1}: {2:0.00} -> {3:0.00} (built {4}, killed {5}, lost {6})", args);
+					else
+						AIUtils.BotDebug("{0} adaptive score for {1}: {2:0.00} -> {3:0.00} (built {4}, killed {5}, lost {6})", args);
+				}
 			}
 
 			if (Info.AdaptiveTypes.Count > 0)
@@ -215,7 +258,10 @@ namespace OpenRA.Mods.Common.Traits
 					var adapted = AdaptiveWeighting.AdaptedWeight(authored, stats.DecayedScore, confidence);
 					return FormattableString.Invariant($"{DisplayName(t)}={adapted:0.0}(authored {authored}, score {stats.DecayedScore:0.00}, conf {confidence:0.00})");
 				});
-				AIUtils.BotDebug("{0} adaptive weights: {1}", player, string.Join(", ", table));
+				if (Info.AdaptiveProductionDebugLogging)
+					LogAdaptiveProduction("{0} weights: {1}", player, string.Join(", ", table));
+				else
+					AIUtils.BotDebug("{0} adaptive weights: {1}", player, string.Join(", ", table));
 			}
 
 			var ticksPerWindow = Math.Max(1, 60000 / world.Timestep);
@@ -265,6 +311,109 @@ namespace OpenRA.Mods.Common.Traits
 				world.ActorsHavingTrait<Building>().Where(a => a.Owner == player).Count() / 20);
 
 			bot.QueueOrder(Order.StartProduction(queue.Actor, name, queueAmount));
+		}
+
+		void BuildAdaptiveUnitsAcrossQueues(IBot bot)
+		{
+			var offers = new List<UnitBuildOffer>();
+			var seenQueues = new HashSet<ProductionQueue>();
+			foreach (var category in Info.UnitQueues.OrderBy(q => q, StringComparer.Ordinal))
+				foreach (var queue in AIUtils.FindQueues(player, category))
+				{
+					if (!seenQueues.Add(queue) || queue.AllQueued().Any())
+						continue;
+
+					var unit = ChooseWeightedUnitToBuild(queue.BuildableItems().ToList());
+					if (unit == null || !CanBuildConfiguredUnit(unit))
+						continue;
+
+					offers.Add(new UnitBuildOffer
+					{
+						Queue = queue,
+						Unit = unit,
+						Category = category,
+						Score = AdaptiveProductionScore(unit.Name),
+						Cost = Math.Max(0, unit.TraitInfoOrDefault<ValuedInfo>()?.Cost ?? 0)
+					});
+				}
+
+			var logTable = Info.AdaptiveProductionDebugLogging && world.WorldTick >= nextAdaptiveProductionLogTick;
+			if (logTable)
+				nextAdaptiveProductionLogTick = world.WorldTick + Math.Max(1, Info.AdaptiveProductionLogInterval);
+
+			if (offers.Count == 0)
+			{
+				if (logTable)
+					LogAdaptiveProduction("{0} has no candidates: {1}", player,
+						string.Join(", ", Info.UnitQueues.OrderBy(q => q, StringComparer.Ordinal).Select(category =>
+						{
+							var queues = AIUtils.FindQueues(player, category).ToList();
+							return $"{category} queues={queues.Count} free={queues.Count(q => !q.AllQueued().Any())}";
+						})));
+
+				return;
+			}
+
+			var budget = Math.Max(0, playerResources.Cash + playerResources.Resources);
+			var selected = new HashSet<int>(AdaptiveWeighting.SelectAffordableOffers(
+				offers.Select(o => o.Score).ToArray(), offers.Select(o => o.Cost).ToArray(), budget));
+			if (logTable)
+			{
+				LogAdaptiveProduction("{0} candidates (budget {1}): {2}", player, budget,
+					string.Join(", ", offers.Select((o, i) => FormattableString.Invariant(
+						$"{o.Category}:{DisplayName(o.Unit.Name)} score={o.Score:0.00} cost={o.Cost} {(selected.Contains(i) ? "selected" : "deferred")}"))));
+			}
+
+			foreach (var index in selected)
+			{
+				var offer = offers[index];
+				bot.QueueOrder(Order.StartProduction(offer.Queue.Actor, offer.Unit.Name, 1));
+				if (Info.AdaptiveProductionDebugLogging)
+					LogAdaptiveProduction("{0} selected {1} on {2}: score={3:0.00} cost={4} budget={5}",
+						player, DisplayName(offer.Unit.Name), offer.Category, offer.Score, offer.Cost, budget);
+			}
+		}
+
+		bool CanBuildConfiguredUnit(ActorInfo unit)
+		{
+			var name = unit.Name;
+			if (!Info.UnitsToBuild.ContainsKey(name))
+				return false;
+
+			if (Info.UnitDelays != null && Info.UnitDelays.TryGetValue(name, out var delay) && delay > world.WorldTick)
+				return false;
+
+			return Info.UnitLimits == null || !Info.UnitLimits.TryGetValue(name, out var limit) ||
+				world.Actors.Count(a => a.Owner == player && a.Info.Name == name) < limit;
+		}
+
+		double AdaptiveProductionScore(string type)
+		{
+			if (type == Info.McvActor && AdaptiveWeighting.ShouldForceMcv(
+				cachedDeployedConstructionYards, Info.McvPriorityThreshold))
+				return 1000000;
+
+			if (Info.EconomyTypes.Contains(type) && AdaptiveWeighting.ShouldForceEconomy(
+				incomeThisWindow, spendThisWindow, cachedLiveHarvesters, Info.HarvesterFloor))
+				return 500000;
+
+			return AdaptiveTypeWeight(type);
+		}
+
+		internal double ProductionBuildingDemand(ActorInfo building)
+		{
+			if (!Info.WeightedUnitSelection || Info.UnitsToBuild == null)
+				return 0;
+
+			var productionTypes = new HashSet<string>(building.TraitInfos<ProductionInfo>()
+				.SelectMany(p => p.Produces), StringComparer.OrdinalIgnoreCase);
+			if (productionTypes.Count == 0)
+				return 0;
+
+			return Info.UnitsToBuild.Keys.Where(world.Map.Rules.Actors.ContainsKey)
+				.Where(t => world.Map.Rules.Actors[t].TraitInfoOrDefault<BuildableInfo>()?.Queue
+					.Any(productionTypes.Contains) == true)
+				.Select(AdaptiveProductionScore).DefaultIfEmpty(0).Max();
 		}
 
 		// In cases where we want to build a specific unit but don't know the queue name (because there's more than one possibility)
