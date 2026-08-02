@@ -46,18 +46,29 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		// Consecutive AirIdleState scans that found no worthwhile target. This gradually increases the
 		// willingness to accept a low score, but coarse route danger always remains part of the cost.
 		internal int AirConsecutiveNoTargetScans;
+		internal int AirConsecutiveNoUndefendedScans;
 		internal readonly List<CPos> AirRoute = new List<CPos>();
-		internal readonly HashSet<uint> AirRouteAssignedUnits = new HashSet<uint>();
-		internal int AirRoutePlanTick;
+		internal bool AirRouteQueued;
 		internal readonly HashSet<uint> AirUnitsRepairing = new HashSet<uint>();
+		internal readonly Dictionary<uint, uint> AirRepairTargets = new Dictionary<uint, uint>();
+		internal readonly HashSet<uint> AirRepairUnavailable = new HashSet<uint>();
+		internal readonly HashSet<uint> AirReinforcements = new HashSet<uint>();
+		internal readonly Dictionary<uint, uint> AirReinforcementTargets = new Dictionary<uint, uint>();
+		WPos airLastFormationCenter;
+		bool hasAirFormationCenter;
 		internal CPos? AirTargetStrategicCell;
 		internal int AirTargetLastProgressTick;
 		internal int AirTargetLastDistanceCells = int.MaxValue;
 		internal int AirTargetLastHP = int.MaxValue;
 		internal int AirTargetScore = int.MinValue;
 		internal bool AirTargetIsUndefended;
+		internal bool AirTargetClearsAa;
+		internal CPos? AirAaClearProtectedCell;
+		internal readonly HashSet<uint> AirAaClearThreatIds = new HashSet<uint>();
+		internal bool AirAaClearEngaged;
 		internal float AirLocalThreatWeight;
 		internal int AirNextTargetReviewTick;
+		internal bool AirEscapingLocalAa;
 
 		public Squad(IBot bot, SquadManagerBotModule squadManager, SquadType type)
 			: this(bot, squadManager, type, null) { }
@@ -174,6 +185,109 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 		public WPos CenterPosition { get { return Units.Select(u => u.CenterPosition).Average(); } }
 
+		/// <summary>
+		/// Aircraft that have reached the formation. Repairing aircraft and reinforcements still traveling
+		/// from a factory or repair pad remain squad-owned, but do not pull its tactical center away from
+		/// the formation or increase the strength used for squad-level decisions.
+		/// </summary>
+		internal List<Actor> AirFormationUnits(bool bootstrapIfEmpty = false)
+		{
+			var formation = Units.Where(a => !AirUnitsRepairing.Contains(a.ActorID) &&
+				!AirReinforcements.Contains(a.ActorID)).ToList();
+			if (formation.Count == 0 && bootstrapIfEmpty)
+				formation.AddRange(Units.Where(a => !AirUnitsRepairing.Contains(a.ActorID)));
+
+			return formation;
+		}
+
+		internal WPos AirFormationCenter
+		{
+			get
+			{
+				var formation = AirFormationUnits();
+				if (formation.Count > 0)
+				{
+					airLastFormationCenter = formation.Select(a => a.CenterPosition).Average();
+					hasAirFormationCenter = true;
+					return airLastFormationCenter;
+				}
+
+				// A new squad's first aircraft is immediately joined, so this fallback is only needed for
+				// old saves or a formation that disappeared before its center was first observed.
+				return hasAirFormationCenter ? airLastFormationCenter : CenterPosition;
+			}
+		}
+
+		internal void MarkAirReinforcement(Actor actor)
+		{
+			AirReinforcements.Add(actor.ActorID);
+			AirReinforcementTargets.Remove(actor.ActorID);
+		}
+
+		internal void MarkAirRepairing(Actor actor, Actor destination = null)
+		{
+			if (!hasAirFormationCenter && !AirReinforcements.Contains(actor.ActorID))
+			{
+				airLastFormationCenter = actor.CenterPosition;
+				hasAirFormationCenter = true;
+			}
+
+			AirUnitsRepairing.Add(actor.ActorID);
+			AirRepairUnavailable.Remove(actor.ActorID);
+			if (destination == null)
+				AirRepairTargets.Remove(actor.ActorID);
+			else
+				AirRepairTargets[actor.ActorID] = destination.ActorID;
+
+			MarkAirReinforcement(actor);
+		}
+
+		internal void JoinAirFormation(Actor actor)
+		{
+			AirReinforcements.Remove(actor.ActorID);
+			AirReinforcementTargets.Remove(actor.ActorID);
+			airLastFormationCenter = actor.CenterPosition;
+			hasAirFormationCenter = true;
+		}
+
+		internal void CleanAirMembership()
+		{
+			var live = new HashSet<uint>(Units.Select(a => a.ActorID));
+			AirUnitsRepairing.RemoveWhere(id => !live.Contains(id));
+			AirRepairUnavailable.RemoveWhere(id => !live.Contains(id));
+			foreach (var id in AirRepairTargets.Keys.Where(id => !live.Contains(id)).ToList())
+				AirRepairTargets.Remove(id);
+
+			AirReinforcements.RemoveWhere(id => !live.Contains(id));
+			foreach (var id in AirReinforcementTargets.Keys.Where(id => !live.Contains(id)).ToList())
+				AirReinforcementTargets.Remove(id);
+
+			var formation = AirFormationUnits();
+			if (formation.Count == 0)
+			{
+				var replacements = Units.Where(a => !AirUnitsRepairing.Contains(a.ActorID))
+					.OrderBy(a => hasAirFormationCenter ?
+						(a.CenterPosition - airLastFormationCenter).LengthSquared : 0)
+					.ThenBy(a => a.ActorID).ToList();
+				if (replacements.Count > 0)
+				{
+					var restored = IsTargetValid ? replacements.Take(1) : replacements;
+					var restoredCount = 0;
+					foreach (var replacement in restored)
+					{
+						JoinAirFormation(replacement);
+						restoredCount++;
+					}
+
+					if (SquadManager.Info.AirTargetDebugLogging)
+						Log.Write("debug", "Air formation [{0}] restored core with {1} aircraft; target={2} remaining-reinforcements={3}.",
+							AirProfile, restoredCount, IsTargetValid ?
+								TargetActor.Info.Name + "#" + TargetActor.ActorID : "none",
+							AirReinforcements.Count);
+				}
+			}
+		}
+
 		internal string AirProfile => AirSquadDefinition != null &&
 			SquadManager.Info.AirSquadDefinitions.TryGetValue(AirSquadDefinition, out var definition) ?
 			definition.Profile : "Generic";
@@ -191,6 +305,17 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 			if (AirSquadDefinition != null)
 				nodes.Nodes.Add(new MiniYamlNode("AirSquadDefinition", AirSquadDefinition));
+
+			if (AirUnitsRepairing.Count > 0)
+				nodes.Nodes.Add(new MiniYamlNode("AirUnitsRepairing",
+					FieldSaver.FormatValue(AirUnitsRepairing.OrderBy(id => id).ToArray())));
+
+			if (AirReinforcements.Count > 0)
+				nodes.Nodes.Add(new MiniYamlNode("AirReinforcements",
+					FieldSaver.FormatValue(AirReinforcements.OrderBy(id => id).ToArray())));
+
+			if (hasAirFormationCenter)
+				nodes.Nodes.Add(new MiniYamlNode("AirFormationCenter", FieldSaver.FormatValue(airLastFormationCenter)));
 
 			return nodes;
 		}
@@ -217,6 +342,26 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			if (unitsNode != null)
 				squad.Units.AddRange(FieldLoader.GetValue<uint[]>("Units", unitsNode.Value.Value)
 					.Select(a => squadManager.World.GetActorById(a)));
+
+			var repairingNode = yaml.Nodes.FirstOrDefault(n => n.Key == "AirUnitsRepairing");
+			if (repairingNode != null)
+				squad.AirUnitsRepairing.UnionWith(
+					FieldLoader.GetValue<uint[]>("AirUnitsRepairing", repairingNode.Value.Value));
+
+			var reinforcementsNode = yaml.Nodes.FirstOrDefault(n => n.Key == "AirReinforcements");
+			if (reinforcementsNode != null)
+				squad.AirReinforcements.UnionWith(
+					FieldLoader.GetValue<uint[]>("AirReinforcements", reinforcementsNode.Value.Value));
+
+			var formationCenterNode = yaml.Nodes.FirstOrDefault(n => n.Key == "AirFormationCenter");
+			if (formationCenterNode != null)
+			{
+				squad.airLastFormationCenter =
+					FieldLoader.GetValue<WPos>("AirFormationCenter", formationCenterNode.Value.Value);
+				squad.hasAirFormationCenter = true;
+			}
+
+			squad.CleanAirMembership();
 
 			return squad;
 		}

@@ -148,6 +148,33 @@ namespace OpenRA.Mods.Common.Traits
 			"without making dense SAM clusters attractive.")]
 		public readonly int AirTargetAaClearUnlockPercent = 100;
 
+		[Desc("Completed target scans without an undefended cell before an air squad may consider deliberately",
+			"attacking an AA actor. Zero allows immediate consideration.")]
+		public readonly int AirTargetAaClearFallbackScans = 0;
+
+		[Desc("Minimum ratio of ammo-weighted aircraft cost to the summed cost of AA covering the target",
+			"before deliberate AA clearing is eligible. Zero disables the value-ratio requirement.")]
+		public readonly int AirTargetAaClearValueRatio = 0;
+
+		[Desc("Number of eligible AA-clearing opportunities with the lowest summed effectiveness-times-value danger",
+			"that remain in contention. The one unlocking the most target value is selected from this shortlist.",
+			"Zero preserves ordinary score-only selection.")]
+		public readonly int AirTargetAaClearWeakestCandidates = 0;
+
+		[Desc("Maximum distance in cells between air-squad formation centers when combining their value",
+			"and orders for a deliberate AA-clearing attack. Zero keeps AA clearing squad-local.")]
+		public readonly int AirTargetAaClearSupportRadius = 0;
+
+		[Desc("Actor types whose air-target priority increases while most non-AA targets are covered by AA.")]
+		public readonly HashSet<string> AirTargetPowerActors = new HashSet<string>();
+
+		[Desc("Percentage of attackable non-AA targets that must be covered before power-target priority starts rising.",
+			"At or below this threshold the authored priority is used; at 100% coverage the configured maximum is used.")]
+		public readonly int AirTargetPowerCoverageThresholdPercent = 100;
+
+		[Desc("Maximum priority assigned to AirTargetPowerActors at 100% AA coverage. Zero disables the boost.")]
+		public readonly int AirTargetPowerPriorityMaximum = 0;
+
 		[Desc("Minimum score a candidate must reach before an air squad commits to attacking it.",
 			"Candidates scoring below this are ignored and the squad stays idle.")]
 		public readonly int AirTargetMinimumScore = 1;
@@ -155,14 +182,8 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Minimum percentage by which a periodic replacement target must outscore the current target.")]
 		public readonly int AirTargetSwitchImprovementPercent = 50;
 
-		[Desc("Ticks after approaching or damaging a target during which an air squad will not reconsider it.")]
-		public readonly int AirTargetCommitmentTicks = 250;
-
-		[Desc("Ticks without route, distance, or damage progress before an air target is considered stalled.")]
-		public readonly int AirTargetStallTicks = 300;
-
-		[Desc("Maximum ticks a queued air route can suppress stall recovery when it makes no progress.")]
-		public readonly int AirTargetRouteTimeoutTicks = 750;
+		[Desc("Ticks without distance or damage progress before an armed air squad replans its target.")]
+		public readonly int AirTargetStallTicks = 150;
 
 		[Desc("Number of nearest air target candidates routed per strategic scan.")]
 		public readonly int AirTargetClosestCandidates = 15;
@@ -276,6 +297,10 @@ namespace OpenRA.Mods.Common.Traits
 			"treats a defender as dangerous out to 150% of its actual weapon range.")]
 		public readonly float AirThreatRangeBuffer = 1.5f;
 
+		[Desc("Optional actor-specific overrides for derived anti-air threat weight. Zero makes that actor",
+			"irrelevant to air routing, destination danger, and local flee checks.")]
+		public readonly Dictionary<string, float> AirThreatWeightOverrides = new Dictionary<string, float>();
+
 		[Desc("Consecutive AirIdleState scans (each AttackForceInterval ticks apart) that find no target",
 			"scoring above AirTargetMinimumScore before the squad stops waiting for an undefended target",
 			"and instead accepts the best finite-cost route. Anti-air costs remain in force, but this is better",
@@ -341,6 +366,10 @@ namespace OpenRA.Mods.Common.Traits
 		public readonly int StealthHarassmentDetectorValue = 3000;
 		public readonly int StealthHarassmentWeakScreenPercent = 50;
 
+		[Desc("Allied actor types whose passive repair aura may be used by damaged air units.",
+			"Allied actors are never entered or reserved; the aircraft waits within their configured aura instead.")]
+		public readonly HashSet<string> AirPassiveRepairActors = new HashSet<string>();
+
 		[Desc("Per-actor-type target score overrides for Orca-type air squads (squads containing at least",
 			"one actor of type OrcaArchetypeActor), keyed by target ActorName - same shape as UnitsToBuild",
 			"elsewhere in this mod. Checked before the generic AirTarget*Value classification; actor types",
@@ -380,12 +409,17 @@ namespace OpenRA.Mods.Common.Traits
 			if (AirTargetReferenceSpeed <= 0)
 				throw new YamlException("AirTargetReferenceSpeed must be greater than zero.");
 
-			if (AirTargetFullAmmoDistanceBonus < 0 || AirTargetAaClearUnlockPercent < 0)
+			if (AirTargetFullAmmoDistanceBonus < 0 || AirTargetAaClearUnlockPercent < 0 ||
+				AirTargetAaClearFallbackScans < 0 || AirTargetAaClearValueRatio < 0 ||
+				AirTargetAaClearWeakestCandidates < 0 || AirTargetAaClearSupportRadius < 0)
 				throw new YamlException("Air target ammo-distance and AA-clear modifiers must not be negative.");
 
-			if (AirTargetSwitchImprovementPercent < 0 || AirTargetCommitmentTicks < 0 ||
-				AirTargetStallTicks <= 0 || AirTargetRouteTimeoutTicks <= 0)
-				throw new YamlException("Air target commitment settings must be non-negative and timeout settings must be positive.");
+			if (AirTargetPowerCoverageThresholdPercent < 0 || AirTargetPowerCoverageThresholdPercent > 100 ||
+				AirTargetPowerPriorityMaximum < 0)
+				throw new YamlException("Air target power coverage settings must use a 0-100 threshold and non-negative priority.");
+
+			if (AirTargetSwitchImprovementPercent < 0 || AirTargetStallTicks <= 0)
+				throw new YamlException("Air target switch improvement must be non-negative and the stall timeout must be positive.");
 
 			if (AirAdaptiveRiskInterval < 0 || AirAdaptiveRiskRollbackTicks < 0 || AirAdaptiveRiskMinimumUnits < 0 ||
 				AirAdaptiveRiskApacheFullAmmoGrowth < 0 || AirAdaptiveRiskOrcaFullAmmoGrowth < 0 ||
@@ -428,6 +462,9 @@ namespace OpenRA.Mods.Common.Traits
 			if (AirThreatRangeBuffer <= 0)
 				throw new YamlException("AirThreatRangeBuffer must be greater than zero.");
 
+			if (AirThreatWeightOverrides.Any(kv => kv.Value < 0))
+				throw new YamlException("AirThreatWeightOverrides values must not be negative.");
+
 			if (AirMassedAttackIdleThreshold < 0)
 				throw new YamlException("AirMassedAttackIdleThreshold must not be negative.");
 
@@ -449,6 +486,14 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (StealthHarassmentSquadCount < 0 || StealthHarassmentSquadSize < 1 || StealthHarassmentSquadSize > 2)
 				throw new YamlException("Stealth harassment squad count must be non-negative and squad size must be one or two.");
+
+			foreach (var actorName in AirPassiveRepairActors)
+			{
+				if (!rules.Actors.TryGetValue(actorName, out var actor) ||
+					!actor.TraitInfos<GrantConditionInRangeInfo>().Any(t => t.Granter &&
+						t.ValidRelationships.HasRelationship(PlayerRelationship.Ally)))
+					throw new YamlException($"AirPassiveRepairActors actor '{actorName}' must grant an allied condition in range.");
+			}
 		}
 
 		public override object Create(ActorInitializer init) { return new SquadManagerBotModule(init.Self, this); }
@@ -591,7 +636,11 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			Squads.RemoveAll(s => !s.IsValid);
 			foreach (var s in Squads)
+			{
 				s.Units.RemoveAll(a => unitCannotBeOrdered(a) || IsReservedForTransport(a));
+				if (s.Type == SquadType.Air)
+					s.CleanAirMembership();
+			}
 		}
 
 		bool IsReservedForTransport(Actor actor)
@@ -750,6 +799,8 @@ namespace OpenRA.Mods.Common.Traits
 						continue;
 
 					air.Units.Add(a);
+					if (air.Units.Count > 1)
+						air.MarkAirReinforcement(a);
 				}
 				else if (Info.NavalUnitsTypes.Contains(a.Info.Name))
 				{
@@ -850,7 +901,8 @@ namespace OpenRA.Mods.Common.Traits
 			if (!protectSq.IsValid)
 			{
 				var ownUnits = World.FindActorsInCircle(World.Map.CenterOfCell(GetRandomBaseCenter()), WDist.FromCells(Info.ProtectUnitScanRadius))
-					.Where(unit => unit.Owner == Player && !Info.ProtectionTypes.Contains(unit.Info.Name) && unit.Info.HasTraitInfo<AttackBaseInfo>());
+					.Where(unit => unit.Owner == Player && !Info.ProtectionTypes.Contains(unit.Info.Name) &&
+						!Info.AirUnitsTypes.Contains(unit.Info.Name) && unit.Info.HasTraitInfo<AttackBaseInfo>());
 
 				foreach (var a in ownUnits)
 					protectSq.Units.Add(a);
