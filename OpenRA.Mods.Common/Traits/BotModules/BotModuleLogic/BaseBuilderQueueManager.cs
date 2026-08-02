@@ -278,21 +278,35 @@ namespace OpenRA.Mods.Common.Traits
 			}
 
 			// Make sure that we can spend as fast as we are earning
-			if (baseBuilder.Info.NewProductionCashThreshold > 0 && playerResources.Resources > baseBuilder.Info.NewProductionCashThreshold)
+			var availableFunds = Math.Max(0, playerResources.Cash + playerResources.Resources);
+			if (baseBuilder.Info.NewProductionCashThreshold > 0 && availableFunds > baseBuilder.Info.NewProductionCashThreshold)
 			{
 				var productionCandidates = buildableThings.Where(a => baseBuilder.Info.ProductionTypes.Contains(a.Name)).ToList();
+				if (baseBuilder.AdaptiveProductionDebugLogging && productionCandidates.Count > 0)
+					baseBuilder.LogAdaptiveProduction("{0} production-building scores (funds {1}): {2}", player, availableFunds,
+						string.Join(", ", productionCandidates.OrderBy(a => a.Name).Select(a =>
+						{
+							var demand = baseBuilder.AdaptiveProductionBuildingDemand(a);
+							var owned = playerBuildings.Count(b => b.Info.Name == a.Name);
+							return FormattableString.Invariant(
+								$"{DisplayName(a.Name)} demand={demand:0.00} owned={owned} score={AdaptiveWeighting.ProductionBuildingScore(demand, owned):0.00}");
+						})));
+
 				var production = GetProducibleBuilding(baseBuilder.Info.ProductionTypes, productionCandidates,
-					a => baseBuilder.AdaptiveProductionBuildingDemand(a) /
-						(1 + playerBuildings.Count(b => b.Info.Name == a.Name)));
+					a => AdaptiveWeighting.ProductionBuildingScore(baseBuilder.AdaptiveProductionBuildingDemand(a),
+						playerBuildings.Count(b => b.Info.Name == a.Name)));
 				if (production != null && HasSufficientPowerForActor(production))
 				{
 					var demand = baseBuilder.AdaptiveProductionBuildingDemand(production);
+					var owned = playerBuildings.Count(b => b.Info.Name == production.Name);
 					AIUtils.BotDebug("{0} decided to build {1}: Priority override (production, adaptive demand {2:0.00})",
 						queue.Actor.Owner, DisplayName(production.Name), demand);
 					if (baseBuilder.AdaptiveProductionDebugLogging)
-						baseBuilder.LogAdaptiveProduction("{0} production-building scores: {1}", player,
-							string.Join(", ", productionCandidates.OrderBy(a => a.Name).Select(a =>
-								FormattableString.Invariant($"{DisplayName(a.Name)}={baseBuilder.AdaptiveProductionBuildingDemand(a):0.00}"))));
+						baseBuilder.LogAdaptiveProduction(
+							"{0} selected production building {1}: demand={2:0.00} owned={3} score={4:0.00} funds={5}",
+							player, DisplayName(production.Name), demand, owned,
+							AdaptiveWeighting.ProductionBuildingScore(demand, owned), availableFunds);
+
 					return production;
 				}
 
@@ -413,6 +427,11 @@ namespace OpenRA.Mods.Common.Traits
 				// Lets build this
 				AIUtils.BotDebug("{0} decided to build {1}: Desired is {2} ({3} / {4}); current is {5} / {4}",
 					queue.Actor.Owner, DisplayName(name), frac.Value, frac.Value * playerBuildings.Length, playerBuildings.Length, count);
+				if (baseBuilder.AdaptiveProductionDebugLogging && baseBuilder.Info.AdaptiveBuildingTypes.Contains(name))
+					baseBuilder.LogAdaptiveProduction(
+						"{0} selected adaptive defense building {1}: authored={2} adapted={3} owned={4} buildings={5}",
+						player, DisplayName(name), frac.Value, fractionValue, count, playerBuildings.Length);
+
 				return actor;
 			}
 

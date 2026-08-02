@@ -52,6 +52,11 @@ namespace OpenRA.Mods.Common.Traits
 			return selected;
 		}
 
+		public static double ProductionBuildingScore(double demand, int ownedCount)
+		{
+			return Math.Max(0, demand) / (1 + Math.Max(0, ownedCount));
+		}
+
 		/// <summary>
 		/// Value destroyed vs value lost for a single rollover window. Losses are floored at 1 (not 0)
 		/// so a type that has killed something but lost nothing yet still gets a large, finite score -

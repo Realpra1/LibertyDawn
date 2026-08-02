@@ -16,6 +16,6 @@ if not defined ai_map (
 
 :launch
 echo Launching autonomous AI test on "%ai_map%".
-call "%~dp0launch-game.cmd" Game.Mod=cnc Launch.Map="%ai_map%" Launch.LobbyCommands="spectate;option gamespeed fastest;slot_bot Multi0 0 skynet 1 1;slot_bot Multi1 0 skynet 1 2;slot_bot Multi2 0 brutalis 2 4;slot_bot Multi3 0 brutalis 2 5;slot_bot Multi4 0 brutalis 2 6"
+call "%~dp0launch-game.cmd" Game.Mod=cnc Launch.Map="%ai_map%" Launch.LobbyCommands="spectate;option gamespeed fastest;option startingcash 20000;slot_bot Multi0 0 skynet 1 1;slot_bot Multi1 0 skynet 1 2;slot_bot Multi2 0 brutalis 2 4;slot_bot Multi3 0 brutalis 2 5;slot_bot Multi4 0 brutalis 2 6;faction 1 nod;faction 2 gdi"
 
 endlocal
