@@ -132,6 +132,15 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Defensive building types the AI puts a wall in front of. Usually its towers.")]
 		public readonly HashSet<string> WalledDefenseTypes = new HashSet<string>();
 
+		[Desc("Preferred wall types used to enclose the first construction yard. Leave empty to disable the enclosure.")]
+		public readonly string[] ConstructionYardEnclosureWallTypes = System.Array.Empty<string>();
+
+		[Desc("Empty cells left between the construction yard footprint and its enclosure.")]
+		public readonly int ConstructionYardEnclosureMargin = 1;
+
+		[Desc("Write construction-yard enclosure planning and failure diagnostics to debug.log.")]
+		public readonly bool ConstructionYardEnclosureDebugLogging = false;
+
 		[Desc("Defensive building types whose BuildingFractions ceiling adapts based on their measured kills-value/losses-value ratio",
 			"(see AdaptiveWeighting). proc/nuke/silo/production buildings are already priority-overridden earlier in",
 			"ChooseBuildingToBuild and must never be listed here - adaptation would fight that logic.")]
