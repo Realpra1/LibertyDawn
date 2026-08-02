@@ -130,9 +130,6 @@ namespace OpenRA.Mods.Common.Traits
 
 		void IBotTick.BotTick(IBot bot)
 		{
-			if (requestPause.Any(rp => rp.PauseUnitProduction))
-				return;
-
 			ticks++;
 
 			if (ticks % FeedbackTime == 0)
@@ -148,7 +145,11 @@ namespace OpenRA.Mods.Common.Traits
 				{
 					BuildUnit(bot, buildRequest);
 					queuedBuildRequests.Remove(buildRequest);
+					return;
 				}
+
+				if (requestPause.Any(rp => rp.PauseUnitProduction))
+					return;
 
 				foreach (var q in Info.UnitQueues)
 					BuildUnit(bot, q, idleUnitCount < Info.IdleBaseUnitsMaximum);

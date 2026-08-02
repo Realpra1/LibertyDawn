@@ -188,6 +188,7 @@ namespace OpenRA.Mods.Common.Traits
 		PlayerResources playerResources;
 		IResourceLayer resourceLayer;
 		IBotPositionsUpdated[] positionsUpdatedModules;
+		IBotRallyPointManager[] rallyPointManagers;
 		CPos initialBaseCenter;
 		CPos defenseCenter;
 
@@ -206,6 +207,7 @@ namespace OpenRA.Mods.Common.Traits
 			playerResources = self.Owner.PlayerActor.Trait<PlayerResources>();
 			resourceLayer = self.World.WorldActor.TraitOrDefault<IResourceLayer>();
 			positionsUpdatedModules = self.Owner.PlayerActor.TraitsImplementing<IBotPositionsUpdated>().ToArray();
+			rallyPointManagers = self.Owner.PlayerActor.TraitsImplementing<IBotRallyPointManager>().ToArray();
 			WallPlanner = new BaseBuilderWallPlanner(this, player);
 		}
 
@@ -259,6 +261,9 @@ namespace OpenRA.Mods.Common.Traits
 			foreach (var rp in world.ActorsWithTrait<RallyPoint>())
 			{
 				if (rp.Actor.Owner != player)
+					continue;
+
+				if (rallyPointManagers.Any(manager => manager.ManagesRallyPoint(rp.Actor)))
 					continue;
 
 				if (rp.Trait.Path.Count == 0 || !IsRallyPointValid(rp.Trait.Path[0], rp.Actor.Info.TraitInfoOrDefault<BuildingInfo>()))

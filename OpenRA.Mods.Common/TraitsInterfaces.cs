@@ -542,6 +542,12 @@ namespace OpenRA.Mods.Common.Traits
 	}
 
 	[RequireExplicitImplementation]
+	public interface IBotRallyPointManager
+	{
+		bool ManagesRallyPoint(Actor producer);
+	}
+
+	[RequireExplicitImplementation]
 	public interface IEditorActorOptions : ITraitInfoInterface
 	{
 		IEnumerable<EditorActorOption> ActorOptions(ActorInfo ai, World world);
