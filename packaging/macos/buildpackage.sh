@@ -67,18 +67,13 @@ build_app() {
 
 	cp -r "${TEMPLATE_DIR}" "${LAUNCHER_DIR}"
 
-	IS_D2K="False"
-	if [ "${MOD_ID}" = "d2k" ]; then
-		IS_D2K="True"
-	fi
-
 	# Install engine and mod files
 	RUNTIME="net6"
 	if [ "${PLATFORM}" = "mono" ]; then
 		RUNTIME="mono"
 	fi
 
-	install_assemblies "${SRCDIR}" "${LAUNCHER_ASSEMBLY_DIR}" "osx-x64" "${RUNTIME}" "True" "True" "${IS_D2K}"
+	install_assemblies "${SRCDIR}" "${LAUNCHER_ASSEMBLY_DIR}" "osx-x64" "${RUNTIME}" "True" "True" "False"
 	install_data "${SRCDIR}" "${LAUNCHER_RESOURCES_DIR}" "${MOD_ID}"
 	set_engine_version "${TAG}" "${LAUNCHER_RESOURCES_DIR}"
 	set_mod_version "${TAG}" "${LAUNCHER_RESOURCES_DIR}/mods/${MOD_ID}/mod.yaml" "${LAUNCHER_RESOURCES_DIR}/mods/modcontent/mod.yaml"
@@ -131,9 +126,7 @@ build_platform() {
 		clang -m64 launcher.m -o "${TEMPLATE_DIR}/Contents/MacOS/Launcher" -framework AppKit -mmacosx-version-min=10.14
 	fi
 
-	build_app "${PLATFORM}" "${TEMPLATE_DIR}" "${BUILTDIR}/OpenRA - Red Alert.app" "ra" "Red Alert" "699222659766026240"
 	build_app "${PLATFORM}" "${TEMPLATE_DIR}" "${BUILTDIR}/OpenRA - Tiberian Dawn.app" "cnc" "Tiberian Dawn" "699223250181292033"
-	build_app "${PLATFORM}" "${TEMPLATE_DIR}" "${BUILTDIR}/OpenRA - Dune 2000.app" "d2k" "Dune 2000" "712711732770111550"
 
 	rm -rf "${TEMPLATE_DIR}"
 
@@ -146,7 +139,7 @@ build_platform() {
 	mkdir "/Volumes/OpenRA/.background/"
 	tiffutil -cathidpicheck "${ARTWORK_DIR}/macos-background.png" "${ARTWORK_DIR}/macos-background-2x.png" -out "/Volumes/OpenRA/.background/background.tiff"
 
-	cp "${BUILTDIR}/OpenRA - Red Alert.app/Contents/Resources/ra.icns" "/Volumes/OpenRA/.VolumeIcon.icns"
+	cp "${BUILTDIR}/OpenRA - Tiberian Dawn.app/Contents/Resources/cnc.icns" "/Volumes/OpenRA/.VolumeIcon.icns"
 
 	echo '
 	   tell application "Finder"
@@ -161,9 +154,7 @@ build_platform() {
 	           set icon size of theViewOptions to 72
 	           set background picture of theViewOptions to file ".background:background.tiff"
 	           make new alias file at container window to POSIX file "/Applications" with properties {name:"Applications"}
-	           set position of item "'OpenRA - Tiberian Dawn.app'" of container window to {160, 106}
-	           set position of item "'OpenRA - Red Alert.app'" of container window to {320, 106}
-	           set position of item "'OpenRA - Dune 2000.app'" of container window to {480, 106}
+	           set position of item "'OpenRA - Tiberian Dawn.app'" of container window to {240, 106}
 	           set position of item "Applications" of container window to {320, 298}
 	           set position of item ".background" of container window to {160, 298}
 	           set position of item ".fseventsd" of container window to {160, 298}
@@ -176,28 +167,9 @@ build_platform() {
 	' | osascript
 
 	# HACK: Copy the volume icon again - something in the previous step seems to delete it...?
-	cp "${BUILTDIR}/OpenRA - Red Alert.app/Contents/Resources/ra.icns" "/Volumes/OpenRA/.VolumeIcon.icns"
+	cp "${BUILTDIR}/OpenRA - Tiberian Dawn.app/Contents/Resources/cnc.icns" "/Volumes/OpenRA/.VolumeIcon.icns"
 	SetFile -c icnC "/Volumes/OpenRA/.VolumeIcon.icns"
 	SetFile -a C "/Volumes/OpenRA"
-
-	# Replace duplicate .NET runtime files with hard links to improve compression
-	if [ "${PLATFORM}" != "mono" ]; then
-		OIFS="$IFS"
-		IFS=$'\n'
-		for MOD in "Red Alert" "Tiberian Dawn"; do
-			for f in $(find /Volumes/OpenRA/OpenRA\ -\ ${MOD}.app/Contents/MacOS/*); do
-				g="/Volumes/OpenRA/OpenRA - Dune 2000.app/Contents/MacOS/"$(basename "${f}")
-				hashf=$(shasum "${f}" | awk '{ print $1 }')
-				hashg=$(shasum "${g}" | awk '{ print $1 }')
-				if [ "${hashf}" = "${hashg}" ]; then
-					echo "Deduplicating ${f}"
-					rm "${f}"
-					ln "${g}" "${f}"
-				fi
-			done
-		done
-		IFS="$OIFS"
-	fi
 
 	chmod -Rf go-w /Volumes/OpenRA
 	sync
@@ -244,9 +216,7 @@ notarize_package() {
 			DMG_DEVICE=$(hdiutil attach -readwrite -noverify -noautoopen "${DMG_PATH}" | egrep '^/dev/' | sed 1q | awk '{print $1}')
 			sleep 2
 
-			xcrun stapler staple "/Volumes/OpenRA/OpenRA - Red Alert.app"
 			xcrun stapler staple "/Volumes/OpenRA/OpenRA - Tiberian Dawn.app"
-			xcrun stapler staple "/Volumes/OpenRA/OpenRA - Dune 2000.app"
 
 			sync
 			sync

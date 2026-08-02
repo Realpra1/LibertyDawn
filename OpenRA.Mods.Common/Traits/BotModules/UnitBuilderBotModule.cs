@@ -49,6 +49,9 @@ namespace OpenRA.Mods.Common.Traits
 			"but bucketed into their own share of the weighted draw via EconomyCombatSplit and the harvester-floor economy gate.")]
 		public readonly HashSet<string> EconomyTypes = new HashSet<string>();
 
+		[Desc("Unit types controlled by another bot module and excluded from random weighted production.")]
+		public readonly HashSet<string> ExternallyManagedTypes = new HashSet<string>();
+
 		[Desc("Chance (0-1) of picking from EconomyTypes over the rest of the pool on a given build, when the economy gate hasn't forced it.")]
 		public readonly float EconomyCombatSplit = 0.5f;
 
@@ -80,7 +83,8 @@ namespace OpenRA.Mods.Common.Traits
 		public override object Create(ActorInitializer init) { return new UnitBuilderBotModule(init.Self, this); }
 	}
 
-	public class UnitBuilderBotModule : ConditionalTrait<UnitBuilderBotModuleInfo>, IBotTick, IBotNotifyIdleBaseUnits, IBotRequestUnitProduction, IGameSaveTraitData
+	public class UnitBuilderBotModule : ConditionalTrait<UnitBuilderBotModuleInfo>, IBotTick, IBotNotifyIdleBaseUnits,
+		IBotRequestUnitProduction, IBotRequestTaggedUnitProduction, IGameSaveTraitData
 	{
 		public const int FeedbackTime = 30; // ticks; = a bit over 1s. must be >= netlag.
 
@@ -88,6 +92,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly Player player;
 
 		readonly List<string> queuedBuildRequests = new List<string>();
+		readonly List<string> queuedBuildRequestTags = new List<string>();
 
 		IBotRequestPauseUnitProduction[] requestPause;
 		PlayerResources playerResources;
@@ -130,7 +135,8 @@ namespace OpenRA.Mods.Common.Traits
 
 		void IBotTick.BotTick(IBot bot)
 		{
-			if (requestPause.Any(rp => rp.PauseUnitProduction))
+			var pauseRandomProduction = requestPause.Any(rp => rp.PauseUnitProduction);
+			if (pauseRandomProduction && queuedBuildRequests.Count == 0)
 				return;
 
 			ticks++;
@@ -146,12 +152,21 @@ namespace OpenRA.Mods.Common.Traits
 				var buildRequest = queuedBuildRequests.FirstOrDefault();
 				if (buildRequest != null)
 				{
-					BuildUnit(bot, buildRequest);
-					queuedBuildRequests.Remove(buildRequest);
+					var accepted = BuildUnit(bot, buildRequest);
+
+					// Preserve tagged policy requests until a production queue actually accepts them.
+					// Untagged legacy requests retain their one-shot behavior so an unavailable actor
+					// cannot block the existing MCV/harvester request queue indefinitely.
+					if (accepted || string.IsNullOrEmpty(queuedBuildRequestTags[0]))
+					{
+						queuedBuildRequests.RemoveAt(0);
+						queuedBuildRequestTags.RemoveAt(0);
+					}
 				}
 
-				foreach (var q in Info.UnitQueues)
-					BuildUnit(bot, q, idleUnitCount < Info.IdleBaseUnitsMaximum);
+				if (!pauseRandomProduction)
+					foreach (var q in Info.UnitQueues)
+						BuildUnit(bot, q, idleUnitCount < Info.IdleBaseUnitsMaximum);
 			}
 		}
 
@@ -225,11 +240,41 @@ namespace OpenRA.Mods.Common.Traits
 		void IBotRequestUnitProduction.RequestUnitProduction(IBot bot, string requestedActor)
 		{
 			queuedBuildRequests.Add(requestedActor);
+			queuedBuildRequestTags.Add(string.Empty);
 		}
 
 		int IBotRequestUnitProduction.RequestedProductionCount(IBot bot, string requestedActor)
 		{
 			return queuedBuildRequests.Count(r => r == requestedActor);
+		}
+
+		void IBotRequestTaggedUnitProduction.RequestUnitProduction(IBot bot, string requestedActor, string requestTag, int count)
+		{
+			if (string.IsNullOrEmpty(requestTag))
+				throw new ArgumentException("Tagged production requests require a non-empty tag.", nameof(requestTag));
+
+			for (var i = 0; i < Math.Max(0, count); i++)
+			{
+				queuedBuildRequests.Add(requestedActor);
+				queuedBuildRequestTags.Add(requestTag);
+			}
+		}
+
+		int IBotRequestTaggedUnitProduction.RequestedProductionCount(IBot bot, string requestTag)
+		{
+			return queuedBuildRequestTags.Count(t => t == requestTag);
+		}
+
+		void IBotRequestTaggedUnitProduction.CancelUnitProduction(IBot bot, string requestTag)
+		{
+			for (var i = queuedBuildRequestTags.Count - 1; i >= 0; i--)
+			{
+				if (queuedBuildRequestTags[i] != requestTag)
+					continue;
+
+				queuedBuildRequestTags.RemoveAt(i);
+				queuedBuildRequests.RemoveAt(i);
+			}
 		}
 
 		void BuildUnit(IBot bot, string category, bool buildRandom)
@@ -268,15 +313,15 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		// In cases where we want to build a specific unit but don't know the queue name (because there's more than one possibility)
-		void BuildUnit(IBot bot, string name)
+		bool BuildUnit(IBot bot, string name)
 		{
 			var actorInfo = world.Map.Rules.Actors[name];
 			if (actorInfo == null)
-				return;
+				return false;
 
 			var buildableInfo = actorInfo.TraitInfoOrDefault<BuildableInfo>();
 			if (buildableInfo == null)
-				return;
+				return false;
 
 			ProductionQueue queue = null;
 			foreach (var pq in buildableInfo.Queue)
@@ -290,12 +335,16 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				bot.QueueOrder(Order.StartProduction(queue.Actor, name, 1));
 				AIUtils.BotDebug("{0} decided to build {1} (external request)", queue.Actor.Owner, DisplayName(name));
+				return true;
 			}
+
+			return false;
 		}
 
 		ActorInfo ChooseRandomUnitToBuild(ProductionQueue queue)
 		{
-			var buildableThings = queue.BuildableItems();
+			var buildableThings = queue.BuildableItems()
+				.Where(a => !Info.ExternallyManagedTypes.Contains(a.Name)).ToArray();
 			if (!buildableThings.Any())
 				return null;
 
@@ -322,11 +371,11 @@ namespace OpenRA.Mods.Common.Traits
 			var buildableNames = new HashSet<string>(buildable.Select(b => b.Name));
 
 			var economyPool = Info.EconomyTypes
-				.Where(t => buildableNames.Contains(t) && Info.UnitsToBuild.ContainsKey(t))
+				.Where(t => buildableNames.Contains(t) && Info.UnitsToBuild.ContainsKey(t) && !Info.ExternallyManagedTypes.Contains(t))
 				.ToDictionary(t => t, t => (double)Info.UnitsToBuild[t]);
 
 			var combatPool = Info.UnitsToBuild.Keys
-				.Where(t => buildableNames.Contains(t) && !Info.EconomyTypes.Contains(t))
+				.Where(t => buildableNames.Contains(t) && !Info.EconomyTypes.Contains(t) && !Info.ExternallyManagedTypes.Contains(t))
 				.ToDictionary(t => t, AdaptiveTypeWeight);
 
 			var forceEconomy = economyPool.Count > 0 &&
@@ -418,6 +467,7 @@ namespace OpenRA.Mods.Common.Traits
 			return new List<MiniYamlNode>()
 			{
 				new MiniYamlNode("QueuedBuildRequests", FieldSaver.FormatValue(queuedBuildRequests.ToArray())),
+				new MiniYamlNode("QueuedBuildRequestTags", FieldSaver.FormatValue(queuedBuildRequestTags.ToArray())),
 				new MiniYamlNode("IdleUnitCount", FieldSaver.FormatValue(idleUnitCount))
 			};
 		}
@@ -432,6 +482,15 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				queuedBuildRequests.Clear();
 				queuedBuildRequests.AddRange(FieldLoader.GetValue<string[]>("QueuedBuildRequests", queuedBuildRequestsNode.Value.Value));
+				queuedBuildRequestTags.Clear();
+				var tagsNode = data.FirstOrDefault(n => n.Key == "QueuedBuildRequestTags");
+				if (tagsNode != null)
+					queuedBuildRequestTags.AddRange(FieldLoader.GetValue<string[]>("QueuedBuildRequestTags", tagsNode.Value.Value));
+
+				while (queuedBuildRequestTags.Count < queuedBuildRequests.Count)
+					queuedBuildRequestTags.Add(string.Empty);
+				if (queuedBuildRequestTags.Count > queuedBuildRequests.Count)
+					queuedBuildRequestTags.RemoveRange(queuedBuildRequests.Count, queuedBuildRequestTags.Count - queuedBuildRequests.Count);
 			}
 
 			var idleUnitCountNode = data.FirstOrDefault(n => n.Key == "IdleUnitCount");

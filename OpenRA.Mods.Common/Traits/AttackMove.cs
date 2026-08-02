@@ -89,6 +89,7 @@ namespace OpenRA.Mods.Common.Traits
 
 				var targetLocation = move.NearestMoveableCell(cell);
 				var assaultMoving = order.OrderString == "AssaultMove";
+				self.TraitOrDefault<Mobile>()?.RecordMoveOrderIntent(targetLocation);
 
 				// TODO: this should scale with unit selection group size.
 				self.QueueActivity(order.Queued, new AttackMoveActivity(self, () => move.MoveTo(targetLocation, 8, targetLineColor: Info.TargetLineColor), assaultMoving));

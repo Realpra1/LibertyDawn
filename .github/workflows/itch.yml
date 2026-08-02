@@ -19,8 +19,6 @@ jobs:
           wget -q "https://github.com/${{ github.repository }}/releases/download/${{ github.event.inputs.tag }}/OpenRA-${{ github.event.inputs.tag }}-x64.exe"
           wget -q "https://github.com/${{ github.repository }}/releases/download/${{ github.event.inputs.tag }}/OpenRA-${{ github.event.inputs.tag }}-x64-winportable.zip" -O "OpenRA-${{ github.event.inputs.tag }}-x64-win-itch.zip"
           wget -q "https://github.com/${{ github.repository }}/releases/download/${{ github.event.inputs.tag }}/OpenRA-${{ github.event.inputs.tag }}.dmg"
-          wget -q "https://github.com/${{ github.repository }}/releases/download/${{ github.event.inputs.tag }}/OpenRA-Dune-2000-x86_64.AppImage"
-          wget -q "https://github.com/${{ github.repository }}/releases/download/${{ github.event.inputs.tag }}/OpenRA-Red-Alert-x86_64.AppImage"
           wget -q "https://github.com/${{ github.repository }}/releases/download/${{ github.event.inputs.tag }}/OpenRA-Tiberian-Dawn-x86_64.AppImage"
           wget -q "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.event.inputs.tag }}/packaging/.itch.toml"
           zip -u "OpenRA-${{ github.event.inputs.tag }}-x64-win-itch.zip" .itch.toml
@@ -55,16 +53,6 @@ jobs:
           VERSION: ${{ github.event.inputs.tag }}
           PACKAGE: OpenRA-${{ github.event.inputs.tag }}.dmg
 
-      - name: Publish RA AppImage
-        uses: josephbmanley/butler-publish-itchio-action@master
-        env:
-          BUTLER_CREDENTIALS: ${{ secrets.BUTLER_CREDENTIALS }}
-          CHANNEL: linux-ra
-          ITCH_GAME: openra
-          ITCH_USER: openra
-          VERSION: ${{ github.event.inputs.tag }}
-          PACKAGE: OpenRA-Red-Alert-x86_64.AppImage
-
       - name: Publish TD AppImage
         uses: josephbmanley/butler-publish-itchio-action@master
         env:
@@ -74,13 +62,3 @@ jobs:
           ITCH_USER: openra
           VERSION: ${{ github.event.inputs.tag }}
           PACKAGE: OpenRA-Tiberian-Dawn-x86_64.AppImage
-
-      - name: Publish D2k AppImage
-        uses: josephbmanley/butler-publish-itchio-action@master
-        env:
-          BUTLER_CREDENTIALS: ${{ secrets.BUTLER_CREDENTIALS }}
-          CHANNEL: linux-d2k
-          ITCH_GAME: openra
-          ITCH_USER: openra
-          VERSION: ${{ github.event.inputs.tag }}
-          PACKAGE: OpenRA-Dune-2000-x86_64.AppImage

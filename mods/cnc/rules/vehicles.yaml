@@ -368,8 +368,11 @@ FTNK:
 CTNK:
 	Inherits: ^Tank
 	Inherits@EXPERIENCE: ^GainsExperience
-	Inherits@CLOAK: ^AcceptsCloakCrate
+	Inherits@CLOAKED: ^Cloakable
 	Inherits@AUTOTARGET: ^AutoTargetGroundAssaultMove
+	Cloak:
+		-RequiresCondition:
+	-GrantConditionInRange@StealthGenReceiver:
 	Valued:
 		Cost: 600
 	Tooltip:
@@ -380,7 +383,7 @@ CTNK:
 		BuildPaletteOrder: 55
 		Prerequisites: anyhq, ~upgrade.covert2, ~techlevel.medium
 		Queue: Vehicle.Nod, Vehicle.GDI
-		Description: Chemical-spewing vehicle.\n Strong vs Infantry and tiberium or nuclear related Stuctures and Units\n Weak vs Air and Tanks
+		Description: Stealthed chemical-spewing vehicle.\n Strong vs Infantry and tiberium or nuclear related Stuctures and Units\n Weak vs Air and Tanks
 	Mobile:
 		TurnSpeed: 30
 		Speed: 100

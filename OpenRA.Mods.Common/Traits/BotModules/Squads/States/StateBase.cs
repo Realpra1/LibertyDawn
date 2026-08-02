@@ -58,7 +58,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			return false;
 		}
 
-		protected static bool CanAttackTarget(Actor a, Actor target)
+		internal static bool CanAttackTarget(Actor a, Actor target)
 		{
 			if (!a.Info.HasTraitInfo<AttackBaseInfo>())
 				return false;

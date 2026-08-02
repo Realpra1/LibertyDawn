@@ -536,9 +536,24 @@ namespace OpenRA.Mods.Common.Traits
 	}
 
 	[RequireExplicitImplementation]
+	public interface IBotRequestTaggedUnitProduction
+	{
+		void RequestUnitProduction(IBot bot, string requestedActor, string requestTag, int count);
+		int RequestedProductionCount(IBot bot, string requestTag);
+		void CancelUnitProduction(IBot bot, string requestTag);
+	}
+
+	[RequireExplicitImplementation]
 	public interface IBotRequestPauseUnitProduction
 	{
 		bool PauseUnitProduction { get; }
+	}
+
+	/// <summary>Coordinates temporary ownership of units assigned to AI transport missions.</summary>
+	[RequireExplicitImplementation]
+	public interface IBotTransportReservations
+	{
+		bool IsTransportReserved(Actor actor);
 	}
 
 	[RequireExplicitImplementation]
@@ -634,6 +649,14 @@ namespace OpenRA.Mods.Common.Traits
 		Horizontal = 1,
 		Vertical = 2,
 		Turn = 4
+	}
+
+	public enum MoveResult
+	{
+		InProgress,
+		CompleteCanceled,
+		CompleteDestinationReached,
+		CompleteDestinationBlocked,
 	}
 
 	[RequireExplicitImplementation]

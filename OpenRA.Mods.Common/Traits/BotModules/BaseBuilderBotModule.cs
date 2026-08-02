@@ -9,6 +9,7 @@
  */
 #endregion
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using OpenRA.Traits;
@@ -26,6 +27,15 @@ namespace OpenRA.Mods.Common.Traits
 
 		[Desc("Tells the AI what building types are considered refineries.")]
 		public readonly HashSet<string> RefineryTypes = new HashSet<string>();
+
+		[Desc("Harvester types used by the conservative refinery-congestion proxy.")]
+		public readonly HashSet<string> HarvesterTypes = new HashSet<string>();
+
+		[Desc("When positive, maintain one refinery per this many harvesters, in addition to the normal opening minimum.")]
+		public readonly int CongestionHarvestersPerRefinery = 0;
+
+		[Desc("Maximum refineries the congestion proxy may add above the normal minimum.")]
+		public readonly int MaximumCongestionRefineries = 0;
 
 		[Desc("Tells the AI what building types are considered power plants.")]
 		public readonly HashSet<string> PowerTypes = new HashSet<string>();
@@ -47,6 +57,36 @@ namespace OpenRA.Mods.Common.Traits
 
 		[Desc("Tells the AI what building types are considered silos (resource storage).")]
 		public readonly HashSet<string> SiloTypes = new HashSet<string>();
+
+		[Desc("Use a single coordinator to enforce the configured cross-queue opening sequence.")]
+		public readonly bool EnableOpeningPolicy = false;
+
+		[Desc("Opening alternatives, ordered from most to least preferred. Unbuildable alternatives are skipped.")]
+		public readonly string[] OpeningPowerTypes = Array.Empty<string>();
+		public readonly string[] OpeningBarracksTypes = Array.Empty<string>();
+		public readonly string[] OpeningRefineryTypes = Array.Empty<string>();
+		public readonly string[] OpeningFactoryTypes = Array.Empty<string>();
+		public readonly string[] OpeningHarvesterTypes = Array.Empty<string>();
+		public readonly string[] OpeningRadarTypes = Array.Empty<string>();
+		public readonly string[] OpeningSiloTypes = Array.Empty<string>();
+
+		[Desc("Mobile construction vehicle requested during the opening and later excess-cash expansion.")]
+		public readonly string OpeningMcvType = "mcv";
+
+		public readonly int OpeningHarvesterCount = 5;
+		public readonly int OpeningConstructionYardCount = 2;
+		public readonly int OpeningUnavailableRetries = 8;
+
+		[Desc("Place the first newly produced combat tower around a construction yard.")]
+		public readonly bool FirstCombatTowerNearConstructionYard = false;
+
+		[Desc("Request expansion MCVs above this cash+stored-resource threshold. Zero disables this behavior.")]
+		public readonly int ExcessCashExpansionThreshold = 0;
+		public readonly int ExcessCashExpansionCooldown = 1500;
+		public readonly int ExcessCashConstructionYardTarget = 2;
+
+		[Desc("Stored-resource percentage that triggers silo construction.")]
+		public readonly int SiloBuildResourcePercent = 80;
 
 		[Desc("Production queues AI uses for buildings.")]
 		public readonly HashSet<string> BuildingQueues = new HashSet<string> { "Building" };
@@ -178,7 +218,7 @@ namespace OpenRA.Mods.Common.Traits
 			return randomConstructionYard?.Location ?? initialBaseCenter;
 		}
 
-		public CPos DefenseCenter => defenseCenter;
+		public CPos DefenseCenter => Info.FirstCombatTowerNearConstructionYard && !firstCombatTowerOrdered ? GetRandomBaseCenter() : defenseCenter;
 
 		internal BaseBuilderWallPlanner WallPlanner { get; private set; }
 
@@ -190,6 +230,13 @@ namespace OpenRA.Mods.Common.Traits
 		IBotPositionsUpdated[] positionsUpdatedModules;
 		CPos initialBaseCenter;
 		CPos defenseCenter;
+		OpeningStage openingStage;
+		int openingUnavailableAttempts;
+		int openingBuildingPendingTick;
+		int nextExcessCashExpansionTick;
+		bool openingBuildingPending;
+		bool firstCombatTowerOrdered;
+		IBotRequestUnitProduction[] unitProduction;
 
 		readonly List<BaseBuilderQueueManager> builders = new List<BaseBuilderQueueManager>();
 
@@ -206,6 +253,7 @@ namespace OpenRA.Mods.Common.Traits
 			playerResources = self.Owner.PlayerActor.Trait<PlayerResources>();
 			resourceLayer = self.World.WorldActor.TraitOrDefault<IResourceLayer>();
 			positionsUpdatedModules = self.Owner.PlayerActor.TraitsImplementing<IBotPositionsUpdated>().ToArray();
+			unitProduction = self.Owner.PlayerActor.TraitsImplementing<IBotRequestUnitProduction>().ToArray();
 			WallPlanner = new BaseBuilderWallPlanner(this, player);
 		}
 
@@ -227,14 +275,163 @@ namespace OpenRA.Mods.Common.Traits
 			defenseCenter = newLocation;
 		}
 
-		bool IBotRequestPauseUnitProduction.PauseUnitProduction => !IsTraitDisabled && !HasAdequateRefineryCount;
+		bool IBotRequestPauseUnitProduction.PauseUnitProduction => !IsTraitDisabled && (!HasAdequateRefineryCount || OpeningActive);
 
 		void IBotTick.BotTick(IBot bot)
 		{
+			UpdateOpening(bot);
+			RequestExcessCashExpansion(bot);
 			SetRallyPointsForNewProductionBuildings(bot);
 
 			foreach (var b in builders)
 				b.Tick(bot);
+		}
+
+		internal bool OpeningActive => Info.EnableOpeningPolicy && openingStage != OpeningStage.Complete;
+		internal bool PlaceFirstCombatTowerByConstructionYard =>
+			Info.FirstCombatTowerNearConstructionYard && !firstCombatTowerOrdered;
+
+		internal ActorInfo OpeningBuilding(IEnumerable<ActorInfo> buildables)
+		{
+			if (!OpeningActive)
+				return null;
+
+			var preferred = OpeningTypes(openingStage);
+			if (preferred == null)
+				return null;
+
+			if (openingBuildingPending)
+			{
+				var queued = Info.BuildingQueues.Concat(Info.DefenseQueues)
+					.SelectMany(q => AIUtils.FindQueues(player, q))
+					.Any(q => q.AllQueued().Any(item => preferred.Contains(item.Item)));
+				if (queued || world.WorldTick - openingBuildingPendingTick <
+					Math.Max(1, Info.StructureProductionInactiveDelay * 2))
+					return null;
+
+				// A queued order never appeared, or its production/placement was canceled.
+				// Release the cross-queue lock and let the same stage retry.
+				openingBuildingPending = false;
+			}
+
+			var buildableArray = buildables.ToArray();
+			var selected = OpeningPolicyLogic.FirstAvailable(preferred, buildableArray.Select(a => a.Name));
+			var actor = buildableArray.FirstOrDefault(a => a.Name == selected);
+			if (actor != null)
+			{
+				openingUnavailableAttempts = 0;
+				openingBuildingPending = true;
+				openingBuildingPendingTick = world.WorldTick;
+				return actor;
+			}
+
+			if (OpeningPolicyLogic.ShouldSkipUnavailable(++openingUnavailableAttempts, Info.OpeningUnavailableRetries))
+			{
+				AIUtils.BotDebug("{0} skipped unavailable opening stage {1}", player, openingStage);
+				openingUnavailableAttempts = 0;
+				openingStage++;
+			}
+
+			return null;
+		}
+
+		internal void NotifyCombatTowerOrdered(ActorInfo actor)
+		{
+			if (!firstCombatTowerOrdered && actor.HasTraitInfo<AttackBaseInfo>())
+			{
+				firstCombatTowerOrdered = true;
+				AIUtils.BotDebug("{0} placed its first combat tower by a construction yard", player);
+			}
+		}
+
+		string[] OpeningTypes(OpeningStage stage)
+		{
+			switch (stage)
+			{
+				case OpeningStage.Power: return Info.OpeningPowerTypes;
+				case OpeningStage.Barracks: return Info.OpeningBarracksTypes;
+				case OpeningStage.Refinery: return Info.OpeningRefineryTypes;
+				case OpeningStage.Factory: return Info.OpeningFactoryTypes;
+				case OpeningStage.Radar: return Info.OpeningRadarTypes;
+				case OpeningStage.Silo: return Info.OpeningSiloTypes;
+				default: return null;
+			}
+		}
+
+		void UpdateOpening(IBot bot)
+		{
+			if (!OpeningActive)
+				return;
+
+			while (OpeningActive && OpeningStageSatisfied(openingStage))
+			{
+				AIUtils.BotDebug("{0} completed opening stage {1}", player, openingStage);
+				openingStage++;
+				openingUnavailableAttempts = 0;
+				openingBuildingPending = false;
+			}
+
+			if (openingStage == OpeningStage.Harvesters)
+				RequestFirstAvailable(bot, Info.OpeningHarvesterTypes, "opening harvesters");
+			else if (openingStage == OpeningStage.Mcv && !HasLiveActor(Info.OpeningMcvType))
+				Request(bot, Info.OpeningMcvType, "opening expansion");
+		}
+
+		bool OpeningStageSatisfied(OpeningStage stage)
+		{
+			switch (stage)
+			{
+				case OpeningStage.Power: return CountActors(Info.OpeningPowerTypes) > 0;
+				case OpeningStage.Barracks: return CountActors(Info.OpeningBarracksTypes) > 0;
+				case OpeningStage.Refinery: return CountActors(Info.OpeningRefineryTypes) > 0;
+				case OpeningStage.Factory: return CountActors(Info.OpeningFactoryTypes) > 0;
+				case OpeningStage.Harvesters: return CountActors(Info.OpeningHarvesterTypes) >= Info.OpeningHarvesterCount;
+				case OpeningStage.Mcv: return CountActors(Info.ConstructionYardTypes) >= Info.OpeningConstructionYardCount;
+				case OpeningStage.Radar: return CountActors(Info.OpeningRadarTypes) > 0;
+				case OpeningStage.Silo: return CountActors(Info.OpeningSiloTypes) > 0;
+				default: return true;
+			}
+		}
+
+		int CountActors(IEnumerable<string> types)
+		{
+			var names = types as ICollection<string> ?? types.ToArray();
+			return world.Actors.Count(a => a.Owner == player && !a.IsDead && names.Contains(a.Info.Name));
+		}
+
+		bool HasLiveActor(string type) { return world.Actors.Any(a => a.Owner == player && !a.IsDead && a.Info.Name == type); }
+
+		void RequestFirstAvailable(IBot bot, IEnumerable<string> types, string reason)
+		{
+			foreach (var type in types)
+				if (world.Map.Rules.Actors.ContainsKey(type) && Request(bot, type, reason))
+					return;
+		}
+
+		bool Request(IBot bot, string type, string reason)
+		{
+			if (string.IsNullOrEmpty(type))
+				return false;
+
+			var requester = unitProduction.FirstOrDefault(r => r.IsTraitEnabled() &&
+				r.RequestedProductionCount(bot, type) == 0);
+			if (requester == null)
+				return false;
+
+			requester.RequestUnitProduction(bot, type);
+			AIUtils.BotDebug("{0} requested {1}: {2}", player, type, reason);
+			return true;
+		}
+
+		void RequestExcessCashExpansion(IBot bot)
+		{
+			if (OpeningActive || Info.ExcessCashExpansionThreshold <= 0 || world.WorldTick < nextExcessCashExpansionTick ||
+				playerResources.Cash + playerResources.Resources < Info.ExcessCashExpansionThreshold ||
+				CountActors(Info.ConstructionYardTypes) >= Info.ExcessCashConstructionYardTarget || HasLiveActor(Info.OpeningMcvType))
+				return;
+
+			if (Request(bot, Info.OpeningMcvType, "excess-cash expansion"))
+				nextExcessCashExpansionTick = world.WorldTick + Info.ExcessCashExpansionCooldown;
 		}
 
 		void IBotRespondToAttack.RespondToAttack(IBot bot, Actor self, AttackInfo e)
@@ -298,7 +495,27 @@ namespace OpenRA.Mods.Common.Traits
 			AIUtils.CountBuildingByCommonName(Info.PowerTypes, player) == 0 ||
 			AIUtils.CountBuildingByCommonName(Info.ConstructionYardTypes, player) == 0;
 
-		int MinimumRefineryCount => AIUtils.CountBuildingByCommonName(Info.BarracksTypes, player) > 0 ? Info.InititalMinimumRefineryCount + Info.AdditionalMinimumRefineryCount : Info.InititalMinimumRefineryCount;
+		internal int CongestionRefineryShortfall
+		{
+			get
+			{
+				var harvesters = AIUtils.CountActorByCommonName(Info.HarvesterTypes, player);
+				var refineries = AIUtils.CountBuildingByCommonName(Info.RefineryTypes, player);
+				return HarvesterRaidLogic.AdditionalRefineries(harvesters, refineries,
+					Info.CongestionHarvestersPerRefinery, Info.MaximumCongestionRefineries);
+			}
+		}
+
+		int MinimumRefineryCount
+		{
+			get
+			{
+				var normal = AIUtils.CountBuildingByCommonName(Info.BarracksTypes, player) > 0 ?
+					Info.InititalMinimumRefineryCount + Info.AdditionalMinimumRefineryCount : Info.InititalMinimumRefineryCount;
+				var refineries = AIUtils.CountBuildingByCommonName(Info.RefineryTypes, player);
+				return Math.Max(normal, refineries + CongestionRefineryShortfall);
+			}
+		}
 
 		List<MiniYamlNode> IGameSaveTraitData.IssueTraitData(Actor self)
 		{
@@ -308,7 +525,13 @@ namespace OpenRA.Mods.Common.Traits
 			return new List<MiniYamlNode>()
 			{
 				new MiniYamlNode("InitialBaseCenter", FieldSaver.FormatValue(initialBaseCenter)),
-				new MiniYamlNode("DefenseCenter", FieldSaver.FormatValue(defenseCenter))
+				new MiniYamlNode("DefenseCenter", FieldSaver.FormatValue(defenseCenter)),
+				new MiniYamlNode("OpeningStage", FieldSaver.FormatValue((int)openingStage)),
+				new MiniYamlNode("OpeningUnavailableAttempts", FieldSaver.FormatValue(openingUnavailableAttempts)),
+				new MiniYamlNode("OpeningBuildingPending", FieldSaver.FormatValue(openingBuildingPending)),
+				new MiniYamlNode("OpeningBuildingPendingTick", FieldSaver.FormatValue(openingBuildingPendingTick)),
+				new MiniYamlNode("NextExcessCashExpansionTick", FieldSaver.FormatValue(nextExcessCashExpansionTick)),
+				new MiniYamlNode("FirstCombatTowerOrdered", FieldSaver.FormatValue(firstCombatTowerOrdered))
 			};
 		}
 
@@ -324,6 +547,38 @@ namespace OpenRA.Mods.Common.Traits
 			var defenseCenterNode = data.FirstOrDefault(n => n.Key == "DefenseCenter");
 			if (defenseCenterNode != null)
 				defenseCenter = FieldLoader.GetValue<CPos>("DefenseCenter", defenseCenterNode.Value.Value);
+
+			var openingStageNode = data.FirstOrDefault(n => n.Key == "OpeningStage");
+			if (openingStageNode != null)
+				openingStage = (OpeningStage)FieldLoader.GetValue<int>("OpeningStage", openingStageNode.Value.Value);
+			var unavailableNode = data.FirstOrDefault(n => n.Key == "OpeningUnavailableAttempts");
+			if (unavailableNode != null)
+				openingUnavailableAttempts = FieldLoader.GetValue<int>("OpeningUnavailableAttempts", unavailableNode.Value.Value);
+			var pendingNode = data.FirstOrDefault(n => n.Key == "OpeningBuildingPending");
+			if (pendingNode != null)
+				openingBuildingPending = FieldLoader.GetValue<bool>("OpeningBuildingPending", pendingNode.Value.Value);
+			var pendingTickNode = data.FirstOrDefault(n => n.Key == "OpeningBuildingPendingTick");
+			if (pendingTickNode != null)
+				openingBuildingPendingTick = FieldLoader.GetValue<int>("OpeningBuildingPendingTick", pendingTickNode.Value.Value);
+			var expansionNode = data.FirstOrDefault(n => n.Key == "NextExcessCashExpansionTick");
+			if (expansionNode != null)
+				nextExcessCashExpansionTick = FieldLoader.GetValue<int>("NextExcessCashExpansionTick", expansionNode.Value.Value);
+			var towerNode = data.FirstOrDefault(n => n.Key == "FirstCombatTowerOrdered");
+			if (towerNode != null)
+				firstCombatTowerOrdered = FieldLoader.GetValue<bool>("FirstCombatTowerOrdered", towerNode.Value.Value);
 		}
+	}
+
+	enum OpeningStage
+	{
+		Power,
+		Barracks,
+		Refinery,
+		Factory,
+		Harvesters,
+		Mcv,
+		Radar,
+		Silo,
+		Complete
 	}
 }

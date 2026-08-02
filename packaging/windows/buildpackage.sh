@@ -63,15 +63,13 @@ function build_platform()
 		USE_PROGRAMFILES32=""
 	fi
 
-	install_assemblies "${SRCDIR}" "${BUILTDIR}" "win-${PLATFORM}" "net6" "False" "True" "True"
-	install_data "${SRCDIR}" "${BUILTDIR}" "cnc" "d2k" "ra"
+	install_assemblies "${SRCDIR}" "${BUILTDIR}" "win-${PLATFORM}" "net6" "False" "True" "False"
+	install_data "${SRCDIR}" "${BUILTDIR}" "cnc"
 	set_engine_version "${TAG}" "${BUILTDIR}"
-	set_mod_version "${TAG}" "${BUILTDIR}/mods/cnc/mod.yaml" "${BUILTDIR}/mods/d2k/mod.yaml" "${BUILTDIR}/mods/ra/mod.yaml"  "${BUILTDIR}/mods/modcontent/mod.yaml"
+	set_mod_version "${TAG}" "${BUILTDIR}/mods/cnc/mod.yaml" "${BUILTDIR}/mods/modcontent/mod.yaml"
 
 	echo "Compiling Windows launchers (${PLATFORM})"
-	makelauncher "RedAlert" "Red Alert" "ra" "${PLATFORM}"
 	makelauncher "TiberianDawn" "Tiberian Dawn" "cnc" "${PLATFORM}"
-	makelauncher "Dune2000" "Dune 2000" "d2k" "${PLATFORM}"
 
 	echo "Building Windows setup.exe ($1)"
 	makensis -V2 -DSRCDIR="${BUILTDIR}" -DTAG="${TAG}" -DSUFFIX="${SUFFIX}" -DOUTFILE="${OUTPUTDIR}/OpenRA-${TAG}-${PLATFORM}.exe" ${USE_PROGRAMFILES32} OpenRA.nsi || exit 1

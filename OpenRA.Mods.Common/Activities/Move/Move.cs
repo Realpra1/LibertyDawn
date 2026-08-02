@@ -41,6 +41,7 @@ namespace OpenRA.Mods.Common.Activities
 
 		List<CPos> path;
 		CPos? destination;
+		bool hadNoPath;
 
 		// For dealing with blockers
 		bool hasWaited;
@@ -111,6 +112,7 @@ namespace OpenRA.Mods.Common.Activities
 
 		protected override void OnFirstRun(Actor self)
 		{
+			mobile.MoveResult = MoveResult.InProgress;
 			if (evaluateNearestMovableCell && destination.HasValue)
 			{
 				var movableDestination = mobile.NearestMoveableCell(destination.Value);
@@ -134,6 +136,7 @@ namespace OpenRA.Mods.Common.Activities
 			{
 				path?.Clear();
 
+				mobile.MoveResult = MoveResult.CompleteCanceled;
 				return true;
 			}
 
@@ -141,19 +144,47 @@ namespace OpenRA.Mods.Common.Activities
 				return false;
 
 			if (destination == mobile.ToCell)
-				return true;
-
-			if (path.Count == 0)
 			{
+				if (hadNoPath)
+					mobile.MoveResult = MoveResult.CompleteDestinationBlocked;
+				else
+					mobile.MoveResult = MoveResult.CompleteDestinationReached;
+
+				return true;
+			}
+
+			(CPos Cell, SubCell SubCell)? nextCell = null;
+			var shouldTryAgain = false;
+			if (path.Count != 0)
+			{
+				// Continue with the path to our destination.
+				destination = path[0];
+				(nextCell, shouldTryAgain) = PopPath(self);
+			}
+			else if (mobile.IsBlocking)
+			{
+				// We cannot reach our destination, but can still move aside to unblock other units.
+				var unblockDestination = UnblockDestination(self);
+				if (unblockDestination != null)
+					(nextCell, shouldTryAgain) = (unblockDestination, true);
+			}
+			else
+			{
+				hadNoPath = true;
 				destination = mobile.ToCell;
 				return false;
 			}
 
-			destination = path[0];
-
-			var nextCell = PopPath(self);
 			if (nextCell == null)
+			{
+				if (!shouldTryAgain)
+				{
+					mobile.MoveResult = MoveResult.CompleteDestinationBlocked;
+					return true;
+				}
+
 				return false;
+			}
 
 			var firstFacing = self.World.Map.FacingBetween(mobile.FromCell, nextCell.Value.Cell, mobile.Facing);
 			if (firstFacing != mobile.Facing)
@@ -184,10 +215,10 @@ namespace OpenRA.Mods.Common.Activities
 			return false;
 		}
 
-		(CPos Cell, SubCell SubCell)? PopPath(Actor self)
+		((CPos Cell, SubCell SubCell)? Next, bool ShouldTryAgain) PopPath(Actor self)
 		{
 			if (path.Count == 0)
-				return null;
+				return (null, false);
 
 			var nextCell = path[path.Count - 1];
 
@@ -195,7 +226,7 @@ namespace OpenRA.Mods.Common.Activities
 			if (!Util.AreAdjacentCells(mobile.ToCell, nextCell))
 			{
 				path = EvalPath(BlockedByActor.Immovable);
-				return null;
+				return (null, false);
 			}
 
 			var containsTemporaryBlocker = WorldUtils.ContainsTemporaryBlocker(self.World, nextCell, self);
@@ -214,7 +245,7 @@ namespace OpenRA.Mods.Common.Activities
 					if (path.Count < 2)
 					{
 						path.Clear();
-						return null;
+						return (null, false);
 					}
 
 					// We can reasonably assume that the blocker is friendly and has a similar locomotor type.
@@ -228,7 +259,7 @@ namespace OpenRA.Mods.Common.Activities
 					if (!nudgeOrRepath)
 					{
 						path.Clear();
-						return null;
+						return (null, false);
 					}
 				}
 
@@ -236,7 +267,7 @@ namespace OpenRA.Mods.Common.Activities
 				if (!mobile.CanEnterCell(nextCell, ignoreActor, BlockedByActor.Immovable))
 				{
 					path = EvalPath(BlockedByActor.Immovable);
-					return null;
+					return (null, false);
 				}
 
 				// See if they will move
@@ -247,17 +278,17 @@ namespace OpenRA.Mods.Common.Activities
 				{
 					waitTicksRemaining = mobile.Info.LocomotorInfo.WaitAverage;
 					hasWaited = true;
-					return null;
+					return (null, true);
 				}
 
 				if (--waitTicksRemaining >= 0)
-					return null;
+					return (null, true);
 
 				hasWaited = false;
 
 				// If the blocking actors are already leaving, wait a little longer instead of repathing
 				if (CellIsEvacuating(self, nextCell))
-					return null;
+					return (null, true);
 
 				// Calculate a new path
 				mobile.RemoveInfluence();
@@ -270,28 +301,32 @@ namespace OpenRA.Mods.Common.Activities
 					var newCell = path[path.Count - 1];
 					path.RemoveAt(path.Count - 1);
 
-					return (newCell, mobile.GetAvailableSubCell(nextCell, mobile.FromSubCell, ignoreActor));
+					return ((newCell, mobile.GetAvailableSubCell(nextCell, mobile.FromSubCell, ignoreActor)), true);
 				}
 				else if (mobile.IsBlocking)
 				{
 					// If there is no way around the blocker and blocker will not move and we are blocking others, back up to let others pass.
-					var newCell = mobile.GetAdjacentCell(nextCell);
+					var newCell = UnblockDestination(self);
 					if (newCell != null)
-					{
-						if ((nextCell - newCell).Value.LengthSquared > 2)
-							path.Add(mobile.ToCell);
-
-						return (newCell.Value, mobile.GetAvailableSubCell(newCell.Value, mobile.FromSubCell, ignoreActor));
-					}
+						return (newCell, true);
 				}
 
-				return null;
+				return (null, false);
 			}
 
 			hasWaited = false;
 			path.RemoveAt(path.Count - 1);
 
-			return (nextCell, mobile.GetAvailableSubCell(nextCell, mobile.FromSubCell, ignoreActor));
+			return ((nextCell, mobile.GetAvailableSubCell(nextCell, mobile.FromSubCell, ignoreActor)), true);
+		}
+
+		(CPos Cell, SubCell SubCell)? UnblockDestination(Actor self)
+		{
+			var adjacent = mobile.GetAdjacentEnterableCell(self.Location);
+			if (adjacent == null)
+				return null;
+
+			return (adjacent.Value, mobile.GetAvailableSubCell(adjacent.Value, mobile.FromSubCell, ignoreActor));
 		}
 
 		protected override void OnLastRun(Actor self)
@@ -487,7 +522,7 @@ namespace OpenRA.Mods.Common.Activities
 				var fromSubcellOffset = map.Grid.OffsetOfSubCell(mobile.FromSubCell);
 				var toSubcellOffset = map.Grid.OffsetOfSubCell(mobile.ToSubCell);
 
-				var nextCell = parent.PopPath(self);
+				var (nextCell, _) = parent.PopPath(self);
 				if (nextCell != null)
 				{
 					if (!mobile.IsTraitPaused && !mobile.IsTraitDisabled && IsTurn(mobile, nextCell.Value.Cell, map))

@@ -242,8 +242,42 @@ Player:
 		HarvesterTypes: harv, sharv
         HarvesterEnemyAvoidanceRadius: 15c0
 		RefineryTypes: proc
+	HarvesterRaidBotModule@stealth:
+		RequiresCondition: enable-viki-ai
+		RaiderTypes: sharv
+		RaidResourceType: RedTiberium
+		MaximumRaidPercent: 5
+		RaidInterval: 1500
+		MaximumTargetOptions: 15
+		CheckTargetVisibility: false
+		DebugLogging: true
 	BuildingRepairBotModule:
 		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai || enable-Easiest-ai
+	CaptureManagerBotModule:
+		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai
+		CapturingActorTypes: e6
+		DemolitionActorTypes: rmbo
+		MinimumCaptureDelay: 375
+		MinimumDemolitionDelay: 375
+		MaximumCaptureTargetOptions: 15
+		CheckCaptureTargetsForVisibility: false
+		CapturableRelationships: Enemy, Neutral
+	SpecialOrderBotModule:
+		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai
+		ScanInterval: 125
+		SupplyActorTypes: truck
+		AlliedSupplyProductionActor: truck
+		AlliedSupplyProductionActorTypes: weap, afld
+		AlliedSupplyProductionQuotaInterval: 7500
+		AlliedRescueCashThreshold: 0
+		AlliedEconomyActorTypes: harv, sharv, proc
+		AlliedRecoveryActorTypes: fact, mcv, weap, afld, pyle, hand, e1, e2, e3, e4, e5, e6, rmbo, harv, sharv, truck
+		CollectVisibleCrates: true
+		EmergencyCrateSearch: true
+		McvActorTypes: mcv
+		EmergencySellActorTypes: nuk2, hq
+		EmergencySellInterval: 7500
+		DebugLogging: true
 	McvManagerBotModule:
 		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-Easy-ai || enable-Easiest-ai
 		McvTypes: mcv
@@ -656,6 +690,21 @@ Player:
             mcv: 3000
     BaseBuilderBotModule@viki:
 		RequiresCondition: enable-viki-ai
+		EnableOpeningPolicy: true
+		OpeningPowerTypes: nuk2, nuke
+		OpeningBarracksTypes: pyle, hand
+		OpeningRefineryTypes: proc
+		OpeningFactoryTypes: weap, afld
+		OpeningHarvesterTypes: harv, sharv
+		OpeningRadarTypes: hq
+		OpeningSiloTypes: silo
+		OpeningMcvType: mcv
+		OpeningHarvesterCount: 5
+		OpeningConstructionYardCount: 2
+		FirstCombatTowerNearConstructionYard: true
+		ExcessCashExpansionThreshold: 15000
+		ExcessCashExpansionCooldown: 1500
+		ExcessCashConstructionYardTarget: 3
 		BuildingQueues: Building.Nod, Building.GDI
 		DefenseQueues: Defence.Nod, Defence.GDI
 		MinimumExcessPower: 151
@@ -666,6 +715,10 @@ Player:
         MaxBaseRadius: 49
 		ConstructionYardTypes: fact
 		RefineryTypes: proc
+		HarvesterTypes: harv, sharv
+		CongestionHarvestersPerRefinery: 4
+		MaximumCongestionRefineries: 3
+		SiloBuildResourcePercent: 75
 		PowerTypes: nuke,nuk2
 		BarracksTypes: pyle,hand
 		VehiclesFactoryTypes: weap,afld
@@ -870,10 +923,67 @@ Player:
 		RequiresCondition: enable-skynet-ai
 		SquadSize: 10
 		AttackForceInterval: 50
-		ExcludeFromSquadsTypes: harv, mcv, a10
+		ExcludeFromSquadsTypes: harv, sharv, mcv, a10, tran, lst, e6, truck
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
+		NavalUnitsTypes: boat
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
+		UseStrategicGroundTargeting: true
+		UseCohesiveGroundSquads: true
+		GroundInfluenceCellSize: 6
+		GroundInfluenceCacheInterval: 125
+		GroundTargetClosestCandidates: 12
+		GroundTargetHighestValueCandidates: 8
+		GroundTargetHarvesterValue: 5000
+		GroundTargetProductionValue: 2000
+		GroundTargetBuildingValue: 750
+		GroundTargetUnitValue: 1000
+		GroundTargetDistancePenalty: 8
+		GroundTargetReferenceSpeed: 100
+		GroundDefenderOvermatchDecayPercent: 50
+		GroundEffectivelyUndefendedRatio: 5
+		GroundTargetDebugLogging: true
+		GroundTargetPriority:
+			harv: 7000
+			sharv: 7000
+			mcv: 6500
+			arty: 5500
+			msam: 5500
+			mlrs: 4000
+			nuk2: 4000
+			weap: 3000
+			afld: 3000
+			proc: 2750
+			fact: 2500
+			fact.gdi: 2500
+			fact.nod: 2500
+			tmpl: 2250
+			eye: 2250
+			nuke: 1500
+			hq: 1250
+		EnableStealthHarassment: true
+		StealthHarassmentUnitTypes: stnk
+		StealthHarassmentSquadCount: 2
+		StealthHarassmentSquadSize: 2
+		StealthHarassmentDetectorValue: 3000
+		StealthHarassmentWeakScreenPercent: 125
+		StealthHarassmentTargetPriority:
+			harv: 8000
+			sharv: 8000
+			nuk2: 5000
+			htnk: 1800
+			mtnk: 1600
+			ltnk: 1400
+			ftnk: 1400
+			ctnk: 1400
+			jeep: 1200
+			bggy: 1200
+			bike: 1200
+			e1: 600
+			e2: 600
+			e3: 600
+			e4: 600
+			e5: 600
 		AirTargetHarvesterValue: 1000
 		AirTargetUnitValue: 450
 		AirTargetProductionValue: 300
@@ -1068,6 +1178,21 @@ Player:
             mhq: 1
     BaseBuilderBotModule@ironreaper:
 		RequiresCondition: enable-ironreaper-ai
+		EnableOpeningPolicy: true
+		OpeningPowerTypes: nuk2, nuke
+		OpeningBarracksTypes: pyle, hand
+		OpeningRefineryTypes: proc, resonator
+		OpeningFactoryTypes: weap, afld
+		OpeningHarvesterTypes: harv, sharv
+		OpeningRadarTypes: hq
+		OpeningSiloTypes: silo
+		OpeningMcvType: mcv
+		OpeningHarvesterCount: 5
+		OpeningConstructionYardCount: 2
+		FirstCombatTowerNearConstructionYard: true
+		ExcessCashExpansionThreshold: 15000
+		ExcessCashExpansionCooldown: 1500
+		ExcessCashConstructionYardTarget: 3
 		BuildingQueues: Building.Nod, Building.GDI
 		DefenseQueues: Defence.Nod, Defence.GDI
 		MinimumExcessPower: 1
@@ -1080,6 +1205,10 @@ Player:
         PlaceDefenseTowardsEnemyChance: 90
 		ConstructionYardTypes: fact
 		RefineryTypes: proc, resonator
+		HarvesterTypes: harv, sharv
+		CongestionHarvestersPerRefinery: 4
+		MaximumCongestionRefineries: 3
+		SiloBuildResourcePercent: 75
 		PowerTypes: nuke, nuk2
         PlaceAsDefenses: nuke, hand, pyle, weap, afld, proc, fix
         PlaceAsDefenseChance: 33
@@ -1135,11 +1264,49 @@ Player:
 			tmpl: 5
 			fix: 5
             resonator: 20
-    SquadManagerBotModule@ironreaper:
+	TechnologyCounterBotModule@ironreaper:
+		RequiresCondition: enable-ironreaper-ai
+		ScanInterval: 125
+		SwitchDelay: 3000
+		InitialBranch: economy
+		CounterBranches:
+			covert: recon
+			recon: economy
+			economy: covert
+		BranchUpgradeActors:
+			covert: upgrade.covert1, upgrade.covert2, upgrade.covert3
+			recon: upgrade.recon1, upgrade.recon2, upgrade.recon3
+			economy: upgrade.economy1, upgrade.economy2, upgrade.economy3
+		BranchDowngradeActors:
+			covert: downgrade.covert
+			recon: downgrade.recon
+			economy: downgrade.economy
+		DebugLogging: true
+	TransportManagerBotModule@ironreaper:
+		RequiresCondition: enable-ironreaper-ai
+		TransportHelicopterTypes: tran
+		GroundTransportTypes: apc
+		InfantryPassengerTypes: e1, e2, e3, e4, e5, rmbo
+		RescuePassengerTypes: e1, e2, e3, e4, e5, rmbo, ltnk, ftnk, ctnk, arty, mtnk, mlrs, stnk, apc, bggy, bike, jeep, msam, htnk
+		HeavyDropPassengerTypes: htnk
+		DestinationTargetTypes: harv, sharv, proc, nuke, nuk2, fact, pyle, hand, afld, weap, hpad, hq, eye, tmpl
+		TransportHelicopterActor: tran
+		EnableUnroutableRescue: true
+		EnableGroundInfantryAssault: true
+		EnableLongDistanceInfantryTransport: true
+		EnableHeavyDrop: true
+		MaximumActiveMissions: 12
+		TransportHelicopterLimit: 10
+		MinimumAssaultPassengers: 3
+		MaximumAssaultPassengers: 8
+		LongDistancePassengerCount: 8
+		HeavyDropUnitCount: 10
+		DebugLogging: true
+	SquadManagerBotModule@ironreaper:
 		RequiresCondition: enable-ironreaper-ai
 		SquadSize: 20
         MaxBaseRadius: 49
-		ExcludeFromSquadsTypes: harv, mcv, a10
+		ExcludeFromSquadsTypes: harv, mcv, a10, tran
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
@@ -1147,6 +1314,7 @@ Player:
 		RequiresCondition: enable-ironreaper-ai
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
         IdleBaseUnitsMaximum: 999
+		ExternallyManagedTypes: truck, upgrade.covert1, upgrade.covert2, upgrade.covert3, downgrade.covert, upgrade.recon1, upgrade.recon2, upgrade.recon3, downgrade.recon, upgrade.economy1, upgrade.economy2, upgrade.economy3, downgrade.economy
         UnitsToBuild:
 			e1: 25
 			e2: 25
@@ -1170,6 +1338,7 @@ Player:
 			htnk: 20
 			heli: 2
 			orca: 5
+			tran: 1
             mhq: 5
             mcv: 0
             upgrade.economy1: 1
@@ -1198,6 +1367,7 @@ Player:
             mhq: 2
 			heli: 20
 			orca: 30
+			tran: 10
             e1: 50
 			e2: 50
 			e3: 50
@@ -1222,6 +1392,7 @@ Player:
 			htnk: 5000
 			heli: 5000
 			orca: 5000
+			tran: 5000
             mcv: 3000
             downgrade.economy: 32000
             upgrade.recon1: 32000
