@@ -117,6 +117,41 @@ namespace OpenRA
 			}
 		}
 
+		public MapPreview LoadExternalMap(string path)
+		{
+			var resolvedPath = Path.GetFullPath(Platform.ResolvePath(path));
+			if (!File.Exists(resolvedPath) && !Directory.Exists(resolvedPath))
+				return null;
+
+			IReadOnlyPackage package = null;
+			try
+			{
+				using (var parent = new Folder(Path.GetDirectoryName(resolvedPath)))
+					package = parent.OpenPackage(Path.GetFileName(resolvedPath), modData.ModFiles);
+
+				if (package == null)
+					return null;
+
+				var uid = Map.ComputeUID(package);
+				var preview = previews[uid];
+				if (preview.Status == MapStatus.Available)
+				{
+					package.Dispose();
+					return preview;
+				}
+
+				var mapGrid = modData.Manifest.Get<MapGrid>();
+				preview.UpdateFromMap(package, null, MapClassification.User,
+					modData.Manifest.MapCompatibility, mapGrid.Type);
+				return preview;
+			}
+			catch
+			{
+				package?.Dispose();
+				throw;
+			}
+		}
+
 		public IEnumerable<IReadWritePackage> EnumerateMapDirPackages(MapClassification classification = MapClassification.System)
 		{
 			// Utility mod that does not support maps

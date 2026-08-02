@@ -96,7 +96,7 @@ MCV:
 	Buildable:
 		Prerequisites: ~disabled
 
-MLRS:
+MSAM:
 	Buildable:
 		Prerequisites: ~disabled
 
@@ -104,7 +104,7 @@ MTNK:
 	Buildable:
 		Prerequisites: ~weap
 
-MSAM:
+MLRS:
 	Buildable:
 		Prerequisites: ~weap
 

@@ -335,6 +335,31 @@ namespace OpenRA.Mods.Common.Server
 					return false;
 				}
 
+				int? team = null;
+				if (parts.Length >= 4)
+				{
+					if (!Exts.TryParseIntegerInvariant(parts[3], out var parsedTeam))
+					{
+						Log.Write("server", "Invalid bot team: {0}", parts[3]);
+						return false;
+					}
+
+					team = parsedTeam;
+				}
+
+				int? spawnPoint = null;
+				if (parts.Length >= 5)
+				{
+					if (!Exts.TryParseIntegerInvariant(parts[4], out var parsedSpawnPoint) ||
+						parsedSpawnPoint < 0 || parsedSpawnPoint > server.Map.SpawnPoints.Length)
+					{
+						Log.Write("server", "Invalid bot spawn point: {0}", parts[4]);
+						return false;
+					}
+
+					spawnPoint = parsedSpawnPoint;
+				}
+
 				// Invalid slot
 				if (bot != null && bot.Bot == null)
 				{
@@ -387,6 +412,13 @@ namespace OpenRA.Mods.Common.Server
 				}
 
 				S.SyncClientToPlayerReference(bot, server.Map.Players.Players[parts[0]]);
+				if (team.HasValue && !slot.LockTeam)
+					bot.Team = team.Value;
+
+				if (spawnPoint.HasValue && !slot.LockSpawn && !server.LobbyInfo.Clients
+					.Any(c => c != bot && c.SpawnPoint == spawnPoint.Value && c.SpawnPoint != 0))
+					bot.SpawnPoint = spawnPoint.Value;
+
 				server.SyncLobbyClients();
 				server.SyncLobbySlots();
 

@@ -31,8 +31,8 @@ Auto3 = { units = { ['e1'] = 3, ['e2'] = 2 }, waypoints = WaypointGroup2, delay 
 Auto4 = { units = { ['mtnk'] = 1 }, waypoints = WaypointGroup1, delay = 50 }
 Auto5 = { units = { ['mtnk'] = 1 }, waypoints = WaypointGroup3, delay = 50 }
 Auto6 = { units = { ['e1'] = 2, ['e3'] = 2 }, waypoints = WaypointGroup3, delay = 50 }
-Auto7 = { units = { ['msam'] = 1 }, waypoints = WaypointGroup1, delay = 40 }
-Auto8 = { units = { ['msam'] = 1 }, waypoints = WaypointGroup3, delay = 50 }
+Auto7 = { units = { ['mlrs'] = 1 }, waypoints = WaypointGroup1, delay = 40 }
+Auto8 = { units = { ['mlrs'] = 1 }, waypoints = WaypointGroup3, delay = 50 }
 
 RmboReinforcements = { Rambo }
 EngineerReinforcements = { "e6", "e6" }
@@ -78,14 +78,14 @@ end
 
 StartPatrols = function()
 	local mtnks = GDI.GetActorsByType("mtnk")
-	local msams = GDI.GetActorsByType("msam")
+	local rocketLaunchers = GDI.GetActorsByType("mlrs")
 
 	if #mtnks >= 1 then
 		mtnks[1].Patrol(Patrol1Waypoints, true, 20)
 	end
 
-	if #msams >= 1 then
-		msams[1].Patrol(Patrol2Waypoints, true, 20)
+	if #rocketLaunchers >= 1 then
+		rocketLaunchers[1].Patrol(Patrol2Waypoints, true, 20)
 	end
 end
 

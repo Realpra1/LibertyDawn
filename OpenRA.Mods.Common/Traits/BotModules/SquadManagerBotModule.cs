@@ -148,9 +148,42 @@ namespace OpenRA.Mods.Common.Traits
 			"without making dense SAM clusters attractive.")]
 		public readonly int AirTargetAaClearUnlockPercent = 100;
 
+		[Desc("Completed target scans without an undefended cell before an air squad may consider deliberately",
+			"attacking an AA actor. Zero allows immediate consideration.")]
+		public readonly int AirTargetAaClearFallbackScans = 0;
+
+		[Desc("Minimum ratio of ammo-weighted aircraft cost to the summed cost of AA covering the target",
+			"before deliberate AA clearing is eligible. Zero disables the value-ratio requirement.")]
+		public readonly int AirTargetAaClearValueRatio = 0;
+
+		[Desc("Number of eligible AA-clearing opportunities with the lowest summed effectiveness-times-value danger",
+			"that remain in contention. The one unlocking the most target value is selected from this shortlist.",
+			"Zero preserves ordinary score-only selection.")]
+		public readonly int AirTargetAaClearWeakestCandidates = 0;
+
+		[Desc("Maximum distance in cells between air-squad formation centers when combining their value",
+			"and orders for a deliberate AA-clearing attack. Zero keeps AA clearing squad-local.")]
+		public readonly int AirTargetAaClearSupportRadius = 0;
+
+		[Desc("Actor types whose air-target priority increases while most non-AA targets are covered by AA.")]
+		public readonly HashSet<string> AirTargetPowerActors = new HashSet<string>();
+
+		[Desc("Percentage of attackable non-AA targets that must be covered before power-target priority starts rising.",
+			"At or below this threshold the authored priority is used; at 100% coverage the configured maximum is used.")]
+		public readonly int AirTargetPowerCoverageThresholdPercent = 100;
+
+		[Desc("Maximum priority assigned to AirTargetPowerActors at 100% AA coverage. Zero disables the boost.")]
+		public readonly int AirTargetPowerPriorityMaximum = 0;
+
 		[Desc("Minimum score a candidate must reach before an air squad commits to attacking it.",
 			"Candidates scoring below this are ignored and the squad stays idle.")]
 		public readonly int AirTargetMinimumScore = 1;
+
+		[Desc("Minimum percentage by which a periodic replacement target must outscore the current target.")]
+		public readonly int AirTargetSwitchImprovementPercent = 50;
+
+		[Desc("Ticks without distance or damage progress before an armed air squad replans its target.")]
+		public readonly int AirTargetStallTicks = 150;
 
 		[Desc("Number of nearest air target candidates routed per strategic scan.")]
 		public readonly int AirTargetClosestCandidates = 15;
@@ -164,6 +197,33 @@ namespace OpenRA.Mods.Common.Traits
 
 		[Desc("Write air target scores and route decisions to debug.log.")]
 		public readonly bool AirTargetDebugLogging = false;
+
+		[Desc("Ticks between adaptive air-risk observations. Zero disables adaptation and preserves authored behavior.")]
+		public readonly int AirAdaptiveRiskInterval = 0;
+
+		[Desc("Ticks of adaptive risk history consulted after an enemy-caused aircraft loss.")]
+		public readonly int AirAdaptiveRiskRollbackTicks = 1500;
+
+		[Desc("Minimum live aircraft in a profile before readiness can increase its adaptive risk.")]
+		public readonly int AirAdaptiveRiskMinimumUnits = 3;
+
+		[Desc("Adaptive risk basis points gained per observation when every Apache is at full ammo.")]
+		public readonly int AirAdaptiveRiskApacheFullAmmoGrowth = 0;
+
+		[Desc("Adaptive risk basis points gained per observation when every Orca is at full ammo.")]
+		public readonly int AirAdaptiveRiskOrcaFullAmmoGrowth = 0;
+
+		[Desc("Adaptive risk basis points lost per observation while a profile is below its minimum force size.")]
+		public readonly int AirAdaptiveRiskLowUnitDecay = 0;
+
+		[Desc("Adaptive risk basis points credited per value point of an enemy killed by an Apache.")]
+		public readonly int AirAdaptiveRiskApacheKillGrowth = 0;
+
+		[Desc("Adaptive risk basis points credited per value point of an enemy killed by an Orca.")]
+		public readonly int AirAdaptiveRiskOrcaKillGrowth = 0;
+
+		[Desc("Additional adaptive risk basis points removed for every enemy-caused aircraft loss.")]
+		public readonly int AirAdaptiveRiskLossDecrement = 0;
 
 		[Desc("Width and height in map cells of one coarse air influence-map cell.")]
 		public readonly int AirInfluenceCellSize = 6;
@@ -237,6 +297,10 @@ namespace OpenRA.Mods.Common.Traits
 			"treats a defender as dangerous out to 150% of its actual weapon range.")]
 		public readonly float AirThreatRangeBuffer = 1.5f;
 
+		[Desc("Optional actor-specific overrides for derived anti-air threat weight. Zero makes that actor",
+			"irrelevant to air routing, destination danger, and local flee checks.")]
+		public readonly Dictionary<string, float> AirThreatWeightOverrides = new Dictionary<string, float>();
+
 		[Desc("Consecutive AirIdleState scans (each AttackForceInterval ticks apart) that find no target",
 			"scoring above AirTargetMinimumScore before the squad stops waiting for an undefended target",
 			"and instead accepts the best finite-cost route. Anti-air costs remain in force, but this is better",
@@ -248,6 +312,10 @@ namespace OpenRA.Mods.Common.Traits
 			"nearest building that can repair its type, the same way SendHomeToResupply already does for",
 			"ammo. Zero disables this.")]
 		public readonly float HealthRetreatThreshold = 0f;
+
+		[Desc("Allied actor types whose passive repair aura may be used by damaged air units.",
+			"Allied actors are never entered or reserved; the aircraft waits within their configured aura instead.")]
+		public readonly HashSet<string> AirPassiveRepairActors = new HashSet<string>();
 
 		[Desc("Per-actor-type target score overrides for Orca-type air squads (squads containing at least",
 			"one actor of type OrcaArchetypeActor), keyed by target ActorName - same shape as UnitsToBuild",
@@ -288,8 +356,23 @@ namespace OpenRA.Mods.Common.Traits
 			if (AirTargetReferenceSpeed <= 0)
 				throw new YamlException("AirTargetReferenceSpeed must be greater than zero.");
 
-			if (AirTargetFullAmmoDistanceBonus < 0 || AirTargetAaClearUnlockPercent < 0)
+			if (AirTargetFullAmmoDistanceBonus < 0 || AirTargetAaClearUnlockPercent < 0 ||
+				AirTargetAaClearFallbackScans < 0 || AirTargetAaClearValueRatio < 0 ||
+				AirTargetAaClearWeakestCandidates < 0 || AirTargetAaClearSupportRadius < 0)
 				throw new YamlException("Air target ammo-distance and AA-clear modifiers must not be negative.");
+
+			if (AirTargetPowerCoverageThresholdPercent < 0 || AirTargetPowerCoverageThresholdPercent > 100 ||
+				AirTargetPowerPriorityMaximum < 0)
+				throw new YamlException("Air target power coverage settings must use a 0-100 threshold and non-negative priority.");
+
+			if (AirTargetSwitchImprovementPercent < 0 || AirTargetStallTicks <= 0)
+				throw new YamlException("Air target switch improvement must be non-negative and the stall timeout must be positive.");
+
+			if (AirAdaptiveRiskInterval < 0 || AirAdaptiveRiskRollbackTicks < 0 || AirAdaptiveRiskMinimumUnits < 0 ||
+				AirAdaptiveRiskApacheFullAmmoGrowth < 0 || AirAdaptiveRiskOrcaFullAmmoGrowth < 0 ||
+				AirAdaptiveRiskLowUnitDecay < 0 || AirAdaptiveRiskApacheKillGrowth < 0 ||
+				AirAdaptiveRiskOrcaKillGrowth < 0 || AirAdaptiveRiskLossDecrement < 0)
+				throw new YamlException("Adaptive air-risk settings must not be negative.");
 
 			if (AirSafetyCheckInterval > 0 && AirThreatScanRadius <= 0)
 				throw new YamlException("AirThreatScanRadius must be greater than zero when AirSafetyCheckInterval is set.");
@@ -326,17 +409,29 @@ namespace OpenRA.Mods.Common.Traits
 			if (AirThreatRangeBuffer <= 0)
 				throw new YamlException("AirThreatRangeBuffer must be greater than zero.");
 
+			if (AirThreatWeightOverrides.Any(kv => kv.Value < 0))
+				throw new YamlException("AirThreatWeightOverrides values must not be negative.");
+
 			if (AirMassedAttackIdleThreshold < 0)
 				throw new YamlException("AirMassedAttackIdleThreshold must not be negative.");
 
 			if (HealthRetreatThreshold < 0 || HealthRetreatThreshold >= 1)
 				throw new YamlException("HealthRetreatThreshold must be at least zero and less than one.");
+
+			foreach (var actorName in AirPassiveRepairActors)
+			{
+				if (!rules.Actors.TryGetValue(actorName, out var actor) ||
+					!actor.TraitInfos<GrantConditionInRangeInfo>().Any(t => t.Granter &&
+						t.ValidRelationships.HasRelationship(PlayerRelationship.Ally)))
+					throw new YamlException($"AirPassiveRepairActors actor '{actorName}' must grant an allied condition in range.");
+			}
 		}
 
 		public override object Create(ActorInitializer init) { return new SquadManagerBotModule(init.Self, this); }
 	}
 
-	public class SquadManagerBotModule : ConditionalTrait<SquadManagerBotModuleInfo>, IBotEnabled, IBotTick, IBotRespondToAttack, IBotPositionsUpdated, IGameSaveTraitData
+	public class SquadManagerBotModule : ConditionalTrait<SquadManagerBotModuleInfo>, IBotEnabled, IBotTick, IBotRespondToAttack,
+		IBotPositionsUpdated, INotifyKilled, INotifyAppliedDamage, IGameSaveTraitData
 	{
 		public CPos GetRandomBaseCenter()
 		{
@@ -352,6 +447,8 @@ namespace OpenRA.Mods.Common.Traits
 
 		readonly Predicate<Actor> unitCannotBeOrdered;
 		readonly List<Actor> unitsHangingAroundTheBase = new List<Actor>();
+		readonly Dictionary<string, AdaptiveAirRiskController> adaptiveAirRisk =
+			new Dictionary<string, AdaptiveAirRiskController>(StringComparer.OrdinalIgnoreCase);
 
 		// Units that the bot already knows about. Any unit not on this list needs to be given a role.
 		readonly List<Actor> activeUnits = new List<Actor>();
@@ -369,6 +466,7 @@ namespace OpenRA.Mods.Common.Traits
 		int attackForceTicks;
 		int minAttackForceDelayTicks;
 		int airSafetyTicks;
+		int adaptiveAirRiskTicks;
 
 		public SquadManagerBotModule(Actor self, SquadManagerBotModuleInfo info)
 			: base(info)
@@ -377,6 +475,19 @@ namespace OpenRA.Mods.Common.Traits
 			Player = self.Owner;
 
 			unitCannotBeOrdered = a => a == null || a.Owner != Player || a.IsDead || !a.IsInWorld;
+
+			if (info.AirAdaptiveRiskInterval > 0)
+			{
+				var historyCapacity = Math.Max(2, info.AirAdaptiveRiskRollbackTicks / info.AirAdaptiveRiskInterval + 2);
+				adaptiveAirRisk.Add("Apache", new AdaptiveAirRiskController(historyCapacity));
+				adaptiveAirRisk.Add("Orca", new AdaptiveAirRiskController(historyCapacity));
+			}
+		}
+
+		internal float AirRiskMultiplier(string profile)
+		{
+			return adaptiveAirRisk.TryGetValue(profile, out var controller) ?
+				controller.MultiplierBasisPoints / (float)AdaptiveAirRiskController.BasisPointsPerMultiplier : 1f;
 		}
 
 		// Use for proactive targeting.
@@ -424,6 +535,9 @@ namespace OpenRA.Mods.Common.Traits
 			// Spread the air safety checks of all the bots across the interval instead of spiking on one tick.
 			if (Info.AirSafetyCheckInterval > 0)
 				airSafetyTicks = World.LocalRandom.Next(0, Info.AirSafetyCheckInterval);
+
+			if (Info.AirAdaptiveRiskInterval > 0)
+				adaptiveAirRiskTicks = Info.AirAdaptiveRiskInterval;
 		}
 
 		void IBotEnabled.BotEnabled(IBot bot)
@@ -451,7 +565,11 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			Squads.RemoveAll(s => !s.IsValid);
 			foreach (var s in Squads)
+			{
 				s.Units.RemoveAll(unitCannotBeOrdered);
+				if (s.Type == SquadType.Air)
+					s.CleanAirMembership();
+			}
 		}
 
 		// HACK: Use of this function requires that there is one squad of this type.
@@ -544,6 +662,12 @@ namespace OpenRA.Mods.Common.Traits
 					s.TickAirSafety();
 			}
 
+			if (Info.AirAdaptiveRiskInterval > 0 && --adaptiveAirRiskTicks <= 0)
+			{
+				adaptiveAirRiskTicks = Info.AirAdaptiveRiskInterval;
+				UpdateAdaptiveAirRisk();
+			}
+
 			if (--assignRolesTicks <= 0)
 			{
 				assignRolesTicks = Info.AssignRolesInterval;
@@ -582,6 +706,8 @@ namespace OpenRA.Mods.Common.Traits
 						continue;
 
 					air.Units.Add(a);
+					if (air.Units.Count > 1)
+						air.MarkAirReinforcement(a);
 				}
 				else if (Info.NavalUnitsTypes.Contains(a.Info.Name))
 				{
@@ -665,7 +791,8 @@ namespace OpenRA.Mods.Common.Traits
 			if (!protectSq.IsValid)
 			{
 				var ownUnits = World.FindActorsInCircle(World.Map.CenterOfCell(GetRandomBaseCenter()), WDist.FromCells(Info.ProtectUnitScanRadius))
-					.Where(unit => unit.Owner == Player && !Info.ProtectionTypes.Contains(unit.Info.Name) && unit.Info.HasTraitInfo<AttackBaseInfo>());
+					.Where(unit => unit.Owner == Player && !Info.ProtectionTypes.Contains(unit.Info.Name) &&
+						!Info.AirUnitsTypes.Contains(unit.Info.Name) && unit.Info.HasTraitInfo<AttackBaseInfo>());
 
 				foreach (var a in ownUnits)
 					protectSq.Units.Add(a);
@@ -678,6 +805,94 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		void IBotPositionsUpdated.UpdatedDefenseCenter(CPos newLocation) { }
+
+		string AirProfileFor(Actor actor)
+		{
+			if (actor == null || !Info.AirUnitsTypes.Contains(actor.Info.Name))
+				return null;
+
+			var squad = Squads.FirstOrDefault(s => s.Type == SquadType.Air && s.Units.Contains(actor));
+			if (squad != null)
+				return squad.AirProfile;
+
+			return Info.AirSquadDefinitions
+				.Where(d => d.Value.UnitTypes.Count == 0 || d.Value.UnitTypes.Contains(actor.Info.Name))
+				.OrderBy(d => d.Value.UnitTypes.Count == 0 ? int.MaxValue : d.Value.UnitTypes.Count)
+				.ThenBy(d => d.Key)
+				.Select(d => d.Value.Profile)
+				.FirstOrDefault();
+		}
+
+		int FullAmmoGrowth(string profile)
+		{
+			return profile.Equals("Apache", StringComparison.OrdinalIgnoreCase) ? Info.AirAdaptiveRiskApacheFullAmmoGrowth :
+				Info.AirAdaptiveRiskOrcaFullAmmoGrowth;
+		}
+
+		int KillGrowth(string profile)
+		{
+			return profile.Equals("Apache", StringComparison.OrdinalIgnoreCase) ? Info.AirAdaptiveRiskApacheKillGrowth :
+				Info.AirAdaptiveRiskOrcaKillGrowth;
+		}
+
+		void UpdateAdaptiveAirRisk()
+		{
+			foreach (var entry in adaptiveAirRisk)
+			{
+				var units = World.Actors.Where(a => a.Owner == Player && !a.IsDead && a.IsInWorld &&
+					entry.Key.Equals(AirProfileFor(a), StringComparison.OrdinalIgnoreCase)).ToList();
+				var fullAmmo = units.Count(a =>
+				{
+					var pools = a.TraitsImplementing<AmmoPool>().ToList();
+					return pools.Count > 0 && pools.All(p => p.HasFullAmmo);
+				});
+
+				var previous = entry.Value.BonusBasisPoints;
+				entry.Value.Update(World.WorldTick, fullAmmo, units.Count, Info.AirAdaptiveRiskMinimumUnits,
+					FullAmmoGrowth(entry.Key), Info.AirAdaptiveRiskLowUnitDecay);
+				if (Info.AirTargetDebugLogging && previous != entry.Value.BonusBasisPoints)
+					Log.Write("debug", "Air adaptive [{0}]: units={1} full-ammo={2} bonus={3} multiplier={4:0.00}.",
+						entry.Key, units.Count, fullAmmo, entry.Value.BonusBasisPoints, AirRiskMultiplier(entry.Key));
+			}
+		}
+
+		void INotifyAppliedDamage.AppliedDamage(Actor self, Actor damaged, AttackInfo e)
+		{
+			if (IsTraitDisabled || e.DamageState != DamageState.Dead || e.PreviousDamageState == DamageState.Dead ||
+				e.Attacker == null || e.Attacker.Owner != Player || Player.RelationshipWith(damaged.Owner) != PlayerRelationship.Enemy)
+				return;
+
+			var profile = AirProfileFor(e.Attacker);
+			if (profile == null || !adaptiveAirRisk.TryGetValue(profile, out var controller))
+				return;
+
+			var growth = KillGrowth(profile);
+			if (growth <= 0)
+				return;
+
+			var value = damaged.Info.TraitInfoOrDefault<ValuedInfo>()?.Cost ?? 0;
+			controller.RecordKill(value, growth);
+			if (Info.AirTargetDebugLogging)
+				Log.Write("debug", "Air adaptive [{0}]: credited {1} value for killing {2}#{3}.",
+					profile, value, damaged.Info.Name, damaged.ActorID);
+		}
+
+		void INotifyKilled.Killed(Actor self, AttackInfo e)
+		{
+			if (IsTraitDisabled || self.Owner != Player || e.Attacker == null || e.Attacker == self ||
+				Player.RelationshipWith(e.Attacker.Owner) != PlayerRelationship.Enemy)
+				return;
+
+			var profile = AirProfileFor(self);
+			if (profile == null || !adaptiveAirRisk.TryGetValue(profile, out var controller))
+				return;
+
+			var previous = controller.BonusBasisPoints;
+			controller.RecordEnemyLoss(World.WorldTick, Info.AirAdaptiveRiskRollbackTicks, Info.AirAdaptiveRiskLossDecrement);
+			if (Info.AirTargetDebugLogging)
+				Log.Write("debug", "Air adaptive [{0}]: enemy loss {1}#{2}, bonus {3}->{4}.",
+					profile, self.Info.Name, self.ActorID, previous, controller.BonusBasisPoints);
+		}
 
 		void IBotRespondToAttack.RespondToAttack(IBot bot, Actor self, AttackInfo e)
 		{
@@ -714,6 +929,18 @@ namespace OpenRA.Mods.Common.Traits
 				new MiniYamlNode("AssignRolesTicks", FieldSaver.FormatValue(assignRolesTicks)),
 				new MiniYamlNode("AttackForceTicks", FieldSaver.FormatValue(attackForceTicks)),
 				new MiniYamlNode("MinAttackForceDelayTicks", FieldSaver.FormatValue(minAttackForceDelayTicks)),
+				new MiniYamlNode("AdaptiveAirRiskTicks", FieldSaver.FormatValue(adaptiveAirRiskTicks)),
+				new MiniYamlNode("AdaptiveAirRisk", "", adaptiveAirRisk.OrderBy(e => e.Key).Select(e =>
+				{
+					var state = e.Value.ExportState();
+					return new MiniYamlNode(e.Key, "", new List<MiniYamlNode>
+					{
+						new MiniYamlNode("Bonus", FieldSaver.FormatValue(state.BonusBasisPoints)),
+						new MiniYamlNode("PendingKillBonus", FieldSaver.FormatValue(state.PendingKillBonusBasisPoints)),
+						new MiniYamlNode("HistoryTicks", FieldSaver.FormatValue(state.History.Select(h => h.Tick).ToArray())),
+						new MiniYamlNode("HistoryBonuses", FieldSaver.FormatValue(state.History.Select(h => h.BonusBasisPoints).ToArray())),
+					});
+				}).ToList()),
 			};
 		}
 
@@ -757,6 +984,35 @@ namespace OpenRA.Mods.Common.Traits
 			var minAttackForceDelayTicksNode = data.FirstOrDefault(n => n.Key == "MinAttackForceDelayTicks");
 			if (minAttackForceDelayTicksNode != null)
 				minAttackForceDelayTicks = FieldLoader.GetValue<int>("MinAttackForceDelayTicks", minAttackForceDelayTicksNode.Value.Value);
+
+			var adaptiveAirRiskTicksNode = data.FirstOrDefault(n => n.Key == "AdaptiveAirRiskTicks");
+			if (adaptiveAirRiskTicksNode != null)
+				adaptiveAirRiskTicks = FieldLoader.GetValue<int>("AdaptiveAirRiskTicks", adaptiveAirRiskTicksNode.Value.Value);
+
+			var adaptiveAirRiskNode = data.FirstOrDefault(n => n.Key == "AdaptiveAirRisk");
+			if (adaptiveAirRiskNode != null)
+				foreach (var profileNode in adaptiveAirRiskNode.Value.Nodes)
+				{
+					if (!adaptiveAirRisk.TryGetValue(profileNode.Key, out var controller))
+						continue;
+
+					var fields = profileNode.Value.Nodes.ToDictionary(n => n.Key);
+					if (!fields.TryGetValue("Bonus", out var bonusNode) ||
+						!fields.TryGetValue("PendingKillBonus", out var pendingNode) ||
+						!fields.TryGetValue("HistoryTicks", out var ticksNode) ||
+						!fields.TryGetValue("HistoryBonuses", out var bonusesNode))
+						continue;
+
+					var ticks = FieldLoader.GetValue<int[]>("HistoryTicks", ticksNode.Value.Value);
+					var bonuses = FieldLoader.GetValue<int[]>("HistoryBonuses", bonusesNode.Value.Value);
+					if (ticks.Length != bonuses.Length)
+						continue;
+
+					controller.ImportState(new AdaptiveAirRiskState(
+						FieldLoader.GetValue<int>("Bonus", bonusNode.Value.Value),
+						FieldLoader.GetValue<int>("PendingKillBonus", pendingNode.Value.Value),
+						ticks.Select((tick, i) => new AdaptiveAirRiskCheckpoint(tick, bonuses[i])).ToArray()));
+				}
 
 			var squadsNode = data.FirstOrDefault(n => n.Key == "Squads");
 			if (squadsNode != null)

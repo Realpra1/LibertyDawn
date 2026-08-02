@@ -46,6 +46,41 @@ namespace OpenRA.Test
 			Assert.That(route, Does.Contain(new CPos(1, 0)));
 		}
 
+		[Test]
+		public void NearestSafeRouteLeavesAaCoverAtLowestCost()
+		{
+			var danger = new[]
+			{
+				0f, 20f, 0f,
+				0f, 10f, 5f,
+				0f, 20f, 0f,
+			};
+
+			var route = AirThreatGeometry.FindNearestSafeCoarseRoute(danger, 3, 3, 1, 1, 100);
+			Assert.That(route, Is.EqualTo(new[] { new CPos(0, 1) }));
+		}
+
+		[Test]
+		public void NearestSafeRouteStaysPutWhenAlreadySafe()
+		{
+			var route = AirThreatGeometry.FindNearestSafeCoarseRoute(new[] { 0f, 10f }, 2, 1, 0, 0, 100);
+			Assert.That(route, Is.Empty);
+		}
+
+		[Test]
+		public void PendingRepairAssignmentImmediatelyClaimsFacilityForOtherAircraft()
+		{
+			var assignments = new Dictionary<uint, uint> { { 11, 50 }, { 12, 60 } };
+			var repairing = new HashSet<uint> { 11, 12 };
+
+			Assert.That(AirThreatGeometry.HasOtherRepairAssignment(assignments, repairing, 13, 50), Is.True);
+			Assert.That(AirThreatGeometry.HasOtherRepairAssignment(assignments, repairing, 11, 50), Is.False);
+
+			// Stale assignments from aircraft that are no longer repairing do not block the facility.
+			repairing.Remove(11);
+			Assert.That(AirThreatGeometry.HasOtherRepairAssignment(assignments, repairing, 13, 50), Is.False);
+		}
+
 		[TestCase(TestName = "Distance to a segment uses the perpendicular when the foot is inside it")]
 		public void PerpendicularDistance()
 		{
@@ -181,6 +216,19 @@ namespace OpenRA.Test
 
 			// Nothing seen is never a reason to run.
 			Assert.That(AirThreatGeometry.ShouldFleeAntiAir(0, Multiplier, 5), Is.False);
+		}
+
+		[Test]
+		public void PlannedAaClearOnlyContinuesWithoutAChangedLocalThreatSet()
+		{
+			Assert.That(AirThreatGeometry.PlannedAaClearResponse(false, true, true),
+				Is.EqualTo(LocalAaClearResponse.Flee));
+			Assert.That(AirThreatGeometry.PlannedAaClearResponse(true, true, true),
+				Is.EqualTo(LocalAaClearResponse.Continue));
+			Assert.That(AirThreatGeometry.PlannedAaClearResponse(true, true, false),
+				Is.EqualTo(LocalAaClearResponse.Recalculate));
+			Assert.That(AirThreatGeometry.PlannedAaClearResponse(true, false, true),
+				Is.EqualTo(LocalAaClearResponse.Recalculate));
 		}
 
 		[TestCase(TestName = "A vector is rescaled to the requested length, keeping its direction")]
@@ -333,7 +381,7 @@ namespace OpenRA.Test
 		[TestCase(TestName = "A weapon's range is respected further out once padded by the buffer, but no further")]
 		public void BufferedRangeExtendsCoverage()
 		{
-			// A TowerAAMissile site: Range 10c0, AirThreatRangeBuffer 1.5 as wired into
+			// A Dragon SAM site: Range 10c0, AirThreatRangeBuffer 1.5 as wired into
 			// SquadManagerBotModule@skynet.
 			Assert.That(AirThreatGeometry.IsWithinBufferedRange(10, 10, 1.5f), Is.True);
 			Assert.That(AirThreatGeometry.IsWithinBufferedRange(15, 10, 1.5f), Is.True);
@@ -341,6 +389,21 @@ namespace OpenRA.Test
 
 			// No buffer at all is just the raw range.
 			Assert.That(AirThreatGeometry.IsWithinBufferedRange(11, 10, 1f), Is.False);
+
+			// Elite SAMs have a live 125% range modifier. Preserve the half-cell rather than
+			// truncating 12.5 back to 12 before applying the existing margin.
+			Assert.That(AirThreatGeometry.IsWithinBufferedRange(18.75f, 12.5f, 1.5f), Is.True);
+			Assert.That(AirThreatGeometry.IsWithinBufferedRange(18.76f, 12.5f, 1.5f), Is.False);
+		}
+
+		[Test]
+		public void ReinforcementJoinsFromTargetOrNeighboringCoarseCell()
+		{
+			var target = new CPos(5, 5);
+			Assert.That(AirThreatGeometry.IsSameOrAdjacentCoarseCell(target, target), Is.True);
+			Assert.That(AirThreatGeometry.IsSameOrAdjacentCoarseCell(new CPos(4, 5), target), Is.True);
+			Assert.That(AirThreatGeometry.IsSameOrAdjacentCoarseCell(new CPos(6, 6), target), Is.True);
+			Assert.That(AirThreatGeometry.IsSameOrAdjacentCoarseCell(new CPos(7, 5), target), Is.False);
 		}
 
 		[TestCase(TestName = "An Orca outruns everything except the two fastest AA missiles it can meet")]
@@ -442,12 +505,210 @@ namespace OpenRA.Test
 			Assert.That(selected, Is.EqualTo(new[] { 0, 1, 2, 3, 4 }));
 		}
 
+		[Test]
+		public void TargetCandidatesAlwaysIncludeMovingIncumbent()
+		{
+			var selected = AirThreatGeometry.SelectTargetCandidates(
+				new long[] { 1, 2, 3, 100 },
+				new[] { 40, 30, 20, 10 },
+				closestCount: 1, highestValueCount: 1, requiredIndex: 3);
+
+			Assert.That(selected, Is.EqualTo(new[] { 0, 3 }));
+		}
+
+		[TestCase(100, 100, 100, 100)]
+		[TestCase(100, 50, 100, 200)]
+		[TestCase(100, 25, 100, 400)]
+		[TestCase(100, 150, 100, 100)]
+		[TestCase(100, 1, 0, 100)]
+		public void RemainingHealthIncreasesTargetPriority(int priority, int hp, int maxHp, int expected)
+		{
+			Assert.That(AirThreatGeometry.RemainingHealthPriority(priority, hp, maxHp), Is.EqualTo(expected));
+		}
+
+		[Test]
+		public void RemainingHealthPrioritySafelyHandlesZeroAndOverflow()
+		{
+			Assert.That(AirThreatGeometry.RemainingHealthPriority(100, 0, 100), Is.EqualTo(10000));
+			Assert.That(AirThreatGeometry.RemainingHealthPriority(int.MaxValue, 1, int.MaxValue), Is.EqualTo(int.MaxValue));
+			Assert.That(AirThreatGeometry.RemainingHealthPriority(-1, 1, 100), Is.Zero);
+		}
+
 		[TestCase(92, 125, 12)]
 		[TestCase(40, 125, 5)]
 		[TestCase(0, 125, 0)]
 		public void MobileThreatBufferCoversCacheLifetime(int speed, int cacheTicks, int expectedCells)
 		{
 			Assert.That(AirThreatGeometry.MobileThreatBufferCells(speed, cacheTicks), Is.EqualTo(expectedCells));
+		}
+
+		[Test]
+		public void TargetSwitchRequiresMaterialImprovement()
+		{
+			Assert.That(AirThreatGeometry.ShouldSwitchTarget(true, 100, true, true, 149, 50), Is.False);
+			Assert.That(AirThreatGeometry.ShouldSwitchTarget(true, 100, true, true, 150, 50), Is.True);
+			Assert.That(AirThreatGeometry.ShouldSwitchTarget(true, 100, false, true, 10000, 50), Is.False);
+		}
+
+		[Test]
+		public void TargetSwitchPreservesUndefendedTier()
+		{
+			Assert.That(AirThreatGeometry.ShouldSwitchTarget(true, 1, true, false, int.MaxValue, 0), Is.False);
+			Assert.That(AirThreatGeometry.ShouldSwitchTarget(false, int.MaxValue, true, true, 1, 100), Is.True);
+		}
+
+		[Test]
+		public void TargetSwitchScoreComparisonDoesNotOverflow()
+		{
+			Assert.That(AirThreatGeometry.ShouldSwitchTarget(
+				true, int.MaxValue - 1, true, true, int.MaxValue, 50), Is.False);
+		}
+
+		[Test]
+		public void StallRescanDoesNotWaitForUnrelatedBusyUnits()
+		{
+			Assert.That(AirThreatGeometry.ShouldRescanStalledTarget(149, 150, true), Is.False);
+			Assert.That(AirThreatGeometry.ShouldRescanStalledTarget(150, 150, true), Is.True);
+			Assert.That(AirThreatGeometry.ShouldRescanStalledTarget(150, 150, false), Is.False);
+		}
+
+		[TestCase(false, false, true)]
+		[TestCase(true, false, false)]
+		[TestCase(false, true, false)]
+		public void ClusterOpportunityOnlyAppliesToFreshCellSearches(
+			bool hasIncumbent, bool currentCellHasTargets, bool expected)
+		{
+			Assert.That(AirThreatGeometry.UseClusterOpportunity(hasIncumbent, currentCellHasTargets),
+				Is.EqualTo(expected));
+		}
+
+		[Test]
+		public void AaClearRequiresSearchPatienceAndDynamicValueAdvantage()
+		{
+			Assert.That(AirThreatGeometry.CanAttemptAaClear(2, 3, 10000, 1, 1000, 10), Is.False);
+			Assert.That(AirThreatGeometry.CanAttemptAaClear(3, 3, 9999, 1, 1000, 10), Is.False);
+			Assert.That(AirThreatGeometry.CanAttemptAaClear(3, 3, 10000, 1, 1000, 10), Is.True);
+			Assert.That(AirThreatGeometry.CanAttemptAaClear(3, 3, long.MaxValue, 1, 0, 10), Is.False);
+			Assert.That(AirThreatGeometry.CanAttemptAaClear(0, 0, 0, 0, 0, 0), Is.True);
+		}
+
+		[TestCase(6500, 8, 5200, 10, true, TestName = "Building SAM still requires 10x economic value")]
+		[TestCase(6499, 8, 5200, 10, false)]
+		[TestCase(3000, 8, 2400, 10, true, TestName = "Half-strength MSAM requires 5x economic value")]
+		[TestCase(2999, 8, 2400, 10, false)]
+		public void AaClearNormalizesAircraftValueAgainstSamThreat(long aircraftValue,
+			float samReferenceWeight, double dangerValue, int requiredRatio, bool expected)
+		{
+			Assert.That(AirThreatGeometry.CanAttemptAaClear(
+				3, 3, aircraftValue, samReferenceWeight, dangerValue, requiredRatio), Is.EqualTo(expected));
+		}
+
+		[TestCase(100, 1000, 200, true, DefendedAirAction.Sneak)]
+		[TestCase(300, 1000, 200, true, DefendedAirAction.ClearAa)]
+		[TestCase(300, 100, 200, true, DefendedAirAction.Reject)]
+		[TestCase(300, 1000, 200, false, DefendedAirAction.Reject)]
+		[TestCase(200, 1000, 200, true, DefendedAirAction.Reject)]
+		[TestCase(long.MaxValue, long.MaxValue, 200, true, DefendedAirAction.ClearAa)]
+		public void DefendedActionUsesKillTimeBeforeTargetValue(long cellTicks, long protectedTicks,
+			long clearTicks, bool valueEligible, DefendedAirAction expected)
+		{
+			Assert.That(AirThreatGeometry.ChooseDefendedAction(
+				cellTicks, protectedTicks, clearTicks, valueEligible), Is.EqualTo(expected));
+		}
+
+		[Test]
+		public void DefendedVictimCannotInheritItsClusterButAaClearKeepsUnlockCredit()
+		{
+			const int IndividualHarvester = 7000;
+			const long HarvesterCluster = 146708;
+
+			Assert.That(AirThreatGeometry.AirTargetOpportunityValue(
+				IndividualHarvester, HarvesterCluster, true, false, false, 125),
+				Is.EqualTo(IndividualHarvester));
+			Assert.That(AirThreatGeometry.AirTargetOpportunityValue(
+				IndividualHarvester, HarvesterCluster, true, true, false, 125),
+				Is.EqualTo(HarvesterCluster));
+
+			// AA unlock credit is retained even during an incumbent comparison where ordinary cluster
+			// opportunity is disabled.
+			Assert.That(AirThreatGeometry.AirTargetOpportunityValue(
+				600, 14000, false, false, true, 125), Is.EqualTo(18100));
+		}
+
+		[Test]
+		public void AaClearChoosesMostValueFromThreeLowestDangerCandidates()
+		{
+			var selected = AirThreatGeometry.SelectAaClearCandidate(
+				new double[] { 100, 200, 50, 75 },
+				new long[] { 1000, 10000, 500, 2000 },
+				new[] { 10, 100, 5, 20 },
+				weakestCount: 3);
+
+			// Candidate 1 unlocks the most overall, but its AA is not among the three weakest.
+			// Of candidates 2, 3 and 0, candidate 3 unlocks the most.
+			Assert.That(selected, Is.EqualTo(3));
+			Assert.That(AirThreatGeometry.SelectAaClearCandidate(
+				System.Array.Empty<double>(), System.Array.Empty<long>(), System.Array.Empty<int>(), 3), Is.EqualTo(-1));
+		}
+
+		[Test]
+		public void AaClearReassessmentRecoversIncumbentsFullProtectedValue()
+		{
+			var selected = AirThreatGeometry.SelectAaClearCandidateForTarget(
+				new uint[] { 831, 778, 831 }, 831,
+				new double[] { 650, 650, 1300 },
+				new long[] { 109101, 53263, 20000 },
+				new[] { 37794, 14580, 5000 });
+
+			// The global challenger (778) is irrelevant here. Reassessment must recover the complete
+			// high-value plan for incumbent 831 rather than its low actor-only cell score.
+			Assert.That(selected, Is.EqualTo(0));
+			Assert.That(AirThreatGeometry.SelectAaClearCandidateForTarget(
+				new uint[] { 831 }, 999, new double[] { 650 }, new long[] { 109101 }, new[] { 37794 }),
+				Is.EqualTo(-1));
+		}
+
+		[TestCase(89, 100, 312)]
+		[TestCase(90, 100, 312)]
+		[TestCase(95, 100, 5156)]
+		[TestCase(100, 100, 10000)]
+		public void PowerPriorityRisesOnlyAboveHeavyAaCoverage(int covered, int total, int expected)
+		{
+			Assert.That(AirThreatGeometry.CoverageAdjustedPriority(
+				312, covered, total, 90, 10000), Is.EqualTo(expected));
+		}
+
+		[Test]
+		public void PowerPriorityRestoresEachArchetypesAuthoredValue()
+		{
+			Assert.That(AirThreatGeometry.CoverageAdjustedPriority(5000, 89, 100, 90, 10000), Is.EqualTo(5000));
+			Assert.That(AirThreatGeometry.CoverageAdjustedPriority(5000, 95, 100, 90, 10000), Is.EqualTo(7500));
+			Assert.That(AirThreatGeometry.CoverageAdjustedPriority(312, 0, 0, 90, 10000), Is.EqualTo(312));
+		}
+
+		[Test]
+		public void ThreatWeightOverrideCanExplicitlyDisableWeakAa()
+		{
+			var overrides = new Dictionary<string, float> { { "e3", 0f } };
+			Assert.That(AirThreatGeometry.ConfiguredThreatWeight("e3", .223f, overrides), Is.Zero);
+			Assert.That(AirThreatGeometry.ConfiguredThreatWeight("sam", 1f, overrides), Is.EqualTo(1f));
+		}
+
+		[Test]
+		public void OrcaOutrunDiscountOnlyProducesASeparateTransitWeight()
+		{
+			const float StoppingWeight = 1f;
+			Assert.That(AirThreatGeometry.OrcaTransitThreatWeight(StoppingWeight, true), Is.EqualTo(.5f));
+			Assert.That(AirThreatGeometry.OrcaTransitThreatWeight(StoppingWeight, false), Is.EqualTo(StoppingWeight));
+			Assert.That(StoppingWeight, Is.EqualTo(1f));
+		}
+
+		[Test]
+		public void AdaptiveLocalRiskOnlyAppliesInsideTargetCell()
+		{
+			Assert.That(AirThreatGeometry.LocalAirRiskMultiplier(false, 4f), Is.EqualTo(1f));
+			Assert.That(AirThreatGeometry.LocalAirRiskMultiplier(true, 4f), Is.EqualTo(4f));
+			Assert.That(AirThreatGeometry.LocalAirRiskMultiplier(true, 0.5f), Is.EqualTo(1f));
 		}
 	}
 }

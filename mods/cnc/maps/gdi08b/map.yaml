@@ -725,7 +725,7 @@ Actors:
 		Location: 13,29
 		Owner: Nod
 		Facing: 512
-	Actor220: msam
+	Actor220: mlrs
 		Location: 35,50
 		Owner: GDI
 	harv1: harv
@@ -744,7 +744,7 @@ Actors:
 	Actor225: jeep
 		Location: 34,48
 		Owner: GDI
-	Actor226: msam
+	Actor226: mlrs
 		Location: 33,50
 		Owner: GDI
 	Actor227: ltnk

@@ -10,6 +10,7 @@
 #endregion
 
 using System;
+using System.Collections.Generic;
 using OpenRA.Network;
 
 namespace OpenRA
@@ -30,6 +31,9 @@ namespace OpenRA
 
 		[Desc("Automatically start playing the given map.")]
 		public string Map;
+
+		[Desc("Semicolon-separated local lobby commands to execute before automatically starting a map.")]
+		public string LobbyCommands;
 
 		public LaunchArguments(Arguments args)
 		{
@@ -63,6 +67,31 @@ namespace OpenRA
 				Log.Write("client", "Failed to parse Launch.URI or Launch.Connect: {0}", ex.Message);
 				return null;
 			}
+		}
+
+		public IReadOnlyList<string> GetLobbyCommands()
+		{
+			if (string.IsNullOrWhiteSpace(LobbyCommands))
+				return Array.Empty<string>();
+
+			if (LobbyCommands.IndexOfAny(new[] { '\r', '\n' }) >= 0)
+				throw new ArgumentException("Launch.LobbyCommands must not contain newlines.");
+
+			var commands = new List<string>();
+			foreach (var command in LobbyCommands.Split(';'))
+			{
+				var trimmed = command.Trim();
+				if (trimmed.Length == 0)
+					throw new ArgumentException("Launch.LobbyCommands must not contain empty commands.");
+
+				var commandName = trimmed.Split(' ')[0];
+				if (commandName == "state" || commandName == "startgame")
+					throw new ArgumentException($"Launch.LobbyCommands cannot control game startup using '{commandName}'.");
+
+				commands.Add(trimmed);
+			}
+
+			return commands;
 		}
 	}
 }

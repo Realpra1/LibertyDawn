@@ -945,15 +945,20 @@ namespace OpenRA
 			benchmark = new Benchmark(prefix);
 		}
 
-		public static void LoadMap(string launchMap)
+		public static void LoadMap(string launchMap, IEnumerable<string> lobbyCommands = null)
 		{
-			var orders = new List<Order>
-			{
-				Order.Command("option gamespeed default"),
-				Order.Command($"state {Session.ClientState.Ready}")
-			};
+			var orders = new List<Order> { Order.Command("option gamespeed default") };
+			if (lobbyCommands != null)
+				orders.AddRange(lobbyCommands.Select(Order.Command));
+
+			// Readiness is deliberately controlled here so custom setup cannot start the game
+			// before every lobby command has been processed.
+			orders.Add(Order.Command($"state {Session.ClientState.Ready}"));
 
 			var map = ModData.MapCache.SingleOrDefault(m => m.Uid == launchMap || Path.GetFileName(m.Package.Name) == launchMap);
+			if (map == null)
+				map = ModData.MapCache.LoadExternalMap(launchMap);
+
 			if (map == null)
 				throw new ArgumentException($"Could not find map '{launchMap}'.");
 
