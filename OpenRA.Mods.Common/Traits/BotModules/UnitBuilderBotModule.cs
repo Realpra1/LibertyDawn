@@ -157,7 +157,6 @@ namespace OpenRA.Mods.Common.Traits
 			var pauseRandomProduction = requestPause.Any(rp => rp.PauseUnitProduction);
 			if (pauseRandomProduction && queuedBuildRequests.Count == 0)
 				return;
-
 			ticks++;
 
 			if (ticks % FeedbackTime == 0)
@@ -173,6 +172,7 @@ namespace OpenRA.Mods.Common.Traits
 				{
 					BuildUnit(bot, buildRequest);
 					queuedBuildRequests.Remove(buildRequest);
+					return;
 				}
 
 				if (!pauseRandomProduction)

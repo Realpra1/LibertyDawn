@@ -229,6 +229,7 @@ namespace OpenRA.Mods.Common.Traits
 		IResourceLayer resourceLayer;
 		IBotPositionsUpdated[] positionsUpdatedModules;
 		IBotRequestUnitProduction[] unitProduction;
+		IBotRallyPointManager[] rallyPointManagers;
 		CPos initialBaseCenter;
 		CPos defenseCenter;
 		readonly Dictionary<int, int> openingStructureReservations = new Dictionary<int, int>();
@@ -262,6 +263,7 @@ namespace OpenRA.Mods.Common.Traits
 			positionsUpdatedModules = self.Owner.PlayerActor.TraitsImplementing<IBotPositionsUpdated>().ToArray();
 			unitBuilders = self.Owner.PlayerActor.TraitsImplementing<UnitBuilderBotModule>().ToArray();
 			unitProduction = self.Owner.PlayerActor.TraitsImplementing<IBotRequestUnitProduction>().ToArray();
+			rallyPointManagers = self.Owner.PlayerActor.TraitsImplementing<IBotRallyPointManager>().ToArray();
 			WallPlanner = new BaseBuilderWallPlanner(this, player);
 		}
 
@@ -570,6 +572,9 @@ namespace OpenRA.Mods.Common.Traits
 			foreach (var rp in world.ActorsWithTrait<RallyPoint>())
 			{
 				if (rp.Actor.Owner != player)
+					continue;
+
+				if (rallyPointManagers.Any(manager => manager.ManagesRallyPoint(rp.Actor)))
 					continue;
 
 				if (rp.Trait.Path.Count == 0 || !IsRallyPointValid(rp.Trait.Path[0], rp.Actor.Info.TraitInfoOrDefault<BuildingInfo>()))
