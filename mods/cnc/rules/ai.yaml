@@ -255,6 +255,21 @@ Player:
 		RefineryTypes: proc
 	BuildingRepairBotModule:
 		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai || enable-Easiest-ai
+	CaptureManagerBotModule:
+		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai || enable-Easiest-ai
+		CapturingActorTypes: e6
+		DemolitionActorTypes: rmbo
+		MinimumCaptureDelay: 375
+		MinimumDemolitionDelay: 375
+		MaximumCaptureTargetOptions: 15
+		CheckCaptureTargetsForVisibility: false
+		CapturableRelationships: Enemy, Neutral
+		DebugLogging: true
+	SpecialOrderBotModule:
+		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai || enable-Easiest-ai
+		ScanInterval: 125
+		SupplyActorTypes: truck
+		DebugLogging: true
 	McvManagerBotModule:
 		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-Easy-ai || enable-Easiest-ai
 		McvTypes: mcv
@@ -320,7 +335,7 @@ Player:
 	SquadManagerBotModule@cabal:
 		RequiresCondition: enable-cabal-ai
 		SquadSize: 15
-		ExcludeFromSquadsTypes: harv, mcv, a10
+		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
@@ -341,6 +356,7 @@ Player:
 			e3: 40
 			e4: 15
 			e5: 15
+			e6: 8
 			harv: 10
 			bggy: 5
 			bike: 40
@@ -412,7 +428,7 @@ Player:
     SquadManagerBotModule@watson:
 		RequiresCondition: enable-watson-ai
 		SquadSize: 15
-		ExcludeFromSquadsTypes: harv, mcv, a10
+		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
@@ -433,6 +449,7 @@ Player:
 			e3: 40
 			e4: 30
 			e5: 30
+			e6: 10
 			harv: 10
 			bggy: 10
 			ftnk: 10
@@ -504,7 +521,7 @@ Player:
 	SquadManagerBotModule@hal9001:
 		RequiresCondition: enable-hal9001-ai
 		SquadSize: 8
-		ExcludeFromSquadsTypes: harv, mcv, a10
+		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
@@ -525,6 +542,7 @@ Player:
 			e3: 40
 			e4: 50
 			e5: 50
+			e6: 12
 			harv: 16
 			bggy: 10
 			bike: 10
@@ -627,14 +645,14 @@ Player:
     SquadManagerBotModule@brutalis:
 		RequiresCondition: enable-brutalis-ai
 		SquadSize: 20
-		ExcludeFromSquadsTypes: harv, mcv, a10
+		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca, stnk
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
     SquadManagerBotModule@wavemaker:
 		RequiresCondition: enable-wavemaker-ai
 		SquadSize: 120
-		ExcludeFromSquadsTypes: harv, mcv, a10
+		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca, stnk
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
@@ -656,6 +674,7 @@ Player:
 			e3: 40
 			e4: 15
 			e5: 15
+			e6: 8
             rmbo: 2
 			harv: 50
 			ltnk: 11
@@ -799,7 +818,7 @@ Player:
     SquadManagerBotModule@viki:
 		RequiresCondition: enable-viki-ai
 		SquadSize: 30
-		ExcludeFromSquadsTypes: harv, sharv, mcv, a10
+		ExcludeFromSquadsTypes: harv, sharv, mcv, a10, e6, rmbo, truck
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
@@ -821,6 +840,7 @@ Player:
 			e3: 50
 			e4: 25
 			e5: 50
+			e6: 8
             rmbo: 2
 			harv: 100
 			sharv: 100
@@ -974,7 +994,7 @@ Player:
 		RequiresCondition: enable-skynet-ai
 		SquadSize: 10
 		AttackForceInterval: 50
-		ExcludeFromSquadsTypes: harv, mcv, a10
+		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
@@ -1113,6 +1133,7 @@ Player:
 			e3: 40
 			e4: 15
 			e5: 15
+			e6: 8
             rmbo: 2
 			harv: 100
 			ltnk: 10
@@ -1277,7 +1298,7 @@ Player:
 		RequiresCondition: enable-ironreaper-ai
 		SquadSize: 20
         MaxBaseRadius: 49
-		ExcludeFromSquadsTypes: harv, mcv, a10
+		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
@@ -1299,6 +1320,7 @@ Player:
 			e3: 50
 			e4: 10
 			e5: 15
+			e6: 7
             rmbo: 2
 			harv: 100
 			ltnk: 11
@@ -1447,7 +1469,7 @@ Player:
     SquadManagerBotModule@Easy:
 		RequiresCondition: enable-Easy-ai
 		SquadSize: 4
-		ExcludeFromSquadsTypes: harv, mcv, a10
+		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
@@ -1469,6 +1491,7 @@ Player:
 			e3: 40
 			e4: 15
 			e5: 15
+			e6: 8
             rmbo: 2
 			harv: 50
 			ltnk: 4
@@ -1589,7 +1612,7 @@ Player:
     SquadManagerBotModule@Easiest:
 		RequiresCondition: enable-Easiest-ai
 		SquadSize: 3
-		ExcludeFromSquadsTypes: harv, mcv, a10
+		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
@@ -1611,6 +1634,7 @@ Player:
 			e3: 100
 			e4: 100
 			e5: 100
+			e6: 26
             rmbo: 2
 			harv: 100
 			ltnk: 100
