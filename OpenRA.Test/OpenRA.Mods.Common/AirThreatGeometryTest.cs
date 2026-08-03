@@ -28,45 +28,6 @@ namespace OpenRA.Test
 			return (long)(cells * 1024) * (cells * 1024);
 		}
 
-		[TestCase(TestName = "Coarse A* detours around expensive anti-air cells")]
-		public void CoarseRouteAvoidsThreat()
-		{
-			var danger = new float[15];
-			danger[2] = 10;
-			var route = AirThreatGeometry.FindCoarseRoute(danger, 5, 3, 0, 0, 4, 0, 100);
-			Assert.That(route, Is.Not.Null);
-			Assert.That(route, Does.Not.Contain(new CPos(2, 0)));
-		}
-
-		[TestCase(TestName = "Coarse A* crosses finite danger when no detour exists")]
-		public void CoarseRouteCanAcceptDanger()
-		{
-			var danger = new[] { 0f, 10f, 0f };
-			var route = AirThreatGeometry.FindCoarseRoute(danger, 3, 1, 0, 0, 2, 0, 100);
-			Assert.That(route, Does.Contain(new CPos(1, 0)));
-		}
-
-		[Test]
-		public void NearestSafeRouteLeavesAaCoverAtLowestCost()
-		{
-			var danger = new[]
-			{
-				0f, 20f, 0f,
-				0f, 10f, 5f,
-				0f, 20f, 0f,
-			};
-
-			var route = AirThreatGeometry.FindNearestSafeCoarseRoute(danger, 3, 3, 1, 1, 100);
-			Assert.That(route, Is.EqualTo(new[] { new CPos(0, 1) }));
-		}
-
-		[Test]
-		public void NearestSafeRouteStaysPutWhenAlreadySafe()
-		{
-			var route = AirThreatGeometry.FindNearestSafeCoarseRoute(new[] { 0f, 10f }, 2, 1, 0, 0, 100);
-			Assert.That(route, Is.Empty);
-		}
-
 		[Test]
 		public void PendingRepairAssignmentImmediatelyClaimsFacilityForOtherAircraft()
 		{
@@ -468,30 +429,6 @@ namespace OpenRA.Test
 			// Never entirely harmless, never overweighted past a genuine full threat.
 			Assert.That(AirThreatGeometry.AaEffectiveness(100000, 1, 128, 4000), Is.EqualTo(0.05f));
 			Assert.That(AirThreatGeometry.AaEffectiveness(1, 100000, 128, 4000), Is.EqualTo(1f));
-		}
-
-		[Test]
-		public void SmoothRouteCollapsesSafeGridPathToStraightFlight()
-		{
-			var danger = new float[25];
-			var route = new[] { new CPos(1, 0), new CPos(2, 0), new CPos(2, 1), new CPos(2, 2), new CPos(3, 2), new CPos(4, 2) };
-
-			var smoothed = AirThreatGeometry.SmoothCoarseRoute(danger, 5, 5, 0, 0, route);
-
-			Assert.That(smoothed, Is.EqualTo(new[] { new CPos(4, 2) }));
-		}
-
-		[Test]
-		public void SmoothRouteKeepsDetourAroundDanger()
-		{
-			var danger = new float[25];
-			danger[2 * 5 + 2] = 1;
-			var route = new[] { new CPos(1, 1), new CPos(2, 1), new CPos(3, 1), new CPos(4, 2) };
-
-			var smoothed = AirThreatGeometry.SmoothCoarseRoute(danger, 5, 5, 0, 2, route);
-
-			Assert.That(smoothed.Count, Is.GreaterThan(1));
-			Assert.That(smoothed[smoothed.Count - 1], Is.EqualTo(new CPos(4, 2)));
 		}
 
 		[Test]

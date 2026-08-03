@@ -974,7 +974,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 				var clearCell = new CPos(plan.ClearTarget.Location.X / coarseSize,
 					plan.ClearTarget.Location.Y / coarseSize);
-				var route = AirThreatGeometry.FindCoarseRoute(danger, width, height, startX, startY,
+				var route = ThreatAwareRoutePlanner.FindRoute(danger, width, height, startX, startY,
 					Math.Clamp(clearCell.X, 0, width - 1), Math.Clamp(clearCell.Y, 0, height - 1),
 					info.AirRouteThreatPenalty);
 				if (route == null)
@@ -994,7 +994,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					plan.UnlockedValue, false, false, true, info.AirTargetAaClearUnlockPercent);
 				var score = opportunity * 1024 / Math.Max(1, 1024 + distanceCost);
 				score = score * 1024 / Math.Max(1, 1024 + (int)exposureCost);
-				var smoothedRoute = AirThreatGeometry.SmoothCoarseRoute(
+				var smoothedRoute = ThreatAwareRoutePlanner.SmoothRoute(
 					danger, width, height, startX, startY, route)
 					.Select(p => map.Clamp(new CPos(
 						p.X * coarseSize + coarseSize / 2, p.Y * coarseSize + coarseSize / 2))).ToList();
@@ -1009,7 +1009,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				var goalX = Math.Clamp(cell.X, 0, width - 1);
 				var goalY = Math.Clamp(cell.Y, 0, height - 1);
 				var clusteredOpportunityValue = cellUtility[cell];
-				var route = AirThreatGeometry.FindCoarseRoute(danger, width, height, startX, startY, goalX, goalY,
+				var route = ThreatAwareRoutePlanner.FindRoute(danger, width, height, startX, startY, goalX, goalY,
 					info.AirRouteThreatPenalty);
 				if (route == null)
 				{
@@ -1028,7 +1028,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				var ammoDistanceScale = 1f + ammoReadiness * info.AirTargetFullAmmoDistanceBonus / 100f * adaptiveRisk;
 				var distanceCost = (int)(route.Count * coarseSize * info.AirTargetDistancePenalty *
 					speedScale * ammoDistanceScale);
-				var smoothedRoute = AirThreatGeometry.SmoothCoarseRoute(
+				var smoothedRoute = ThreatAwareRoutePlanner.SmoothRoute(
 					danger, width, height, startX, startY, route)
 					.Select(p => map.Clamp(new CPos(
 						p.X * coarseSize + coarseSize / 2, p.Y * coarseSize + coarseSize / 2))).ToList();
@@ -1358,12 +1358,12 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var startY = Math.Clamp(start.Y / coarseSize, 0, cache.Height - 1);
 			var goalX = Math.Clamp(targetCell.X / coarseSize, 0, cache.Width - 1);
 			var goalY = Math.Clamp(targetCell.Y / coarseSize, 0, cache.Height - 1);
-			var route = AirThreatGeometry.FindCoarseRoute(cache.Danger, cache.Width, cache.Height,
+			var route = ThreatAwareRoutePlanner.FindRoute(cache.Danger, cache.Width, cache.Height,
 				startX, startY, goalX, goalY, info.AirRouteThreatPenalty);
 			if (route == null)
 				return null;
 
-			return AirThreatGeometry.SmoothCoarseRoute(
+			return ThreatAwareRoutePlanner.SmoothRoute(
 				cache.Danger, cache.Width, cache.Height, startX, startY, route)
 				.Select(p => map.Clamp(new CPos(
 					p.X * coarseSize + coarseSize / 2, p.Y * coarseSize + coarseSize / 2))).ToList();
@@ -1387,12 +1387,12 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var start = map.CellContaining(owner.AirFormationCenter);
 			var startX = Math.Clamp(start.X / coarseSize, 0, cache.Width - 1);
 			var startY = Math.Clamp(start.Y / coarseSize, 0, cache.Height - 1);
-			var route = AirThreatGeometry.FindNearestSafeCoarseRoute(
+			var route = ThreatAwareRoutePlanner.FindNearestSafeRoute(
 				cache.Danger, cache.Width, cache.Height, startX, startY, info.AirRouteThreatPenalty);
 			if (route == null || route.Count == 0)
 				return route;
 
-			return AirThreatGeometry.SmoothCoarseRoute(
+			return ThreatAwareRoutePlanner.SmoothRoute(
 				cache.Danger, cache.Width, cache.Height, startX, startY, route)
 				.Select(p => map.Clamp(new CPos(
 					p.X * coarseSize + coarseSize / 2, p.Y * coarseSize + coarseSize / 2))).ToList();
@@ -2191,7 +2191,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					continue;
 				}
 
-				var route = AirThreatGeometry.FindCoarseRoute(
+				var route = ThreatAwareRoutePlanner.FindRoute(
 					danger, width, height, startX, startY, goalX, goalY, info.AirRouteThreatPenalty);
 				if (route == null)
 					continue;
@@ -2206,7 +2206,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				best = candidate.Building;
 				bestRepairAtEnd = candidate.RepairAtEnd;
 				bestCost = cost;
-				bestRoute = AirThreatGeometry.SmoothCoarseRoute(
+				bestRoute = ThreatAwareRoutePlanner.SmoothRoute(
 					danger, width, height, startX, startY, route)
 					.Select(p => map.Clamp(new CPos(
 						p.X * coarseSize + coarseSize / 2, p.Y * coarseSize + coarseSize / 2))).ToList();
@@ -2278,7 +2278,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					danger[goalY * width + goalX] > 0)
 					continue;
 
-				var route = AirThreatGeometry.FindCoarseRoute(
+				var route = ThreatAwareRoutePlanner.FindRoute(
 					danger, width, height, startX, startY, goalX, goalY, info.AirRouteThreatPenalty);
 				if (route == null)
 					continue;
@@ -2297,13 +2297,13 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 			if (bestShelter == null)
 			{
-				bestRoute = AirThreatGeometry.FindNearestSafeCoarseRoute(
+				bestRoute = ThreatAwareRoutePlanner.FindNearestSafeRoute(
 					danger, width, height, startX, startY, info.AirRouteThreatPenalty);
 				if (bestRoute == null)
 					return null;
 			}
 
-			var smoothedRoute = AirThreatGeometry.SmoothCoarseRoute(
+			var smoothedRoute = ThreatAwareRoutePlanner.SmoothRoute(
 				danger, width, height, startX, startY, bestRoute)
 				.Select(p => map.Clamp(new CPos(
 					p.X * coarseSize + coarseSize / 2, p.Y * coarseSize + coarseSize / 2))).ToList();
