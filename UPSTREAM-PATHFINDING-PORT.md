@@ -20,6 +20,9 @@ upstream engine and content changes.
   [PR #22487](https://github.com/OpenRA/OpenRA/pull/22487): preserve deadlock recovery after the
   cooldown change. A blocking unit can immediately move aside, and its fallback destination must
   be an actually enterable cell.
+- [`0c4dff77c9`](https://github.com/OpenRA/OpenRA/commit/0c4dff77c9da44601c871ebb72e393e2c85c6a70):
+  distinguish an actor that is already at an acceptable destination from a failed zero-length path.
+  This prevents the cooldown result from incorrectly cancelling follow-up behavior.
 
 The original upstream patch also modifies the newer generic docking framework. LibertyDawn predates
 that framework, so those files and interfaces were deliberately not imported. The equivalent legacy
@@ -45,4 +48,7 @@ may diverge when played with this build.
 
 `MoveCooldownHelperTest` covers blocked completion, delayed retry, successful/cancelled movement,
 hidden targets, and immediate deadlock-unblocking behavior. The normal engine build, lint checks,
-unit tests, mod rules, sequences, and map validation remain the integration gate.
+unit tests, mod rules, sequences, and map validation remain the integration gate. Runtime tests also
+cover actors already in range, large groups with unreachable destinations, and harvester recovery.
+Lua debug messages are also written to `debug.log` when `Debug.LuaDebug` is enabled, so focused map
+harnesses can provide durable evidence without adding production movement logging on hot paths.

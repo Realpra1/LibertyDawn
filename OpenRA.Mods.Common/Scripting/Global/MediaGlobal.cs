@@ -215,6 +215,7 @@ namespace OpenRA.Mods.Common.Scripting
 			if (string.IsNullOrEmpty(text) || !Game.Settings.Debug.LuaDebug)
 				return;
 
+			Log.Write("debug", "Lua debug: {0}", text);
 			TextNotificationsManager.Debug(text);
 		}
 
