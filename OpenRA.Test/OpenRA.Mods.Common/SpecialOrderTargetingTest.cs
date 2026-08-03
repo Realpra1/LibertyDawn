@@ -36,5 +36,22 @@ namespace OpenRA.Test
 			Assert.That(SpecialOrderTargeting.AcceptsDelivery(PlayerRelationship.Ally, deliveryType,
 				new HashSet<string> { "supply" }, PlayerRelationship.Ally), Is.EqualTo(expected));
 		}
+
+		[Test]
+		public void DeliveryProgressRequiresGettingCloser()
+		{
+			Assert.That(SpecialOrderTargeting.MadeDeliveryProgress(99, 100), Is.True);
+			Assert.That(SpecialOrderTargeting.MadeDeliveryProgress(100, 100), Is.False);
+			Assert.That(SpecialOrderTargeting.MadeDeliveryProgress(101, 100), Is.False);
+		}
+
+		[Test]
+		public void DeliveryRetargetsForInvalidIdleOrStalledOrders()
+		{
+			Assert.That(SpecialOrderTargeting.ShouldRetargetDelivery(false, true, 249, 0, 250), Is.False);
+			Assert.That(SpecialOrderTargeting.ShouldRetargetDelivery(false, true, 250, 0, 250), Is.True);
+			Assert.That(SpecialOrderTargeting.ShouldRetargetDelivery(true, true, 1, 0, 250), Is.True);
+			Assert.That(SpecialOrderTargeting.ShouldRetargetDelivery(false, false, 1, 0, 250), Is.True);
+		}
 	}
 }
