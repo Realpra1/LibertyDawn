@@ -273,6 +273,9 @@ Player:
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: true
 		MaximumWallSegments: 24
+		FirstTowerTypes: gtwr, gun, atwr, obli
+		FirstTowerSearchRadius: 20
+		FirstTowerDebugLogging: true
 		BuildingQueues: Building.Nod, Building.GDI
 		DefenseQueues: Defence.Nod, Defence.GDI
 		MinimumExcessPower: 30
@@ -354,6 +357,9 @@ Player:
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: true
 		MaximumWallSegments: 24
+		FirstTowerTypes: gtwr, gun, atwr, obli
+		FirstTowerSearchRadius: 20
+		FirstTowerDebugLogging: true
 		BuildingQueues: Building.Nod, Building.GDI
 		DefenseQueues: Defence.Nod, Defence.GDI
 		MinimumExcessPower: 30
@@ -435,6 +441,9 @@ Player:
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: true
 		MaximumWallSegments: 24
+		FirstTowerTypes: gtwr, gun, atwr, obli
+		FirstTowerSearchRadius: 20
+		FirstTowerDebugLogging: true
 		BuildingQueues: Building.Nod, Building.GDI
 		DefenseQueues: Defence.Nod, Defence.GDI
 		MinimumExcessPower: 30
@@ -518,6 +527,9 @@ Player:
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: true
 		MaximumWallSegments: 24
+		FirstTowerTypes: gtwr, gun, atwr, obli
+		FirstTowerSearchRadius: 20
+		FirstTowerDebugLogging: true
 		BuildingQueues: Building.Nod, Building.GDI
 		DefenseQueues: Defence.Nod, Defence.GDI
 		MinimumExcessPower: 1
@@ -682,6 +694,9 @@ Player:
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: true
 		MaximumWallSegments: 24
+		FirstTowerTypes: gtwr, gun, atwr, obli
+		FirstTowerSearchRadius: 20
+		FirstTowerDebugLogging: true
 		BuildingQueues: Building.Nod, Building.GDI
 		DefenseQueues: Defence.Nod, Defence.GDI
 		MinimumExcessPower: 151
@@ -834,6 +849,9 @@ Player:
 		OpeningMcvCount: 1
 		OpeningRequestRetryDelay: 250
 		OpeningDebugLogging: true
+		FirstTowerTypes: gtwr, gun, atwr, obli
+		FirstTowerSearchRadius: 20
+		FirstTowerDebugLogging: true
 		BuildingQueues: Building.Nod, Building.GDI
 		DefenseQueues: Defence.Nod, Defence.GDI
         MinimumExcessPower: 1
@@ -1137,6 +1155,9 @@ Player:
 		OpeningMcvCount: 1
 		OpeningRequestRetryDelay: 250
 		OpeningDebugLogging: true
+		FirstTowerTypes: gtwr, gun, atwr, obli
+		FirstTowerSearchRadius: 20
+		FirstTowerDebugLogging: true
 		BuildingQueues: Building.Nod, Building.GDI
 		DefenseQueues: Defence.Nod, Defence.GDI
 		MinimumExcessPower: 1
@@ -1301,6 +1322,9 @@ Player:
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: true
 		MaximumWallSegments: 24
+		FirstTowerTypes: gtwr, gun, atwr, obli
+		FirstTowerSearchRadius: 20
+		FirstTowerDebugLogging: true
 		BuildingQueues: Building.Nod, Building.GDI
 		DefenseQueues: Defence.Nod, Defence.GDI
         AdditionalMinimumRefineryCount: 0
@@ -1431,6 +1455,9 @@ Player:
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: true
 		MaximumWallSegments: 24
+		FirstTowerTypes: gtwr, gun, atwr, obli
+		FirstTowerSearchRadius: 20
+		FirstTowerDebugLogging: true
 		BuildingQueues: Building.Nod, Building.GDI
 		DefenseQueues: Defence.Nod, Defence.GDI
         AdditionalMinimumRefineryCount: 0

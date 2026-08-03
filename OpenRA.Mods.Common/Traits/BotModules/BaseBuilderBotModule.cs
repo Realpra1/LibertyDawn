@@ -33,6 +33,15 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Forces AI to treat these buildings as defenses and build them toward enemy.")]
 		public readonly HashSet<string> PlaceAsDefenses = new HashSet<string>();
 
+		[Desc("Anti-ground defense types whose first completed structure is placed beside the initial construction yard.")]
+		public readonly HashSet<string> FirstTowerTypes = new HashSet<string>();
+
+		[Desc("Maximum cells searched around the preferred first-tower position when it is blocked.")]
+		public readonly int FirstTowerSearchRadius = 20;
+
+		[Desc("Write first-tower planning and completion diagnostics to debug.log.")]
+		public readonly bool FirstTowerDebugLogging = false;
+
 		[Desc("Chance of forced placing as defense.")]
 		public readonly int PlaceAsDefenseChance = 50;
 
@@ -220,6 +229,7 @@ namespace OpenRA.Mods.Common.Traits
 		public CPos DefenseCenter => defenseCenter;
 
 		internal BaseBuilderWallPlanner WallPlanner { get; private set; }
+		internal BaseBuilderFirstTowerPlanner FirstTowerPlanner { get; private set; }
 
 		readonly World world;
 		readonly Player player;
@@ -265,6 +275,7 @@ namespace OpenRA.Mods.Common.Traits
 			unitProduction = self.Owner.PlayerActor.TraitsImplementing<IBotRequestUnitProduction>().ToArray();
 			rallyPointManagers = self.Owner.PlayerActor.TraitsImplementing<IBotRallyPointManager>().ToArray();
 			WallPlanner = new BaseBuilderWallPlanner(this, player);
+			FirstTowerPlanner = new BaseBuilderFirstTowerPlanner(this, player);
 		}
 
 		internal bool AdaptiveProductionDebugLogging => unitBuilders.Any(u =>
@@ -305,6 +316,7 @@ namespace OpenRA.Mods.Common.Traits
 		void IBotTick.BotTick(IBot bot)
 		{
 			UpdateOpening(bot);
+			FirstTowerPlanner.Update();
 			SetRallyPointsForNewProductionBuildings(bot);
 
 			foreach (var b in builders)
@@ -632,7 +644,8 @@ namespace OpenRA.Mods.Common.Traits
 				new MiniYamlNode("NextOpeningSoldierRequestTick", FieldSaver.FormatValue(nextOpeningSoldierRequestTick)),
 				new MiniYamlNode("NextOpeningHarvesterRequestTick", FieldSaver.FormatValue(nextOpeningHarvesterRequestTick)),
 				new MiniYamlNode("NextOpeningDefenseUnlockRequestTick", FieldSaver.FormatValue(nextOpeningDefenseUnlockRequestTick)),
-				new MiniYamlNode("NextOpeningMcvRequestTick", FieldSaver.FormatValue(nextOpeningMcvRequestTick))
+				new MiniYamlNode("NextOpeningMcvRequestTick", FieldSaver.FormatValue(nextOpeningMcvRequestTick)),
+				new MiniYamlNode("FirstTowerPlacementComplete", FieldSaver.FormatValue(FirstTowerPlanner.Complete))
 			};
 		}
 
@@ -677,6 +690,10 @@ namespace OpenRA.Mods.Common.Traits
 			var mcvRequestNode = data.FirstOrDefault(n => n.Key == "NextOpeningMcvRequestTick");
 			if (mcvRequestNode != null)
 				nextOpeningMcvRequestTick = FieldLoader.GetValue<int>("NextOpeningMcvRequestTick", mcvRequestNode.Value.Value);
+
+			var firstTowerNode = data.FirstOrDefault(n => n.Key == "FirstTowerPlacementComplete");
+			if (firstTowerNode != null)
+				FirstTowerPlanner.Complete = FieldLoader.GetValue<bool>("FirstTowerPlacementComplete", firstTowerNode.Value.Value);
 		}
 	}
 }
