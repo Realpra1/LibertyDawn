@@ -991,6 +991,8 @@ Player:
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
         IdleBaseUnitsMaximum: 999
 		WeightedUnitSelection: true
+		AdaptiveProductionDebugLogging: true
+		AdaptiveProductionLogInterval: 250
 		AdaptiveTypes: e1, e2, e3, e4, e5, rmbo, ltnk, ftnk, ctnk, arty, mtnk, mlrs, stnk, apc, bggy, bike, jeep, htnk, heli, orca
 		EconomyTypes: harv
 		UnitsToBuild:
