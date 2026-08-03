@@ -22,5 +22,16 @@ namespace OpenRA.Mods.Common.Traits
 			return validRelationships.HasRelationship(relationship) &&
 				(validTypes.Count == 0 || (!string.IsNullOrEmpty(deliveryType) && validTypes.Contains(deliveryType)));
 		}
+
+		public static bool MadeDeliveryProgress(long distanceSquared, long bestDistanceSquared)
+		{
+			return distanceSquared < bestDistanceSquared;
+		}
+
+		public static bool ShouldRetargetDelivery(bool truckIdle, bool targetEligible,
+			int currentTick, int lastProgressTick, int retryInterval)
+		{
+			return truckIdle || !targetEligible || currentTick - lastProgressTick >= retryInterval;
+		}
 	}
 }
