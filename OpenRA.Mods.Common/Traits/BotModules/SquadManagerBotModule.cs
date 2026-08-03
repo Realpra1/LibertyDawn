@@ -458,6 +458,7 @@ namespace OpenRA.Mods.Common.Traits
 		IBot bot;
 		IBotPositionsUpdated[] notifyPositionsUpdated;
 		IBotNotifyIdleBaseUnits[] notifyIdleBaseUnits;
+		IBotTransportReservations[] transportReservations;
 
 		CPos initialBaseCenter;
 
@@ -519,6 +520,7 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			notifyPositionsUpdated = self.Owner.PlayerActor.TraitsImplementing<IBotPositionsUpdated>().ToArray();
 			notifyIdleBaseUnits = self.Owner.PlayerActor.TraitsImplementing<IBotNotifyIdleBaseUnits>().ToArray();
+			transportReservations = self.Owner.PlayerActor.TraitsImplementing<IBotTransportReservations>().ToArray();
 		}
 
 		protected override void TraitEnabled(Actor self)
@@ -566,10 +568,15 @@ namespace OpenRA.Mods.Common.Traits
 			Squads.RemoveAll(s => !s.IsValid);
 			foreach (var s in Squads)
 			{
-				s.Units.RemoveAll(unitCannotBeOrdered);
+				s.Units.RemoveAll(a => unitCannotBeOrdered(a) || IsReservedForTransport(a));
 				if (s.Type == SquadType.Air)
 					s.CleanAirMembership();
 			}
+		}
+
+		bool IsReservedForTransport(Actor actor)
+		{
+			return transportReservations != null && transportReservations.Any(r => r.IsTransportReserved(actor));
 		}
 
 		// HACK: Use of this function requires that there is one squad of this type.
@@ -635,7 +642,9 @@ namespace OpenRA.Mods.Common.Traits
 			CleanSquads();
 
 			activeUnits.RemoveAll(unitCannotBeOrdered);
+			activeUnits.RemoveAll(IsReservedForTransport);
 			unitsHangingAroundTheBase.RemoveAll(unitCannotBeOrdered);
+			unitsHangingAroundTheBase.RemoveAll(IsReservedForTransport);
 			foreach (var n in notifyIdleBaseUnits)
 				n.UpdatedIdleBaseUnits(unitsHangingAroundTheBase);
 
@@ -691,6 +700,7 @@ namespace OpenRA.Mods.Common.Traits
 			var newUnits = World.ActorsHavingTrait<IPositionable>()
 				.Where(a => a.Owner == Player &&
 					!Info.ExcludeFromSquadsTypes.Contains(a.Info.Name) &&
+					!IsReservedForTransport(a) &&
 					!activeUnits.Contains(a));
 
 			foreach (var a in newUnits)

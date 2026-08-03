@@ -536,6 +536,12 @@ namespace OpenRA.Mods.Common.Traits
 	}
 
 	[RequireExplicitImplementation]
+	public interface IBotTransportReservations
+	{
+		bool IsTransportReserved(Actor actor);
+	}
+
+	[RequireExplicitImplementation]
 	public interface IBotRequestPauseUnitProduction
 	{
 		bool PauseUnitProduction { get; }
