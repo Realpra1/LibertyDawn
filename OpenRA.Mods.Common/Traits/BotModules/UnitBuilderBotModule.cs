@@ -34,8 +34,27 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("What units should the AI have a maximum limit to train.")]
 		public readonly Dictionary<string, int> UnitLimits = null;
 
-		[Desc("Total live and queued mobile-unit ceiling. Positive values replace individual UnitLimits.")]
+		[Desc("Total live and queued mobile-unit ceiling. Positive values replace individual UnitLimits.",
+			"With AdaptiveUnitCap enabled this is the initial lag-enforcement ceiling, not a limit during healthy play.")]
 		public readonly int TotalUnitLimit = 0;
+
+		[Desc("Enforce and progressively lower TotalUnitLimit only while real time falls behind game time.")]
+		public readonly bool AdaptiveUnitCap = false;
+
+		[Desc("Allowed real-time slowdown relative to the selected game speed before enforcing a unit cap.")]
+		public readonly float AdaptiveUnitCapLagTolerance = 0.1f;
+
+		[Desc("Game ticks between real-time performance samples.")]
+		public readonly int AdaptiveUnitCapSampleInterval = 250;
+
+		[Desc("Lowest total mobile-unit cap that continued lag may enforce.")]
+		public readonly int AdaptiveUnitCapMinimum = 100;
+
+		[Desc("Amount removed from the enforced cap after each additional slow sample.")]
+		public readonly int AdaptiveUnitCapReductionStep = 25;
+
+		[Desc("Consecutive healthy samples required to remove an enforced cap.")]
+		public readonly int AdaptiveUnitCapRecoverySamples = 3;
 
 		[Desc("Unit types sharing the independent harvester ceiling.")]
 		public readonly HashSet<string> HarvesterTypes = new HashSet<string>();
@@ -142,6 +161,7 @@ namespace OpenRA.Mods.Common.Traits
 		int cachedLiveHarvesters;
 		int cachedCommittedUnits;
 		int cachedCommittedHarvesters;
+		int effectiveTotalUnitLimit;
 		int nextUnitCapLogTick;
 		int nextUnitSamplingLogTick;
 
@@ -154,6 +174,7 @@ namespace OpenRA.Mods.Common.Traits
 		int spendThisWindow;
 		int nextAdaptiveProductionLogTick;
 		bool adaptiveInitializationLogged;
+		AdaptiveUnitCapController adaptiveUnitCap;
 
 		sealed class UnitBuildOffer
 		{
@@ -176,6 +197,12 @@ namespace OpenRA.Mods.Common.Traits
 			requestPause = self.Owner.PlayerActor.TraitsImplementing<IBotRequestPauseUnitProduction>().ToArray();
 			playerResources = self.Owner.PlayerActor.Trait<PlayerResources>();
 			playerStats = self.Owner.PlayerActor.Trait<PlayerStatistics>();
+			if (Info.AdaptiveUnitCap)
+				adaptiveUnitCap = new AdaptiveUnitCapController(Info.AdaptiveUnitCapSampleInterval,
+					Info.AdaptiveUnitCapLagTolerance, Info.AdaptiveUnitCapMinimum,
+					Info.AdaptiveUnitCapReductionStep, Info.AdaptiveUnitCapRecoverySamples);
+			else
+				effectiveTotalUnitLimit = Info.TotalUnitLimit;
 		}
 
 		void IBotNotifyIdleBaseUnits.UpdatedIdleBaseUnits(List<Actor> idleUnits)
@@ -200,6 +227,7 @@ namespace OpenRA.Mods.Common.Traits
 			if (ticks % FeedbackTime == 0)
 			{
 				RefreshProductionCounts();
+				UpdateAdaptiveUnitCap();
 				DiscoverSampledUnitTypes();
 				if (Info.WeightedUnitSelection)
 				{
@@ -284,8 +312,24 @@ namespace OpenRA.Mods.Common.Traits
 				return;
 
 			nextUnitCapLogTick = world.WorldTick + Math.Max(1, Info.UnitCapLogInterval);
+			var mobileLimit = effectiveTotalUnitLimit > 0 ? effectiveTotalUnitLimit.ToString() : "unlimited";
 			Log.Write("debug", "AI unit capacity: {0} mobile={1}/{2}, harvesters={3}/{4} (live plus queued).",
-				player, cachedCommittedUnits, Info.TotalUnitLimit, cachedCommittedHarvesters, Info.HarvesterLimit);
+				player, cachedCommittedUnits, mobileLimit, cachedCommittedHarvesters, Info.HarvesterLimit);
+		}
+
+		void UpdateAdaptiveUnitCap()
+		{
+			if (adaptiveUnitCap == null)
+				return;
+
+			var sample = adaptiveUnitCap.Update(world.WorldTick, Game.LocalTick, world.Timestep, Game.RunTime,
+				cachedCommittedUnits, Info.TotalUnitLimit);
+			effectiveTotalUnitLimit = sample.EffectiveLimit;
+			if (Info.UnitCapDebugLogging && sample.Sampled)
+				Log.Write("debug", "AI unit capacity: {0} performance={1:0.000}x allowed={2:0.000}x, " +
+					"decision={3}, mobile-limit={4}.", player, sample.RealTimeRatio,
+					1d + Math.Max(0, Info.AdaptiveUnitCapLagTolerance), sample.Decision,
+					effectiveTotalUnitLimit > 0 ? effectiveTotalUnitLimit.ToString() : "unlimited");
 		}
 
 		void MaybeRollAdaptiveWindow()
@@ -655,7 +699,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		int AllowedQueueAmount(ActorInfo actorInfo, int requested)
 		{
-			return UnitCapPolicy.AllowedQueueAmount(requested, cachedCommittedUnits, Info.TotalUnitLimit,
+			return UnitCapPolicy.AllowedQueueAmount(requested, cachedCommittedUnits, effectiveTotalUnitLimit,
 				Info.HarvesterTypes.Contains(actorInfo.Name), cachedCommittedHarvesters, Info.HarvesterLimit,
 				CountsTowardUnitLimit(actorInfo));
 		}

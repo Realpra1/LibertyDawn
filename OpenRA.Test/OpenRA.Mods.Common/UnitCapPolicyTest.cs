@@ -29,6 +29,8 @@ namespace OpenRA.Test
 		{
 			Assert.That(UnitCapPolicy.AllowedQueueAmount(5, 300, 400, true, 74, 75, true), Is.EqualTo(1));
 			Assert.That(UnitCapPolicy.AllowedQueueAmount(1, 300, 400, true, 75, 75, true), Is.Zero);
+			Assert.That(UnitCapPolicy.AllowedQueueAmount(5, 500, 0, true, 74, 75, true), Is.EqualTo(1),
+				"The harvester cap must remain active while the adaptive mobile cap is unlimited.");
 		}
 
 		[Test]

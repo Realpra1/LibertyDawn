@@ -347,6 +347,7 @@ Player:
 	UnitBuilderBotModule@cabal:
 		RequiresCondition: enable-cabal-ai
 		TotalUnitLimit: 400
+		AdaptiveUnitCap: true
 		HarvesterTypes: harv, sharv
 		HarvesterLimit: 75
 		UnitCapDebugLogging: true
@@ -440,6 +441,7 @@ Player:
 	UnitBuilderBotModule@watson:
 		RequiresCondition: enable-watson-ai
 		TotalUnitLimit: 400
+		AdaptiveUnitCap: true
 		HarvesterTypes: harv, sharv
 		HarvesterLimit: 75
 		UnitCapDebugLogging: true
@@ -533,6 +535,7 @@ Player:
 	UnitBuilderBotModule@hal9001:
 		RequiresCondition: enable-hal9001-ai
 		TotalUnitLimit: 400
+		AdaptiveUnitCap: true
 		HarvesterTypes: harv, sharv
 		HarvesterLimit: 75
 		UnitCapDebugLogging: true
@@ -664,6 +667,7 @@ Player:
     UnitBuilderBotModule@brutalis:
 		RequiresCondition: enable-brutalis-ai || enable-wavemaker-ai
 		TotalUnitLimit: 400
+		AdaptiveUnitCap: true
 		HarvesterTypes: harv, sharv
 		HarvesterLimit: 75
 		UnitCapDebugLogging: true
@@ -830,6 +834,7 @@ Player:
 	UnitBuilderBotModule@viki:
 		RequiresCondition: enable-viki-ai
 		TotalUnitLimit: 400
+		AdaptiveUnitCap: true
 		HarvesterTypes: harv, sharv
 		HarvesterLimit: 75
 		UnitCapDebugLogging: true
@@ -1118,6 +1123,7 @@ Player:
 	UnitBuilderBotModule@skynet:
 		RequiresCondition: enable-skynet-ai
 		TotalUnitLimit: 400
+		AdaptiveUnitCap: true
 		HarvesterTypes: harv, sharv
 		HarvesterLimit: 75
 		UnitCapDebugLogging: true
@@ -1309,6 +1315,7 @@ Player:
 	UnitBuilderBotModule@ironreaper:
 		RequiresCondition: enable-ironreaper-ai
 		TotalUnitLimit: 400
+		AdaptiveUnitCap: true
 		HarvesterTypes: harv, sharv
 		HarvesterLimit: 75
 		UnitCapDebugLogging: true
@@ -1480,6 +1487,7 @@ Player:
 	UnitBuilderBotModule@Easy:
 		RequiresCondition: enable-Easy-ai
 		TotalUnitLimit: 400
+		AdaptiveUnitCap: true
 		HarvesterTypes: harv, sharv
 		HarvesterLimit: 75
 		UnitCapDebugLogging: true
@@ -1623,6 +1631,7 @@ Player:
 	UnitBuilderBotModule@Easiest:
 		RequiresCondition: enable-Easiest-ai
 		TotalUnitLimit: 400
+		AdaptiveUnitCap: true
 		HarvesterTypes: harv, sharv
 		HarvesterLimit: 75
 		UnitCapDebugLogging: true
