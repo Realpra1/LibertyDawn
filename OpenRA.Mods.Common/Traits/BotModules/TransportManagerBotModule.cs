@@ -15,7 +15,7 @@ using OpenRA.Traits;
 
 namespace OpenRA.Mods.Common.Traits
 {
-	[Desc("Coordinates route-failure rescue and optional infantry assault transports.")]
+	[Desc("Coordinates route-failure rescue, infantry assaults, and heavy-unit air drops.")]
 	public class TransportManagerBotModuleInfo : ConditionalTraitInfo
 	{
 		[ActorReference]
@@ -43,6 +43,15 @@ namespace OpenRA.Mods.Common.Traits
 		public readonly HashSet<string> AssaultBotTypes = new HashSet<string>();
 
 		[ActorReference]
+		public readonly HashSet<string> HeavyDropPassengerTypes = new HashSet<string>();
+
+		[ActorReference]
+		public readonly HashSet<string> HeavyDropTargetTypes = new HashSet<string>();
+
+		[Desc("Bot types allowed to use the mid/late-game heavy air-drop strategy.")]
+		public readonly HashSet<string> HeavyDropBotTypes = new HashSet<string>();
+
+		[ActorReference]
 		public readonly string TransportHelicopterActor = null;
 
 		[ActorReference]
@@ -66,6 +75,23 @@ namespace OpenRA.Mods.Common.Traits
 		public readonly int AssaultGatherTimeoutTicks = 750;
 		public readonly int AssaultCooldownTicks = 7500;
 		public readonly int AssaultOrderRetryTicks = 75;
+		public readonly int HeavyDropMinimumGameTicks = 7500;
+		public readonly int HeavyDropMinimumPassengers = 8;
+		public readonly int HeavyDropMaximumPassengers = 10;
+		public readonly int HeavyDropConcurrentBoarding = 3;
+		public readonly int HeavyDropBoardingRetryTicks = 750;
+		public readonly int HeavyDropGatherTimeoutTicks = 3000;
+		public readonly int HeavyDropMissionTimeoutTicks = 9000;
+		public readonly int HeavyDropCooldownTicks = 7500;
+		public readonly int HeavyDropReplanInterval = 150;
+		public readonly int HeavyDropTargetCandidateLimit = 12;
+		public readonly int HeavyDropLandingRadius = 8;
+		public readonly int HeavyDropFormationRadius = 8;
+		public readonly int HeavyDropFormationSpacing = 3;
+		public readonly int HeavyDropUnloadRangeCells = 1;
+		public readonly int HeavyDropDefenseRadius = 7;
+		public readonly int HeavyDropMaximumDefenderValue = 3400;
+		public readonly float HeavyDropMaximumAaDanger = 0f;
 		public readonly bool DebugLogging = false;
 
 		public override void RulesetLoaded(Ruleset rules, ActorInfo ai)
@@ -77,7 +103,15 @@ namespace OpenRA.Mods.Common.Traits
 				IdleServiceInterval <= 0 || IdleStagingRadius <= 0 || RepairHealthPercent <= 0 || RepairHealthPercent > 100 ||
 				AssaultSelectionPercent < 0 || AssaultSelectionPercent > 100 || MinimumAssaultPassengers <= 0 ||
 				MaximumAssaultPassengers < MinimumAssaultPassengers || AssaultGatherTimeoutTicks <= 0 || AssaultCooldownTicks <= 0 ||
-				AssaultOrderRetryTicks <= 0)
+				AssaultOrderRetryTicks <= 0 || HeavyDropMinimumGameTicks < 0 || HeavyDropMinimumPassengers <= 0 ||
+				HeavyDropMaximumPassengers < HeavyDropMinimumPassengers || HeavyDropConcurrentBoarding <= 0 ||
+				HeavyDropConcurrentBoarding > HeavyDropMaximumPassengers || HeavyDropBoardingRetryTicks <= 0 ||
+				HeavyDropGatherTimeoutTicks <= 0 ||
+				HeavyDropMissionTimeoutTicks <= HeavyDropGatherTimeoutTicks ||
+				HeavyDropCooldownTicks <= 0 || HeavyDropReplanInterval <= 0 || HeavyDropTargetCandidateLimit <= 0 ||
+				HeavyDropLandingRadius <= 0 || HeavyDropFormationRadius <= 0 || HeavyDropFormationSpacing <= 0 ||
+				HeavyDropUnloadRangeCells < 0 || HeavyDropDefenseRadius <= 0 || HeavyDropMaximumDefenderValue < 0 ||
+				HeavyDropMaximumAaDanger < 0)
 				throw new YamlException("AI transport counts, ranges, intervals, timeouts, and repair threshold must be positive and valid.");
 		}
 
@@ -123,6 +157,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly List<Mission> missions = new List<Mission>();
 		readonly Dictionary<uint, BlockedObservation> blocked = new Dictionary<uint, BlockedObservation>();
 		readonly InfantryAssaultTransportManager infantryAssault;
+		readonly HeavyDropTransportManager heavyDrop;
 		IBot bot;
 		UnitBuilderBotModule[] production;
 		SquadManagerBotModule squadManager;
@@ -137,6 +172,8 @@ namespace OpenRA.Mods.Common.Traits
 			coordinator = new TransportMissionCoordinator(info.MaximumActiveMissions);
 			infantryAssault = new InfantryAssaultTransportManager(world, player, info, coordinator,
 				IssueRoutedMove, RequestTransportHelicopter);
+			heavyDrop = new HeavyDropTransportManager(world, player, info, coordinator,
+				IssueRoutedMove, RequestTransportHelicopter, () => squadManager);
 		}
 
 		protected override void Created(Actor self)
@@ -151,6 +188,7 @@ namespace OpenRA.Mods.Common.Traits
 			scanTicks = Info.ScanInterval;
 			serviceTicks = Info.IdleServiceInterval;
 			infantryAssault.Enable();
+			heavyDrop.Enable();
 		}
 
 		void IBotEnabled.BotEnabled(IBot enabledBot) { bot = enabledBot; }
@@ -163,7 +201,10 @@ namespace OpenRA.Mods.Common.Traits
 		void IBotRespondToAttack.RespondToAttack(IBot enabledBot, Actor self, AttackInfo e)
 		{
 			if (!IsTraitDisabled)
+			{
 				infantryAssault.RespondToAttack(enabledBot, self, e);
+				heavyDrop.RespondToAttack(enabledBot, self, e);
+			}
 		}
 
 		void IBotTick.BotTick(IBot enabledBot)
@@ -176,10 +217,17 @@ namespace OpenRA.Mods.Common.Traits
 				scanTicks = Info.ScanInterval;
 				RefreshSquadManager();
 				AdvanceMissions();
-				if (coordinator.MissionCount < Info.MaximumActiveMissions && !TryCreateRescueMission())
+				var createdRescue = coordinator.MissionCount < Info.MaximumActiveMissions && TryCreateRescueMission();
+				if (!createdRescue)
+				{
+					heavyDrop.Tick(enabledBot);
 					infantryAssault.Tick(enabledBot);
+				}
 				else
+				{
+					heavyDrop.Advance(enabledBot);
 					infantryAssault.Advance(enabledBot);
+				}
 			}
 
 			if (--serviceTicks <= 0)
