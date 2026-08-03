@@ -12,6 +12,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using OpenRA.Mods.Common.Traits.BotModules.BotModuleLogic;
 using OpenRA.Traits;
 
 namespace OpenRA.Mods.Common.Traits
@@ -25,6 +26,32 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Actor types that deliver cash to compatible buildings owned by the bot.")]
 		public readonly HashSet<string> SupplyActorTypes = new HashSet<string>();
 
+		[ActorReference]
+		[Desc("Supply actor requested when a crippled ally needs financial aid.")]
+		public readonly string AlliedAidSupplyActor = null;
+
+		[ActorReference]
+		[Desc("Owned production buildings that each permit one allied-aid dispatch per interval.")]
+		public readonly HashSet<string> AlliedAidFactoryTypes = new HashSet<string>();
+
+		[ActorReference]
+		public readonly HashSet<string> AlliedAidHarvesterTypes = new HashSet<string>();
+
+		[ActorReference]
+		public readonly HashSet<string> AlliedAidRefineryTypes = new HashSet<string>();
+
+		[ActorReference]
+		public readonly HashSet<string> AlliedAidMcvTypes = new HashSet<string>();
+
+		[Desc("Maximum spendable cash at which an ally can request recovery aid.")]
+		public readonly int AlliedAidMaximumCash = 0;
+
+		[Desc("Rolling ticks between allied-aid dispatches allowed by each available factory.")]
+		public readonly int AlliedAidInterval = 7500;
+
+		[Desc("Ticks before an unfulfilled allied-aid production request is released for retry.")]
+		public readonly int AlliedAidRequestTimeout = 750;
+
 		[Desc("Ticks without getting closer to the destination before a supply order is cancelled and retargeted.")]
 		public readonly int SupplyStallRetryInterval = 250;
 
@@ -34,8 +61,12 @@ namespace OpenRA.Mods.Common.Traits
 		public override void RulesetLoaded(Ruleset rules, ActorInfo ai)
 		{
 			base.RulesetLoaded(rules, ai);
-			if (SupplyStallRetryInterval <= 0)
-				throw new YamlException("SupplyStallRetryInterval must be greater than zero.");
+			if (SupplyStallRetryInterval <= 0 || AlliedAidInterval <= 0 || AlliedAidRequestTimeout <= 0 ||
+				AlliedAidMaximumCash < 0)
+				throw new YamlException("Supply and allied-aid intervals must be positive and maximum cash cannot be negative.");
+
+			if (!string.IsNullOrEmpty(AlliedAidSupplyActor) && !SupplyActorTypes.Contains(AlliedAidSupplyActor))
+				throw new YamlException("AlliedAidSupplyActor must also be listed in SupplyActorTypes.");
 		}
 
 		public override object Create(ActorInitializer init) { return new SpecialOrderBotModule(init.Self, this); }
@@ -48,11 +79,13 @@ namespace OpenRA.Mods.Common.Traits
 			public uint TargetId;
 			public long BestDistanceSquared;
 			public int LastProgressTick;
+			public int AidRecipientIndex = -1;
 		}
 
 		readonly World world;
 		readonly Player player;
 		readonly Dictionary<uint, SupplyAssignment> supplyAssignments = new Dictionary<uint, SupplyAssignment>();
+		readonly AlliedSupplyAidManager alliedAid;
 		int scanTicks;
 
 		public SpecialOrderBotModule(Actor self, SpecialOrderBotModuleInfo info)
@@ -60,6 +93,12 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			world = self.World;
 			player = self.Owner;
+			alliedAid = new AlliedSupplyAidManager(world, player, info);
+		}
+
+		protected override void Created(Actor self)
+		{
+			alliedAid.Initialize();
 		}
 
 		protected override void TraitEnabled(Actor self)
@@ -73,8 +112,10 @@ namespace OpenRA.Mods.Common.Traits
 				return;
 
 			scanTicks = Info.ScanInterval;
+			alliedAid.Refresh(bot, supplyAssignments.Keys);
 			ReviewAssignments(bot);
 			AssignSupplyOrders(bot);
+			alliedAid.RequestTruck(bot);
 		}
 
 		void ReviewAssignments(IBot bot)
@@ -90,7 +131,9 @@ namespace OpenRA.Mods.Common.Traits
 
 				var assignment = supplyAssignments[truckId];
 				var target = world.GetActorById(assignment.TargetId);
-				var targetEligible = IsEligibleCashTarget(truck, target);
+				var aidNoLongerNeeded = assignment.AidRecipientIndex >= 0 &&
+					!alliedAid.ShouldAid(alliedAid.PlayerByClientIndex(assignment.AidRecipientIndex));
+				var targetEligible = IsEligibleCashTarget(truck, target, assignment.AidRecipientIndex);
 				if (targetEligible)
 				{
 					var distance = (truck.CenterPosition - target.CenterPosition).LengthSquared;
@@ -105,9 +148,10 @@ namespace OpenRA.Mods.Common.Traits
 					world.WorldTick, assignment.LastProgressTick, Info.SupplyStallRetryInterval))
 					continue;
 
-				var reason = !targetEligible ? "target unavailable" : truck.IsIdle ?
+				var reason = aidNoLongerNeeded ? "ally recovered or unavailable" : !targetEligible ?
+					"target unavailable" : truck.IsIdle ?
 					"order ended without delivery" : "no forward progress";
-				IssueSupplyOrder(bot, truck, assignment.TargetId, reason);
+				IssueSupplyOrder(bot, truck, assignment.TargetId, assignment.AidRecipientIndex, false, reason);
 			}
 		}
 
@@ -115,15 +159,23 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			foreach (var truck in world.Actors.Where(a => a.Owner == player && a.IsIdle &&
 				Info.SupplyActorTypes.Contains(a.Info.Name) && a.Info.HasTraitInfo<DeliversCashInfo>() &&
-				!supplyAssignments.ContainsKey(a.ActorID)))
+				!supplyAssignments.ContainsKey(a.ActorID)).OrderBy(a => a.ActorID))
 			{
-				IssueSupplyOrder(bot, truck, 0, "new assignment");
+				IssueSupplyOrder(bot, truck, 0, -1, true, "new assignment");
 			}
 		}
 
-		void IssueSupplyOrder(IBot bot, Actor truck, uint previousTargetId, string reason)
+		void IssueSupplyOrder(IBot bot, Actor truck, uint previousTargetId, int previousAidRecipientIndex,
+			bool allowNewAidDispatch, string reason)
 		{
-			var candidates = EligibleCashTargets(truck).OrderBy(a =>
+			Player aidRecipient = null;
+			if (previousAidRecipientIndex >= 0)
+				aidRecipient = alliedAid.FindRecipient(truck, alliedAid.PlayerByClientIndex(previousAidRecipientIndex));
+			else if (allowNewAidDispatch && alliedAid.CanAssignNewTruck())
+				aidRecipient = alliedAid.FindRecipient(truck, null);
+
+			var targetOwner = aidRecipient ?? player;
+			var candidates = EligibleCashTargets(truck, targetOwner).OrderBy(a =>
 				(a.CenterPosition - truck.CenterPosition).LengthSquared).ThenBy(a => a.ActorID).ToList();
 			var target = candidates.FirstOrDefault(a => a.ActorID != previousTargetId) ?? candidates.FirstOrDefault();
 			if (target == null)
@@ -134,21 +186,26 @@ namespace OpenRA.Mods.Common.Traits
 				return;
 			}
 
+			if (aidRecipient != null && previousAidRecipientIndex < 0)
+				alliedAid.RecordDispatch();
+
 			bot.QueueOrder(new Order("DeliverCash", truck, Target.FromActor(target), false));
 			supplyAssignments[truck.ActorID] = new SupplyAssignment
 			{
 				TargetId = target.ActorID,
 				BestDistanceSquared = (truck.CenterPosition - target.CenterPosition).LengthSquared,
 				LastProgressTick = world.WorldTick,
+				AidRecipientIndex = aidRecipient?.ClientIndex ?? -1,
 			};
-			Debug("supply {0}#{1} -> {2}#{3} ({4})", truck.Info.Name, truck.ActorID,
-				target.Info.Name, target.ActorID, reason);
+			Debug("supply {0}#{1} -> {2}#{3} owner={4} ({5})", truck.Info.Name, truck.ActorID,
+				target.Info.Name, target.ActorID, targetOwner.ClientIndex,
+				aidRecipient != null ? $"allied aid; {reason}" : reason);
 		}
 
-		IEnumerable<Actor> EligibleCashTargets(Actor truck)
+		IEnumerable<Actor> EligibleCashTargets(Actor truck, Player targetOwner)
 		{
 			var deliveryType = truck.Info.TraitInfo<DeliversCashInfo>().Type;
-			return world.Actors.Where(a => a.Owner == player && !a.IsDead && a.IsInWorld)
+			return world.Actors.Where(a => a.Owner == targetOwner && !a.IsDead && a.IsInWorld)
 				.Where(a =>
 				{
 					var accepts = a.Info.TraitInfoOrDefault<AcceptsDeliveredCashInfo>();
@@ -157,9 +214,16 @@ namespace OpenRA.Mods.Common.Traits
 				});
 		}
 
-		bool IsEligibleCashTarget(Actor truck, Actor target)
+		bool IsEligibleCashTarget(Actor truck, Actor target, int aidRecipientIndex)
 		{
-			if (target == null || target.IsDead || !target.IsInWorld || target.Owner != player)
+			if (target == null || target.IsDead || !target.IsInWorld)
+				return false;
+
+			if (aidRecipientIndex < 0 && target.Owner != player)
+				return false;
+
+			if (aidRecipientIndex >= 0 &&
+				(target.Owner.ClientIndex != aidRecipientIndex || !alliedAid.ShouldAid(target.Owner)))
 				return false;
 
 			var accepts = target.Info.TraitInfoOrDefault<AcceptsDeliveredCashInfo>();
