@@ -309,6 +309,10 @@ Player:
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
 	UnitBuilderBotModule@cabal:
 		RequiresCondition: enable-cabal-ai
+		LearnHumanBuiltUnits: true
+		SampledUnitChance: 0.05
+		MaximumSampledUnitChance: 0.5
+		UnitSamplingDebugLogging: true
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
 		UnitsToBuild:
 			e1: 65
@@ -387,6 +391,10 @@ Player:
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
 	UnitBuilderBotModule@watson:
 		RequiresCondition: enable-watson-ai
+		LearnHumanBuiltUnits: true
+		SampledUnitChance: 0.05
+		MaximumSampledUnitChance: 0.5
+		UnitSamplingDebugLogging: true
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
 		UnitsToBuild:
 			e1: 65
@@ -465,6 +473,10 @@ Player:
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
 	UnitBuilderBotModule@hal9001:
 		RequiresCondition: enable-hal9001-ai
+		LearnHumanBuiltUnits: true
+		SampledUnitChance: 0.05
+		MaximumSampledUnitChance: 0.5
+		UnitSamplingDebugLogging: true
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
 		UnitsToBuild:
 			e1: 65
@@ -581,6 +593,10 @@ Player:
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
     UnitBuilderBotModule@brutalis:
 		RequiresCondition: enable-brutalis-ai || enable-wavemaker-ai
+		LearnHumanBuiltUnits: true
+		SampledUnitChance: 0.05
+		MaximumSampledUnitChance: 0.5
+		UnitSamplingDebugLogging: true
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
         IdleBaseUnitsMaximum: 999
 		UnitsToBuild:
@@ -732,6 +748,10 @@ Player:
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
 	UnitBuilderBotModule@viki:
 		RequiresCondition: enable-viki-ai
+		LearnHumanBuiltUnits: true
+		SampledUnitChance: 0.05
+		MaximumSampledUnitChance: 0.5
+		UnitSamplingDebugLogging: true
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
         IdleBaseUnitsMaximum: 999
 		UnitsToBuild:
@@ -988,6 +1008,10 @@ Player:
 			obli: 1
 	UnitBuilderBotModule@skynet:
 		RequiresCondition: enable-skynet-ai
+		LearnHumanBuiltUnits: true
+		SampledUnitChance: 0.05
+		MaximumSampledUnitChance: 0.5
+		UnitSamplingDebugLogging: true
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
         IdleBaseUnitsMaximum: 999
 		WeightedUnitSelection: true
@@ -1145,6 +1169,10 @@ Player:
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
 	UnitBuilderBotModule@ironreaper:
 		RequiresCondition: enable-ironreaper-ai
+		LearnHumanBuiltUnits: true
+		SampledUnitChance: 0.05
+		MaximumSampledUnitChance: 0.5
+		UnitSamplingDebugLogging: true
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
         IdleBaseUnitsMaximum: 999
         UnitsToBuild:
@@ -1301,6 +1329,10 @@ Player:
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
 	UnitBuilderBotModule@Easy:
 		RequiresCondition: enable-Easy-ai
+		LearnHumanBuiltUnits: true
+		SampledUnitChance: 0.05
+		MaximumSampledUnitChance: 0.5
+		UnitSamplingDebugLogging: true
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
         IdleBaseUnitsMaximum: 999
         UnitsToBuild:
@@ -1429,6 +1461,10 @@ Player:
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
 	UnitBuilderBotModule@Easiest:
 		RequiresCondition: enable-Easiest-ai
+		LearnHumanBuiltUnits: true
+		SampledUnitChance: 0.05
+		MaximumSampledUnitChance: 0.5
+		UnitSamplingDebugLogging: true
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
         IdleBaseUnitsMaximum: 999
         UnitsToBuild:
