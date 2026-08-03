@@ -33,7 +33,6 @@ namespace OpenRA.Test
 		}
 
 		// --- facing -------------------------------------------------------------------------------
-
 		[TestCase(TestName = "The wall's facing snaps to an axis and never returns zero")]
 		public void DominantDirectionIsAlwaysAnAxis()
 		{
@@ -63,7 +62,6 @@ namespace OpenRA.Test
 		}
 
 		// --- the line -----------------------------------------------------------------------------
-
 		[TestCase(TestName = "A wall line is straight, contiguous and centred on the tower")]
 		public void LineIsStraightAndCentred()
 		{
@@ -120,8 +118,23 @@ namespace OpenRA.Test
 			Assert.That(run[run.Count - 1], Is.EqualTo(cells[cells.Count - 1]));
 		}
 
-		// --- reachability -------------------------------------------------------------------------
+		[Test]
+		public void EnclosureSurroundsTheWholeBuildingFootprint()
+		{
+			var topLeft = new CPos(50, 50);
+			var corners = BotWallGeometry.EnclosureCorners(topLeft, new CVec(3, 3), 1);
+			Assert.That(corners, Is.EqualTo(new[]
+			{
+				new CPos(49, 49), new CPos(53, 49), new CPos(53, 53), new CPos(49, 53)
+			}));
 
+			var perimeter = BotWallGeometry.EnclosurePerimeter(topLeft, new CVec(3, 3), 1);
+			Assert.That(perimeter.Count, Is.EqualTo(16));
+			Assert.That(perimeter.Distinct().Count(), Is.EqualTo(perimeter.Count));
+			Assert.That(perimeter.Any(c => c.X >= 50 && c.X <= 52 && c.Y >= 50 && c.Y <= 52), Is.False);
+		}
+
+		// --- reachability -------------------------------------------------------------------------
 		[TestCase(TestName = "An open field is escapable")]
 		public void OpenFieldIsOpen()
 		{

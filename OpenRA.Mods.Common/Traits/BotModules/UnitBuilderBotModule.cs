@@ -34,6 +34,40 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("What units should the AI have a maximum limit to train.")]
 		public readonly Dictionary<string, int> UnitLimits = null;
 
+		[Desc("Total live and queued mobile-unit ceiling. Positive values replace individual UnitLimits.",
+			"With AdaptiveUnitCap enabled this is the initial lag-enforcement ceiling, not a limit during healthy play.")]
+		public readonly int TotalUnitLimit = 0;
+
+		[Desc("Enforce and progressively lower TotalUnitLimit only while real time falls behind game time.")]
+		public readonly bool AdaptiveUnitCap = false;
+
+		[Desc("Allowed real-time slowdown relative to the selected game speed before enforcing a unit cap.")]
+		public readonly float AdaptiveUnitCapLagTolerance = 0.1f;
+
+		[Desc("Game ticks between real-time performance samples.")]
+		public readonly int AdaptiveUnitCapSampleInterval = 250;
+
+		[Desc("Lowest total mobile-unit cap that continued lag may enforce.")]
+		public readonly int AdaptiveUnitCapMinimum = AdaptiveUnitCapController.GlobalMinimumLimit;
+
+		[Desc("Amount removed from the enforced cap after each additional slow sample.")]
+		public readonly int AdaptiveUnitCapReductionStep = 25;
+
+		[Desc("Consecutive healthy samples required to remove an enforced cap.")]
+		public readonly int AdaptiveUnitCapRecoverySamples = 3;
+
+		[Desc("Unit types sharing the independent harvester ceiling.")]
+		public readonly HashSet<string> HarvesterTypes = new HashSet<string>();
+
+		[Desc("Total live and queued HarvesterTypes ceiling. Zero disables this ceiling.")]
+		public readonly int HarvesterLimit = 0;
+
+		[Desc("Write periodic live/queued unit-cap diagnostics to debug.log.")]
+		public readonly bool UnitCapDebugLogging = false;
+
+		[Desc("Ticks between unit-cap diagnostic snapshots.")]
+		public readonly int UnitCapLogInterval = 1500;
+
 		[Desc("When should the AI start train specific units.")]
 		public readonly Dictionary<string, int> UnitDelays = null;
 
@@ -62,6 +96,24 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Maximum share of the adaptive build-probability mass a single adaptive type may hold.")]
 		public readonly float AdaptiveWeightCeiling = 0.5f;
 
+		[Desc("Learn mobile unit types produced by other playable humans but absent from UnitsToBuild.")]
+		public readonly bool LearnHumanBuiltUnits = false;
+
+		[Desc("Only learn from human players. Disable only for automated test scenarios.")]
+		public readonly bool SampleHumanPlayersOnly = true;
+
+		[Desc("Initial independent build chance (0-1) assigned to each learned unit type.")]
+		public readonly float SampledUnitChance = 0.05f;
+
+		[Desc("Maximum combined chance (0-1) reserved for all learned unit types.")]
+		public readonly float MaximumSampledUnitChance = 0.5f;
+
+		[Desc("Write learned-unit discoveries and selections to debug.log.")]
+		public readonly bool UnitSamplingDebugLogging = false;
+
+		[Desc("Ticks between learned-unit sampling heartbeat diagnostics.")]
+		public readonly int UnitSamplingLogInterval = 1500;
+
 		[Desc("Blend weight given to the most recent minute's kill/loss ratio when updating a type's decayed score.")]
 		public readonly float AdaptationMinuteWeight = 0.5f;
 
@@ -77,6 +129,12 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Actor type name of the mobile construction vehicle, exempted from adaptive scoring and boosted by McvPriorityThreshold.")]
 		public readonly string McvActor = "mcv";
 
+		[Desc("Write adaptive unit/building demand scores and cross-queue production decisions to debug.log.")]
+		public readonly bool AdaptiveProductionDebugLogging = false;
+
+		[Desc("Minimum ticks between full adaptive candidate-table log entries. Selection decisions are always logged.")]
+		public readonly int AdaptiveProductionLogInterval = 250;
+
 		public override object Create(ActorInitializer init) { return new UnitBuilderBotModule(init.Self, this); }
 	}
 
@@ -88,6 +146,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly Player player;
 
 		readonly List<string> queuedBuildRequests = new List<string>();
+		readonly HashSet<string> sampledUnitTypes = new HashSet<string>();
 
 		IBotRequestPauseUnitProduction[] requestPause;
 		PlayerResources playerResources;
@@ -96,10 +155,15 @@ namespace OpenRA.Mods.Common.Traits
 
 		int ticks;
 
-		// Refreshed once per FeedbackTime window (not per queue/BuildUnit call) so enabling
-		// WeightedUnitSelection costs one extra O(player actor count) scan per ~1.2s, not five.
+		// Refreshed once per FeedbackTime window (not per queue/BuildUnit call), keeping the
+		// adaptive economy and unit-cap scans to one O(player actor count) pass per ~1.2s.
 		int cachedDeployedConstructionYards;
 		int cachedLiveHarvesters;
+		int cachedCommittedUnits;
+		int cachedCommittedHarvesters;
+		int effectiveTotalUnitLimit;
+		int nextUnitCapLogTick;
+		int nextUnitSamplingLogTick;
 
 		// Player-level income/spend over the current adaptive rollover window; used only by the
 		// economy gate. Not game-save persisted - after a load the very first window's reading is a
@@ -108,6 +172,18 @@ namespace OpenRA.Mods.Common.Traits
 		int lastWindowSpent;
 		int incomeThisWindow;
 		int spendThisWindow;
+		int nextAdaptiveProductionLogTick;
+		bool adaptiveInitializationLogged;
+		AdaptiveUnitCapController adaptiveUnitCap;
+
+		sealed class UnitBuildOffer
+		{
+			public ProductionQueue Queue;
+			public ActorInfo Unit;
+			public string Category;
+			public double Score;
+			public int Cost;
+		}
 
 		public UnitBuilderBotModule(Actor self, UnitBuilderBotModuleInfo info)
 			: base(info)
@@ -121,6 +197,12 @@ namespace OpenRA.Mods.Common.Traits
 			requestPause = self.Owner.PlayerActor.TraitsImplementing<IBotRequestPauseUnitProduction>().ToArray();
 			playerResources = self.Owner.PlayerActor.Trait<PlayerResources>();
 			playerStats = self.Owner.PlayerActor.Trait<PlayerStatistics>();
+			if (Info.AdaptiveUnitCap)
+				adaptiveUnitCap = new AdaptiveUnitCapController(Info.AdaptiveUnitCapSampleInterval,
+					Info.AdaptiveUnitCapLagTolerance, Info.AdaptiveUnitCapMinimum,
+					Info.AdaptiveUnitCapReductionStep, Info.AdaptiveUnitCapRecoverySamples);
+			else
+				effectiveTotalUnitLimit = Info.TotalUnitLimit;
 		}
 
 		void IBotNotifyIdleBaseUnits.UpdatedIdleBaseUnits(List<Actor> idleUnits)
@@ -130,28 +212,47 @@ namespace OpenRA.Mods.Common.Traits
 
 		void IBotTick.BotTick(IBot bot)
 		{
-			if (requestPause.Any(rp => rp.PauseUnitProduction))
-				return;
+			if (Info.AdaptiveProductionDebugLogging && !adaptiveInitializationLogged)
+			{
+				adaptiveInitializationLogged = true;
+				LogAdaptiveProduction("{0} module active for queues: {1}", player,
+					string.Join(", ", Info.UnitQueues.OrderBy(q => q, StringComparer.Ordinal)));
+			}
 
+			var pauseRandomProduction = requestPause.Any(rp => rp.PauseUnitProduction);
+			if (pauseRandomProduction && queuedBuildRequests.Count == 0)
+				return;
 			ticks++;
 
 			if (ticks % FeedbackTime == 0)
 			{
+				RefreshProductionCounts();
+				UpdateAdaptiveUnitCap();
+				DiscoverSampledUnitTypes();
 				if (Info.WeightedUnitSelection)
 				{
-					RefreshAdaptiveCounts();
 					MaybeRollAdaptiveWindow();
 				}
+
+				MaybeLogUnitCapacity();
 
 				var buildRequest = queuedBuildRequests.FirstOrDefault();
 				if (buildRequest != null)
 				{
 					BuildUnit(bot, buildRequest);
 					queuedBuildRequests.Remove(buildRequest);
+					return;
 				}
 
-				foreach (var q in Info.UnitQueues)
-					BuildUnit(bot, q, idleUnitCount < Info.IdleBaseUnitsMaximum);
+				if (!pauseRandomProduction)
+				{
+					if (Info.WeightedUnitSelection && Info.UnitsToBuild != null &&
+						idleUnitCount < Info.IdleBaseUnitsMaximum)
+						BuildAdaptiveUnitsAcrossQueues(bot);
+					else
+						foreach (var q in Info.UnitQueues)
+							BuildUnit(bot, q, idleUnitCount < Info.IdleBaseUnitsMaximum);
+				}
 			}
 		}
 
@@ -163,10 +264,18 @@ namespace OpenRA.Mods.Common.Traits
 			return !string.IsNullOrEmpty(tooltip?.Name) ? $"{tooltip.Name} ({type})" : type;
 		}
 
-		void RefreshAdaptiveCounts()
+		void LogAdaptiveProduction(string format, params object[] args)
+		{
+			AIUtils.BotDebug(format, args);
+			Log.Write("debug", "AI adaptive production: " + format, args);
+		}
+
+		void RefreshProductionCounts()
 		{
 			cachedDeployedConstructionYards = 0;
 			cachedLiveHarvesters = 0;
+			cachedCommittedUnits = 0;
+			cachedCommittedHarvesters = 0;
 
 			foreach (var a in world.Actors)
 			{
@@ -177,7 +286,50 @@ namespace OpenRA.Mods.Common.Traits
 					cachedDeployedConstructionYards++;
 				else if (Info.EconomyTypes.Contains(a.Info.Name))
 					cachedLiveHarvesters++;
+
+				if (CountsTowardUnitLimit(a.Info))
+					cachedCommittedUnits++;
+
+				if (Info.HarvesterTypes.Contains(a.Info.Name))
+					cachedCommittedHarvesters++;
 			}
+
+			foreach (var queue in world.ActorsWithTrait<ProductionQueue>().Where(q => q.Actor.Owner == player))
+				foreach (var item in queue.Trait.AllQueued())
+					if (world.Map.Rules.Actors.TryGetValue(item.Item, out var actorInfo))
+					{
+						if (CountsTowardUnitLimit(actorInfo))
+							cachedCommittedUnits++;
+
+						if (Info.HarvesterTypes.Contains(actorInfo.Name))
+							cachedCommittedHarvesters++;
+					}
+		}
+
+		void MaybeLogUnitCapacity()
+		{
+			if (!Info.UnitCapDebugLogging || world.WorldTick < nextUnitCapLogTick)
+				return;
+
+			nextUnitCapLogTick = world.WorldTick + Math.Max(1, Info.UnitCapLogInterval);
+			var mobileLimit = effectiveTotalUnitLimit > 0 ? effectiveTotalUnitLimit.ToString() : "unlimited";
+			Log.Write("debug", "AI unit capacity: {0} mobile={1}/{2}, harvesters={3}/{4} (live plus queued).",
+				player, cachedCommittedUnits, mobileLimit, cachedCommittedHarvesters, Info.HarvesterLimit);
+		}
+
+		void UpdateAdaptiveUnitCap()
+		{
+			if (adaptiveUnitCap == null)
+				return;
+
+			var sample = adaptiveUnitCap.Update(world.WorldTick, Game.LocalTick, world.Timestep, Game.RunTime,
+				cachedCommittedUnits, Info.TotalUnitLimit);
+			effectiveTotalUnitLimit = sample.EffectiveLimit;
+			if (Info.UnitCapDebugLogging && sample.Sampled)
+				Log.Write("debug", "AI unit capacity: {0} performance={1:0.000}x allowed={2:0.000}x, " +
+					"decision={3}, mobile-limit={4}.", player, sample.RealTimeRatio,
+					1d + Math.Max(0, Info.AdaptiveUnitCapLagTolerance), sample.Decision,
+					effectiveTotalUnitLimit > 0 ? effectiveTotalUnitLimit.ToString() : "unlimited");
 		}
 
 		void MaybeRollAdaptiveWindow()
@@ -201,8 +353,17 @@ namespace OpenRA.Mods.Common.Traits
 				stats.MinuteLossesValue = 0;
 
 				if (Math.Abs(stats.DecayedScore - previous) > 0.05)
-					AIUtils.BotDebug("{0} adaptive score for {1}: {2:0.00} -> {3:0.00} (built {4}, killed {5}, lost {6})",
-						player, DisplayName(kv.Key), previous, stats.DecayedScore, stats.BuiltCount, stats.KillsCount, stats.LossesCount);
+				{
+					var args = new object[]
+					{
+						player, DisplayName(kv.Key), previous, stats.DecayedScore,
+						stats.BuiltCount, stats.KillsCount, stats.LossesCount
+					};
+					if (Info.AdaptiveProductionDebugLogging)
+						LogAdaptiveProduction("{0} score for {1}: {2:0.00} -> {3:0.00} (built {4}, killed {5}, lost {6})", args);
+					else
+						AIUtils.BotDebug("{0} adaptive score for {1}: {2:0.00} -> {3:0.00} (built {4}, killed {5}, lost {6})", args);
+				}
 			}
 
 			if (Info.AdaptiveTypes.Count > 0)
@@ -215,7 +376,10 @@ namespace OpenRA.Mods.Common.Traits
 					var adapted = AdaptiveWeighting.AdaptedWeight(authored, stats.DecayedScore, confidence);
 					return FormattableString.Invariant($"{DisplayName(t)}={adapted:0.0}(authored {authored}, score {stats.DecayedScore:0.00}, conf {confidence:0.00})");
 				});
-				AIUtils.BotDebug("{0} adaptive weights: {1}", player, string.Join(", ", table));
+				if (Info.AdaptiveProductionDebugLogging)
+					LogAdaptiveProduction("{0} weights: {1}", player, string.Join(", ", table));
+				else
+					AIUtils.BotDebug("{0} adaptive weights: {1}", player, string.Join(", ", table));
 			}
 
 			var ticksPerWindow = Math.Max(1, 60000 / world.Timestep);
@@ -248,7 +412,7 @@ namespace OpenRA.Mods.Common.Traits
 
 			var name = unit.Name;
 
-			if (Info.UnitsToBuild != null && !Info.UnitsToBuild.ContainsKey(name))
+			if (Info.UnitsToBuild != null && !Info.UnitsToBuild.ContainsKey(name) && !sampledUnitTypes.Contains(name))
 				return;
 
 			if (Info.UnitDelays != null &&
@@ -256,15 +420,137 @@ namespace OpenRA.Mods.Common.Traits
 				Info.UnitDelays[name] > world.WorldTick)
 				return;
 
-			if (Info.UnitLimits != null &&
+			if (Info.TotalUnitLimit <= 0 && Info.UnitLimits != null &&
 				Info.UnitLimits.ContainsKey(name) &&
 				world.Actors.Count(a => a.Owner == player && a.Info.Name == name) >= Info.UnitLimits[name])
 				return;
 
-			int queueAmount = System.Math.Max(1,
+			var queueAmount = System.Math.Max(1,
 				world.ActorsHavingTrait<Building>().Where(a => a.Owner == player).Count() / 20);
+			queueAmount = AllowedQueueAmount(unit, queueAmount);
+			if (queueAmount <= 0)
+				return;
 
 			bot.QueueOrder(Order.StartProduction(queue.Actor, name, queueAmount));
+			RecordQueued(unit, queueAmount);
+			if (sampledUnitTypes.Contains(name))
+				LogSampling("{0} queued learned unit {1}: amount={2}, queue={3}.",
+					player, DisplayName(name), queueAmount, queue.Info.Type);
+		}
+
+		void BuildAdaptiveUnitsAcrossQueues(IBot bot)
+		{
+			var offers = new List<UnitBuildOffer>();
+			var seenQueues = new HashSet<ProductionQueue>();
+			foreach (var category in Info.UnitQueues.OrderBy(q => q, StringComparer.Ordinal))
+				foreach (var queue in AIUtils.FindQueues(player, category))
+				{
+					if (!seenQueues.Add(queue) || queue.AllQueued().Any())
+						continue;
+
+					var unit = ChooseRandomUnitToBuild(queue);
+					if (unit == null || !CanBuildCandidateUnit(unit))
+						continue;
+
+					offers.Add(new UnitBuildOffer
+					{
+						Queue = queue,
+						Unit = unit,
+						Category = category,
+						Score = AdaptiveProductionScore(unit.Name),
+						Cost = Math.Max(0, unit.TraitInfoOrDefault<ValuedInfo>()?.Cost ?? 0)
+					});
+				}
+
+			var logTable = Info.AdaptiveProductionDebugLogging && world.WorldTick >= nextAdaptiveProductionLogTick;
+			if (logTable)
+				nextAdaptiveProductionLogTick = world.WorldTick + Math.Max(1, Info.AdaptiveProductionLogInterval);
+
+			if (offers.Count == 0)
+			{
+				if (logTable)
+					LogAdaptiveProduction("{0} has no candidates: {1}", player,
+						string.Join(", ", Info.UnitQueues.OrderBy(q => q, StringComparer.Ordinal).Select(category =>
+						{
+							var queues = AIUtils.FindQueues(player, category).ToList();
+							return $"{category} queues={queues.Count} free={queues.Count(q => !q.AllQueued().Any())}";
+						})));
+
+				return;
+			}
+
+			var budget = Math.Max(0, playerResources.Cash + playerResources.Resources);
+			var selected = new HashSet<int>(AdaptiveWeighting.SelectAffordableOffers(
+				offers.Select(o => o.Score).ToArray(), offers.Select(o => o.Cost).ToArray(), budget));
+			if (logTable)
+			{
+				LogAdaptiveProduction("{0} candidates (budget {1}): {2}", player, budget,
+					string.Join(", ", offers.Select((o, i) => FormattableString.Invariant(
+						$"{o.Category}:{DisplayName(o.Unit.Name)} score={o.Score:0.00} cost={o.Cost} {(selected.Contains(i) ? "selected" : "deferred")}"))));
+			}
+
+			foreach (var index in selected)
+			{
+				var offer = offers[index];
+				if (AllowedQueueAmount(offer.Unit, 1) <= 0)
+					continue;
+
+				bot.QueueOrder(Order.StartProduction(offer.Queue.Actor, offer.Unit.Name, 1));
+				RecordQueued(offer.Unit, 1);
+				if (sampledUnitTypes.Contains(offer.Unit.Name))
+					LogSampling("{0} queued learned unit {1}: amount=1, queue={2}.",
+						player, DisplayName(offer.Unit.Name), offer.Queue.Info.Type);
+
+				if (Info.AdaptiveProductionDebugLogging)
+					LogAdaptiveProduction("{0} selected {1} on {2}: score={3:0.00} cost={4} budget={5}",
+						player, DisplayName(offer.Unit.Name), offer.Category, offer.Score, offer.Cost, budget);
+			}
+		}
+
+		bool CanBuildCandidateUnit(ActorInfo unit)
+		{
+			var name = unit.Name;
+			if (!Info.UnitsToBuild.ContainsKey(name) && !sampledUnitTypes.Contains(name))
+				return false;
+
+			if (Info.UnitDelays != null && Info.UnitDelays.TryGetValue(name, out var delay) && delay > world.WorldTick)
+				return false;
+
+			return AllowedQueueAmount(unit, 1) > 0 &&
+				(Info.UnitLimits == null || !Info.UnitLimits.TryGetValue(name, out var limit) ||
+				world.Actors.Count(a => a.Owner == player && a.Info.Name == name) < limit);
+		}
+
+		double AdaptiveProductionScore(string type)
+		{
+			if (sampledUnitTypes.Contains(type))
+				return SampledChance(world.Map.Rules.Actors[type]) * Info.UnitsToBuild.Values.Sum();
+
+			if (type == Info.McvActor && AdaptiveWeighting.ShouldForceMcv(
+				cachedDeployedConstructionYards, Info.McvPriorityThreshold))
+				return 1000000;
+
+			if (Info.EconomyTypes.Contains(type) && AdaptiveWeighting.ShouldForceEconomy(
+				incomeThisWindow, spendThisWindow, cachedLiveHarvesters, Info.HarvesterFloor))
+				return 500000;
+
+			return AdaptiveTypeWeight(type);
+		}
+
+		internal double ProductionBuildingDemand(ActorInfo building)
+		{
+			if (!Info.WeightedUnitSelection || Info.UnitsToBuild == null)
+				return 0;
+
+			var productionTypes = new HashSet<string>(building.TraitInfos<ProductionInfo>()
+				.SelectMany(p => p.Produces), StringComparer.OrdinalIgnoreCase);
+			if (productionTypes.Count == 0)
+				return 0;
+
+			return Info.UnitsToBuild.Keys.Concat(sampledUnitTypes).Distinct().Where(world.Map.Rules.Actors.ContainsKey)
+				.Where(t => world.Map.Rules.Actors[t].TraitInfoOrDefault<BuildableInfo>()?.Queue
+					.Any(productionTypes.Contains) == true)
+				.Select(AdaptiveProductionScore).DefaultIfEmpty(0).Max();
 		}
 
 		// In cases where we want to build a specific unit but don't know the queue name (because there's more than one possibility)
@@ -286,26 +572,37 @@ namespace OpenRA.Mods.Common.Traits
 					break;
 			}
 
-			if (queue != null)
+			if (queue != null && AllowedQueueAmount(actorInfo, 1) > 0)
 			{
 				bot.QueueOrder(Order.StartProduction(queue.Actor, name, 1));
+				RecordQueued(actorInfo, 1);
 				AIUtils.BotDebug("{0} decided to build {1} (external request)", queue.Actor.Owner, DisplayName(name));
 			}
 		}
 
 		ActorInfo ChooseRandomUnitToBuild(ProductionQueue queue)
 		{
-			var buildableThings = queue.BuildableItems();
+			var buildableThings = queue.BuildableItems().Where(CanQueue).ToArray();
 			if (!buildableThings.Any())
 				return null;
 
+			var sampled = buildableThings.Where(a => sampledUnitTypes.Contains(a.Name)).ToArray();
+			var sampledPick = ChooseSampledUnit(sampled);
+			if (sampledPick != null)
+				return HasAdequateAirUnitReloadBuildings(sampledPick) ? sampledPick : null;
+
+			var configured = Info.UnitsToBuild == null ? buildableThings :
+				buildableThings.Where(a => Info.UnitsToBuild.ContainsKey(a.Name)).ToArray();
+			if (configured.Length == 0)
+				return sampled.Length > 0 ? sampled.Random(world.LocalRandom) : null;
+
 			if (!Info.WeightedUnitSelection || Info.UnitsToBuild == null)
 			{
-				var unit = buildableThings.Random(world.LocalRandom);
+				var unit = configured.Random(world.LocalRandom);
 				return HasAdequateAirUnitReloadBuildings(unit) ? unit : null;
 			}
 
-			return ChooseWeightedUnitToBuild(buildableThings.ToList());
+			return ChooseWeightedUnitToBuild(configured.ToList());
 		}
 
 		ActorInfo ChooseWeightedUnitToBuild(List<ActorInfo> buildable)
@@ -372,9 +669,14 @@ namespace OpenRA.Mods.Common.Traits
 
 		ActorInfo ChooseUnitToBuild(ProductionQueue queue)
 		{
-			var buildableThings = queue.BuildableItems();
+			var buildableThings = queue.BuildableItems().Where(CanQueue).ToArray();
 			if (!buildableThings.Any())
 				return null;
+
+			var sampled = buildableThings.Where(a => sampledUnitTypes.Contains(a.Name)).ToArray();
+			var sampledPick = ChooseSampledUnit(sampled);
+			if (sampledPick != null)
+				return HasAdequateAirUnitReloadBuildings(sampledPick) ? sampledPick : null;
 
 			var myUnits = player.World
 				.ActorsHavingTrait<IPositionable>()
@@ -388,6 +690,106 @@ namespace OpenRA.Mods.Common.Traits
 							return world.Map.Rules.Actors[unit.Key];
 
 			return null;
+		}
+
+		bool CanQueue(ActorInfo actorInfo)
+		{
+			return AllowedQueueAmount(actorInfo, 1) > 0;
+		}
+
+		int AllowedQueueAmount(ActorInfo actorInfo, int requested)
+		{
+			return UnitCapPolicy.AllowedQueueAmount(requested, cachedCommittedUnits, effectiveTotalUnitLimit,
+				Info.HarvesterTypes.Contains(actorInfo.Name), cachedCommittedHarvesters, Info.HarvesterLimit,
+				CountsTowardUnitLimit(actorInfo));
+		}
+
+		void RecordQueued(ActorInfo actorInfo, int amount)
+		{
+			if (CountsTowardUnitLimit(actorInfo))
+				cachedCommittedUnits += amount;
+
+			if (Info.HarvesterTypes.Contains(actorInfo.Name))
+				cachedCommittedHarvesters += amount;
+		}
+
+		static bool CountsTowardUnitLimit(ActorInfo actorInfo)
+		{
+			return actorInfo.HasTraitInfo<MobileInfo>() || actorInfo.HasTraitInfo<AircraftInfo>();
+		}
+
+		void DiscoverSampledUnitTypes()
+		{
+			if (!Info.LearnHumanBuiltUnits || Info.UnitsToBuild == null)
+				return;
+
+			var sources = world.Players.Where(p => p != player && p.Playable && !p.NonCombatant &&
+				(!Info.SampleHumanPlayersOnly || !p.IsBot)).ToArray();
+			foreach (var source in sources)
+			{
+				var statistics = source.PlayerActor.TraitOrDefault<PlayerStatistics>();
+				if (statistics == null)
+					continue;
+
+				foreach (var sample in statistics.AdaptiveStats.Where(kv => kv.Value.BuiltCount > 0))
+				{
+					if (Info.UnitsToBuild.ContainsKey(sample.Key) || sampledUnitTypes.Contains(sample.Key) ||
+						!world.Map.Rules.Actors.TryGetValue(sample.Key, out var actorInfo))
+						continue;
+
+					var buildable = actorInfo.TraitInfoOrDefault<BuildableInfo>();
+					var queueCompatible = buildable != null && buildable.Queue.Any(Info.UnitQueues.Contains);
+					var mobile = actorInfo.HasTraitInfo<MobileInfo>() || actorInfo.HasTraitInfo<AircraftInfo>();
+					if (!PlayerUnitSamplingPolicy.CanLearn(source.IsBot, Info.SampleHumanPlayersOnly,
+						source.Playable, source.NonCombatant, queueCompatible, mobile, sample.Value.BuiltCount))
+						continue;
+
+					sampledUnitTypes.Add(sample.Key);
+					LogSampling("{0} learned {1} from {2}: built={3}, base-chance={4:P0}.",
+						player, DisplayName(sample.Key), source, sample.Value.BuiltCount, Info.SampledUnitChance);
+				}
+			}
+
+			if (Info.UnitSamplingDebugLogging && world.WorldTick >= nextUnitSamplingLogTick)
+			{
+				nextUnitSamplingLogTick = world.WorldTick + Math.Max(1, Info.UnitSamplingLogInterval);
+				Log.Write("debug", "AI unit sampling: {0} scan: eligible-sources={1}, learned={2}, own-built={3}.",
+					player, sources.Length, sampledUnitTypes.Count,
+					playerStats.AdaptiveStats.Sum(kv => kv.Value.BuiltCount));
+			}
+		}
+
+		ActorInfo ChooseSampledUnit(ActorInfo[] buildableSamples)
+		{
+			if (buildableSamples.Length == 0)
+				return null;
+
+			var chances = buildableSamples.ToDictionary(a => a.Name, SampledChance);
+			var picked = PlayerUnitSamplingPolicy.Pick(chances, Info.MaximumSampledUnitChance,
+				world.LocalRandom.NextFloat());
+			if (picked == null)
+				return null;
+
+			LogSampling("{0} selected learned unit {1}: adjusted-chance={2:P1}, learned-types={3}.",
+				player, DisplayName(picked), chances[picked], sampledUnitTypes.Count);
+			return world.Map.Rules.Actors[picked];
+		}
+
+		double SampledChance(ActorInfo actorInfo)
+		{
+			if (!Info.WeightedUnitSelection)
+				return Info.SampledUnitChance;
+
+			var stats = playerStats.AdaptiveStats[actorInfo.Name];
+			var confidence = AdaptiveWeighting.Confidence(stats.KillsCount + stats.LossesCount, Info.AdaptiveConfidenceSamples);
+			return AdaptiveWeighting.AdaptedWeight(Info.SampledUnitChance, stats.DecayedScore, confidence);
+		}
+
+		void LogSampling(string format, params object[] args)
+		{
+			AIUtils.BotDebug(format, args);
+			if (Info.UnitSamplingDebugLogging)
+				Log.Write("debug", "AI unit sampling: " + format, args);
 		}
 
 		// For mods like RA (number of RearmActors must match the number of aircraft)
@@ -418,7 +820,8 @@ namespace OpenRA.Mods.Common.Traits
 			return new List<MiniYamlNode>()
 			{
 				new MiniYamlNode("QueuedBuildRequests", FieldSaver.FormatValue(queuedBuildRequests.ToArray())),
-				new MiniYamlNode("IdleUnitCount", FieldSaver.FormatValue(idleUnitCount))
+				new MiniYamlNode("IdleUnitCount", FieldSaver.FormatValue(idleUnitCount)),
+				new MiniYamlNode("SampledUnitTypes", FieldSaver.FormatValue(sampledUnitTypes.OrderBy(t => t, StringComparer.Ordinal).ToArray()))
 			};
 		}
 
@@ -437,6 +840,13 @@ namespace OpenRA.Mods.Common.Traits
 			var idleUnitCountNode = data.FirstOrDefault(n => n.Key == "IdleUnitCount");
 			if (idleUnitCountNode != null)
 				idleUnitCount = FieldLoader.GetValue<int>("IdleUnitCount", idleUnitCountNode.Value.Value);
+
+			var sampledNode = data.FirstOrDefault(n => n.Key == "SampledUnitTypes");
+			if (sampledNode != null)
+			{
+				sampledUnitTypes.Clear();
+				sampledUnitTypes.UnionWith(FieldLoader.GetValue<string[]>("SampledUnitTypes", sampledNode.Value.Value));
+			}
 		}
 	}
 }

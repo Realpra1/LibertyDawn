@@ -65,6 +65,43 @@ namespace OpenRA.Mods.Common.Traits
 			return cells;
 		}
 
+		public static List<CPos> EnclosureCorners(CPos topLeft, CVec dimensions, int margin)
+		{
+			var gap = Math.Max(0, margin);
+			var left = topLeft.X - gap;
+			var top = topLeft.Y - gap;
+			var right = topLeft.X + Math.Max(1, dimensions.X) - 1 + gap;
+			var bottom = topLeft.Y + Math.Max(1, dimensions.Y) - 1 + gap;
+			return new List<CPos>
+			{
+				new CPos(left, top),
+				new CPos(right, top),
+				new CPos(right, bottom),
+				new CPos(left, bottom)
+			};
+		}
+
+		public static List<CPos> EnclosurePerimeter(CPos topLeft, CVec dimensions, int margin)
+		{
+			var corners = EnclosureCorners(topLeft, dimensions, margin);
+			var cells = new List<CPos>();
+			for (var x = corners[0].X; x <= corners[1].X; x++)
+			{
+				cells.Add(new CPos(x, corners[0].Y));
+				if (corners[2].Y != corners[0].Y)
+					cells.Add(new CPos(x, corners[2].Y));
+			}
+
+			for (var y = corners[0].Y + 1; y < corners[3].Y; y++)
+			{
+				cells.Add(new CPos(corners[0].X, y));
+				if (corners[1].X != corners[0].X)
+					cells.Add(new CPos(corners[1].X, y));
+			}
+
+			return cells;
+		}
+
 		/// <summary>
 		/// The longest contiguous run of usable cells in <paramref name="cells"/>, or an empty list if
 		/// the longest run is shorter than <paramref name="minLength"/>. This is where "prefer one long
