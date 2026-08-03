@@ -34,6 +34,21 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("What units should the AI have a maximum limit to train.")]
 		public readonly Dictionary<string, int> UnitLimits = null;
 
+		[Desc("Total live and queued mobile-unit ceiling. Positive values replace individual UnitLimits.")]
+		public readonly int TotalUnitLimit = 0;
+
+		[Desc("Unit types sharing the independent harvester ceiling.")]
+		public readonly HashSet<string> HarvesterTypes = new HashSet<string>();
+
+		[Desc("Total live and queued HarvesterTypes ceiling. Zero disables this ceiling.")]
+		public readonly int HarvesterLimit = 0;
+
+		[Desc("Write periodic live/queued unit-cap diagnostics to debug.log.")]
+		public readonly bool UnitCapDebugLogging = false;
+
+		[Desc("Ticks between unit-cap diagnostic snapshots.")]
+		public readonly int UnitCapLogInterval = 1500;
+
 		[Desc("When should the AI start train specific units.")]
 		public readonly Dictionary<string, int> UnitDelays = null;
 
@@ -96,10 +111,13 @@ namespace OpenRA.Mods.Common.Traits
 
 		int ticks;
 
-		// Refreshed once per FeedbackTime window (not per queue/BuildUnit call) so enabling
-		// WeightedUnitSelection costs one extra O(player actor count) scan per ~1.2s, not five.
+		// Refreshed once per FeedbackTime window (not per queue/BuildUnit call), keeping the
+		// adaptive economy and unit-cap scans to one O(player actor count) pass per ~1.2s.
 		int cachedDeployedConstructionYards;
 		int cachedLiveHarvesters;
+		int cachedCommittedUnits;
+		int cachedCommittedHarvesters;
+		int nextUnitCapLogTick;
 
 		// Player-level income/spend over the current adaptive rollover window; used only by the
 		// economy gate. Not game-save persisted - after a load the very first window's reading is a
@@ -137,11 +155,13 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (ticks % FeedbackTime == 0)
 			{
+				RefreshProductionCounts();
 				if (Info.WeightedUnitSelection)
 				{
-					RefreshAdaptiveCounts();
 					MaybeRollAdaptiveWindow();
 				}
+
+				MaybeLogUnitCapacity();
 
 				var buildRequest = queuedBuildRequests.FirstOrDefault();
 				if (buildRequest != null)
@@ -163,10 +183,12 @@ namespace OpenRA.Mods.Common.Traits
 			return !string.IsNullOrEmpty(tooltip?.Name) ? $"{tooltip.Name} ({type})" : type;
 		}
 
-		void RefreshAdaptiveCounts()
+		void RefreshProductionCounts()
 		{
 			cachedDeployedConstructionYards = 0;
 			cachedLiveHarvesters = 0;
+			cachedCommittedUnits = 0;
+			cachedCommittedHarvesters = 0;
 
 			foreach (var a in world.Actors)
 			{
@@ -177,7 +199,34 @@ namespace OpenRA.Mods.Common.Traits
 					cachedDeployedConstructionYards++;
 				else if (Info.EconomyTypes.Contains(a.Info.Name))
 					cachedLiveHarvesters++;
+
+				if (CountsTowardUnitLimit(a.Info))
+					cachedCommittedUnits++;
+
+				if (Info.HarvesterTypes.Contains(a.Info.Name))
+					cachedCommittedHarvesters++;
 			}
+
+			foreach (var queue in world.ActorsWithTrait<ProductionQueue>().Where(q => q.Actor.Owner == player))
+				foreach (var item in queue.Trait.AllQueued())
+					if (world.Map.Rules.Actors.TryGetValue(item.Item, out var actorInfo))
+					{
+						if (CountsTowardUnitLimit(actorInfo))
+							cachedCommittedUnits++;
+
+						if (Info.HarvesterTypes.Contains(actorInfo.Name))
+							cachedCommittedHarvesters++;
+					}
+		}
+
+		void MaybeLogUnitCapacity()
+		{
+			if (!Info.UnitCapDebugLogging || world.WorldTick < nextUnitCapLogTick)
+				return;
+
+			nextUnitCapLogTick = world.WorldTick + Math.Max(1, Info.UnitCapLogInterval);
+			Log.Write("debug", "AI unit capacity: {0} mobile={1}/{2}, harvesters={3}/{4} (live plus queued).",
+				player, cachedCommittedUnits, Info.TotalUnitLimit, cachedCommittedHarvesters, Info.HarvesterLimit);
 		}
 
 		void MaybeRollAdaptiveWindow()
@@ -256,15 +305,19 @@ namespace OpenRA.Mods.Common.Traits
 				Info.UnitDelays[name] > world.WorldTick)
 				return;
 
-			if (Info.UnitLimits != null &&
+			if (Info.TotalUnitLimit <= 0 && Info.UnitLimits != null &&
 				Info.UnitLimits.ContainsKey(name) &&
 				world.Actors.Count(a => a.Owner == player && a.Info.Name == name) >= Info.UnitLimits[name])
 				return;
 
-			int queueAmount = System.Math.Max(1,
+			var queueAmount = System.Math.Max(1,
 				world.ActorsHavingTrait<Building>().Where(a => a.Owner == player).Count() / 20);
+			queueAmount = AllowedQueueAmount(unit, queueAmount);
+			if (queueAmount <= 0)
+				return;
 
 			bot.QueueOrder(Order.StartProduction(queue.Actor, name, queueAmount));
+			RecordQueued(unit, queueAmount);
 		}
 
 		// In cases where we want to build a specific unit but don't know the queue name (because there's more than one possibility)
@@ -286,16 +339,17 @@ namespace OpenRA.Mods.Common.Traits
 					break;
 			}
 
-			if (queue != null)
+			if (queue != null && AllowedQueueAmount(actorInfo, 1) > 0)
 			{
 				bot.QueueOrder(Order.StartProduction(queue.Actor, name, 1));
+				RecordQueued(actorInfo, 1);
 				AIUtils.BotDebug("{0} decided to build {1} (external request)", queue.Actor.Owner, DisplayName(name));
 			}
 		}
 
 		ActorInfo ChooseRandomUnitToBuild(ProductionQueue queue)
 		{
-			var buildableThings = queue.BuildableItems();
+			var buildableThings = queue.BuildableItems().Where(CanQueue).ToArray();
 			if (!buildableThings.Any())
 				return null;
 
@@ -372,7 +426,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		ActorInfo ChooseUnitToBuild(ProductionQueue queue)
 		{
-			var buildableThings = queue.BuildableItems();
+			var buildableThings = queue.BuildableItems().Where(CanQueue).ToArray();
 			if (!buildableThings.Any())
 				return null;
 
@@ -388,6 +442,32 @@ namespace OpenRA.Mods.Common.Traits
 							return world.Map.Rules.Actors[unit.Key];
 
 			return null;
+		}
+
+		bool CanQueue(ActorInfo actorInfo)
+		{
+			return AllowedQueueAmount(actorInfo, 1) > 0;
+		}
+
+		int AllowedQueueAmount(ActorInfo actorInfo, int requested)
+		{
+			return UnitCapPolicy.AllowedQueueAmount(requested, cachedCommittedUnits, Info.TotalUnitLimit,
+				Info.HarvesterTypes.Contains(actorInfo.Name), cachedCommittedHarvesters, Info.HarvesterLimit,
+				CountsTowardUnitLimit(actorInfo));
+		}
+
+		void RecordQueued(ActorInfo actorInfo, int amount)
+		{
+			if (CountsTowardUnitLimit(actorInfo))
+				cachedCommittedUnits += amount;
+
+			if (Info.HarvesterTypes.Contains(actorInfo.Name))
+				cachedCommittedHarvesters += amount;
+		}
+
+		static bool CountsTowardUnitLimit(ActorInfo actorInfo)
+		{
+			return actorInfo.HasTraitInfo<MobileInfo>() || actorInfo.HasTraitInfo<AircraftInfo>();
 		}
 
 		// For mods like RA (number of RearmActors must match the number of aircraft)
