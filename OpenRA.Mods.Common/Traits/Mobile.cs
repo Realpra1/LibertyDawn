@@ -205,6 +205,7 @@ namespace OpenRA.Mods.Common.Traits
 		public bool IsBlocking { get; private set; }
 
 		public bool IsMovingBetweenCells => FromCell != ToCell;
+		public MoveResult MoveResult { get; set; }
 
 		#region IFacing
 
@@ -368,24 +369,36 @@ namespace OpenRA.Mods.Common.Traits
 				self.QueueActivity(false, MoveTo(cell.Value, 0));
 		}
 
-		public CPos? GetAdjacentCell(CPos nextCell, Func<CPos, bool> preferToAvoid = null)
+		public CPos? GetAdjacentEnterableCell(CPos nextCell, Func<CPos, bool> preferToAvoid = null)
 		{
 			var availCells = new List<CPos>();
-			var notStupidCells = new List<CPos>();
 			foreach (CVec direction in CVec.Directions)
 			{
 				var p = ToCell + direction;
 				if (CanEnterCell(p) && CanStayInCell(p) && (preferToAvoid == null || !preferToAvoid(p)))
 					availCells.Add(p);
-				else if (p != nextCell && p != ToCell)
-					notStupidCells.Add(p);
 			}
 
 			CPos? newCell = null;
 			if (availCells.Count > 0)
 				newCell = availCells.Random(self.World.SharedRandom);
-			else
+
+			return newCell;
+		}
+
+		public CPos? GetAdjacentCell(CPos nextCell, Func<CPos, bool> preferToAvoid = null)
+		{
+			var newCell = GetAdjacentEnterableCell(nextCell, preferToAvoid);
+			if (newCell == null)
 			{
+				var notStupidCells = new List<CPos>();
+				foreach (CVec direction in CVec.Directions)
+				{
+					var p = ToCell + direction;
+					if (p != nextCell && p != ToCell)
+						notStupidCells.Add(p);
+				}
+
 				var cellInfo = notStupidCells
 					.SelectMany(c => self.World.ActorMap.GetActorsAt(c).Where(IsMovable),
 						(c, a) => new { Cell = c, Actor = a })
@@ -799,7 +812,7 @@ namespace OpenRA.Mods.Common.Traits
 				notifyCrushed.Trait.WarnCrush(notifyCrushed.Actor, self, Info.LocomotorInfo.Crushes);
 		}
 
-		public Activity MoveTo(Func<BlockedByActor, List<CPos>> pathFunc) { return new Move(self, pathFunc); }
+		public Activity MoveTo(Func<BlockedByActor, (bool AlreadyAtDestination, List<CPos> Path)> pathFunc) { return new Move(self, pathFunc); }
 
 		Activity LocalMove(Actor self, WPos fromPos, WPos toPos, CPos cell)
 		{
