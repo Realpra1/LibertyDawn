@@ -788,6 +788,24 @@ Player:
             mcv: 1
     BaseBuilderBotModule@skynet:
 		RequiresCondition: enable-skynet-ai
+		EnableOpeningPolicy: true
+		OpeningPowerTypes: nuk2, nuke
+		OpeningSiloTypes: silo
+		OpeningDefenseTypes: gtwr, gun
+		OpeningBarracksTypes: pyle, hand
+		OpeningRefineryTypes: proc
+		OpeningFactoryTypes: weap, afld
+		OpeningRadarTypes: hq
+		OpeningOptionalStructureTypes: silo, gtwr, gun
+		OpeningSoldierTypes: e1, e3
+		OpeningHarvesterTypes: harv, sharv
+		OpeningDefenseUnlockTypes: upgrade.recon1
+		OpeningMcvType: mcv
+		OpeningSoldierCount: 20
+		OpeningHarvesterCount: 5
+		OpeningMcvCount: 1
+		OpeningRequestRetryDelay: 250
+		OpeningDebugLogging: true
 		BuildingQueues: Building.Nod, Building.GDI
 		DefenseQueues: Defence.Nod, Defence.GDI
         MinimumExcessPower: 1
@@ -1070,6 +1088,24 @@ Player:
             mhq: 1
     BaseBuilderBotModule@ironreaper:
 		RequiresCondition: enable-ironreaper-ai
+		EnableOpeningPolicy: true
+		OpeningPowerTypes: nuk2, nuke
+		OpeningSiloTypes: silo
+		OpeningDefenseTypes: gtwr, gun
+		OpeningBarracksTypes: pyle, hand
+		OpeningRefineryTypes: proc, resonator
+		OpeningFactoryTypes: weap, afld
+		OpeningRadarTypes: hq
+		OpeningOptionalStructureTypes: silo, gtwr, gun
+		OpeningSoldierTypes: e1, e3
+		OpeningHarvesterTypes: sharv, harv
+		OpeningDefenseUnlockTypes: upgrade.recon1
+		OpeningMcvType: mcv
+		OpeningSoldierCount: 20
+		OpeningHarvesterCount: 5
+		OpeningMcvCount: 1
+		OpeningRequestRetryDelay: 250
+		OpeningDebugLogging: true
 		BuildingQueues: Building.Nod, Building.GDI
 		DefenseQueues: Defence.Nod, Defence.GDI
 		MinimumExcessPower: 1

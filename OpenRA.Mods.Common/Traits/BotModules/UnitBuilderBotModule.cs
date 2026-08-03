@@ -154,7 +154,8 @@ namespace OpenRA.Mods.Common.Traits
 					string.Join(", ", Info.UnitQueues.OrderBy(q => q, StringComparer.Ordinal)));
 			}
 
-			if (requestPause.Any(rp => rp.PauseUnitProduction))
+			var pauseRandomProduction = requestPause.Any(rp => rp.PauseUnitProduction);
+			if (pauseRandomProduction && queuedBuildRequests.Count == 0)
 				return;
 
 			ticks++;
@@ -174,12 +175,15 @@ namespace OpenRA.Mods.Common.Traits
 					queuedBuildRequests.Remove(buildRequest);
 				}
 
-				if (Info.WeightedUnitSelection && Info.UnitsToBuild != null &&
-					idleUnitCount < Info.IdleBaseUnitsMaximum)
-					BuildAdaptiveUnitsAcrossQueues(bot);
-				else
-					foreach (var q in Info.UnitQueues)
-						BuildUnit(bot, q, idleUnitCount < Info.IdleBaseUnitsMaximum);
+				if (!pauseRandomProduction)
+				{
+					if (Info.WeightedUnitSelection && Info.UnitsToBuild != null &&
+						idleUnitCount < Info.IdleBaseUnitsMaximum)
+						BuildAdaptiveUnitsAcrossQueues(bot);
+					else
+						foreach (var q in Info.UnitQueues)
+							BuildUnit(bot, q, idleUnitCount < Info.IdleBaseUnitsMaximum);
+				}
 			}
 		}
 

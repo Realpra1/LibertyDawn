@@ -260,6 +260,16 @@ namespace OpenRA.Mods.Common.Traits
 				}
 			}
 
+			var opening = baseBuilder.OpeningBuilding(buildableThings);
+			if (opening != null)
+			{
+				AIUtils.BotDebug("{0} decided to build {1}: parallel opening policy", queue.Actor.Owner, DisplayName(opening.Name));
+				return opening;
+			}
+
+			if (baseBuilder.OpeningActive)
+				return null;
+
 			// Next is to build up a strong economy
 			if (!baseBuilder.HasAdequateRefineryCount)
 			{
