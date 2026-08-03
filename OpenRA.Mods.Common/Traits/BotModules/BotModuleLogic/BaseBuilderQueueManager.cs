@@ -260,6 +260,14 @@ namespace OpenRA.Mods.Common.Traits
 				}
 			}
 
+			var enclosureWall = baseBuilder.WallPlanner?.ConstructionYardEnclosureWall(buildableThings, playerBuildings);
+			if (enclosureWall != null)
+			{
+				AIUtils.BotDebug("{0} decided to build {1}: construction-yard enclosure",
+					queue.Actor.Owner, DisplayName(enclosureWall.Name));
+				return enclosureWall;
+			}
+
 			var opening = baseBuilder.OpeningBuilding(buildableThings);
 			if (opening != null)
 			{
@@ -269,7 +277,6 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (baseBuilder.OpeningActive)
 				return null;
-
 			// Next is to build up a strong economy
 			if (!baseBuilder.HasAdequateRefineryCount)
 			{

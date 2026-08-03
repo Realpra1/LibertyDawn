@@ -67,16 +67,21 @@ namespace OpenRA.Mods.Common.Traits
 		/// <summary>Towers remembered as already dealt with, oldest dropped first.</summary>
 		const int MaxHandledTowers = 64;
 
+		const int MaxEnclosureAttempts = 8;
+
 		readonly BaseBuilderBotModule baseBuilder;
 		readonly World world;
 		readonly Player player;
 
 		// The LineBuild anchors of the wall currently being ordered. Two of them, or none.
 		readonly List<CPos> pendingAnchors = new List<CPos>();
+		string pendingWallType;
 
 		// Towers we have already planned a wall for, or tried and failed to.
 		readonly HashSet<uint> handledTowers = new HashSet<uint>();
 		readonly Queue<uint> handledTowerOrder = new Queue<uint>();
+		readonly HashSet<uint> handledEnclosureYards = new HashSet<uint>();
+		readonly Dictionary<uint, int> enclosureAttempts = new Dictionary<uint, int>();
 
 		int nextPlanTick;
 
@@ -95,12 +100,30 @@ namespace OpenRA.Mods.Common.Traits
 
 		public bool Enabled
 		{
-			get { return Info.MaximumWallSegments > 0 && Info.WallTypes.Count > 0 && Info.WalledDefenseTypes.Count > 0; }
+			get
+			{
+				return Info.MaximumWallSegments > 0 &&
+					(Info.WallTypes.Count > 0 || Info.ConstructionYardEnclosureWallTypes.Length > 0) &&
+					(Info.WalledDefenseTypes.Count > 0 || Info.ConstructionYardEnclosureWallTypes.Length > 0);
+			}
 		}
 
 		public bool IsWallType(string actorType)
 		{
-			return Info.WallTypes.Contains(actorType);
+			return Info.WallTypes.Contains(actorType) || Info.ConstructionYardEnclosureWallTypes.Contains(actorType);
+		}
+
+		public ActorInfo ConstructionYardEnclosureWall(IEnumerable<ActorInfo> buildables, Actor[] playerBuildings)
+		{
+			if (!Enabled || Info.ConstructionYardEnclosureWallTypes.Length == 0 || WallCount(playerBuildings) >= Info.MaximumWallSegments)
+				return null;
+
+			var available = buildables.ToDictionary(a => a.Name);
+			foreach (var type in Info.ConstructionYardEnclosureWallTypes)
+				if (available.TryGetValue(type, out var wall) && PeekAnchor(type) != null)
+					return wall;
+
+			return null;
 		}
 
 		/// <summary>Gate used when deciding what to put into the production queue.</summary>
@@ -109,12 +132,7 @@ namespace OpenRA.Mods.Common.Traits
 			if (!Enabled || !IsWallType(actorType))
 				return false;
 
-			var wallCount = 0;
-			for (var i = 0; i < playerBuildings.Length; i++)
-				if (Info.WallTypes.Contains(playerBuildings[i].Info.Name))
-					wallCount++;
-
-			if (wallCount >= Info.MaximumWallSegments)
+			if (WallCount(playerBuildings) >= Info.MaximumWallSegments)
 				return false;
 
 			return PeekAnchor(actorType) != null;
@@ -125,7 +143,11 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			var cell = PeekAnchor(actorType);
 			if (cell != null)
+			{
 				pendingAnchors.RemoveAt(0);
+				if (pendingAnchors.Count == 0)
+					pendingWallType = null;
+			}
 
 			return cell;
 		}
@@ -133,6 +155,9 @@ namespace OpenRA.Mods.Common.Traits
 		CPos? PeekAnchor(string actorType)
 		{
 			if (!Enabled)
+				return null;
+
+			if (pendingAnchors.Count > 0 && pendingWallType != actorType)
 				return null;
 
 			var wallInfo = world.Map.Rules.Actors[actorType];
@@ -160,6 +185,19 @@ namespace OpenRA.Mods.Common.Traits
 			// we can no longer legally start a building on is dropped.
 			while (pendingAnchors.Count > 0 && !CanAnchorAt(pendingAnchors[0], wallInfo, bi))
 				pendingAnchors.RemoveAt(0);
+
+			if (pendingAnchors.Count == 0)
+				pendingWallType = null;
+		}
+
+		int WallCount(Actor[] playerBuildings)
+		{
+			var count = 0;
+			for (var i = 0; i < playerBuildings.Length; i++)
+				if (IsWallType(playerBuildings[i].Info.Name))
+					count++;
+
+			return count;
 		}
 
 		bool CanAnchorAt(CPos cell, ActorInfo wallInfo, BuildingInfo bi)
@@ -195,6 +233,9 @@ namespace OpenRA.Mods.Common.Traits
 			ResolveWorldTraits();
 
 			if (world.WorldTick < nextPlanTick)
+				return;
+
+			if (TryPlanConstructionYardEnclosure(wallInfo, wallBuildingInfo))
 				return;
 
 			var targetCell = EnemyDirectionTarget();
@@ -239,6 +280,7 @@ namespace OpenRA.Mods.Common.Traits
 				// Two anchors however long the line is - LineBuild fills everything between them for free.
 				pendingAnchors.Add(line[0]);
 				pendingAnchors.Add(line[line.Count - 1]);
+				pendingWallType = wallInfo.Name;
 
 				AIUtils.BotDebug("{0} is walling {1} cells in front of {2} at {3}.",
 					player, line.Count, tower.Info.Name, tower.Location);
@@ -247,6 +289,89 @@ namespace OpenRA.Mods.Common.Traits
 
 			// Nothing usable this pass. Don't come back for a while - a failed pass is the expensive one.
 			nextPlanTick = world.WorldTick + PlanRetryDelay;
+		}
+
+		bool TryPlanConstructionYardEnclosure(ActorInfo wallInfo, BuildingInfo wallBuildingInfo)
+		{
+			if (!Info.ConstructionYardEnclosureWallTypes.Contains(wallInfo.Name))
+				return false;
+
+			var yard = world.ActorsHavingTrait<Building>()
+				.Where(a => a.Owner == player && a.IsInWorld && !a.IsDead &&
+					Info.ConstructionYardTypes.Contains(a.Info.Name) && !handledEnclosureYards.Contains(a.ActorID))
+				.OrderBy(a => a.ActorID).FirstOrDefault();
+			if (yard == null)
+				return false;
+
+			var yardBuilding = yard.Info.TraitInfoOrDefault<BuildingInfo>();
+			if (yardBuilding == null)
+			{
+				handledEnclosureYards.Add(yard.ActorID);
+				return false;
+			}
+
+			var margin = Info.ConstructionYardEnclosureMargin.Clamp(0, 8);
+			var corners = BotWallGeometry.EnclosureCorners(yard.Location, yardBuilding.Dimensions, margin);
+			var perimeter = BotWallGeometry.EnclosurePerimeter(yard.Location, yardBuilding.Dimensions, margin);
+			if (perimeter.All(HasOwnWall))
+			{
+				handledEnclosureYards.Add(yard.ActorID);
+				LogEnclosure("{0} completed wall enclosure around {1} at {2}.", player, yard.Info.Name, yard.Location);
+				return false;
+			}
+
+			var missingWallCells = perimeter.Count(c => !HasOwnWall(c));
+			var wallCount = world.ActorsHavingTrait<Building>()
+				.Count(a => a.Owner == player && a.IsInWorld && !a.IsDead && IsWallType(a.Info.Name));
+			if (wallCount + missingWallCells > Info.MaximumWallSegments)
+			{
+				handledEnclosureYards.Add(yard.ActorID);
+				LogEnclosure("{0} skipped enclosing {1} at {2}: {3} existing plus {4} required walls exceeds cap {5}.",
+					player, yard.Info.Name, yard.Location, wallCount, missingWallCells, Info.MaximumWallSegments);
+				return false;
+			}
+
+			var attempts = enclosureAttempts.TryGetValue(yard.ActorID, out var previous) ? previous + 1 : 1;
+			enclosureAttempts[yard.ActorID] = attempts;
+			if (attempts > MaxEnclosureAttempts)
+			{
+				handledEnclosureYards.Add(yard.ActorID);
+				LogEnclosure("{0} gave up enclosing {1} at {2} after {3} attempts.",
+					player, yard.Info.Name, yard.Location, MaxEnclosureAttempts);
+				return false;
+			}
+
+			var lineRange = MaxWallRun(wallInfo);
+			if (corners[1].X - corners[0].X + 1 > lineRange || corners[3].Y - corners[0].Y + 1 > lineRange ||
+				perimeter.Any(c => !HasOwnWall(c) && !CanAnchorAt(c, wallInfo, wallBuildingInfo)))
+			{
+				nextPlanTick = world.WorldTick + PlanRetryDelay;
+				LogEnclosure("{0} cannot yet enclose {1} at {2} with {3} (attempt {4}/{5}).",
+					player, yard.Info.Name, yard.Location, wallInfo.Name, attempts, MaxEnclosureAttempts);
+				return false;
+			}
+
+			foreach (var corner in corners)
+				if (!HasOwnWall(corner))
+					pendingAnchors.Add(corner);
+
+			if (pendingAnchors.Count == 0)
+			{
+				nextPlanTick = world.WorldTick + PlanRetryDelay;
+				return false;
+			}
+
+			pendingWallType = wallInfo.Name;
+			LogEnclosure("{0} planned {1}-cell {2} enclosure around {3} at {4} using {5} anchors.",
+				player, perimeter.Count, wallInfo.Name, yard.Info.Name, yard.Location, pendingAnchors.Count);
+			return true;
+		}
+
+		void LogEnclosure(string format, params object[] args)
+		{
+			AIUtils.BotDebug(format, args);
+			if (Info.ConstructionYardEnclosureDebugLogging)
+				Log.Write("debug", "AI wall enclosure: " + format, args);
 		}
 
 		/// <summary>
@@ -299,7 +424,7 @@ namespace OpenRA.Mods.Common.Traits
 				return false;
 
 			foreach (var b in buildingInfluence.GetBuildingsAt(cell))
-				if (b.Owner == player && Info.WallTypes.Contains(b.Info.Name))
+				if (b.Owner == player && IsWallType(b.Info.Name))
 					return true;
 
 			return false;
