@@ -24,7 +24,8 @@ namespace OpenRA.Test.Mods.Common
 			new[] { "advanced-power", "power" },
 			new[] { "silo" },
 			new[] { "guard-tower", "turret" },
-			new[] { "barracks" }
+			new[] { "barracks" },
+			new[] { "helipad" }
 		};
 
 		[Test]
@@ -45,6 +46,16 @@ namespace OpenRA.Test.Mods.Common
 				Goals, new[] { 0 }, new[] { 1 }, new[] { "guard-tower", "turret" });
 
 			Assert.That(goal, Is.EqualTo(2));
+		}
+
+		[Test]
+		public void PicksFinalGoalAfterEarlierGoalsComplete()
+		{
+			var goal = OpeningPolicyLogic.FirstBuildableGoal(
+				Goals, new[] { 0, 1, 2, 3 }, Array.Empty<int>(), new[] { "helipad", "power" });
+
+			Assert.That(goal, Is.EqualTo(4));
+			Assert.That(OpeningPolicyLogic.FirstAvailable(Goals[goal], new[] { "helipad" }), Is.EqualTo("helipad"));
 		}
 
 		[Test]

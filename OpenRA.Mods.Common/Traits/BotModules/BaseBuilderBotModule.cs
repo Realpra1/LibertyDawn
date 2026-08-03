@@ -68,6 +68,7 @@ namespace OpenRA.Mods.Common.Traits
 		public readonly string[] OpeningRefineryTypes = System.Array.Empty<string>();
 		public readonly string[] OpeningFactoryTypes = System.Array.Empty<string>();
 		public readonly string[] OpeningRadarTypes = System.Array.Empty<string>();
+		public readonly string[] OpeningHelipadTypes = System.Array.Empty<string>();
 		public readonly string[] OpeningOptionalStructureTypes = System.Array.Empty<string>();
 
 		[Desc("Opening unit alternatives and targets. External requests ignore ordinary unit delays.")]
@@ -356,12 +357,13 @@ namespace OpenRA.Mods.Common.Traits
 			Info.OpeningBarracksTypes,
 			Info.OpeningRefineryTypes,
 			Info.OpeningFactoryTypes,
-			Info.OpeningRadarTypes
+			Info.OpeningRadarTypes,
+			Info.OpeningHelipadTypes
 		};
 
 		static string OpeningGoalName(int goal)
 		{
-			var names = new[] { "power", "silo", "anti-ground defense", "barracks", "refinery", "factory", "radar" };
+			var names = new[] { "power", "silo", "anti-ground defense", "barracks", "refinery", "factory", "radar", "helipad" };
 			return goal >= 0 && goal < names.Length ? names[goal] : goal.ToString();
 		}
 

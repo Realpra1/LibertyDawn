@@ -899,6 +899,7 @@ Player:
 		OpeningRefineryTypes: proc
 		OpeningFactoryTypes: weap, afld
 		OpeningRadarTypes: hq
+		OpeningHelipadTypes: hpad
 		OpeningOptionalStructureTypes: silo, gtwr, gun
 		OpeningHarvesterTypes: harv, sharv
 		OpeningDefenseUnlockTypes: upgrade.recon1

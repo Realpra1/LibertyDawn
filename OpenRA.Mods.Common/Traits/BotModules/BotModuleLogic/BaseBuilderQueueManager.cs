@@ -281,9 +281,6 @@ namespace OpenRA.Mods.Common.Traits
 				return opening;
 			}
 
-			if (baseBuilder.OpeningActive)
-				return null;
-
 			// Next is to build up a strong economy
 			if (!baseBuilder.HasAdequateRefineryCount)
 			{
