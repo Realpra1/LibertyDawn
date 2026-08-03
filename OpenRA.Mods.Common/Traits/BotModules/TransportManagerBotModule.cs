@@ -15,7 +15,7 @@ using OpenRA.Traits;
 
 namespace OpenRA.Mods.Common.Traits
 {
-	[Desc("Rescues AI ground units after persistent movement failure using threat-routed transport aircraft.")]
+	[Desc("Coordinates route-failure rescue and optional infantry assault transports.")]
 	public class TransportManagerBotModuleInfo : ConditionalTraitInfo
 	{
 		[ActorReference]
@@ -25,7 +25,28 @@ namespace OpenRA.Mods.Common.Traits
 		public readonly HashSet<string> RescuePassengerTypes = new HashSet<string>();
 
 		[ActorReference]
+		public readonly HashSet<string> GroundTransportTypes = new HashSet<string>();
+
+		[ActorReference]
+		public readonly HashSet<string> AssaultPassengerTypes = new HashSet<string>();
+
+		[ActorReference]
+		public readonly HashSet<string> AssaultEngineerTypes = new HashSet<string>();
+
+		[ActorReference]
+		public readonly HashSet<string> AssaultCommandoTypes = new HashSet<string>();
+
+		[ActorReference]
+		public readonly HashSet<string> AssaultTargetTypes = new HashSet<string>();
+
+		[Desc("Bot types allowed to select the optional infantry transport strategy.")]
+		public readonly HashSet<string> AssaultBotTypes = new HashSet<string>();
+
+		[ActorReference]
 		public readonly string TransportHelicopterActor = null;
+
+		[ActorReference]
+		public readonly string GroundTransportActor = null;
 
 		public readonly int ScanInterval = 75;
 		public readonly int MaximumActiveMissions = 4;
@@ -39,6 +60,12 @@ namespace OpenRA.Mods.Common.Traits
 		public readonly int IdleServiceInterval = 250;
 		public readonly int IdleStagingRadius = 10;
 		public readonly int RepairHealthPercent = 50;
+		public readonly int AssaultSelectionPercent = 0;
+		public readonly int MinimumAssaultPassengers = 3;
+		public readonly int MaximumAssaultPassengers = 8;
+		public readonly int AssaultGatherTimeoutTicks = 750;
+		public readonly int AssaultCooldownTicks = 7500;
+		public readonly int AssaultOrderRetryTicks = 75;
 		public readonly bool DebugLogging = false;
 
 		public override void RulesetLoaded(Ruleset rules, ActorInfo ai)
@@ -47,7 +74,10 @@ namespace OpenRA.Mods.Common.Traits
 			if (ScanInterval <= 0 || MaximumActiveMissions <= 0 || TransportHelicopterLimit <= 0 ||
 				PersistentBlockedScans <= 0 || MaximumCandidatesPerScan <= 0 || MoveIntentMaximumAge <= 0 ||
 				PickupRangeCells <= 0 || UnloadRangeCells <= 0 || MissionTimeoutTicks <= 0 ||
-				IdleServiceInterval <= 0 || IdleStagingRadius <= 0 || RepairHealthPercent <= 0 || RepairHealthPercent > 100)
+				IdleServiceInterval <= 0 || IdleStagingRadius <= 0 || RepairHealthPercent <= 0 || RepairHealthPercent > 100 ||
+				AssaultSelectionPercent < 0 || AssaultSelectionPercent > 100 || MinimumAssaultPassengers <= 0 ||
+				MaximumAssaultPassengers < MinimumAssaultPassengers || AssaultGatherTimeoutTicks <= 0 || AssaultCooldownTicks <= 0 ||
+				AssaultOrderRetryTicks <= 0)
 				throw new YamlException("AI transport counts, ranges, intervals, timeouts, and repair threshold must be positive and valid.");
 		}
 
@@ -55,7 +85,7 @@ namespace OpenRA.Mods.Common.Traits
 	}
 
 	public class TransportManagerBotModule : ConditionalTrait<TransportManagerBotModuleInfo>,
-		IBotEnabled, IBotTick, IBotTransportReservations
+		IBotEnabled, IBotTick, IBotTransportReservations, IBotRespondToAttack
 	{
 		enum MissionStage { Gathering, Travelling, Unloading }
 
@@ -92,6 +122,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly TransportMissionCoordinator coordinator;
 		readonly List<Mission> missions = new List<Mission>();
 		readonly Dictionary<uint, BlockedObservation> blocked = new Dictionary<uint, BlockedObservation>();
+		readonly InfantryAssaultTransportManager infantryAssault;
 		IBot bot;
 		UnitBuilderBotModule[] production;
 		SquadManagerBotModule squadManager;
@@ -104,17 +135,22 @@ namespace OpenRA.Mods.Common.Traits
 			world = self.World;
 			player = self.Owner;
 			coordinator = new TransportMissionCoordinator(info.MaximumActiveMissions);
+			infantryAssault = new InfantryAssaultTransportManager(world, player, info, coordinator,
+				IssueRoutedMove, RequestTransportHelicopter);
 		}
 
 		protected override void Created(Actor self)
 		{
 			production = self.Owner.PlayerActor.TraitsImplementing<UnitBuilderBotModule>().ToArray();
+			infantryAssault.Initialize(production);
+			base.Created(self);
 		}
 
 		protected override void TraitEnabled(Actor self)
 		{
 			scanTicks = Info.ScanInterval;
 			serviceTicks = Info.IdleServiceInterval;
+			infantryAssault.Enable();
 		}
 
 		void IBotEnabled.BotEnabled(IBot enabledBot) { bot = enabledBot; }
@@ -122,6 +158,12 @@ namespace OpenRA.Mods.Common.Traits
 		bool IBotTransportReservations.IsTransportReserved(Actor actor)
 		{
 			return actor != null && coordinator.IsReserved(actor.ActorID);
+		}
+
+		void IBotRespondToAttack.RespondToAttack(IBot enabledBot, Actor self, AttackInfo e)
+		{
+			if (!IsTraitDisabled)
+				infantryAssault.RespondToAttack(enabledBot, self, e);
 		}
 
 		void IBotTick.BotTick(IBot enabledBot)
@@ -134,8 +176,10 @@ namespace OpenRA.Mods.Common.Traits
 				scanTicks = Info.ScanInterval;
 				RefreshSquadManager();
 				AdvanceMissions();
-				if (coordinator.MissionCount < Info.MaximumActiveMissions)
-					TryCreateRescueMission();
+				if (coordinator.MissionCount < Info.MaximumActiveMissions && !TryCreateRescueMission())
+					infantryAssault.Tick(enabledBot);
+				else
+					infantryAssault.Advance(enabledBot);
 			}
 
 			if (--serviceTicks <= 0)
@@ -335,6 +379,14 @@ namespace OpenRA.Mods.Common.Traits
 		void RequestTransportHelicopter()
 		{
 			if (string.IsNullOrEmpty(Info.TransportHelicopterActor) || bot == null)
+				return;
+
+			if (!world.Map.Rules.Actors.TryGetValue(Info.TransportHelicopterActor, out var transportInfo))
+				return;
+
+			var buildable = transportInfo.TraitInfoOrDefault<BuildableInfo>();
+			if (buildable == null || !buildable.Queue.Any(queueType => AIUtils.FindQueues(player, queueType)
+				.Any(queue => queue.BuildableItems().Any(item => item.Name == Info.TransportHelicopterActor))))
 				return;
 
 			var committed = world.Actors.Count(a => a.Owner == player && !a.IsDead &&
