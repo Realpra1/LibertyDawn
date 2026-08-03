@@ -28,15 +28,35 @@ namespace OpenRA.Test.Mods.Common
 		[Test]
 		public void SelectsValueThenBuildingThenDistanceAndDoesNotDuplicate()
 		{
-			var values = new[] { 1000, 1500, 1500, 1500 };
+			var scores = new double[] { 1000, 1500, 1500, 1500 };
 			var buildings = new[] { true, false, true, true };
 			var distances = new long[] { 1, 1, 100, 25 };
 			var assigned = new HashSet<int>();
 
-			var first = CaptureTargeting.BestTargetIndex(values, buildings, distances, assigned);
+			var first = CaptureTargeting.BestTargetIndex(scores, buildings, distances, assigned);
 			Assert.That(first, Is.EqualTo(3));
 			assigned.Add(first);
-			Assert.That(CaptureTargeting.BestTargetIndex(values, buildings, distances, assigned), Is.EqualTo(2));
+			Assert.That(CaptureTargeting.BestTargetIndex(scores, buildings, distances, assigned), Is.EqualTo(2));
+		}
+
+		[Test]
+		public void TargetScoreBalancesEconomicValueAgainstTravelDistance()
+		{
+			var nearbyHusk = CaptureTargeting.Score(1100, 2, 10);
+			var distantBuilding = CaptureTargeting.Score(4000, 170, 10);
+
+			Assert.That(nearbyHusk, Is.GreaterThan(distantBuilding));
+			Assert.That(CaptureTargeting.Score(4000, 0, 10), Is.EqualTo(4000));
+		}
+
+		[Test]
+		public void HealthyBuildingsRequirePairAndRetargetingUsesMargin()
+		{
+			Assert.That(CaptureTargeting.RequiresEngineerPair(true, 51, 50), Is.True);
+			Assert.That(CaptureTargeting.RequiresEngineerPair(true, 50, 50), Is.False);
+			Assert.That(CaptureTargeting.RequiresEngineerPair(false, 100, 50), Is.False);
+			Assert.That(CaptureTargeting.ShouldRetarget(100, 124, 25), Is.False);
+			Assert.That(CaptureTargeting.ShouldRetarget(100, 126, 25), Is.True);
 		}
 	}
 }

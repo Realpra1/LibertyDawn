@@ -34,6 +34,15 @@ namespace OpenRA.Mods.Common.Traits
 			"If a value less than 1 is given 1 will be used instead.")]
 		public readonly int MaximumCaptureTargetOptions = 10;
 
+		[Desc("Distance in cells at which travel reduces a capture target's economic score by half.")]
+		public readonly int CaptureDistanceBias = 10;
+
+		[Desc("Percentage by which a replacement target must outscore an active target before retargeting.")]
+		public readonly int CaptureRetargetImprovement = 25;
+
+		[Desc("Maximum building health percentage that one engineer may attempt to capture alone.")]
+		public readonly int SoloBuildingCaptureHealth = 50;
+
 		[Desc("Should visibility (Shroud, Fog, Cloak, etc) be considered when searching for capturable targets?")]
 		public readonly bool CheckCaptureTargetsForVisibility = true;
 
@@ -60,12 +69,16 @@ namespace OpenRA.Mods.Common.Traits
 			public readonly Actor Actor;
 			public readonly int Value;
 			public readonly bool IsBuilding;
+			public readonly int HealthPercent;
 
 			public CaptureCandidate(Actor actor, int value)
 			{
 				Actor = actor;
 				Value = value;
 				IsBuilding = actor.Info.HasTraitInfo<BuildingInfo>();
+				var health = actor.TraitOrDefault<IHealth>();
+				HealthPercent = health == null || health.MaxHP <= 0 ? 100 :
+					(int)(100L * health.HP / health.MaxHP);
 			}
 		}
 
@@ -166,13 +179,12 @@ namespace OpenRA.Mods.Common.Traits
 
 			RetireFinishedAssignments(activeCapturers, "capture");
 
-			var newUnits = world.ActorsHavingTrait<IPositionable>()
-				.Where(a => a.Owner == player && !activeCapturers.ContainsKey(a));
-
-			var capturers = newUnits
-				.Where(a => a.IsIdle && Info.CapturingActorTypes.Contains(a.Info.Name) && a.Info.HasTraitInfo<CapturesInfo>())
+			var capturers = world.ActorsHavingTrait<IPositionable>()
+				.Where(a => a.Owner == player && (a.IsIdle || activeCapturers.ContainsKey(a)) &&
+					Info.CapturingActorTypes.Contains(a.Info.Name) && a.Info.HasTraitInfo<CapturesInfo>())
 				.Select(a => new TraitPair<CaptureManager>(a, a.TraitOrDefault<CaptureManager>()))
 				.Where(tp => tp.Trait != null)
+				.OrderBy(tp => tp.Actor.ActorID)
 				.ToArray();
 
 			if (capturers.Length == 0)
@@ -196,36 +208,173 @@ namespace OpenRA.Mods.Common.Traits
 			if (Info.CapturableActorTypes.Any())
 				capturableTargetOptions = capturableTargetOptions.Where(target => Info.CapturableActorTypes.Contains(target.Info.Name.ToLowerInvariant()));
 
-			var candidates = capturableTargetOptions.Select(target => new CaptureCandidate(target, CaptureEconomicValue(target)))
-				.OrderByDescending(candidate => candidate.Value)
+			var allCandidates = capturableTargetOptions.Select(target => new CaptureCandidate(target, CaptureEconomicValue(target)))
+				.ToArray();
+			var candidates = allCandidates
+				.OrderByDescending(candidate => capturers.Max(capturer => CaptureScore(capturer.Actor, candidate)))
 				.ThenByDescending(candidate => candidate.IsBuilding)
 				.ThenBy(candidate => candidate.Actor.ActorID)
 				.Take(maximumCaptureTargetOptions).ToArray();
+
+			// The incumbent must remain in the comparison even if a new global top-N list would otherwise omit it.
+			candidates = candidates.Concat(allCandidates.Where(candidate => activeCapturers.Values.Any(assignment =>
+				assignment.Target == candidate.Actor))).GroupBy(candidate => candidate.Actor.ActorID).Select(group => group.First()).ToArray();
 			if (candidates.Length == 0)
 				return;
 
-			var activeTargetIds = activeCapturers.Values.Select(assignment => assignment.Target.ActorID).ToHashSet();
-			var assigned = Enumerable.Range(0, candidates.Length)
-				.Where(index => activeTargetIds.Contains(candidates[index].Actor.ActorID)).ToHashSet();
-			foreach (var capturer in capturers.OrderBy(capturer => capturer.Actor.ActorID))
+			var reserved = new HashSet<int>();
+			var retainedPairActors = new HashSet<Actor>();
+			foreach (var group in activeCapturers.Where(pair => !pair.Key.IsDead && pair.Key.IsInWorld)
+				.GroupBy(pair => pair.Value.Target))
 			{
-				var distances = candidates.Select(candidate =>
-					(long)(candidate.Actor.CenterPosition - capturer.Actor.CenterPosition).LengthSquared).ToArray();
-				var targetIndex = CaptureTargeting.BestTargetIndex(candidates.Select(candidate => candidate.Value).ToArray(),
-					candidates.Select(candidate => candidate.IsBuilding).ToArray(), distances, assigned);
-				if (targetIndex < 0)
+				var targetIndex = Array.FindIndex(candidates, candidate => candidate.Actor == group.Key);
+				if (targetIndex < 0 || group.Count() < 2 || !RequiresPair(candidates[targetIndex]))
 					continue;
 
-				assigned.Add(targetIndex);
-				var target = candidates[targetIndex];
-
-				bot.QueueOrder(new Order("CaptureActor", capturer.Actor, Target.FromActor(target.Actor), true));
-				AIUtils.BotDebug("AI ({0}): Ordered {1} to capture {2}", player.ClientIndex, capturer.Actor, target.Actor);
-				Debug("capture {0}#{1} -> {2}#{3}: value={4}, distance-cells={5:0.0}, building={6}",
-					capturer.Actor.Info.Name, capturer.Actor.ActorID, target.Actor.Info.Name, target.Actor.ActorID,
-					target.Value, System.Math.Sqrt(distances[targetIndex]) / 1024d, target.IsBuilding);
-				activeCapturers.Add(capturer.Actor, new SpecialistAssignment(target.Actor));
+				reserved.Add(targetIndex);
+				foreach (var pair in group)
+					retainedPairActors.Add(pair.Key);
 			}
+
+			var remaining = capturers.Where(capturer => !retainedPairActors.Contains(capturer.Actor)).ToList();
+			AssignHealthyBuildingPairs(bot, candidates, remaining, reserved);
+
+			foreach (var capturer in remaining.ToArray())
+			{
+				var distances = candidates.Select(candidate => DistanceSquared(capturer.Actor, candidate.Actor)).ToArray();
+				var scores = candidates.Select(candidate => CanCapture(capturer, candidate.Actor) && !RequiresPair(candidate) ?
+					CaptureScore(capturer.Actor, candidate) : -1d).ToArray();
+				var unavailable = new HashSet<int>(reserved);
+				var incumbentIndex = -1;
+				if (activeCapturers.TryGetValue(capturer.Actor, out var incumbent))
+				{
+					incumbentIndex = Array.FindIndex(candidates, candidate => candidate.Actor == incumbent.Target);
+					unavailable.Remove(incumbentIndex);
+				}
+
+				var targetIndex = CaptureTargeting.BestTargetIndex(scores,
+					candidates.Select(candidate => candidate.IsBuilding).ToArray(), distances, unavailable);
+				if (incumbentIndex >= 0 && scores[incumbentIndex] >= 0 &&
+					(targetIndex == incumbentIndex || targetIndex < 0 || !CaptureTargeting.ShouldRetarget(
+						scores[incumbentIndex], scores[targetIndex], Info.CaptureRetargetImprovement)))
+				{
+					reserved.Add(incumbentIndex);
+					continue;
+				}
+
+				if (targetIndex < 0 || scores[targetIndex] < 0)
+				{
+					if (activeCapturers.Remove(capturer.Actor))
+					{
+						bot.QueueOrder(new Order("Stop", capturer.Actor, false));
+						Debug("capture {0}#{1} stopped: no eligible solo target or healthy-building partner",
+							capturer.Actor.Info.Name, capturer.Actor.ActorID);
+					}
+
+					continue;
+				}
+
+				reserved.Add(targetIndex);
+				var target = candidates[targetIndex];
+				var action = incumbentIndex >= 0 ? "retarget" : "capture";
+				var oldTarget = incumbentIndex >= 0 ? candidates[incumbentIndex] : default(CaptureCandidate);
+
+				bot.QueueOrder(new Order("CaptureActor", capturer.Actor, Target.FromActor(target.Actor), false));
+				AIUtils.BotDebug("AI ({0}): Ordered {1} to capture {2}", player.ClientIndex, capturer.Actor, target.Actor);
+				Debug("{0} {1}#{2} -> {3}#{4}: value={5}, distance-cells={6:0.0}, score={7:0.0}, " +
+					"building={8}, health={9}%{10}", action,
+					capturer.Actor.Info.Name, capturer.Actor.ActorID, target.Actor.Info.Name, target.Actor.ActorID,
+					target.Value, DistanceCells(distances[targetIndex]), scores[targetIndex], target.IsBuilding, target.HealthPercent,
+					incumbentIndex >= 0 ? string.Format(", previous={0}#{1}, previous-score={2:0.0}",
+						oldTarget.Actor.Info.Name, oldTarget.Actor.ActorID, scores[incumbentIndex]) : string.Empty);
+				activeCapturers[capturer.Actor] = new SpecialistAssignment(target.Actor);
+			}
+		}
+
+		void AssignHealthyBuildingPairs(IBot bot, CaptureCandidate[] candidates,
+			List<TraitPair<CaptureManager>> remaining, HashSet<int> reserved)
+		{
+			while (true)
+			{
+				var idle = remaining.Where(capturer => capturer.Actor.IsIdle && !activeCapturers.ContainsKey(capturer.Actor)).ToArray();
+				if (idle.Length < 2)
+					return;
+
+				var bestTargetIndex = -1;
+				TraitPair<CaptureManager>[] bestPair = null;
+				var bestPairScore = 0d;
+				for (var i = 0; i < candidates.Length; i++)
+				{
+					if (reserved.Contains(i) || !RequiresPair(candidates[i]))
+						continue;
+
+					var pair = idle.Where(capturer => CanCapture(capturer, candidates[i].Actor))
+						.OrderByDescending(capturer => CaptureScore(capturer.Actor, candidates[i]))
+						.ThenBy(capturer => capturer.Actor.ActorID).Take(2).ToArray();
+					if (pair.Length < 2)
+						continue;
+
+					var pairScore = pair.Min(capturer => CaptureScore(capturer.Actor, candidates[i]));
+					var alternativeScore = pair.Max(capturer => BestSoloScore(capturer, candidates, reserved));
+					if (pairScore <= alternativeScore || pairScore <= bestPairScore)
+						continue;
+
+					bestTargetIndex = i;
+					bestPair = pair;
+					bestPairScore = pairScore;
+				}
+
+				if (bestPair == null)
+					return;
+
+				var target = candidates[bestTargetIndex];
+				reserved.Add(bestTargetIndex);
+				foreach (var capturer in bestPair)
+				{
+					bot.QueueOrder(new Order("CaptureActor", capturer.Actor, Target.FromActor(target.Actor), false));
+					activeCapturers[capturer.Actor] = new SpecialistAssignment(target.Actor);
+					remaining.Remove(capturer);
+				}
+
+				Debug("capture pair {0}#{1}+{2}#{3} -> {4}#{5}: value={6}, health={7}%, pair-score={8:0.0}",
+					bestPair[0].Actor.Info.Name, bestPair[0].Actor.ActorID, bestPair[1].Actor.Info.Name,
+					bestPair[1].Actor.ActorID, target.Actor.Info.Name, target.Actor.ActorID, target.Value,
+					target.HealthPercent, bestPairScore);
+			}
+		}
+
+		double BestSoloScore(TraitPair<CaptureManager> capturer, CaptureCandidate[] candidates, HashSet<int> reserved)
+		{
+			return candidates.Select((candidate, index) => reserved.Contains(index) || RequiresPair(candidate) ||
+				!CanCapture(capturer, candidate.Actor) ? -1d : CaptureScore(capturer.Actor, candidate)).Max();
+		}
+
+		bool RequiresPair(CaptureCandidate candidate)
+		{
+			return CaptureTargeting.RequiresEngineerPair(candidate.IsBuilding, candidate.HealthPercent,
+				Info.SoloBuildingCaptureHealth);
+		}
+
+		static bool CanCapture(TraitPair<CaptureManager> capturer, Actor target)
+		{
+			var captureManager = target.TraitOrDefault<CaptureManager>();
+			return captureManager != null && captureManager.CanBeTargetedBy(target, capturer.Actor, capturer.Trait);
+		}
+
+		double CaptureScore(Actor capturer, CaptureCandidate candidate)
+		{
+			return CaptureTargeting.Score(candidate.Value, DistanceCells(DistanceSquared(capturer, candidate.Actor)),
+				Info.CaptureDistanceBias);
+		}
+
+		static long DistanceSquared(Actor first, Actor second)
+		{
+			return (long)(second.CenterPosition - first.CenterPosition).LengthSquared;
+		}
+
+		static double DistanceCells(long distanceSquared)
+		{
+			return Math.Sqrt(distanceSquared) / 1024d;
 		}
 
 		int CaptureEconomicValue(Actor target)
