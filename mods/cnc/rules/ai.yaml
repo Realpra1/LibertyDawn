@@ -74,6 +74,7 @@ Player:
 		RocketCount: 8
 		RequestInterval: 50
 		MaximumRallyDistance: 3
+		PreferRallyBelowConstructionYard: true
 		DebugLogging: true
 	SupportPowerBotModule@a:
 		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai

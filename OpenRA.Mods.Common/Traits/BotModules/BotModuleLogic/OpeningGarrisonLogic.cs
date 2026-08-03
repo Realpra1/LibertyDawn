@@ -11,6 +11,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace OpenRA.Mods.Common.Traits
 {
@@ -60,6 +61,20 @@ namespace OpenRA.Mods.Common.Traits
 			}
 
 			return cells;
+		}
+
+		public static List<CPos> CellsBelowBuilding(CPos topLeft, CVec dimensions, int distance)
+		{
+			var width = Math.Max(1, dimensions.X);
+			var height = Math.Max(1, dimensions.Y);
+			var left = topLeft.X;
+			var right = left + width - 1;
+			var y = topLeft.Y + height - 1 + Math.Max(1, distance);
+
+			return Enumerable.Range(left, width)
+				.OrderBy(x => Math.Abs(2 * x - left - right))
+				.ThenBy(x => x)
+				.Select(x => new CPos(x, y)).ToList();
 		}
 	}
 }

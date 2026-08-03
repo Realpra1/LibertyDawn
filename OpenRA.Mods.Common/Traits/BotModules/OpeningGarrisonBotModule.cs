@@ -54,6 +54,9 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Maximum ring distance from the construction-yard footprint used to find a legal rally cell.")]
 		public readonly int MaximumRallyDistance = 3;
 
+		[Desc("Prefer bottom-middle rally cells beneath the construction yard before considering its other sides.")]
+		public readonly bool PreferRallyBelowConstructionYard = false;
+
 		[Desc("Write opening-garrison decisions to debug.log.")]
 		public readonly bool DebugLogging = false;
 
@@ -257,28 +260,48 @@ namespace OpenRA.Mods.Common.Traits
 			if (yardInfo == null)
 				return;
 
-			for (var distance = 1; distance <= Math.Max(1, Info.MaximumRallyDistance); distance++)
+			CPos? target = null;
+			var targetDistance = 0;
+			var targetDirection = "fallback";
+			if (Info.PreferRallyBelowConstructionYard)
 			{
-				var target = OpeningGarrisonLogic.CellsAroundBuilding(yard.Location, yardInfo.Dimensions, distance)
+				for (var distance = 1; distance <= Math.Max(1, Info.MaximumRallyDistance) && target == null; distance++)
+				{
+					target = OpeningGarrisonLogic.CellsBelowBuilding(yard.Location, yardInfo.Dimensions, distance)
+						.Where(IsLegalRallyCell).Select(c => (CPos?)c).FirstOrDefault();
+					targetDistance = distance;
+					targetDirection = "below";
+				}
+			}
+
+			if (target == null)
+				targetDirection = "fallback";
+
+			for (var distance = 1; distance <= Math.Max(1, Info.MaximumRallyDistance) && target == null; distance++)
+			{
+				target = OpeningGarrisonLogic.CellsAroundBuilding(yard.Location, yardInfo.Dimensions, distance)
 					.Where(IsLegalRallyCell)
 					.OrderBy(c => (c - barracks.Actor.Location).LengthSquared)
 					.Select(c => (CPos?)c).FirstOrDefault();
-				if (target == null)
-					continue;
+				targetDistance = distance;
+			}
 
-				bot.QueueOrder(new Order("SetRallyPoint", barracks.Actor, Target.FromCell(world, target.Value), false)
-				{
-					SuppressVisualFeedback = true
-				});
-				pendingRallyBarracksId = barracks.Actor.ActorID;
-				pendingRallyTarget = target.Value;
-				nextRallyRetryTick = world.WorldTick + Math.Max(150, Info.RequestInterval);
-				LogDecision("{0} requested opening rally for first {1} at {2} beside {3} at {4}; target={5}, distance={6}.",
-					player, barracks.Actor.Info.Name, barracks.Actor.Location, yard.Info.Name, yard.Location, target.Value, distance);
+			if (target == null)
+			{
+				LogDecision("{0} could not find a legal opening rally cell near {1} at {2}.", player, yard.Info.Name, yard.Location);
 				return;
 			}
 
-			LogDecision("{0} could not find a legal opening rally cell near {1} at {2}.", player, yard.Info.Name, yard.Location);
+			bot.QueueOrder(new Order("SetRallyPoint", barracks.Actor, Target.FromCell(world, target.Value), false)
+			{
+				SuppressVisualFeedback = true
+			});
+			pendingRallyBarracksId = barracks.Actor.ActorID;
+			pendingRallyTarget = target.Value;
+			nextRallyRetryTick = world.WorldTick + Math.Max(150, Info.RequestInterval);
+			LogDecision("{0} requested opening rally for first {1} at {2} beside {3} at {4}; " +
+				"target={5}, distance={6}, direction={7}.", player, barracks.Actor.Info.Name, barracks.Actor.Location,
+				yard.Info.Name, yard.Location, target.Value, targetDistance, targetDirection);
 		}
 
 		bool IsLegalRallyCell(CPos cell)

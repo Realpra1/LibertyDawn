@@ -49,5 +49,20 @@ namespace OpenRA.Test
 			Assert.That(cells.Distinct().Count(), Is.EqualTo(cells.Count));
 			Assert.That(cells.Any(c => c.X >= 20 && c.X <= 22 && c.Y >= 30 && c.Y <= 32), Is.False);
 		}
+
+		[Test]
+		public void PreferredRallyCellsAreCenteredBeneathBuilding()
+		{
+			var cells = OpeningGarrisonLogic.CellsBelowBuilding(new CPos(20, 30), new CVec(3, 3), 1);
+
+			Assert.That(cells, Is.EqualTo(new[]
+			{
+				new CPos(21, 33),
+				new CPos(20, 33),
+				new CPos(22, 33)
+			}));
+			Assert.That(OpeningGarrisonLogic.CellsBelowBuilding(new CPos(20, 30), new CVec(3, 3), 2)
+				.All(c => c.Y == 34), Is.True);
+		}
 	}
 }
