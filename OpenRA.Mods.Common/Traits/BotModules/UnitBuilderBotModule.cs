@@ -62,6 +62,24 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Maximum share of the adaptive build-probability mass a single adaptive type may hold.")]
 		public readonly float AdaptiveWeightCeiling = 0.5f;
 
+		[Desc("Learn mobile unit types produced by other playable humans but absent from UnitsToBuild.")]
+		public readonly bool LearnHumanBuiltUnits = false;
+
+		[Desc("Only learn from human players. Disable only for automated test scenarios.")]
+		public readonly bool SampleHumanPlayersOnly = true;
+
+		[Desc("Initial independent build chance (0-1) assigned to each learned unit type.")]
+		public readonly float SampledUnitChance = 0.05f;
+
+		[Desc("Maximum combined chance (0-1) reserved for all learned unit types.")]
+		public readonly float MaximumSampledUnitChance = 0.5f;
+
+		[Desc("Write learned-unit discoveries and selections to debug.log.")]
+		public readonly bool UnitSamplingDebugLogging = false;
+
+		[Desc("Ticks between learned-unit sampling heartbeat diagnostics.")]
+		public readonly int UnitSamplingLogInterval = 1500;
+
 		[Desc("Blend weight given to the most recent minute's kill/loss ratio when updating a type's decayed score.")]
 		public readonly float AdaptationMinuteWeight = 0.5f;
 
@@ -88,6 +106,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly Player player;
 
 		readonly List<string> queuedBuildRequests = new List<string>();
+		readonly HashSet<string> sampledUnitTypes = new HashSet<string>();
 
 		IBotRequestPauseUnitProduction[] requestPause;
 		PlayerResources playerResources;
@@ -100,6 +119,7 @@ namespace OpenRA.Mods.Common.Traits
 		// WeightedUnitSelection costs one extra O(player actor count) scan per ~1.2s, not five.
 		int cachedDeployedConstructionYards;
 		int cachedLiveHarvesters;
+		int nextUnitSamplingLogTick;
 
 		// Player-level income/spend over the current adaptive rollover window; used only by the
 		// economy gate. Not game-save persisted - after a load the very first window's reading is a
@@ -137,6 +157,7 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (ticks % FeedbackTime == 0)
 			{
+				DiscoverSampledUnitTypes();
 				if (Info.WeightedUnitSelection)
 				{
 					RefreshAdaptiveCounts();
@@ -248,7 +269,7 @@ namespace OpenRA.Mods.Common.Traits
 
 			var name = unit.Name;
 
-			if (Info.UnitsToBuild != null && !Info.UnitsToBuild.ContainsKey(name))
+			if (Info.UnitsToBuild != null && !Info.UnitsToBuild.ContainsKey(name) && !sampledUnitTypes.Contains(name))
 				return;
 
 			if (Info.UnitDelays != null &&
@@ -265,6 +286,9 @@ namespace OpenRA.Mods.Common.Traits
 				world.ActorsHavingTrait<Building>().Where(a => a.Owner == player).Count() / 20);
 
 			bot.QueueOrder(Order.StartProduction(queue.Actor, name, queueAmount));
+			if (sampledUnitTypes.Contains(name))
+				LogSampling("{0} queued learned unit {1}: amount={2}, queue={3}.",
+					player, DisplayName(name), queueAmount, queue.Info.Type);
 		}
 
 		// In cases where we want to build a specific unit but don't know the queue name (because there's more than one possibility)
@@ -295,17 +319,27 @@ namespace OpenRA.Mods.Common.Traits
 
 		ActorInfo ChooseRandomUnitToBuild(ProductionQueue queue)
 		{
-			var buildableThings = queue.BuildableItems();
+			var buildableThings = queue.BuildableItems().ToArray();
 			if (!buildableThings.Any())
 				return null;
 
+			var sampled = buildableThings.Where(a => sampledUnitTypes.Contains(a.Name)).ToArray();
+			var sampledPick = ChooseSampledUnit(sampled);
+			if (sampledPick != null)
+				return HasAdequateAirUnitReloadBuildings(sampledPick) ? sampledPick : null;
+
+			var configured = Info.UnitsToBuild == null ? buildableThings :
+				buildableThings.Where(a => Info.UnitsToBuild.ContainsKey(a.Name)).ToArray();
+			if (configured.Length == 0)
+				return sampled.Length > 0 ? sampled.Random(world.LocalRandom) : null;
+
 			if (!Info.WeightedUnitSelection || Info.UnitsToBuild == null)
 			{
-				var unit = buildableThings.Random(world.LocalRandom);
+				var unit = configured.Random(world.LocalRandom);
 				return HasAdequateAirUnitReloadBuildings(unit) ? unit : null;
 			}
 
-			return ChooseWeightedUnitToBuild(buildableThings.ToList());
+			return ChooseWeightedUnitToBuild(configured.ToList());
 		}
 
 		ActorInfo ChooseWeightedUnitToBuild(List<ActorInfo> buildable)
@@ -372,9 +406,14 @@ namespace OpenRA.Mods.Common.Traits
 
 		ActorInfo ChooseUnitToBuild(ProductionQueue queue)
 		{
-			var buildableThings = queue.BuildableItems();
+			var buildableThings = queue.BuildableItems().ToArray();
 			if (!buildableThings.Any())
 				return null;
+
+			var sampled = buildableThings.Where(a => sampledUnitTypes.Contains(a.Name)).ToArray();
+			var sampledPick = ChooseSampledUnit(sampled);
+			if (sampledPick != null)
+				return HasAdequateAirUnitReloadBuildings(sampledPick) ? sampledPick : null;
 
 			var myUnits = player.World
 				.ActorsHavingTrait<IPositionable>()
@@ -388,6 +427,80 @@ namespace OpenRA.Mods.Common.Traits
 							return world.Map.Rules.Actors[unit.Key];
 
 			return null;
+		}
+
+		void DiscoverSampledUnitTypes()
+		{
+			if (!Info.LearnHumanBuiltUnits || Info.UnitsToBuild == null)
+				return;
+
+			var sources = world.Players.Where(p => p != player && p.Playable && !p.NonCombatant &&
+				(!Info.SampleHumanPlayersOnly || !p.IsBot)).ToArray();
+			foreach (var source in sources)
+			{
+				var statistics = source.PlayerActor.TraitOrDefault<PlayerStatistics>();
+				if (statistics == null)
+					continue;
+
+				foreach (var sample in statistics.AdaptiveStats.Where(kv => kv.Value.BuiltCount > 0))
+				{
+					if (Info.UnitsToBuild.ContainsKey(sample.Key) || sampledUnitTypes.Contains(sample.Key) ||
+						!world.Map.Rules.Actors.TryGetValue(sample.Key, out var actorInfo))
+						continue;
+
+					var buildable = actorInfo.TraitInfoOrDefault<BuildableInfo>();
+					var queueCompatible = buildable != null && buildable.Queue.Any(Info.UnitQueues.Contains);
+					var mobile = actorInfo.HasTraitInfo<MobileInfo>() || actorInfo.HasTraitInfo<AircraftInfo>();
+					if (!PlayerUnitSamplingPolicy.CanLearn(source.IsBot, Info.SampleHumanPlayersOnly,
+						source.Playable, source.NonCombatant, queueCompatible, mobile, sample.Value.BuiltCount))
+						continue;
+
+					sampledUnitTypes.Add(sample.Key);
+					LogSampling("{0} learned {1} from {2}: built={3}, base-chance={4:P0}.",
+						player, DisplayName(sample.Key), source, sample.Value.BuiltCount, Info.SampledUnitChance);
+				}
+			}
+
+			if (Info.UnitSamplingDebugLogging && world.WorldTick >= nextUnitSamplingLogTick)
+			{
+				nextUnitSamplingLogTick = world.WorldTick + Math.Max(1, Info.UnitSamplingLogInterval);
+				Log.Write("debug", "AI unit sampling: {0} scan: eligible-sources={1}, learned={2}, own-built={3}.",
+					player, sources.Length, sampledUnitTypes.Count,
+					playerStats.AdaptiveStats.Sum(kv => kv.Value.BuiltCount));
+			}
+		}
+
+		ActorInfo ChooseSampledUnit(ActorInfo[] buildableSamples)
+		{
+			if (buildableSamples.Length == 0)
+				return null;
+
+			var chances = buildableSamples.ToDictionary(a => a.Name, SampledChance);
+			var picked = PlayerUnitSamplingPolicy.Pick(chances, Info.MaximumSampledUnitChance,
+				world.LocalRandom.NextFloat());
+			if (picked == null)
+				return null;
+
+			LogSampling("{0} selected learned unit {1}: adjusted-chance={2:P1}, learned-types={3}.",
+				player, DisplayName(picked), chances[picked], sampledUnitTypes.Count);
+			return world.Map.Rules.Actors[picked];
+		}
+
+		double SampledChance(ActorInfo actorInfo)
+		{
+			if (!Info.WeightedUnitSelection)
+				return Info.SampledUnitChance;
+
+			var stats = playerStats.AdaptiveStats[actorInfo.Name];
+			var confidence = AdaptiveWeighting.Confidence(stats.KillsCount + stats.LossesCount, Info.AdaptiveConfidenceSamples);
+			return AdaptiveWeighting.AdaptedWeight(Info.SampledUnitChance, stats.DecayedScore, confidence);
+		}
+
+		void LogSampling(string format, params object[] args)
+		{
+			AIUtils.BotDebug(format, args);
+			if (Info.UnitSamplingDebugLogging)
+				Log.Write("debug", "AI unit sampling: " + format, args);
 		}
 
 		// For mods like RA (number of RearmActors must match the number of aircraft)
@@ -418,7 +531,8 @@ namespace OpenRA.Mods.Common.Traits
 			return new List<MiniYamlNode>()
 			{
 				new MiniYamlNode("QueuedBuildRequests", FieldSaver.FormatValue(queuedBuildRequests.ToArray())),
-				new MiniYamlNode("IdleUnitCount", FieldSaver.FormatValue(idleUnitCount))
+				new MiniYamlNode("IdleUnitCount", FieldSaver.FormatValue(idleUnitCount)),
+				new MiniYamlNode("SampledUnitTypes", FieldSaver.FormatValue(sampledUnitTypes.OrderBy(t => t, StringComparer.Ordinal).ToArray()))
 			};
 		}
 
@@ -437,6 +551,13 @@ namespace OpenRA.Mods.Common.Traits
 			var idleUnitCountNode = data.FirstOrDefault(n => n.Key == "IdleUnitCount");
 			if (idleUnitCountNode != null)
 				idleUnitCount = FieldLoader.GetValue<int>("IdleUnitCount", idleUnitCountNode.Value.Value);
+
+			var sampledNode = data.FirstOrDefault(n => n.Key == "SampledUnitTypes");
+			if (sampledNode != null)
+			{
+				sampledUnitTypes.Clear();
+				sampledUnitTypes.UnionWith(FieldLoader.GetValue<string[]>("SampledUnitTypes", sampledNode.Value.Value));
+			}
 		}
 	}
 }
