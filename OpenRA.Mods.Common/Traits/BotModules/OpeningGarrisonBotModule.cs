@@ -31,6 +31,19 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Preferred anti-armor infantry types, in fallback order.")]
 		public readonly string[] RocketTypes = Array.Empty<string>();
 
+		[Desc("Initial construction-yard or MCV types used as the emergency-garrison anchor.")]
+		public readonly HashSet<string> EmergencyAnchorTypes = new HashSet<string>();
+
+		[Desc("Combat infantry types that count as nearby emergency defenders.")]
+		public readonly HashSet<string> EmergencyDefenderTypes = new HashSet<string>();
+
+		[Desc("Cheap emergency infantry requested when the anchor has too few nearby defenders, in fallback order.")]
+		public readonly string[] EmergencyInfantryTypes = Array.Empty<string>();
+
+		[Desc("Number of emergency defenders maintained near the initial anchor and radius in cells.")]
+		public readonly int EmergencyDefenderCount = 0;
+		public readonly int EmergencyDefenderRadius = 10;
+
 		[Desc("Number of rifle and rocket infantry forced during the opening.")]
 		public readonly int RifleCount = 10;
 		public readonly int RocketCount = 7;
@@ -60,6 +73,7 @@ namespace OpenRA.Mods.Common.Traits
 		CPos pendingRallyTarget;
 		bool rallyOrderIssued;
 		bool completionLogged;
+		int emergencyBurstRequests;
 
 		public OpeningGarrisonBotModule(Actor self, OpeningGarrisonBotModuleInfo info)
 			: base(info)
@@ -77,6 +91,11 @@ namespace OpenRA.Mods.Common.Traits
 		void IBotTick.BotTick(IBot bot)
 		{
 			UpdateOpeningRallyPoint(bot);
+			if (world.WorldTick >= nextRequestTick && TryRequestEmergencyGarrison(bot))
+			{
+				nextRequestTick = world.WorldTick + Math.Max(1, Info.RequestInterval);
+				return;
+			}
 
 			var riflesBuilt = BuiltCount(Info.RifleTypes);
 			var rocketsBuilt = BuiltCount(Info.RocketTypes);
@@ -103,6 +122,47 @@ namespace OpenRA.Mods.Common.Traits
 			var preferred = preferRifle ? Info.RifleTypes : Info.RocketTypes;
 			if (TryRequest(bot, preferred, riflesBuilt, rocketsBuilt))
 				nextRequestTick = world.WorldTick + Math.Max(1, Info.RequestInterval);
+		}
+
+		bool TryRequestEmergencyGarrison(IBot bot)
+		{
+			if (Info.EmergencyDefenderCount <= 0 || Info.EmergencyInfantryTypes.Length == 0 ||
+				Info.EmergencyAnchorTypes.Count == 0 || Info.EmergencyDefenderTypes.Count == 0)
+				return false;
+
+			var anchor = world.Actors.Where(a => a.Owner == player && a.IsInWorld && !a.IsDead &&
+				Info.EmergencyAnchorTypes.Contains(a.Info.Name)).OrderBy(a => a.ActorID).FirstOrDefault();
+			if (anchor == null)
+				return false;
+
+			var radiusSquared = (long)Math.Max(1, Info.EmergencyDefenderRadius) * Math.Max(1, Info.EmergencyDefenderRadius);
+			var nearby = world.Actors.Count(a => a.Owner == player && a.IsInWorld && !a.IsDead &&
+				Info.EmergencyDefenderTypes.Contains(a.Info.Name) &&
+				(long)(a.Location - anchor.Location).LengthSquared <= radiusSquared);
+			if (nearby > 0 && emergencyBurstRequests >= Info.EmergencyDefenderCount)
+				emergencyBurstRequests = 0;
+
+			if (OpeningGarrisonLogic.EmergencyRequestsNeeded(nearby, emergencyBurstRequests,
+				Info.EmergencyDefenderCount) <= 0)
+				return false;
+
+			foreach (var type in Info.EmergencyInfantryTypes)
+			{
+				if (!CanProduce(type))
+					continue;
+
+				var producer = unitProduction.FirstOrDefault(p => p.IsTraitEnabled());
+				if (producer == null)
+					return false;
+
+				producer.RequestUnitProduction(bot, type);
+				emergencyBurstRequests++;
+				LogDecision("{0} requested emergency infantry {1}: anchor={2}#{3} nearby=0, burst={4}/{5}.",
+					player, type, anchor.Info.Name, anchor.ActorID, emergencyBurstRequests, Info.EmergencyDefenderCount);
+				return true;
+			}
+
+			return false;
 		}
 
 		bool TryRequest(IBot bot, IEnumerable<string> types, int riflesBuilt, int rocketsBuilt)
@@ -256,7 +316,8 @@ namespace OpenRA.Mods.Common.Traits
 				new MiniYamlNode("PendingRallyBarracksId", FieldSaver.FormatValue(pendingRallyBarracksId)),
 				new MiniYamlNode("PendingRallyTarget", FieldSaver.FormatValue(pendingRallyTarget)),
 				new MiniYamlNode("RallyOrderIssued", FieldSaver.FormatValue(rallyOrderIssued)),
-				new MiniYamlNode("CompletionLogged", FieldSaver.FormatValue(completionLogged))
+				new MiniYamlNode("CompletionLogged", FieldSaver.FormatValue(completionLogged)),
+				new MiniYamlNode("EmergencyBurstRequests", FieldSaver.FormatValue(emergencyBurstRequests))
 			};
 		}
 
@@ -284,6 +345,10 @@ namespace OpenRA.Mods.Common.Traits
 			var completionNode = data.FirstOrDefault(n => n.Key == "CompletionLogged");
 			if (completionNode != null)
 				completionLogged = FieldLoader.GetValue<bool>("CompletionLogged", completionNode.Value.Value);
+
+			var emergencyNode = data.FirstOrDefault(n => n.Key == "EmergencyBurstRequests");
+			if (emergencyNode != null)
+				emergencyBurstRequests = FieldLoader.GetValue<int>("EmergencyBurstRequests", emergencyNode.Value.Value);
 		}
 	}
 }

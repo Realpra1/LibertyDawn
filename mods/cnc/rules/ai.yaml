@@ -65,6 +65,11 @@ Player:
 		ConstructionYardTypes: fact
 		RifleTypes: e1
 		RocketTypes: e3
+		EmergencyAnchorTypes: fact, mcv
+		EmergencyDefenderTypes: e1, e2, e3, e4, e5, rmbo
+		EmergencyInfantryTypes: e1, e4
+		EmergencyDefenderCount: 2
+		EmergencyDefenderRadius: 12
 		RifleCount: 12
 		RocketCount: 8
 		RequestInterval: 50

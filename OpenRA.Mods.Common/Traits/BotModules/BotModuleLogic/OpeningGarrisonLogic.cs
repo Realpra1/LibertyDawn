@@ -16,6 +16,15 @@ namespace OpenRA.Mods.Common.Traits
 {
 	public static class OpeningGarrisonLogic
 	{
+		public static int EmergencyRequestsNeeded(int nearbyDefenders, int pendingRequests, int desiredDefenders)
+		{
+			var requested = Math.Max(0, pendingRequests);
+			if (requested > 0)
+				return Math.Max(0, desiredDefenders - requested);
+
+			return nearbyDefenders > 0 ? 0 : Math.Max(0, desiredDefenders);
+		}
+
 		public static bool ShouldBuildRifle(int riflesBuilt, int rifleGoal, int rocketsBuilt, int rocketGoal)
 		{
 			if (riflesBuilt >= rifleGoal)

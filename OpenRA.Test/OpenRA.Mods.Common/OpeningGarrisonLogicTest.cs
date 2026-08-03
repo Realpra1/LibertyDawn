@@ -18,6 +18,19 @@ namespace OpenRA.Test
 	[TestFixture]
 	public class OpeningGarrisonLogicTest
 	{
+		[TestCase(0, 0, 2, 2)]
+		[TestCase(1, 0, 2, 0)]
+		[TestCase(0, 1, 2, 1)]
+		[TestCase(1, 1, 2, 1)]
+		[TestCase(0, 2, 2, 0)]
+		[TestCase(2, 0, 2, 0)]
+		[TestCase(-1, -1, 2, 2)]
+		public void EmergencyRequestsAreBoundedByNearbyAndPendingDefenders(
+			int nearby, int pending, int desired, int expected)
+		{
+			Assert.That(OpeningGarrisonLogic.EmergencyRequestsNeeded(nearby, pending, desired), Is.EqualTo(expected));
+		}
+
 		[Test]
 		public void OpeningProductionBalancesProgressAndCompletesBothGoals()
 		{
