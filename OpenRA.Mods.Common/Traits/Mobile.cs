@@ -206,6 +206,14 @@ namespace OpenRA.Mods.Common.Traits
 
 		public bool IsMovingBetweenCells => FromCell != ToCell;
 		public MoveResult MoveResult { get; set; }
+		public CPos? LastMoveOrderDestination { get; private set; }
+		public int LastMoveOrderTick { get; private set; }
+
+		public void RecordMoveOrderIntent(CPos destination)
+		{
+			LastMoveOrderDestination = destination;
+			LastMoveOrderTick = self.World.WorldTick;
+		}
 
 		#region IFacing
 
@@ -948,6 +956,7 @@ namespace OpenRA.Mods.Common.Traits
 				if (!Info.LocomotorInfo.MoveIntoShroud && !self.Owner.Shroud.IsExplored(cell))
 					return;
 
+				RecordMoveOrderIntent(cell);
 				self.QueueActivity(order.Queued, WrapMove(new Move(self, cell, WDist.FromCells(8), null, true, Info.TargetLineColor)));
 				self.ShowTargetLines();
 			}

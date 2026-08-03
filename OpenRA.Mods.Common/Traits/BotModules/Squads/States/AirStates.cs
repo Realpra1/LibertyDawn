@@ -1369,6 +1369,67 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					p.X * coarseSize + coarseSize / 2, p.Y * coarseSize + coarseSize / 2))).ToList();
 		}
 
+		/// <summary>
+		/// Builds a conservative live AA map for an independently controlled aircraft such as a transport.
+		/// Unlike Orca combat routing this deliberately applies no fly-by discount: a carrier may stop to
+		/// load or unload, so every live threat uses its full configured effectiveness. The route planner
+		/// uses finite costs and therefore returns the least-dangerous route when no threat-free path exists.
+		/// </summary>
+		internal static List<CPos> SafeIndependentAirRoute(SquadManagerBotModule manager, Actor aircraft, CPos targetCell)
+		{
+			if (manager == null || aircraft == null || aircraft.IsDead || !aircraft.IsInWorld)
+				return null;
+
+			var info = manager.Info;
+			var map = manager.World.Map;
+			var coarseSize = info.AirInfluenceCellSize;
+			var width = (map.MapSize.X + coarseSize - 1) / coarseSize;
+			var height = (map.MapSize.Y + coarseSize - 1) / coarseSize;
+			var danger = new float[width * height];
+			foreach (var enemy in manager.World.Actors)
+			{
+				if (!manager.IsPreferredEnemyUnit(enemy))
+					continue;
+
+				var profile = AntiAirProfile(enemy);
+				var weight = AirThreatGeometry.ConfiguredThreatWeight(enemy.Info.Name, profile.Weight,
+					info.AirThreatWeightOverrides);
+				if (weight <= 0)
+					continue;
+
+				var range = Math.Max(1, (int)Math.Ceiling(profile.RangeCells * info.AirThreatRangeBuffer));
+				var mobile = enemy.Info.TraitInfoOrDefault<MobileInfo>();
+				if (mobile != null)
+					range += AirThreatGeometry.MobileThreatBufferCells(mobile.Speed, info.AirInfluenceCacheInterval);
+
+				var minX = Math.Max(0, (enemy.Location.X - range) / coarseSize);
+				var maxX = Math.Min(width - 1, (enemy.Location.X + range) / coarseSize);
+				var minY = Math.Max(0, (enemy.Location.Y - range) / coarseSize);
+				var maxY = Math.Min(height - 1, (enemy.Location.Y + range) / coarseSize);
+				for (var y = minY; y <= maxY; y++)
+					for (var x = minX; x <= maxX; x++)
+					{
+						var cell = map.Clamp(new CPos(x * coarseSize + coarseSize / 2, y * coarseSize + coarseSize / 2));
+						if ((map.CenterOfCell(cell) - enemy.CenterPosition).Length / 1024f <= range)
+							danger[y * width + x] += weight;
+					}
+			}
+
+			var start = map.CellContaining(aircraft.CenterPosition);
+			var startX = Math.Clamp(start.X / coarseSize, 0, width - 1);
+			var startY = Math.Clamp(start.Y / coarseSize, 0, height - 1);
+			var goalX = Math.Clamp(targetCell.X / coarseSize, 0, width - 1);
+			var goalY = Math.Clamp(targetCell.Y / coarseSize, 0, height - 1);
+			var route = ThreatAwareRoutePlanner.FindRoute(
+				danger, width, height, startX, startY, goalX, goalY, info.AirRouteThreatPenalty);
+			if (route == null)
+				return null;
+
+			return ThreatAwareRoutePlanner.SmoothRoute(danger, width, height, startX, startY, route)
+				.Select(p => map.Clamp(new CPos(
+					p.X * coarseSize + coarseSize / 2, p.Y * coarseSize + coarseSize / 2))).ToList();
+		}
+
 		static List<CPos> NearestSafeRouteFromFormation(Squad owner)
 		{
 			var info = owner.SquadManager.Info;
