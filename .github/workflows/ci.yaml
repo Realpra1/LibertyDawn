@@ -67,8 +67,30 @@ jobs:
       - name: Install Lua 5.1
         shell: pwsh
         run: |
-          choco install lua --version=5.1.5.52 -y
-          "C:\Program Files (x86)\Lua\5.1" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          $luaInstaller = Join-Path $env:RUNNER_TEMP "LuaForWindows_v5.1.5-52.exe"
+          Invoke-WebRequest `
+            -Uri "https://github.com/rjpcomputing/luaforwindows/releases/download/v5.1.5-52/LuaForWindows_v5.1.5-52.exe" `
+            -OutFile $luaInstaller
+
+          $expectedHash = "c5f96e5183adea82a0f0d25ad0940c7ae50d40c542d2d7331cc887d5fddb4191"
+          $actualHash = (Get-FileHash -LiteralPath $luaInstaller -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actualHash -ne $expectedHash) {
+            throw "Lua installer checksum mismatch: $actualHash"
+          }
+
+          $install = Start-Process -FilePath $luaInstaller `
+            -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-" `
+            -Wait -PassThru
+          if ($install.ExitCode -ne 0) {
+            throw "Lua installer failed with exit code $($install.ExitCode)."
+          }
+
+          $luaPath = "C:\Program Files (x86)\Lua\5.1"
+          if (-not (Test-Path (Join-Path $luaPath "luac.exe"))) {
+            throw "Lua compiler was not installed at $luaPath."
+          }
+
+          $luaPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Check Code
         shell: pwsh
