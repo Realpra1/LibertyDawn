@@ -133,6 +133,7 @@ namespace OpenRA.Test
 			Assert.That(perimeter.Distinct().Count(), Is.EqualTo(perimeter.Count));
 			Assert.That(perimeter.Any(c => c.X >= 50 && c.X <= 52 && c.Y >= 50 && c.Y <= 52), Is.False);
 		}
+
 		// --- reachability -------------------------------------------------------------------------
 		[TestCase(TestName = "An open field is escapable")]
 		public void OpenFieldIsOpen()

@@ -65,8 +65,8 @@ Player:
 		ConstructionYardTypes: fact
 		RifleTypes: e1
 		RocketTypes: e3
-		RifleCount: 10
-		RocketCount: 7
+		RifleCount: 12
+		RocketCount: 8
 		RequestInterval: 50
 		MaximumRallyDistance: 3
 		DebugLogging: true
@@ -900,11 +900,10 @@ Player:
 		OpeningFactoryTypes: weap, afld
 		OpeningRadarTypes: hq
 		OpeningOptionalStructureTypes: silo, gtwr, gun
-		OpeningSoldierTypes: e1, e3
 		OpeningHarvesterTypes: harv, sharv
 		OpeningDefenseUnlockTypes: upgrade.recon1
 		OpeningMcvType: mcv
-		OpeningSoldierCount: 20
+		OpeningSoldierCount: 0
 		OpeningHarvesterCount: 5
 		OpeningMcvCount: 1
 		OpeningRequestRetryDelay: 250
@@ -1215,11 +1214,10 @@ Player:
 		OpeningFactoryTypes: weap, afld
 		OpeningRadarTypes: hq
 		OpeningOptionalStructureTypes: silo, gtwr, gun
-		OpeningSoldierTypes: e1, e3
 		OpeningHarvesterTypes: sharv, harv
 		OpeningDefenseUnlockTypes: upgrade.recon1
 		OpeningMcvType: mcv
-		OpeningSoldierCount: 20
+		OpeningSoldierCount: 0
 		OpeningHarvesterCount: 5
 		OpeningMcvCount: 1
 		OpeningRequestRetryDelay: 250
