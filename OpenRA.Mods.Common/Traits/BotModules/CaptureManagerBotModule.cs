@@ -55,6 +55,32 @@ namespace OpenRA.Mods.Common.Traits
 
 	public class CaptureManagerBotModule : ConditionalTrait<CaptureManagerBotModuleInfo>, IBotTick
 	{
+		readonly struct CaptureCandidate
+		{
+			public readonly Actor Actor;
+			public readonly int Value;
+			public readonly bool IsBuilding;
+
+			public CaptureCandidate(Actor actor, int value)
+			{
+				Actor = actor;
+				Value = value;
+				IsBuilding = actor.Info.HasTraitInfo<BuildingInfo>();
+			}
+		}
+
+		readonly struct SpecialistAssignment
+		{
+			public readonly Actor Target;
+			public readonly int TargetHealth;
+
+			public SpecialistAssignment(Actor target)
+			{
+				Target = target;
+				TargetHealth = target.TraitOrDefault<IHealth>()?.HP ?? 0;
+			}
+		}
+
 		readonly World world;
 		readonly Player player;
 		readonly Func<Actor, bool> isEnemyUnit;
@@ -63,9 +89,10 @@ namespace OpenRA.Mods.Common.Traits
 		int minCaptureDelayTicks;
 		int minDemolitionDelayTicks;
 
-		// Units that the bot already knows about and has given a capture order. Any unit not on this list needs to be given a new order.
-		readonly List<Actor> activeCapturers = new List<Actor>();
-		readonly List<Actor> activeDemolitionUnits = new List<Actor>();
+		// Specialists with active orders and their targets. Remembering the target prevents duplicate assignments
+		// and lets the debug log distinguish completed work from an interrupted order.
+		readonly Dictionary<Actor, SpecialistAssignment> activeCapturers = new Dictionary<Actor, SpecialistAssignment>();
+		readonly Dictionary<Actor, SpecialistAssignment> activeDemolitionUnits = new Dictionary<Actor, SpecialistAssignment>();
 
 		public CaptureManagerBotModule(Actor self, CaptureManagerBotModuleInfo info)
 			: base(info)
@@ -137,10 +164,10 @@ namespace OpenRA.Mods.Common.Traits
 			if (!Info.CapturingActorTypes.Any() || player.WinState != WinState.Undefined)
 				return;
 
-			activeCapturers.RemoveAll(unitCannotBeOrderedOrIsIdle);
+			RetireFinishedAssignments(activeCapturers, "capture");
 
 			var newUnits = world.ActorsHavingTrait<IPositionable>()
-				.Where(a => a.Owner == player && !activeCapturers.Contains(a));
+				.Where(a => a.Owner == player && !activeCapturers.ContainsKey(a));
 
 			var capturers = newUnits
 				.Where(a => a.IsIdle && Info.CapturingActorTypes.Contains(a.Info.Name) && a.Info.HasTraitInfo<CapturesInfo>())
@@ -164,28 +191,55 @@ namespace OpenRA.Mods.Common.Traits
 						return false;
 
 					return capturers.Any(tp => captureManager.CanBeTargetedBy(target, tp.Actor, tp.Trait));
-				})
-				.OrderByDescending(target => target.GetSellValue())
-				.Take(maximumCaptureTargetOptions);
+				});
 
 			if (Info.CapturableActorTypes.Any())
 				capturableTargetOptions = capturableTargetOptions.Where(target => Info.CapturableActorTypes.Contains(target.Info.Name.ToLowerInvariant()));
 
-			if (!capturableTargetOptions.Any())
+			var candidates = capturableTargetOptions.Select(target => new CaptureCandidate(target, CaptureEconomicValue(target)))
+				.OrderByDescending(candidate => candidate.Value)
+				.ThenByDescending(candidate => candidate.IsBuilding)
+				.ThenBy(candidate => candidate.Actor.ActorID)
+				.Take(maximumCaptureTargetOptions).ToArray();
+			if (candidates.Length == 0)
 				return;
 
-			foreach (var capturer in capturers)
+			var activeTargetIds = activeCapturers.Values.Select(assignment => assignment.Target.ActorID).ToHashSet();
+			var assigned = Enumerable.Range(0, candidates.Length)
+				.Where(index => activeTargetIds.Contains(candidates[index].Actor.ActorID)).ToHashSet();
+			foreach (var capturer in capturers.OrderBy(capturer => capturer.Actor.ActorID))
 			{
-				var targetActor = capturableTargetOptions.MinByOrDefault(target => (target.CenterPosition - capturer.Actor.CenterPosition).LengthSquared);
-				if (targetActor == null)
+				var distances = candidates.Select(candidate =>
+					(long)(candidate.Actor.CenterPosition - capturer.Actor.CenterPosition).LengthSquared).ToArray();
+				var targetIndex = CaptureTargeting.BestTargetIndex(candidates.Select(candidate => candidate.Value).ToArray(),
+					candidates.Select(candidate => candidate.IsBuilding).ToArray(), distances, assigned);
+				if (targetIndex < 0)
 					continue;
 
-				bot.QueueOrder(new Order("CaptureActor", capturer.Actor, Target.FromActor(targetActor), true));
-				AIUtils.BotDebug("AI ({0}): Ordered {1} to capture {2}", player.ClientIndex, capturer.Actor, targetActor);
-				Debug("capture {0}#{1} -> {2}#{3}", capturer.Actor.Info.Name, capturer.Actor.ActorID,
-					targetActor.Info.Name, targetActor.ActorID);
-				activeCapturers.Add(capturer.Actor);
+				assigned.Add(targetIndex);
+				var target = candidates[targetIndex];
+
+				bot.QueueOrder(new Order("CaptureActor", capturer.Actor, Target.FromActor(target.Actor), true));
+				AIUtils.BotDebug("AI ({0}): Ordered {1} to capture {2}", player.ClientIndex, capturer.Actor, target.Actor);
+				Debug("capture {0}#{1} -> {2}#{3}: value={4}, distance-cells={5:0.0}, building={6}",
+					capturer.Actor.Info.Name, capturer.Actor.ActorID, target.Actor.Info.Name, target.Actor.ActorID,
+					target.Value, System.Math.Sqrt(distances[targetIndex]) / 1024d, target.IsBuilding);
+				activeCapturers.Add(capturer.Actor, new SpecialistAssignment(target.Actor));
 			}
+		}
+
+		int CaptureEconomicValue(Actor target)
+		{
+			var transformedValue = 0;
+			var transform = target.Info.TraitInfoOrDefault<TransformOnCaptureInfo>();
+			if (transform != null && world.Map.Rules.Actors.TryGetValue(transform.IntoActor, out var transformed))
+			{
+				var customValue = transformed.TraitInfoOrDefault<CustomSellValueInfo>();
+				var valued = transformed.TraitInfoOrDefault<ValuedInfo>();
+				transformedValue = customValue?.Value ?? valued?.Cost ?? 0;
+			}
+
+			return CaptureTargeting.EconomicValue(target.GetSellValue(), transformedValue);
 		}
 
 		void QueueDemolitionOrders(IBot bot)
@@ -193,27 +247,50 @@ namespace OpenRA.Mods.Common.Traits
 			if (Info.DemolitionActorTypes.Count == 0 || player.WinState != WinState.Undefined)
 				return;
 
-			activeDemolitionUnits.RemoveAll(unitCannotBeOrderedOrIsIdle);
+			RetireFinishedAssignments(activeDemolitionUnits, "demolition");
+			var activeTargetIds = activeDemolitionUnits.Values.Select(assignment => assignment.Target.ActorID).ToHashSet();
 			var demolitionUnits = world.Actors.Where(a => a.Owner == player && a.IsIdle &&
 				Info.DemolitionActorTypes.Contains(a.Info.Name) && a.Info.HasTraitInfo<DemolitionInfo>() &&
-				!activeDemolitionUnits.Contains(a)).ToArray();
+				!activeDemolitionUnits.ContainsKey(a)).ToArray();
 
-			foreach (var unit in demolitionUnits)
+			foreach (var unit in demolitionUnits.OrderBy(unit => unit.ActorID))
 			{
 				var target = world.Actors.Where(a => !a.IsDead && a.IsInWorld &&
 					player.RelationshipWith(a.Owner) == PlayerRelationship.Enemy &&
 					a.Info.HasTraitInfo<BuildingInfo>() &&
 					a.TraitsImplementing<IDemolishable>().Any(d => d.IsValidTarget(a, unit)) &&
-					(!Info.CheckCaptureTargetsForVisibility || a.CanBeViewedByPlayer(player)))
-					.OrderByDescending(a => a.GetSellValue()).Take(maximumCaptureTargetOptions)
+					(!Info.CheckCaptureTargetsForVisibility || a.CanBeViewedByPlayer(player)) &&
+					!activeTargetIds.Contains(a.ActorID))
+					.OrderByDescending(a => a.GetSellValue())
+					.Take(maximumCaptureTargetOptions)
 					.MinByOrDefault(a => (a.CenterPosition - unit.CenterPosition).LengthSquared);
 				if (target == null)
 					continue;
 
 				bot.QueueOrder(new Order("C4", unit, Target.FromActor(target), false));
 				AIUtils.BotDebug("AI ({0}): Ordered {1} to demolish {2}", player.ClientIndex, unit, target);
-				Debug("demolish {0}#{1} -> {2}#{3}", unit.Info.Name, unit.ActorID, target.Info.Name, target.ActorID);
-				activeDemolitionUnits.Add(unit);
+				Debug("demolish {0}#{1} -> {2}#{3}: value={4}, distance-cells={5:0.0}", unit.Info.Name,
+					unit.ActorID, target.Info.Name, target.ActorID, target.GetSellValue(),
+					System.Math.Sqrt((target.CenterPosition - unit.CenterPosition).LengthSquared) / 1024d);
+				activeDemolitionUnits.Add(unit, new SpecialistAssignment(target));
+				activeTargetIds.Add(target.ActorID);
+			}
+		}
+
+		void RetireFinishedAssignments(Dictionary<Actor, SpecialistAssignment> assignments, string action)
+		{
+			foreach (var pair in assignments.Where(pair => unitCannotBeOrderedOrIsIdle(pair.Key)).ToArray())
+			{
+				var target = pair.Value.Target;
+				var targetRemoved = target.IsDead || !target.IsInWorld;
+				var targetHealth = targetRemoved ? 0 : target.TraitOrDefault<IHealth>()?.HP ?? 0;
+				var result = targetRemoved ? "target-removed" :
+					target.Owner == player ? "captured" :
+					targetHealth < pair.Value.TargetHealth ? "sabotaged" :
+					pair.Key.IsDead || !pair.Key.IsInWorld ? "specialist-lost" : "specialist-idle";
+				Debug("{0} {1}#{2} released from {3}#{4}: result={5}", action, pair.Key.Info.Name,
+					pair.Key.ActorID, target.Info.Name, target.ActorID, result);
+				assignments.Remove(pair.Key);
 			}
 		}
 
