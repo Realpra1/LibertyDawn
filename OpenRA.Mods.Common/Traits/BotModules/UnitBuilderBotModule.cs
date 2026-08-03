@@ -48,7 +48,7 @@ namespace OpenRA.Mods.Common.Traits
 		public readonly int AdaptiveUnitCapSampleInterval = 250;
 
 		[Desc("Lowest total mobile-unit cap that continued lag may enforce.")]
-		public readonly int AdaptiveUnitCapMinimum = 100;
+		public readonly int AdaptiveUnitCapMinimum = AdaptiveUnitCapController.GlobalMinimumLimit;
 
 		[Desc("Amount removed from the enforced cap after each additional slow sample.")]
 		public readonly int AdaptiveUnitCapReductionStep = 25;

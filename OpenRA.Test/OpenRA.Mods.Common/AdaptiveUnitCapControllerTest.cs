@@ -55,7 +55,21 @@ namespace OpenRA.Test
 			var sample = controller.Update(20, 20, 20, 442, 50, 400);
 
 			Assert.That(sample.Decision, Is.EqualTo("held"));
-			Assert.That(sample.EffectiveLimit, Is.EqualTo(100));
+			Assert.That(sample.EffectiveLimit, Is.EqualTo(AdaptiveUnitCapController.GlobalMinimumLimit));
+		}
+
+		[Test]
+		public void BadConfigurationCannotLowerTheGlobalPerAiFloor()
+		{
+			var controller = new AdaptiveUnitCapController(10, 0.1f, 1, 100, 3);
+			controller.Update(0, 0, 20, 0, 50, 100);
+
+			var enforced = controller.Update(10, 10, 20, 221, 50, 100);
+			var held = controller.Update(20, 20, 20, 442, 50, 100);
+
+			Assert.That(enforced.EffectiveLimit, Is.EqualTo(AdaptiveUnitCapController.GlobalMinimumLimit));
+			Assert.That(held.EffectiveLimit, Is.EqualTo(AdaptiveUnitCapController.GlobalMinimumLimit));
+			Assert.That(held.Decision, Is.EqualTo("held"));
 		}
 
 		[Test]

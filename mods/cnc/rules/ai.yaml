@@ -352,6 +352,7 @@ Player:
 		RequiresCondition: enable-cabal-ai
 		TotalUnitLimit: 400
 		AdaptiveUnitCap: true
+		AdaptiveUnitCapMinimum: 300
 		HarvesterTypes: harv, sharv
 		HarvesterLimit: 75
 		UnitCapDebugLogging: true
@@ -446,6 +447,7 @@ Player:
 		RequiresCondition: enable-watson-ai
 		TotalUnitLimit: 400
 		AdaptiveUnitCap: true
+		AdaptiveUnitCapMinimum: 300
 		HarvesterTypes: harv, sharv
 		HarvesterLimit: 75
 		UnitCapDebugLogging: true
@@ -540,6 +542,7 @@ Player:
 		RequiresCondition: enable-hal9001-ai
 		TotalUnitLimit: 400
 		AdaptiveUnitCap: true
+		AdaptiveUnitCapMinimum: 300
 		HarvesterTypes: harv, sharv
 		HarvesterLimit: 75
 		UnitCapDebugLogging: true
@@ -672,6 +675,7 @@ Player:
 		RequiresCondition: enable-brutalis-ai || enable-wavemaker-ai
 		TotalUnitLimit: 400
 		AdaptiveUnitCap: true
+		AdaptiveUnitCapMinimum: 300
 		HarvesterTypes: harv, sharv
 		HarvesterLimit: 75
 		UnitCapDebugLogging: true
@@ -839,6 +843,7 @@ Player:
 		RequiresCondition: enable-viki-ai
 		TotalUnitLimit: 400
 		AdaptiveUnitCap: true
+		AdaptiveUnitCapMinimum: 300
 		HarvesterTypes: harv, sharv
 		HarvesterLimit: 75
 		UnitCapDebugLogging: true
@@ -1128,6 +1133,7 @@ Player:
 		RequiresCondition: enable-skynet-ai
 		TotalUnitLimit: 400
 		AdaptiveUnitCap: true
+		AdaptiveUnitCapMinimum: 300
 		HarvesterTypes: harv, sharv
 		HarvesterLimit: 75
 		UnitCapDebugLogging: true
@@ -1320,6 +1326,7 @@ Player:
 		RequiresCondition: enable-ironreaper-ai
 		TotalUnitLimit: 400
 		AdaptiveUnitCap: true
+		AdaptiveUnitCapMinimum: 300
 		HarvesterTypes: harv, sharv
 		HarvesterLimit: 75
 		UnitCapDebugLogging: true
@@ -1492,6 +1499,7 @@ Player:
 		RequiresCondition: enable-Easy-ai
 		TotalUnitLimit: 400
 		AdaptiveUnitCap: true
+		AdaptiveUnitCapMinimum: 300
 		HarvesterTypes: harv, sharv
 		HarvesterLimit: 75
 		UnitCapDebugLogging: true
@@ -1636,6 +1644,7 @@ Player:
 		RequiresCondition: enable-Easiest-ai
 		TotalUnitLimit: 400
 		AdaptiveUnitCap: true
+		AdaptiveUnitCapMinimum: 300
 		HarvesterTypes: harv, sharv
 		HarvesterLimit: 75
 		UnitCapDebugLogging: true

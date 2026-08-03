@@ -31,6 +31,8 @@ namespace OpenRA.Mods.Common.Traits
 
 	public sealed class AdaptiveUnitCapController
 	{
+		public const int GlobalMinimumLimit = 300;
+
 		readonly int sampleInterval;
 		readonly double lagTolerance;
 		readonly int minimumLimit;
@@ -49,7 +51,7 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			this.sampleInterval = Math.Max(1, sampleInterval);
 			this.lagTolerance = Math.Max(0, lagTolerance);
-			this.minimumLimit = Math.Max(1, minimumLimit);
+			this.minimumLimit = Math.Max(GlobalMinimumLimit, minimumLimit);
 			this.reductionStep = Math.Max(1, reductionStep);
 			this.recoverySamples = Math.Max(1, recoverySamples);
 		}
@@ -77,8 +79,9 @@ namespace OpenRA.Mods.Common.Traits
 			if (enforcementCeiling <= 0)
 				return new AdaptiveUnitCapSample(true, ratio, 0, "disabled-no-ceiling");
 
-			var ceiling = Math.Max(1, enforcementCeiling);
-			var floor = Math.Min(ceiling, minimumLimit);
+			// A stale or mistaken ceiling must never undermine the global per-AI safety floor.
+			var floor = minimumLimit;
+			var ceiling = Math.Max(floor, enforcementCeiling);
 			if (ratio > 1d + lagTolerance)
 			{
 				healthySamples = 0;
