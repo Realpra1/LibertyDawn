@@ -330,6 +330,10 @@ Player:
 		HarvesterTypes: harv, sharv
 		HarvesterLimit: 75
 		UnitCapDebugLogging: true
+		LearnHumanBuiltUnits: true
+		SampledUnitChance: 0.05
+		MaximumSampledUnitChance: 0.5
+		UnitSamplingDebugLogging: true
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
 		UnitsToBuild:
 			e1: 65
@@ -418,6 +422,10 @@ Player:
 		HarvesterTypes: harv, sharv
 		HarvesterLimit: 75
 		UnitCapDebugLogging: true
+		LearnHumanBuiltUnits: true
+		SampledUnitChance: 0.05
+		MaximumSampledUnitChance: 0.5
+		UnitSamplingDebugLogging: true
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
 		UnitsToBuild:
 			e1: 65
@@ -506,6 +514,10 @@ Player:
 		HarvesterTypes: harv, sharv
 		HarvesterLimit: 75
 		UnitCapDebugLogging: true
+		LearnHumanBuiltUnits: true
+		SampledUnitChance: 0.05
+		MaximumSampledUnitChance: 0.5
+		UnitSamplingDebugLogging: true
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
 		UnitsToBuild:
 			e1: 65
@@ -632,6 +644,10 @@ Player:
 		HarvesterTypes: harv, sharv
 		HarvesterLimit: 75
 		UnitCapDebugLogging: true
+		LearnHumanBuiltUnits: true
+		SampledUnitChance: 0.05
+		MaximumSampledUnitChance: 0.5
+		UnitSamplingDebugLogging: true
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
         IdleBaseUnitsMaximum: 999
 		UnitsToBuild:
@@ -793,6 +809,10 @@ Player:
 		HarvesterTypes: harv, sharv
 		HarvesterLimit: 75
 		UnitCapDebugLogging: true
+		LearnHumanBuiltUnits: true
+		SampledUnitChance: 0.05
+		MaximumSampledUnitChance: 0.5
+		UnitSamplingDebugLogging: true
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
         IdleBaseUnitsMaximum: 999
 		UnitsToBuild:
@@ -1076,6 +1096,10 @@ Player:
 		HarvesterTypes: harv, sharv
 		HarvesterLimit: 75
 		UnitCapDebugLogging: true
+		LearnHumanBuiltUnits: true
+		SampledUnitChance: 0.05
+		MaximumSampledUnitChance: 0.5
+		UnitSamplingDebugLogging: true
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
         IdleBaseUnitsMaximum: 999
 		WeightedUnitSelection: true
@@ -1263,6 +1287,10 @@ Player:
 		HarvesterTypes: harv, sharv
 		HarvesterLimit: 75
 		UnitCapDebugLogging: true
+		LearnHumanBuiltUnits: true
+		SampledUnitChance: 0.05
+		MaximumSampledUnitChance: 0.5
+		UnitSamplingDebugLogging: true
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
         IdleBaseUnitsMaximum: 999
         UnitsToBuild:
@@ -1429,6 +1457,10 @@ Player:
 		HarvesterTypes: harv, sharv
 		HarvesterLimit: 75
 		UnitCapDebugLogging: true
+		LearnHumanBuiltUnits: true
+		SampledUnitChance: 0.05
+		MaximumSampledUnitChance: 0.5
+		UnitSamplingDebugLogging: true
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
         IdleBaseUnitsMaximum: 999
         UnitsToBuild:
@@ -1567,6 +1599,10 @@ Player:
 		HarvesterTypes: harv, sharv
 		HarvesterLimit: 75
 		UnitCapDebugLogging: true
+		LearnHumanBuiltUnits: true
+		SampledUnitChance: 0.05
+		MaximumSampledUnitChance: 0.5
+		UnitSamplingDebugLogging: true
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
         IdleBaseUnitsMaximum: 999
         UnitsToBuild:
