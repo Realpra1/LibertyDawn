@@ -69,6 +69,9 @@ Player:
 		AssaultCommandoTypes: rmbo
 		AssaultTargetTypes: harv, sharv, proc, resonator, nuke, nuk2, fact, pyle, hand, afld, weap, hpad, hq, eye, tmpl
 		AssaultBotTypes: viki, ironreaper
+		HeavyDropPassengerTypes: htnk
+		HeavyDropTargetTypes: harv, sharv, proc, resonator, nuke, nuk2, fact, afld, weap, hpad, hq, eye, tmpl
+		HeavyDropBotTypes: brutalis, ironreaper
 		TransportHelicopterActor: tran
 		GroundTransportActor: apc
 		ScanInterval: 75
@@ -85,6 +88,23 @@ Player:
 		AssaultGatherTimeoutTicks: 750
 		AssaultCooldownTicks: 7500
 		AssaultOrderRetryTicks: 75
+		HeavyDropMinimumGameTicks: 0
+		HeavyDropMinimumPassengers: 8
+		HeavyDropMaximumPassengers: 10
+		HeavyDropConcurrentBoarding: 10
+		HeavyDropBoardingRetryTicks: 750
+		HeavyDropGatherTimeoutTicks: 3000
+		HeavyDropMissionTimeoutTicks: 9000
+		HeavyDropCooldownTicks: 7500
+		HeavyDropReplanInterval: 150
+		HeavyDropTargetCandidateLimit: 12
+		HeavyDropLandingRadius: 8
+		HeavyDropFormationRadius: 8
+		HeavyDropFormationSpacing: 3
+		HeavyDropUnloadRangeCells: 1
+		HeavyDropDefenseRadius: 7
+		HeavyDropMaximumDefenderValue: 3400
+		HeavyDropMaximumAaDanger: 0
 		DebugLogging: true
 	OpeningGarrisonBotModule:
 		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai || enable-Easiest-ai

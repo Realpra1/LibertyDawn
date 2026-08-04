@@ -55,6 +55,9 @@ namespace OpenRA
 
 		static bool takeScreenshot = false;
 		static Benchmark benchmark = null;
+		static int automatedSaveTick = -1;
+		static string automatedSaveName;
+		public static bool IsAutomatedGameSaveLoad { get; private set; }
 
 		public static event Action OnShellmapLoaded = () => { };
 
@@ -575,9 +578,10 @@ namespace OpenRA
 			}
 		}
 
-		static void InnerLogicTick(OrderManager orderManager)
+		static bool InnerLogicTick(OrderManager orderManager, bool forceWorldTick = false)
 		{
 			var tick = RunTime;
+			var worldTicked = false;
 
 			var world = orderManager.World;
 
@@ -588,27 +592,33 @@ namespace OpenRA
 				Cursor.Tick();
 			}
 
-			if (orderManager.LastTickTime.ShouldAdvance(tick))
+			if (forceWorldTick || orderManager.LastTickTime.ShouldAdvance(tick))
 			{
 				using (new PerfSample("tick_time"))
 				{
-					orderManager.LastTickTime.AdvanceTickTime(tick);
+					if (forceWorldTick)
+						orderManager.LastTickTime.Value = tick;
+					else
+						orderManager.LastTickTime.AdvanceTickTime(tick);
 
 					Sound.Tick();
 
 					Sync.RunUnsynced(world, orderManager.TickImmediate);
 
 					if (world == null)
-						return;
+						return false;
 
 					if (orderManager.TryTick())
 					{
+						worldTicked = true;
 						Sync.RunUnsynced(world, () =>
 						{
 							world.OrderGenerator.Tick(world);
 						});
 
 						world.Tick();
+						if (ReferenceEquals(orderManager, OrderManager))
+							TryAutomatedSave(world);
 
 						PerfHistory.Tick();
 					}
@@ -620,9 +630,11 @@ namespace OpenRA
 
 				benchmark?.Tick(LocalTick);
 			}
+
+			return worldTicked;
 		}
 
-		static void LogicTick()
+		static bool LogicTick(bool forceCurrentWorldTick = false)
 		{
 			PerformDelayedActions();
 
@@ -632,9 +644,11 @@ namespace OpenRA
 				ConnectionStateChanged(OrderManager, null, nc);
 			}
 
-			InnerLogicTick(OrderManager);
+			var worldTicked = InnerLogicTick(OrderManager, forceCurrentWorldTick);
 			if (worldRenderer != null && OrderManager.World != worldRenderer.World)
 				InnerLogicTick(worldRenderer.World.OrderManager);
+
+			return worldTicked;
 		}
 
 		public static void PerformDelayedActions()
@@ -763,15 +777,39 @@ namespace OpenRA
 			var nextRender = RunTime;
 			var forcedNextRender = RunTime;
 			var renderBeforeNextTick = false;
+			var maximumSpeedActive = false;
+			var maximumSpeedNextProgressTick = 0;
+			var maximumSpeedLastProgress = RunTime;
+			var maximumSpeedLastWarning = RunTime;
+			var maximumSpeedLastWorldTick = -1;
 
 			while (state == RunStatus.Running)
 			{
 				var logicInterval = Ui.Timestep;
 				var logicWorld = worldRenderer?.World;
+				var runAtMaximumSpeed = logicWorld != null && logicWorld == OrderManager.World &&
+					logicWorld.GameSpeed.UsesMaximumSpeed(server?.Type == ServerType.Local,
+						logicWorld.IsReplay, logicWorld.IsLoadingGameSave);
+
+				if (runAtMaximumSpeed != maximumSpeedActive)
+				{
+					maximumSpeedActive = runAtMaximumSpeed;
+					Log.Write("debug", "MAX game speed {0} at world tick {1}.",
+						runAtMaximumSpeed ? "enabled" : "disabled", logicWorld != null ? logicWorld.WorldTick : -1);
+					if (runAtMaximumSpeed)
+					{
+						maximumSpeedNextProgressTick = logicWorld.WorldTick + 5000;
+						maximumSpeedLastWorldTick = logicWorld.WorldTick;
+						maximumSpeedLastProgress = maximumSpeedLastWarning = RunTime;
+					}
+				}
 
 				// ReplayTimestep = 0 means the replay is paused: we need to keep logicInterval as UI.Timestep to avoid breakage
 				if (logicWorld != null && !(logicWorld.IsReplay && logicWorld.ReplayTimestep == 0))
 					logicInterval = logicWorld == OrderManager.World ? OrderManager.SuggestedTimestep : logicWorld.Timestep;
+
+				if (runAtMaximumSpeed)
+					logicInterval = 1;
 
 				// Ideal time between screen updates
 				var maxFramerate = Settings.Graphics.CapFramerate ? Settings.Graphics.MaxFramerate.Clamp(1, 1000) : 1000;
@@ -785,6 +823,8 @@ namespace OpenRA
 				}
 
 				var now = RunTime;
+				if (runAtMaximumSpeed)
+					nextLogic = now;
 
 				// If the logic has fallen behind too much, skip it and catch up
 				if (now - nextLogic > MaxLogicTicksBehind)
@@ -795,16 +835,43 @@ namespace OpenRA
 				if (now >= nextUpdate)
 				{
 					var forceRender = renderBeforeNextTick || now >= forcedNextRender;
+					var worldTicked = false;
 
 					if (now >= nextLogic && !renderBeforeNextTick)
 					{
-						nextLogic += logicInterval;
+						nextLogic = runAtMaximumSpeed ? now : nextLogic + logicInterval;
 
-						LogicTick();
+						worldTicked = LogicTick(runAtMaximumSpeed);
 
 						// Force at least one render per tick during regular gameplay
-						if (OrderManager.World != null && !OrderManager.World.IsLoadingGameSave && !OrderManager.World.IsReplay)
+						if (!runAtMaximumSpeed && OrderManager.World != null &&
+							!OrderManager.World.IsLoadingGameSave && !OrderManager.World.IsReplay)
 							renderBeforeNextTick = true;
+					}
+
+					if (runAtMaximumSpeed)
+					{
+						var progressTime = RunTime;
+						if (logicWorld.WorldTick != maximumSpeedLastWorldTick)
+						{
+							maximumSpeedLastWorldTick = logicWorld.WorldTick;
+							maximumSpeedLastProgress = progressTime;
+							if (logicWorld.WorldTick >= maximumSpeedNextProgressTick)
+							{
+								Log.Write("debug", "MAX progress: world={0}, local={1}, net={2}, queued-orders={3}.",
+									logicWorld.WorldTick, OrderManager.LocalFrameNumber,
+									OrderManager.NetFrameNumber, OrderManager.OrderQueueLength);
+								maximumSpeedNextProgressTick = logicWorld.WorldTick + 5000;
+							}
+						}
+						else if (progressTime - maximumSpeedLastProgress >= 5000 &&
+							progressTime - maximumSpeedLastWarning >= 5000)
+						{
+							maximumSpeedLastWarning = progressTime;
+							Log.Write("debug", "MAX waiting for world progress: world={0}, local={1}, net={2}, queued-orders={3}, paused={4}.",
+								logicWorld.WorldTick, OrderManager.LocalFrameNumber,
+								OrderManager.NetFrameNumber, OrderManager.OrderQueueLength, logicWorld.Paused);
+						}
 					}
 
 					var haveSomeTimeUntilNextLogic = now < nextLogic;
@@ -837,6 +904,10 @@ namespace OpenRA
 						// Ensure that we still logic tick despite not rendering
 						renderBeforeNextTick = false;
 					}
+
+					// The local server runs on another thread. Yield when it has not supplied the next order frame yet.
+					if (runAtMaximumSpeed && !worldTicked)
+						Thread.Yield();
 				}
 				else
 					Thread.Sleep((int)(nextUpdate - now));
@@ -943,6 +1014,58 @@ namespace OpenRA
 		public static void BenchmarkMode(string prefix)
 		{
 			benchmark = new Benchmark(prefix);
+		}
+
+		public static void ConfigureAutomatedSave(int worldTick, string filename)
+		{
+			automatedSaveTick = Math.Max(0, worldTick);
+			automatedSaveName = string.IsNullOrWhiteSpace(filename) ? "automated-test.orasav" : filename;
+		}
+
+		static void TryAutomatedSave(World world)
+		{
+			if (automatedSaveTick < 0 || world.WorldTick < automatedSaveTick || world.IsReplay || world.IsLoadingGameSave)
+				return;
+
+			var saveTick = automatedSaveTick;
+			automatedSaveTick = -1;
+			if (!world.LobbyInfo.GlobalSettings.GameSavesEnabled)
+			{
+				Log.Write("debug", "Automated save at tick {0} skipped because game saves are disabled.", saveTick);
+				return;
+			}
+
+			if (!automatedSaveName.EndsWith(".orasav", StringComparison.OrdinalIgnoreCase))
+				automatedSaveName += ".orasav";
+
+			Log.Write("debug", "Requesting automated game save '{0}' at world tick {1}.", automatedSaveName, world.WorldTick);
+			world.RequestGameSave(automatedSaveName);
+		}
+
+		public static void LoadGameSave(string savePath)
+		{
+			if (!Path.IsPathRooted(savePath))
+				savePath = Path.Combine(Platform.SupportDir, "Saves", ModData.Manifest.Id,
+					ModData.Manifest.Metadata.Version, savePath);
+
+			var save = new GameSave(savePath);
+			var map = ModData.MapCache[save.GlobalSettings.Map];
+			if (map.Status != MapStatus.Available)
+				throw new InvalidDataException($"Map '{save.GlobalSettings.Map}' required by game save is unavailable.");
+
+			var orders = new[]
+			{
+				Order.FromTargetString("LoadGameSave", Path.GetFileName(savePath), true),
+				Order.Command($"state {Session.ClientState.Ready}")
+			};
+
+			IsAutomatedGameSaveLoad = true;
+			CreateAndStartLocalServer(map.Uid, orders);
+		}
+
+		public static void CompleteAutomatedGameSaveLoad()
+		{
+			IsAutomatedGameSaveLoad = false;
 		}
 
 		public static void LoadMap(string launchMap, IEnumerable<string> lobbyCommands = null)

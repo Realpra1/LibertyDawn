@@ -1430,6 +1430,42 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					p.X * coarseSize + coarseSize / 2, p.Y * coarseSize + coarseSize / 2))).ToList();
 		}
 
+		/// <summary>
+		/// Returns the conservative live stopping threat at a carrier destination. This shares the exact
+		/// weapon, veterancy-range, configured-effectiveness, safety-margin, and mobile-AA assumptions used
+		/// by independent carrier routing, but avoids constructing a full influence map for drop-site ranking.
+		/// </summary>
+		internal static float SafeIndependentAirThreatAt(SquadManagerBotModule manager, CPos targetCell)
+		{
+			if (manager == null)
+				return float.MaxValue;
+
+			var info = manager.Info;
+			var destination = manager.World.Map.CenterOfCell(targetCell);
+			var danger = 0f;
+			foreach (var enemy in manager.World.Actors)
+			{
+				if (!manager.IsPreferredEnemyUnit(enemy))
+					continue;
+
+				var profile = AntiAirProfile(enemy);
+				var weight = AirThreatGeometry.ConfiguredThreatWeight(enemy.Info.Name, profile.Weight,
+					info.AirThreatWeightOverrides);
+				if (weight <= 0)
+					continue;
+
+				var range = Math.Max(1, (int)Math.Ceiling(profile.RangeCells * info.AirThreatRangeBuffer));
+				var mobile = enemy.Info.TraitInfoOrDefault<MobileInfo>();
+				if (mobile != null)
+					range += AirThreatGeometry.MobileThreatBufferCells(mobile.Speed, info.AirInfluenceCacheInterval);
+
+				if ((destination - enemy.CenterPosition).Length / 1024f <= range)
+					danger += weight;
+			}
+
+			return danger;
+		}
+
 		static List<CPos> NearestSafeRouteFromFormation(Squad owner)
 		{
 			var info = owner.SquadManager.Info;
