@@ -532,6 +532,7 @@ namespace OpenRA.Mods.Common.Traits
 	public interface IBotRequestUnitProduction
 	{
 		void RequestUnitProduction(IBot bot, string requestedActor);
+		void CancelRequestedUnitProduction(IBot bot, string requestedActor);
 		int RequestedProductionCount(IBot bot, string requestedActor);
 	}
 
