@@ -1,6 +1,15 @@
 @echo off
 title OpenRA.Utility.exe
 set ENGINE_DIR=..
+
+rem Forward scripted invocations directly to the utility.  The interactive
+rem prompt below is retained when no command (or only a mod) is supplied.
+if not "%~2"=="" goto runarguments
+if not "%~1"=="" (
+	set "mod=%~1"
+	goto help
+)
+
 :choosemod
 echo ----------------------------------------
 echo.
@@ -41,3 +50,7 @@ echo.
 echo OpenRA.Utility.exe %mod% %command%
 call bin\OpenRA.Utility.exe %mod% %command%
 goto start
+
+:runarguments
+call bin\OpenRA.Utility.exe %*
+exit /b %errorlevel%
