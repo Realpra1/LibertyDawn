@@ -58,6 +58,8 @@ namespace OpenRA
 		static int automatedSaveTick = -1;
 		static string automatedSaveName;
 		public static bool IsAutomatedGameSaveLoad { get; private set; }
+		public static bool IsHeadlessAutomationRequested { get; private set; }
+		public static bool IsHeadlessAutomation { get; private set; }
 
 		public static event Action OnShellmapLoaded = () => { };
 
@@ -252,7 +254,7 @@ namespace OpenRA
 				CreateAndStartLocalServer(lobbyInfo.GlobalSettings.Map, orders);
 		}
 
-		public static void CreateAndStartLocalServer(string mapUID, IEnumerable<Order> setupOrders)
+		public static void CreateAndStartLocalServer(string mapUID, IEnumerable<Order> setupOrders, int? randomSeed = null)
 		{
 			OrderManager om = null;
 
@@ -266,7 +268,7 @@ namespace OpenRA
 
 			LobbyInfoChanged += lobbyReady;
 
-			om = JoinServer(CreateLocalServer(mapUID), "");
+			om = JoinServer(CreateLocalServer(mapUID, randomSeed), "");
 		}
 
 		public static bool IsHost
@@ -299,6 +301,9 @@ namespace OpenRA
 
 		static void Initialize(Arguments args)
 		{
+			IsHeadlessAutomationRequested = FieldLoader.GetValue<bool>("Launch.Headless",
+				args.GetValue("Launch.Headless", "False"));
+
 			var engineDirArg = args.GetValue("Engine.EngineDir", null);
 			if (!string.IsNullOrEmpty(engineDirArg))
 				Platform.OverrideEngineDir(engineDirArg);
@@ -368,7 +373,7 @@ namespace OpenRA
 						throw new InvalidOperationException("Platform dll must include exactly one IPlatform implementation.");
 
 					var platform = (IPlatform)platformType.GetConstructor(Type.EmptyTypes).Invoke(null);
-					Renderer = new Renderer(platform, Settings.Graphics);
+					Renderer = new Renderer(platform, Settings.Graphics, IsHeadlessAutomationRequested);
 					Sound = new Sound(platform, Settings.Sound);
 
 					break;
@@ -624,7 +629,7 @@ namespace OpenRA
 					}
 
 					// Wait until we have done our first world Tick before TickRendering
-					if (orderManager.LocalFrameNumber > 0)
+					if (orderManager.LocalFrameNumber > 0 && !IsHeadlessAutomation)
 						Sync.RunUnsynced(world, () => world.TickRender(worldRenderer));
 				}
 
@@ -782,6 +787,7 @@ namespace OpenRA
 			var maximumSpeedLastProgress = RunTime;
 			var maximumSpeedLastWarning = RunTime;
 			var maximumSpeedLastWorldTick = -1;
+			var headlessNextInputPump = RunTime;
 
 			while (state == RunStatus.Running)
 			{
@@ -830,8 +836,13 @@ namespace OpenRA
 				if (now - nextLogic > MaxLogicTicksBehind)
 					nextLogic = now;
 
+				// A regular load may request a final render before headless automation is activated.
+				// Headless mode deliberately has no render path to clear that gate, so discard it here.
+				if (IsHeadlessAutomation)
+					renderBeforeNextTick = false;
+
 				// When's the next update (logic or render)
-				var nextUpdate = Math.Min(nextLogic, nextRender);
+				var nextUpdate = IsHeadlessAutomation ? nextLogic : Math.Min(nextLogic, nextRender);
 				if (now >= nextUpdate)
 				{
 					var forceRender = renderBeforeNextTick || now >= forcedNextRender;
@@ -876,7 +887,8 @@ namespace OpenRA
 
 					var haveSomeTimeUntilNextLogic = now < nextLogic;
 					var isTimeToRender = now >= nextRender;
-					if (!Renderer.WindowIsSuspended && ((isTimeToRender && haveSomeTimeUntilNextLogic) || forceRender))
+					if (!IsHeadlessAutomation && !Renderer.WindowIsSuspended &&
+						((isTimeToRender && haveSomeTimeUntilNextLogic) || forceRender))
 					{
 						nextRender = now + renderInterval;
 
@@ -893,7 +905,7 @@ namespace OpenRA
 					}
 
 					// Simulate a render tick if it was time to render but we skip actually rendering
-					if (Renderer.WindowIsSuspended && isTimeToRender)
+					if (!IsHeadlessAutomation && Renderer.WindowIsSuspended && isTimeToRender)
 					{
 						// Make sure that nextUpdate is set to a proper minimum interval
 						nextRender = now + renderInterval;
@@ -903,6 +915,12 @@ namespace OpenRA
 
 						// Ensure that we still logic tick despite not rendering
 						renderBeforeNextTick = false;
+					}
+
+					if (IsHeadlessAutomation && now >= headlessNextInputPump)
+					{
+						Renderer.Window.PumpInput(new NullInputHandler());
+						headlessNextInputPump = now + 250;
 					}
 
 					// The local server runs on another thread. Yield when it has not supplied the next order frame yet.
@@ -980,7 +998,7 @@ namespace OpenRA
 			return server.GetEndpointForLocalConnection();
 		}
 
-		public static ConnectionTarget CreateLocalServer(string map)
+		public static ConnectionTarget CreateLocalServer(string map, int? randomSeed = null)
 		{
 			var settings = new ServerSettings()
 			{
@@ -996,7 +1014,7 @@ namespace OpenRA
 			{
 				new IPEndPoint(IPAddress.Loopback, 0)
 			};
-			server = new Server.Server(endpoints, settings, ModData, ServerType.Local);
+			server = new Server.Server(endpoints, settings, ModData, ServerType.Local, randomSeed);
 
 			return server.GetEndpointForLocalConnection();
 		}
@@ -1014,6 +1032,15 @@ namespace OpenRA
 		public static void BenchmarkMode(string prefix)
 		{
 			benchmark = new Benchmark(prefix);
+		}
+
+		public static void ConfigureHeadlessAutomation()
+		{
+			if (!IsHeadlessAutomationRequested)
+				throw new InvalidOperationException("Headless automation was not requested during engine startup.");
+
+			IsHeadlessAutomation = true;
+			Log.Write("debug", "Headless MAX automation enabled: game rendering suppressed; input events remain bounded.");
 		}
 
 		public static void ConfigureAutomatedSave(int worldTick, string filename)
@@ -1068,7 +1095,7 @@ namespace OpenRA
 			IsAutomatedGameSaveLoad = false;
 		}
 
-		public static void LoadMap(string launchMap, IEnumerable<string> lobbyCommands = null)
+		public static void LoadMap(string launchMap, IEnumerable<string> lobbyCommands = null, int? randomSeed = null)
 		{
 			var orders = new List<Order> { Order.Command("option gamespeed default") };
 			if (lobbyCommands != null)
@@ -1085,14 +1112,19 @@ namespace OpenRA
 			if (map == null)
 				throw new ArgumentException($"Could not find map '{launchMap}'.");
 
-			CreateAndStartLocalServer(map.Uid, orders);
+			CreateAndStartLocalServer(map.Uid, orders, randomSeed);
 		}
 
 		public static void FinishBenchmark()
 		{
 			if (benchmark != null)
-			{
 				benchmark.Write();
+
+			if (benchmark != null || IsHeadlessAutomation)
+			{
+				if (IsHeadlessAutomation)
+					Log.Write("debug", "Headless MAX automation reached natural game over; exiting.");
+
 				Exit();
 			}
 		}

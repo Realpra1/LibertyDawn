@@ -134,7 +134,7 @@ namespace OpenRA.Platforms.Default
 		static extern IntPtr XFlush(IntPtr display);
 
 		public Sdl2PlatformWindow(Size requestEffectiveWindowSize, WindowMode windowMode,
-			float scaleModifier, int batchSize, int videoDisplay, GLProfile requestProfile, bool enableLegacyGL)
+			float scaleModifier, int batchSize, int videoDisplay, GLProfile requestProfile, bool enableLegacyGL, bool hidden)
 		{
 			// Lock the Window/Surface properties until initialization is complete
 			lock (syncObject)
@@ -222,6 +222,8 @@ namespace OpenRA.Platforms.Default
 				Console.WriteLine("Using resolution: {0}x{1}", windowSize.Width, windowSize.Height);
 
 				var windowFlags = SDL.SDL_WindowFlags.SDL_WINDOW_OPENGL | SDL.SDL_WindowFlags.SDL_WINDOW_ALLOW_HIGHDPI;
+				if (hidden)
+					windowFlags |= SDL.SDL_WindowFlags.SDL_WINDOW_HIDDEN;
 
 				// HiDPI doesn't work properly on OSX with (legacy) fullscreen mode
 				if (Platform.CurrentPlatform == PlatformType.OSX && windowMode == WindowMode.Fullscreen)

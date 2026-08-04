@@ -26,7 +26,8 @@ namespace OpenRA
 
 	public interface IPlatform
 	{
-		IPlatformWindow CreateWindow(Size size, WindowMode windowMode, float scaleModifier, int batchSize, int videoDisplay, GLProfile profile, bool enableLegacyGL);
+		IPlatformWindow CreateWindow(Size size, WindowMode windowMode, float scaleModifier, int batchSize, int videoDisplay,
+			GLProfile profile, bool enableLegacyGL, bool hidden);
 		ISoundEngine CreateSound(string device);
 		IFont CreateFont(byte[] data);
 	}
