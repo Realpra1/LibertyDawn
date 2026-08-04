@@ -1,6 +1,8 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 
+using OpenRA.Traits;
+
 namespace OpenRA.Mods.Common.Traits
 {
 	[Desc("This actor modifies resource behavior.")]
@@ -46,11 +48,57 @@ namespace OpenRA.Mods.Common.Traits
 		public override object Create(ActorInitializer init) { return new ModifiesResources(this); }
 	}
 
-	public class ModifiesResources : ConditionalTrait<ModifiesResourcesInfo>
+	public class ModifiesResources : ConditionalTrait<ModifiesResourcesInfo>, INotifyAddedToWorld,
+		INotifyRemovedFromWorld, INotifyCenterPositionChanged
 	{
+		bool isInWorld;
+		CPos cachedLocation;
+
 		public WDist Range => IsTraitDisabled ? WDist.Zero : Info.Range;
 
 		public ModifiesResources(ModifiesResourcesInfo info)
 			: base(info) { }
+
+		void InvalidateResourceLayer(Actor self)
+		{
+			self.World.WorldActor.TraitOrDefault<ResourceLayer>()?.InvalidateModifierCache();
+		}
+
+		protected override void TraitEnabled(Actor self)
+		{
+			if (isInWorld)
+				InvalidateResourceLayer(self);
+		}
+
+		protected override void TraitDisabled(Actor self)
+		{
+			if (isInWorld)
+				InvalidateResourceLayer(self);
+		}
+
+		void INotifyAddedToWorld.AddedToWorld(Actor self)
+		{
+			isInWorld = true;
+			cachedLocation = self.Location;
+			if (!IsTraitDisabled)
+				InvalidateResourceLayer(self);
+		}
+
+		void INotifyRemovedFromWorld.RemovedFromWorld(Actor self)
+		{
+			if (!IsTraitDisabled)
+				InvalidateResourceLayer(self);
+			isInWorld = false;
+		}
+
+		void INotifyCenterPositionChanged.CenterPositionChanged(Actor self, byte oldLayer, byte newLayer)
+		{
+			if (self.Location == cachedLocation)
+				return;
+
+			cachedLocation = self.Location;
+			if (isInWorld && !IsTraitDisabled)
+				InvalidateResourceLayer(self);
+		}
 	}
 }
