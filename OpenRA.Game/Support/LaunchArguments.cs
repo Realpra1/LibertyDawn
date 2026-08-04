@@ -32,6 +32,15 @@ namespace OpenRA
 		[Desc("Automatically start playing the given map.")]
 		public string Map;
 
+		[Desc("Automatically load the given local game save.")]
+		public string GameSave;
+
+		[Desc("Automatically create a local game save at the given world tick. Disabled when negative.")]
+		public int SaveGameAtTick = -1;
+
+		[Desc("Filename used by SaveGameAtTick.")]
+		public string SaveGameName = "automated-test.orasav";
+
 		[Desc("Semicolon-separated local lobby commands to execute before automatically starting a map.")]
 		public string LobbyCommands;
 

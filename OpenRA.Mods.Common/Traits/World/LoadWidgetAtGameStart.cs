@@ -84,8 +84,10 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				var optionsButton = root.GetOrNull<MenuButtonWidget>("OPTIONS_BUTTON");
 				world.SetPauseState(false);
-				if (optionsButton != null)
+				if (!Game.IsAutomatedGameSaveLoad && optionsButton != null)
 					Sync.RunUnsynced(world, optionsButton.OnClick);
+
+				Game.CompleteAutomatedGameSaveLoad();
 			}
 		}
 	}

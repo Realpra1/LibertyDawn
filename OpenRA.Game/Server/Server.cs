@@ -1201,6 +1201,18 @@ namespace OpenRA.Server
 		{
 			lock (LobbyInfo)
 			{
+				if (Type != ServerType.Local)
+				{
+					var speeds = Game.ModData.Manifest.Get<GameSpeeds>();
+					var speedName = LobbyInfo.GlobalSettings.OptionOrDefault("gamespeed", speeds.DefaultSpeed);
+					if (speeds.Speeds[speedName].RunAtMaximumSpeed)
+					{
+						SendMessage("MAX game speed is available only in local skirmish and debug games.");
+						Log.Write("server", "Rejected local-only MAX game speed on a {0} server.", Type);
+						return;
+					}
+				}
+
 				Console.WriteLine("[{0}] Game started", DateTime.Now.ToString(Settings.TimestampFormat));
 
 				// Drop any players who are not ready
