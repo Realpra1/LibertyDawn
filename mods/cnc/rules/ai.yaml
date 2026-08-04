@@ -50,6 +50,9 @@ Player:
     GrantConditionOnBotOwner@ironreaper:
 		Condition: enable-ironreaper-ai
 		Bots: ironreaper
+	GrantConditionOnBotOwner@ironreaper-tech-counter:
+		Condition: enable-ironreaper-tech-counter
+		Bots: ironreaper
     GrantConditionOnBotOwner@wavemaker:
 		Condition: enable-wavemaker-ai
 		Bots: wavemaker
@@ -1292,14 +1295,13 @@ Player:
 		EnableOpeningPolicy: true
 		OpeningPowerTypes: nuk2, nuke
 		OpeningSiloTypes: silo
-		OpeningDefenseTypes: gtwr, gun
+		OpeningDefenseTypes: obli, gtwr, gun
 		OpeningBarracksTypes: pyle, hand
 		OpeningRefineryTypes: proc, resonator
 		OpeningFactoryTypes: weap, afld
 		OpeningRadarTypes: hq
-		OpeningOptionalStructureTypes: silo, gtwr, gun
+		OpeningOptionalStructureTypes: silo, obli, gtwr, gun
 		OpeningHarvesterTypes: sharv, harv
-		OpeningDefenseUnlockTypes: upgrade.recon1
 		OpeningMcvType: mcv
 		OpeningSoldierCount: 0
 		OpeningHarvesterCount: 5
@@ -1376,6 +1378,27 @@ Player:
 			tmpl: 5
 			fix: 5
             resonator: 20
+	TechnologyCounterBotModule@ironreaper:
+		RequiresCondition: enable-ironreaper-tech-counter
+		ScanInterval: 125
+		SwitchDelay: 3000
+		InitialBranch: economy
+		CounterBranches:
+			covert: recon
+			recon: economy
+			economy: covert
+		BranchUpgradeActors:
+			covert: upgrade.covert1, upgrade.covert2, upgrade.covert3
+			recon: upgrade.recon1, upgrade.recon2, upgrade.recon3
+			economy: upgrade.economy1, upgrade.economy2, upgrade.economy3
+		BranchDowngradeActors:
+			covert: downgrade.covert
+			recon: downgrade.recon
+			economy: downgrade.economy
+		PreserveExistingBranchesPrerequisites: techlevel.extra
+		CompleteAllBranchesPrerequisites: techlevel.extra
+		StatusLogInterval: 750
+		DebugLogging: true
     SquadManagerBotModule@ironreaper:
 		RequiresCondition: enable-ironreaper-ai
 		SquadSize: 20
@@ -1386,7 +1409,7 @@ Player:
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
 	UnitBuilderBotModule@ironreaper:
 		RequiresCondition: enable-ironreaper-ai
-		ExternallyManagedTypes: tran, truck
+		ExternallyManagedTypes: tran, truck, upgrade.covert1, upgrade.covert2, upgrade.covert3, downgrade.covert, upgrade.recon1, upgrade.recon2, upgrade.recon3, downgrade.recon, upgrade.economy1, upgrade.economy2, upgrade.economy3, downgrade.economy
 		TotalUnitLimit: 400
 		AdaptiveUnitCap: true
 		AdaptiveUnitCapMinimum: 300

@@ -394,6 +394,11 @@ namespace OpenRA.Mods.Common.Traits
 			queuedBuildRequests.Add(requestedActor);
 		}
 
+		void IBotRequestUnitProduction.CancelRequestedUnitProduction(IBot bot, string requestedActor)
+		{
+			queuedBuildRequests.RemoveAll(r => r == requestedActor);
+		}
+
 		int IBotRequestUnitProduction.RequestedProductionCount(IBot bot, string requestedActor)
 		{
 			return queuedBuildRequests.Count(r => r == requestedActor);
