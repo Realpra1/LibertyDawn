@@ -5,6 +5,7 @@
 - Branch: `agent/cnc66a-empire-lars`
 - Pull request: https://github.com/Realpra1/LibertyDawn/pull/52
 - Remaining gate: real-Mac startup verification
+- GitHub gate: Linux and Windows passed at implementation commit `592f8ff3f1`
 
 ## Result
 
