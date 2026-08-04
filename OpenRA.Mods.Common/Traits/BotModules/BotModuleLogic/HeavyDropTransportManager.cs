@@ -73,6 +73,7 @@ namespace OpenRA.Mods.Common.Traits
 			public int LastPlanTick;
 			public int TimeoutOriginTick;
 			public bool ReturningToAssembly;
+			public bool Aborted;
 
 			public Wave(int id, int tick, List<Pair> pairs, DropPlan plan)
 			{
@@ -221,11 +222,14 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				bot.QueueOrder(new Order("Stop", pair.Transport, false));
 				bot.QueueOrder(new Order("Stop", pair.Passenger, false));
+				IssueRoutedLanding(pair.Transport, pair.PickupDestination);
+				pair.PickupOrdered = true;
 			}
 
 			Debug("created wave {0}: pairs={1}, target={2}#{3}, landing={4}, AA={5:0.00}, defenders={6}, score={7}",
 				missionId, pairs.Count, plan.Target.Info.Name, plan.Target.ActorID, plan.LandingCenter,
 				plan.AaDanger, plan.DefenderValue, plan.Score);
+			Debug("wave {0} routed all {1} carriers concurrently to distinct pickup cells", missionId, pairs.Count);
 		}
 
 		void AdvanceGathering(IBot bot)
@@ -404,7 +408,7 @@ namespace OpenRA.Mods.Common.Traits
 				p.Transport.TraitOrDefault<Cargo>()?.IsEmpty() == false).ToList();
 			if (carrying.Count == 0)
 			{
-				FinishWave(wave.ReturningToAssembly ? "safe assembly return complete" :
+				FinishWave(bot, wave.ReturningToAssembly ? "safe assembly return complete" :
 					"ground-force handoff complete");
 				return;
 			}
@@ -448,6 +452,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		void BeginAbortUnload(IBot bot, string reason)
 		{
+			wave.Aborted = true;
 			wave.Stage = WaveStage.Unloading;
 			foreach (var pair in wave.Pairs.Where(IsPairUsable))
 			{
@@ -535,6 +540,7 @@ namespace OpenRA.Mods.Common.Traits
 		List<CPos> FindDistinctPickupDestinations(List<Actor> passengers, List<Actor> transports)
 		{
 			var used = new HashSet<CPos>();
+			var spacingSquared = info.HeavyDropFormationSpacing * info.HeavyDropFormationSpacing;
 			var result = new List<CPos>();
 			for (var i = 0; i < passengers.Count; i++)
 			{
@@ -544,8 +550,8 @@ namespace OpenRA.Mods.Common.Traits
 				var pickup = world.Map.FindTilesInCircle(passenger.Location, info.HeavyDropFormationRadius)
 					.OrderBy(c => (c - passenger.Location).LengthSquared).ThenBy(c => c.X).ThenBy(c => c.Y)
 					.Cast<CPos?>().FirstOrDefault(c => c.HasValue && c.Value != passenger.Location &&
-						!used.Contains(c.Value) && mobile != null && aircraft != null &&
-						aircraft.CanLand(c.Value, blockedByMobile: false) &&
+						used.All(u => (u - c.Value).LengthSquared >= spacingSquared) &&
+						mobile != null && aircraft != null && aircraft.CanLand(c.Value) &&
 						HasReachableBoardingApproach(passenger, mobile, c.Value));
 				if (!pickup.HasValue)
 					continue;
@@ -662,9 +668,11 @@ namespace OpenRA.Mods.Common.Traits
 		bool PickupReady(Pair pair)
 		{
 			var mobile = pair.Passenger.TraitOrDefault<Mobile>();
-			return (pair.Transport.Location - pair.Passenger.Location).LengthSquared <=
-				info.PickupRangeCells * info.PickupRangeCells && mobile != null &&
-				mobile.CanEnterCell(pair.Transport.Location, pair.Transport, BlockedByActor.Immovable);
+			var aircraft = pair.Transport.TraitOrDefault<Aircraft>();
+			return mobile != null && HeavyDropPolicy.CanBoardAtPickup(
+				pair.Transport.Location == pair.PickupDestination,
+				aircraft?.AtLandAltitude == true,
+				mobile.CanEnterCell(pair.Transport.Location, pair.Transport, BlockedByActor.Immovable));
 		}
 
 		static bool IsCargoReserved(Pair pair)
@@ -704,10 +712,27 @@ namespace OpenRA.Mods.Common.Traits
 			return Math.Max(0, actor.Info.TraitInfoOrDefault<ValuedInfo>()?.Cost ?? 0);
 		}
 
-		void FinishWave(string reason)
+		void FinishWave(IBot bot, string reason)
 		{
-			Debug("released wave {0}: {1}", wave.Id, reason);
-			coordinator.Release(wave.Id);
+			var completedWave = wave;
+			var passengers = completedWave.Pairs.Select(p => p.Passenger).ToList();
+			coordinator.Release(completedWave.Id);
+
+			var manager = squadManager();
+			if (!completedWave.Aborted && !completedWave.ReturningToAssembly)
+			{
+				var adopted = manager?.AdoptTransportedAssault(bot, passengers, completedWave.Target) ?? 0;
+				Debug("released wave {0}: {1}; adopted={2}/{3}, target={4}#{5}", completedWave.Id,
+					reason, adopted, passengers.Count, completedWave.Target?.Info.Name ?? "none",
+					completedWave.Target?.ActorID ?? 0);
+			}
+			else
+			{
+				var restored = manager?.RestoreTransportedUnits(passengers) ?? 0;
+				Debug("released wave {0}: {1}; restored={2}/{3} to ordinary squads", completedWave.Id,
+					reason, restored, passengers.Count);
+			}
+
 			wave = null;
 		}
 

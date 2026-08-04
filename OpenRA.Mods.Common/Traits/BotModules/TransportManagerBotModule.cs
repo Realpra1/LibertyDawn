@@ -78,7 +78,7 @@ namespace OpenRA.Mods.Common.Traits
 		public readonly int HeavyDropMinimumGameTicks = 7500;
 		public readonly int HeavyDropMinimumPassengers = 8;
 		public readonly int HeavyDropMaximumPassengers = 10;
-		public readonly int HeavyDropConcurrentBoarding = 3;
+		public readonly int HeavyDropConcurrentBoarding = 10;
 		public readonly int HeavyDropBoardingRetryTicks = 750;
 		public readonly int HeavyDropGatherTimeoutTicks = 3000;
 		public readonly int HeavyDropMissionTimeoutTicks = 9000;

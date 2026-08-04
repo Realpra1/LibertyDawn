@@ -55,6 +55,17 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(HeavyDropPolicy.AvailableBoardingSlots(limit, active), Is.EqualTo(expected));
 		}
 
+		[TestCase(true, true, true, true)]
+		[TestCase(false, true, true, false)]
+		[TestCase(true, false, true, false)]
+		[TestCase(true, true, false, false)]
+		public void BoardingWaitsForTheAssignedLandedCarrier(bool atAssignedCell, bool landed,
+			bool passengerCanEnter, bool expected)
+		{
+			Assert.That(HeavyDropPolicy.CanBoardAtPickup(atAssignedCell, landed, passengerCanEnter),
+				Is.EqualTo(expected));
+		}
+
 		[Test]
 		public void TargetScoreRewardsValueAndBehindPositionButPenalizesDefenseAndDistance()
 		{

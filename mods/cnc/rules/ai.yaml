@@ -91,7 +91,7 @@ Player:
 		HeavyDropMinimumGameTicks: 0
 		HeavyDropMinimumPassengers: 8
 		HeavyDropMaximumPassengers: 10
-		HeavyDropConcurrentBoarding: 3
+		HeavyDropConcurrentBoarding: 10
 		HeavyDropBoardingRetryTicks: 750
 		HeavyDropGatherTimeoutTicks: 3000
 		HeavyDropMissionTimeoutTicks: 9000
