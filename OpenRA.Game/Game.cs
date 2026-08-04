@@ -57,6 +57,7 @@ namespace OpenRA
 		static Benchmark benchmark = null;
 		static int automatedSaveTick = -1;
 		static string automatedSaveName;
+		static bool automatedExitRequested;
 		public static bool IsAutomatedGameSaveLoad { get; private set; }
 		public static bool IsHeadlessAutomationRequested { get; private set; }
 		public static bool IsHeadlessAutomation { get; private set; }
@@ -1117,16 +1118,15 @@ namespace OpenRA
 
 		public static void FinishBenchmark()
 		{
-			if (benchmark != null)
-				benchmark.Write();
+			if (automatedExitRequested || (benchmark == null && !IsHeadlessAutomation))
+				return;
 
-			if (benchmark != null || IsHeadlessAutomation)
-			{
-				if (IsHeadlessAutomation)
-					Log.Write("debug", "Headless MAX automation reached natural game over; exiting.");
+			automatedExitRequested = true;
+			benchmark?.Write();
+			if (IsHeadlessAutomation)
+				Log.Write("debug", "Headless MAX automation reached natural game over; exiting.");
 
-				Exit();
-			}
+			Exit();
 		}
 	}
 
