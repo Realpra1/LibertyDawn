@@ -4,7 +4,8 @@
 - Deferred work: `DEFERRED_WORK.md`
 - Completed tasks: `CNC-19` (11 cycles, PR #38 green); `CNC-20` (12 cycles, PR #39 green); `CNC-21` (12 cycles, PR #40 green); `CNC-22` (8 cycles, PR #41 green); `CNC-23` (11 cycles, PR #42 green); `CNC-24` (14 cycles, PR #43 green); `CNC-24.5` (20 cycles, PR #45 green); `CNC-24.6` (14 cycles, PR #46 green); `CNC-25` (22 resumed cycles plus retained 28-cycle history, PR #44 green); `CNC-26` (12 cycles, PR #47 green); `CNC-26A` (11 cycles, PR #48 green)
 - Active task: none; autonomous loop paused after completing CNC-26A at the user's request
-- Next cumulative base: `origin/agent/cnc-workflow-portability` (the workflow-portability PR head, which includes PR #48)
+- Integration checkpoint: PR #49 (`agent/cnc-workflow-portability` -> `bleed`) contains all cumulative work through CNC-26A plus the portable skill and coordinator files.
+- Next cumulative base: after PR #49 merges, fetch and use `origin/bleed`; while it remains open, use `origin/agent/cnc-workflow-portability` so no completed work is lost.
 - Publication: one task branch and pull request; never push directly to `bleed`
 - Cumulative rule: CNC-20 and later use the preceding task PR branch as their base
 - Aged reference: insane PR may be inspected for ideas/provenance only
@@ -30,5 +31,5 @@
 - CNC-26A local gates: strict Debug build passed with zero warnings/errors and all 286 unit tests passed. The explicit-interface utility emitted no diagnostics but exceeded five minutes; like the known exhaustive-validator issue now tracked by CNC-66, it remains inconclusive pending authoritative GitHub Linux/Windows checks.
 - CNC-26A publication: commit `e5883edacb` is pushed on `agent/cnc26a-all-technologies`; draft PR #48 targets `agent/cnc26-tech-switching`, is mergeable, and has green Linux/Windows checks: https://github.com/Realpra1/LibertyDawn/pull/48
 - CNC-26A completion gate: PR #48 is clean and both required checks passed at commit `e5883edacb` (Linux 3m06s, Windows 4m17s); task complete at 11/30 cycles. PR: https://github.com/Realpra1/LibertyDawn/pull/48
-- Next eligible task: CNC-27, to use cumulative base `origin/agent/cnc-workflow-portability` when resumed.
+- Next eligible task: CNC-27, using the post-PR-#49 base described above.
 - Session state: autonomous work is paused, no task branch is active, and the previous Windows presentation-mode keep-awake helper was stopped. Start a new reversible session helper only when autonomous work resumes.

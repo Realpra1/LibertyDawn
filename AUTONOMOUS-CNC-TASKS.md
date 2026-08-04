@@ -5,6 +5,7 @@
 - Supported game/mod: LibertyDawn Command & Conquer (`cnc`) only. Do not build, test, package, or modify Red Alert, Dune 2000, or Tiberian Sun unless shared engine compilation makes it unavoidable.
 - CNC-19 starts from freshly fetched `origin/bleed`, which contains the user's latest merged work.
 - Starting with CNC-20, base each task branch and pull request on the preceding task PR branch so the series is cumulative. Do not push directly to `bleed` and do not close earlier PRs.
+- PR #49 is the integration checkpoint that collects the cumulative series through CNC-26A plus the portable Codex workflow into `bleed`. After it merges, begin CNC-27 from freshly fetched `origin/bleed`, then resume the cumulative per-task branch rule.
 - The aged insane PR may be inspected for ideas and provenance, but its code is not an authoritative base. Preserve LibertyDawn balance, resource growth, harvester logic, and later improvements.
 - A task is `complete` only after its required behavior, regression checks, adversarial edge-case cycles, report, and green GitHub checks pass. Otherwise mark it `first iteration` or `to be resumed`, recording the number of cycles used.
 
