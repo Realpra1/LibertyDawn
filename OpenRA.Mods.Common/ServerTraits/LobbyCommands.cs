@@ -583,6 +583,16 @@ namespace OpenRA.Mods.Common.Server
 					return true;
 				}
 
+				if (option.Id == "gamespeed" && server.Type != ServerType.Local)
+				{
+					var speeds = Game.ModData.Manifest.Get<GameSpeeds>();
+					if (speeds.Speeds[split[1]].RunAtMaximumSpeed)
+					{
+						server.SendOrderTo(conn, "Message", "MAX game speed is available only in local skirmish and debug games.");
+						return true;
+					}
+				}
+
 				var oo = server.LobbyInfo.GlobalSettings.LobbyOptions[option.Id];
 				if (oo.Value == split[1])
 					return true;

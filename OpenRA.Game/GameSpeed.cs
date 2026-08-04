@@ -24,6 +24,13 @@ namespace OpenRA
 
 		[FieldLoader.Require]
 		public readonly int OrderLatency;
+
+		public readonly bool RunAtMaximumSpeed = false;
+
+		public bool UsesMaximumSpeed(bool isLocalServer, bool isReplay, bool isLoadingGameSave)
+		{
+			return RunAtMaximumSpeed && isLocalServer && !isReplay && !isLoadingGameSave;
+		}
 	}
 
 	public class GameSpeeds : IGlobalModData

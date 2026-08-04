@@ -57,12 +57,22 @@ namespace OpenRA.Mods.Common.LoadScreens
 				Game.BenchmarkMode(Launch.Benchmark);
 			}
 
+			if (Launch.SaveGameAtTick >= 0)
+				Game.ConfigureAutomatedSave(Launch.SaveGameAtTick, Launch.SaveGameName);
+
 			// Join a server directly
 			var connect = Launch.GetConnectEndPoint();
 			if (connect != null)
 			{
 				Game.LoadShellMap();
 				Game.RemoteDirectConnect(connect);
+				return;
+			}
+
+			// Load a local game save directly
+			if (!string.IsNullOrEmpty(Launch.GameSave))
+			{
+				Game.LoadGameSave(Launch.GameSave);
 				return;
 			}
 
