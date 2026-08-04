@@ -10,6 +10,7 @@
 #endregion
 
 using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 using OpenRA.Mods.Common.Traits;
 
@@ -87,6 +88,26 @@ namespace OpenRA.Test
 				new HashSet<string> { "recon1", "recon3" }), Is.EqualTo("recon2"));
 			Assert.That(TechnologyCounterLogic.NextUpgrade(upgrades,
 				new HashSet<string>(upgrades)), Is.Null);
+		}
+
+		[Test]
+		public void AllBranchUpgradePrefersDesiredThenUsesStableBranchOrder()
+		{
+			var upgrades = new Dictionary<string, string[]>
+			{
+				{ "recon", new[] { "recon1", "recon2" } },
+				{ "economy", new[] { "economy1", "economy2" } },
+				{ "covert", new[] { "covert1", "covert2" } }
+			};
+
+			Assert.That(TechnologyCounterLogic.NextUpgradeAcrossBranches(upgrades, "recon",
+				new HashSet<string> { "recon1", "economy1" }), Is.EqualTo("recon2"));
+			Assert.That(TechnologyCounterLogic.NextUpgradeAcrossBranches(upgrades, "recon",
+				new HashSet<string> { "recon1", "recon2", "covert1", "covert2", "economy1" }), Is.EqualTo("economy2"));
+			Assert.That(TechnologyCounterLogic.NextUpgradeAcrossBranches(upgrades, "unknown",
+				new HashSet<string>()), Is.EqualTo("covert1"));
+			Assert.That(TechnologyCounterLogic.NextUpgradeAcrossBranches(upgrades, "recon",
+				new HashSet<string>(upgrades.SelectMany(kv => kv.Value))), Is.Null);
 		}
 	}
 }

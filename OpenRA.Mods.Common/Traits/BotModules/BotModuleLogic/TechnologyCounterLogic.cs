@@ -67,5 +67,25 @@ namespace OpenRA.Mods.Common.Traits
 
 			return orderedUpgrades.FirstOrDefault(upgrade => !ownedActorTypes.Contains(upgrade));
 		}
+
+		public static string NextUpgradeAcrossBranches(IReadOnlyDictionary<string, string[]> branchUpgrades,
+			string preferredBranch, ISet<string> ownedActorTypes)
+		{
+			if (branchUpgrades == null || ownedActorTypes == null)
+				return null;
+
+			IEnumerable<string> branches = branchUpgrades.Keys.OrderBy(k => k, StringComparer.Ordinal);
+			if (!string.IsNullOrEmpty(preferredBranch) && branchUpgrades.ContainsKey(preferredBranch))
+				branches = new[] { preferredBranch }.Concat(branches.Where(k => k != preferredBranch));
+
+			foreach (var branch in branches)
+			{
+				var next = NextUpgrade(branchUpgrades[branch], ownedActorTypes);
+				if (next != null)
+					return next;
+			}
+
+			return null;
+		}
 	}
 }
