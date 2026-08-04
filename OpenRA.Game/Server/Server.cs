@@ -160,7 +160,7 @@ namespace OpenRA.Server
 			}
 		}
 
-		public Server(List<IPEndPoint> endpoints, ServerSettings settings, ModData modData, ServerType type)
+		public Server(List<IPEndPoint> endpoints, ServerSettings settings, ModData modData, ServerType type, int? configuredRandomSeed = null)
 		{
 			Log.AddChannel("server", "server.log", true);
 
@@ -230,7 +230,7 @@ namespace OpenRA.Server
 
 			playerDatabase = modData.Manifest.Get<PlayerDatabase>();
 
-			randomSeed = (int)DateTime.Now.ToBinary();
+			randomSeed = configuredRandomSeed ?? (int)DateTime.Now.ToBinary();
 
 			if (type != ServerType.Local && settings.EnableGeoIP)
 				GeoIP.Initialize();
@@ -1201,6 +1201,18 @@ namespace OpenRA.Server
 		{
 			lock (LobbyInfo)
 			{
+				if (Type != ServerType.Local)
+				{
+					var speeds = Game.ModData.Manifest.Get<GameSpeeds>();
+					var speedName = LobbyInfo.GlobalSettings.OptionOrDefault("gamespeed", speeds.DefaultSpeed);
+					if (speeds.Speeds[speedName].RunAtMaximumSpeed)
+					{
+						SendMessage("MAX game speed is available only in local skirmish and debug games.");
+						Log.Write("server", "Rejected local-only MAX game speed on a {0} server.", Type);
+						return;
+					}
+				}
+
 				Console.WriteLine("[{0}] Game started", DateTime.Now.ToString(Settings.TimestampFormat));
 
 				// Drop any players who are not ready

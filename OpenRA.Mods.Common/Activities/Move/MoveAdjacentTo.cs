@@ -102,15 +102,23 @@ namespace OpenRA.Mods.Common.Activities
 			if (!IsCanceling && shouldRepath)
 				QueueChild(Mobile.MoveTo(check => CalculatePathToTarget(self, check)));
 
-			// The last queued childactivity is guaranteed to be the inner move, so if the childactivity
-			// queue is empty it means we have reached our destination.
-			return TickChild(self);
+			// The last queued child activity is guaranteed to be the inner move,
+			// so if the child activity queue is empty it means the move completed.
+			if (!TickChild(self))
+				return false;
+
+			if (Mobile.MoveResult == MoveResult.CompleteDestinationReached)
+				return true;
+
+			// The move completed but we didn't reach the destination, so Cancel.
+			Cancel(self);
+			return true;
 		}
 
 		readonly List<CPos> searchCells = new List<CPos>();
 		int searchCellsTick = -1;
 
-		List<CPos> CalculatePathToTarget(Actor self, BlockedByActor check)
+		(bool AlreadyAtDestination, List<CPos> Path) CalculatePathToTarget(Actor self, BlockedByActor check)
 		{
 			var loc = self.Location;
 
@@ -121,16 +129,23 @@ namespace OpenRA.Mods.Common.Activities
 				searchCells.Clear();
 				searchCellsTick = self.World.WorldTick;
 				foreach (var cell in CandidateMovementCells(self))
+				{
 					if (Mobile.CanEnterCell(cell))
+					{
+						if (cell == loc)
+							return (true, PathFinder.NoPath);
+
 						searchCells.Add(cell);
+					}
+				}
 			}
 
 			if (!searchCells.Any())
-				return PathFinder.NoPath;
+				return (false, PathFinder.NoPath);
 
 			using (var fromSrc = PathSearch.ToTargetCell(self.World, Mobile.Locomotor, self, searchCells, loc, check))
 			using (var fromDest = PathSearch.ToTargetCell(self.World, Mobile.Locomotor, self, loc, lastVisibleTargetLocation, check, inReverse: true))
-				return Mobile.Pathfinder.FindBidiPath(fromSrc, fromDest);
+				return (false, Mobile.Pathfinder.FindBidiPath(fromSrc, fromDest));
 		}
 
 		public override IEnumerable<Target> GetTargets(Actor self)

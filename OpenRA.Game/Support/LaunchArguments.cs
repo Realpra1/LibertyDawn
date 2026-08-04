@@ -11,6 +11,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using OpenRA.Network;
 
 namespace OpenRA
@@ -29,8 +30,23 @@ namespace OpenRA
 		[Desc("Dump performance data into cpu.csv and render.csv in the logs folder with the given prefix.")]
 		public string Benchmark;
 
+		[Desc("Run an automated local MAX game without showing or rendering the game window.")]
+		public bool Headless;
+
 		[Desc("Automatically start playing the given map.")]
 		public string Map;
+
+		[Desc("Automatically load the given local game save.")]
+		public string GameSave;
+
+		[Desc("Automatically create a local game save at the given world tick. Disabled when negative.")]
+		public int SaveGameAtTick = -1;
+
+		[Desc("Deterministic random seed for an automatically started local map. Disabled when omitted.")]
+		public int RandomSeed = int.MinValue;
+
+		[Desc("Filename used by SaveGameAtTick.")]
+		public string SaveGameName = "automated-test.orasav";
 
 		[Desc("Semicolon-separated local lobby commands to execute before automatically starting a map.")]
 		public string LobbyCommands;
@@ -92,6 +108,27 @@ namespace OpenRA
 			}
 
 			return commands;
+		}
+
+		public string HeadlessValidationError()
+		{
+			if (!Headless)
+				return null;
+
+			if (!string.IsNullOrEmpty(Connect) || !string.IsNullOrEmpty(URI))
+				return "Launch.Headless supports local automated games only.";
+
+			if (!string.IsNullOrEmpty(Replay))
+				return "Launch.Headless does not support replay playback.";
+
+			if (string.IsNullOrEmpty(Map) && string.IsNullOrEmpty(GameSave))
+				return "Launch.Headless requires Launch.Map or Launch.GameSave.";
+
+			if (!string.IsNullOrEmpty(Map) && !GetLobbyCommands().Any(c =>
+				c.Equals("option gamespeed max", StringComparison.OrdinalIgnoreCase)))
+				return "Launch.Headless map games require 'option gamespeed max' in Launch.LobbyCommands.";
+
+			return null;
 		}
 	}
 }

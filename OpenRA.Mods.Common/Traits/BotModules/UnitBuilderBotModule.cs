@@ -34,6 +34,9 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("What units should the AI have a maximum limit to train.")]
 		public readonly Dictionary<string, int> UnitLimits = null;
 
+		[Desc("Unit types produced only through explicit bot-module requests, never ordinary or learned-unit selection.")]
+		public readonly HashSet<string> ExternallyManagedTypes = new HashSet<string>();
+
 		[Desc("Total live and queued mobile-unit ceiling. Positive values replace individual UnitLimits.",
 			"With AdaptiveUnitCap enabled this is the initial lag-enforcement ceiling, not a limit during healthy play.")]
 		public readonly int TotalUnitLimit = 0;
@@ -391,6 +394,11 @@ namespace OpenRA.Mods.Common.Traits
 			queuedBuildRequests.Add(requestedActor);
 		}
 
+		void IBotRequestUnitProduction.CancelRequestedUnitProduction(IBot bot, string requestedActor)
+		{
+			queuedBuildRequests.RemoveAll(r => r == requestedActor);
+		}
+
 		int IBotRequestUnitProduction.RequestedProductionCount(IBot bot, string requestedActor)
 		{
 			return queuedBuildRequests.Count(r => r == requestedActor);
@@ -510,6 +518,9 @@ namespace OpenRA.Mods.Common.Traits
 		bool CanBuildCandidateUnit(ActorInfo unit)
 		{
 			var name = unit.Name;
+			if (Info.ExternallyManagedTypes.Contains(name))
+				return false;
+
 			if (!Info.UnitsToBuild.ContainsKey(name) && !sampledUnitTypes.Contains(name))
 				return false;
 
@@ -547,7 +558,8 @@ namespace OpenRA.Mods.Common.Traits
 			if (productionTypes.Count == 0)
 				return 0;
 
-			return Info.UnitsToBuild.Keys.Concat(sampledUnitTypes).Distinct().Where(world.Map.Rules.Actors.ContainsKey)
+			return Info.UnitsToBuild.Keys.Concat(sampledUnitTypes).Distinct()
+				.Where(t => !Info.ExternallyManagedTypes.Contains(t) && world.Map.Rules.Actors.ContainsKey(t))
 				.Where(t => world.Map.Rules.Actors[t].TraitInfoOrDefault<BuildableInfo>()?.Queue
 					.Any(productionTypes.Contains) == true)
 				.Select(AdaptiveProductionScore).DefaultIfEmpty(0).Max();
@@ -582,7 +594,8 @@ namespace OpenRA.Mods.Common.Traits
 
 		ActorInfo ChooseRandomUnitToBuild(ProductionQueue queue)
 		{
-			var buildableThings = queue.BuildableItems().Where(CanQueue).ToArray();
+			var buildableThings = queue.BuildableItems()
+				.Where(a => !Info.ExternallyManagedTypes.Contains(a.Name) && CanQueue(a)).ToArray();
 			if (!buildableThings.Any())
 				return null;
 
@@ -733,7 +746,7 @@ namespace OpenRA.Mods.Common.Traits
 
 				foreach (var sample in statistics.AdaptiveStats.Where(kv => kv.Value.BuiltCount > 0))
 				{
-					if (Info.UnitsToBuild.ContainsKey(sample.Key) || sampledUnitTypes.Contains(sample.Key) ||
+					if (Info.ExternallyManagedTypes.Contains(sample.Key) || Info.UnitsToBuild.ContainsKey(sample.Key) || sampledUnitTypes.Contains(sample.Key) ||
 						!world.Map.Rules.Actors.TryGetValue(sample.Key, out var actorInfo))
 						continue;
 

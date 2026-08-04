@@ -99,6 +99,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly Func<Actor, bool> isEnemyUnit;
 		readonly Predicate<Actor> unitCannotBeOrderedOrIsIdle;
 		readonly int maximumCaptureTargetOptions;
+		IBotTransportReservations[] transportReservations;
 		int minCaptureDelayTicks;
 		int minDemolitionDelayTicks;
 
@@ -124,6 +125,12 @@ namespace OpenRA.Mods.Common.Traits
 			unitCannotBeOrderedOrIsIdle = a => a.Owner != player || a.IsDead || !a.IsInWorld || a.IsIdle;
 
 			maximumCaptureTargetOptions = Math.Max(1, Info.MaximumCaptureTargetOptions);
+		}
+
+		protected override void Created(Actor self)
+		{
+			transportReservations = self.Owner.PlayerActor.TraitsImplementing<IBotTransportReservations>().ToArray();
+			base.Created(self);
 		}
 
 		protected override void TraitEnabled(Actor self)
@@ -178,10 +185,12 @@ namespace OpenRA.Mods.Common.Traits
 				return;
 
 			RetireFinishedAssignments(activeCapturers, "capture");
+			ReleaseTransportReservations(activeCapturers);
 
 			var capturers = world.ActorsHavingTrait<IPositionable>()
 				.Where(a => a.Owner == player && (a.IsIdle || activeCapturers.ContainsKey(a)) &&
-					Info.CapturingActorTypes.Contains(a.Info.Name) && a.Info.HasTraitInfo<CapturesInfo>())
+					Info.CapturingActorTypes.Contains(a.Info.Name) && a.Info.HasTraitInfo<CapturesInfo>() &&
+					!IsReservedForTransport(a))
 				.Select(a => new TraitPair<CaptureManager>(a, a.TraitOrDefault<CaptureManager>()))
 				.Where(tp => tp.Trait != null)
 				.OrderBy(tp => tp.Actor.ActorID)
@@ -397,10 +406,11 @@ namespace OpenRA.Mods.Common.Traits
 				return;
 
 			RetireFinishedAssignments(activeDemolitionUnits, "demolition");
+			ReleaseTransportReservations(activeDemolitionUnits);
 			var activeTargetIds = activeDemolitionUnits.Values.Select(assignment => assignment.Target.ActorID).ToHashSet();
 			var demolitionUnits = world.Actors.Where(a => a.Owner == player && a.IsIdle &&
 				Info.DemolitionActorTypes.Contains(a.Info.Name) && a.Info.HasTraitInfo<DemolitionInfo>() &&
-				!activeDemolitionUnits.ContainsKey(a)).ToArray();
+				!activeDemolitionUnits.ContainsKey(a) && !IsReservedForTransport(a)).ToArray();
 
 			foreach (var unit in demolitionUnits.OrderBy(unit => unit.ActorID))
 			{
@@ -424,6 +434,20 @@ namespace OpenRA.Mods.Common.Traits
 				activeDemolitionUnits.Add(unit, new SpecialistAssignment(target));
 				activeTargetIds.Add(target.ActorID);
 			}
+		}
+
+		void ReleaseTransportReservations(Dictionary<Actor, SpecialistAssignment> assignments)
+		{
+			foreach (var actor in assignments.Keys.Where(IsReservedForTransport).ToArray())
+			{
+				assignments.Remove(actor);
+				Debug("released {0}#{1} to a transport mission", actor.Info.Name, actor.ActorID);
+			}
+		}
+
+		bool IsReservedForTransport(Actor actor)
+		{
+			return transportReservations != null && transportReservations.Any(r => r.IsTransportReserved(actor));
 		}
 
 		void RetireFinishedAssignments(Dictionary<Actor, SpecialistAssignment> assignments, string action)

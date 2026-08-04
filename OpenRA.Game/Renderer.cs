@@ -71,14 +71,14 @@ namespace OpenRA
 		IBatchRenderer currentBatchRenderer;
 		RenderType renderType = RenderType.None;
 
-		public Renderer(IPlatform platform, GraphicSettings graphicSettings)
+		public Renderer(IPlatform platform, GraphicSettings graphicSettings, bool hidden = false)
 		{
 			this.platform = platform;
 			var resolution = GetResolution(graphicSettings);
 
 			Window = platform.CreateWindow(new Size(resolution.Width, resolution.Height),
 				graphicSettings.Mode, graphicSettings.UIScale, graphicSettings.BatchSize,
-				graphicSettings.VideoDisplay, graphicSettings.GLProfile, !graphicSettings.DisableLegacyGL);
+				graphicSettings.VideoDisplay, graphicSettings.GLProfile, !graphicSettings.DisableLegacyGL, hidden);
 
 			Context = Window.Context;
 

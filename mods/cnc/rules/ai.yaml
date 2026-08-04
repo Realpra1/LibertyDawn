@@ -50,15 +50,65 @@ Player:
     GrantConditionOnBotOwner@ironreaper:
 		Condition: enable-ironreaper-ai
 		Bots: ironreaper
+	GrantConditionOnBotOwner@ironreaper-tech-counter:
+		Condition: enable-ironreaper-tech-counter
+		Bots: ironreaper
     GrantConditionOnBotOwner@wavemaker:
 		Condition: enable-wavemaker-ai
 		Bots: wavemaker
     GrantConditionOnBotOwner@Easy:
 		Condition: enable-Easy-ai
 		Bots: Easy
-    GrantConditionOnBotOwner@Easiest:
+	GrantConditionOnBotOwner@Easiest:
 		Condition: enable-Easiest-ai
 		Bots: Easiest
+	TransportManagerBotModule:
+		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai || enable-Easiest-ai
+		TransportHelicopterTypes: tran
+		RescuePassengerTypes: e1, e2, e3, e4, e5, jeep, bggy, bike, apc, ltnk, ftnk, ctnk, arty, mtnk, msam, mlrs, stnk, htnk
+		GroundTransportTypes: apc
+		AssaultPassengerTypes: e1, e2, e3, e4, e5, e6, rmbo
+		AssaultEngineerTypes: e6
+		AssaultCommandoTypes: rmbo
+		AssaultTargetTypes: harv, sharv, proc, resonator, nuke, nuk2, fact, pyle, hand, afld, weap, hpad, hq, eye, tmpl
+		AssaultBotTypes: viki, ironreaper
+		HeavyDropPassengerTypes: htnk
+		HeavyDropTargetTypes: harv, sharv, proc, resonator, nuke, nuk2, fact, afld, weap, hpad, hq, eye, tmpl
+		HeavyDropBotTypes: brutalis, ironreaper
+		TransportHelicopterActor: tran
+		GroundTransportActor: apc
+		ScanInterval: 75
+		MaximumActiveMissions: 4
+		TransportHelicopterLimit: 10
+		PersistentBlockedScans: 3
+		MaximumCandidatesPerScan: 32
+		MoveIntentMaximumAge: 1500
+		MissionTimeoutTicks: 3000
+		RepairHealthPercent: 50
+		AssaultSelectionPercent: 50
+		MinimumAssaultPassengers: 3
+		MaximumAssaultPassengers: 8
+		AssaultGatherTimeoutTicks: 750
+		AssaultCooldownTicks: 7500
+		AssaultOrderRetryTicks: 75
+		HeavyDropMinimumGameTicks: 0
+		HeavyDropMinimumPassengers: 8
+		HeavyDropMaximumPassengers: 10
+		HeavyDropConcurrentBoarding: 10
+		HeavyDropBoardingRetryTicks: 750
+		HeavyDropGatherTimeoutTicks: 3000
+		HeavyDropMissionTimeoutTicks: 9000
+		HeavyDropCooldownTicks: 7500
+		HeavyDropReplanInterval: 150
+		HeavyDropTargetCandidateLimit: 12
+		HeavyDropLandingRadius: 8
+		HeavyDropFormationRadius: 8
+		HeavyDropFormationSpacing: 3
+		HeavyDropUnloadRangeCells: 1
+		HeavyDropDefenseRadius: 7
+		HeavyDropMaximumDefenderValue: 3400
+		HeavyDropMaximumAaDanger: 0
+		DebugLogging: true
 	OpeningGarrisonBotModule:
 		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai || enable-Easiest-ai
 		BarracksTypes: pyle, hand
@@ -278,6 +328,15 @@ Player:
 		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai || enable-Easiest-ai
 		ScanInterval: 125
 		SupplyActorTypes: truck
+		AlliedAidSupplyActor: truck
+		AlliedAidFactoryTypes: weap, afld
+		AlliedAidHarvesterTypes: harv, sharv
+		AlliedAidRefineryTypes: proc, resonator
+		AlliedAidMcvTypes: mcv
+		AlliedAidMaximumCash: 0
+		AlliedAidInterval: 7500
+		AlliedAidRequestTimeout: 750
+		SupplyStallRetryInterval: 250
 		DebugLogging: true
 	McvManagerBotModule:
 		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-Easy-ai || enable-Easiest-ai
@@ -344,12 +403,13 @@ Player:
 	SquadManagerBotModule@cabal:
 		RequiresCondition: enable-cabal-ai
 		SquadSize: 15
-		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck
+		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck, tran
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
 	UnitBuilderBotModule@cabal:
 		RequiresCondition: enable-cabal-ai
+		ExternallyManagedTypes: tran, truck
 		TotalUnitLimit: 400
 		AdaptiveUnitCap: true
 		AdaptiveUnitCapMinimum: 300
@@ -439,12 +499,13 @@ Player:
     SquadManagerBotModule@watson:
 		RequiresCondition: enable-watson-ai
 		SquadSize: 15
-		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck
+		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck, tran
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
 	UnitBuilderBotModule@watson:
 		RequiresCondition: enable-watson-ai
+		ExternallyManagedTypes: tran, truck
 		TotalUnitLimit: 400
 		AdaptiveUnitCap: true
 		AdaptiveUnitCapMinimum: 300
@@ -534,12 +595,13 @@ Player:
 	SquadManagerBotModule@hal9001:
 		RequiresCondition: enable-hal9001-ai
 		SquadSize: 8
-		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck
+		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck, tran
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
 	UnitBuilderBotModule@hal9001:
 		RequiresCondition: enable-hal9001-ai
+		ExternallyManagedTypes: tran, truck
 		TotalUnitLimit: 400
 		AdaptiveUnitCap: true
 		AdaptiveUnitCapMinimum: 300
@@ -660,19 +722,20 @@ Player:
     SquadManagerBotModule@brutalis:
 		RequiresCondition: enable-brutalis-ai
 		SquadSize: 20
-		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck
+		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck, tran
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca, stnk
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
     SquadManagerBotModule@wavemaker:
 		RequiresCondition: enable-wavemaker-ai
 		SquadSize: 120
-		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck
+		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck, tran
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca, stnk
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
     UnitBuilderBotModule@brutalis:
 		RequiresCondition: enable-brutalis-ai || enable-wavemaker-ai
+		ExternallyManagedTypes: tran, truck
 		TotalUnitLimit: 400
 		AdaptiveUnitCap: true
 		AdaptiveUnitCapMinimum: 300
@@ -835,12 +898,13 @@ Player:
     SquadManagerBotModule@viki:
 		RequiresCondition: enable-viki-ai
 		SquadSize: 30
-		ExcludeFromSquadsTypes: harv, sharv, mcv, a10, e6, rmbo, truck
+		ExcludeFromSquadsTypes: harv, sharv, mcv, a10, e6, rmbo, truck, tran
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
 	UnitBuilderBotModule@viki:
 		RequiresCondition: enable-viki-ai
+		ExternallyManagedTypes: tran, truck
 		TotalUnitLimit: 400
 		AdaptiveUnitCap: true
 		AdaptiveUnitCapMinimum: 300
@@ -1013,7 +1077,7 @@ Player:
 		RequiresCondition: enable-skynet-ai
 		SquadSize: 10
 		AttackForceInterval: 50
-		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck
+		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck, tran
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
@@ -1131,6 +1195,7 @@ Player:
 			obli: 1
 	UnitBuilderBotModule@skynet:
 		RequiresCondition: enable-skynet-ai
+		ExternallyManagedTypes: tran, truck
 		TotalUnitLimit: 400
 		AdaptiveUnitCap: true
 		AdaptiveUnitCapMinimum: 300
@@ -1230,14 +1295,13 @@ Player:
 		EnableOpeningPolicy: true
 		OpeningPowerTypes: nuk2, nuke
 		OpeningSiloTypes: silo
-		OpeningDefenseTypes: gtwr, gun
+		OpeningDefenseTypes: obli, gtwr, gun
 		OpeningBarracksTypes: pyle, hand
 		OpeningRefineryTypes: proc, resonator
 		OpeningFactoryTypes: weap, afld
 		OpeningRadarTypes: hq
-		OpeningOptionalStructureTypes: silo, gtwr, gun
+		OpeningOptionalStructureTypes: silo, obli, gtwr, gun
 		OpeningHarvesterTypes: sharv, harv
-		OpeningDefenseUnlockTypes: upgrade.recon1
 		OpeningMcvType: mcv
 		OpeningSoldierCount: 0
 		OpeningHarvesterCount: 5
@@ -1314,16 +1378,38 @@ Player:
 			tmpl: 5
 			fix: 5
             resonator: 20
+	TechnologyCounterBotModule@ironreaper:
+		RequiresCondition: enable-ironreaper-tech-counter
+		ScanInterval: 125
+		SwitchDelay: 3000
+		InitialBranch: economy
+		CounterBranches:
+			covert: recon
+			recon: economy
+			economy: covert
+		BranchUpgradeActors:
+			covert: upgrade.covert1, upgrade.covert2, upgrade.covert3
+			recon: upgrade.recon1, upgrade.recon2, upgrade.recon3
+			economy: upgrade.economy1, upgrade.economy2, upgrade.economy3
+		BranchDowngradeActors:
+			covert: downgrade.covert
+			recon: downgrade.recon
+			economy: downgrade.economy
+		PreserveExistingBranchesPrerequisites: techlevel.extra
+		CompleteAllBranchesPrerequisites: techlevel.extra
+		StatusLogInterval: 750
+		DebugLogging: true
     SquadManagerBotModule@ironreaper:
 		RequiresCondition: enable-ironreaper-ai
 		SquadSize: 20
         MaxBaseRadius: 49
-		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck
+		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck, tran
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
 	UnitBuilderBotModule@ironreaper:
 		RequiresCondition: enable-ironreaper-ai
+		ExternallyManagedTypes: tran, truck, upgrade.covert1, upgrade.covert2, upgrade.covert3, downgrade.covert, upgrade.recon1, upgrade.recon2, upgrade.recon3, downgrade.recon, upgrade.economy1, upgrade.economy2, upgrade.economy3, downgrade.economy
 		TotalUnitLimit: 400
 		AdaptiveUnitCap: true
 		AdaptiveUnitCapMinimum: 300
@@ -1491,12 +1577,13 @@ Player:
     SquadManagerBotModule@Easy:
 		RequiresCondition: enable-Easy-ai
 		SquadSize: 4
-		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck
+		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck, tran
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
 	UnitBuilderBotModule@Easy:
 		RequiresCondition: enable-Easy-ai
+		ExternallyManagedTypes: tran, truck
 		TotalUnitLimit: 400
 		AdaptiveUnitCap: true
 		AdaptiveUnitCapMinimum: 300
@@ -1636,12 +1723,13 @@ Player:
     SquadManagerBotModule@Easiest:
 		RequiresCondition: enable-Easiest-ai
 		SquadSize: 3
-		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck
+		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck, tran
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
 	UnitBuilderBotModule@Easiest:
 		RequiresCondition: enable-Easiest-ai
+		ExternallyManagedTypes: tran, truck
 		TotalUnitLimit: 400
 		AdaptiveUnitCap: true
 		AdaptiveUnitCapMinimum: 300

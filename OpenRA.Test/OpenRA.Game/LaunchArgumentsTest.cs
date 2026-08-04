@@ -50,5 +50,42 @@ namespace OpenRA.Test
 
 			Assert.Throws<ArgumentException>(() => launch.GetLobbyCommands());
 		}
+
+		[Test]
+		public void ParsesAutomatedSaveArguments()
+		{
+			var launch = new LaunchArguments(new Arguments(
+				"Launch.GameSave=test.orasav",
+				"Launch.SaveGameAtTick=1234",
+				"Launch.SaveGameName=checkpoint.orasav",
+				"Launch.RandomSeed=24680"));
+
+			Assert.That(launch.GameSave, Is.EqualTo("test.orasav"));
+			Assert.That(launch.SaveGameAtTick, Is.EqualTo(1234));
+			Assert.That(launch.SaveGameName, Is.EqualTo("checkpoint.orasav"));
+			Assert.That(launch.RandomSeed, Is.EqualTo(24680));
+		}
+
+		[Test]
+		public void AcceptsHeadlessMaxMapAutomation()
+		{
+			var launch = new LaunchArguments(new Arguments(
+				"Launch.Headless=true",
+				"Launch.Map=test.oramap",
+				"Launch.LobbyCommands=spectate;option gamespeed max"));
+
+			Assert.That(launch.Headless, Is.True);
+			Assert.That(launch.HeadlessValidationError(), Is.Null);
+		}
+
+		[TestCase("Launch.Headless=true", "Launch.Headless requires Launch.Map or Launch.GameSave.")]
+		[TestCase("Launch.Headless=true|Launch.Map=test.oramap|Launch.LobbyCommands=spectate;option gamespeed fastest", "Launch.Headless map games require 'option gamespeed max' in Launch.LobbyCommands.")]
+		[TestCase("Launch.Headless=true|Launch.Connect=localhost:1234|Launch.Map=test.oramap|Launch.LobbyCommands=option gamespeed max", "Launch.Headless supports local automated games only.")]
+		[TestCase("Launch.Headless=true|Launch.Replay=test.orarep", "Launch.Headless does not support replay playback.")]
+		public void RejectsInvalidHeadlessAutomation(string arguments, string expectedError)
+		{
+			var launch = new LaunchArguments(new Arguments(arguments.Split('|')));
+			Assert.That(launch.HeadlessValidationError(), Is.EqualTo(expectedError));
+		}
 	}
 }

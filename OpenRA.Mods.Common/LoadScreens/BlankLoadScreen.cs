@@ -33,7 +33,7 @@ namespace OpenRA.Mods.Common.LoadScreens
 
 		public virtual void Display()
 		{
-			if (Game.Renderer == null || initialized)
+			if (Game.Renderer == null || initialized || Game.IsHeadlessAutomationRequested)
 				return;
 
 			// Draw a black screen
@@ -47,6 +47,13 @@ namespace OpenRA.Mods.Common.LoadScreens
 		public virtual void StartGame(Arguments args)
 		{
 			Launch = new LaunchArguments(args);
+			var headlessError = Launch.HeadlessValidationError();
+			if (headlessError != null)
+				throw new ArgumentException(headlessError);
+
+			if (Launch.Headless)
+				Game.ConfigureHeadlessAutomation();
+
 			Ui.ResetAll();
 			Game.Settings.Save();
 
@@ -57,6 +64,9 @@ namespace OpenRA.Mods.Common.LoadScreens
 				Game.BenchmarkMode(Launch.Benchmark);
 			}
 
+			if (Launch.SaveGameAtTick >= 0)
+				Game.ConfigureAutomatedSave(Launch.SaveGameAtTick, Launch.SaveGameName);
+
 			// Join a server directly
 			var connect = Launch.GetConnectEndPoint();
 			if (connect != null)
@@ -66,10 +76,18 @@ namespace OpenRA.Mods.Common.LoadScreens
 				return;
 			}
 
+			// Load a local game save directly
+			if (!string.IsNullOrEmpty(Launch.GameSave))
+			{
+				Game.LoadGameSave(Launch.GameSave);
+				return;
+			}
+
 			// Start a map directly
 			if (!string.IsNullOrEmpty(Launch.Map))
 			{
-				Game.LoadMap(Launch.Map, Launch.GetLobbyCommands());
+				Game.LoadMap(Launch.Map, Launch.GetLobbyCommands(),
+					Launch.RandomSeed == int.MinValue ? (int?)null : Launch.RandomSeed);
 				return;
 			}
 

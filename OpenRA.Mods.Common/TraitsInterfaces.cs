@@ -532,7 +532,14 @@ namespace OpenRA.Mods.Common.Traits
 	public interface IBotRequestUnitProduction
 	{
 		void RequestUnitProduction(IBot bot, string requestedActor);
+		void CancelRequestedUnitProduction(IBot bot, string requestedActor);
 		int RequestedProductionCount(IBot bot, string requestedActor);
+	}
+
+	[RequireExplicitImplementation]
+	public interface IBotTransportReservations
+	{
+		bool IsTransportReserved(Actor actor);
 	}
 
 	[RequireExplicitImplementation]
@@ -640,6 +647,14 @@ namespace OpenRA.Mods.Common.Traits
 		Horizontal = 1,
 		Vertical = 2,
 		Turn = 4
+	}
+
+	public enum MoveResult
+	{
+		InProgress,
+		CompleteCanceled,
+		CompleteDestinationReached,
+		CompleteDestinationBlocked,
 	}
 
 	[RequireExplicitImplementation]
