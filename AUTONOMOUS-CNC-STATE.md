@@ -3,7 +3,7 @@
 - Task sheet: `AUTONOMOUS-CNC-TASKS.md`
 - Deferred work: `DEFERRED_WORK.md`
 - Completed tasks: `CNC-19` (11 cycles, PR #38 green); `CNC-20` (12 cycles, PR #39 green); `CNC-21` (12 cycles, PR #40 green); `CNC-22` (8 cycles, PR #41 green); `CNC-23` (11 cycles, PR #42 green); `CNC-24` (14 cycles, PR #43 green); `CNC-24.5` (20 cycles, PR #45 green); `CNC-24.6` (14 cycles, PR #46 green); `CNC-25` (22 resumed cycles plus retained 28-cycle history, PR #44 green); `CNC-26` (12 cycles, PR #47 green); `CNC-26A` (11 cycles, PR #48 green)
-- Active task: none; autonomous loop paused after completing CNC-26A at the user's request
+- Active task: CNC-66 at cycle 0/30 on branch `agent/cnc66-validator`, based on `origin/agent/cnc-task-sheet-updates` (PR #50 head) so the unmerged durable queue updates remain in the cumulative series.
 - Integration checkpoint: PR #49 (`agent/cnc-workflow-portability` -> `bleed`) contains all cumulative work through CNC-26A plus the portable skill and coordinator files.
 - Next cumulative base: after PR #49 merges, fetch and use `origin/bleed`; while it remains open, use `origin/agent/cnc-workflow-portability` so no completed work is lost.
 - Publication: one task branch and pull request; never push directly to `bleed`
@@ -32,4 +32,7 @@
 - CNC-26A publication: commit `e5883edacb` is pushed on `agent/cnc26a-all-technologies`; draft PR #48 targets `agent/cnc26-tech-switching`, is mergeable, and has green Linux/Windows checks: https://github.com/Realpra1/LibertyDawn/pull/48
 - CNC-26A completion gate: PR #48 is clean and both required checks passed at commit `e5883edacb` (Linux 3m06s, Windows 4m17s); task complete at 11/30 cycles. PR: https://github.com/Realpra1/LibertyDawn/pull/48
 - Next eligible task: CNC-66, using the post-PR-#49 base described above. CNC-26B follows it. CNC-26C is permanently pinned last: complete every other current and future task first, then ask its required user-design questions before implementation.
-- Session state: autonomous work is paused, no task branch is active, and the previous Windows presentation-mode keep-awake helper was stopped. Start a new reversible session helper only when autonomous work resumes.
+- CNC-66 literal acceptance: the documented Windows `utility.cmd cnc --check-yaml` path must complete the full CNC validator set with useful stage/progress diagnostics in bounded time and the same failures/results as the direct utility path. It must not enter an interactive prompt loop, silently skip maps/lints, or change LibertyDawn gameplay/content.
+- CNC-66 contention/coverage inventory: Windows batch wrapper and argument forwarding, build-on-demand, utility executable startup, mod discovery/loading, lint selection, rules/sequences/maps loading, map enumeration, explicit/conditional interface checks, missing-sprite checks, process exit/timeout handling, CI shell differences, and existing launcher/debug processes.
+- CNC-66 initial evidence: CNC-24.5 recorded the interactive-wrapper mistake while the direct utility executable completed full validation in 19 seconds; CNC-26 later reproduced a silent 20-minute `utility.cmd` timeout and CNC-26A reproduced a silent five-minute interface-utility timeout. No validator process is currently running, and no dedicated CNC-66 raw log exists yet.
+- Session state: autonomous CNC-66 work is active. Windows presentation mode was requested with `PresentationSettings.exe /start` as the reversible session keep-awake mechanism; run `PresentationSettings.exe /stop` when this autonomous run pauses or ends.
