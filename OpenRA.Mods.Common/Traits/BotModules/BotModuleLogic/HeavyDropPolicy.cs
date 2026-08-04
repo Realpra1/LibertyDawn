@@ -37,6 +37,11 @@ namespace OpenRA.Mods.Common.Traits
 			return Math.Max(0, concurrentLimit - Math.Max(0, activeBoarding));
 		}
 
+		public static bool CanBoardAtPickup(bool atAssignedCell, bool landed, bool passengerCanEnter)
+		{
+			return atAssignedCell && landed && passengerCanEnter;
+		}
+
 		public static long TargetScore(int targetValue, int defenderValue, int distanceCells, int behindDot)
 		{
 			var value = Math.Max(0, targetValue);
