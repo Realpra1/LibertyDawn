@@ -217,17 +217,15 @@ namespace OpenRA.Mods.Common.Traits
 				scanTicks = Info.ScanInterval;
 				RefreshSquadManager();
 				AdvanceMissions();
+
+				// Reserve a complete strategic wave before opportunistic one-unit transport missions
+				// can consume its carriers or passengers.
+				heavyDrop.Tick(enabledBot);
 				var createdRescue = coordinator.MissionCount < Info.MaximumActiveMissions && TryCreateRescueMission();
 				if (!createdRescue)
-				{
-					heavyDrop.Tick(enabledBot);
 					infantryAssault.Tick(enabledBot);
-				}
 				else
-				{
-					heavyDrop.Advance(enabledBot);
 					infantryAssault.Advance(enabledBot);
-				}
 			}
 
 			if (--serviceTicks <= 0)

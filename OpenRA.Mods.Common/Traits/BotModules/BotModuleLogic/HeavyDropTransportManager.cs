@@ -71,11 +71,13 @@ namespace OpenRA.Mods.Common.Traits
 			public CPos LandingCenter;
 			public WaveStage Stage;
 			public int LastPlanTick;
+			public int TimeoutOriginTick;
+			public bool ReturningToAssembly;
 
 			public Wave(int id, int tick, List<Pair> pairs, DropPlan plan)
 			{
 				Id = id;
-				CreatedTick = LastPlanTick = tick;
+				CreatedTick = LastPlanTick = TimeoutOriginTick = tick;
 				Pairs = pairs;
 				Target = plan.Target;
 				LandingCenter = plan.LandingCenter;
@@ -195,7 +197,7 @@ namespace OpenRA.Mods.Common.Traits
 				return;
 			}
 
-			var pickupDestinations = FindDistinctPickupDestinations(passengers);
+			var pickupDestinations = FindDistinctPickupDestinations(passengers, transports);
 			if (pickupDestinations.Count < passengers.Count)
 			{
 				Debug("rejected wave assembly: only {0}/{1} distinct Mammoth-passable pickup cells",
@@ -278,7 +280,7 @@ namespace OpenRA.Mods.Common.Traits
 			foreach (var pair in livePairs.Where(p => !IsLoaded(p) && !IsBoarding(p) && ReadyToRetry(p))
 				.Take(availableSlots))
 			{
-				issueRoutedAirMove(pair.Transport, pair.PickupDestination, null);
+				IssueRoutedLanding(pair.Transport, pair.PickupDestination);
 				pair.PickupOrdered = true;
 				pair.LastOrderTick = world.WorldTick;
 			}
@@ -305,16 +307,20 @@ namespace OpenRA.Mods.Common.Traits
 			foreach (var pair in pairs.Where(p => !IsLoaded(p)).OrderBy(p => p.Passenger.ActorID))
 			{
 				var passenger = pair.Passenger.TraitOrDefault<Passenger>();
-				Debug("wave {0} unboarded pair: carrier={1} at {2}, passenger={3} at {4}, pickup={5}, reserved={6}, idle={7}",
+				var aircraft = pair.Transport.TraitOrDefault<Aircraft>();
+				Debug("wave {0} unboarded pair: carrier={1} at {2}, passenger={3} at {4}, pickup={5}, distance2={6}, " +
+					"reserved={7}, idle={8}, landed={9}, carrierActivity={10}, passengerActivity={11}",
 					wave.Id, pair.Transport, pair.Transport.Location, pair.Passenger, pair.Passenger.Location,
-					pair.PickupDestination, passenger?.ReservedCargo == pair.Transport.TraitOrDefault<Cargo>(),
-					pair.Passenger.IsIdle);
+					pair.PickupDestination, (pair.Transport.Location - pair.PickupDestination).LengthSquared,
+					passenger?.ReservedCargo == pair.Transport.TraitOrDefault<Cargo>(), pair.Passenger.IsIdle,
+					aircraft?.AtLandAltitude == true, pair.Transport.CurrentActivity?.GetType().Name ?? "none",
+					pair.Passenger.CurrentActivity?.GetType().Name ?? "none");
 			}
 		}
 
 		void AdvanceTravelling(IBot bot)
 		{
-			if (world.WorldTick - wave.CreatedTick >= info.HeavyDropMissionTimeoutTicks)
+			if (world.WorldTick - wave.TimeoutOriginTick >= info.HeavyDropMissionTimeoutTicks)
 			{
 				DebugTravelFailure("mission timeout");
 				BeginAbortUnload(bot, "mission timeout");
@@ -329,7 +335,8 @@ namespace OpenRA.Mods.Common.Traits
 				return;
 			}
 
-			if (world.WorldTick - wave.LastPlanTick >= info.HeavyDropReplanInterval)
+			if (!wave.ReturningToAssembly &&
+				world.WorldTick - wave.LastPlanTick >= info.HeavyDropReplanInterval)
 			{
 				wave.LastPlanTick = world.WorldTick;
 				if (!IsCurrentPlanSafe())
@@ -337,7 +344,8 @@ namespace OpenRA.Mods.Common.Traits
 					var replacement = FindDropPlan(loadedPairs[0].Transport.Location, loadedPairs[0].Passenger);
 					if (replacement == null)
 					{
-						Debug("wave {0} holding: destination became defended and no safe replacement exists", wave.Id);
+						ReturnWaveToAssembly(bot, loadedPairs,
+							"destination became defended and no safe replacement exists");
 						return;
 					}
 
@@ -369,7 +377,7 @@ namespace OpenRA.Mods.Common.Traits
 
 				if (IsCarrierIdle(pair.Transport) && ReadyToRetry(pair))
 				{
-					issueRoutedAirMove(pair.Transport, pair.Destination, null);
+					IssueRoutedLanding(pair.Transport, pair.Destination);
 					pair.LastOrderTick = world.WorldTick;
 				}
 			}
@@ -396,7 +404,8 @@ namespace OpenRA.Mods.Common.Traits
 				p.Transport.TraitOrDefault<Cargo>()?.IsEmpty() == false).ToList();
 			if (carrying.Count == 0)
 			{
-				FinishWave("ground-force handoff complete");
+				FinishWave(wave.ReturningToAssembly ? "safe assembly return complete" :
+					"ground-force handoff complete");
 				return;
 			}
 
@@ -407,18 +416,34 @@ namespace OpenRA.Mods.Common.Traits
 			}
 		}
 
+		void ReturnWaveToAssembly(IBot bot, List<Pair> loadedPairs, string reason)
+		{
+			wave.ReturningToAssembly = true;
+			wave.TimeoutOriginTick = world.WorldTick;
+			foreach (var pair in loadedPairs)
+				pair.Destination = pair.PickupDestination;
+
+			IssueWaveTravel(bot, $"{reason}; returning to safe assembly cells");
+		}
+
 		void IssueWaveTravel(IBot bot, string reason)
 		{
 			var travelling = 0;
 			foreach (var pair in wave.Pairs.Where(p => IsPairUsable(p) && IsLoaded(p)))
 			{
-				issueRoutedAirMove(pair.Transport, pair.Destination, null);
+				IssueRoutedLanding(pair.Transport, pair.Destination);
 				pair.LastOrderTick = world.WorldTick;
 				travelling++;
 			}
 
 			Debug("wave {0} travelling with {1} carriers to {2}: {3}",
 				wave.Id, travelling, wave.LandingCenter, reason);
+		}
+
+		void IssueRoutedLanding(Actor transport, CPos destination)
+		{
+			issueRoutedAirMove(transport, destination,
+				new Order("Land", transport, Target.FromCell(world, destination), true));
 		}
 
 		void BeginAbortUnload(IBot bot, string reason)
@@ -507,18 +532,21 @@ namespace OpenRA.Mods.Common.Traits
 				passenger.CanEnterCell(c, check: BlockedByActor.Immovable));
 		}
 
-		List<CPos> FindDistinctPickupDestinations(List<Actor> passengers)
+		List<CPos> FindDistinctPickupDestinations(List<Actor> passengers, List<Actor> transports)
 		{
 			var used = new HashSet<CPos>();
 			var result = new List<CPos>();
-			foreach (var passenger in passengers)
+			for (var i = 0; i < passengers.Count; i++)
 			{
+				var passenger = passengers[i];
 				var mobile = passenger.TraitOrDefault<Mobile>();
-				var pickup = world.Map.FindTilesInCircle(passenger.Location, 5)
+				var aircraft = transports[i].TraitOrDefault<Aircraft>();
+				var pickup = world.Map.FindTilesInCircle(passenger.Location, info.HeavyDropFormationRadius)
 					.OrderBy(c => (c - passenger.Location).LengthSquared).ThenBy(c => c.X).ThenBy(c => c.Y)
 					.Cast<CPos?>().FirstOrDefault(c => c.HasValue && c.Value != passenger.Location &&
-						!used.Contains(c.Value) && mobile != null && mobile.CanEnterCell(c.Value,
-							check: BlockedByActor.All));
+						!used.Contains(c.Value) && mobile != null && aircraft != null &&
+						aircraft.CanLand(c.Value, blockedByMobile: false) &&
+						HasReachableBoardingApproach(passenger, mobile, c.Value));
 				if (!pickup.HasValue)
 					continue;
 
@@ -527,6 +555,21 @@ namespace OpenRA.Mods.Common.Traits
 			}
 
 			return result;
+		}
+
+		bool HasReachableBoardingApproach(Actor passenger, Mobile mobile, CPos pickup)
+		{
+			foreach (var approach in world.Map.FindTilesInCircle(pickup, 1).Where(c => c != pickup))
+			{
+				if (!mobile.CanEnterCell(approach, check: BlockedByActor.Immovable))
+					continue;
+
+				if (approach == passenger.Location || mobile.Pathfinder.FindUnitPath(passenger.Location,
+					approach, passenger, null, BlockedByActor.Immovable).Count > 0)
+					return true;
+			}
+
+			return false;
 		}
 
 		CPos MoveableCellNear(Actor passenger, CPos intended)

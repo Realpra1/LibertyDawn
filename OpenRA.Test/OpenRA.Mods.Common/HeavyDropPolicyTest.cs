@@ -19,6 +19,7 @@ namespace OpenRA.Test.Mods.Common
 		[TestCase(true, 10000, 7500, 9, 10, 10, false)]
 		[TestCase(true, 10000, 7500, 10, 9, 10, false)]
 		[TestCase(true, 10000, 7500, 10, 10, 10, true)]
+		[TestCase(true, 0, 0, 10, 10, 10, true)]
 		public void PreparationRequiresEligibleLateGameAndCompleteWave(bool eligible, int tick,
 			int minimumTick, int passengers, int transports, int desired, bool expected)
 		{
