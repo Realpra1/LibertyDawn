@@ -1,0 +1,4 @@
+interface:
+  display_name: "Autonomous CNC Coding"
+  short_description: "Autonomously build and test CNC features"
+  default_prompt: "Use $autonomous-cnc-coding to take the next eligible CNC task through implementation, game testing, and a pull request."

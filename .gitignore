@@ -58,3 +58,4 @@ update.log
 # Local dev
 /vendor-libs/
 /.worktrees/
+/AUTONOMOUS-CNC-LOGS/
