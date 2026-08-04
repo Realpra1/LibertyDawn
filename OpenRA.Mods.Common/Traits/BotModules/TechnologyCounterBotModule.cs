@@ -40,6 +40,9 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("When these prerequisites are owned, retain existing branches while adding the desired branch.")]
 		public readonly string[] PreserveExistingBranchesPrerequisites = { "techlevel.extra" };
 
+		[Desc("When these prerequisites are owned, complete every configured branch instead of only the current counter branch.")]
+		public readonly string[] CompleteAllBranchesPrerequisites = { "techlevel.extra" };
+
 		[Desc("Minimum ticks between repeated blocked-state diagnostics.")]
 		public readonly int StatusLogInterval = 750;
 
@@ -95,6 +98,7 @@ namespace OpenRA.Mods.Common.Traits
 		string observedBranch;
 		string desiredBranch;
 		string completedDesiredBranch;
+		bool completedAllBranches;
 		string lastBlockedReason;
 		string lastProgressSignature;
 
@@ -158,7 +162,9 @@ namespace OpenRA.Mods.Common.Traits
 				observedBranch, world.WorldTick, observedSinceTick, Info.SwitchDelay, Info.CounterBranches);
 			if (!string.Equals(nextDesired, desiredBranch, StringComparison.Ordinal))
 			{
-				CancelManagedTransitions(bot);
+				if (!HasPrerequisites(Info.CompleteAllBranchesPrerequisites))
+					CancelManagedTransitions(bot);
+
 				Debug("mature counter decision changed desired branch {0} -> {1} against {2}",
 					desiredBranch ?? "none", nextDesired ?? "none", observedBranch ?? "none");
 				desiredBranch = nextDesired;
@@ -236,8 +242,29 @@ namespace OpenRA.Mods.Common.Traits
 			}
 
 			var progress = OwnProgress(out var ownedActorTypes);
-			var preserveExisting = Info.PreserveExistingBranchesPrerequisites.Length > 0 &&
-				techTree.HasPrerequisites(Info.PreserveExistingBranchesPrerequisites);
+			var completeAllBranches = HasPrerequisites(Info.CompleteAllBranchesPrerequisites);
+			var preserveExisting = completeAllBranches || HasPrerequisites(Info.PreserveExistingBranchesPrerequisites);
+			if (completeAllBranches)
+			{
+				var nextBranchUpgrade = TechnologyCounterLogic.NextUpgradeAcrossBranches(
+					Info.BranchUpgradeActors, desiredBranch, ownedActorTypes);
+				if (nextBranchUpgrade == null)
+				{
+					if (!completedAllBranches)
+					{
+						completedAllBranches = true;
+						Debug("completed all configured technology branches under the all-technologies prerequisite");
+					}
+
+					ClearBlocked();
+					return;
+				}
+
+				completedAllBranches = false;
+				Request(bot, nextBranchUpgrade, "complete all technology branches");
+				return;
+			}
+
 			var branchToDowngrade = preserveExisting ? null :
 				TechnologyCounterLogic.BranchToDowngrade(progress, desiredBranch);
 			if (branchToDowngrade != null)
@@ -266,6 +293,11 @@ namespace OpenRA.Mods.Common.Traits
 			}
 
 			Request(bot, nextUpgrade, $"pursue {desiredBranch} against {observedBranch ?? "unobserved enemy technology"}");
+		}
+
+		bool HasPrerequisites(string[] prerequisites)
+		{
+			return prerequisites != null && prerequisites.Length > 0 && techTree.HasPrerequisites(prerequisites);
 		}
 
 		void Request(IBot bot, string actorType, string reason)

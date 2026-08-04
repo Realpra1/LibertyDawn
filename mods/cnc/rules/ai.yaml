@@ -1396,6 +1396,7 @@ Player:
 			recon: downgrade.recon
 			economy: downgrade.economy
 		PreserveExistingBranchesPrerequisites: techlevel.extra
+		CompleteAllBranchesPrerequisites: techlevel.extra
 		StatusLogInterval: 750
 		DebugLogging: true
     SquadManagerBotModule@ironreaper:
