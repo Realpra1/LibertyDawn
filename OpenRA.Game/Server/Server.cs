@@ -160,7 +160,7 @@ namespace OpenRA.Server
 			}
 		}
 
-		public Server(List<IPEndPoint> endpoints, ServerSettings settings, ModData modData, ServerType type)
+		public Server(List<IPEndPoint> endpoints, ServerSettings settings, ModData modData, ServerType type, int? configuredRandomSeed = null)
 		{
 			Log.AddChannel("server", "server.log", true);
 
@@ -230,7 +230,7 @@ namespace OpenRA.Server
 
 			playerDatabase = modData.Manifest.Get<PlayerDatabase>();
 
-			randomSeed = (int)DateTime.Now.ToBinary();
+			randomSeed = configuredRandomSeed ?? (int)DateTime.Now.ToBinary();
 
 			if (type != ServerType.Local && settings.EnableGeoIP)
 				GeoIP.Initialize();
