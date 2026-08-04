@@ -50,5 +50,18 @@ namespace OpenRA.Test
 
 			Assert.Throws<ArgumentException>(() => launch.GetLobbyCommands());
 		}
+
+		[Test]
+		public void ParsesAutomatedSaveArguments()
+		{
+			var launch = new LaunchArguments(new Arguments(
+				"Launch.GameSave=test.orasav",
+				"Launch.SaveGameAtTick=1234",
+				"Launch.SaveGameName=checkpoint.orasav"));
+
+			Assert.That(launch.GameSave, Is.EqualTo("test.orasav"));
+			Assert.That(launch.SaveGameAtTick, Is.EqualTo(1234));
+			Assert.That(launch.SaveGameName, Is.EqualTo("checkpoint.orasav"));
+		}
 	}
 }
