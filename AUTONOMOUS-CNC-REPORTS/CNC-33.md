@@ -4,6 +4,7 @@
 - Cycles used: 30 of 30
 - Branch: `agent/cnc33-smart-economy`
 - Base: green CNC-32 head `1ef4e17d70`
+- Pull request: https://github.com/Realpra1/LibertyDawn/pull/60
 
 ## Observable goal
 
