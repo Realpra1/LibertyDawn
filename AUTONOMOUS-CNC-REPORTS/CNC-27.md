@@ -1,6 +1,6 @@
 # CNC-27: Stealth-Tank Squads
 
-- Status: implementation complete; awaiting final green GitHub checks
+- Status: complete
 - Cycles used: 15 of 30
 - Branch: `agent/cnc27-stealth-squads`
 - Base: `origin/agent/cnc26b-branch-config`
@@ -53,6 +53,7 @@ Ignored raw evidence and fixture maps are under `AUTONOMOUS-CNC-LOGS/CNC-27/`.
 - Full CNC YAML/map validator: passed in 20.7 seconds.
 - Final adversarial gate: three consecutive post-fix passes (cycles 13-15), including two natural game completions and one focused lifecycle regression.
 - Real-game errors: no new fatal, unhandled, or Lua error in the final clean cycles. The recurring map-cache warning names the user's pre-existing invalid `TibTest.oramap`, not the loaded test fixture.
+- GitHub implementation head `bab0eb56e4`: Linux passed in 3m17s and Windows passed in 3m59s; PR #54 is mergeable.
 
 ## Deferred boundary
 
