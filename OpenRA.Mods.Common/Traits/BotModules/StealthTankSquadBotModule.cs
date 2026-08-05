@@ -14,11 +14,14 @@ using OpenRA.Traits;
 
 namespace OpenRA.Mods.Common.Traits
 {
-	[Desc("Manages a bounded number of specialist stealth-tank harassment and anti-tank squads.")]
+	[Desc("Manages a bounded number of specialist stealth harassment and attack squads.")]
 	public class StealthTankSquadBotModuleInfo : ConditionalTraitInfo
 	{
 		[Desc("Actor types eligible for specialist stealth squads.")]
 		public readonly HashSet<string> UnitTypes = new HashSet<string>();
+
+		[Desc("Short diagnostic name used to distinguish multiple configured specialist managers.")]
+		public readonly string SquadLabel = "stealth-tank";
 
 		[Desc("Actor-specific harassment priorities. Unlisted harvesters, structures and infantry use class fallbacks.")]
 		public readonly Dictionary<string, int> HarassmentTargetPriorities = new Dictionary<string, int>();
@@ -29,25 +32,47 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Actor-specific cooperative attack priorities. Tank target types otherwise receive the highest fallback.")]
 		public readonly Dictionary<string, int> AttackTargetPriorities = new Dictionary<string, int>();
 
+		[Desc("Structure armor types and their harassment priorities. Actor-specific priorities take precedence.")]
+		public readonly Dictionary<string, int> HarassmentArmorPriorities = new Dictionary<string, int>();
+
+		[Desc("Target types that harassment groups must never deliberately select.")]
+		public readonly BitSet<TargetableType> ExcludedHarassmentTargetTypes = default(BitSet<TargetableType>);
+
+		[Desc("Target types whose weapons do not make a harassment route dangerous. Detector ranges still apply.")]
+		public readonly BitSet<TargetableType> IgnoredHarassmentWeaponThreatTypes = default(BitSet<TargetableType>);
+
 		public readonly int ScanInterval = 75;
 		public readonly int OrderInterval = 75;
 		public readonly int MaximumTargetCandidates = 48;
+		public readonly int MaximumHarassmentGroups = 2;
+		public readonly bool IncludeAttackGroup = true;
+		public readonly bool ReserveOpeningPair = true;
 		public readonly int ThreatRangeBufferCells = 2;
 		public readonly int DetectorRangeBufferCells = 2;
 		public readonly int KiteRangeMarginCells = 1;
 		public readonly int CarefulClearValueRatio = 5;
 		public readonly int MinimumLateHarassmentGroupSize = 3;
 		public readonly int TargetSwitchImprovementPercent = 25;
+		public readonly int InfantryTargetPriority = 1200;
+		public readonly int StructureTargetPriority = 500;
+		public readonly int TankTargetPriority = 1500;
+		public readonly int InfantryClusterRadiusCells = 0;
+		public readonly int InfantryClusterBonusPercentPerNearbyActor = 0;
+		public readonly int MaximumInfantryClusterMultiplierPercent = 100;
+		public readonly bool CrushInfantryTargets = true;
 		public readonly bool DebugLogging = false;
 
 		public override void RulesetLoaded(Ruleset rules, ActorInfo ai)
 		{
 			base.RulesetLoaded(rules, ai);
-			if (UnitTypes.Count == 0 || ScanInterval <= 0 || OrderInterval <= 0 || MaximumTargetCandidates <= 0 ||
+			if (UnitTypes.Count == 0 || string.IsNullOrWhiteSpace(SquadLabel) || ScanInterval <= 0 || OrderInterval <= 0 ||
+				MaximumTargetCandidates <= 0 || MaximumHarassmentGroups <= 0 ||
 				ThreatRangeBufferCells < 0 || DetectorRangeBufferCells < 0 ||
 				KiteRangeMarginCells < 0 || CarefulClearValueRatio <= 0 || MinimumLateHarassmentGroupSize <= 0 ||
-				TargetSwitchImprovementPercent < 0)
-				throw new YamlException("Stealth-tank squad types, intervals, bounds, buffers, and ratios must be positive and valid.");
+				TargetSwitchImprovementPercent < 0 || InfantryTargetPriority < 0 || StructureTargetPriority < 0 ||
+				TankTargetPriority < 0 || InfantryClusterRadiusCells < 0 || InfantryClusterBonusPercentPerNearbyActor < 0 ||
+				MaximumInfantryClusterMultiplierPercent < 100)
+				throw new YamlException("Stealth squad types, labels, intervals, bounds, priorities, buffers, and ratios must be positive and valid.");
 		}
 
 		public override object Create(ActorInitializer init) { return new StealthTankSquadBotModule(init.Self, this); }
@@ -77,7 +102,6 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		static readonly BitSet<TargetableType> TankTargetTypes = new BitSet<TargetableType>("Tank");
-		static readonly BitSet<TargetableType> VehicleTargetTypes = new BitSet<TargetableType>("Vehicle");
 		static readonly BitSet<TargetableType> GroundTargetTypes = new BitSet<TargetableType>("Ground");
 		static readonly BitSet<TargetableType> InfantryTargetTypes = new BitSet<TargetableType>("Infantry");
 		static readonly BitSet<TargetableType> StructureTargetTypes = new BitSet<TargetableType>("Structure");
@@ -85,7 +109,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly World world;
 		readonly Player player;
 		readonly HashSet<uint> reserved = new HashSet<uint>();
-		readonly SpecialistGroup[] groups = { new SpecialistGroup(0), new SpecialistGroup(1), new SpecialistGroup(2) };
+		readonly SpecialistGroup[] groups;
 		IBot bot;
 		IBotTransportReservations[] transportReservations;
 		int scanTicks;
@@ -96,6 +120,8 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			world = self.World;
 			player = self.Owner;
+			var groupCount = info.MaximumHarassmentGroups + (info.IncludeAttackGroup ? 1 : 0);
+			groups = Enumerable.Range(0, groupCount).Select(i => new SpecialistGroup(i)).ToArray();
 		}
 
 		protected override void Created(Actor self)
@@ -161,7 +187,7 @@ namespace OpenRA.Mods.Common.Traits
 		void Rebalance()
 		{
 			var eligible = world.Actors.Where(IsEligible).OrderBy(a => a.ActorID).ToList();
-			var desired = StealthTankSquadPolicy.SpecialistCount(eligible.Count);
+			var desired = StealthTankSquadPolicy.SpecialistCount(eligible.Count, Info.ReserveOpeningPair);
 			var selected = eligible.Where(a => reserved.Contains(a.ActorID)).Take(desired).ToList();
 			selected.AddRange(eligible.Where(a => !reserved.Contains(a.ActorID)).Take(desired - selected.Count));
 
@@ -174,7 +200,8 @@ namespace OpenRA.Mods.Common.Traits
 				group.Units.Clear();
 			for (var i = 0; i < selected.Count; i++)
 			{
-				var groupIndex = StealthTankSquadPolicy.GroupForIndex(i, selected.Count);
+				var groupIndex = StealthTankSquadPolicy.GroupForIndex(i, selected.Count,
+					Info.MaximumHarassmentGroups, Info.IncludeAttackGroup);
 				if (groupIndex >= 0)
 					groups[groupIndex].Units.Add(selected[i]);
 			}
@@ -185,9 +212,9 @@ namespace OpenRA.Mods.Common.Traits
 					group.Target = null;
 
 			if (Info.DebugLogging && (eligible.Count != lastEligibleCount || !previous.SetEquals(reserved)))
-				Log.Write("debug", "AI stealth squads [{0}]: total={1} reserved={2} groups={3}/{4}/{5} ordinary={6}.",
-					player.PlayerName, eligible.Count, reserved.Count, groups[0].Units.Count, groups[1].Units.Count,
-					groups[2].Units.Count, eligible.Count - reserved.Count);
+				Log.Write("debug", "AI stealth squads {0} [{1}]: total={2} reserved={3} groups={4} ordinary={5}.",
+					Info.SquadLabel, player.PlayerName, eligible.Count, reserved.Count,
+					string.Join("/", groups.Select(g => g.Units.Count)), eligible.Count - reserved.Count);
 
 			lastEligibleCount = eligible.Count;
 		}
@@ -226,7 +253,8 @@ namespace OpenRA.Mods.Common.Traits
 			if (group.Units.Count == 0)
 				return;
 
-			var role = StealthTankSquadPolicy.RoleForGroup(group.Index);
+			var role = StealthTankSquadPolicy.RoleForGroup(group.Index,
+				Info.MaximumHarassmentGroups, Info.IncludeAttackGroup);
 			var center = group.Units.Select(a => a.CenterPosition).Average();
 			var ownRange = group.Units.SelectMany(a => a.TraitsImplementing<Armament>())
 				.Where(a => !a.IsTraitDisabled && a.Weapon.IsValidTarget(GroundTargetTypes))
@@ -237,11 +265,13 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				Actor = a,
 				Priority = Priority(role, a, group.Units.Count),
-				Distance = (a.CenterPosition - center).Length / 1024
+				Distance = (a.CenterPosition - center).Length / 1024,
+				ClusterMultiplier = InfantryClusterMultiplier(role, a)
 			}).Where(c => c.Priority > 0)
 				.OrderByDescending(c => StealthTankSquadPolicy.TargetScore(c.Priority,
 					c.Actor.Info.TraitInfoOrDefault<ValuedInfo>()?.Cost ?? 1, c.Distance,
-					c.Actor == group.Target ? 100 + Info.TargetSwitchImprovementPercent : 100))
+					c.Actor == group.Target ? 100 + Info.TargetSwitchImprovementPercent : 100,
+					c.ClusterMultiplier))
 				.ThenBy(c => c.Actor.ActorID).Take(Info.MaximumTargetCandidates).ToList();
 
 			Actor selected = null;
@@ -269,7 +299,8 @@ namespace OpenRA.Mods.Common.Traits
 
 				var score = StealthTankSquadPolicy.TargetScore(candidate.Priority,
 					candidate.Actor.Info.TraitInfoOrDefault<ValuedInfo>()?.Cost ?? 1, candidate.Distance,
-					candidate.Actor == group.Target ? 100 + Info.TargetSwitchImprovementPercent : 100);
+					candidate.Actor == group.Target ? 100 + Info.TargetSwitchImprovementPercent : 100,
+					candidate.ClusterMultiplier);
 				if (score <= selectedScore)
 					continue;
 
@@ -283,8 +314,8 @@ namespace OpenRA.Mods.Common.Traits
 				if (Info.DebugLogging && world.WorldTick >= group.LastNoTargetLogTick + Info.ScanInterval * 10)
 				{
 					group.LastNoTargetLogTick = world.WorldTick;
-					Log.Write("debug", "AI stealth squad [{0}:{1}] {2} waiting: units={3} candidates={4} dangerous={5} rejected={6} blocker={7}.",
-						player.PlayerName, group.Index, role, group.Units.Count, candidates.Count, dangerousCandidates,
+					Log.Write("debug", "AI stealth squad {0} [{1}:{2}] {3} waiting: units={4} candidates={5} dangerous={6} rejected={7} blocker={8}.",
+						Info.SquadLabel, player.PlayerName, group.Index, role, group.Units.Count, candidates.Count, dangerousCandidates,
 						rejectedTarget == null ? "none" : rejectedTarget.Info.Name + "#" + rejectedTarget.ActorID,
 						rejectedBlocker == null ? "none" : rejectedBlocker.Info.Name + "#" + rejectedBlocker.ActorID);
 				}
@@ -301,20 +332,38 @@ namespace OpenRA.Mods.Common.Traits
 				return;
 
 			group.LastOrderTick = world.WorldTick;
-			var crush = role == StealthTankSquadRole.Harass && selected.GetEnabledTargetTypes().Overlaps(InfantryTargetTypes);
+			var crush = Info.CrushInfantryTargets && role == StealthTankSquadRole.Harass &&
+				selected.GetEnabledTargetTypes().Overlaps(InfantryTargetTypes);
 			var order = crush ? new Order("Move", null, Target.FromCell(world, selected.Location), false,
 				groupedActors: group.Units.ToArray()) :
 				new Order("Attack", null, Target.FromActor(selected), false, groupedActors: group.Units.ToArray());
 			bot.QueueOrder(order);
 
 			if (Info.DebugLogging)
-				Log.Write("debug", "AI stealth squad [{0}:{1}] {2} target {3}#{4}: units={5} score={6} defended-value={7} order={8}.",
-					player.PlayerName, group.Index, role, selected.Info.Name, selected.ActorID, group.Units.Count,
+				Log.Write("debug", "AI stealth squad {0} [{1}:{2}] {3} target {4}#{5}: units={6} score={7} defended-value={8} order={9}.",
+					Info.SquadLabel, player.PlayerName, group.Index, role, selected.Info.Name, selected.ActorID, group.Units.Count,
 					selectedScore, selectedDanger, crush ? "crush" : "attack");
+		}
+
+		int InfantryClusterMultiplier(StealthTankSquadRole role, Actor actor)
+		{
+			if (role != StealthTankSquadRole.Harass || Info.InfantryClusterRadiusCells <= 0 ||
+				Info.InfantryClusterBonusPercentPerNearbyActor <= 0 ||
+				!actor.GetEnabledTargetTypes().Overlaps(InfantryTargetTypes))
+				return 100;
+
+			var nearby = world.FindActorsInCircle(actor.CenterPosition, WDist.FromCells(Info.InfantryClusterRadiusCells))
+				.Count(a => a != actor && IsEnemyTarget(a) && a.GetEnabledTargetTypes().Overlaps(InfantryTargetTypes));
+			return StealthTankSquadPolicy.InfantryClusterMultiplier(nearby,
+				Info.InfantryClusterBonusPercentPerNearbyActor, Info.MaximumInfantryClusterMultiplierPercent);
 		}
 
 		int Priority(StealthTankSquadRole role, Actor actor, int groupSize)
 		{
+			var types = actor.GetEnabledTargetTypes();
+			if (role == StealthTankSquadRole.Harass && types.Overlaps(Info.ExcludedHarassmentTargetTypes))
+				return 0;
+
 			if (role == StealthTankSquadRole.Harass && groupSize >= Info.MinimumLateHarassmentGroupSize &&
 				Info.LateHarassmentTargetPriorities.TryGetValue(actor.Info.Name, out var latePriority))
 				return latePriority;
@@ -324,15 +373,20 @@ namespace OpenRA.Mods.Common.Traits
 			if (configured.TryGetValue(actor.Info.Name, out var priority))
 				return priority;
 
-			var types = actor.GetEnabledTargetTypes();
 			if (role == StealthTankSquadRole.Attack)
 				return types.Overlaps(TankTargetTypes) ? 8000 : 0;
 			if (types.Overlaps(InfantryTargetTypes))
-				return 1200;
+				return Info.InfantryTargetPriority;
 			if (types.Overlaps(StructureTargetTypes))
-				return 500;
+			{
+				var armorType = actor.Info.TraitInfoOrDefault<ArmorInfo>()?.Type;
+				if (armorType != null && Info.HarassmentArmorPriorities.TryGetValue(armorType, out var armorPriority))
+					return armorPriority;
 
-			return types.Overlaps(TankTargetTypes) ? 1500 : 0;
+				return Info.StructureTargetPriority;
+			}
+
+			return types.Overlaps(TankTargetTypes) ? Info.TankTargetPriority : 0;
 		}
 
 		bool DangerAlongRun(WPos start, Actor target, List<Threat> threats, int ownRange, bool stopAtFirstDanger,
@@ -346,7 +400,9 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				var detectorRange = StealthTankSquadPolicy.BufferedRange(threat.DetectorRangeCells,
 					Info.DetectorRangeBufferCells);
-				var weaponRange = StealthTankSquadPolicy.BufferedRange(threat.WeaponRangeCells,
+				var ignoreWeapon = stopAtFirstDanger &&
+					threat.Actor.GetEnabledTargetTypes().Overlaps(Info.IgnoredHarassmentWeaponThreatTypes);
+				var weaponRange = StealthTankSquadPolicy.BufferedRange(ignoreWeapon ? 0 : threat.WeaponRangeCells,
 					Info.ThreatRangeBufferCells);
 				var targetDistance = (threat.Actor.CenterPosition - target.CenterPosition).Length / 1024;
 				var endpointDanger = (detectorRange > 0 && targetDistance <= detectorRange) ||
