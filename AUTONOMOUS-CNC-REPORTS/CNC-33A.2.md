@@ -4,7 +4,7 @@
 - Cycles used: 30 of 30
 - Branch: `agent/cnc33a2-tiberium-explosion-options`
 - Base: green CNC-33A.1 PR #65 head `a302f673be`
-- Pull request: pending
+- Pull request: draft PR #67
 
 ## Literal acceptance
 
