@@ -476,6 +476,7 @@ namespace OpenRA.Mods.Common.Traits
 
 			bot.QueueOrder(Order.StartProduction(queue.Actor, name, queueAmount));
 			RecordQueued(unit, queueAmount);
+			LogProductionSpend(unit, queue, queueAmount);
 			if (sampledUnitTypes.Contains(name))
 				LogSampling("{0} queued learned unit {1}: amount={2}, queue={3}.",
 					player, DisplayName(name), queueAmount, queue.Info.Type);
@@ -540,6 +541,7 @@ namespace OpenRA.Mods.Common.Traits
 
 				bot.QueueOrder(Order.StartProduction(offer.Queue.Actor, offer.Unit.Name, 1));
 				RecordQueued(offer.Unit, 1);
+				LogProductionSpend(offer.Unit, offer.Queue, 1);
 				if (sampledUnitTypes.Contains(offer.Unit.Name))
 					LogSampling("{0} queued learned unit {1}: amount=1, queue={2}.",
 						player, DisplayName(offer.Unit.Name), offer.Queue.Info.Type);
@@ -631,8 +633,19 @@ namespace OpenRA.Mods.Common.Traits
 
 			bot.QueueOrder(Order.StartProduction(queue.Actor, name, 1));
 			RecordQueued(actorInfo, 1);
+			LogProductionSpend(actorInfo, queue, 1);
 			AIUtils.BotDebug("{0} decided to build {1} (external request)", queue.Actor.Owner, DisplayName(name));
 			return ExternalBuildRequestResult.Queued;
+		}
+
+		void LogProductionSpend(ActorInfo actor, ProductionQueue queue, int amount)
+		{
+			if (!Info.AdaptiveProductionDebugLogging)
+				return;
+
+			var cost = Math.Max(0, actor.TraitInfoOrDefault<ValuedInfo>()?.Cost ?? 0) * Math.Max(1, amount);
+			Log.Write("debug", "AI production spend: {0} tick={1} item={2} amount={3} queue={4} cost={5}",
+				player, world.WorldTick, actor.Name, Math.Max(1, amount), queue.Info.Type, cost);
 		}
 
 		ActorInfo ChooseRandomUnitToBuild(ProductionQueue queue)

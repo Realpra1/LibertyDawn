@@ -67,6 +67,9 @@ namespace OpenRA.Mods.Common.LoadScreens
 			if (Launch.SaveGameAtTick >= 0)
 				Game.ConfigureAutomatedSave(Launch.SaveGameAtTick, Launch.SaveGameName);
 
+			if (Launch.ExitAtTick >= 0)
+				Game.ConfigureAutomatedExit(Launch.ExitAtTick);
+
 			// Join a server directly
 			var connect = Launch.GetConnectEndPoint();
 			if (connect != null)

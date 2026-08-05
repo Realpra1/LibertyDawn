@@ -196,6 +196,9 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Maximum smart-economy refineries that may be queued or reserved concurrently across idle construction yards.")]
 		public readonly int SmartEconomyMaximumParallelRefineries = 3;
 
+		[Desc("Percentage of active Fact construction slots reserved for early vehicle-factory capacity while that capacity is inadequate.")]
+		public readonly int SmartEconomyEarlyVehicleFactoryPercent = 50;
+
 		[Desc("Stored-resource percentage that requests silo capacity ahead of discretionary scaling.")]
 		public readonly int SmartEconomyStorageThresholdPercent = 80;
 
@@ -374,6 +377,16 @@ namespace OpenRA.Mods.Common.Traits
 			Log.Write("debug", "AI adaptive production: " + format, args);
 		}
 
+		internal void LogProductionSpend(ActorInfo actor, ProductionQueue queue, int amount = 1)
+		{
+			if (!AdaptiveProductionDebugLogging)
+				return;
+
+			var cost = System.Math.Max(0, actor.TraitInfoOrDefault<ValuedInfo>()?.Cost ?? 0) * System.Math.Max(1, amount);
+			Log.Write("debug", "AI production spend: {0} tick={1} item={2} amount={3} queue={4} cost={5}",
+				player, world.WorldTick, actor.Name, System.Math.Max(1, amount), queue.Info.Type, cost);
+		}
+
 		internal double AdaptiveProductionBuildingDemand(ActorInfo building)
 		{
 			return unitBuilders.Where(u => !u.IsTraitDisabled)
@@ -420,6 +433,9 @@ namespace OpenRA.Mods.Common.Traits
 
 		internal bool SmartEconomyWantsProductionCapacity => smartEconomy?.WantsProductionCapacity ?? false;
 
+		internal bool SmartEconomyWantsEarlyVehicleProductionCapacity =>
+			smartEconomy?.WantsEarlyVehicleProductionCapacity ?? false;
+
 		internal bool SmartEconomyWantsSilo => smartEconomy?.WantsSilo ?? false;
 
 		internal HashSet<string> SmartEconomyRefineryTypes => Info.SmartEconomyRefineryTypes.Count > 0 ?
@@ -440,6 +456,11 @@ namespace OpenRA.Mods.Common.Traits
 		internal bool TryReserveSmartEconomyMissingRefinery(ProductionQueue queue, string type)
 		{
 			return smartEconomy?.TryReserveMissingRefineryBuild(queue, type) ?? false;
+		}
+
+		internal bool TryReserveSmartEconomyVehicleFactory(ProductionQueue queue, string type)
+		{
+			return smartEconomy?.TryReserveVehicleFactoryBuild(queue, type) ?? false;
 		}
 
 		internal bool TryReserveSmartEconomyControlledRefinery(ProductionQueue queue, string type)
@@ -846,6 +867,10 @@ namespace OpenRA.Mods.Common.Traits
 				new MiniYamlNode("SmartEconomyRefineryReservationExpiryTicks", FieldSaver.FormatValue(smartEconomy?.RefineryReservationExpiryTicks ?? System.Array.Empty<int>())),
 				new MiniYamlNode("SmartEconomyRefineryReservationTargetCounts", FieldSaver.FormatValue(smartEconomy?.RefineryReservationTargetCounts ?? System.Array.Empty<int>())),
 				new MiniYamlNode("SmartEconomyRefineryReservationCosts", FieldSaver.FormatValue(smartEconomy?.RefineryReservationCosts ?? System.Array.Empty<int>())),
+				new MiniYamlNode("SmartEconomyVehicleFactoryReservationQueueIds", FieldSaver.FormatValue(smartEconomy?.VehicleFactoryReservationQueueIds ?? System.Array.Empty<uint>())),
+				new MiniYamlNode("SmartEconomyVehicleFactoryReservationTypes", FieldSaver.FormatValue(smartEconomy?.VehicleFactoryReservationTypes ?? System.Array.Empty<string>())),
+				new MiniYamlNode("SmartEconomyVehicleFactoryReservationExpiryTicks", FieldSaver.FormatValue(smartEconomy?.VehicleFactoryReservationExpiryTicks ?? System.Array.Empty<int>())),
+				new MiniYamlNode("SmartEconomyVehicleFactoryReservationTargetCounts", FieldSaver.FormatValue(smartEconomy?.VehicleFactoryReservationTargetCounts ?? System.Array.Empty<int>())),
 				new MiniYamlNode("SmartEconomyMcvRequestOutstanding", FieldSaver.FormatValue(smartEconomy?.McvRequestOutstanding ?? false)),
 				new MiniYamlNode("SmartEconomyMcvRequestExpiryTick", FieldSaver.FormatValue(smartEconomy?.McvRequestExpiryTick ?? 0)),
 				new MiniYamlNode("SmartEconomyMcvRequestTargetAssets", FieldSaver.FormatValue(smartEconomy?.McvRequestTargetAssets ?? 0)),
@@ -916,6 +941,10 @@ namespace OpenRA.Mods.Common.Traits
 			var smartRefineryExpiryTicksNode = data.FirstOrDefault(n => n.Key == "SmartEconomyRefineryReservationExpiryTicks");
 			var smartRefineryTargetCountsNode = data.FirstOrDefault(n => n.Key == "SmartEconomyRefineryReservationTargetCounts");
 			var smartRefineryCostsNode = data.FirstOrDefault(n => n.Key == "SmartEconomyRefineryReservationCosts");
+			var smartVehicleFactoryQueueIdsNode = data.FirstOrDefault(n => n.Key == "SmartEconomyVehicleFactoryReservationQueueIds");
+			var smartVehicleFactoryTypesNode = data.FirstOrDefault(n => n.Key == "SmartEconomyVehicleFactoryReservationTypes");
+			var smartVehicleFactoryExpiryTicksNode = data.FirstOrDefault(n => n.Key == "SmartEconomyVehicleFactoryReservationExpiryTicks");
+			var smartVehicleFactoryTargetCountsNode = data.FirstOrDefault(n => n.Key == "SmartEconomyVehicleFactoryReservationTargetCounts");
 			var smartMcvOutstandingNode = data.FirstOrDefault(n => n.Key == "SmartEconomyMcvRequestOutstanding");
 			var smartMcvExpiryNode = data.FirstOrDefault(n => n.Key == "SmartEconomyMcvRequestExpiryTick");
 			var smartMcvTargetNode = data.FirstOrDefault(n => n.Key == "SmartEconomyMcvRequestTargetAssets");
@@ -952,6 +981,14 @@ namespace OpenRA.Mods.Common.Traits
 					FieldLoader.GetValue<int[]>("SmartEconomyRefineryReservationExpiryTicks", smartRefineryExpiryTicksNode.Value.Value),
 					FieldLoader.GetValue<int[]>("SmartEconomyRefineryReservationTargetCounts", smartRefineryTargetCountsNode.Value.Value),
 					FieldLoader.GetValue<int[]>("SmartEconomyRefineryReservationCosts", smartRefineryCostsNode.Value.Value));
+
+			if (smartEconomy != null && smartVehicleFactoryQueueIdsNode != null && smartVehicleFactoryTypesNode != null &&
+				smartVehicleFactoryExpiryTicksNode != null && smartVehicleFactoryTargetCountsNode != null)
+				smartEconomy.LoadVehicleFactoryReservations(
+					FieldLoader.GetValue<uint[]>("SmartEconomyVehicleFactoryReservationQueueIds", smartVehicleFactoryQueueIdsNode.Value.Value),
+					FieldLoader.GetValue<string[]>("SmartEconomyVehicleFactoryReservationTypes", smartVehicleFactoryTypesNode.Value.Value),
+					FieldLoader.GetValue<int[]>("SmartEconomyVehicleFactoryReservationExpiryTicks", smartVehicleFactoryExpiryTicksNode.Value.Value),
+					FieldLoader.GetValue<int[]>("SmartEconomyVehicleFactoryReservationTargetCounts", smartVehicleFactoryTargetCountsNode.Value.Value));
 
 			var firstTowerNode = data.FirstOrDefault(n => n.Key == "FirstTowerPlacementComplete");
 			if (firstTowerNode != null)
