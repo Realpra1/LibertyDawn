@@ -1,0 +1,36 @@
+{
+  "defaults": {
+    "map": "mods/cnc/maps/Empire-Earth.oramap",
+    "lobby_commands": "spectate;option gamespeed max;option startingcash 20000;slot_bot Multi0 0 skynet 1 1;slot_bot Multi1 0 skynet 1 2;slot_bot Multi2 0 brutalis 2 4;slot_bot Multi3 0 brutalis 2 5;slot_bot Multi4 0 brutalis 2 6;faction 1 nod;faction 2 gdi",
+    "exit_at_tick": 10000,
+    "minimum_world_tick": 10000,
+    "timeout_seconds": 1800,
+    "required_log_patterns": [
+      "Headless MAX automation started map 'Empire Earth4'",
+      "bot=skynet",
+      "bot=brutalis"
+    ],
+    "forbidden_log_patterns": [
+      "Desync detected"
+    ]
+  },
+  "runs": [
+    {
+      "name": "empire-1",
+      "seed": 24680
+    },
+    {
+      "name": "empire-2",
+      "seed": 24681,
+      "save_at_tick": 5000,
+      "save_name": "empire-2.orasav",
+      "expected_artifacts": [
+        "Saves/**/*.orasav"
+      ]
+    },
+    {
+      "name": "empire-3",
+      "seed": 24682
+    }
+  ]
+}
