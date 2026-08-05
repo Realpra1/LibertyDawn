@@ -109,6 +109,36 @@ Player:
 		HeavyDropMaximumDefenderValue: 3400
 		HeavyDropMaximumAaDanger: 0
 		DebugLogging: true
+	StealthTankSquadBotModule:
+		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai || enable-Easiest-ai
+		UnitTypes: stnk
+		ScanInterval: 75
+		OrderInterval: 75
+		MaximumTargetCandidates: 48
+		ThreatRangeBufferCells: 2
+		DetectorRangeBufferCells: 2
+		KiteRangeMarginCells: 1
+		CarefulClearValueRatio: 5
+		MinimumLateHarassmentGroupSize: 3
+		TargetSwitchImprovementPercent: 25
+		HarassmentTargetPriorities:
+			harv: 10000
+			sharv: 10000
+			nuk2: 8500
+			proc: 6000
+			eye: 5500
+			tmpl: 5500
+			hq: 4500
+			nuke: 1800
+		LateHarassmentTargetPriorities:
+			fact: 7000
+		AttackTargetPriorities:
+			htnk: 10000
+			mtnk: 8500
+			ctnk: 8000
+			ltnk: 7000
+			ftnk: 6500
+		DebugLogging: true
 	OpeningGarrisonBotModule:
 		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai || enable-Easiest-ai
 		BarracksTypes: pyle, hand
@@ -725,14 +755,14 @@ Player:
 		SquadSize: 20
 		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck, tran
 		ConstructionYardTypes: fact
-        AirUnitsTypes: heli, orca, stnk
+        AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
     SquadManagerBotModule@wavemaker:
 		RequiresCondition: enable-wavemaker-ai
 		SquadSize: 120
 		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck, tran
 		ConstructionYardTypes: fact
-        AirUnitsTypes: heli, orca, stnk
+        AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
     UnitBuilderBotModule@brutalis:
 		RequiresCondition: enable-brutalis-ai || enable-wavemaker-ai
