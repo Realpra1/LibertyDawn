@@ -23,6 +23,9 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Actor-specific harassment priorities. Unlisted harvesters, structures and infantry use class fallbacks.")]
 		public readonly Dictionary<string, int> HarassmentTargetPriorities = new Dictionary<string, int>();
 
+		[Desc("Additional harassment priorities enabled only after a specialist group has grown.")]
+		public readonly Dictionary<string, int> LateHarassmentTargetPriorities = new Dictionary<string, int>();
+
 		[Desc("Actor-specific cooperative attack priorities. Tank target types otherwise receive the highest fallback.")]
 		public readonly Dictionary<string, int> AttackTargetPriorities = new Dictionary<string, int>();
 
@@ -34,6 +37,7 @@ namespace OpenRA.Mods.Common.Traits
 		public readonly int DetectorRangeBufferCells = 2;
 		public readonly int KiteRangeMarginCells = 1;
 		public readonly int CarefulClearValueRatio = 5;
+		public readonly int MinimumLateHarassmentGroupSize = 3;
 		public readonly int TargetSwitchImprovementPercent = 25;
 		public readonly bool DebugLogging = false;
 
@@ -42,7 +46,8 @@ namespace OpenRA.Mods.Common.Traits
 			base.RulesetLoaded(rules, ai);
 			if (UnitTypes.Count == 0 || ScanInterval <= 0 || OrderInterval <= 0 || MaximumTargetCandidates <= 0 ||
 				MaximumThreatActors <= 0 || ThreatRangeBufferCells < 0 || DetectorRangeBufferCells < 0 ||
-				KiteRangeMarginCells < 0 || CarefulClearValueRatio <= 0 || TargetSwitchImprovementPercent < 0)
+				KiteRangeMarginCells < 0 || CarefulClearValueRatio <= 0 || MinimumLateHarassmentGroupSize <= 0 ||
+				TargetSwitchImprovementPercent < 0)
 				throw new YamlException("Stealth-tank squad types, intervals, bounds, buffers, and ratios must be positive and valid.");
 		}
 
@@ -225,7 +230,7 @@ namespace OpenRA.Mods.Common.Traits
 			var candidates = enemies.Select(a => new
 			{
 				Actor = a,
-				Priority = Priority(role, a),
+				Priority = Priority(role, a, group.Units.Count),
 				Distance = (a.CenterPosition - center).Length / 1024
 			}).Where(c => c.Priority > 0)
 				.OrderByDescending(c => StealthTankSquadPolicy.TargetScore(c.Priority,
@@ -291,8 +296,12 @@ namespace OpenRA.Mods.Common.Traits
 					selectedScore, selectedDanger, crush ? "crush" : "attack");
 		}
 
-		int Priority(StealthTankSquadRole role, Actor actor)
+		int Priority(StealthTankSquadRole role, Actor actor, int groupSize)
 		{
+			if (role == StealthTankSquadRole.Harass && groupSize >= Info.MinimumLateHarassmentGroupSize &&
+				Info.LateHarassmentTargetPriorities.TryGetValue(actor.Info.Name, out var latePriority))
+				return latePriority;
+
 			var configured = role == StealthTankSquadRole.Harass ?
 				Info.HarassmentTargetPriorities : Info.AttackTargetPriorities;
 			if (configured.TryGetValue(actor.Info.Name, out var priority))
@@ -300,7 +309,7 @@ namespace OpenRA.Mods.Common.Traits
 
 			var types = actor.GetEnabledTargetTypes();
 			if (role == StealthTankSquadRole.Attack)
-				return types.Overlaps(TankTargetTypes) ? 8000 : types.Overlaps(VehicleTargetTypes) ? 2500 : 0;
+				return types.Overlaps(TankTargetTypes) ? 8000 : types.Overlaps(VehicleTargetTypes) ? 500 : 0;
 			if (types.Overlaps(InfantryTargetTypes))
 				return 1200;
 			if (types.Overlaps(StructureTargetTypes))

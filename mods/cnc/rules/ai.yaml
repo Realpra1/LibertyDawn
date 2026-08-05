@@ -120,17 +120,19 @@ Player:
 		DetectorRangeBufferCells: 2
 		KiteRangeMarginCells: 1
 		CarefulClearValueRatio: 5
+		MinimumLateHarassmentGroupSize: 3
 		TargetSwitchImprovementPercent: 25
 		HarassmentTargetPriorities:
 			harv: 10000
 			sharv: 10000
 			nuk2: 8500
-			fact: 7000
 			proc: 6000
 			eye: 5500
 			tmpl: 5500
 			hq: 4500
 			nuke: 1800
+		LateHarassmentTargetPriorities:
+			fact: 7000
 		AttackTargetPriorities:
 			htnk: 10000
 			mtnk: 8500
