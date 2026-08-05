@@ -27,6 +27,17 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(StealthTankSquadPolicy.SpecialistCount(total), Is.EqualTo(expected));
 		}
 
+		[TestCase(0, 0)]
+		[TestCase(1, 0)]
+		[TestCase(2, 1)]
+		[TestCase(3, 2)]
+		[TestCase(4, 2)]
+		[TestCase(10, 5)]
+		public void HalfPreservingReservationNeverConsumesTheOpeningPair(int total, int expected)
+		{
+			Assert.That(StealthTankSquadPolicy.SpecialistCount(total, false), Is.EqualTo(expected));
+		}
+
 		[Test]
 		public void LargeForceCreatesTwoHarassmentGroupsAndOneAttackGroup()
 		{
@@ -40,12 +51,32 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
+		public void ChemicalConfigurationAlwaysCreatesOneHarassmentGroup()
+		{
+			for (var i = 0; i < 6; i++)
+				Assert.That(StealthTankSquadPolicy.GroupForIndex(i, 6, 1, false), Is.Zero);
+
+			Assert.That(StealthTankSquadPolicy.RoleForGroup(0, 1, false),
+				Is.EqualTo(StealthTankSquadRole.Harass));
+		}
+
+		[Test]
 		public void ScoringRewardsValueAndIncumbencyButPenalizesDistance()
 		{
 			var baseline = StealthTankSquadPolicy.TargetScore(1000, 1000, 20, 100);
 			Assert.That(StealthTankSquadPolicy.TargetScore(1000, 2000, 20, 100), Is.GreaterThan(baseline));
 			Assert.That(StealthTankSquadPolicy.TargetScore(1000, 1000, 40, 100), Is.LessThan(baseline));
 			Assert.That(StealthTankSquadPolicy.TargetScore(1000, 1000, 20, 125), Is.GreaterThan(baseline));
+		}
+
+		[Test]
+		public void InfantryClusterBonusIsBoundedAndImprovesTargetScore()
+		{
+			Assert.That(StealthTankSquadPolicy.InfantryClusterMultiplier(0, 50, 300), Is.EqualTo(100));
+			Assert.That(StealthTankSquadPolicy.InfantryClusterMultiplier(2, 50, 300), Is.EqualTo(200));
+			Assert.That(StealthTankSquadPolicy.InfantryClusterMultiplier(20, 50, 300), Is.EqualTo(300));
+			Assert.That(StealthTankSquadPolicy.TargetScore(1000, 100, 10, 100, 200),
+				Is.GreaterThan(StealthTankSquadPolicy.TargetScore(1000, 100, 10, 100)));
 		}
 
 		[TestCase(4999, 1000, 5, false)]
