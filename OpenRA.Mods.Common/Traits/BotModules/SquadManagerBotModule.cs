@@ -459,6 +459,7 @@ namespace OpenRA.Mods.Common.Traits
 		IBotPositionsUpdated[] notifyPositionsUpdated;
 		IBotNotifyIdleBaseUnits[] notifyIdleBaseUnits;
 		IBotTransportReservations[] transportReservations;
+		IBotUnitReservations[] unitReservations;
 
 		CPos initialBaseCenter;
 
@@ -521,6 +522,7 @@ namespace OpenRA.Mods.Common.Traits
 			notifyPositionsUpdated = self.Owner.PlayerActor.TraitsImplementing<IBotPositionsUpdated>().ToArray();
 			notifyIdleBaseUnits = self.Owner.PlayerActor.TraitsImplementing<IBotNotifyIdleBaseUnits>().ToArray();
 			transportReservations = self.Owner.PlayerActor.TraitsImplementing<IBotTransportReservations>().ToArray();
+			unitReservations = self.Owner.PlayerActor.TraitsImplementing<IBotUnitReservations>().ToArray();
 		}
 
 		protected override void TraitEnabled(Actor self)
@@ -568,7 +570,7 @@ namespace OpenRA.Mods.Common.Traits
 			Squads.RemoveAll(s => !s.IsValid);
 			foreach (var s in Squads)
 			{
-				s.Units.RemoveAll(a => unitCannotBeOrdered(a) || IsReservedForTransport(a));
+				s.Units.RemoveAll(a => unitCannotBeOrdered(a) || IsReservedForSpecialBehavior(a));
 				if (s.Type == SquadType.Air)
 					s.CleanAirMembership();
 			}
@@ -577,6 +579,12 @@ namespace OpenRA.Mods.Common.Traits
 		bool IsReservedForTransport(Actor actor)
 		{
 			return transportReservations != null && transportReservations.Any(r => r.IsTransportReserved(actor));
+		}
+
+		bool IsReservedForSpecialBehavior(Actor actor)
+		{
+			return IsReservedForTransport(actor) ||
+				(unitReservations != null && unitReservations.Any(r => r.IsUnitReserved(actor)));
 		}
 
 		// HACK: Use of this function requires that there is one squad of this type.
@@ -695,9 +703,9 @@ namespace OpenRA.Mods.Common.Traits
 			CleanSquads();
 
 			activeUnits.RemoveAll(unitCannotBeOrdered);
-			activeUnits.RemoveAll(IsReservedForTransport);
+			activeUnits.RemoveAll(IsReservedForSpecialBehavior);
 			unitsHangingAroundTheBase.RemoveAll(unitCannotBeOrdered);
-			unitsHangingAroundTheBase.RemoveAll(IsReservedForTransport);
+			unitsHangingAroundTheBase.RemoveAll(IsReservedForSpecialBehavior);
 			foreach (var n in notifyIdleBaseUnits)
 				n.UpdatedIdleBaseUnits(unitsHangingAroundTheBase);
 
@@ -753,7 +761,7 @@ namespace OpenRA.Mods.Common.Traits
 			var newUnits = World.ActorsHavingTrait<IPositionable>()
 				.Where(a => a.Owner == Player &&
 					!Info.ExcludeFromSquadsTypes.Contains(a.Info.Name) &&
-					!IsReservedForTransport(a) &&
+					!IsReservedForSpecialBehavior(a) &&
 					!activeUnits.Contains(a));
 
 			foreach (var a in newUnits)

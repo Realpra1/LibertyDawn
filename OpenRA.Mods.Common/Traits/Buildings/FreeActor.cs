@@ -12,6 +12,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using OpenRA.Primitives;
 using OpenRA.Traits;
 
@@ -43,6 +44,20 @@ namespace OpenRA.Mods.Common.Traits
 
 		[Desc("List of required prerequisites.")]
 		public readonly string[] Prerequisites = Array.Empty<string>();
+
+		[ActorReference]
+		[Desc("Actor types sharing an owner-wide spawn limit with this free actor.")]
+		public readonly HashSet<string> OwnerActorLimitTypes = new HashSet<string>();
+
+		[Desc("Maximum live and queued OwnerActorLimitTypes allowed before suppressing this free actor.",
+			"Zero disables the limit.")]
+		public readonly int OwnerActorLimit = 0;
+
+		[Desc("Apply OwnerActorLimit only when the building owner is a bot.")]
+		public readonly bool OwnerActorLimitBotsOnly = false;
+
+		[Desc("Write a debug-log entry when OwnerActorLimit suppresses this free actor.")]
+		public readonly bool OwnerActorLimitDebugLogging = false;
 
 		IEnumerable<EditorActorOption> IEditorActorOptions.ActorOptions(ActorInfo ai, World world)
 		{
@@ -147,6 +162,27 @@ namespace OpenRA.Mods.Common.Traits
 
 			self.World.AddFrameEndTask(w =>
 			{
+				if (Info.OwnerActorLimit > 0 && (!Info.OwnerActorLimitBotsOnly || self.Owner.IsBot))
+				{
+					var live = w.Actors.Count(a => a.Owner == self.Owner && !a.IsDead &&
+						Info.OwnerActorLimitTypes.Contains(a.Info.Name));
+					var queued = w.ActorsWithTrait<ProductionQueue>()
+						.Where(q => q.Actor.Owner == self.Owner && !q.Actor.IsDead && q.Actor.IsInWorld)
+						.Sum(q => q.Trait.AllQueued().Count(i => Info.OwnerActorLimitTypes.Contains(i.Item)));
+					var pending = w.ActorsWithTrait<IPendingProductionActors>()
+						.Where(p => p.Actor.Owner == self.Owner && !p.Actor.IsDead && p.Actor.IsInWorld)
+						.Sum(p => p.Trait.PendingActorTypes.Count(Info.OwnerActorLimitTypes.Contains));
+					if (SharedActorLimitPolicy.AllowedAmount(1, live + queued + pending,
+						SharedActorLimitReservations.Reserved(w, self.Owner), Info.OwnerActorLimit) == 0)
+					{
+						if (Info.OwnerActorLimitDebugLogging)
+							Log.Write("debug", "Free actor {0} from {1} suppressed for {2}: shared actors={3} live+{4} queued/{5}.",
+								Info.Actor, self.Info.Name, self.Owner, live, queued + pending, Info.OwnerActorLimit);
+
+						return;
+					}
+				}
+
 				w.CreateActor(Info.Actor, new TypeDictionary
 				{
 					new ParentActorInit(self),
@@ -155,6 +191,80 @@ namespace OpenRA.Mods.Common.Traits
 					new FacingInit(Info.Facing),
 				});
 			});
+		}
+	}
+
+	public static class SharedActorLimitPolicy
+	{
+		public static bool CanSpawn(int liveActors, int queuedActors, int maximumActors)
+		{
+			return maximumActors <= 0 || (long)Math.Max(0, liveActors) + Math.Max(0, queuedActors) < maximumActors;
+		}
+
+		public static int AllowedAmount(int requestedActors, int committedActors, int reservedActors, int maximumActors)
+		{
+			if (requestedActors <= 0)
+				return 0;
+
+			if (maximumActors <= 0)
+				return requestedActors;
+
+			var available = (long)maximumActors - Math.Max(0, committedActors) - Math.Max(0, reservedActors);
+			return (int)Math.Min(requestedActors, Math.Max(0L, available));
+		}
+	}
+
+	// Production orders and free-actor creation are both deferred until frame end. Keep their
+	// same-tick claims in one owner-wide ledger so several queues/refineries cannot all observe the
+	// same final slot. This state is deliberately ephemeral: the live and queued actors are the
+	// authoritative state again on the next simulation tick and across save/load.
+	public static class SharedActorLimitReservations
+	{
+		sealed class WorldReservations
+		{
+			public int Tick = int.MinValue;
+			public readonly Dictionary<Player, int> ByOwner = new Dictionary<Player, int>();
+		}
+
+		static readonly ConditionalWeakTable<World, WorldReservations> Reservations =
+			new ConditionalWeakTable<World, WorldReservations>();
+
+		static WorldReservations For(World world)
+		{
+			var reservations = Reservations.GetOrCreateValue(world);
+			if (reservations.Tick != world.WorldTick)
+			{
+				reservations.Tick = world.WorldTick;
+				reservations.ByOwner.Clear();
+			}
+
+			return reservations;
+		}
+
+		public static int Reserved(World world, Player owner)
+		{
+			return For(world).ByOwner.TryGetValue(owner, out var reserved) ? reserved : 0;
+		}
+
+		public static void Reserve(World world, Player owner, int amount)
+		{
+			if (amount <= 0)
+				return;
+
+			var reservations = For(world);
+			reservations.ByOwner[owner] = Reserved(world, owner) + amount;
+		}
+
+		public static bool TryReserve(World world, Player owner, int committedActors,
+			int maximumActors, int requestedActors)
+		{
+			var allowed = SharedActorLimitPolicy.AllowedAmount(requestedActors, committedActors,
+				Reserved(world, owner), maximumActors);
+			if (allowed < requestedActors)
+				return false;
+
+			Reserve(world, owner, allowed);
+			return true;
 		}
 	}
 

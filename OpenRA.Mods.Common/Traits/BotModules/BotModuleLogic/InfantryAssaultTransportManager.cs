@@ -53,6 +53,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly TransportMissionCoordinator coordinator;
 		readonly Action<Actor, CPos, Order> issueRoutedAirMove;
 		readonly Action requestTransportHelicopter;
+		readonly Func<Actor, bool> isReservedForOtherBehavior;
 		UnitBuilderBotModule[] production;
 		Mission mission;
 		bool selected;
@@ -60,7 +61,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		public InfantryAssaultTransportManager(World world, Player player, TransportManagerBotModuleInfo info,
 			TransportMissionCoordinator coordinator, Action<Actor, CPos, Order> issueRoutedAirMove,
-			Action requestTransportHelicopter)
+			Action requestTransportHelicopter, Func<Actor, bool> isReservedForOtherBehavior)
 		{
 			this.world = world;
 			this.player = player;
@@ -68,6 +69,7 @@ namespace OpenRA.Mods.Common.Traits
 			this.coordinator = coordinator;
 			this.issueRoutedAirMove = issueRoutedAirMove;
 			this.requestTransportHelicopter = requestTransportHelicopter;
+			this.isReservedForOtherBehavior = isReservedForOtherBehavior;
 		}
 
 		public void Initialize(UnitBuilderBotModule[] production)
@@ -227,7 +229,7 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			var passengerPool = world.Actors.Where(a => IsUsable(a) && a.Owner == player && a.IsIdle &&
 				info.AssaultPassengerTypes.Contains(a.Info.Name) && a.Info.HasTraitInfo<PassengerInfo>() &&
-				!coordinator.IsReserved(a.ActorID)).OrderBy(a => a.ActorID).ToList();
+				!coordinator.IsReserved(a.ActorID) && !isReservedForOtherBehavior(a)).OrderBy(a => a.ActorID).ToList();
 			if (passengerPool.Count < info.MinimumAssaultPassengers)
 				return false;
 
@@ -346,7 +348,8 @@ namespace OpenRA.Mods.Common.Traits
 		Actor FindTransport(HashSet<string> types, CPos origin)
 		{
 			return world.Actors.Where(a => IsUsable(a) && a.Owner == player && types.Contains(a.Info.Name) &&
-				!coordinator.IsReserved(a.ActorID) && a.TraitOrDefault<Cargo>()?.IsEmpty() == true && !NeedsRepair(a))
+				!coordinator.IsReserved(a.ActorID) && !isReservedForOtherBehavior(a) &&
+				a.TraitOrDefault<Cargo>()?.IsEmpty() == true && !NeedsRepair(a))
 				.OrderBy(a => (a.Location - origin).LengthSquared).ThenBy(a => a.ActorID).FirstOrDefault();
 		}
 

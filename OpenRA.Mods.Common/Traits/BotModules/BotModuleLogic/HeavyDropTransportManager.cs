@@ -92,13 +92,15 @@ namespace OpenRA.Mods.Common.Traits
 		readonly Action<Actor, CPos, Order> issueRoutedAirMove;
 		readonly Action requestTransportHelicopter;
 		readonly Func<SquadManagerBotModule> squadManager;
+		readonly Func<Actor, bool> isReservedForOtherBehavior;
 		Wave wave;
 		bool enabled;
 		int nextWaveTick;
 
 		public HeavyDropTransportManager(World world, Player player, TransportManagerBotModuleInfo info,
 			TransportMissionCoordinator coordinator, Action<Actor, CPos, Order> issueRoutedAirMove,
-			Action requestTransportHelicopter, Func<SquadManagerBotModule> squadManager)
+			Action requestTransportHelicopter, Func<SquadManagerBotModule> squadManager,
+			Func<Actor, bool> isReservedForOtherBehavior)
 		{
 			this.world = world;
 			this.player = player;
@@ -107,6 +109,7 @@ namespace OpenRA.Mods.Common.Traits
 			this.issueRoutedAirMove = issueRoutedAirMove;
 			this.requestTransportHelicopter = requestTransportHelicopter;
 			this.squadManager = squadManager;
+			this.isReservedForOtherBehavior = isReservedForOtherBehavior;
 		}
 
 		public void Enable()
@@ -609,7 +612,8 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			return world.Actors.Where(a => IsActorUsable(a) && a.Owner == player &&
 				info.HeavyDropPassengerTypes.Contains(a.Info.Name) && a.Info.HasTraitInfo<PassengerInfo>() &&
-				a.TraitOrDefault<Passenger>()?.Transport == null && !coordinator.IsReserved(a.ActorID))
+				a.TraitOrDefault<Passenger>()?.Transport == null && !coordinator.IsReserved(a.ActorID) &&
+				!isReservedForOtherBehavior(a))
 				.OrderBy(a => a.ActorID);
 		}
 
@@ -617,6 +621,7 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			return world.Actors.Where(a => IsTransportUsable(a) && a.Owner == player &&
 				info.TransportHelicopterTypes.Contains(a.Info.Name) && !coordinator.IsReserved(a.ActorID) &&
+				!isReservedForOtherBehavior(a) &&
 				a.TraitOrDefault<Cargo>()?.IsEmpty() == true && a.Trait<Cargo>().HasSpace(passengerWeight) && !NeedsRepair(a))
 				.OrderBy(a => (a.Location - origin).LengthSquared).ThenBy(a => a.ActorID);
 		}

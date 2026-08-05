@@ -22,6 +22,9 @@ namespace OpenRA.Mods.Common.Traits
 		[FieldLoader.LoadUsing(nameof(LoadDecisions))]
 		public readonly List<SupportPowerDecision> Decisions = new List<SupportPowerDecision>();
 
+		[Desc("Write support-power targeting decisions to debug.log in addition to the BotDebug overlay.")]
+		public readonly bool DebugLogging = false;
+
 		static object LoadDecisions(MiniYaml yaml)
 		{
 			var ret = new List<SupportPowerDecision>();
@@ -63,6 +66,13 @@ namespace OpenRA.Mods.Common.Traits
 				powerDecisions.Add(decision.OrderName, decision);
 		}
 
+		void LogDecision(string format, params object[] args)
+		{
+			AIUtils.BotDebug(format, args);
+			if (Info.DebugLogging)
+				Log.Write("debug", "AI support power: " + format, args);
+		}
+
 		void IBotTick.BotTick(IBot bot)
 		{
 			foreach (var sp in supportPowerManager.Powers.Values)
@@ -84,14 +94,14 @@ namespace OpenRA.Mods.Common.Traits
 					var powerDecision = powerDecisions[sp.Info.OrderName];
 					if (powerDecision == null)
 					{
-						AIUtils.BotDebug("{0} couldn't find powerDecision for {1}", player.PlayerName, sp.Info.OrderName);
+						LogDecision("{0} couldn't find powerDecision for {1}", player.PlayerName, sp.Info.OrderName);
 						continue;
 					}
 
 					var attackLocation = FindCoarseAttackLocationToSupportPower(sp);
 					if (attackLocation == null)
 					{
-						AIUtils.BotDebug("{0} can't find suitable coarse attack location for support power {1}. Delaying rescan.", player.PlayerName, sp.Info.OrderName);
+						LogDecision("{0} can't find suitable coarse attack location for support power {1}. Delaying rescan.", player.PlayerName, sp.Info.OrderName);
 						waitingPowers[sp] += powerDecision.GetNextScanTime(world);
 
 						continue;
@@ -101,14 +111,14 @@ namespace OpenRA.Mods.Common.Traits
 					attackLocation = FindFineAttackLocationToSupportPower(sp, (CPos)attackLocation);
 					if (attackLocation == null)
 					{
-						AIUtils.BotDebug("{0} can't find suitable final attack location for support power {1}. Delaying rescan.", player.PlayerName, sp.Info.OrderName);
+						LogDecision("{0} can't find suitable final attack location for support power {1}. Delaying rescan.", player.PlayerName, sp.Info.OrderName);
 						waitingPowers[sp] += powerDecision.GetNextScanTime(world);
 
 						continue;
 					}
 
 					// Valid target found, delay by a few ticks to avoid rescanning before power fires via order
-					AIUtils.BotDebug("{0} found new target location {1} for support power {2}.", player.PlayerName, attackLocation, sp.Info.OrderName);
+					LogDecision("{0} found new target location {1} for support power {2}.", player.PlayerName, attackLocation, sp.Info.OrderName);
 					waitingPowers[sp] += 10;
 
 					// Note: SelectDirectionalTarget uses uint.MaxValue in ExtraData to indicate that the player did not pick a direction.
@@ -130,7 +140,7 @@ namespace OpenRA.Mods.Common.Traits
 			var powerDecision = powerDecisions[readyPower.Info.OrderName];
 			if (powerDecision == null)
 			{
-				AIUtils.BotDebug("{0} couldn't find powerDecision for {1}", player.PlayerName, readyPower.Info.OrderName);
+				LogDecision("{0} couldn't find powerDecision for {1}", player.PlayerName, readyPower.Info.OrderName);
 				return null;
 			}
 
@@ -180,7 +190,7 @@ namespace OpenRA.Mods.Common.Traits
 			var powerDecision = powerDecisions[readyPower.Info.OrderName];
 			if (powerDecision == null)
 			{
-				AIUtils.BotDebug("{0} couldn't find powerDecision for {1}", player.PlayerName, readyPower.Info.OrderName);
+				LogDecision("{0} couldn't find powerDecision for {1}", player.PlayerName, readyPower.Info.OrderName);
 				return null;
 			}
 

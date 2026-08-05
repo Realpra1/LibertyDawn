@@ -119,7 +119,7 @@ namespace OpenRA.Mods.Common.Traits
 	}
 
 	public class TransportManagerBotModule : ConditionalTrait<TransportManagerBotModuleInfo>,
-		IBotEnabled, IBotTick, IBotTransportReservations, IBotRespondToAttack
+		IBotEnabled, IBotTick, IBotTransportReservations, IBotUnitReservations, IBotRespondToAttack
 	{
 		enum MissionStage { Gathering, Travelling, Unloading }
 
@@ -160,6 +160,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly HeavyDropTransportManager heavyDrop;
 		IBot bot;
 		UnitBuilderBotModule[] production;
+		IBotUnitReservations[] otherUnitReservations;
 		SquadManagerBotModule squadManager;
 		int scanTicks;
 		int serviceTicks;
@@ -171,14 +172,16 @@ namespace OpenRA.Mods.Common.Traits
 			player = self.Owner;
 			coordinator = new TransportMissionCoordinator(info.MaximumActiveMissions);
 			infantryAssault = new InfantryAssaultTransportManager(world, player, info, coordinator,
-				IssueRoutedMove, RequestTransportHelicopter);
+				IssueRoutedMove, RequestTransportHelicopter, IsReservedForOtherBehavior);
 			heavyDrop = new HeavyDropTransportManager(world, player, info, coordinator,
-				IssueRoutedMove, RequestTransportHelicopter, () => squadManager);
+				IssueRoutedMove, RequestTransportHelicopter, () => squadManager, IsReservedForOtherBehavior);
 		}
 
 		protected override void Created(Actor self)
 		{
 			production = self.Owner.PlayerActor.TraitsImplementing<UnitBuilderBotModule>().ToArray();
+			otherUnitReservations = self.Owner.PlayerActor.TraitsImplementing<IBotUnitReservations>()
+				.Where(r => !ReferenceEquals(r, this)).ToArray();
 			infantryAssault.Initialize(production);
 			base.Created(self);
 		}
@@ -196,6 +199,19 @@ namespace OpenRA.Mods.Common.Traits
 		bool IBotTransportReservations.IsTransportReserved(Actor actor)
 		{
 			return actor != null && coordinator.IsReserved(actor.ActorID);
+		}
+
+		bool IBotUnitReservations.IsUnitReserved(Actor actor)
+		{
+			// The coordinator reserves both carriers and pending passengers. Exposing both through the
+			// generic seam prevents unrelated specialist managers from replacing their mission orders.
+			return actor != null && coordinator.IsReserved(actor.ActorID);
+		}
+
+		bool IsReservedForOtherBehavior(Actor actor)
+		{
+			return actor != null && otherUnitReservations != null &&
+				otherUnitReservations.Any(r => r.IsUnitReserved(actor));
 		}
 
 		void IBotRespondToAttack.RespondToAttack(IBot enabledBot, Actor self, AttackInfo e)
@@ -356,7 +372,8 @@ namespace OpenRA.Mods.Common.Traits
 
 			var candidates = world.Actors
 				.Where(a => IsUsable(a) && a.Owner == player && Info.RescuePassengerTypes.Contains(a.Info.Name) &&
-					!coordinator.IsReserved(a.ActorID) && a.TraitOrDefault<Passenger>()?.Transport == null)
+					!coordinator.IsReserved(a.ActorID) && !IsReservedForOtherBehavior(a) &&
+					a.TraitOrDefault<Passenger>()?.Transport == null)
 				.OrderBy(a => a.ActorID).Take(Info.MaximumCandidatesPerScan);
 			foreach (var actor in candidates)
 			{
@@ -417,6 +434,7 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			return world.Actors.Where(a => IsUsable(a) && a.Owner == player &&
 				Info.TransportHelicopterTypes.Contains(a.Info.Name) && !coordinator.IsReserved(a.ActorID) &&
+				!IsReservedForOtherBehavior(a) &&
 				a.TraitOrDefault<Cargo>()?.IsEmpty() == true && !NeedsRepair(a) &&
 				a.Trait<Cargo>().HasSpace(passenger.Trait<Passenger>().Info.Weight))
 				.OrderBy(a => (a.Location - passenger.Location).LengthSquared).ThenBy(a => a.ActorID).FirstOrDefault();
@@ -463,6 +481,7 @@ namespace OpenRA.Mods.Common.Traits
 			var baseCenter = squadManager.GetRandomBaseCenter();
 			foreach (var transport in world.Actors.Where(a => IsUsable(a) && a.Owner == player &&
 				Info.TransportHelicopterTypes.Contains(a.Info.Name) && !coordinator.IsReserved(a.ActorID) &&
+				!IsReservedForOtherBehavior(a) &&
 				a.TraitOrDefault<Cargo>()?.IsEmpty() == true && IsCarrierIdle(a)).OrderBy(a => a.ActorID))
 			{
 				if (NeedsRepair(transport))

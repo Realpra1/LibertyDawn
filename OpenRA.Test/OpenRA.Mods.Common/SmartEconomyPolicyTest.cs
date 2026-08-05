@@ -1,0 +1,180 @@
+#region Copyright & License Information
+/*
+ * Copyright 2007-2021 The OpenRA Developers (see AUTHORS)
+ * This file is part of OpenRA, which is free software. It is made
+ * available to you under the terms of the GNU General Public License
+ * as published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version. For more
+ * information, see COPYING.
+ */
+#endregion
+
+using System;
+using NUnit.Framework;
+using OpenRA.Mods.Common.Traits;
+
+namespace OpenRA.Test.Mods.Common
+{
+	[TestFixture]
+	public class SmartEconomyPolicyTest
+	{
+		[Test]
+		public void PostLoadSettlementDelaysOneSamplerWithoutOverflow()
+		{
+			Assert.That(SmartEconomyPolicy.PostLoadResumeTick(1303, 25), Is.EqualTo(1328));
+			Assert.That(SmartEconomyPolicy.PostLoadResumeTick(1303, 0), Is.EqualTo(1304));
+			Assert.That(SmartEconomyPolicy.PostLoadResumeTick(int.MaxValue - 5, 25), Is.EqualTo(int.MaxValue));
+		}
+
+		[Test]
+		public void PressureRequiresSustainedEvidenceAndReleasesWithHysteresis()
+		{
+			var pressure = new SmartEconomyPressure(0, false);
+			pressure = SmartEconomyPolicy.UpdatePressure(pressure, true, 25, 100, 25);
+			Assert.That(pressure.Active, Is.False);
+
+			pressure = SmartEconomyPolicy.UpdatePressure(pressure, true, 75, 100, 25);
+			Assert.That(pressure.Active, Is.True);
+			Assert.That(pressure.EvidenceTicks, Is.EqualTo(100));
+
+			pressure = SmartEconomyPolicy.UpdatePressure(pressure, false, 50, 100, 25);
+			Assert.That(pressure.Active, Is.True);
+
+			pressure = SmartEconomyPolicy.UpdatePressure(pressure, false, 25, 100, 25);
+			Assert.That(pressure.Active, Is.False);
+		}
+
+		[TestCase(0, 0)]
+		[TestCase(1, 0)]
+		[TestCase(2, 1)]
+		[TestCase(4, 3)]
+		public void WaitingHarvestersExcludeTheActiveServiceSlot(int linked, int expected)
+		{
+			Assert.That(SmartEconomyPolicy.WaitingHarvesters(linked), Is.EqualTo(expected));
+		}
+
+		[Test]
+		public void CongestionRequiresEveryRefineryToBeOccupied()
+		{
+			Assert.That(SmartEconomyPolicy.WaitingHarvestersWhenAllRefineriesOccupied(Array.Empty<int>()), Is.Zero);
+			Assert.That(SmartEconomyPolicy.WaitingHarvestersWhenAllRefineriesOccupied(new[] { 3, 0 }), Is.Zero);
+			Assert.That(SmartEconomyPolicy.WaitingHarvestersWhenAllRefineriesOccupied(new[] { 1, 1 }), Is.Zero);
+			Assert.That(SmartEconomyPolicy.WaitingHarvestersWhenAllRefineriesOccupied(new[] { 3, 1 }), Is.EqualTo(2));
+			Assert.That(SmartEconomyPolicy.WaitingHarvestersWhenAllRefineriesOccupied(new[] { 2, 2 }), Is.EqualTo(2));
+		}
+
+		[Test]
+		public void StoragePressureUsesCapacityAndHandlesMissingStorage()
+		{
+			Assert.That(SmartEconomyPolicy.StoragePressure(799, 1000, 80), Is.False);
+			Assert.That(SmartEconomyPolicy.StoragePressure(800, 1000, 80), Is.True);
+			Assert.That(SmartEconomyPolicy.StoragePressure(100, 0, 80), Is.False);
+		}
+
+		[Test]
+		public void RefineryDemandCountsQueuesRequestsAndFreePendingHarvesters()
+		{
+			var demand = SmartEconomyPolicy.RefineryDemand(
+				10, 1, 1, 2, 1, 0, 1, 3, 3);
+
+			Assert.That(demand.CommittedHarvesters, Is.EqualTo(13));
+			Assert.That(demand.CommittedRefineries, Is.EqualTo(3));
+			Assert.That(demand.DesiredRefineries, Is.EqualTo(5));
+			Assert.That(demand.Deficit, Is.EqualTo(2));
+			Assert.That(demand.AvailableRequests, Is.EqualTo(2));
+		}
+
+		[Test]
+		public void ParallelRefineryDemandIsBoundedAndCannotRepeatCommittedWork()
+		{
+			var initial = SmartEconomyPolicy.RefineryDemand(30, 0, 0, 2, 0, 0, 1, 3, 3);
+			Assert.That(initial.DesiredRefineries, Is.EqualTo(10));
+			Assert.That(initial.AvailableRequests, Is.EqualTo(3));
+
+			var reserved = SmartEconomyPolicy.RefineryDemand(30, 0, 0, 2, 0, 3, 1, 3, 3);
+			Assert.That(reserved.CommittedHarvesters, Is.EqualTo(33));
+			Assert.That(reserved.CommittedRefineries, Is.EqualTo(5));
+			Assert.That(reserved.AvailableRequests, Is.Zero);
+		}
+
+		[Test]
+		public void RefineryDemandIsNotCappedByAnAuthoredBuildingLimit()
+		{
+			var demand = SmartEconomyPolicy.RefineryDemand(75, 0, 0, 24, 0, 0, 1, 2, 3);
+			Assert.That(demand.DesiredRefineries, Is.EqualTo(38));
+			Assert.That(demand.AvailableRequests, Is.EqualTo(3));
+		}
+
+		[Test]
+		public void SustainedCongestionRequestsOneAdditionalUnloadingPointAtATime()
+		{
+			var demand = SmartEconomyPolicy.RefineryDemand(4, 0, 0, 2, 0, 0, 1, 2, 3, true);
+			Assert.That(demand.DesiredRefineries, Is.EqualTo(3));
+			Assert.That(demand.AvailableRequests, Is.EqualTo(1));
+
+			var queued = SmartEconomyPolicy.RefineryDemand(4, 0, 0, 2, 1, 0, 1, 2, 3, true);
+			Assert.That(queued.AvailableRequests, Is.Zero);
+		}
+
+		[Test]
+		public void CashPauseCoversOnlyAnUnfundedFirstRefinery()
+		{
+			Assert.That(SmartEconomyPolicy.RefineryCashShortfall(1499, 1500, 0, 0, 0, 1), Is.EqualTo(1));
+			Assert.That(SmartEconomyPolicy.RefineryCashShortfall(1500, 1500, 0, 0, 0, 1), Is.Zero);
+			Assert.That(SmartEconomyPolicy.RefineryCashShortfall(0, 1500, 1, 0, 0, 1), Is.Zero,
+				"A throughput deficit is not a missing critical refinery.");
+			Assert.That(SmartEconomyPolicy.RefineryCashShortfall(0, 1500, 0, 1, 0, 1), Is.Zero);
+			Assert.That(SmartEconomyPolicy.RefineryCashShortfall(0, 1500, 0, 0, 1, 1), Is.Zero);
+			Assert.That(SmartEconomyPolicy.RefineryCashShortfall(0, 1500, 0, 0, 0, 0), Is.Zero,
+				"Busy Facts cannot spend the reserved cash, so combat production must continue.");
+		}
+
+		[Test]
+		public void SmartEconomySerializesOnlyTheMissingFirstRefinery()
+		{
+			Assert.That(SmartEconomyPolicy.NeedsSerializedFirstRefinery(true, 0, 0, 0), Is.True);
+			Assert.That(SmartEconomyPolicy.NeedsSerializedFirstRefinery(true, 0, 1, 0), Is.False);
+			Assert.That(SmartEconomyPolicy.NeedsSerializedFirstRefinery(true, 0, 0, 1), Is.False);
+			Assert.That(SmartEconomyPolicy.NeedsSerializedFirstRefinery(true, 1, 0, 0), Is.False);
+			Assert.That(SmartEconomyPolicy.NeedsSerializedFirstRefinery(false, 0, 0, 0), Is.False,
+				"Feature-disabled controls retain their legacy behavior.");
+		}
+
+		[Test]
+		public void ParallelReservationsUseOnlyUncommittedCash()
+		{
+			Assert.That(SmartEconomyPolicy.CanFundRefinery(4500, 1500, 1500, 1500), Is.True);
+			Assert.That(SmartEconomyPolicy.CanFundRefinery(4499, 1500, 1500, 1500), Is.False);
+		}
+
+		[Test]
+		public void ThroughputWorkPreservesHalfOfAvailableFactsForUsefulConstruction()
+		{
+			Assert.That(SmartEconomyPolicy.EffectiveParallelRefineryLimit(4, 0, 3, false), Is.EqualTo(3));
+			Assert.That(SmartEconomyPolicy.EffectiveParallelRefineryLimit(3, 0, 3, true), Is.EqualTo(2));
+			Assert.That(SmartEconomyPolicy.EffectiveParallelRefineryLimit(1, 2, 3, true), Is.EqualTo(2));
+			Assert.That(SmartEconomyPolicy.EffectiveParallelRefineryLimit(1, 0, 3, true), Is.EqualTo(1));
+			Assert.That(SmartEconomyPolicy.EffectiveParallelRefineryLimit(12, 0, 3, true), Is.EqualTo(3));
+		}
+
+		[Test]
+		public void ExcessCashRaisesExpansionTargetToConfiguredCeiling()
+		{
+			Assert.That(SmartEconomyPolicy.DesiredExpansionAssets(34999, 35000, 8), Is.Zero);
+			Assert.That(SmartEconomyPolicy.DesiredExpansionAssets(35000, 35000, 8), Is.EqualTo(2));
+			Assert.That(SmartEconomyPolicy.DesiredExpansionAssets(70000, 35000, 8), Is.EqualTo(3));
+			Assert.That(SmartEconomyPolicy.DesiredExpansionAssets(105000, 35000, 8), Is.EqualTo(4));
+			Assert.That(SmartEconomyPolicy.DesiredExpansionAssets(210000, 35000, 8), Is.EqualTo(7));
+			Assert.That(SmartEconomyPolicy.DesiredExpansionAssets(999999, 35000, 8), Is.EqualTo(8));
+		}
+
+		[Test]
+		public void ExpansionWaitsForConfiguredArmySupport()
+		{
+			Assert.That(SmartEconomyPolicy.ExpansionArmyReady(3319, 34570, 20), Is.False);
+			Assert.That(SmartEconomyPolicy.ExpansionArmyReady(6914, 34570, 20), Is.True);
+			Assert.That(SmartEconomyPolicy.ExpansionArmyReady(0, 34570, 0), Is.True);
+			Assert.That(SmartEconomyPolicy.ExpansionArmyReady(0, 0, 20), Is.True);
+		}
+	}
+}

@@ -25,6 +25,7 @@ namespace OpenRA.Mods.Common.Activities
 		readonly Mobile mobile;
 		readonly ResourceClaimLayer claimLayer;
 		readonly MoveCooldownHelper moveCooldownHelper;
+		readonly bool ignoreBotResourcePolicies;
 		Actor deliverActor;
 		CPos? orderLocation;
 		CPos? lastHarvestedCell;
@@ -44,10 +45,11 @@ namespace OpenRA.Mods.Common.Activities
 			this.deliverActor = deliverActor;
 		}
 
-		public FindAndDeliverResources(Actor self, CPos orderLocation)
+		public FindAndDeliverResources(Actor self, CPos orderLocation, bool ignoreBotResourcePolicies = false)
 			: this(self, null)
 		{
 			this.orderLocation = orderLocation;
+			this.ignoreBotResourcePolicies = ignoreBotResourcePolicies;
 		}
 
 		protected override void OnFirstRun(Actor self)
@@ -151,7 +153,7 @@ namespace OpenRA.Mods.Common.Activities
 
 			// If we get here, our search for resources was successful. Commence harvesting.
 			moveCooldownHelper.NotifyMoveQueued();
-			QueueChild(new HarvestResource(self, closestHarvestableCell.Value));
+			QueueChild(new HarvestResource(self, closestHarvestableCell.Value, ignoreBotResourcePolicies));
 			lastHarvestedCell = closestHarvestableCell.Value;
 			hasHarvestedCell = true;
 			return false;
@@ -166,12 +168,14 @@ namespace OpenRA.Mods.Common.Activities
 			// Harvesters should respect an explicit harvest order instead of harvesting the current cell.
 			if (orderLocation == null)
 			{
-				if (harv.CanHarvestCell(self, self.Location) && claimLayer.CanClaimCell(self, self.Location))
+				if (harv.CanHarvestCell(self, self.Location, ignoreBotResourcePolicies) &&
+					claimLayer.CanClaimCell(self, self.Location))
 					return self.Location;
 			}
 			else
 			{
-				if (harv.CanHarvestCell(self, orderLocation.Value) && claimLayer.CanClaimCell(self, orderLocation.Value))
+				if (harv.CanHarvestCell(self, orderLocation.Value, ignoreBotResourcePolicies) &&
+					claimLayer.CanClaimCell(self, orderLocation.Value))
 					return orderLocation;
 
 				orderLocation = null;
@@ -193,7 +197,7 @@ namespace OpenRA.Mods.Common.Activities
 			using (var search = PathSearch.ToTargetCellByPredicate(
 				self.World, mobile.Locomotor, self, new[] { searchFromLoc, self.Location },
 				loc =>
-					harv.CanHarvestCell(self, loc) &&
+					harv.CanHarvestCell(self, loc, ignoreBotResourcePolicies) &&
 					claimLayer.CanClaimCell(self, loc),
 				BlockedByActor.Stationary,
 				loc =>
@@ -203,7 +207,8 @@ namespace OpenRA.Mods.Common.Activities
 
 					// Add a cost modifier to harvestable cells to prefer resources that are closer to the refinery.
 					// This reduces the tendency for harvesters to move in straight lines
-					if (procPos.HasValue && harvInfo.ResourceRefineryDirectionPenalty > 0 && harv.CanHarvestCell(self, loc))
+					if (procPos.HasValue && harvInfo.ResourceRefineryDirectionPenalty > 0 &&
+						harv.CanHarvestCell(self, loc, ignoreBotResourcePolicies))
 					{
 						var pos = map.CenterOfCell(loc);
 

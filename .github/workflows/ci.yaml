@@ -104,6 +104,10 @@ jobs:
         shell: pwsh
         run: .\make.ps1 test
 
+      - name: Check Windows Utility Wrapper
+        shell: cmd
+        run: utility.cmd cnc --check-yaml
+
       - name: Run Unit Tests
         shell: pwsh
         run: >-

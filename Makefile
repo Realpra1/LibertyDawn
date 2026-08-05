@@ -9,16 +9,16 @@
 # to compile using system libraries for native dependencies, run:
 #   make [RUNTIME=net6] TARGETPLATFORM=unix-generic
 #
-# to check the official mods for erroneous yaml files, run:
+# to check the LibertyDawn CNC mod for erroneous yaml files, run:
 #   make [RUNTIME=net6] test
 #
-# to check the engine and official mod dlls for code style violations, run:
+# to check the engine and CNC mod dlls for code style violations, run:
 #   make [RUNTIME=net6] check
 #
-# to compile and install Red Alert, Tiberian Dawn, and Dune 2000, run:
+# to compile and install LibertyDawn Tiberian Dawn, run:
 #   make [RUNTIME=net6] [prefix=/foo] [bindir=/bar/bin] install
 #
-# to compile and install Red Alert, Tiberian Dawn, and Dune 2000
+# to compile and install LibertyDawn Tiberian Dawn
 # using system libraries for native dependencies, run:
 #   make [prefix=/foo] [bindir=/bar/bin] TARGETPLATFORM=unix-generic install
 #
@@ -110,50 +110,41 @@ ifeq ($(TARGETPLATFORM), unix-generic)
 endif
 	@echo
 	@echo "Checking for explicit interface violations..."
-	@./utility.sh all --check-explicit-interfaces
+	@./utility.sh cnc --check-explicit-interfaces
 	@echo
 	@echo "Checking for incorrect conditional trait interface overrides..."
-	@./utility.sh all --check-conditional-trait-interface-overrides
+	@./utility.sh cnc --check-conditional-trait-interface-overrides
 
 check-scripts:
 	@echo
 	@echo "Checking for Lua syntax errors..."
-	@luac -p $(shell find mods/*/maps/* -iname '*.lua')
+	@luac -p $(shell find mods/cnc/maps -iname '*.lua')
 	@luac -p $(shell find lua/* -iname '*.lua')
-	@luac -p $(shell find mods/*/scripts/* -iname '*.lua')
+	@luac -p $(shell find mods/cnc/scripts mods/common/scripts -iname '*.lua')
 
 test: all
 	@echo
-	@echo "Testing Tiberian Sun mod MiniYAML..."
-	@./utility.sh ts --check-yaml
-	@echo
-	@echo "Testing Dune 2000 mod MiniYAML..."
-	@./utility.sh d2k --check-yaml
-	@echo
-	@echo "Testing Tiberian Dawn mod MiniYAML..."
+	@echo "Testing LibertyDawn Tiberian Dawn mod MiniYAML..."
 	@./utility.sh cnc --check-yaml
-	@echo
-	@echo "Testing Red Alert mod MiniYAML..."
-	@./utility.sh ra --check-yaml
 
 ############# LOCAL INSTALLATION AND DOWNSTREAM PACKAGING ##############
 #
-version: VERSION mods/ra/mod.yaml mods/cnc/mod.yaml mods/d2k/mod.yaml mods/ts/mod.yaml mods/modcontent/mod.yaml mods/all/mod.yaml
+version: VERSION mods/cnc/mod.yaml mods/modcontent/mod.yaml mods/all/mod.yaml
 ifeq ($(VERSION),)
 	$(error Unable to determine new version (requires git or override of variable VERSION))
 endif
 	@sh -c '. ./packaging/functions.sh; set_engine_version "$(VERSION)" .'
-	@sh -c '. ./packaging/functions.sh; set_mod_version "$(VERSION)" mods/ra/mod.yaml mods/cnc/mod.yaml mods/d2k/mod.yaml mods/ts/mod.yaml mods/modcontent/mod.yaml mods/all/mod.yaml'
+	@sh -c '. ./packaging/functions.sh; set_mod_version "$(VERSION)" mods/cnc/mod.yaml mods/modcontent/mod.yaml mods/all/mod.yaml'
 
 install:
-	@sh -c '. ./packaging/functions.sh; install_assemblies $(CWD) $(DESTDIR)$(gameinstalldir) $(TARGETPLATFORM) $(RUNTIME) True True True'
-	@sh -c '. ./packaging/functions.sh; install_data $(CWD) $(DESTDIR)$(gameinstalldir) cnc d2k ra'
+	@sh -c '. ./packaging/functions.sh; install_assemblies $(CWD) $(DESTDIR)$(gameinstalldir) $(TARGETPLATFORM) $(RUNTIME) True True False'
+	@sh -c '. ./packaging/functions.sh; install_data $(CWD) $(DESTDIR)$(gameinstalldir) cnc'
 
 install-linux-shortcuts:
-	@sh -c '. ./packaging/functions.sh; install_linux_shortcuts $(CWD) "$(DESTDIR)" "$(gameinstalldir)" "$(bindir)" "$(datadir)" "$(shell head -n1 VERSION)" cnc d2k ra'
+	@sh -c '. ./packaging/functions.sh; install_linux_shortcuts $(CWD) "$(DESTDIR)" "$(gameinstalldir)" "$(bindir)" "$(datadir)" "$(shell head -n1 VERSION)" cnc'
 
 install-linux-appdata:
-	@sh -c '. ./packaging/functions.sh; install_linux_appdata $(CWD) "$(DESTDIR)" "$(datadir)" cnc d2k ra'
+	@sh -c '. ./packaging/functions.sh; install_linux_appdata $(CWD) "$(DESTDIR)" "$(datadir)" cnc'
 
 help:
 	@echo 'to compile, run:'
@@ -165,16 +156,16 @@ help:
 	@echo 'to compile using system libraries for native dependencies, run:'
 	@echo '  make [RUNTIME=net6] TARGETPLATFORM=unix-generic'
 	@echo
-	@echo 'to check the official mods for erroneous yaml files, run:'
+	@echo 'to check the LibertyDawn CNC mod for erroneous yaml files, run:'
 	@echo '  make [RUNTIME=net6] test'
 	@echo
-	@echo 'to check the engine and official mod dlls for code style violations, run:'
+	@echo 'to check the engine and CNC mod dlls for code style violations, run:'
 	@echo '  make [RUNTIME=net6] check'
 	@echo
-	@echo 'to compile and install Red Alert, Tiberian Dawn, and Dune 2000 run:'
+	@echo 'to compile and install LibertyDawn Tiberian Dawn, run:'
 	@echo '  make [RUNTIME=net6] [prefix=/foo] [TARGETPLATFORM=unix-generic] install'
 	@echo
-	@echo 'to compile and install Red Alert, Tiberian Dawn, and Dune 2000'
+	@echo 'to compile and install LibertyDawn Tiberian Dawn'
 	@echo 'using system libraries for native dependencies, run:'
 	@echo '   make [RUNTIME=net6] [prefix=/foo] [bindir=/bar/bin] TARGETPLATFORM=unix-generic install'
 	@echo

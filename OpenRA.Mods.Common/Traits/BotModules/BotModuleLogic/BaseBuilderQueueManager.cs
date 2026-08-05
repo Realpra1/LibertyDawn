@@ -266,6 +266,23 @@ namespace OpenRA.Mods.Common.Traits
 				}
 			}
 
+			// A smart AI with no live unloading refinery is in critical recovery. Let one
+			// Fact fund the serialized refinery (or the power prerequisite above), and
+			// keep every other construction queue from splitting the remaining cash.
+			if (baseBuilder.SmartEconomySerializesMissingRefinery)
+			{
+				var refinery = GetProducibleBuilding(baseBuilder.SmartEconomyRefineryTypes, buildableThings);
+				if (refinery != null && HasSufficientPowerForActor(refinery) &&
+					baseBuilder.TryReserveSmartEconomyMissingRefinery(queue, refinery.Name))
+				{
+					AIUtils.BotDebug("{0} decided to build {1}: serialized missing-refinery recovery",
+						queue.Actor.Owner, DisplayName(refinery.Name));
+					return refinery;
+				}
+
+				return null;
+			}
+
 			var enclosureWall = baseBuilder.WallPlanner?.ConstructionYardEnclosureWall(buildableThings, playerBuildings);
 			if (enclosureWall != null)
 			{
@@ -277,6 +294,13 @@ namespace OpenRA.Mods.Common.Traits
 			var opening = baseBuilder.OpeningBuilding(buildableThings);
 			if (opening != null)
 			{
+				if (baseBuilder.SmartEconomyRefineryTypes.Contains(opening.Name) &&
+					!baseBuilder.TryReserveSmartEconomyControlledRefinery(queue, opening.Name))
+					opening = null;
+			}
+
+			if (opening != null)
+			{
 				AIUtils.BotDebug("{0} decided to build {1}: parallel opening policy", queue.Actor.Owner, DisplayName(opening.Name));
 				return opening;
 			}
@@ -284,8 +308,9 @@ namespace OpenRA.Mods.Common.Traits
 			// Next is to build up a strong economy
 			if (!baseBuilder.HasAdequateRefineryCount)
 			{
-				var refinery = GetProducibleBuilding(baseBuilder.Info.RefineryTypes, buildableThings);
-				if (refinery != null && HasSufficientPowerForActor(refinery))
+				var refinery = GetProducibleBuilding(baseBuilder.SmartEconomyRefineryTypes, buildableThings);
+				if (refinery != null && HasSufficientPowerForActor(refinery) &&
+					baseBuilder.TryReserveSmartEconomyControlledRefinery(queue, refinery.Name))
 				{
 					AIUtils.BotDebug("{0} decided to build {1}: Priority override (refinery)", queue.Actor.Owner, DisplayName(refinery.Name));
 					return refinery;
@@ -298,9 +323,51 @@ namespace OpenRA.Mods.Common.Traits
 				}
 			}
 
+			// Persistent loaded-harvester congestion is stronger evidence than a fixed
+			// harvester/refinery ratio. Add unloading capacity before discretionary scaling.
+			if (baseBuilder.SmartEconomyWantsRefinery)
+			{
+				var refinery = GetProducibleBuilding(baseBuilder.SmartEconomyRefineryTypes, buildableThings);
+				if (refinery != null && HasSufficientPowerForActor(refinery) &&
+					baseBuilder.TryReserveSmartEconomyRefinery(queue, refinery.Name))
+				{
+					baseBuilder.LogSmartEconomy("{0} decided to build {1}: sustained unload congestion",
+						queue.Actor.Owner, DisplayName(refinery.Name));
+					return refinery;
+				}
+
+				if (power != null && refinery != null && !HasSufficientPowerForActor(refinery))
+				{
+					baseBuilder.LogSmartEconomy("{0} decided to build {1}: congested refinery requires power",
+						queue.Actor.Owner, DisplayName(power.Name));
+					return power;
+				}
+			}
+
+			// Stored-resource pressure is orthogonal to refinery throughput. A defense queue
+			// that can build silos should create headroom before spending on optional defenses.
+			if (baseBuilder.SmartEconomyWantsSilo)
+			{
+				var silo = GetProducibleBuilding(baseBuilder.Info.SiloTypes, buildableThings);
+				if (silo != null && HasSufficientPowerForActor(silo))
+				{
+					baseBuilder.LogSmartEconomy("{0} decided to build {1}: storage pressure",
+						queue.Actor.Owner, DisplayName(silo.Name));
+					return silo;
+				}
+
+				if (power != null && silo != null && !HasSufficientPowerForActor(silo))
+				{
+					baseBuilder.LogSmartEconomy("{0} decided to build {1}: pressured silo requires power",
+						queue.Actor.Owner, DisplayName(power.Name));
+					return power;
+				}
+			}
+
 			// Make sure that we can spend as fast as we are earning
 			var availableFunds = Math.Max(0, playerResources.Cash + playerResources.Resources);
-			if (baseBuilder.Info.NewProductionCashThreshold > 0 && availableFunds > baseBuilder.Info.NewProductionCashThreshold)
+			if ((baseBuilder.Info.NewProductionCashThreshold > 0 && availableFunds > baseBuilder.Info.NewProductionCashThreshold) ||
+				baseBuilder.SmartEconomyWantsProductionCapacity)
 			{
 				var productionCandidates = buildableThings.Where(a => baseBuilder.Info.ProductionTypes.Contains(a.Name)).ToList();
 				if (baseBuilder.AdaptiveProductionDebugLogging && productionCandidates.Count > 0)
@@ -358,7 +425,7 @@ namespace OpenRA.Mods.Common.Traits
 			}
 
 			// Create some head room for resource storage if we really need it
-			if (playerResources.Resources > 0.8 * playerResources.ResourceCapacity)
+			if (!baseBuilder.Info.EnableSmartEconomy && playerResources.Resources > 0.8 * playerResources.ResourceCapacity)
 			{
 				var silo = GetProducibleBuilding(baseBuilder.Info.SiloTypes, buildableThings);
 				if (silo != null && HasSufficientPowerForActor(silo))
@@ -398,6 +465,9 @@ namespace OpenRA.Mods.Common.Traits
 				if (limitedFractions.ContainsKey(name))
 					continue;
 
+				// While a smart AI has no live refinery, every refinery source shares the one
+				// serialized recovery reservation. This also covers the ordinary authored
+				// building-fraction fallback after the higher-priority paths declined a queue.
 				// Does this building have initial delay, if so have we passed it?
 				if (baseBuilder.Info.BuildingDelays != null &&
 					baseBuilder.Info.BuildingDelays.ContainsKey(name) &&
@@ -444,6 +514,12 @@ namespace OpenRA.Mods.Common.Traits
 						return power;
 					}
 				}
+
+				// Enabled smart bots route every refinery source through the same per-Fact
+				// reservation after all other authored checks have accepted the candidate.
+				if (baseBuilder.SmartEconomyRefineryTypes.Contains(name) &&
+					!baseBuilder.TryReserveSmartEconomyControlledRefinery(queue, name))
+					continue;
 
 				// Lets build this
 				AIUtils.BotDebug("{0} decided to build {1}: Desired is {2} ({3} / {4}); current is {5} / {4}",

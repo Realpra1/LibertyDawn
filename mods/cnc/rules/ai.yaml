@@ -109,6 +109,109 @@ Player:
 		HeavyDropMaximumDefenderValue: 3400
 		HeavyDropMaximumAaDanger: 0
 		DebugLogging: true
+	StealthTankSquadBotModule:
+		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai || enable-Easiest-ai
+		UnitTypes: stnk
+		SquadLabel: stealth-tank
+		ScanInterval: 75
+		OrderInterval: 75
+		MaximumTargetCandidates: 48
+		ThreatRangeBufferCells: 2
+		DetectorRangeBufferCells: 2
+		KiteRangeMarginCells: 1
+		CarefulClearValueRatio: 5
+		MinimumLateHarassmentGroupSize: 3
+		TargetSwitchImprovementPercent: 25
+		HarassmentTargetPriorities:
+			harv: 10000
+			sharv: 10000
+			nuk2: 8500
+			proc: 6000
+			eye: 5500
+			tmpl: 5500
+			hq: 4500
+			nuke: 1800
+		LateHarassmentTargetPriorities:
+			fact: 7000
+		AttackTargetPriorities:
+			htnk: 10000
+			mtnk: 8500
+			ctnk: 8000
+			ltnk: 7000
+			ftnk: 6500
+		DebugLogging: true
+	StealthTankSquadBotModule@chemical:
+		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai || enable-Easiest-ai
+		UnitTypes: ctnk
+		SquadLabel: chemical
+		ScanInterval: 75
+		OrderInterval: 75
+		MaximumTargetCandidates: 48
+		MaximumHarassmentGroups: 1
+		IncludeAttackGroup: false
+		ReserveOpeningPair: false
+		ThreatRangeBufferCells: 2
+		DetectorRangeBufferCells: 2
+		KiteRangeMarginCells: 1
+		CarefulClearValueRatio: 5
+		MinimumLateHarassmentGroupSize: 3
+		TargetSwitchImprovementPercent: 25
+		ExcludedHarassmentTargetTypes: Tank
+		IgnoredHarassmentWeaponThreatTypes: Infantry, Creep
+		InfantryTargetPriority: 5000
+		StructureTargetPriority: 0
+		TankTargetPriority: 0
+		InfantryClusterRadiusCells: 3
+		InfantryClusterBonusPercentPerNearbyActor: 50
+		MaximumInfantryClusterMultiplierPercent: 300
+		CrushInfantryTargets: false
+		HarassmentTargetPriorities:
+			harv: 10000
+			sharv: 10000
+			vice: 10000
+			pvice: 10000
+		HarassmentArmorPriorities:
+			TiberiumWood: 6000
+			Tiberium: 6000
+		DebugLogging: true
+	CrateCollectorBotModule:
+		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai || enable-Easiest-ai
+		ScanInterval: 250
+		CoarseCellSize: 6
+		MaximumRegionCandidates: 32
+		AssignmentStallInterval: 500
+		EmergencyCashThreshold: 0
+		McvTypes: mcv, fact
+		ExcludedCollectorTypes: truck, harv, sharv, mcv, e6, rmbo, tran
+		EmergencySellActorTypes: nuke, nuk2, hq
+		EmergencySellInterval: 1500
+		MinimumCollectorHealthPercent: 75
+		DebugLogging: true
+	RedTiberiumBombBotModule:
+		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai || enable-Easiest-ai
+		StealthHarvesterTypes: sharv
+		HarvesterTypes: harv, sharv
+		UnstableResourceTypes: RedTiberium
+		ScanInterval: 50
+		LaunchPercentPerMinute: 5
+		GameTicksPerMinute: 1500
+		MaximumStoredLaunches: 1
+		MaximumTargetCandidates: 32
+		TargetApproachRadius: 1
+		MissionStallInterval: 250
+		OrderRetryInterval: 75
+		DebugSummaryInterval: 500
+		TargetPriorities:
+			fact: 10000
+			eye: 9000
+			tmpl: 9000
+			hq: 9000
+			proc: 8500
+			weap: 8000
+			afld: 8000
+			hpad: 7000
+			resonator: 6500
+		DebugLogging: true
 	OpeningGarrisonBotModule:
 		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai || enable-Easiest-ai
 		BarracksTypes: pyle, hand
@@ -189,6 +292,7 @@ Player:
 					CheckRadius: 7c0
     SupportPowerBotModule@b:
 		RequiresCondition: enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai
+		DebugLogging: true
 		Decisions:
 			Airstrike:
 				OrderName: AirstrikePowerInfoOrder
@@ -414,7 +518,7 @@ Player:
 		AdaptiveUnitCap: true
 		AdaptiveUnitCapMinimum: 300
 		HarvesterTypes: harv, sharv
-		HarvesterLimit: 75
+		HarvesterLimit: 90
 		UnitCapDebugLogging: true
 		LearnHumanBuiltUnits: true
 		SampledUnitChance: 0.05
@@ -510,7 +614,7 @@ Player:
 		AdaptiveUnitCap: true
 		AdaptiveUnitCapMinimum: 300
 		HarvesterTypes: harv, sharv
-		HarvesterLimit: 75
+		HarvesterLimit: 90
 		UnitCapDebugLogging: true
 		LearnHumanBuiltUnits: true
 		SampledUnitChance: 0.05
@@ -606,7 +710,7 @@ Player:
 		AdaptiveUnitCap: true
 		AdaptiveUnitCapMinimum: 300
 		HarvesterTypes: harv, sharv
-		HarvesterLimit: 75
+		HarvesterLimit: 90
 		UnitCapDebugLogging: true
 		LearnHumanBuiltUnits: true
 		SampledUnitChance: 0.05
@@ -643,6 +747,10 @@ Player:
 			harv: 8
     BaseBuilderBotModule@brutalis:
 		RequiresCondition: enable-brutalis-ai || enable-wavemaker-ai
+		EnableSmartEconomy: true
+		SmartEconomyRefineryTypes: proc
+		SmartEconomyMcvTypes: mcv
+		SmartEconomyDebugLogging: true
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: true
 		MaximumWallSegments: 24
@@ -669,7 +777,6 @@ Player:
 		ProductionTypes: pyle,hand,weap,afld,hpad,hq
 		SiloTypes: silo
 		BuildingLimits:
-            proc: 25
             weap: 15
             nuk2: 8
 			afld: 15
@@ -724,23 +831,23 @@ Player:
 		SquadSize: 20
 		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck, tran
 		ConstructionYardTypes: fact
-        AirUnitsTypes: heli, orca, stnk
+        AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
     SquadManagerBotModule@wavemaker:
 		RequiresCondition: enable-wavemaker-ai
 		SquadSize: 120
 		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck, tran
 		ConstructionYardTypes: fact
-        AirUnitsTypes: heli, orca, stnk
+        AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
-    UnitBuilderBotModule@brutalis:
+	UnitBuilderBotModule@brutalis:
 		RequiresCondition: enable-brutalis-ai || enable-wavemaker-ai
-		ExternallyManagedTypes: tran, truck
+		ExternallyManagedTypes: tran, truck, mcv
 		TotalUnitLimit: 400
 		AdaptiveUnitCap: true
 		AdaptiveUnitCapMinimum: 300
 		HarvesterTypes: harv, sharv
-		HarvesterLimit: 75
+		HarvesterLimit: 90
 		UnitCapDebugLogging: true
 		LearnHumanBuiltUnits: true
 		SampledUnitChance: 0.05
@@ -822,6 +929,10 @@ Player:
             mcv: 3000
     BaseBuilderBotModule@viki:
 		RequiresCondition: enable-viki-ai
+		EnableSmartEconomy: true
+		SmartEconomyRefineryTypes: proc
+		SmartEconomyMcvTypes: mcv
+		SmartEconomyDebugLogging: true
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: true
 		MaximumWallSegments: 24
@@ -844,7 +955,6 @@ Player:
 		ProductionTypes: pyle,hand,weap,afld,hpad,hq
 		SiloTypes: silo
 		BuildingLimits:
-            proc: 25
             weap: 15
             nuk2: 8
 			afld: 1
@@ -904,12 +1014,12 @@ Player:
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
 	UnitBuilderBotModule@viki:
 		RequiresCondition: enable-viki-ai
-		ExternallyManagedTypes: tran, truck
+		ExternallyManagedTypes: tran, truck, mcv
 		TotalUnitLimit: 400
 		AdaptiveUnitCap: true
 		AdaptiveUnitCapMinimum: 300
 		HarvesterTypes: harv, sharv
-		HarvesterLimit: 75
+		HarvesterLimit: 90
 		UnitCapDebugLogging: true
 		LearnHumanBuiltUnits: true
 		SampledUnitChance: 0.05
@@ -972,6 +1082,10 @@ Player:
             mcv: 1
     BaseBuilderBotModule@skynet:
 		RequiresCondition: enable-skynet-ai
+		EnableSmartEconomy: true
+		SmartEconomyRefineryTypes: proc
+		SmartEconomyMcvTypes: mcv
+		SmartEconomyDebugLogging: true
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: true
 		EnableOpeningPolicy: true
@@ -1020,7 +1134,6 @@ Player:
 		MaximumWallSegments: 150
 		WallPathCheckLocomotor: wheeled
 		BuildingLimits:
-            proc: 25
 			pyle: 3
 			hand: 3
 			hq: 1
@@ -1195,12 +1308,12 @@ Player:
 			obli: 1
 	UnitBuilderBotModule@skynet:
 		RequiresCondition: enable-skynet-ai
-		ExternallyManagedTypes: tran, truck
+		ExternallyManagedTypes: tran, truck, mcv
 		TotalUnitLimit: 400
 		AdaptiveUnitCap: true
 		AdaptiveUnitCapMinimum: 300
 		HarvesterTypes: harv, sharv
-		HarvesterLimit: 75
+		HarvesterLimit: 90
 		UnitCapDebugLogging: true
 		LearnHumanBuiltUnits: true
 		SampledUnitChance: 0.05
@@ -1289,6 +1402,10 @@ Player:
             mhq: 1
     BaseBuilderBotModule@ironreaper:
 		RequiresCondition: enable-ironreaper-ai
+		EnableSmartEconomy: true
+		SmartEconomyRefineryTypes: proc
+		SmartEconomyMcvTypes: mcv
+		SmartEconomyDebugLogging: true
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: true
 		MaximumWallSegments: 24
@@ -1331,7 +1448,6 @@ Player:
 		ProductionTypes: pyle,hand,weap,afld,hpad, hq
 		SiloTypes: silo
 		BuildingLimits:
-            proc: 25
             weap: 15
             nuk2: 8
 			afld: 15
@@ -1365,6 +1481,7 @@ Player:
 			proc: 20
 			pyle: 15
 			hand: 15
+			stealth: 2
 			hq: 5
 			weap: 25
 			afld: 25
@@ -1403,18 +1520,18 @@ Player:
 		RequiresCondition: enable-ironreaper-ai
 		SquadSize: 20
         MaxBaseRadius: 49
-		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck, tran
+		ExcludeFromSquadsTypes: harv, sharv, mcv, a10, e6, rmbo, truck, tran
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
 	UnitBuilderBotModule@ironreaper:
 		RequiresCondition: enable-ironreaper-ai
-		ExternallyManagedTypes: tran, truck, upgrade.covert1, upgrade.covert2, upgrade.covert3, downgrade.covert, upgrade.recon1, upgrade.recon2, upgrade.recon3, downgrade.recon, upgrade.economy1, upgrade.economy2, upgrade.economy3, downgrade.economy
+		ExternallyManagedTypes: tran, truck, mcv, upgrade.covert1, upgrade.covert2, upgrade.covert3, downgrade.covert, upgrade.recon1, upgrade.recon2, upgrade.recon3, downgrade.recon, upgrade.economy1, upgrade.economy2, upgrade.economy3, downgrade.economy
 		TotalUnitLimit: 400
 		AdaptiveUnitCap: true
 		AdaptiveUnitCapMinimum: 300
 		HarvesterTypes: harv, sharv
-		HarvesterLimit: 75
+		HarvesterLimit: 90
 		UnitCapDebugLogging: true
 		LearnHumanBuiltUnits: true
 		SampledUnitChance: 0.05
@@ -1431,13 +1548,14 @@ Player:
 			e6: 7
             rmbo: 2
 			harv: 100
+			sharv: 100
 			ltnk: 11
 			ftnk: 6
             ctnk: 0
 			arty: 57
 			mtnk: 1
 			mlrs: 59
-			stnk: 2
+			stnk: 15
 			apc: 1
 			bggy: 1
 			bike: 1
@@ -1470,6 +1588,7 @@ Player:
             jeep: 25
 			htnk: 50
             harv: 50
+			sharv: 50
 			msam: 4
             mhq: 2
 			heli: 20
@@ -1588,7 +1707,7 @@ Player:
 		AdaptiveUnitCap: true
 		AdaptiveUnitCapMinimum: 300
 		HarvesterTypes: harv, sharv
-		HarvesterLimit: 75
+		HarvesterLimit: 90
 		UnitCapDebugLogging: true
 		LearnHumanBuiltUnits: true
 		SampledUnitChance: 0.05
@@ -1734,7 +1853,7 @@ Player:
 		AdaptiveUnitCap: true
 		AdaptiveUnitCapMinimum: 300
 		HarvesterTypes: harv, sharv
-		HarvesterLimit: 75
+		HarvesterLimit: 90
 		UnitCapDebugLogging: true
 		LearnHumanBuiltUnits: true
 		SampledUnitChance: 0.05
