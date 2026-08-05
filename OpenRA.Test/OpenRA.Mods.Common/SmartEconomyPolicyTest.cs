@@ -148,13 +148,46 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
-		public void ThroughputWorkPreservesHalfOfAvailableFactsForUsefulConstruction()
+		public void OneThroughputRefineryMayStreamButParallelWorkMustBeFunded()
 		{
-			Assert.That(SmartEconomyPolicy.EffectiveParallelRefineryLimit(4, 0, 3, false), Is.EqualTo(3));
-			Assert.That(SmartEconomyPolicy.EffectiveParallelRefineryLimit(3, 0, 3, true), Is.EqualTo(2));
-			Assert.That(SmartEconomyPolicy.EffectiveParallelRefineryLimit(1, 2, 3, true), Is.EqualTo(2));
-			Assert.That(SmartEconomyPolicy.EffectiveParallelRefineryLimit(1, 0, 3, true), Is.EqualTo(1));
-			Assert.That(SmartEconomyPolicy.EffectiveParallelRefineryLimit(12, 0, 3, true), Is.EqualTo(3));
+			Assert.That(SmartEconomyPolicy.CanStartThroughputRefinery(0, 0, 0, 1500, 0), Is.True);
+			Assert.That(SmartEconomyPolicy.CanStartThroughputRefinery(1499, 0, 0, 1500, 1), Is.False);
+			Assert.That(SmartEconomyPolicy.CanStartThroughputRefinery(3000, 1500, 0, 1500, 1), Is.True);
+		}
+
+		[Test]
+		public void EarlyVehicleCapacityUsesConfiguredShareOfFacts()
+		{
+			Assert.That(SmartEconomyPolicy.DesiredEarlyVehicleFactories(0, 50), Is.Zero);
+			Assert.That(SmartEconomyPolicy.DesiredEarlyVehicleFactories(1, 50), Is.EqualTo(1));
+			Assert.That(SmartEconomyPolicy.DesiredEarlyVehicleFactories(2, 50), Is.EqualTo(1));
+			Assert.That(SmartEconomyPolicy.DesiredEarlyVehicleFactories(3, 50), Is.EqualTo(2));
+			Assert.That(SmartEconomyPolicy.DesiredEarlyVehicleFactories(4, 50), Is.EqualTo(2));
+			Assert.That(SmartEconomyPolicy.DesiredEarlyVehicleFactories(4, 25), Is.EqualTo(1));
+			Assert.That(SmartEconomyPolicy.DesiredEarlyVehicleFactories(4, 75), Is.EqualTo(3));
+		}
+
+		[Test]
+		public void VehicleCapacityTracksTheConfiguredRefineryConstructionBalance()
+		{
+			Assert.That(SmartEconomyPolicy.DesiredVehicleFactoriesForRefineryBalance(0, 50), Is.Zero);
+			Assert.That(SmartEconomyPolicy.DesiredVehicleFactoriesForRefineryBalance(1, 50), Is.EqualTo(1));
+			Assert.That(SmartEconomyPolicy.DesiredVehicleFactoriesForRefineryBalance(3, 50), Is.EqualTo(3));
+			Assert.That(SmartEconomyPolicy.DesiredVehicleFactoriesForRefineryBalance(3, 25), Is.EqualTo(1));
+			Assert.That(SmartEconomyPolicy.DesiredVehicleFactoriesForRefineryBalance(3, 75), Is.EqualTo(9));
+			Assert.That(SmartEconomyPolicy.DesiredVehicleFactoriesForRefineryBalance(3, 0), Is.Zero);
+			Assert.That(SmartEconomyPolicy.DesiredVehicleFactoriesForRefineryBalance(3, 100), Is.EqualTo(int.MaxValue));
+		}
+
+		[Test]
+		public void ThroughputWorkLeavesConfiguredFactShareForAlternativeConstruction()
+		{
+			Assert.That(SmartEconomyPolicy.EffectiveParallelRefineryLimit(4, 3, 50, false), Is.EqualTo(3));
+			Assert.That(SmartEconomyPolicy.EffectiveParallelRefineryLimit(4, 3, 50, true), Is.EqualTo(2));
+			Assert.That(SmartEconomyPolicy.EffectiveParallelRefineryLimit(3, 3, 50, true), Is.EqualTo(1));
+			Assert.That(SmartEconomyPolicy.EffectiveParallelRefineryLimit(2, 3, 50, true), Is.EqualTo(1));
+			Assert.That(SmartEconomyPolicy.EffectiveParallelRefineryLimit(1, 3, 50, true), Is.Zero);
+			Assert.That(SmartEconomyPolicy.EffectiveParallelRefineryLimit(12, 3, 50, true), Is.EqualTo(3));
 		}
 
 		[Test]

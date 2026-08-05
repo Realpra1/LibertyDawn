@@ -144,13 +144,47 @@ namespace OpenRA.Mods.Common.Traits
 			return Math.Max(0, spendableCash) >= committedCost;
 		}
 
-		public static int EffectiveParallelRefineryLimit(int idleRefineryQueues, int pendingRefineries,
-			int configuredLimit, bool preserveProductionQueue)
+		public static bool CanStartThroughputRefinery(int spendableCash, int queuedRemainingCost,
+			int reservedCost, int refineryCost, int pendingRefineries)
 		{
-			var pending = Math.Max(0, pendingRefineries);
-			var usableQueues = pending + Math.Max(0, idleRefineryQueues);
-			if (preserveProductionQueue && usableQueues > 1)
-				usableQueues = Math.Max(pending, (usableQueues + 1) / 2);
+			// A low-cash AI with busy unit queues may never accumulate the full price at one
+			// instant. Permit one streaming construction commitment, but require every
+			// additional parallel commitment to be fully funded.
+			return Math.Max(0, pendingRefineries) == 0 || CanFundRefinery(spendableCash,
+				queuedRemainingCost, reservedCost, refineryCost);
+		}
+
+		public static int DesiredEarlyVehicleFactories(int activeFactQueues, int vehicleFactoryPercent)
+		{
+			var facts = Math.Max(0, activeFactQueues);
+			var percent = Math.Clamp(vehicleFactoryPercent, 0, 100);
+			return (int)Math.Min(int.MaxValue, ((long)facts * percent + 99) / 100);
+		}
+
+		public static int DesiredVehicleFactoriesForRefineryBalance(int committedRefineries, int vehicleFactoryPercent)
+		{
+			var refineries = Math.Max(0, committedRefineries);
+			var percent = Math.Clamp(vehicleFactoryPercent, 0, 100);
+			if (refineries == 0 || percent == 0)
+				return 0;
+
+			if (percent == 100)
+				return int.MaxValue;
+
+			var refineryPercent = 100 - percent;
+			return (int)Math.Min(int.MaxValue,
+				((long)refineries * percent + refineryPercent - 1) / refineryPercent);
+		}
+
+		public static int EffectiveParallelRefineryLimit(int activeFactQueues,
+			int configuredLimit, int vehicleFactoryPercent, bool preserveAlternativeConstruction)
+		{
+			var usableQueues = Math.Max(0, activeFactQueues);
+			if (preserveAlternativeConstruction)
+			{
+				var reservedVehicleSlots = DesiredEarlyVehicleFactories(usableQueues, vehicleFactoryPercent);
+				usableQueues = Math.Max(0, usableQueues - reservedVehicleSlots);
+			}
 
 			return Math.Min(Math.Max(0, configuredLimit), usableQueues);
 		}

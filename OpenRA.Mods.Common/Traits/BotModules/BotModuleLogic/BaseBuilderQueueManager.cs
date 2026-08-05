@@ -137,6 +137,7 @@ namespace OpenRA.Mods.Common.Traits
 					return false;
 
 				bot.QueueOrder(Order.StartProduction(queue.Actor, item.Name, 1));
+				baseBuilder.LogProductionSpend(item, queue);
 			}
 			else if (currentBuilding != null && currentBuilding.Done)
 			{
@@ -289,6 +290,33 @@ namespace OpenRA.Mods.Common.Traits
 				AIUtils.BotDebug("{0} decided to build {1}: construction-yard enclosure",
 					queue.Actor.Owner, DisplayName(enclosureWall.Name));
 				return enclosureWall;
+			}
+
+			// Once the first refinery is live, establish the configured share of useful
+			// vehicle-factory capacity before any refinery source can consume those Facts.
+			if (baseBuilder.SmartEconomyWantsEarlyVehicleProductionCapacity)
+			{
+				var vehicleFactories = buildableThings.Where(a => baseBuilder.Info.VehiclesFactoryTypes.Contains(a.Name))
+					.OrderByDescending(a => AdaptiveWeighting.ProductionBuildingScore(
+						baseBuilder.AdaptiveProductionBuildingDemand(a), playerBuildings.Count(b => b.Info.Name == a.Name)))
+					.ThenBy(a => a.Name, StringComparer.Ordinal).ToArray();
+				foreach (var vehicleFactory in vehicleFactories)
+				{
+					if (HasSufficientPowerForActor(vehicleFactory) &&
+						baseBuilder.TryReserveSmartEconomyVehicleFactory(queue, vehicleFactory.Name))
+					{
+						baseBuilder.LogSmartEconomy("{0} decided to build {1}: early vehicle-production priority",
+							queue.Actor.Owner, DisplayName(vehicleFactory.Name));
+						return vehicleFactory;
+					}
+				}
+
+				if (power != null && vehicleFactories.Any(v => !HasSufficientPowerForActor(v)))
+				{
+					baseBuilder.LogSmartEconomy("{0} decided to build {1}: early vehicle factory requires power",
+						queue.Actor.Owner, DisplayName(power.Name));
+					return power;
+				}
 			}
 
 			var opening = baseBuilder.OpeningBuilding(buildableThings);
