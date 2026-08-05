@@ -40,7 +40,7 @@ install_assemblies() {
 		rm -rf "${SRC_PATH}/OpenRA."*/obj
 		rm -rf "${SRC_PATH:?}/bin"
 
-		msbuild -verbosity:m -nologo -t:Build -restore -p:Configuration=Release -p:TargetPlatform="${TARGETPLATFORM}" -p:Mono=true
+		msbuild -m:1 -verbosity:m -nologo -t:Build -restore -p:Configuration=Release -p:TargetPlatform="${TARGETPLATFORM}" -p:Mono=true
 		if [ "${TARGETPLATFORM}" = "unix-generic" ]; then
 			./configure-system-libraries.sh
 		fi
@@ -54,7 +54,7 @@ install_assemblies() {
 		fi
 
 		if [ "${COPY_D2K_DLL}" != "True" ]; then
-			rm "${SRC_PATH}/bin/OpenRA.Mods.D2k.dll"
+			rm -f "${SRC_PATH}/bin/OpenRA.Mods.D2k.dll"
 		fi
 
 		cd "${ORIG_PWD}" || exit 1
@@ -78,7 +78,11 @@ install_assemblies() {
 			done
 		fi
 	else
-		dotnet publish -c Release -p:TargetPlatform="${TARGETPLATFORM}" -p:CopyGenericLauncher="${COPY_GENERIC_LAUNCHER}" -p:CopyCncDll="${COPY_CNC_DLL}" -p:CopyD2kDll="${COPY_D2K_DLL}" -r "${TARGETPLATFORM}" -o "${DEST_PATH}" --self-contained true
+		dotnet publish -m:1 -c Release -p:TargetPlatform="${TARGETPLATFORM}" -p:CopyGenericLauncher="${COPY_GENERIC_LAUNCHER}" -p:CopyCncDll="${COPY_CNC_DLL}" -p:CopyD2kDll="${COPY_D2K_DLL}" -r "${TARGETPLATFORM}" -o "${DEST_PATH}" --self-contained true
+	fi
+
+	if [ "${COPY_D2K_DLL}" != "True" ]; then
+		rm -f "${DEST_PATH}/OpenRA.Mods.D2k.dll"
 	fi
 	cd "${ORIG_PWD}" || exit 1
 }
@@ -100,6 +104,9 @@ install_data() {
 	SRC_PATH="${1}"
 	DEST_PATH="${2}"
 	shift 2
+	if [ "$#" -eq 1 ] && [ "${1}" = "cnc" ]; then
+		rm -rf "${DEST_PATH:?}/mods/ra" "${DEST_PATH:?}/mods/d2k" "${DEST_PATH:?}/mods/ts"
+	fi
 
 	"${SRC_PATH}"/fetch-geoip.sh
 
@@ -220,6 +227,17 @@ install_linux_shortcuts() {
 	SHARE_PATH="${5}"
 	VERSION="${6}"
 	shift 6
+	if [ "$#" -eq 1 ] && [ "${1}" = "cnc" ]; then
+		rm -f "${BUILD_PATH}/${BIN_PATH}/openra-ra" "${BUILD_PATH}/${BIN_PATH}/openra-ra-server" \
+			"${BUILD_PATH}/${BIN_PATH}/openra-d2k" "${BUILD_PATH}/${BIN_PATH}/openra-d2k-server" \
+			"${BUILD_PATH}${SHARE_PATH}/applications/openra-ra.desktop" "${BUILD_PATH}${SHARE_PATH}/applications/openra-d2k.desktop" \
+			"${BUILD_PATH}${SHARE_PATH}/mime/packages/openra-ra.xml" "${BUILD_PATH}${SHARE_PATH}/mime/packages/openra-d2k.xml"
+		for SIZE in 16x16 32x32 48x48 64x64 128x128; do
+			rm -f "${BUILD_PATH}${SHARE_PATH}/icons/hicolor/${SIZE}/apps/openra-ra.png" \
+				"${BUILD_PATH}${SHARE_PATH}/icons/hicolor/${SIZE}/apps/openra-d2k.png"
+		done
+		rm -f "${BUILD_PATH}${SHARE_PATH}/icons/hicolor/scalable/apps/openra-ra.svg"
+	fi
 
 	while [ -n "${1}" ]; do
 		MOD_ID="${1}"
@@ -285,6 +303,10 @@ install_linux_appdata() {
 	BUILD_PATH="${2}"
 	SHARE_PATH="${3}"
 	shift 3
+	if [ "$#" -eq 1 ] && [ "${1}" = "cnc" ]; then
+		rm -f "${BUILD_PATH}${SHARE_PATH}/metainfo/openra-ra.metainfo.xml" \
+			"${BUILD_PATH}${SHARE_PATH}/metainfo/openra-d2k.metainfo.xml"
+	fi
 	while [ -n "${1}" ]; do
 		MOD_ID="${1}"
 		SCREENSHOT_CNC=

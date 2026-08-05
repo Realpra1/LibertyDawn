@@ -60,12 +60,7 @@ build_appimage() {
 	APPDIR="$(pwd)/${MOD_ID}.appdir"
 	APPIMAGE="OpenRA-$(echo "${DISPLAY_NAME}" | sed 's/ /-/g')${SUFFIX}-x86_64.AppImage"
 
-	IS_D2K="False"
-	if [ "${MOD_ID}" = "d2k" ]; then
-		IS_D2K="True"
-	fi
-
-	install_assemblies "${SRCDIR}" "${APPDIR}/usr/lib/openra" "linux-x64" "net6" "True" "True" "${IS_D2K}"
+	install_assemblies "${SRCDIR}" "${APPDIR}/usr/lib/openra" "linux-x64" "net6" "True" "True" "False"
 	install_data "${SRCDIR}" "${APPDIR}/usr/lib/openra" "${MOD_ID}"
 	set_engine_version "${TAG}" "${APPDIR}/usr/lib/openra"
 	set_mod_version "${TAG}" "${APPDIR}/usr/lib/openra/mods/${MOD_ID}/mod.yaml" "${APPDIR}/usr/lib/openra/mods/modcontent/mod.yaml"
@@ -122,9 +117,7 @@ build_appimage() {
 	rm -rf "${APPDIR}"
 }
 
-build_appimage "ra" "Red Alert" "699222659766026240"
 build_appimage "cnc" "Tiberian Dawn" "699223250181292033"
-build_appimage "d2k" "Dune 2000" "712711732770111550"
 
 # Clean up
 rm -rf appimagetool-x86_64.AppImage "${BUILTDIR}"
