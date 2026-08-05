@@ -4,7 +4,7 @@
 - Cycles used: 33 of 33 (user extended the original ceiling by three verification cycles)
 - Branch: `agent/cnc33a-refinery-throughput`
 - Base: green CNC-33 PR #60 head `962b09b5b2`
-- Pull request: pending
+- Pull request: https://github.com/Realpra1/LibertyDawn/pull/61
 
 ## Literal acceptance
 
