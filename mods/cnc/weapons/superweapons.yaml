@@ -100,6 +100,7 @@ Atomic:
 		Duration: 20
         
 AtomicHarv:
+	ImpactType: RedTiberiumExplosion
 	ValidTargets: Ground, Water, Air, Trees
 	Report: nukemisl.aud
 	Warhead@1Dam_impact: SpreadDamage
@@ -201,6 +202,7 @@ AtomicHarv:
 		Duration: 20
 
 AtomicTib:
+	ImpactType: RedTiberiumExplosion
 	ValidTargets: Ground, Water, Air, Trees
 	Report: nukemisl.aud
     Warhead@1Dam_impact: SpreadDamage
