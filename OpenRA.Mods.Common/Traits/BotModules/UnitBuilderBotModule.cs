@@ -143,6 +143,13 @@ namespace OpenRA.Mods.Common.Traits
 
 	public class UnitBuilderBotModule : ConditionalTrait<UnitBuilderBotModuleInfo>, IBotTick, IBotNotifyIdleBaseUnits, IBotRequestUnitProduction, IGameSaveTraitData
 	{
+		enum ExternalBuildRequestResult
+		{
+			Queued,
+			WaitingForQueue,
+			Unavailable
+		}
+
 		public const int FeedbackTime = 30; // ticks; = a bit over 1s. must be >= netlag.
 
 		readonly World world;
@@ -239,13 +246,31 @@ namespace OpenRA.Mods.Common.Traits
 
 				MaybeLogUnitCapacity();
 
-				var buildRequest = queuedBuildRequests.FirstOrDefault();
-				if (buildRequest != null)
+				var handledExternalRequest = false;
+				for (var i = 0; i < queuedBuildRequests.Count;)
 				{
-					BuildUnit(bot, buildRequest);
-					queuedBuildRequests.Remove(buildRequest);
-					return;
+					var buildRequest = queuedBuildRequests[i];
+					var result = BuildUnit(bot, buildRequest);
+					if (result == ExternalBuildRequestResult.WaitingForQueue)
+					{
+						i++;
+						continue;
+					}
+
+					queuedBuildRequests.RemoveAt(i);
+					if (result == ExternalBuildRequestResult.Unavailable)
+					{
+						LogAdaptiveProduction("{0} canceled unavailable external request for {1}",
+							player, world.Map.Rules.Actors.ContainsKey(buildRequest) ? DisplayName(buildRequest) : buildRequest);
+						continue;
+					}
+
+					handledExternalRequest = true;
+					break;
 				}
+
+				if (handledExternalRequest || queuedBuildRequests.Count > 0)
+					return;
 
 				if (!pauseRandomProduction)
 				{
@@ -566,30 +591,38 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		// In cases where we want to build a specific unit but don't know the queue name (because there's more than one possibility)
-		void BuildUnit(IBot bot, string name)
+		ExternalBuildRequestResult BuildUnit(IBot bot, string name)
 		{
-			var actorInfo = world.Map.Rules.Actors[name];
-			if (actorInfo == null)
-				return;
+			if (!world.Map.Rules.Actors.TryGetValue(name, out var actorInfo))
+				return ExternalBuildRequestResult.Unavailable;
 
 			var buildableInfo = actorInfo.TraitInfoOrDefault<BuildableInfo>();
 			if (buildableInfo == null)
-				return;
+				return ExternalBuildRequestResult.Unavailable;
 
 			ProductionQueue queue = null;
+			var canBuildOnCompatibleQueue = false;
 			foreach (var pq in buildableInfo.Queue)
 			{
-				queue = AIUtils.FindQueues(player, pq).FirstOrDefault(q => !q.AllQueued().Any());
+				var queues = AIUtils.FindQueues(player, pq).ToArray();
+				canBuildOnCompatibleQueue |= queues.Any(q => q.BuildableItems().Any(item => item.Name == name));
+				queue = queues.FirstOrDefault(q => !q.AllQueued().Any() &&
+					q.BuildableItems().Any(item => item.Name == name));
 				if (queue != null)
 					break;
 			}
 
-			if (queue != null && AllowedQueueAmount(actorInfo, 1) > 0)
-			{
-				bot.QueueOrder(Order.StartProduction(queue.Actor, name, 1));
-				RecordQueued(actorInfo, 1);
-				AIUtils.BotDebug("{0} decided to build {1} (external request)", queue.Actor.Owner, DisplayName(name));
-			}
+			if (queue == null)
+				return canBuildOnCompatibleQueue ? ExternalBuildRequestResult.WaitingForQueue :
+					ExternalBuildRequestResult.Unavailable;
+
+			if (AllowedQueueAmount(actorInfo, 1) <= 0)
+				return ExternalBuildRequestResult.Unavailable;
+
+			bot.QueueOrder(Order.StartProduction(queue.Actor, name, 1));
+			RecordQueued(actorInfo, 1);
+			AIUtils.BotDebug("{0} decided to build {1} (external request)", queue.Actor.Owner, DisplayName(name));
+			return ExternalBuildRequestResult.Queued;
 		}
 
 		ActorInfo ChooseRandomUnitToBuild(ProductionQueue queue)

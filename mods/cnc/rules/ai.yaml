@@ -747,6 +747,10 @@ Player:
 			harv: 8
     BaseBuilderBotModule@brutalis:
 		RequiresCondition: enable-brutalis-ai || enable-wavemaker-ai
+		EnableSmartEconomy: true
+		SmartEconomyRefineryTypes: proc
+		SmartEconomyMcvTypes: mcv
+		SmartEconomyDebugLogging: true
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: true
 		MaximumWallSegments: 24
@@ -837,9 +841,9 @@ Player:
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
-    UnitBuilderBotModule@brutalis:
+	UnitBuilderBotModule@brutalis:
 		RequiresCondition: enable-brutalis-ai || enable-wavemaker-ai
-		ExternallyManagedTypes: tran, truck
+		ExternallyManagedTypes: tran, truck, mcv
 		TotalUnitLimit: 400
 		AdaptiveUnitCap: true
 		AdaptiveUnitCapMinimum: 300
@@ -926,6 +930,10 @@ Player:
             mcv: 3000
     BaseBuilderBotModule@viki:
 		RequiresCondition: enable-viki-ai
+		EnableSmartEconomy: true
+		SmartEconomyRefineryTypes: proc
+		SmartEconomyMcvTypes: mcv
+		SmartEconomyDebugLogging: true
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: true
 		MaximumWallSegments: 24
@@ -1008,7 +1016,7 @@ Player:
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
 	UnitBuilderBotModule@viki:
 		RequiresCondition: enable-viki-ai
-		ExternallyManagedTypes: tran, truck
+		ExternallyManagedTypes: tran, truck, mcv
 		TotalUnitLimit: 400
 		AdaptiveUnitCap: true
 		AdaptiveUnitCapMinimum: 300
@@ -1076,6 +1084,10 @@ Player:
             mcv: 1
     BaseBuilderBotModule@skynet:
 		RequiresCondition: enable-skynet-ai
+		EnableSmartEconomy: true
+		SmartEconomyRefineryTypes: proc
+		SmartEconomyMcvTypes: mcv
+		SmartEconomyDebugLogging: true
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: true
 		EnableOpeningPolicy: true
@@ -1299,7 +1311,7 @@ Player:
 			obli: 1
 	UnitBuilderBotModule@skynet:
 		RequiresCondition: enable-skynet-ai
-		ExternallyManagedTypes: tran, truck
+		ExternallyManagedTypes: tran, truck, mcv
 		TotalUnitLimit: 400
 		AdaptiveUnitCap: true
 		AdaptiveUnitCapMinimum: 300
@@ -1393,6 +1405,10 @@ Player:
             mhq: 1
     BaseBuilderBotModule@ironreaper:
 		RequiresCondition: enable-ironreaper-ai
+		EnableSmartEconomy: true
+		SmartEconomyRefineryTypes: proc
+		SmartEconomyMcvTypes: mcv
+		SmartEconomyDebugLogging: true
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: true
 		MaximumWallSegments: 24
@@ -1514,7 +1530,7 @@ Player:
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
 	UnitBuilderBotModule@ironreaper:
 		RequiresCondition: enable-ironreaper-ai
-		ExternallyManagedTypes: tran, truck, upgrade.covert1, upgrade.covert2, upgrade.covert3, downgrade.covert, upgrade.recon1, upgrade.recon2, upgrade.recon3, downgrade.recon, upgrade.economy1, upgrade.economy2, upgrade.economy3, downgrade.economy
+		ExternallyManagedTypes: tran, truck, mcv, upgrade.covert1, upgrade.covert2, upgrade.covert3, downgrade.covert, upgrade.recon1, upgrade.recon2, upgrade.recon3, downgrade.recon, upgrade.economy1, upgrade.economy2, upgrade.economy3, downgrade.economy
 		TotalUnitLimit: 400
 		AdaptiveUnitCap: true
 		AdaptiveUnitCapMinimum: 300
