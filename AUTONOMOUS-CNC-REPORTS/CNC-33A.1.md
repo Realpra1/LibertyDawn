@@ -4,7 +4,7 @@
 - Cycles used: 30 of 30
 - Branch: `agent/cnc33a1-vehicle-production-priority`
 - Base: green CNC-24.7 PR #64 head `42ca957a2c`
-- Pull request: pending
+- Pull request: #65 (`agent/cnc33a1-vehicle-production-priority` -> `agent/cnc24-7-parallel-simulations`)
 
 ## Literal acceptance
 
