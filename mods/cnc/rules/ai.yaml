@@ -174,6 +174,19 @@ Player:
 			TiberiumWood: 6000
 			Tiberium: 6000
 		DebugLogging: true
+	CrateCollectorBotModule:
+		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai || enable-Easiest-ai
+		ScanInterval: 250
+		CoarseCellSize: 6
+		MaximumRegionCandidates: 32
+		AssignmentStallInterval: 500
+		EmergencyCashThreshold: 0
+		McvTypes: mcv, fact
+		ExcludedCollectorTypes: truck, harv, sharv, mcv, e6, rmbo, tran
+		EmergencySellActorTypes: nuke, nuk2, hq
+		EmergencySellInterval: 1500
+		MinimumCollectorHealthPercent: 75
+		DebugLogging: true
 	OpeningGarrisonBotModule:
 		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai || enable-Easiest-ai
 		BarracksTypes: pyle, hand
