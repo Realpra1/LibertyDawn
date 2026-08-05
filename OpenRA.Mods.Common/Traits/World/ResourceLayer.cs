@@ -38,15 +38,15 @@ namespace OpenRA.Mods.Common.Traits
 
 	public class ResourceTickInfo
 	{
-		public readonly int Token;
+		public readonly long Token;
 		public readonly int ExpectedStageInterval;
 		public readonly int ExpectedSpreadInterval;
 		public int LastStageTime;
 		public int LastSpreadTime;
 
-		public ResourceTickInfo(int expectedStageInterval, int expectedSpreadInterval, int currentTime)
+		public ResourceTickInfo(int expectedStageInterval, int expectedSpreadInterval, int currentTime, long token)
 		{
-			Token = currentTime;
+			Token = token;
 			ExpectedStageInterval = expectedStageInterval;
 			ExpectedSpreadInterval = expectedSpreadInterval;
 			LastStageTime = currentTime;
@@ -186,6 +186,20 @@ namespace OpenRA.Mods.Common.Traits
 
 	public class ResourceLayer : IResourceLayer, IWorldLoaded, ITick
 	{
+		readonly struct DelayedResourceExplosion
+		{
+			public readonly long Token;
+			public readonly string ResourceType;
+			public readonly bool IsInstability;
+
+			public DelayedResourceExplosion(long token, string resourceType, bool isInstability)
+			{
+				Token = token;
+				ResourceType = resourceType;
+				IsInstability = isInstability;
+			}
+		}
+
 		readonly ResourceLayerInfo info;
 		readonly World world;
 		protected readonly Map Map;
@@ -193,12 +207,15 @@ namespace OpenRA.Mods.Common.Traits
 		protected readonly CellLayer<ResourceLayerContents> Content;
 		protected readonly Dictionary<byte, string> ResourceTypesByIndex;
 
-		readonly Dictionary<CPos, int> tickTokens = new Dictionary<CPos, int>();
-		readonly Dictionary<CPos, bool> delayedExplosions = new Dictionary<CPos, bool>();
+		readonly Dictionary<CPos, long> tickTokens = new Dictionary<CPos, long>();
+		readonly Dictionary<CPos, ResourceTickInfo> activeTickInfos = new Dictionary<CPos, ResourceTickInfo>();
+		readonly Dictionary<CPos, DelayedResourceExplosion> delayedExplosions = new Dictionary<CPos, DelayedResourceExplosion>();
 		readonly Dictionary<CPos, int> blinks = new Dictionary<CPos, int>();
 		readonly Dictionary<CPos, int> stageTimes = new Dictionary<CPos, int>();
 		readonly Dictionary<CPos, int> spreadTimes = new Dictionary<CPos, int>();
 		readonly Dictionary<int, LinkedList<Action>> scheduledActions = new Dictionary<int, LinkedList<Action>>();
+		long nextDelayedExplosionToken;
+		long nextResourceTickToken;
 
 		int resCells;
 
@@ -268,39 +285,114 @@ namespace OpenRA.Mods.Common.Traits
 			return modifier != null ? modifier.Info.StageModifier : info.StageModifier;
 		}
 
-		protected int modifierCachedTickTime = 0;
+		protected bool modifierCacheInitialized;
+		protected bool modifierCacheDirty = true;
 		protected Dictionary<CPos, ModifiesResources> cachedModifiers = new Dictionary<CPos, ModifiesResources>();
+
+		public static bool IsModifierCacheFresh(bool initialized, bool dirty)
+		{
+			return initialized && !dirty;
+		}
+
+		public void InvalidateModifierCache()
+		{
+			modifierCacheDirty = true;
+		}
+
+		public static bool CanRunDelayedExplosion(long expectedToken, long activeToken, bool isInstability,
+			string scheduledResourceType, string currentResourceType, int currentDensity, int maxDensity, string maxStageEvolvesTo)
+		{
+			if (expectedToken != activeToken || scheduledResourceType != currentResourceType)
+				return false;
+
+			return !isInstability || (currentDensity == maxDensity &&
+				string.Equals(maxStageEvolvesTo, "explode", StringComparison.OrdinalIgnoreCase));
+		}
+
+		public static bool IsCurrentResourceTick(long expectedToken, long activeToken)
+		{
+			return expectedToken == activeToken;
+		}
+
+		public static int ApplyTimeModifier(int interval, int modifier)
+		{
+			return interval * 100 / modifier;
+		}
+
 		protected ModifiesResources GetModifier(CPos cell)
 		{
-			if (tickTime != -1 && tickTime <= modifierCachedTickTime + 50)
-				return cachedModifiers.ContainsKey(cell) ? cachedModifiers[cell] : null;
+			if (IsModifierCacheFresh(modifierCacheInitialized, modifierCacheDirty))
+				return cachedModifiers.TryGetValue(cell, out var cachedModifier) ? cachedModifier : null;
 
+			var hadCachedModifiers = modifierCacheInitialized;
 			var prevCached = cachedModifiers;
 			cachedModifiers = new Dictionary<CPos, ModifiesResources>();
 			var modifiers = world.ActorsWithTrait<ModifiesResources>();
-			var toUpdate = new LinkedList<CPos>();
+			var enabledModifierCount = 0;
 
 			foreach (var modifier in modifiers)
 			{
 				if (modifier.Trait.IsTraitDisabled)
 					continue;
 
+				enabledModifierCount++;
 				var moddedCells = world.Map.FindTilesInCircle(modifier.Actor.Location, WDist.ToCells(modifier.Trait.Range));
 
 				foreach (var modCell in moddedCells)
-				{
-					if (!prevCached.ContainsKey(modCell))
-						toUpdate.AddLast(modCell);
 					cachedModifiers.TryAdd(modCell, modifier.Trait);
-				}
 			}
 
-			modifierCachedTickTime = tickTime;
+			modifierCacheInitialized = true;
+			modifierCacheDirty = false;
+			if (!hadCachedModifiers)
+				Log.Write("debug", "Resource modifier cache initialized with {0} enabled actors covering {1} cells.",
+					enabledModifierCount, cachedModifiers.Count);
 
-			foreach (var modCell in toUpdate)
-				AddToTickQueue(modCell, Content[modCell].Type, true);
+			if (hadCachedModifiers)
+			{
+				var changedCells = new HashSet<CPos>();
+				foreach (var modifier in cachedModifiers)
+					if (!prevCached.TryGetValue(modifier.Key, out var previous) || previous != modifier.Value)
+						changedCells.Add(modifier.Key);
 
-			return cachedModifiers.ContainsKey(cell) ? cachedModifiers[cell] : null;
+				foreach (var modifier in prevCached)
+					if (!cachedModifiers.ContainsKey(modifier.Key))
+						changedCells.Add(modifier.Key);
+
+				var cancelledInstabilities = 0;
+				foreach (var modCell in changedCells)
+				{
+					if (!delayedExplosions.TryGetValue(modCell, out var explosion) || !explosion.IsInstability)
+						continue;
+
+					var content = Content[modCell];
+					if (content.Type != null && info.ResourceTypes.TryGetValue(content.Type, out var resourceInfo) &&
+						string.Equals(GetEvolvesTo(modCell, resourceInfo), "explode", StringComparison.OrdinalIgnoreCase))
+						continue;
+
+					delayedExplosions.Remove(modCell);
+					cancelledInstabilities++;
+				}
+
+				var resourceCells = 0;
+				var scheduledResourceCells = 0;
+				foreach (var modCell in changedCells.OrderBy(c => c.Y).ThenBy(c => c.X))
+				{
+					AddToTickQueue(modCell, Content[modCell].Type, true);
+					if (Content[modCell].Type == null)
+						continue;
+
+					resourceCells++;
+					if (stageTimes.ContainsKey(modCell) || spreadTimes.ContainsKey(modCell))
+						scheduledResourceCells++;
+				}
+
+				Log.Write("debug", "Resource modifier cache refreshed with {0} enabled actors; {1} affected cells ({2} resources, " +
+					"{3} with active timed updates) rescheduled; {4} queued instability explosions cancelled.",
+					enabledModifierCount, changedCells.Count, resourceCells, scheduledResourceCells, cancelledInstabilities);
+			}
+
+			return cachedModifiers.TryGetValue(cell, out var result) ? result : null;
 		}
 
 		protected virtual void WorldLoaded(World w, WorldRenderer wr)
@@ -478,8 +570,7 @@ namespace OpenRA.Mods.Common.Traits
 				Content[cell] = ResourceLayerContents.Empty;
 				Map.CustomTerrain[cell] = byte.MaxValue;
 				--resCells;
-				if (!tickTokens.TryAdd(cell, tickTime + 1))
-					tickTokens[cell] = tickTime + 1;
+				InvalidateResourceTick(cell);
 
 				CellChanged?.Invoke(cell, null);
 			}
@@ -495,6 +586,18 @@ namespace OpenRA.Mods.Common.Traits
 
 		readonly int explodeDelayMin = 12;
 		readonly int explodeDelayMax = 50;
+
+		void ScheduleDelayedExplosion(Actor source, ResourceLayerInfo.ResourceTypeInfo resourceInfo, CPos cell,
+			int waitForTime, bool isInstability)
+		{
+			if (delayedExplosions.ContainsKey(cell))
+				return;
+
+			var explosion = new DelayedResourceExplosion(++nextDelayedExplosionToken, Content[cell].Type, isInstability);
+			delayedExplosions.Add(cell, explosion);
+			Schedule(waitForTime, () => TryDoDelayedExplosion(source, resourceInfo, cell, explosion.Token));
+		}
+
 		void DamageResource(Actor source, CPos cell, int damage)
 		{
 			try
@@ -512,8 +615,7 @@ namespace OpenRA.Mods.Common.Traits
 				if (!delayedExplosions.ContainsKey(cell))
 				{
 					var waitForTime = tickTime + world.SharedRandom.Next(explodeDelayMin, explodeDelayMax);
-					delayedExplosions.Add(cell, true);
-					Schedule(waitForTime, () => DoExplode(source, resourceInfo, cell));
+					ScheduleDelayedExplosion(source, resourceInfo, cell, waitForTime, false);
 				}
 			}
 			catch (Exception ex)
@@ -535,8 +637,7 @@ namespace OpenRA.Mods.Common.Traits
 			Content[cell] = ResourceLayerContents.Empty;
 			Map.CustomTerrain[cell] = byte.MaxValue;
 			--resCells;
-			if (!tickTokens.TryAdd(cell, tickTime + 1))
-				tickTokens[cell] = tickTime + 1;
+			InvalidateResourceTick(cell);
 
 			CellChanged?.Invoke(cell, null);
 		}
@@ -559,6 +660,16 @@ namespace OpenRA.Mods.Common.Traits
 		bool IResourceLayer.IsEmpty => resCells < 1;
 		IResourceLayerInfo IResourceLayer.Info => info;
 		void ITick.Tick(Actor self) { Tick(self); }
+
+		void InvalidateResourceTick(CPos cell)
+		{
+			tickTokens[cell] = ++nextResourceTickToken;
+			activeTickInfos.Remove(cell);
+			stageTimes.Remove(cell);
+			spreadTimes.Remove(cell);
+			blinks.Remove(cell);
+			delayedExplosions.Remove(cell);
+		}
 
 		void AddToTickQueue(CPos cell, string resourceType)
 		{
@@ -587,24 +698,41 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			try
 			{
-				var useTickTime = updateOnly && tickTokens.ContainsKey(cell) ? tickTokens[cell] : tickTime;
+				var lastStageTime = tickTime;
+				var lastSpreadTime = tickTime;
+				if (updateOnly && activeTickInfos.TryGetValue(cell, out var previousTickInfo))
+				{
+					lastStageTime = previousTickInfo.LastStageTime;
+					lastSpreadTime = previousTickInfo.LastSpreadTime;
+				}
 
-				if (!tickTokens.TryAdd(cell, useTickTime))
-					tickTokens[cell] = useTickTime;
+				var token = ++nextResourceTickToken;
+				tickTokens[cell] = token;
 				spreadTimes.Remove(cell);
 				stageTimes.Remove(cell);
 
 				if (typeInfo == null)
+				{
+					activeTickInfos.Remove(cell);
 					return;
+				}
 
 				var spreadModifier = GetSpreadModifier(cell, typeInfo);
 				var content = Content[cell];
 				var stageModifier = content.Density == typeInfo.MaxDensity ? GetStageModifier(cell, typeInfo) : GetSpreadModifier(cell, typeInfo);
-				var cellTickInfo = new ResourceTickInfo(typeInfo.DensityIntervals.ContainsKey(content.Density) ? typeInfo.DensityIntervals[content.Density] * 100 / stageModifier : 0, typeInfo.SpreadInterval * 100 / spreadModifier, useTickTime);
+				var cellTickInfo = new ResourceTickInfo(
+					typeInfo.DensityIntervals.ContainsKey(content.Density) ?
+						ApplyTimeModifier(typeInfo.DensityIntervals[content.Density], stageModifier) : 0,
+					ApplyTimeModifier(typeInfo.SpreadInterval, spreadModifier), tickTime, token)
+				{
+					LastStageTime = lastStageTime,
+					LastSpreadTime = lastSpreadTime
+				};
+				activeTickInfos[cell] = cellTickInfo;
 
 				if (typeInfo.SpreadInterval != 0 && content.Density == typeInfo.MaxDensity)
 				{
-					ScheduleSpreadTime(Math.Max(useTickTime + cellTickInfo.ExpectedSpreadInterval, tickTime + 1),
+					ScheduleSpreadTime(Math.Max(lastSpreadTime + cellTickInfo.ExpectedSpreadInterval, tickTime + 1),
 						() => DoResourceTickActions(cell, cellTickInfo),
 						cell);
 				}
@@ -620,11 +748,12 @@ namespace OpenRA.Mods.Common.Traits
 					if (typeInfo.DensityIntervals[content.Density] == 0)
 						return;
 
-					ScheduleStageTime(Math.Max(useTickTime + cellTickInfo.ExpectedStageInterval, tickTime + 1),
+					ScheduleStageTime(Math.Max(lastStageTime + cellTickInfo.ExpectedStageInterval, tickTime + 1),
 						() => DoResourceTickActions(cell, cellTickInfo),
 						cell);
 
-					CheckForAndScheduleBlink(cell, typeInfo, Math.Max(useTickTime + cellTickInfo.ExpectedStageInterval, tickTime + 1));
+					CheckForAndScheduleBlink(cell, typeInfo,
+						Math.Max(lastStageTime + cellTickInfo.ExpectedStageInterval, tickTime + 1));
 				}
 			}
 			catch (Exception ex)
@@ -660,8 +789,8 @@ namespace OpenRA.Mods.Common.Traits
 			if (Content[cell].Type == null || !info.ResourceTypes.TryGetValue(Content[cell].Type, out var resourceInfo))
 				return;
 
-			if (ResourceTypesByIndex[resourceInfo.ResourceIndex] != Content[cell].Type
-				|| !tickTokens.ContainsKey(cell) || tickTokens[cell] != tickInfo.Token)
+			if (ResourceTypesByIndex[resourceInfo.ResourceIndex] != Content[cell].Type ||
+				!tickTokens.TryGetValue(cell, out var activeToken) || !IsCurrentResourceTick(tickInfo.Token, activeToken))
 				return;
 
 			if (resourceInfo.SpreadInterval != 0 && Content[cell].Density == resourceInfo.MaxDensity && tickTime - tickInfo.LastSpreadTime >= tickInfo.ExpectedSpreadInterval)
@@ -711,11 +840,12 @@ namespace OpenRA.Mods.Common.Traits
 					if (string.IsNullOrEmpty(maxStageEvolvesTo))
 						return;
 
-					if (maxStageEvolvesTo.ToLower() == "explode" && !delayedExplosions.ContainsKey(cell))
+					if (string.Equals(maxStageEvolvesTo, "explode", StringComparison.OrdinalIgnoreCase) &&
+						!delayedExplosions.ContainsKey(cell))
 					{
 						var resActor = world.Players.Where(p => p.PlayerName == "Creeps").FirstOrDefault().PlayerActor;
-						delayedExplosions.Add(cell, true);
-						Schedule(tickTime + world.SharedRandom.Next(1, 120), () => DoExplode(resActor, resourceInfo, cell));
+						ScheduleDelayedExplosion(resActor, resourceInfo, cell,
+							tickTime + world.SharedRandom.Next(1, 120), true);
 						return;
 					}
 
@@ -827,6 +957,29 @@ namespace OpenRA.Mods.Common.Traits
 			CellChanged?.Invoke(cell, content.Type);
 		}
 
+		void TryDoDelayedExplosion(Actor source, ResourceLayerInfo.ResourceTypeInfo resourceInfo, CPos cell, long token)
+		{
+			if (!delayedExplosions.TryGetValue(cell, out var explosion))
+				return;
+
+			var content = Content[cell];
+			var maxStageEvolvesTo = content.Type != null && info.ResourceTypes.TryGetValue(content.Type, out var currentResourceInfo) ?
+				GetEvolvesTo(cell, currentResourceInfo) : null;
+			if (!delayedExplosions.TryGetValue(cell, out explosion))
+				return;
+
+			if (!CanRunDelayedExplosion(token, explosion.Token, explosion.IsInstability, explosion.ResourceType,
+				content.Type, content.Density, resourceInfo.MaxDensity, maxStageEvolvesTo))
+			{
+				if (token == explosion.Token)
+					delayedExplosions.Remove(cell);
+				return;
+			}
+
+			delayedExplosions.Remove(cell);
+			DoExplode(source, resourceInfo, cell);
+		}
+
 		void DoExplode(Actor source, ResourceLayerInfo.ResourceTypeInfo resourceInfo, CPos cell)
 		{
 			try
@@ -846,8 +999,6 @@ namespace OpenRA.Mods.Common.Traits
 						ResourceExplosion(source, weapon, cell);
 					}
 				}
-
-				delayedExplosions.Remove(cell);
 
 				var content = Content[cell];
 				var newDensity = world.SharedRandom.Next(0, Math.Max(0, content.Density - 1));
