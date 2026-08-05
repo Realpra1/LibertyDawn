@@ -4,7 +4,7 @@
 - Branch: `agent/cnc24-7-parallel-simulations`
 - Base: created from `origin/agent/cnc33a-refinery-throughput`; publication targets `bleed` after merged integration PR #62
 - Cycles used: 27 of 30
-- Pull request: pending
+- Pull request: #64 (`agent/cnc24-7-parallel-simulations` -> `bleed`)
 
 ## Literal acceptance
 
