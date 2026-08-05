@@ -216,6 +216,18 @@ namespace OpenRA
 			Ui.KeyboardFocusWidget = null;
 
 			OrderManager.StartGame();
+			if (IsHeadlessAutomation)
+			{
+				var bots = OrderManager.LobbyInfo.Clients
+					.Where(client => client.IsBot)
+					.OrderBy(client => client.Index)
+					.Select(client => string.Format(CultureInfo.InvariantCulture,
+						"{0}: bot={1}, faction={2}, team={3}, spawn={4}", client.Name, client.Bot,
+						client.Faction, client.Team, client.SpawnPoint));
+				Log.Write("debug", "Headless MAX automation started map '{0}' with bots: {1}.",
+					map.Title, string.Join("; ", bots));
+			}
+
 			worldRenderer.RefreshPalette();
 			Cursor.SetCursor(ChromeMetrics.Get<string>("DefaultCursor"));
 

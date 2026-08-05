@@ -25,6 +25,7 @@ MAX_TICK_PATTERNS = (
 )
 HEADLESS_MARKER = "Headless MAX automation enabled"
 MAX_MARKER = "MAX game speed enabled"
+STARTED_MARKER = "Headless MAX automation started map"
 NATURAL_MARKER = "Headless MAX automation reached natural game over"
 BOUNDED_MARKER = "Headless MAX automation reached configured exit"
 FATAL_PATTERN = re.compile(
@@ -383,6 +384,8 @@ def finalize_run(run: ActiveRun) -> dict[str, Any]:
         reasons.append("headless activation marker missing")
     if MAX_MARKER not in text:
         reasons.append("MAX activation marker missing")
+    if STARTED_MARKER not in text:
+        reasons.append("actual map/bot start marker missing")
     exit_marker = BOUNDED_MARKER if run.spec.exit_at_tick is not None else NATURAL_MARKER
     if exit_marker not in text:
         reasons.append(

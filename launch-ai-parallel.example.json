@@ -6,9 +6,9 @@
     "minimum_world_tick": 10000,
     "timeout_seconds": 1800,
     "required_log_patterns": [
-      "AI unit capacity: SkyNet",
-      "AI unit capacity: Brutalis",
-      "Found [0-9]+ domains .* map Empire Earth"
+      "Headless MAX automation started map 'Empire Earth4'",
+      "bot=skynet",
+      "bot=brutalis"
     ],
     "forbidden_log_patterns": [
       "Desync detected"

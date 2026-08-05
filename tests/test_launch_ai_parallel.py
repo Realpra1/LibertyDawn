@@ -33,6 +33,7 @@ if source == "fail":
     raise SystemExit(7)
 debug.write_text(
     "Headless MAX automation enabled\n"
+    "Headless MAX automation started map 'Fake Map' with bots: Fake: bot=viki.\n"
     "MAX game speed enabled at world tick 0.\n"
     f"MAX progress: world={exit_tick}, local={exit_tick}, net={exit_tick}, queued-orders=0.\n"
     f"Headless MAX automation reached configured exit at world tick {exit_tick}; exiting.\n"
