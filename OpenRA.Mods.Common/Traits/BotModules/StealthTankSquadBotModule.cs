@@ -90,6 +90,7 @@ namespace OpenRA.Mods.Common.Traits
 		IBot bot;
 		IBotTransportReservations[] transportReservations;
 		int scanTicks;
+		int lastEligibleCount = -1;
 
 		public StealthTankSquadBotModule(Actor self, StealthTankSquadBotModuleInfo info)
 			: base(info)
@@ -113,6 +114,7 @@ namespace OpenRA.Mods.Common.Traits
 		protected override void TraitDisabled(Actor self)
 		{
 			reserved.Clear();
+			lastEligibleCount = -1;
 			foreach (var group in groups)
 			{
 				group.Units.Clear();
@@ -181,10 +183,12 @@ namespace OpenRA.Mods.Common.Traits
 					player.RelationshipWith(group.Target.Owner) != PlayerRelationship.Enemy))
 					group.Target = null;
 
-			if (Info.DebugLogging && !previous.SetEquals(reserved))
+			if (Info.DebugLogging && (eligible.Count != lastEligibleCount || !previous.SetEquals(reserved)))
 				Log.Write("debug", "AI stealth squads [{0}]: total={1} reserved={2} groups={3}/{4}/{5} ordinary={6}.",
 					player.PlayerName, eligible.Count, reserved.Count, groups[0].Units.Count, groups[1].Units.Count,
 					groups[2].Units.Count, eligible.Count - reserved.Count);
+
+			lastEligibleCount = eligible.Count;
 		}
 
 		bool IsEnemyTarget(Actor actor)
