@@ -22,6 +22,9 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Ticks between bounded crate/exploration scans. Zero disables the module.")]
 		public readonly int ScanInterval = 250;
 
+		[Desc("Ticks before the first scan, allowing the initial shroud to become current.")]
+		public readonly int InitialScanDelay = 2;
+
 		[Desc("Width and height in cells of one exploration region.")]
 		public readonly int CoarseCellSize = 6;
 
@@ -61,7 +64,7 @@ namespace OpenRA.Mods.Common.Traits
 		public override void RulesetLoaded(Ruleset rules, ActorInfo ai)
 		{
 			base.RulesetLoaded(rules, ai);
-			if (ScanInterval <= 0 || CoarseCellSize <= 0 || MaximumRegionCandidates <= 0 ||
+			if (ScanInterval <= 0 || InitialScanDelay <= 0 || CoarseCellSize <= 0 || MaximumRegionCandidates <= 0 ||
 				AssignmentStallInterval < ScanInterval || EmergencyCashThreshold < 0 ||
 				EmergencySellInterval <= 0 || MinimumCollectorHealthPercent <= 0 ||
 				MinimumCollectorHealthPercent > 100 || string.IsNullOrEmpty(CrateCrushClass))
@@ -106,6 +109,7 @@ namespace OpenRA.Mods.Common.Traits
 		int[] lastVisibleTicks = Array.Empty<int>();
 		int scanTicks;
 		int nextEmergencySaleTick;
+		bool initialScanPending;
 
 		public CrateCollectorBotModule(Actor self, CrateCollectorBotModuleInfo info)
 			: base(info)
@@ -129,18 +133,21 @@ namespace OpenRA.Mods.Common.Traits
 
 		protected override void TraitEnabled(Actor self)
 		{
-			// Establish reservations before the ordinary squad manager's first role assignment.
-			scanTicks = 1;
+			// Provisionally reserve eligible collectors until the initial shroud has been populated.
+			initialScanPending = true;
+			scanTicks = Info.InitialScanDelay;
 		}
 
 		protected override void TraitDisabled(Actor self)
 		{
+			initialScanPending = false;
 			assignments.Clear();
 		}
 
 		bool IBotUnitReservations.IsUnitReserved(Actor actor)
 		{
-			return actor != null && assignments.ContainsKey(actor.ActorID);
+			return actor != null && (assignments.ContainsKey(actor.ActorID) ||
+				(initialScanPending && IsSuitableCollector(actor)));
 		}
 
 		void IBotTick.BotTick(IBot bot)
@@ -174,11 +181,12 @@ namespace OpenRA.Mods.Common.Traits
 			if (emergency)
 				AssignScouts(bot, collectors);
 
-			if (emergency && SuitableCollectors().Count == 0)
+			if (emergency && !world.Actors.Any(IsPotentialCollector))
 				TryEmergencySale(bot);
 
 			Debug("scan emergency={0} visible-crates={1} assignments={2} collectors={3}",
 				emergency, visibleCrates.Count, assignments.Count, collectors.Count);
+			initialScanPending = false;
 		}
 
 		void BuildRegions()
@@ -317,8 +325,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		bool IsSuitableCollector(Actor actor)
 		{
-			if (actor == null || actor.Owner != player || !actor.IsInWorld || actor.IsDead ||
-				Info.ExcludedCollectorTypes.Contains(actor.Info.Name))
+			if (!IsPotentialCollector(actor))
 				return false;
 
 			var health = actor.TraitOrDefault<IHealth>();
@@ -333,6 +340,15 @@ namespace OpenRA.Mods.Common.Traits
 				return false;
 
 			if (otherUnitReservations != null && otherUnitReservations.Any(r => r.IsUnitReserved(actor)))
+				return false;
+
+			return true;
+		}
+
+		bool IsPotentialCollector(Actor actor)
+		{
+			if (actor == null || actor.Owner != player || !actor.IsInWorld || actor.IsDead ||
+				Info.ExcludedCollectorTypes.Contains(actor.Info.Name))
 				return false;
 
 			var mobile = actor.TraitOrDefault<Mobile>();
@@ -355,11 +371,14 @@ namespace OpenRA.Mods.Common.Traits
 				foreach (var collector in collectors.OrderBy(a =>
 					(a.CenterPosition - crate.CenterPosition).LengthSquared).ThenBy(a => a.ActorID))
 				{
-					if (TryPlanCrateCollection(collector, crate, out airRoute))
+					if (TryPlanCrateCollection(collector, crate, out airRoute, out var rejection))
 					{
 						selected = collector;
 						break;
 					}
+
+					Debug("rejected {0}#{1} -> visible crate {2}#{3} at {4}: {5}", collector.Info.Name,
+						collector.ActorID, crate.Info.Name, crate.ActorID, crate.Location, rejection);
 				}
 
 				if (selected == null)
@@ -380,21 +399,62 @@ namespace OpenRA.Mods.Common.Traits
 			}
 		}
 
-		bool TryPlanCrateCollection(Actor collector, Actor crate, out List<CPos> airRoute)
+		bool TryPlanCrateCollection(Actor collector, Actor crate, out List<CPos> airRoute, out string rejection)
 		{
 			airRoute = null;
+			rejection = string.Empty;
 			var mobile = collector.TraitOrDefault<Mobile>();
 			if (mobile != null)
-				return mobile.Locomotor.MovementCostForCell(crate.Location) != PathGraph.MovementCostForUnreachableCell &&
-					domainIndex.IsPassable(collector.Location, crate.Location, mobile.Locomotor);
+			{
+				if (mobile.Locomotor.MovementCostForCell(crate.Location) == PathGraph.MovementCostForUnreachableCell)
+				{
+					rejection = "unwalkable crate cell";
+					return false;
+				}
+
+				if (!domainIndex.IsPassable(collector.Location, crate.Location, mobile.Locomotor))
+				{
+					rejection = "different movement domain";
+					return false;
+				}
+
+				return true;
+			}
 
 			var aircraft = collector.TraitOrDefault<Aircraft>();
-			if (aircraft == null || squadManager == null || !aircraft.CanLand(crate.Location, blockedByMobile: false) ||
-				AirStateBase.SafeIndependentAirThreatAt(squadManager, crate.Location) > 0f)
+			if (aircraft == null)
+			{
+				rejection = "not mobile or aircraft";
 				return false;
+			}
+
+			if (squadManager == null)
+			{
+				rejection = "no air threat manager";
+				return false;
+			}
+
+			if (!aircraft.CanLand(crate.Location, blockedByMobile: false))
+			{
+				rejection = "crate cell cannot be landed on";
+				return false;
+			}
+
+			var destinationThreat = AirStateBase.SafeIndependentAirThreatAt(squadManager, crate.Location);
+			if (destinationThreat > 0f)
+			{
+				rejection = $"stopping AA threat {destinationThreat}";
+				return false;
+			}
 
 			airRoute = AirStateBase.SafeIndependentAirRoute(squadManager, collector, crate.Location);
-			return airRoute != null;
+			if (airRoute == null)
+			{
+				rejection = "no bounded air route";
+				return false;
+			}
+
+			return true;
 		}
 
 		void AssignScouts(IBot bot, List<Actor> collectors)
@@ -552,6 +612,7 @@ namespace OpenRA.Mods.Common.Traits
 			return new List<MiniYamlNode>
 			{
 				new MiniYamlNode("CrateScanTicks", FieldSaver.FormatValue(scanTicks)),
+				new MiniYamlNode("CrateInitialScanPending", FieldSaver.FormatValue(initialScanPending)),
 				new MiniYamlNode("CrateNextEmergencySaleTick", FieldSaver.FormatValue(nextEmergencySaleTick)),
 				new MiniYamlNode("CrateRegionLastVisibleTicks", FieldSaver.FormatValue(lastVisibleTicks)),
 				new MiniYamlNode("CrateAssignments", "", assignments.OrderBy(kv => kv.Key).Select(kv =>
@@ -578,6 +639,9 @@ namespace OpenRA.Mods.Common.Traits
 				{
 					case "CrateScanTicks":
 						scanTicks = FieldLoader.GetValue<int>(node.Key, node.Value.Value);
+						break;
+					case "CrateInitialScanPending":
+						initialScanPending = FieldLoader.GetValue<bool>(node.Key, node.Value.Value);
 						break;
 					case "CrateNextEmergencySaleTick":
 						nextEmergencySaleTick = FieldLoader.GetValue<int>(node.Key, node.Value.Value);
