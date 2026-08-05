@@ -73,6 +73,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		static readonly BitSet<TargetableType> TankTargetTypes = new BitSet<TargetableType>("Tank");
 		static readonly BitSet<TargetableType> VehicleTargetTypes = new BitSet<TargetableType>("Vehicle");
+		static readonly BitSet<TargetableType> GroundTargetTypes = new BitSet<TargetableType>("Ground");
 		static readonly BitSet<TargetableType> InfantryTargetTypes = new BitSet<TargetableType>("Infantry");
 		static readonly BitSet<TargetableType> StructureTargetTypes = new BitSet<TargetableType>("Structure");
 
@@ -190,7 +191,7 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			var weaponRange = 0;
 			foreach (var armament in actor.TraitsImplementing<Armament>())
-				if (!armament.IsTraitDisabled && armament.Weapon.IsValidTarget(VehicleTargetTypes))
+				if (!armament.IsTraitDisabled && armament.Weapon.IsValidTarget(GroundTargetTypes))
 					weaponRange = Math.Max(weaponRange, (int)Math.Ceiling(armament.MaxRange().Length / 1024f));
 
 			var detectorRange = actor.TraitsImplementing<DetectCloaked>()
@@ -216,7 +217,7 @@ namespace OpenRA.Mods.Common.Traits
 			var role = StealthTankSquadPolicy.RoleForGroup(group.Index);
 			var center = group.Units.Select(a => a.CenterPosition).Average();
 			var ownRange = group.Units.SelectMany(a => a.TraitsImplementing<Armament>())
-				.Where(a => !a.IsTraitDisabled && a.Weapon.IsValidTarget(VehicleTargetTypes))
+				.Where(a => !a.IsTraitDisabled && a.Weapon.IsValidTarget(GroundTargetTypes))
 				.Select(a => (int)Math.Ceiling(a.MaxRange().Length / 1024f)).DefaultIfEmpty(0).Max();
 			var squadValue = group.Units.Sum(a => Math.Max(1, a.Info.TraitInfoOrDefault<ValuedInfo>()?.Cost ?? 1));
 
