@@ -83,6 +83,9 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Ticks before retrying an opening structure request that never entered any production queue.")]
 		public readonly int OpeningRequestRetryDelay = 250;
 		public readonly int OpeningUnitRequestCooldown = 60;
+
+		[Desc("Ticks to remember an accepted opening MCV request after it leaves production, preventing a duplicate during actor creation. Retried after this timeout if no request, queued item, live MCV, or completed MCV remains.")]
+		public readonly int OpeningMcvRequestTimeout = 3000;
 		public readonly int OpeningProgressLogInterval = 750;
 
 		[Desc("Write opening goal, request, completion, and stall diagnostics to debug.log.")]
@@ -153,6 +156,72 @@ namespace OpenRA.Mods.Common.Traits
 
 		[Desc("Try to build another production building if there is too much cash.")]
 		public readonly int NewProductionCashThreshold = 5000;
+
+		[Desc("Enable sustained refinery-congestion and excess-cash economy scaling.")]
+		public readonly bool EnableSmartEconomy = false;
+
+		[Desc("Bot types that retain smart-economy observation/logging but do not act on it. Intended for matched scenario controls.")]
+		public readonly HashSet<string> SmartEconomyExcludedBotTypes = new HashSet<string>();
+
+		[Desc("Ticks between bounded smart-economy observations.")]
+		public readonly int SmartEconomyScanInterval = 25;
+
+		[Desc("Maximum distance in cells from a refinery delivery cell at which a linked loaded harvester counts toward unload congestion.")]
+		public readonly int SmartEconomyRefineryQueueRadius = 4;
+
+		[Desc("Waiting harvesters, after excluding one active refinery service slot, required to observe congestion.")]
+		public readonly int SmartEconomyWaitingHarvesterThreshold = 2;
+
+		[Desc("Resource-unloading refinery types eligible for congestion relief. Keep non-unloading economy structures out of this list.")]
+		public readonly HashSet<string> SmartEconomyRefineryTypes = new HashSet<string>();
+
+		[Desc("Ticks of persistent unload congestion required before requesting another refinery.")]
+		public readonly int SmartEconomyRefineryPressureDuration = 750;
+
+		[Desc("Evidence ticks at or below which active refinery pressure is released.")]
+		public readonly int SmartEconomyRefineryPressureRelease = 250;
+
+		[Desc("Ticks to retain one congestion-relief refinery decision while it enters construction. Queued construction remains protected beyond this timeout.")]
+		public readonly int SmartEconomyRefineryBuildTimeout = 750;
+
+		[Desc("Stored-resource percentage that requests silo capacity ahead of discretionary scaling.")]
+		public readonly int SmartEconomyStorageThresholdPercent = 80;
+
+		[Desc("Spendable cash that begins sustained excess-cash observation after the opening.")]
+		public readonly int SmartEconomyExcessCashThreshold = 20000;
+
+		[Desc("Spendable cash below which active excess-cash pressure begins releasing.")]
+		public readonly int SmartEconomyExcessCashReleaseThreshold = 12000;
+
+		[Desc("Ticks of persistent excessive cash required before scaling expansion capacity.")]
+		public readonly int SmartEconomyExcessCashPressureDuration = 750;
+
+		[Desc("Evidence ticks at or below which active excess-cash pressure is released.")]
+		public readonly int SmartEconomyExcessCashPressureRelease = 250;
+
+		[Desc("MCV alternatives used for excess-cash base expansion.")]
+		public readonly string[] SmartEconomyMcvTypes = System.Array.Empty<string>();
+
+		[Desc("Additional sustained spendable cash required per desired expansion asset. This is separate from the lower pressure threshold so production can scale before several MCVs are requested.")]
+		public readonly int SmartEconomyExpansionCashPerAsset = 35000;
+
+		[Desc("Minimum army value as a percentage of non-army asset value before excess cash may request another MCV. Production scaling is not gated by this value.")]
+		public readonly int SmartEconomyExpansionMinimumArmyPercent = 20;
+
+		[Desc("Maximum combined deployed construction yards, live MCVs, and outstanding smart-economy MCV requests.")]
+		public readonly int SmartEconomyMaximumExpansionAssets = 8;
+
+		[Desc("Ticks between smart-economy attempts to request an expansion MCV.")]
+		public readonly int SmartEconomyMcvRequestCooldown = 250;
+
+		[Desc("Ticks to retain an accepted smart-economy MCV request while it moves from production into the world. Retried after this timeout only when no request or queued item remains and expansion capacity did not increase.")]
+		public readonly int SmartEconomyMcvRequestTimeout = 3000;
+
+		[Desc("Ticks between periodic smart-economy progress samples written when debug logging is enabled.")]
+		public readonly int SmartEconomyProgressLogInterval = 750;
+
+		[Desc("Write smart-economy observations, transitions, and requests to debug.log.")]
+		public readonly bool SmartEconomyDebugLogging = false;
 
 		[Desc("Radius in cells around a factory scanned for rally points by the AI.")]
 		public readonly int RallyPointScanRadius = 8;
@@ -253,7 +322,10 @@ namespace OpenRA.Mods.Common.Traits
 		int nextOpeningHarvesterRequestTick;
 		int nextOpeningDefenseUnlockRequestTick;
 		int nextOpeningMcvRequestTick;
+		bool openingMcvRequestOutstanding;
+		int openingMcvRequestExpiryTick;
 		int nextOpeningProgressLogTick;
+		BaseBuilderSmartEconomyManager smartEconomy;
 
 		readonly List<BaseBuilderQueueManager> builders = new List<BaseBuilderQueueManager>();
 		UnitBuilderBotModule[] unitBuilders;
@@ -277,6 +349,8 @@ namespace OpenRA.Mods.Common.Traits
 			rallyPointManagers = self.Owner.PlayerActor.TraitsImplementing<IBotRallyPointManager>().ToArray();
 			WallPlanner = new BaseBuilderWallPlanner(this, player);
 			FirstTowerPlanner = new BaseBuilderFirstTowerPlanner(this, player);
+			if (Info.EnableSmartEconomy)
+				smartEconomy = new BaseBuilderSmartEconomyManager(this, player, playerResources, unitProduction);
 		}
 
 		internal bool AdaptiveProductionDebugLogging => unitBuilders.Any(u =>
@@ -312,11 +386,13 @@ namespace OpenRA.Mods.Common.Traits
 			defenseCenter = newLocation;
 		}
 
-		bool IBotRequestPauseUnitProduction.PauseUnitProduction => !IsTraitDisabled && !HasAdequateRefineryCount;
+		bool IBotRequestPauseUnitProduction.PauseUnitProduction => !IsTraitDisabled &&
+			(!HasAdequateRefineryCount || SmartEconomyShouldReserveCashForRefinery);
 
 		void IBotTick.BotTick(IBot bot)
 		{
 			UpdateOpening(bot);
+			smartEconomy?.Tick(bot);
 			FirstTowerPlanner.Update();
 			SetRallyPointsForNewProductionBuildings(bot);
 
@@ -325,6 +401,35 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		internal bool OpeningActive => Info.EnableOpeningPolicy && !OpeningComplete;
+
+		internal bool SmartEconomyWantsRefinery => smartEconomy?.WantsRefinery ?? false;
+
+		internal bool SmartEconomyWantsProductionCapacity => smartEconomy?.WantsProductionCapacity ?? false;
+
+		internal bool SmartEconomyWantsSilo => smartEconomy?.WantsSilo ?? false;
+
+		internal HashSet<string> SmartEconomyRefineryTypes => Info.SmartEconomyRefineryTypes.Count > 0 ?
+			Info.SmartEconomyRefineryTypes : Info.RefineryTypes;
+
+		internal bool SmartEconomyShouldReserveCashForRefinery => smartEconomy?.ShouldReserveCashForRefinery ?? false;
+
+		internal bool TryReserveSmartEconomyRefinery(string type)
+		{
+			return smartEconomy?.TryReserveRefineryBuild(type) ?? false;
+		}
+
+		internal bool CanBuildAnotherSmartEconomyRefinery()
+		{
+			return SmartEconomyRefineryTypes.Any(type => IsCurrentlyBuildable(type) &&
+				(!Info.BuildingLimits.TryGetValue(type, out var limit) || CountActors(new[] { type }) < limit));
+		}
+
+		internal void LogSmartEconomy(string format, params object[] args)
+		{
+			AIUtils.BotDebug(format, args);
+			if (Info.SmartEconomyDebugLogging)
+				Log.Write("debug", "AI smart economy: " + format, args);
+		}
 
 		internal ActorInfo OpeningBuilding(IEnumerable<ActorInfo> buildables)
 		{
@@ -419,6 +524,7 @@ namespace OpenRA.Mods.Common.Traits
 
 			var completedStructures = CompletedOpeningStructureGoals(OpeningStructureGoals);
 			CompleteUnavailableOptionalOpeningStructureGoals(completedStructures);
+			UpdateOpeningMcvRequestState(bot);
 			if (Info.OpeningDebugLogging && world.WorldTick >= nextOpeningProgressLogTick)
 			{
 				nextOpeningProgressLogTick = world.WorldTick + System.Math.Max(1, Info.OpeningProgressLogInterval);
@@ -448,15 +554,41 @@ namespace OpenRA.Mods.Common.Traits
 			if (!string.IsNullOrEmpty(Info.OpeningMcvType) &&
 				CountActors(Info.OpeningHarvesterTypes) >= Info.OpeningHarvesterCount &&
 				OpeningMcvsBuilt < Info.OpeningMcvCount &&
-				!HasLiveActor(Info.OpeningMcvType) && world.WorldTick >= nextOpeningMcvRequestTick &&
+				!openingMcvRequestOutstanding && !HasLiveActor(Info.OpeningMcvType) &&
+				!HasRequestedOrQueued(bot, Info.OpeningMcvType) &&
+				world.WorldTick >= nextOpeningMcvRequestTick &&
 				Request(bot, Info.OpeningMcvType, "opening expansion MCV"))
+			{
+				openingMcvRequestOutstanding = true;
+				openingMcvRequestExpiryTick = world.WorldTick + System.Math.Max(1, Info.OpeningMcvRequestTimeout);
 				nextOpeningMcvRequestTick = world.WorldTick + System.Math.Max(1, Info.OpeningUnitRequestCooldown);
+			}
 
 			if (OpeningComplete && !openingCompletionLogged)
 			{
 				openingCompletionLogged = true;
 				LogOpening("{0} completed opening policy", player);
 			}
+		}
+
+		void UpdateOpeningMcvRequestState(IBot bot)
+		{
+			if (!openingMcvRequestOutstanding)
+				return;
+
+			if (OpeningMcvsBuilt >= Info.OpeningMcvCount)
+			{
+				openingMcvRequestOutstanding = false;
+				return;
+			}
+
+			if (world.WorldTick < openingMcvRequestExpiryTick || HasLiveActor(Info.OpeningMcvType) ||
+				HasQueued(Info.OpeningMcvType))
+				return;
+
+			CancelRequests(bot, Info.OpeningMcvType);
+			openingMcvRequestOutstanding = false;
+			LogOpening("{0} opening MCV request expired without a live, queued, or completed MCV; allowing retry", player);
 		}
 
 		void CompleteUnavailableOptionalOpeningStructureGoals(HashSet<int> completedGoals)
@@ -489,7 +621,7 @@ namespace OpenRA.Mods.Common.Traits
 			(string.IsNullOrEmpty(Info.OpeningMcvType) ||
 				OpeningMcvsBuilt >= Info.OpeningMcvCount);
 
-		int CountActors(IEnumerable<string> types)
+		internal int CountActors(IEnumerable<string> types)
 		{
 			var names = types as ICollection<string> ?? types.ToArray();
 			return world.Actors.Count(a => a.Owner == player && !a.IsDead && names.Contains(a.Info.Name));
@@ -511,7 +643,30 @@ namespace OpenRA.Mods.Common.Traits
 			return !string.IsNullOrEmpty(type) && world.Actors.Any(a => a.Owner == player && !a.IsDead && a.Info.Name == type);
 		}
 
-		bool RequestFirstAvailable(IBot bot, IEnumerable<string> types, string reason)
+		bool HasRequestedOrQueued(IBot bot, string type)
+		{
+			return HasRequested(bot, type) || HasQueued(type);
+		}
+
+		bool HasRequested(IBot bot, string type)
+		{
+			return unitProduction.Any(r => r.IsTraitEnabled() && r.RequestedProductionCount(bot, type) > 0);
+		}
+
+		bool HasQueued(string type)
+		{
+			return world.ActorsWithTrait<ProductionQueue>().Any(q => q.Actor.Owner == player && !q.Actor.IsDead &&
+				q.Actor.IsInWorld && q.Trait.AllQueued().Any(item => item.Item == type));
+		}
+
+		void CancelRequests(IBot bot, string type)
+		{
+			foreach (var requester in unitProduction.Where(r => r.IsTraitEnabled() &&
+				r.RequestedProductionCount(bot, type) > 0))
+				requester.CancelRequestedUnitProduction(bot, type);
+		}
+
+		internal bool RequestFirstAvailable(IBot bot, IEnumerable<string> types, string reason, bool requireIdleQueue = true)
 		{
 			var alternatives = types.ToArray();
 			if (alternatives.Any(type => unitProduction.Any(r => r.IsTraitEnabled() &&
@@ -519,15 +674,15 @@ namespace OpenRA.Mods.Common.Traits
 				return false;
 
 			foreach (var type in alternatives)
-				if (world.Map.Rules.Actors.ContainsKey(type) && Request(bot, type, reason))
+				if (world.Map.Rules.Actors.ContainsKey(type) && Request(bot, type, reason, requireIdleQueue))
 					return true;
 
 			return false;
 		}
 
-		bool Request(IBot bot, string type, string reason)
+		bool Request(IBot bot, string type, string reason, bool requireIdleQueue = true)
 		{
-			if (string.IsNullOrEmpty(type) || !CanCurrentlyProduce(type))
+			if (string.IsNullOrEmpty(type) || (requireIdleQueue ? !CanCurrentlyProduce(type) : !IsCurrentlyBuildable(type)))
 				return false;
 
 			var requester = unitProduction.FirstOrDefault(r => r.IsTraitEnabled() &&
@@ -647,6 +802,21 @@ namespace OpenRA.Mods.Common.Traits
 				new MiniYamlNode("NextOpeningHarvesterRequestTick", FieldSaver.FormatValue(nextOpeningHarvesterRequestTick)),
 				new MiniYamlNode("NextOpeningDefenseUnlockRequestTick", FieldSaver.FormatValue(nextOpeningDefenseUnlockRequestTick)),
 				new MiniYamlNode("NextOpeningMcvRequestTick", FieldSaver.FormatValue(nextOpeningMcvRequestTick)),
+				new MiniYamlNode("OpeningMcvRequestOutstanding", FieldSaver.FormatValue(openingMcvRequestOutstanding)),
+				new MiniYamlNode("OpeningMcvRequestExpiryTick", FieldSaver.FormatValue(openingMcvRequestExpiryTick)),
+				new MiniYamlNode("NextSmartEconomyScanTick", FieldSaver.FormatValue(smartEconomy?.NextScanTick ?? 0)),
+				new MiniYamlNode("NextSmartEconomyMcvRequestTick", FieldSaver.FormatValue(smartEconomy?.NextMcvRequestTick ?? 0)),
+				new MiniYamlNode("NextSmartEconomyProgressLogTick", FieldSaver.FormatValue(smartEconomy?.NextProgressLogTick ?? 0)),
+				new MiniYamlNode("SmartEconomyRefineryBuildOutstanding", FieldSaver.FormatValue(smartEconomy?.RefineryBuildOutstanding ?? false)),
+				new MiniYamlNode("SmartEconomyRefineryBuildExpiryTick", FieldSaver.FormatValue(smartEconomy?.RefineryBuildExpiryTick ?? 0)),
+				new MiniYamlNode("SmartEconomyRefineryBuildTargetCount", FieldSaver.FormatValue(smartEconomy?.RefineryBuildTargetCount ?? 0)),
+				new MiniYamlNode("SmartEconomyMcvRequestOutstanding", FieldSaver.FormatValue(smartEconomy?.McvRequestOutstanding ?? false)),
+				new MiniYamlNode("SmartEconomyMcvRequestExpiryTick", FieldSaver.FormatValue(smartEconomy?.McvRequestExpiryTick ?? 0)),
+				new MiniYamlNode("SmartEconomyMcvRequestTargetAssets", FieldSaver.FormatValue(smartEconomy?.McvRequestTargetAssets ?? 0)),
+				new MiniYamlNode("SmartEconomyRefineryEvidenceTicks", FieldSaver.FormatValue(smartEconomy?.RefineryPressure.EvidenceTicks ?? 0)),
+				new MiniYamlNode("SmartEconomyRefineryPressureActive", FieldSaver.FormatValue(smartEconomy?.RefineryPressure.Active ?? false)),
+				new MiniYamlNode("SmartEconomyCashEvidenceTicks", FieldSaver.FormatValue(smartEconomy?.CashPressure.EvidenceTicks ?? 0)),
+				new MiniYamlNode("SmartEconomyCashPressureActive", FieldSaver.FormatValue(smartEconomy?.CashPressure.Active ?? false)),
 				new MiniYamlNode("FirstTowerPlacementComplete", FieldSaver.FormatValue(FirstTowerPlanner.Complete))
 			};
 		}
@@ -692,6 +862,46 @@ namespace OpenRA.Mods.Common.Traits
 			var mcvRequestNode = data.FirstOrDefault(n => n.Key == "NextOpeningMcvRequestTick");
 			if (mcvRequestNode != null)
 				nextOpeningMcvRequestTick = FieldLoader.GetValue<int>("NextOpeningMcvRequestTick", mcvRequestNode.Value.Value);
+			var mcvOutstandingNode = data.FirstOrDefault(n => n.Key == "OpeningMcvRequestOutstanding");
+			if (mcvOutstandingNode != null)
+				openingMcvRequestOutstanding = FieldLoader.GetValue<bool>("OpeningMcvRequestOutstanding", mcvOutstandingNode.Value.Value);
+			var mcvExpiryNode = data.FirstOrDefault(n => n.Key == "OpeningMcvRequestExpiryTick");
+			if (mcvExpiryNode != null)
+				openingMcvRequestExpiryTick = FieldLoader.GetValue<int>("OpeningMcvRequestExpiryTick", mcvExpiryNode.Value.Value);
+
+			var smartScanNode = data.FirstOrDefault(n => n.Key == "NextSmartEconomyScanTick");
+			var smartMcvRequestNode = data.FirstOrDefault(n => n.Key == "NextSmartEconomyMcvRequestTick");
+			var smartProgressLogNode = data.FirstOrDefault(n => n.Key == "NextSmartEconomyProgressLogTick");
+			var smartRefineryOutstandingNode = data.FirstOrDefault(n => n.Key == "SmartEconomyRefineryBuildOutstanding");
+			var smartRefineryExpiryNode = data.FirstOrDefault(n => n.Key == "SmartEconomyRefineryBuildExpiryTick");
+			var smartRefineryTargetNode = data.FirstOrDefault(n => n.Key == "SmartEconomyRefineryBuildTargetCount");
+			var smartMcvOutstandingNode = data.FirstOrDefault(n => n.Key == "SmartEconomyMcvRequestOutstanding");
+			var smartMcvExpiryNode = data.FirstOrDefault(n => n.Key == "SmartEconomyMcvRequestExpiryTick");
+			var smartMcvTargetNode = data.FirstOrDefault(n => n.Key == "SmartEconomyMcvRequestTargetAssets");
+			var refineryEvidenceNode = data.FirstOrDefault(n => n.Key == "SmartEconomyRefineryEvidenceTicks");
+			var refineryActiveNode = data.FirstOrDefault(n => n.Key == "SmartEconomyRefineryPressureActive");
+			var cashEvidenceNode = data.FirstOrDefault(n => n.Key == "SmartEconomyCashEvidenceTicks");
+			var cashActiveNode = data.FirstOrDefault(n => n.Key == "SmartEconomyCashPressureActive");
+			if (smartEconomy != null && (smartScanNode != null || smartMcvRequestNode != null || smartProgressLogNode != null ||
+				smartRefineryOutstandingNode != null || smartRefineryExpiryNode != null || smartRefineryTargetNode != null ||
+				smartMcvOutstandingNode != null || smartMcvExpiryNode != null || smartMcvTargetNode != null ||
+				refineryEvidenceNode != null || refineryActiveNode != null || cashEvidenceNode != null || cashActiveNode != null))
+				smartEconomy.LoadState(
+					smartScanNode != null ? FieldLoader.GetValue<int>("NextSmartEconomyScanTick", smartScanNode.Value.Value) : 0,
+					smartMcvRequestNode != null ? FieldLoader.GetValue<int>("NextSmartEconomyMcvRequestTick", smartMcvRequestNode.Value.Value) : 0,
+					smartProgressLogNode != null ? FieldLoader.GetValue<int>("NextSmartEconomyProgressLogTick", smartProgressLogNode.Value.Value) : 0,
+					smartRefineryOutstandingNode != null && FieldLoader.GetValue<bool>("SmartEconomyRefineryBuildOutstanding", smartRefineryOutstandingNode.Value.Value),
+					smartRefineryExpiryNode != null ? FieldLoader.GetValue<int>("SmartEconomyRefineryBuildExpiryTick", smartRefineryExpiryNode.Value.Value) : 0,
+					smartRefineryTargetNode != null ? FieldLoader.GetValue<int>("SmartEconomyRefineryBuildTargetCount", smartRefineryTargetNode.Value.Value) : 0,
+					smartMcvOutstandingNode != null && FieldLoader.GetValue<bool>("SmartEconomyMcvRequestOutstanding", smartMcvOutstandingNode.Value.Value),
+					smartMcvExpiryNode != null ? FieldLoader.GetValue<int>("SmartEconomyMcvRequestExpiryTick", smartMcvExpiryNode.Value.Value) : 0,
+					smartMcvTargetNode != null ? FieldLoader.GetValue<int>("SmartEconomyMcvRequestTargetAssets", smartMcvTargetNode.Value.Value) : 0,
+					new SmartEconomyPressure(
+						refineryEvidenceNode != null ? FieldLoader.GetValue<int>("SmartEconomyRefineryEvidenceTicks", refineryEvidenceNode.Value.Value) : 0,
+						refineryActiveNode != null && FieldLoader.GetValue<bool>("SmartEconomyRefineryPressureActive", refineryActiveNode.Value.Value)),
+					new SmartEconomyPressure(
+						cashEvidenceNode != null ? FieldLoader.GetValue<int>("SmartEconomyCashEvidenceTicks", cashEvidenceNode.Value.Value) : 0,
+						cashActiveNode != null && FieldLoader.GetValue<bool>("SmartEconomyCashPressureActive", cashActiveNode.Value.Value)));
 
 			var firstTowerNode = data.FirstOrDefault(n => n.Key == "FirstTowerPlacementComplete");
 			if (firstTowerNode != null)

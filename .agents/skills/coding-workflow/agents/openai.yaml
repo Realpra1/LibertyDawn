@@ -1,0 +1,4 @@
+interface:
+  display_name: "Coding Workflow"
+  short_description: "Plan, test, and publish robust code changes"
+  default_prompt: "Use $coding-workflow to plan, implement, test, and publish this code change with proportionate engineering discipline."
