@@ -1,10 +1,10 @@
 # CNC-32: Remove Unsupported Mods from Normal Workflows
 
-- Status: implementation and local validation complete; publication pending
+- Status: implementation and local validation complete; exact-head GitHub checks pending
 - Cycles used: 15 of 30
 - Branch: `agent/cnc32-remove-unsupported`
 - Base: `origin/agent/cnc31-red-tiberium-bomb-trucks` at `5b341c4433`
-- Draft pull request: pending
+- Draft pull request: https://github.com/Realpra1/LibertyDawn/pull/59
 
 ## Result
 

@@ -3,7 +3,7 @@
 - Task sheet: `AUTONOMOUS-CNC-TASKS.md`
 - Deferred work: `DEFERRED_WORK.md`
 - Completed tasks: `CNC-19` (11 cycles, PR #38 green); `CNC-20` (12 cycles, PR #39 green); `CNC-21` (12 cycles, PR #40 green); `CNC-22` (8 cycles, PR #41 green); `CNC-23` (11 cycles, PR #42 green); `CNC-24` (14 cycles, PR #43 green); `CNC-24.5` (20 cycles, PR #45 green); `CNC-24.6` (14 cycles, PR #46 green); `CNC-25` (22 resumed cycles plus retained 28-cycle history, PR #44 green); `CNC-26` (12 cycles, PR #47 green); `CNC-26A` (11 cycles, PR #48 green); `CNC-66` (4 cycles, PR #51 green); `CNC-26B` (8 cycles, PR #53 green); `CNC-27` (15 cycles, PR #54 green); `CNC-28` (10 cycles, PR #55 green); `CNC-29` (13 cycles, PR #56 green); `CNC-30` (19 cycles, PR #57 green); `CNC-31` (30 cycles, PR #58 green)
-- Active task: `CNC-32` at 0/30 cycles on branch `agent/cnc32-remove-unsupported`, cumulatively based on green CNC-31 final head `5b341c4433`.
+- Active task: `CNC-32` at 15/30 cycles on branch `agent/cnc32-remove-unsupported`, cumulatively based on green CNC-31 final head `5b341c4433`.
 - Integration checkpoint: PR #49 (`agent/cnc-workflow-portability` -> `bleed`) was merged and contains all cumulative work through CNC-26A plus the portable skill and coordinator files. PR #50 keeps later task-sheet updates durable; CNC-66 PR #51 targets that queue branch.
 - Next cumulative base: `origin/agent/cnc66-validator` (PR #51 head) for CNC-66A so both the repaired validator and unmerged durable task updates remain in the cumulative series.
 - Publication: one task branch and pull request; never push directly to `bleed`
