@@ -1,6 +1,6 @@
 # CNC-26B: Iron Reaper Branch-Config Parity
 
-- Status: local implementation complete; GitHub green pending
+- Status: complete
 - Cycles used: 8 of 30
 - Branch: `agent/cnc26b-branch-config`
 - Base: `origin/agent/cnc66a-empire-lars`
@@ -51,7 +51,7 @@ Ignored raw evidence is under `AUTONOMOUS-CNC-LOGS/CNC-26B/`, including the two 
 - Explicit and conditional trait-interface checks: passed.
 - Unit tests: 300/300 passed.
 - Real-game errors: no new fatal, unhandled, or Lua error in clean cycles 6-8.
-- GitHub Linux/Windows checks: pending.
+- GitHub checks at implementation commit `eed40a5e8b`: Linux passed in 3m17s; Windows passed in 4m42s. PR #53 is mergeable.
 
 ## Deferred boundary
 
