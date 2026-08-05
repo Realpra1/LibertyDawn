@@ -115,7 +115,6 @@ Player:
 		ScanInterval: 75
 		OrderInterval: 75
 		MaximumTargetCandidates: 48
-		MaximumThreatActors: 96
 		ThreatRangeBufferCells: 2
 		DetectorRangeBufferCells: 2
 		KiteRangeMarginCells: 1

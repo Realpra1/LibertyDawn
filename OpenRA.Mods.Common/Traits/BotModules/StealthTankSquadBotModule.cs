@@ -32,7 +32,6 @@ namespace OpenRA.Mods.Common.Traits
 		public readonly int ScanInterval = 75;
 		public readonly int OrderInterval = 75;
 		public readonly int MaximumTargetCandidates = 48;
-		public readonly int MaximumThreatActors = 96;
 		public readonly int ThreatRangeBufferCells = 2;
 		public readonly int DetectorRangeBufferCells = 2;
 		public readonly int KiteRangeMarginCells = 1;
@@ -45,7 +44,7 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			base.RulesetLoaded(rules, ai);
 			if (UnitTypes.Count == 0 || ScanInterval <= 0 || OrderInterval <= 0 || MaximumTargetCandidates <= 0 ||
-				MaximumThreatActors <= 0 || ThreatRangeBufferCells < 0 || DetectorRangeBufferCells < 0 ||
+				ThreatRangeBufferCells < 0 || DetectorRangeBufferCells < 0 ||
 				KiteRangeMarginCells < 0 || CarefulClearValueRatio <= 0 || MinimumLateHarassmentGroupSize <= 0 ||
 				TargetSwitchImprovementPercent < 0)
 				throw new YamlException("Stealth-tank squad types, intervals, bounds, buffers, and ratios must be positive and valid.");
@@ -140,8 +139,10 @@ namespace OpenRA.Mods.Common.Traits
 				return;
 
 			var enemies = world.Actors.Where(IsEnemyTarget).OrderBy(a => a.ActorID).ToList();
-			var threats = enemies.Select(CreateThreat).Where(t => t != null)
-				.Take(Info.MaximumThreatActors).ToList();
+
+			// Build one shared threat snapshot per bot scan. Do not truncate by actor creation order:
+			// late-built detectors and defenses are at least as important as opening units.
+			var threats = enemies.Select(CreateThreat).Where(t => t != null).ToList();
 			foreach (var group in groups)
 				UpdateGroup(group, enemies, threats);
 		}
@@ -251,8 +252,8 @@ namespace OpenRA.Mods.Common.Traits
 			Actor rejectedBlocker = null;
 			foreach (var candidate in candidates)
 			{
-				var danger = DangerAlongRun(center, candidate.Actor, threats, ownRange, out var defendingValue,
-					out var strongestDefender);
+				var danger = DangerAlongRun(center, candidate.Actor, threats, ownRange,
+					role == StealthTankSquadRole.Harass, out var defendingValue, out var strongestDefender);
 				if (danger && (role == StealthTankSquadRole.Harass ||
 					!StealthTankSquadPolicy.CanCarefullyClear(squadValue, defendingValue, Info.CarefulClearValueRatio)))
 				{
@@ -334,8 +335,8 @@ namespace OpenRA.Mods.Common.Traits
 			return types.Overlaps(TankTargetTypes) ? 1500 : 0;
 		}
 
-		bool DangerAlongRun(WPos start, Actor target, List<Threat> threats, int ownRange, out int defendingValue,
-			out Actor strongestDefender)
+		bool DangerAlongRun(WPos start, Actor target, List<Threat> threats, int ownRange, bool stopAtFirstDanger,
+			out int defendingValue, out Actor strongestDefender)
 		{
 			defendingValue = 0;
 			strongestDefender = null;
@@ -366,6 +367,9 @@ namespace OpenRA.Mods.Common.Traits
 					strongestValue = threat.Value;
 					strongestDefender = threat.Actor;
 				}
+
+				if (stopAtFirstDanger)
+					return true;
 			}
 
 			return dangerous;
