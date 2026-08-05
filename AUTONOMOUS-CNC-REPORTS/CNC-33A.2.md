@@ -4,7 +4,7 @@
 - Cycles used: 30 of 30
 - Branch: `agent/cnc33a2-tiberium-explosion-options`
 - Base: green CNC-33A.1 PR #65 head `a302f673be`
-- Pull request: draft PR #67
+- Pull request: draft PR #67, mergeable; implementation/publication head passed Linux and Windows CI
 
 ## Literal acceptance
 
@@ -46,3 +46,5 @@ Forbidden outcomes are actor/map-name special cases, visual-only suppression, gr
 ## Result and remaining risks
 
 The independent lobby matrix, common weapon boundary, field boundary, red cargo path, ordinary-explosion regression, release-quiet default, real bots, replay output, and natural complete match have strong evidence. The 30-cycle cap was reached without a successful isolated reload or a clean blue loaded-cargo observable, so this is deliberately published as `first iteration`, not `complete`. A future correction should stage the exact ignored map UID before reload and remove every unrelated death trait from the cargo fixture (or assert semantic tick events rather than total target health), then revalidate both loaded colors and save/load without changing the implementation unless those tests expose a product defect.
+
+Draft PR #67 is mergeable. Exact implementation/publication head `68160a187d` passed Linux CI in 2m08s and Windows CI in 3m29s.
