@@ -157,7 +157,7 @@ Player:
 		MinimumLateHarassmentGroupSize: 3
 		TargetSwitchImprovementPercent: 25
 		ExcludedHarassmentTargetTypes: Tank
-		IgnoredHarassmentWeaponThreatTypes: Infantry
+		IgnoredHarassmentWeaponThreatTypes: Infantry, Creep
 		InfantryTargetPriority: 5000
 		StructureTargetPriority: 0
 		TankTargetPriority: 0
@@ -168,6 +168,8 @@ Player:
 		HarassmentTargetPriorities:
 			harv: 10000
 			sharv: 10000
+			vice: 10000
+			pvice: 10000
 		HarassmentArmorPriorities:
 			TiberiumWood: 6000
 			Tiberium: 6000
