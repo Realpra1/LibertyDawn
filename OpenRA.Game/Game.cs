@@ -57,6 +57,7 @@ namespace OpenRA
 		static Benchmark benchmark = null;
 		static int automatedSaveTick = -1;
 		static string automatedSaveName;
+		static int automatedExitTick = -1;
 		static bool automatedExitRequested;
 		public static bool IsAutomatedGameSaveLoad { get; private set; }
 		public static bool IsHeadlessAutomationRequested { get; private set; }
@@ -635,6 +636,8 @@ namespace OpenRA
 				}
 
 				benchmark?.Tick(LocalTick);
+				if (worldTicked && ReferenceEquals(orderManager, OrderManager))
+					TryAutomatedExit(world);
 			}
 
 			return worldTicked;
@@ -1048,6 +1051,22 @@ namespace OpenRA
 		{
 			automatedSaveTick = Math.Max(0, worldTick);
 			automatedSaveName = string.IsNullOrWhiteSpace(filename) ? "automated-test.orasav" : filename;
+		}
+
+		public static void ConfigureAutomatedExit(int worldTick)
+		{
+			automatedExitTick = Math.Max(0, worldTick);
+		}
+
+		static void TryAutomatedExit(World world)
+		{
+			if (automatedExitTick < 0 || world.WorldTick < automatedExitTick || world.IsLoadingGameSave)
+				return;
+
+			automatedExitTick = -1;
+			Log.Write("debug", "Headless MAX automation reached configured exit at world tick {0}; exiting.",
+				world.WorldTick);
+			FinishBenchmark();
 		}
 
 		static void TryAutomatedSave(World world)

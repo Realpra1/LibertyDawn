@@ -40,6 +40,9 @@ jobs:
       - name: Check Scripts
         run: make check-scripts
 
+      - name: Test Parallel Headless Launcher
+        run: python3 -m unittest tests/test_launch_ai_parallel.py
+
       - name: Check Mods
         run: make test
 

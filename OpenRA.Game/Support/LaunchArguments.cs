@@ -42,6 +42,9 @@ namespace OpenRA
 		[Desc("Automatically create a local game save at the given world tick. Disabled when negative.")]
 		public int SaveGameAtTick = -1;
 
+		[Desc("Automatically exit a headless local game at the given world tick. Disabled when negative.")]
+		public int ExitAtTick = -1;
+
 		[Desc("Deterministic random seed for an automatically started local map. Disabled when omitted.")]
 		public int RandomSeed = int.MinValue;
 
@@ -112,6 +115,9 @@ namespace OpenRA
 
 		public string HeadlessValidationError()
 		{
+			if (ExitAtTick >= 0 && !Headless)
+				return "Launch.ExitAtTick requires Launch.Headless=true.";
+
 			if (!Headless)
 				return null;
 

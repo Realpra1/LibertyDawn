@@ -72,9 +72,11 @@ namespace OpenRA.Test
 			var launch = new LaunchArguments(new Arguments(
 				"Launch.Headless=true",
 				"Launch.Map=test.oramap",
-				"Launch.LobbyCommands=spectate;option gamespeed max"));
+				"Launch.LobbyCommands=spectate;option gamespeed max",
+				"Launch.ExitAtTick=5000"));
 
 			Assert.That(launch.Headless, Is.True);
+			Assert.That(launch.ExitAtTick, Is.EqualTo(5000));
 			Assert.That(launch.HeadlessValidationError(), Is.Null);
 		}
 
@@ -82,6 +84,7 @@ namespace OpenRA.Test
 		[TestCase("Launch.Headless=true|Launch.Map=test.oramap|Launch.LobbyCommands=spectate;option gamespeed fastest", "Launch.Headless map games require 'option gamespeed max' in Launch.LobbyCommands.")]
 		[TestCase("Launch.Headless=true|Launch.Connect=localhost:1234|Launch.Map=test.oramap|Launch.LobbyCommands=option gamespeed max", "Launch.Headless supports local automated games only.")]
 		[TestCase("Launch.Headless=true|Launch.Replay=test.orarep", "Launch.Headless does not support replay playback.")]
+		[TestCase("Launch.ExitAtTick=5000|Launch.Map=test.oramap", "Launch.ExitAtTick requires Launch.Headless=true.")]
 		public void RejectsInvalidHeadlessAutomation(string arguments, string expectedError)
 		{
 			var launch = new LaunchArguments(new Arguments(arguments.Split('|')));
