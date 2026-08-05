@@ -1,6 +1,6 @@
 # CNC-28: Stealth Chemical Tanks
 
-- Status: local gates passed; final GitHub CI pending
+- Status: complete
 - Cycles used: 10 of 30
 - Branch: `agent/cnc28-stealth-chem`
 - Base: `origin/agent/cnc27-stealth-squads`
@@ -43,7 +43,7 @@ Ignored raw evidence and fixture packages are under `AUTONOMOUS-CNC-LOGS/CNC-28/
 - Golden rule: updated behavior decisively defeated an equal old-behavior control, 7 survivors to 0.
 - Full real match: natural MAX game completion with normal AIs and late-game chemical-husk lifecycle; no new fatal, unhandled, or Lua error.
 - The recurring map-cache warning names the user's pre-existing invalid `TibTest.oramap`; it is not the loaded CNC-28 fixture.
-- Final GitHub Linux/Windows checks: pending on the implementation/report head.
+- GitHub implementation/report head `34009d7c79`: Linux passed in 3m16s and Windows passed in 4m25s; PR #55 is mergeable.
 
 ## Deferred boundary
 
