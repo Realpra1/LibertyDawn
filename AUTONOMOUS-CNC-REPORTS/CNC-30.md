@@ -1,6 +1,6 @@
 # CNC-30: Crates and Exploration
 
-- Status: local complete; GitHub checks pending
+- Status: complete
 - Cycles used: 19 of 30
 - Branch: `agent/cnc30-crates-exploration`
 - Base: `origin/agent/cnc29-stealth-chem-squad`
@@ -56,6 +56,7 @@ At zero spendable cash or without an owned MCV/construction yard, all otherwise 
 - Strict Debug solution build: zero warnings/errors.
 - Unit tests: 328/328 passed, including six crate exploration policy tests.
 - Full CNC YAML/map validator: passed.
+- GitHub implementation/report head `17e15f5c53`: Linux passed in 3m19s and Windows passed in 4m46s; PR #57 is mergeable.
 
 ## Boundaries and remaining risk
 
