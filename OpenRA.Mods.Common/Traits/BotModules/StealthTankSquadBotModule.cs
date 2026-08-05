@@ -59,6 +59,7 @@ namespace OpenRA.Mods.Common.Traits
 			public Actor Target;
 			public long TargetScore;
 			public int LastOrderTick;
+			public int LastNoTargetLogTick;
 
 			public SpecialistGroup(int index) { Index = index; }
 		}
@@ -235,12 +236,16 @@ namespace OpenRA.Mods.Common.Traits
 			Actor selected = null;
 			long selectedScore = 0;
 			var selectedDanger = 0;
+			var dangerousCandidates = 0;
 			foreach (var candidate in candidates)
 			{
 				var danger = DangerAlongRun(center, candidate.Actor, threats, ownRange, out var defendingValue);
 				if (danger && (role == StealthTankSquadRole.Harass ||
 					!StealthTankSquadPolicy.CanCarefullyClear(squadValue, defendingValue, Info.CarefulClearValueRatio)))
+				{
+					dangerousCandidates++;
 					continue;
+				}
 
 				var score = StealthTankSquadPolicy.TargetScore(candidate.Priority,
 					candidate.Actor.Info.TraitInfoOrDefault<ValuedInfo>()?.Cost ?? 1, candidate.Distance,
@@ -255,6 +260,13 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (selected == null)
 			{
+				if (Info.DebugLogging && world.WorldTick >= group.LastNoTargetLogTick + Info.ScanInterval * 10)
+				{
+					group.LastNoTargetLogTick = world.WorldTick;
+					Log.Write("debug", "AI stealth squad [{0}:{1}] {2} waiting: units={3} candidates={4} dangerous={5}.",
+						player.PlayerName, group.Index, role, group.Units.Count, candidates.Count, dangerousCandidates);
+				}
+
 				group.Target = null;
 				group.TargetScore = 0;
 				return;
