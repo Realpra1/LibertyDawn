@@ -122,6 +122,17 @@ Player:
 		CarefulClearValueRatio: 5
 		MinimumLateHarassmentGroupSize: 3
 		TargetSwitchImprovementPercent: 25
+		HarassmentDistancePenalty: 3
+		HarvesterTypes: harv, sharv
+		HarvesterWaitingAnchorTypes: proc, resonator
+		ResourceWaitingSearchRadius: 20
+		ResourceWaitingOrderInterval: 750
+		AvoidResourceTypes: BlueTiberium
+		PendingResourceExplosionAvoidanceRadius: 1
+		HazardRouteWaypointSpacing: 4
+		DefenderClearFallbackScans: 20
+		DefenderClearValueRatio: 1
+		DefenderClearWeakestCandidates: 3
 		HarassmentTargetPriorities:
 			harv: 10000
 			sharv: 10000
@@ -754,6 +765,28 @@ Player:
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: false
 		MaximumWallSegments: 24
+		EnableOpeningPolicy: true
+		OpeningPowerTypes: nuk2, nuke
+		OpeningSiloTypes: silo
+		OpeningDefenseTypes: gtwr, gun
+		OpeningBarracksTypes: pyle, hand
+		OpeningRefineryTypes: proc
+		OpeningFactoryTypes: weap, afld
+		OpeningAdditionalFactoryTypes: afld
+		OpeningAdditionalFactoryCount: 2
+		OpeningRadarTypes: hq
+		OpeningHelipadTypes: hpad
+		OpeningOptionalStructureTypes: silo, gtwr, gun
+		OpeningHarvesterTypes: harv, sharv
+		OpeningMcvType: mcv
+		OpeningSoldierCount: 0
+		OpeningHarvesterCount: 5
+		OpeningMcvCount: 1
+		OpeningRequestRetryDelay: 250
+		OpeningDebugLogging: false
+		AirRepairBuildingTypes: hpad
+		AirUnitsPerRepairBuilding: 4
+		AirRepairCapacityDebugLogging: false
 		FirstTowerTypes: gtwr, gun, atwr, obli
 		FirstTowerSearchRadius: 20
 		FirstTowerDebugLogging: false
@@ -936,6 +969,22 @@ Player:
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: false
 		MaximumWallSegments: 24
+		EnableOpeningPolicy: true
+		OpeningPowerTypes: nuk2, nuke
+		OpeningSiloTypes: silo
+		OpeningDefenseTypes: gtwr, gun
+		OpeningBarracksTypes: pyle, hand
+		OpeningRefineryTypes: proc
+		OpeningFactoryTypes: weap, afld
+		OpeningRadarTypes: hq
+		OpeningOptionalStructureTypes: silo, gtwr, gun
+		OpeningHarvesterTypes: harv, sharv
+		OpeningMcvType: mcv
+		OpeningSoldierCount: 0
+		OpeningHarvesterCount: 5
+		OpeningMcvCount: 1
+		OpeningRequestRetryDelay: 250
+		OpeningDebugLogging: false
 		FirstTowerTypes: gtwr, gun, atwr, obli
 		FirstTowerSearchRadius: 20
 		FirstTowerDebugLogging: false
@@ -1106,6 +1155,9 @@ Player:
 		OpeningMcvCount: 1
 		OpeningRequestRetryDelay: 250
 		OpeningDebugLogging: false
+		AirRepairBuildingTypes: hpad
+		AirUnitsPerRepairBuilding: 4
+		AirRepairCapacityDebugLogging: false
 		FirstTowerTypes: gtwr, gun, atwr, obli
 		FirstTowerSearchRadius: 20
 		FirstTowerDebugLogging: false
@@ -1425,6 +1477,10 @@ Player:
 		OpeningMcvCount: 1
 		OpeningRequestRetryDelay: 250
 		OpeningDebugLogging: false
+		AirRepairBuildingTypes: hpad
+		AirUnitsPerRepairBuilding: 4
+		MinimumPostOpeningAirRepairBuildings: 2
+		AirRepairCapacityDebugLogging: false
 		FirstTowerTypes: gtwr, gun, atwr, obli
 		FirstTowerSearchRadius: 20
 		FirstTowerDebugLogging: false

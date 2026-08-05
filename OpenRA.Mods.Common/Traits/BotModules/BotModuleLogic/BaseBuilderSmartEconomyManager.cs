@@ -400,6 +400,9 @@ namespace OpenRA.Mods.Common.Traits
 
 		void TryRequestExpansionMcv(IBot bot)
 		{
+			if (baseBuilder.OpeningOwnsMcvProduction)
+				return;
+
 			if (!enabled || !cashPressure.Active || mcvRequestOutstanding || world.WorldTick < nextMcvRequestTick ||
 				baseBuilder.Info.SmartEconomyMcvTypes.Length == 0)
 				return;

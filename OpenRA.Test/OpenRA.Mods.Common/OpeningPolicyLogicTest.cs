@@ -32,7 +32,7 @@ namespace OpenRA.Test.Mods.Common
 		public void PicksPreferredAlternativeFromFirstBuildableGoal()
 		{
 			var goal = OpeningPolicyLogic.FirstBuildableGoal(
-				Goals, new[] { 0 }, Array.Empty<int>(), new[] { "turret", "guard-tower", "barracks" });
+				Goals, new[] { 0, 1 }, Array.Empty<int>(), new[] { "turret", "guard-tower", "barracks" });
 
 			Assert.That(goal, Is.EqualTo(2));
 			Assert.That(OpeningPolicyLogic.FirstAvailable(Goals[goal], new[] { "turret", "guard-tower" }),
@@ -40,12 +40,21 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
-		public void ReservedGoalDoesNotBlockAnotherParallelQueue()
+		public void ReservedGoalKeepsLaterGoalsOrderedWhileOtherQueuesFallBack()
 		{
 			var goal = OpeningPolicyLogic.FirstBuildableGoal(
 				Goals, new[] { 0 }, new[] { 1 }, new[] { "guard-tower", "turret" });
 
-			Assert.That(goal, Is.EqualTo(2));
+			Assert.That(goal, Is.EqualTo(-1));
+		}
+
+		[Test]
+		public void UnbuildableCurrentGoalDoesNotSkipToLaterGoal()
+		{
+			var goal = OpeningPolicyLogic.FirstBuildableGoal(
+				Goals, new[] { 0 }, Array.Empty<int>(), new[] { "guard-tower", "turret" });
+
+			Assert.That(goal, Is.EqualTo(-1));
 		}
 
 		[Test]

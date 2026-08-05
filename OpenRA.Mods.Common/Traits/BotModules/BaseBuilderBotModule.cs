@@ -57,19 +57,21 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Tells the AI what building types are considered silos (resource storage).")]
 		public readonly HashSet<string> SiloTypes = new HashSet<string>();
 
-		[Desc("Use the configured parallel opening goals before ordinary structure selection.")]
+		[Desc("Use the configured ordered opening goals before ordinary structure selection.")]
 		public readonly bool EnableOpeningPolicy = false;
 
-		[Desc("Opening structure alternatives in goal order. Separate production queues may work on different goals concurrently.")]
+		[Desc("Opening structure alternatives. Only the earliest incomplete goal is coordinated; unrelated idle queues use normal logic.")]
 		public readonly string[] OpeningPowerTypes = System.Array.Empty<string>();
 		public readonly string[] OpeningSiloTypes = System.Array.Empty<string>();
 		public readonly string[] OpeningDefenseTypes = System.Array.Empty<string>();
 		public readonly string[] OpeningBarracksTypes = System.Array.Empty<string>();
 		public readonly string[] OpeningRefineryTypes = System.Array.Empty<string>();
 		public readonly string[] OpeningFactoryTypes = System.Array.Empty<string>();
+		public readonly string[] OpeningAdditionalFactoryTypes = System.Array.Empty<string>();
 		public readonly string[] OpeningRadarTypes = System.Array.Empty<string>();
 		public readonly string[] OpeningHelipadTypes = System.Array.Empty<string>();
 		public readonly string[] OpeningOptionalStructureTypes = System.Array.Empty<string>();
+		public readonly int OpeningAdditionalFactoryCount = 0;
 
 		[Desc("Opening unit alternatives and targets. External requests ignore ordinary unit delays.")]
 		public readonly string[] OpeningSoldierTypes = System.Array.Empty<string>();
@@ -90,6 +92,18 @@ namespace OpenRA.Mods.Common.Traits
 
 		[Desc("Write opening goal, request, completion, and stall diagnostics to debug.log.")]
 		public readonly bool OpeningDebugLogging = false;
+
+		[Desc("Owned repair-building types that should scale with the repairable aircraft fleet.")]
+		public readonly HashSet<string> AirRepairBuildingTypes = new HashSet<string>();
+
+		[Desc("Desired maximum live repairable aircraft per repair building. Zero disables fleet-based scaling.")]
+		public readonly int AirUnitsPerRepairBuilding = 0;
+
+		[Desc("Minimum repair buildings requested after the configured opening completes. Capped by BuildingLimits.")]
+		public readonly int MinimumPostOpeningAirRepairBuildings = 0;
+
+		[Desc("Write fleet-based air repair-capacity decisions to debug.log.")]
+		public readonly bool AirRepairCapacityDebugLogging = false;
 
 		[Desc("Production queues AI uses for buildings.")]
 		public readonly HashSet<string> BuildingQueues = new HashSet<string> { "Building" };
@@ -302,6 +316,15 @@ namespace OpenRA.Mods.Common.Traits
 	public class BaseBuilderBotModule : ConditionalTrait<BaseBuilderBotModuleInfo>, IGameSaveTraitData,
 		IBotTick, IBotPositionsUpdated, IBotRespondToAttack, IBotRequestPauseUnitProduction
 	{
+		const int OpeningRadarGoal = 5;
+		const int OpeningDefenseGoal = 8;
+
+		sealed class AirRepairBuildingReservation
+		{
+			public string Type;
+			public int Tick;
+		}
+
 		public CPos GetRandomBaseCenter()
 		{
 			var randomConstructionYard = world.Actors.Where(a => a.Owner == player &&
@@ -329,6 +352,7 @@ namespace OpenRA.Mods.Common.Traits
 		CPos defenseCenter;
 		readonly Dictionary<int, int> openingStructureReservations = new Dictionary<int, int>();
 		readonly HashSet<int> loggedCompletedOpeningGoals = new HashSet<int>();
+		readonly HashSet<int> skippedOpeningGoals = new HashSet<int>();
 		bool openingCompletionLogged;
 		bool openingInitialized;
 		int openingSoldierBuiltBaseline;
@@ -340,6 +364,8 @@ namespace OpenRA.Mods.Common.Traits
 		bool openingMcvRequestOutstanding;
 		int openingMcvRequestExpiryTick;
 		int nextOpeningProgressLogTick;
+		readonly Dictionary<uint, AirRepairBuildingReservation> airRepairBuildingReservations =
+			new Dictionary<uint, AirRepairBuildingReservation>();
 		BaseBuilderSmartEconomyManager smartEconomy;
 
 		readonly List<BaseBuilderQueueManager> builders = new List<BaseBuilderQueueManager>();
@@ -393,6 +419,80 @@ namespace OpenRA.Mods.Common.Traits
 				.Select(u => u.ProductionBuildingDemand(building)).DefaultIfEmpty(0).Max();
 		}
 
+		internal ActorInfo AirRepairCapacityBuilding(IEnumerable<ActorInfo> buildables)
+		{
+			if (Info.AirUnitsPerRepairBuilding <= 0 || Info.AirRepairBuildingTypes.Count == 0)
+				return null;
+
+			RefreshAirRepairBuildingReservations();
+			foreach (var building in buildables.Where(b => Info.AirRepairBuildingTypes.Contains(b.Name))
+				.OrderBy(b => b.Name, System.StringComparer.Ordinal))
+			{
+				if (!Info.BuildingLimits.TryGetValue(building.Name, out var limit))
+					continue;
+
+				var aircraft = RepairableAircraftCount(building.Name);
+				var desired = System.Math.Min(limit, System.Math.Max(
+					openingCompletionLogged ? System.Math.Max(0, Info.MinimumPostOpeningAirRepairBuildings) : 0,
+					AirRepairCapacityPolicy.DesiredBuildings(aircraft, Info.AirUnitsPerRepairBuilding, limit)));
+				var committed = CountActors(new[] { building.Name }) +
+					CountQueuedOrPendingActors(new[] { building.Name }) +
+					airRepairBuildingReservations.Values.Count(r => r.Type == building.Name);
+				if (committed < desired)
+					return building;
+			}
+
+			return null;
+		}
+
+		internal bool TryReserveAirRepairCapacity(ProductionQueue queue, string type)
+		{
+			if (queue == null || queue.AllQueued().Any() || !Info.AirRepairBuildingTypes.Contains(type))
+				return false;
+
+			RefreshAirRepairBuildingReservations();
+			if (!Info.BuildingLimits.TryGetValue(type, out var limit))
+				return false;
+
+			var aircraft = RepairableAircraftCount(type);
+			var desired = System.Math.Min(limit, System.Math.Max(
+				openingCompletionLogged ? System.Math.Max(0, Info.MinimumPostOpeningAirRepairBuildings) : 0,
+				AirRepairCapacityPolicy.DesiredBuildings(aircraft, Info.AirUnitsPerRepairBuilding, limit)));
+			var committed = CountActors(new[] { type }) + CountQueuedOrPendingActors(new[] { type }) +
+				airRepairBuildingReservations.Values.Count(r => r.Type == type);
+			if (committed >= desired)
+				return false;
+
+			airRepairBuildingReservations[queue.Actor.ActorID] = new AirRepairBuildingReservation
+			{
+				Type = type,
+				Tick = world.WorldTick
+			};
+			if (Info.AirRepairCapacityDebugLogging)
+				Log.Write("debug", "AI air repair capacity: {0} reserved {1}: aircraft={2}, committed={3}, desired={4}.",
+					player, type, aircraft, committed, desired);
+			return true;
+		}
+
+		void RefreshAirRepairBuildingReservations()
+		{
+			foreach (var reservation in airRepairBuildingReservations.ToArray())
+			{
+				var actor = world.GetActorById(reservation.Key);
+				var queued = actor != null && actor.TraitsImplementing<ProductionQueue>()
+					.Any(q => q.AllQueued().Any(i => i.Item == reservation.Value.Type));
+				if (queued || world.WorldTick - reservation.Value.Tick >= System.Math.Max(1, Info.OpeningRequestRetryDelay))
+					airRepairBuildingReservations.Remove(reservation.Key);
+			}
+		}
+
+		int RepairableAircraftCount(string repairBuildingType)
+		{
+			return world.Actors.Count(a => a.Owner == player && !a.IsDead && a.IsInWorld &&
+				a.Info.HasTraitInfo<AircraftInfo>() &&
+				a.Info.TraitInfoOrDefault<RepairableInfo>()?.RepairActors.Contains(repairBuildingType) == true);
+		}
+
 		protected override void TraitEnabled(Actor self)
 		{
 			foreach (var building in Info.BuildingQueues)
@@ -425,7 +525,10 @@ namespace OpenRA.Mods.Common.Traits
 				b.Tick(bot);
 		}
 
-		internal bool OpeningActive => Info.EnableOpeningPolicy && !OpeningComplete;
+		internal bool OpeningActive => Info.EnableOpeningPolicy && !openingCompletionLogged && !OpeningComplete;
+
+		internal bool OpeningOwnsMcvProduction => Info.EnableOpeningPolicy && !openingCompletionLogged &&
+			!string.IsNullOrEmpty(Info.OpeningMcvType) && OpeningMcvsBuilt < Info.OpeningMcvCount;
 
 		internal bool SmartEconomyWantsRefinery => smartEconomy?.WantsRefinery ?? false;
 
@@ -508,31 +611,52 @@ namespace OpenRA.Mods.Common.Traits
 			return buildableArray.First(a => a.Name == selected);
 		}
 
+		internal bool IsOpeningStructureReserved(string type)
+		{
+			var goals = OpeningStructureGoals;
+			return openingStructureReservations.Keys.Any(i => i >= 0 && i < goals.Count && goals[i].Contains(type));
+		}
+
 		IReadOnlyList<string[]> OpeningStructureGoals => new[]
 		{
 			Info.OpeningPowerTypes,
-			Info.OpeningSiloTypes,
-			Info.OpeningDefenseTypes,
 			Info.OpeningBarracksTypes,
 			Info.OpeningRefineryTypes,
 			Info.OpeningFactoryTypes,
+			Info.OpeningAdditionalFactoryTypes,
 			Info.OpeningRadarTypes,
-			Info.OpeningHelipadTypes
+			Info.OpeningHelipadTypes,
+			Info.OpeningSiloTypes,
+			Info.OpeningDefenseTypes
+		};
+
+		IReadOnlyList<int> OpeningStructureGoalCounts => new[]
+		{
+			1,
+			1,
+			1,
+			1,
+			System.Math.Max(0, Info.OpeningAdditionalFactoryCount),
+			1,
+			1,
+			1,
+			1
 		};
 
 		static string OpeningGoalName(int goal)
 		{
-			var names = new[] { "power", "silo", "anti-ground defense", "barracks", "refinery", "factory", "radar", "helipad" };
+			var names = new[] { "power", "barracks", "refinery", "factory", "additional factory", "radar", "helipad", "silo", "anti-ground defense" };
 			return goal >= 0 && goal < names.Length ? names[goal] : goal.ToString();
 		}
 
 		HashSet<int> CompletedOpeningStructureGoals(IReadOnlyList<string[]> goals)
 		{
-			var completed = new HashSet<int>(loggedCompletedOpeningGoals);
+			var completed = new HashSet<int>(skippedOpeningGoals);
+			var counts = OpeningStructureGoalCounts;
 			for (var i = 0; i < goals.Count; i++)
 			{
 				// Empty goals are intentionally disabled by configuration.
-				if (goals[i].Length == 0 || CountActors(goals[i]) > 0)
+				if (goals[i].Length == 0 || counts[i] <= 0 || CountActors(goals[i]) >= counts[i])
 				{
 					completed.Add(i);
 					if (loggedCompletedOpeningGoals.Add(i))
@@ -546,13 +670,15 @@ namespace OpenRA.Mods.Common.Traits
 		void RefreshOpeningStructureReservations()
 		{
 			var goals = OpeningStructureGoals;
+			var counts = OpeningStructureGoalCounts;
 			var queues = Info.BuildingQueues.Concat(Info.DefenseQueues)
 				.SelectMany(q => AIUtils.FindQueues(player, q)).ToArray();
 			foreach (var reservation in openingStructureReservations.ToArray())
 			{
-				var completed = reservation.Key < goals.Count && CountActors(goals[reservation.Key]) > 0;
-				var queued = reservation.Key < goals.Count && queues.Any(q =>
-					q.AllQueued().Any(item => goals[reservation.Key].Contains(item.Item)));
+				var completed = reservation.Key < goals.Count &&
+					CountActors(goals[reservation.Key]) >= counts[reservation.Key];
+				var queued = reservation.Key < goals.Count && CountActors(goals[reservation.Key]) + queues.Sum(q =>
+					q.AllQueued().Count(item => goals[reservation.Key].Contains(item.Item))) >= counts[reservation.Key];
 				if (completed || OpeningPolicyLogic.RetryReservation(reservation.Value, world.WorldTick,
 					Info.OpeningRequestRetryDelay, queued))
 				{
@@ -576,6 +702,9 @@ namespace OpenRA.Mods.Common.Traits
 					TotalBuilt(new[] { Info.OpeningMcvType });
 			}
 
+			if (openingCompletionLogged)
+				return;
+
 			var completedStructures = CompletedOpeningStructureGoals(OpeningStructureGoals);
 			CompleteUnavailableOptionalOpeningStructureGoals(completedStructures);
 			UpdateOpeningMcvRequestState(bot);
@@ -585,7 +714,7 @@ namespace OpenRA.Mods.Common.Traits
 				LogOpening("{0} progress: structures={1}/{2}, soldiers={3}/{4}, harvesters={5}/{6}, mcvs-built={7}/{8}",
 					player, completedStructures.Count, OpeningStructureGoals.Count,
 					OpeningSoldiersBuilt, Info.OpeningSoldierCount,
-					CountActors(Info.OpeningHarvesterTypes), Info.OpeningHarvesterCount,
+					OpeningCommittedHarvesters, Info.OpeningHarvesterCount,
 					OpeningMcvsBuilt, Info.OpeningMcvCount);
 			}
 
@@ -594,19 +723,19 @@ namespace OpenRA.Mods.Common.Traits
 				RequestFirstAvailable(bot, Info.OpeningSoldierTypes, "opening soldiers"))
 				nextOpeningSoldierRequestTick = world.WorldTick + System.Math.Max(1, Info.OpeningUnitRequestCooldown);
 
-			if (Info.OpeningHarvesterTypes.Length > 0 && CountActors(Info.OpeningHarvesterTypes) < Info.OpeningHarvesterCount &&
+			if (Info.OpeningHarvesterTypes.Length > 0 && OpeningCommittedHarvesters < Info.OpeningHarvesterCount &&
 				world.WorldTick >= nextOpeningHarvesterRequestTick &&
 				RequestFirstAvailable(bot, Info.OpeningHarvesterTypes, "opening harvesters"))
 				nextOpeningHarvesterRequestTick = world.WorldTick + System.Math.Max(1, Info.OpeningUnitRequestCooldown);
 
-			if (!completedStructures.Contains(2) && completedStructures.Contains(6) &&
+			if (!completedStructures.Contains(OpeningDefenseGoal) && completedStructures.Contains(OpeningRadarGoal) &&
 				Info.OpeningDefenseUnlockTypes.Length > 0 && CountActors(Info.OpeningDefenseUnlockTypes) == 0 &&
 				world.WorldTick >= nextOpeningDefenseUnlockRequestTick &&
 				RequestFirstAvailable(bot, Info.OpeningDefenseUnlockTypes, "opening defense unlock"))
 				nextOpeningDefenseUnlockRequestTick = world.WorldTick + System.Math.Max(1, Info.OpeningUnitRequestCooldown);
 
 			if (!string.IsNullOrEmpty(Info.OpeningMcvType) &&
-				CountActors(Info.OpeningHarvesterTypes) >= Info.OpeningHarvesterCount &&
+				OpeningCommittedHarvesters >= Info.OpeningHarvesterCount &&
 				OpeningMcvsBuilt < Info.OpeningMcvCount &&
 				!openingMcvRequestOutstanding && !HasLiveActor(Info.OpeningMcvType) &&
 				!HasRequestedOrQueued(bot, Info.OpeningMcvType) &&
@@ -656,7 +785,7 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				// A defense unlock that is buildable under the current technology means the
 				// tower is only temporarily unavailable and must not be skipped.
-				if (i == 2 && Info.OpeningDefenseUnlockTypes.Any(IsCurrentlyBuildable))
+				if (i == OpeningDefenseGoal && Info.OpeningDefenseUnlockTypes.Any(IsCurrentlyBuildable))
 					continue;
 
 				if (!OpeningPolicyLogic.CanSkipUnavailableGoal(i, goals, completedGoals,
@@ -664,6 +793,7 @@ namespace OpenRA.Mods.Common.Traits
 					continue;
 
 				completedGoals.Add(i);
+				skippedOpeningGoals.Add(i);
 				if (loggedCompletedOpeningGoals.Add(i))
 					LogOpening("{0} skipped unavailable optional structure goal {1}", player, OpeningGoalName(i));
 			}
@@ -671,7 +801,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		bool OpeningComplete => CompletedOpeningStructureGoals(OpeningStructureGoals).Count == OpeningStructureGoals.Count &&
 			(Info.OpeningSoldierTypes.Length == 0 || OpeningSoldiersBuilt >= Info.OpeningSoldierCount) &&
-			(Info.OpeningHarvesterTypes.Length == 0 || CountActors(Info.OpeningHarvesterTypes) >= Info.OpeningHarvesterCount) &&
+			(Info.OpeningHarvesterTypes.Length == 0 || OpeningCommittedHarvesters >= Info.OpeningHarvesterCount) &&
 			(string.IsNullOrEmpty(Info.OpeningMcvType) ||
 				OpeningMcvsBuilt >= Info.OpeningMcvCount);
 
@@ -679,6 +809,21 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			var names = types as ICollection<string> ?? types.ToArray();
 			return world.Actors.Count(a => a.Owner == player && !a.IsDead && names.Contains(a.Info.Name));
+		}
+
+		int OpeningCommittedHarvesters => CountActors(Info.OpeningHarvesterTypes) +
+			CountQueuedOrPendingActors(Info.OpeningHarvesterTypes);
+
+		internal int CountQueuedOrPendingActors(IEnumerable<string> types)
+		{
+			var names = types as ICollection<string> ?? types.ToArray();
+			var queued = world.ActorsWithTrait<ProductionQueue>()
+				.Where(q => q.Actor.Owner == player && !q.Actor.IsDead && q.Actor.IsInWorld)
+				.Sum(q => q.Trait.AllQueued().Count(i => names.Contains(i.Item)));
+			var pending = world.ActorsWithTrait<IPendingProductionActors>()
+				.Where(p => p.Actor.Owner == player && !p.Actor.IsDead && p.Actor.IsInWorld)
+				.Sum(p => p.Trait.PendingActorTypes.Count(names.Contains));
+			return queued + pending;
 		}
 
 		int OpeningSoldiersBuilt => System.Math.Max(0,
@@ -850,6 +995,8 @@ namespace OpenRA.Mods.Common.Traits
 				new MiniYamlNode("OpeningSoldierBuiltBaseline", FieldSaver.FormatValue(openingSoldierBuiltBaseline)),
 				new MiniYamlNode("OpeningMcvBuiltBaseline", FieldSaver.FormatValue(openingMcvBuiltBaseline)),
 				new MiniYamlNode("CompletedOpeningGoals", FieldSaver.FormatValue(loggedCompletedOpeningGoals.ToArray())),
+				new MiniYamlNode("SkippedOpeningGoals", FieldSaver.FormatValue(skippedOpeningGoals.ToArray())),
+				new MiniYamlNode("OpeningCompletionLogged", FieldSaver.FormatValue(openingCompletionLogged)),
 				new MiniYamlNode("NextOpeningSoldierRequestTick", FieldSaver.FormatValue(nextOpeningSoldierRequestTick)),
 				new MiniYamlNode("NextOpeningHarvesterRequestTick", FieldSaver.FormatValue(nextOpeningHarvesterRequestTick)),
 				new MiniYamlNode("NextOpeningDefenseUnlockRequestTick", FieldSaver.FormatValue(nextOpeningDefenseUnlockRequestTick)),
@@ -910,6 +1057,17 @@ namespace OpenRA.Mods.Common.Traits
 				loggedCompletedOpeningGoals.Clear();
 				loggedCompletedOpeningGoals.UnionWith(FieldLoader.GetValue<int[]>("CompletedOpeningGoals", completedGoalsNode.Value.Value));
 			}
+
+			var skippedGoalsNode = data.FirstOrDefault(n => n.Key == "SkippedOpeningGoals");
+			if (skippedGoalsNode != null)
+			{
+				skippedOpeningGoals.Clear();
+				skippedOpeningGoals.UnionWith(FieldLoader.GetValue<int[]>("SkippedOpeningGoals", skippedGoalsNode.Value.Value));
+			}
+
+			var completionNode = data.FirstOrDefault(n => n.Key == "OpeningCompletionLogged");
+			if (completionNode != null)
+				openingCompletionLogged = FieldLoader.GetValue<bool>("OpeningCompletionLogged", completionNode.Value.Value);
 
 			var soldierRequestNode = data.FirstOrDefault(n => n.Key == "NextOpeningSoldierRequestTick");
 			if (soldierRequestNode != null)

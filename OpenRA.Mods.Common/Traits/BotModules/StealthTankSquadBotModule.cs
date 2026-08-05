@@ -9,6 +9,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using OpenRA.Mods.Common.Pathfinder;
 using OpenRA.Primitives;
 using OpenRA.Traits;
 
@@ -53,6 +54,23 @@ namespace OpenRA.Mods.Common.Traits
 		public readonly int CarefulClearValueRatio = 5;
 		public readonly int MinimumLateHarassmentGroupSize = 3;
 		public readonly int TargetSwitchImprovementPercent = 25;
+		public readonly int HarassmentDistancePenalty = 1;
+		public readonly HashSet<string> HarvesterTypes = new HashSet<string>();
+		public readonly HashSet<string> HarvesterWaitingAnchorTypes = new HashSet<string>();
+		public readonly int ResourceWaitingSearchRadius = 0;
+		public readonly int ResourceWaitingOrderInterval = 750;
+		[Desc("Resource types specialist routes, firing positions, and waiting positions must avoid.")]
+		public readonly HashSet<string> AvoidResourceTypes = new HashSet<string>();
+		[Desc("Cells around a pending resource explosion that specialist routes and firing positions avoid.")]
+		public readonly int PendingResourceExplosionAvoidanceRadius = 0;
+		[Desc("Maximum cells between queued hazard-aware route waypoints.")]
+		public readonly int HazardRouteWaypointSpacing = 4;
+		[Desc("Consecutive all-defended scans before a harassment group may clear a weak defender.")]
+		public readonly int DefenderClearFallbackScans = 20;
+		[Desc("Required specialist value multiple over the complete defended route package before clearing its weakest member.")]
+		public readonly int DefenderClearValueRatio = 1;
+		[Desc("Number of lowest-total-defense opportunities considered before choosing by unlocked target score.")]
+		public readonly int DefenderClearWeakestCandidates = 3;
 		public readonly int InfantryTargetPriority = 1200;
 		public readonly int StructureTargetPriority = 500;
 		public readonly int TankTargetPriority = 1500;
@@ -69,7 +87,12 @@ namespace OpenRA.Mods.Common.Traits
 				MaximumTargetCandidates <= 0 || MaximumHarassmentGroups <= 0 ||
 				ThreatRangeBufferCells < 0 || DetectorRangeBufferCells < 0 ||
 				KiteRangeMarginCells < 0 || CarefulClearValueRatio <= 0 || MinimumLateHarassmentGroupSize <= 0 ||
-				TargetSwitchImprovementPercent < 0 || InfantryTargetPriority < 0 || StructureTargetPriority < 0 ||
+				TargetSwitchImprovementPercent < 0 || HarassmentDistancePenalty <= 0 ||
+				ResourceWaitingSearchRadius < 0 || ResourceWaitingOrderInterval <= 0 ||
+				PendingResourceExplosionAvoidanceRadius < 0 || HazardRouteWaypointSpacing <= 0 ||
+				DefenderClearFallbackScans < 0 || DefenderClearValueRatio <= 0 ||
+				DefenderClearWeakestCandidates <= 0 ||
+				InfantryTargetPriority < 0 || StructureTargetPriority < 0 ||
 				TankTargetPriority < 0 || InfantryClusterRadiusCells < 0 || InfantryClusterBonusPercentPerNearbyActor < 0 ||
 				MaximumInfantryClusterMultiplierPercent < 100)
 				throw new YamlException("Stealth squad types, labels, intervals, bounds, priorities, buffers, and ratios must be positive and valid.");
@@ -89,8 +112,17 @@ namespace OpenRA.Mods.Common.Traits
 			public long TargetScore;
 			public int LastOrderTick;
 			public int LastNoTargetLogTick;
+			public int ConsecutiveNoSafeTargetScans;
 
 			public SpecialistGroup(int index) { Index = index; }
+		}
+
+		sealed class DefendedOpportunity
+		{
+			public Actor ProtectedTarget;
+			public Actor ClearTarget;
+			public int DefendingValue;
+			public long UnlockedScore;
 		}
 
 		sealed class Threat
@@ -109,9 +141,12 @@ namespace OpenRA.Mods.Common.Traits
 		readonly World world;
 		readonly Player player;
 		readonly HashSet<uint> reserved = new HashSet<uint>();
+		readonly Dictionary<CPos, bool> resourceHazardCache = new Dictionary<CPos, bool>();
 		readonly SpecialistGroup[] groups;
 		IBot bot;
 		IBotTransportReservations[] transportReservations;
+		IResourceLayer resourceLayer;
+		DomainIndex domainIndex;
 		int scanTicks;
 		int lastEligibleCount = -1;
 
@@ -127,6 +162,8 @@ namespace OpenRA.Mods.Common.Traits
 		protected override void Created(Actor self)
 		{
 			transportReservations = self.Owner.PlayerActor.TraitsImplementing<IBotTransportReservations>().ToArray();
+			resourceLayer = world.WorldActor.TraitOrDefault<IResourceLayer>();
+			domainIndex = world.WorldActor.TraitOrDefault<DomainIndex>();
 			base.Created(self);
 		}
 
@@ -144,6 +181,7 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				group.Units.Clear();
 				group.Target = null;
+				group.ConsecutiveNoSafeTargetScans = 0;
 			}
 		}
 
@@ -160,6 +198,7 @@ namespace OpenRA.Mods.Common.Traits
 				return;
 
 			scanTicks = Info.ScanInterval;
+			resourceHazardCache.Clear();
 			Rebalance();
 			if (reserved.Count == 0)
 				return;
@@ -271,7 +310,7 @@ namespace OpenRA.Mods.Common.Traits
 				.OrderByDescending(c => StealthTankSquadPolicy.TargetScore(c.Priority,
 					c.Actor.Info.TraitInfoOrDefault<ValuedInfo>()?.Cost ?? 1, c.Distance,
 					c.Actor == group.Target ? 100 + Info.TargetSwitchImprovementPercent : 100,
-					c.ClusterMultiplier))
+					c.ClusterMultiplier, role == StealthTankSquadRole.Harass ? Info.HarassmentDistancePenalty : 1))
 				.ThenBy(c => c.Actor.ActorID).Take(Info.MaximumTargetCandidates).ToList();
 
 			Actor selected = null;
@@ -280,14 +319,34 @@ namespace OpenRA.Mods.Common.Traits
 			var dangerousCandidates = 0;
 			Actor rejectedTarget = null;
 			Actor rejectedBlocker = null;
+			var defendedOpportunities = new List<DefendedOpportunity>();
 			foreach (var candidate in candidates)
 			{
 				var danger = DangerAlongRun(center, candidate.Actor, threats, ownRange,
-					role == StealthTankSquadRole.Harass, out var defendingValue, out var strongestDefender);
+					role == StealthTankSquadRole.Harass, out var defendingValue, out var strongestDefender,
+					out var defenders);
 				if (danger && (role == StealthTankSquadRole.Harass ||
 					!StealthTankSquadPolicy.CanCarefullyClear(squadValue, defendingValue, Info.CarefulClearValueRatio)))
 				{
 					dangerousCandidates++;
+					if (role == StealthTankSquadRole.Harass)
+					{
+						var clearTarget = defenders.Where(d =>
+							d.Actor.GetEnabledTargetTypes().Overlaps(GroundTargetTypes))
+							.OrderBy(d => d.Value).ThenBy(d => d.Actor.ActorID).FirstOrDefault()?.Actor;
+						if (clearTarget != null)
+							defendedOpportunities.Add(new DefendedOpportunity
+							{
+								ProtectedTarget = candidate.Actor,
+								ClearTarget = clearTarget,
+								DefendingValue = defendingValue,
+								UnlockedScore = StealthTankSquadPolicy.TargetScore(candidate.Priority,
+									candidate.Actor.Info.TraitInfoOrDefault<ValuedInfo>()?.Cost ?? 1,
+									candidate.Distance, 100, candidate.ClusterMultiplier,
+									Info.HarassmentDistancePenalty)
+							});
+					}
+
 					if (rejectedTarget == null)
 					{
 						rejectedTarget = candidate.Actor;
@@ -300,13 +359,57 @@ namespace OpenRA.Mods.Common.Traits
 				var score = StealthTankSquadPolicy.TargetScore(candidate.Priority,
 					candidate.Actor.Info.TraitInfoOrDefault<ValuedInfo>()?.Cost ?? 1, candidate.Distance,
 					candidate.Actor == group.Target ? 100 + Info.TargetSwitchImprovementPercent : 100,
-					candidate.ClusterMultiplier);
+					candidate.ClusterMultiplier, role == StealthTankSquadRole.Harass ? Info.HarassmentDistancePenalty : 1);
 				if (score <= selectedScore)
 					continue;
 
 				selected = candidate.Actor;
 				selectedScore = score;
 				selectedDanger = defendingValue;
+			}
+
+			if (selected == null)
+			{
+				var allUsefulTargetsDefended = candidates.Count > 0 && dangerousCandidates == candidates.Count;
+				if (allUsefulTargetsDefended && group.ConsecutiveNoSafeTargetScans < int.MaxValue)
+					group.ConsecutiveNoSafeTargetScans++;
+				else if (!allUsefulTargetsDefended)
+					group.ConsecutiveNoSafeTargetScans = 0;
+
+				var eligibleClears = defendedOpportunities.Where(o =>
+					StealthTankSquadPolicy.CanAttemptDefenderClear(group.ConsecutiveNoSafeTargetScans,
+						Info.DefenderClearFallbackScans, squadValue, o.DefendingValue,
+						Info.DefenderClearValueRatio))
+					.GroupBy(o => o.ClearTarget.ActorID)
+					.Select(g => g.OrderBy(o => o.DefendingValue).ThenByDescending(o => o.UnlockedScore).First())
+					.ToList();
+				while (eligibleClears.Count > 0)
+				{
+					var clearIndex = StealthTankSquadPolicy.SelectDefenderClearOpportunity(
+						eligibleClears.Select(o => o.DefendingValue).ToArray(),
+						eligibleClears.Select(o => o.UnlockedScore).ToArray(), Info.DefenderClearWeakestCandidates);
+					if (clearIndex < 0)
+						break;
+
+					var clear = eligibleClears[clearIndex];
+					var clearByCrushing = Info.CrushInfantryTargets &&
+						clear.ClearTarget.GetEnabledTargetTypes().Overlaps(InfantryTargetTypes);
+					if (!HasHazardAwareRoute(group, clear.ClearTarget, threats, ownRange, clearByCrushing))
+					{
+						eligibleClears.RemoveAt(clearIndex);
+						continue;
+					}
+
+					selected = clear.ClearTarget;
+					selectedScore = clear.UnlockedScore;
+					selectedDanger = clear.DefendingValue;
+					if (Info.DebugLogging)
+						Log.Write("debug", "AI stealth squad {0} [{1}:{2}] selected reachable weakest defender {3}#{4} after {5} all-defended scans; protected={6}#{7} package-value={8} unlocked-score={9}.",
+							Info.SquadLabel, player.PlayerName, group.Index, selected.Info.Name, selected.ActorID,
+							group.ConsecutiveNoSafeTargetScans, clear.ProtectedTarget.Info.Name,
+							clear.ProtectedTarget.ActorID, clear.DefendingValue, clear.UnlockedScore);
+					break;
+				}
 			}
 
 			if (selected == null)
@@ -320,10 +423,21 @@ namespace OpenRA.Mods.Common.Traits
 						rejectedBlocker == null ? "none" : rejectedBlocker.Info.Name + "#" + rejectedBlocker.ActorID);
 				}
 
+				var abandonedTarget = group.Target != null;
 				group.Target = null;
 				group.TargetScore = 0;
+				if (abandonedTarget)
+				{
+					bot.QueueOrder(new Order("Stop", null, false, groupedActors: group.Units.ToArray()));
+					group.LastOrderTick = world.WorldTick;
+				}
+
+				if (role == StealthTankSquadRole.Harass)
+					WaitNearHarvesterField(group, enemies, threats, ownRange, abandonedTarget);
 				return;
 			}
+			else if (dangerousCandidates < candidates.Count)
+				group.ConsecutiveNoSafeTargetScans = 0;
 
 			var changed = selected != group.Target;
 			group.Target = selected;
@@ -334,15 +448,188 @@ namespace OpenRA.Mods.Common.Traits
 			group.LastOrderTick = world.WorldTick;
 			var crush = Info.CrushInfantryTargets && role == StealthTankSquadRole.Harass &&
 				selected.GetEnabledTargetTypes().Overlaps(InfantryTargetTypes);
-			var order = crush ? new Order("Move", null, Target.FromCell(world, selected.Location), false,
-				groupedActors: group.Units.ToArray()) :
-				new Order("Attack", null, Target.FromActor(selected), false, groupedActors: group.Units.ToArray());
-			bot.QueueOrder(order);
+			var routed = role == StealthTankSquadRole.Harass && Info.AvoidResourceTypes.Count > 0 &&
+				IssueHazardAwareOrder(group, selected, threats, ownRange, crush);
+			if (!routed)
+			{
+				var order = crush ? new Order("Move", null, Target.FromCell(world, selected.Location), false,
+					groupedActors: group.Units.ToArray()) :
+					new Order("Attack", null, Target.FromActor(selected), false, groupedActors: group.Units.ToArray());
+				bot.QueueOrder(order);
+			}
 
 			if (Info.DebugLogging)
 				Log.Write("debug", "AI stealth squad {0} [{1}:{2}] {3} target {4}#{5}: units={6} score={7} defended-value={8} order={9}.",
 					Info.SquadLabel, player.PlayerName, group.Index, role, selected.Info.Name, selected.ActorID, group.Units.Count,
-					selectedScore, selectedDanger, crush ? "crush" : "attack");
+					selectedScore, selectedDanger, crush ? "crush" : routed ? "hazard-routed attack" : "attack");
+		}
+
+		void WaitNearHarvesterField(SpecialistGroup group, IEnumerable<Actor> enemies,
+			IEnumerable<Threat> threats, int ownRange, bool force)
+		{
+			if (resourceLayer == null || domainIndex == null || Info.ResourceWaitingSearchRadius <= 0 ||
+				(!force && world.WorldTick < group.LastOrderTick + Info.ResourceWaitingOrderInterval))
+				return;
+
+			var first = group.Units.FirstOrDefault(IsEligible);
+			var mobile = first?.TraitOrDefault<Mobile>();
+			if (first == null || mobile == null)
+				return;
+
+			var anchors = enemies.Where(a => Info.HarvesterTypes.Contains(a.Info.Name) ||
+				Info.HarvesterWaitingAnchorTypes.Contains(a.Info.Name))
+				.OrderBy(a => (a.CenterPosition - first.CenterPosition).HorizontalLengthSquared)
+				.ThenBy(a => a.ActorID).Take(8);
+			foreach (var anchor in anchors)
+			{
+				var cells = world.Map.FindTilesInAnnulus(anchor.Location, 0, Info.ResourceWaitingSearchRadius)
+					.Where(c => resourceLayer.GetResource(c).Type != null && !IsResourceHazard(c) &&
+						!IsThreatenedCell(c, null, threats, ownRange) &&
+						mobile.CanEnterCell(c) && domainIndex.IsPassable(first.Location, c, mobile.Locomotor))
+					.OrderBy(c => (c - first.Location).LengthSquared)
+					.ThenBy(c => c.Y).ThenBy(c => c.X).Take(1).ToArray();
+				if (cells.Length == 0)
+					continue;
+				var cell = cells[0];
+
+				group.LastOrderTick = world.WorldTick;
+				bot.QueueOrder(new Order("Move", null, Target.FromCell(world, cell), false,
+					groupedActors: group.Units.ToArray()));
+				if (Info.DebugLogging)
+					Log.Write("debug", "AI stealth squad {0} [{1}:{2}] waiting near harvester field at {3} from anchor {4}#{5}.",
+						Info.SquadLabel, player.PlayerName, group.Index, cell, anchor.Info.Name, anchor.ActorID);
+				return;
+			}
+		}
+
+		bool IssueHazardAwareOrder(SpecialistGroup group, Actor target, List<Threat> threats, int ownRange, bool crush)
+		{
+			if (resourceLayer == null || ownRange <= 0)
+				return false;
+
+			var routedUnits = 0;
+			var withheldUnits = 0;
+			var waypointCount = 0;
+			foreach (var unit in group.Units.Where(IsEligible))
+			{
+				var path = HazardAwarePath(unit, target, threats, ownRange, crush);
+				if (path == null || path.Count == 0)
+				{
+					bot.QueueOrder(new Order("Stop", unit, false));
+					withheldUnits++;
+					continue;
+				}
+
+				path.Reverse();
+				var queued = false;
+				for (var i = Math.Min(Info.HazardRouteWaypointSpacing, path.Count - 1);
+					i < path.Count; i += Info.HazardRouteWaypointSpacing)
+				{
+					bot.QueueOrder(new Order("Move", unit, Target.FromCell(world, path[i]), queued));
+					queued = true;
+					waypointCount++;
+				}
+
+				if (path.Count > 1 && (path.Count - 1) % Info.HazardRouteWaypointSpacing != 0)
+				{
+					bot.QueueOrder(new Order("Move", unit, Target.FromCell(world, path[path.Count - 1]), queued));
+					queued = true;
+					waypointCount++;
+				}
+
+				if (crush)
+				{
+					if (!queued)
+						bot.QueueOrder(new Order("Move", unit, Target.FromCell(world, target.Location), false));
+				}
+				else
+					bot.QueueOrder(new Order("Attack", unit, Target.FromActor(target), queued));
+				routedUnits++;
+			}
+
+			if (Info.DebugLogging)
+				Log.Write("debug", "AI stealth squad {0} [{1}:{2}] hazard route to {3}#{4}: routed={5} withheld={6} waypoints={7} avoided-resources={8} pending-radius={9} action={10}.",
+					Info.SquadLabel, player.PlayerName, group.Index, target.Info.Name, target.ActorID,
+					routedUnits, withheldUnits, waypointCount, string.Join("/", Info.AvoidResourceTypes.OrderBy(t => t)),
+					Info.PendingResourceExplosionAvoidanceRadius, crush ? "crush" : "attack");
+
+			// The safety policy handled every eligible unit, including explicit Stop orders for units
+			// without a safe route. Never fall back to a direct hazardous attack.
+			return true;
+		}
+
+		bool HasHazardAwareRoute(SpecialistGroup group, Actor target, List<Threat> threats, int ownRange, bool crush)
+		{
+			var unit = group.Units.FirstOrDefault(IsEligible);
+			var path = unit == null ? null : HazardAwarePath(unit, target, threats, ownRange, crush);
+			return path != null && path.Count > 0;
+		}
+
+		List<CPos> HazardAwarePath(Actor unit, Actor target, List<Threat> threats, int ownRange, bool crush)
+		{
+			var mobile = unit.TraitOrDefault<Mobile>();
+			if (mobile == null)
+				return null;
+
+			var approachCells = (crush ? new[] { target.Location } :
+				world.Map.FindTilesInAnnulus(target.Location,
+					Math.Max(1, ownRange - 1), Math.Max(1, ownRange)))
+				.Where(c => mobile.CanEnterCell(c, check: BlockedByActor.Immovable) &&
+					!IsResourceHazard(c) && !IsThreatenedCell(c, target, threats, ownRange))
+				.ToHashSet();
+			if (approachCells.Count == 0)
+				return null;
+
+			List<CPos> path;
+			using (var search = PathSearch.ToTargetCellByPredicate(world, mobile.Locomotor, unit,
+				new[] { unit.Location }, approachCells.Contains, BlockedByActor.Immovable,
+				c => IsResourceHazard(c) || IsThreatenedCell(c, target, threats, ownRange) ?
+					PathGraph.PathCostForInvalidPath : 0))
+				path = mobile.Pathfinder.FindPath(search);
+
+			return path.Count == 0 ? null : path;
+		}
+
+		bool IsResourceHazard(CPos cell)
+		{
+			if (resourceLayer == null)
+				return false;
+			if (resourceHazardCache.TryGetValue(cell, out var cached))
+				return cached;
+
+			var type = resourceLayer.GetResource(cell).Type;
+			if (type != null && Info.AvoidResourceTypes.Contains(type))
+			{
+				resourceHazardCache.Add(cell, true);
+				return true;
+			}
+
+			var radius = Info.PendingResourceExplosionAvoidanceRadius;
+			var result = radius > 0 && world.Map.FindTilesInAnnulus(cell, 0, radius)
+				.Any(resourceLayer.IsExplosionPending);
+			resourceHazardCache.Add(cell, result);
+			return result;
+		}
+
+		bool IsThreatenedCell(CPos cell, Actor intendedTarget, IEnumerable<Threat> threats, int ownRange)
+		{
+			var position = world.Map.CenterOfCell(cell);
+			foreach (var threat in threats)
+			{
+				var detectorRange = StealthTankSquadPolicy.BufferedRange(threat.DetectorRangeCells,
+					Info.DetectorRangeBufferCells);
+				var ignoreWeapon = threat.Actor.GetEnabledTargetTypes()
+					.Overlaps(Info.IgnoredHarassmentWeaponThreatTypes);
+				var weaponRange = StealthTankSquadPolicy.BufferedRange(ignoreWeapon ? 0 : threat.WeaponRangeCells,
+					Info.ThreatRangeBufferCells);
+				var canKiteTarget = threat.Actor == intendedTarget && detectorRange <= 0 &&
+					ownRange >= threat.WeaponRangeCells + Info.KiteRangeMarginCells;
+				var range = Math.Max(detectorRange, canKiteTarget ? 0 : weaponRange);
+				if (range > 0 && (position - threat.Actor.CenterPosition).Length <= range * 1024)
+					return true;
+			}
+
+			return false;
 		}
 
 		int InfantryClusterMultiplier(StealthTankSquadRole role, Actor actor)
@@ -390,10 +677,11 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		bool DangerAlongRun(WPos start, Actor target, List<Threat> threats, int ownRange, bool stopAtFirstDanger,
-			out int defendingValue, out Actor strongestDefender)
+			out int defendingValue, out Actor strongestDefender, out List<Threat> defenders)
 		{
 			defendingValue = 0;
 			strongestDefender = null;
+			defenders = new List<Threat>();
 			var strongestValue = 0;
 			var dangerous = false;
 			foreach (var threat in threats)
@@ -418,14 +706,12 @@ namespace OpenRA.Mods.Common.Traits
 
 				dangerous = true;
 				defendingValue += threat.Value;
+				defenders.Add(threat);
 				if (threat.Value > strongestValue)
 				{
 					strongestValue = threat.Value;
 					strongestDefender = threat.Actor;
 				}
-
-				if (stopAtFirstDanger)
-					return true;
 			}
 
 			return dangerous;
