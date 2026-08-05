@@ -1,10 +1,10 @@
 # CNC-31: Red-Tiberium Bomb Harvesters
 
-- Status: local implementation, engine acceptance, and validation passed; publication gate pending
-- Cycles used: 28 of 30 so far
+- Status: complete
+- Cycles used: 30 of 30
 - Branch: `agent/cnc31-red-tiberium-bomb-trucks`
 - Base: `origin/agent/cnc30-crates-exploration`
-- Pull request: pending
+- Draft pull request: https://github.com/Realpra1/LibertyDawn/pull/58
 
 ## Behavior
 
@@ -53,6 +53,8 @@ A selected stealth harvester receives a replay-safe explicit unstable-resource h
 26. Created an exact-final-build save at tick 3,500 with two live missions.
 27. Third clean pass loaded at tick 3,503, restored both missions and budget, completed target destruction, launched further missions, and ended naturally without desync.
 28. Final local gate passed: strict zero-warning Debug build, 334/334 tests, both interface checks, `git diff --check`, and exhaustive CNC YAML/map validation.
+29. Committed and pushed the cumulative task branch and opened draft PR #58 against `agent/cnc30-crates-exploration`.
+30. GitHub Linux passed in 3m15s and Windows passed in 4m41s; PR #58 was mergeable and the green completion gate passed.
 
 ## Validation so far
 
@@ -65,7 +67,7 @@ A selected stealth harvester receives a replay-safe explicit unstable-resource h
 - Real-path selection removed repeated retries against immovable enclosures.
 - Final save/load restored active missions and budget without desync.
 - Exhaustive CNC YAML/map validation passes, including Empire Lars and Archipelago.
-- Commit/PR and green GitHub checks remain before completion.
+- Implementation/report commit `3985863016` passed both required GitHub jobs and PR #58 is mergeable.
 
 ## Boundaries
 
