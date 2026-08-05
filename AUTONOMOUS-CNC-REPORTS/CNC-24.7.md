@@ -1,10 +1,10 @@
 # CNC-24.7: Parallel headless MAX simulations
 
-- Status: in progress
+- Status: complete
 - Branch: `agent/cnc24-7-parallel-simulations`
 - Base: created from `origin/agent/cnc33a-refinery-throughput`; publication targets `bleed` after merged integration PR #62
 - Cycles used: 27 of 30
-- Pull request: #64 (`agent/cnc24-7-parallel-simulations` -> `bleed`)
+- Pull request: #64 (`agent/cnc24-7-parallel-simulations` -> `bleed`), required Linux/Windows checks green
 
 ## Literal acceptance
 
@@ -54,7 +54,8 @@ Forbidden outcomes are shared mutable support or map artifacts, colliding logs/r
 - Python launcher tests: four passed.
 - Exhaustive CNC rules, sequences, and map YAML validation: passed with no diagnostics.
 - Skill validation: repository autonomous skill remains valid after adding concurrent-test guidance.
+- GitHub: PR #64 is mergeable; both Linux checks passed in 1m50s/2m22s and both Windows checks passed in 3m31s/4m33s at implementation head `cd38beb876`.
 
 ## Remaining risk
 
-Three five-bot games fit this 8 GiB host comfortably, but unusually large games or smaller-memory machines should select `--jobs 2` or `--jobs 1`. The shared Content link is intentionally read-only by convention; all mutable runtime data is isolated. GitHub checks and the task PR remain before completion.
+Three five-bot games fit this 8 GiB host comfortably, but unusually large games or smaller-memory machines should select `--jobs 2` or `--jobs 1`. The shared Content link is intentionally read-only by convention; all mutable runtime data is isolated.
