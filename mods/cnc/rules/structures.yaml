@@ -252,7 +252,7 @@ PROC:
 		OwnerActorLimitTypes: harv, sharv
 		OwnerActorLimit: 90
 		OwnerActorLimitBotsOnly: true
-		OwnerActorLimitDebugLogging: true
+		OwnerActorLimitDebugLogging: false
         AtSpawnOnly: true
         Prerequisites: !upgrade.covert2
     FreeActor@sharv:
@@ -262,7 +262,7 @@ PROC:
 		OwnerActorLimitTypes: harv, sharv
 		OwnerActorLimit: 90
 		OwnerActorLimitBotsOnly: true
-		OwnerActorLimitDebugLogging: true
+		OwnerActorLimitDebugLogging: false
         AtSpawnOnly: true
         Prerequisites: upgrade.covert2
 	WithBuildingBib:

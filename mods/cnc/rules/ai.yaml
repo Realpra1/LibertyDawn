@@ -108,7 +108,7 @@ Player:
 		HeavyDropDefenseRadius: 7
 		HeavyDropMaximumDefenderValue: 3400
 		HeavyDropMaximumAaDanger: 0
-		DebugLogging: true
+		DebugLogging: false
 	StealthTankSquadBotModule:
 		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai || enable-Easiest-ai
 		UnitTypes: stnk
@@ -139,7 +139,7 @@ Player:
 			ctnk: 8000
 			ltnk: 7000
 			ftnk: 6500
-		DebugLogging: true
+		DebugLogging: false
 	StealthTankSquadBotModule@chemical:
 		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai || enable-Easiest-ai
 		UnitTypes: ctnk
@@ -173,7 +173,7 @@ Player:
 		HarassmentArmorPriorities:
 			TiberiumWood: 6000
 			Tiberium: 6000
-		DebugLogging: true
+		DebugLogging: false
 	CrateCollectorBotModule:
 		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai || enable-Easiest-ai
 		ScanInterval: 250
@@ -186,7 +186,7 @@ Player:
 		EmergencySellActorTypes: nuke, nuk2, hq
 		EmergencySellInterval: 1500
 		MinimumCollectorHealthPercent: 75
-		DebugLogging: true
+		DebugLogging: false
 	RedTiberiumBombBotModule:
 		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai || enable-Easiest-ai
 		StealthHarvesterTypes: sharv
@@ -211,7 +211,7 @@ Player:
 			afld: 8000
 			hpad: 7000
 			resonator: 6500
-		DebugLogging: true
+		DebugLogging: false
 	OpeningGarrisonBotModule:
 		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai || enable-Easiest-ai
 		BarracksTypes: pyle, hand
@@ -228,7 +228,7 @@ Player:
 		RequestInterval: 50
 		MaximumRallyDistance: 3
 		PreferRallyBelowConstructionYard: true
-		DebugLogging: true
+		DebugLogging: false
 	SupportPowerBotModule@a:
 		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai
 		Decisions:
@@ -292,7 +292,7 @@ Player:
 					CheckRadius: 7c0
     SupportPowerBotModule@b:
 		RequiresCondition: enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai
-		DebugLogging: true
+		DebugLogging: false
 		Decisions:
 			Airstrike:
 				OrderName: AirstrikePowerInfoOrder
@@ -427,7 +427,7 @@ Player:
 		SoloBuildingCaptureHealth: 50
 		CheckCaptureTargetsForVisibility: false
 		CapturableRelationships: Enemy, Neutral
-		DebugLogging: true
+		DebugLogging: false
 	SpecialOrderBotModule:
 		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai || enable-Easiest-ai
 		ScanInterval: 125
@@ -441,7 +441,7 @@ Player:
 		AlliedAidInterval: 7500
 		AlliedAidRequestTimeout: 750
 		SupplyStallRetryInterval: 250
-		DebugLogging: true
+		DebugLogging: false
 	McvManagerBotModule:
 		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-Easy-ai || enable-Easiest-ai
 		McvTypes: mcv
@@ -458,11 +458,11 @@ Player:
 	BaseBuilderBotModule@cabal:
 		RequiresCondition: enable-cabal-ai
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
-		ConstructionYardEnclosureDebugLogging: true
+		ConstructionYardEnclosureDebugLogging: false
 		MaximumWallSegments: 24
 		FirstTowerTypes: gtwr, gun, atwr, obli
 		FirstTowerSearchRadius: 20
-		FirstTowerDebugLogging: true
+		FirstTowerDebugLogging: false
 		BuildingQueues: Building.Nod, Building.GDI
 		DefenseQueues: Defence.Nod, Defence.GDI
 		MinimumExcessPower: 30
@@ -519,11 +519,11 @@ Player:
 		AdaptiveUnitCapMinimum: 300
 		HarvesterTypes: harv, sharv
 		HarvesterLimit: 90
-		UnitCapDebugLogging: true
+		UnitCapDebugLogging: false
 		LearnHumanBuiltUnits: true
 		SampledUnitChance: 0.05
 		MaximumSampledUnitChance: 0.5
-		UnitSamplingDebugLogging: true
+		UnitSamplingDebugLogging: false
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
 		UnitsToBuild:
 			e1: 65
@@ -554,11 +554,11 @@ Player:
 	BaseBuilderBotModule@watson:
 		RequiresCondition: enable-watson-ai
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
-		ConstructionYardEnclosureDebugLogging: true
+		ConstructionYardEnclosureDebugLogging: false
 		MaximumWallSegments: 24
 		FirstTowerTypes: gtwr, gun, atwr, obli
 		FirstTowerSearchRadius: 20
-		FirstTowerDebugLogging: true
+		FirstTowerDebugLogging: false
 		BuildingQueues: Building.Nod, Building.GDI
 		DefenseQueues: Defence.Nod, Defence.GDI
 		MinimumExcessPower: 30
@@ -615,11 +615,11 @@ Player:
 		AdaptiveUnitCapMinimum: 300
 		HarvesterTypes: harv, sharv
 		HarvesterLimit: 90
-		UnitCapDebugLogging: true
+		UnitCapDebugLogging: false
 		LearnHumanBuiltUnits: true
 		SampledUnitChance: 0.05
 		MaximumSampledUnitChance: 0.5
-		UnitSamplingDebugLogging: true
+		UnitSamplingDebugLogging: false
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
 		UnitsToBuild:
 			e1: 65
@@ -650,11 +650,11 @@ Player:
     BaseBuilderBotModule@hal9001:
 		RequiresCondition: enable-hal9001-ai
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
-		ConstructionYardEnclosureDebugLogging: true
+		ConstructionYardEnclosureDebugLogging: false
 		MaximumWallSegments: 24
 		FirstTowerTypes: gtwr, gun, atwr, obli
 		FirstTowerSearchRadius: 20
-		FirstTowerDebugLogging: true
+		FirstTowerDebugLogging: false
 		BuildingQueues: Building.Nod, Building.GDI
 		DefenseQueues: Defence.Nod, Defence.GDI
 		MinimumExcessPower: 30
@@ -711,11 +711,11 @@ Player:
 		AdaptiveUnitCapMinimum: 300
 		HarvesterTypes: harv, sharv
 		HarvesterLimit: 90
-		UnitCapDebugLogging: true
+		UnitCapDebugLogging: false
 		LearnHumanBuiltUnits: true
 		SampledUnitChance: 0.05
 		MaximumSampledUnitChance: 0.5
-		UnitSamplingDebugLogging: true
+		UnitSamplingDebugLogging: false
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
 		UnitsToBuild:
 			e1: 65
@@ -750,13 +750,13 @@ Player:
 		EnableSmartEconomy: true
 		SmartEconomyRefineryTypes: proc
 		SmartEconomyMcvTypes: mcv
-		SmartEconomyDebugLogging: true
+		SmartEconomyDebugLogging: false
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
-		ConstructionYardEnclosureDebugLogging: true
+		ConstructionYardEnclosureDebugLogging: false
 		MaximumWallSegments: 24
 		FirstTowerTypes: gtwr, gun, atwr, obli
 		FirstTowerSearchRadius: 20
-		FirstTowerDebugLogging: true
+		FirstTowerDebugLogging: false
 		BuildingQueues: Building.Nod, Building.GDI
 		DefenseQueues: Defence.Nod, Defence.GDI
 		MinimumExcessPower: 1
@@ -848,11 +848,11 @@ Player:
 		AdaptiveUnitCapMinimum: 300
 		HarvesterTypes: harv, sharv
 		HarvesterLimit: 90
-		UnitCapDebugLogging: true
+		UnitCapDebugLogging: false
 		LearnHumanBuiltUnits: true
 		SampledUnitChance: 0.05
 		MaximumSampledUnitChance: 0.5
-		UnitSamplingDebugLogging: true
+		UnitSamplingDebugLogging: false
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
         IdleBaseUnitsMaximum: 999
 		UnitsToBuild:
@@ -932,13 +932,13 @@ Player:
 		EnableSmartEconomy: true
 		SmartEconomyRefineryTypes: proc
 		SmartEconomyMcvTypes: mcv
-		SmartEconomyDebugLogging: true
+		SmartEconomyDebugLogging: false
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
-		ConstructionYardEnclosureDebugLogging: true
+		ConstructionYardEnclosureDebugLogging: false
 		MaximumWallSegments: 24
 		FirstTowerTypes: gtwr, gun, atwr, obli
 		FirstTowerSearchRadius: 20
-		FirstTowerDebugLogging: true
+		FirstTowerDebugLogging: false
 		BuildingQueues: Building.Nod, Building.GDI
 		DefenseQueues: Defence.Nod, Defence.GDI
 		MinimumExcessPower: 151
@@ -1020,11 +1020,11 @@ Player:
 		AdaptiveUnitCapMinimum: 300
 		HarvesterTypes: harv, sharv
 		HarvesterLimit: 90
-		UnitCapDebugLogging: true
+		UnitCapDebugLogging: false
 		LearnHumanBuiltUnits: true
 		SampledUnitChance: 0.05
 		MaximumSampledUnitChance: 0.5
-		UnitSamplingDebugLogging: true
+		UnitSamplingDebugLogging: false
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
         IdleBaseUnitsMaximum: 999
 		UnitsToBuild:
@@ -1085,9 +1085,9 @@ Player:
 		EnableSmartEconomy: true
 		SmartEconomyRefineryTypes: proc
 		SmartEconomyMcvTypes: mcv
-		SmartEconomyDebugLogging: true
+		SmartEconomyDebugLogging: false
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
-		ConstructionYardEnclosureDebugLogging: true
+		ConstructionYardEnclosureDebugLogging: false
 		EnableOpeningPolicy: true
 		OpeningPowerTypes: nuk2, nuke
 		OpeningSiloTypes: silo
@@ -1105,10 +1105,10 @@ Player:
 		OpeningHarvesterCount: 5
 		OpeningMcvCount: 1
 		OpeningRequestRetryDelay: 250
-		OpeningDebugLogging: true
+		OpeningDebugLogging: false
 		FirstTowerTypes: gtwr, gun, atwr, obli
 		FirstTowerSearchRadius: 20
-		FirstTowerDebugLogging: true
+		FirstTowerDebugLogging: false
 		BuildingQueues: Building.Nod, Building.GDI
 		DefenseQueues: Defence.Nod, Defence.GDI
         MinimumExcessPower: 1
@@ -1217,7 +1217,7 @@ Player:
 		AirTargetClosestCandidates: 15
 		AirTargetHighestValueCandidates: 10
 		AirTargetHarvesterCandidates: 10
-		AirTargetDebugLogging: true
+		AirTargetDebugLogging: false
 		AirAdaptiveRiskInterval: 125
 		AirAdaptiveRiskRollbackTicks: 1500
 		AirAdaptiveRiskMinimumUnits: 3
@@ -1314,15 +1314,15 @@ Player:
 		AdaptiveUnitCapMinimum: 300
 		HarvesterTypes: harv, sharv
 		HarvesterLimit: 90
-		UnitCapDebugLogging: true
+		UnitCapDebugLogging: false
 		LearnHumanBuiltUnits: true
 		SampledUnitChance: 0.05
 		MaximumSampledUnitChance: 0.5
-		UnitSamplingDebugLogging: true
+		UnitSamplingDebugLogging: false
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
         IdleBaseUnitsMaximum: 999
 		WeightedUnitSelection: true
-		AdaptiveProductionDebugLogging: true
+		AdaptiveProductionDebugLogging: false
 		AdaptiveProductionLogInterval: 250
 		AdaptiveTypes: e1, e2, e3, e4, e5, rmbo, ltnk, ftnk, ctnk, arty, mtnk, mlrs, stnk, apc, bggy, bike, jeep, htnk, heli, orca
 		EconomyTypes: harv
@@ -1405,9 +1405,9 @@ Player:
 		EnableSmartEconomy: true
 		SmartEconomyRefineryTypes: proc
 		SmartEconomyMcvTypes: mcv
-		SmartEconomyDebugLogging: true
+		SmartEconomyDebugLogging: false
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
-		ConstructionYardEnclosureDebugLogging: true
+		ConstructionYardEnclosureDebugLogging: false
 		MaximumWallSegments: 24
 		EnableOpeningPolicy: true
 		OpeningPowerTypes: nuk2, nuke
@@ -1424,10 +1424,10 @@ Player:
 		OpeningHarvesterCount: 5
 		OpeningMcvCount: 1
 		OpeningRequestRetryDelay: 250
-		OpeningDebugLogging: true
+		OpeningDebugLogging: false
 		FirstTowerTypes: gtwr, gun, atwr, obli
 		FirstTowerSearchRadius: 20
-		FirstTowerDebugLogging: true
+		FirstTowerDebugLogging: false
 		BuildingQueues: Building.Nod, Building.GDI
 		DefenseQueues: Defence.Nod, Defence.GDI
 		MinimumExcessPower: 1
@@ -1515,7 +1515,7 @@ Player:
 		PreserveExistingBranchesPrerequisites: techlevel.extra
 		CompleteAllBranchesPrerequisites: techlevel.extra
 		StatusLogInterval: 750
-		DebugLogging: true
+		DebugLogging: false
     SquadManagerBotModule@ironreaper:
 		RequiresCondition: enable-ironreaper-ai
 		SquadSize: 20
@@ -1532,11 +1532,11 @@ Player:
 		AdaptiveUnitCapMinimum: 300
 		HarvesterTypes: harv, sharv
 		HarvesterLimit: 90
-		UnitCapDebugLogging: true
+		UnitCapDebugLogging: false
 		LearnHumanBuiltUnits: true
 		SampledUnitChance: 0.05
 		MaximumSampledUnitChance: 0.5
-		UnitSamplingDebugLogging: true
+		UnitSamplingDebugLogging: false
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
         IdleBaseUnitsMaximum: 999
         UnitsToBuild:
@@ -1625,11 +1625,11 @@ Player:
     BaseBuilderBotModule@Easy:
 		RequiresCondition: enable-Easy-ai
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
-		ConstructionYardEnclosureDebugLogging: true
+		ConstructionYardEnclosureDebugLogging: false
 		MaximumWallSegments: 24
 		FirstTowerTypes: gtwr, gun, atwr, obli
 		FirstTowerSearchRadius: 20
-		FirstTowerDebugLogging: true
+		FirstTowerDebugLogging: false
 		BuildingQueues: Building.Nod, Building.GDI
 		DefenseQueues: Defence.Nod, Defence.GDI
         AdditionalMinimumRefineryCount: 0
@@ -1708,11 +1708,11 @@ Player:
 		AdaptiveUnitCapMinimum: 300
 		HarvesterTypes: harv, sharv
 		HarvesterLimit: 90
-		UnitCapDebugLogging: true
+		UnitCapDebugLogging: false
 		LearnHumanBuiltUnits: true
 		SampledUnitChance: 0.05
 		MaximumSampledUnitChance: 0.5
-		UnitSamplingDebugLogging: true
+		UnitSamplingDebugLogging: false
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
         IdleBaseUnitsMaximum: 999
         UnitsToBuild:
@@ -1770,11 +1770,11 @@ Player:
     BaseBuilderBotModule@Easiest:
 		RequiresCondition: enable-Easiest-ai
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
-		ConstructionYardEnclosureDebugLogging: true
+		ConstructionYardEnclosureDebugLogging: false
 		MaximumWallSegments: 24
 		FirstTowerTypes: gtwr, gun, atwr, obli
 		FirstTowerSearchRadius: 20
-		FirstTowerDebugLogging: true
+		FirstTowerDebugLogging: false
 		BuildingQueues: Building.Nod, Building.GDI
 		DefenseQueues: Defence.Nod, Defence.GDI
         AdditionalMinimumRefineryCount: 0
@@ -1854,11 +1854,11 @@ Player:
 		AdaptiveUnitCapMinimum: 300
 		HarvesterTypes: harv, sharv
 		HarvesterLimit: 90
-		UnitCapDebugLogging: true
+		UnitCapDebugLogging: false
 		LearnHumanBuiltUnits: true
 		SampledUnitChance: 0.05
 		MaximumSampledUnitChance: 0.5
-		UnitSamplingDebugLogging: true
+		UnitSamplingDebugLogging: false
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
         IdleBaseUnitsMaximum: 999
         UnitsToBuild:
