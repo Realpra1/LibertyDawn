@@ -243,13 +243,22 @@ namespace OpenRA.Mods.Common.Traits
 			long selectedScore = 0;
 			var selectedDanger = 0;
 			var dangerousCandidates = 0;
+			Actor rejectedTarget = null;
+			Actor rejectedBlocker = null;
 			foreach (var candidate in candidates)
 			{
-				var danger = DangerAlongRun(center, candidate.Actor, threats, ownRange, out var defendingValue);
+				var danger = DangerAlongRun(center, candidate.Actor, threats, ownRange, out var defendingValue,
+					out var strongestDefender);
 				if (danger && (role == StealthTankSquadRole.Harass ||
 					!StealthTankSquadPolicy.CanCarefullyClear(squadValue, defendingValue, Info.CarefulClearValueRatio)))
 				{
 					dangerousCandidates++;
+					if (rejectedTarget == null)
+					{
+						rejectedTarget = candidate.Actor;
+						rejectedBlocker = strongestDefender;
+					}
+
 					continue;
 				}
 
@@ -269,8 +278,10 @@ namespace OpenRA.Mods.Common.Traits
 				if (Info.DebugLogging && world.WorldTick >= group.LastNoTargetLogTick + Info.ScanInterval * 10)
 				{
 					group.LastNoTargetLogTick = world.WorldTick;
-					Log.Write("debug", "AI stealth squad [{0}:{1}] {2} waiting: units={3} candidates={4} dangerous={5}.",
-						player.PlayerName, group.Index, role, group.Units.Count, candidates.Count, dangerousCandidates);
+					Log.Write("debug", "AI stealth squad [{0}:{1}] {2} waiting: units={3} candidates={4} dangerous={5} rejected={6} blocker={7}.",
+						player.PlayerName, group.Index, role, group.Units.Count, candidates.Count, dangerousCandidates,
+						rejectedTarget == null ? "none" : rejectedTarget.Info.Name + "#" + rejectedTarget.ActorID,
+						rejectedBlocker == null ? "none" : rejectedBlocker.Info.Name + "#" + rejectedBlocker.ActorID);
 				}
 
 				group.Target = null;
@@ -310,7 +321,7 @@ namespace OpenRA.Mods.Common.Traits
 
 			var types = actor.GetEnabledTargetTypes();
 			if (role == StealthTankSquadRole.Attack)
-				return types.Overlaps(TankTargetTypes) ? 8000 : types.Overlaps(VehicleTargetTypes) ? 500 : 0;
+				return types.Overlaps(TankTargetTypes) ? 8000 : 0;
 			if (types.Overlaps(InfantryTargetTypes))
 				return 1200;
 			if (types.Overlaps(StructureTargetTypes))
@@ -319,9 +330,12 @@ namespace OpenRA.Mods.Common.Traits
 			return types.Overlaps(TankTargetTypes) ? 1500 : 0;
 		}
 
-		bool DangerAlongRun(WPos start, Actor target, List<Threat> threats, int ownRange, out int defendingValue)
+		bool DangerAlongRun(WPos start, Actor target, List<Threat> threats, int ownRange, out int defendingValue,
+			out Actor strongestDefender)
 		{
 			defendingValue = 0;
+			strongestDefender = null;
+			var strongestValue = 0;
 			var dangerous = false;
 			foreach (var threat in threats)
 			{
@@ -341,6 +355,11 @@ namespace OpenRA.Mods.Common.Traits
 
 				dangerous = true;
 				defendingValue += threat.Value;
+				if (threat.Value > strongestValue)
+				{
+					strongestValue = threat.Value;
+					strongestDefender = threat.Actor;
+				}
 			}
 
 			return dangerous;
