@@ -332,6 +332,16 @@ namespace OpenRA.Mods.Common.Traits
 						if (Info.HarvesterTypes.Contains(actorInfo.Name))
 							cachedCommittedHarvesters++;
 					}
+
+			foreach (var type in PendingProductionActorTypes())
+				if (world.Map.Rules.Actors.TryGetValue(type, out var actorInfo))
+				{
+					if (CountsTowardUnitLimit(actorInfo))
+						cachedCommittedUnits++;
+
+					if (Info.HarvesterTypes.Contains(actorInfo.Name))
+						cachedCommittedHarvesters++;
+				}
 		}
 
 		void MaybeLogUnitCapacity()
@@ -745,9 +755,33 @@ namespace OpenRA.Mods.Common.Traits
 
 		int AllowedQueueAmount(ActorInfo actorInfo, int requested)
 		{
+			var isHarvester = Info.HarvesterTypes.Contains(actorInfo.Name);
+			var committedHarvesters = cachedCommittedHarvesters;
+			if (isHarvester && Info.HarvesterLimit > 0)
+				committedHarvesters = ExactCommittedHarvesters() +
+					SharedActorLimitReservations.Reserved(world, player);
+
 			return UnitCapPolicy.AllowedQueueAmount(requested, cachedCommittedUnits, effectiveTotalUnitLimit,
-				Info.HarvesterTypes.Contains(actorInfo.Name), cachedCommittedHarvesters, Info.HarvesterLimit,
+				isHarvester, committedHarvesters, Info.HarvesterLimit,
 				CountsTowardUnitLimit(actorInfo));
+		}
+
+		int ExactCommittedHarvesters()
+		{
+			var live = world.Actors.Count(a => a.Owner == player && !a.IsDead &&
+				Info.HarvesterTypes.Contains(a.Info.Name));
+			var queued = world.ActorsWithTrait<ProductionQueue>()
+				.Where(q => q.Actor.Owner == player && !q.Actor.IsDead && q.Actor.IsInWorld)
+				.Sum(q => q.Trait.AllQueued().Count(i => Info.HarvesterTypes.Contains(i.Item)));
+			var pending = PendingProductionActorTypes().Count(Info.HarvesterTypes.Contains);
+			return live + queued + pending;
+		}
+
+		IEnumerable<string> PendingProductionActorTypes()
+		{
+			return world.ActorsWithTrait<IPendingProductionActors>()
+				.Where(p => p.Actor.Owner == player && !p.Actor.IsDead && p.Actor.IsInWorld)
+				.SelectMany(p => p.Trait.PendingActorTypes);
 		}
 
 		void RecordQueued(ActorInfo actorInfo, int amount)
@@ -756,7 +790,10 @@ namespace OpenRA.Mods.Common.Traits
 				cachedCommittedUnits += amount;
 
 			if (Info.HarvesterTypes.Contains(actorInfo.Name))
+			{
 				cachedCommittedHarvesters += amount;
+				SharedActorLimitReservations.Reserve(world, player, amount);
+			}
 		}
 
 		static bool CountsTowardUnitLimit(ActorInfo actorInfo)

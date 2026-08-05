@@ -266,6 +266,23 @@ namespace OpenRA.Mods.Common.Traits
 				}
 			}
 
+			// A smart AI with no live unloading refinery is in critical recovery. Let one
+			// Fact fund the serialized refinery (or the power prerequisite above), and
+			// keep every other construction queue from splitting the remaining cash.
+			if (baseBuilder.SmartEconomySerializesMissingRefinery)
+			{
+				var refinery = GetProducibleBuilding(baseBuilder.SmartEconomyRefineryTypes, buildableThings);
+				if (refinery != null && HasSufficientPowerForActor(refinery) &&
+					baseBuilder.TryReserveSmartEconomyMissingRefinery(queue, refinery.Name))
+				{
+					AIUtils.BotDebug("{0} decided to build {1}: serialized missing-refinery recovery",
+						queue.Actor.Owner, DisplayName(refinery.Name));
+					return refinery;
+				}
+
+				return null;
+			}
+
 			var enclosureWall = baseBuilder.WallPlanner?.ConstructionYardEnclosureWall(buildableThings, playerBuildings);
 			if (enclosureWall != null)
 			{
@@ -277,6 +294,13 @@ namespace OpenRA.Mods.Common.Traits
 			var opening = baseBuilder.OpeningBuilding(buildableThings);
 			if (opening != null)
 			{
+				if (baseBuilder.SmartEconomyRefineryTypes.Contains(opening.Name) &&
+					!baseBuilder.TryReserveSmartEconomyControlledRefinery(queue, opening.Name))
+					opening = null;
+			}
+
+			if (opening != null)
+			{
 				AIUtils.BotDebug("{0} decided to build {1}: parallel opening policy", queue.Actor.Owner, DisplayName(opening.Name));
 				return opening;
 			}
@@ -285,7 +309,8 @@ namespace OpenRA.Mods.Common.Traits
 			if (!baseBuilder.HasAdequateRefineryCount)
 			{
 				var refinery = GetProducibleBuilding(baseBuilder.SmartEconomyRefineryTypes, buildableThings);
-				if (refinery != null && HasSufficientPowerForActor(refinery))
+				if (refinery != null && HasSufficientPowerForActor(refinery) &&
+					baseBuilder.TryReserveSmartEconomyControlledRefinery(queue, refinery.Name))
 				{
 					AIUtils.BotDebug("{0} decided to build {1}: Priority override (refinery)", queue.Actor.Owner, DisplayName(refinery.Name));
 					return refinery;
@@ -304,7 +329,7 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				var refinery = GetProducibleBuilding(baseBuilder.SmartEconomyRefineryTypes, buildableThings);
 				if (refinery != null && HasSufficientPowerForActor(refinery) &&
-					baseBuilder.TryReserveSmartEconomyRefinery(refinery.Name))
+					baseBuilder.TryReserveSmartEconomyRefinery(queue, refinery.Name))
 				{
 					baseBuilder.LogSmartEconomy("{0} decided to build {1}: sustained unload congestion",
 						queue.Actor.Owner, DisplayName(refinery.Name));
@@ -440,6 +465,9 @@ namespace OpenRA.Mods.Common.Traits
 				if (limitedFractions.ContainsKey(name))
 					continue;
 
+				// While a smart AI has no live refinery, every refinery source shares the one
+				// serialized recovery reservation. This also covers the ordinary authored
+				// building-fraction fallback after the higher-priority paths declined a queue.
 				// Does this building have initial delay, if so have we passed it?
 				if (baseBuilder.Info.BuildingDelays != null &&
 					baseBuilder.Info.BuildingDelays.ContainsKey(name) &&
@@ -486,6 +514,12 @@ namespace OpenRA.Mods.Common.Traits
 						return power;
 					}
 				}
+
+				// Enabled smart bots route every refinery source through the same per-Fact
+				// reservation after all other authored checks have accepted the candidate.
+				if (baseBuilder.SmartEconomyRefineryTypes.Contains(name) &&
+					!baseBuilder.TryReserveSmartEconomyControlledRefinery(queue, name))
+					continue;
 
 				// Lets build this
 				AIUtils.BotDebug("{0} decided to build {1}: Desired is {2} ({3} / {4}); current is {5} / {4}",

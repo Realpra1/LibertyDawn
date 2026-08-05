@@ -249,12 +249,20 @@ PROC:
 		Actor: HARV
 		SpawnOffset: 1,2
 		Facing: 256
+		OwnerActorLimitTypes: harv, sharv
+		OwnerActorLimit: 90
+		OwnerActorLimitBotsOnly: true
+		OwnerActorLimitDebugLogging: true
         AtSpawnOnly: true
         Prerequisites: !upgrade.covert2
     FreeActor@sharv:
 		Actor: SHARV
 		SpawnOffset: 1,2
 		Facing: 256
+		OwnerActorLimitTypes: harv, sharv
+		OwnerActorLimit: 90
+		OwnerActorLimitBotsOnly: true
+		OwnerActorLimitDebugLogging: true
         AtSpawnOnly: true
         Prerequisites: upgrade.covert2
 	WithBuildingBib:
@@ -458,6 +466,9 @@ AFLD:
 	ProductionAirdrop:
 		Produces: Vehicle.Nod
 		ActorType: c17
+		OwnerActorLimitTypes: harv, sharv
+		OwnerActorLimit: 90
+		OwnerActorLimitBotsOnly: true
 	WithBuildingBib:
 	WithIdleOverlay@DISH:
 		RequiresCondition: !build-incomplete
@@ -531,6 +542,9 @@ WEAP:
 		ExitDelay: 3
 	Production:
 		Produces: Vehicle.GDI
+		OwnerActorLimitTypes: harv, sharv
+		OwnerActorLimit: 90
+		OwnerActorLimitBotsOnly: true
 	ProductionQueue:
 		Type: Vehicle.GDI
 		DisplayOrder: 3

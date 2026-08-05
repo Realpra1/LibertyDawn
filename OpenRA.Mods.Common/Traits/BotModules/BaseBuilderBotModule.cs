@@ -178,11 +178,23 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Ticks of persistent unload congestion required before requesting another refinery.")]
 		public readonly int SmartEconomyRefineryPressureDuration = 750;
 
+		[Desc("Ticks of persistent harvester/refinery capacity deficit required before requesting another refinery.")]
+		public readonly int SmartEconomyRefineryCapacityPressureDuration = 250;
+
 		[Desc("Evidence ticks at or below which active refinery pressure is released.")]
 		public readonly int SmartEconomyRefineryPressureRelease = 250;
 
 		[Desc("Ticks to retain one congestion-relief refinery decision while it enters construction. Queued construction remains protected beyond this timeout.")]
 		public readonly int SmartEconomyRefineryBuildTimeout = 750;
+
+		[Desc("Committed harvesters supported by each unloading refinery when calculating throughput demand.")]
+		public readonly int SmartEconomyHarvestersPerRefinery = 2;
+
+		[Desc("Harvesters expected to spawn for free from each pending smart-economy refinery.")]
+		public readonly int SmartEconomyFreeHarvestersPerRefinery = 1;
+
+		[Desc("Maximum smart-economy refineries that may be queued or reserved concurrently across idle construction yards.")]
+		public readonly int SmartEconomyMaximumParallelRefineries = 3;
 
 		[Desc("Stored-resource percentage that requests silo capacity ahead of discretionary scaling.")]
 		public readonly int SmartEconomyStorageThresholdPercent = 80;
@@ -404,6 +416,8 @@ namespace OpenRA.Mods.Common.Traits
 
 		internal bool SmartEconomyWantsRefinery => smartEconomy?.WantsRefinery ?? false;
 
+		internal bool SmartEconomyEnabled => smartEconomy?.Enabled ?? false;
+
 		internal bool SmartEconomyWantsProductionCapacity => smartEconomy?.WantsProductionCapacity ?? false;
 
 		internal bool SmartEconomyWantsSilo => smartEconomy?.WantsSilo ?? false;
@@ -411,17 +425,36 @@ namespace OpenRA.Mods.Common.Traits
 		internal HashSet<string> SmartEconomyRefineryTypes => Info.SmartEconomyRefineryTypes.Count > 0 ?
 			Info.SmartEconomyRefineryTypes : Info.RefineryTypes;
 
+		internal HashSet<string> SmartEconomyHarvesterTypes => unitBuilders
+			.SelectMany(u => u.Info.HarvesterTypes).ToHashSet();
+
 		internal bool SmartEconomyShouldReserveCashForRefinery => smartEconomy?.ShouldReserveCashForRefinery ?? false;
 
-		internal bool TryReserveSmartEconomyRefinery(string type)
+		internal bool SmartEconomySerializesMissingRefinery => smartEconomy?.SerializesMissingRefinery ?? false;
+
+		internal bool TryReserveSmartEconomyRefinery(ProductionQueue queue, string type)
 		{
-			return smartEconomy?.TryReserveRefineryBuild(type) ?? false;
+			return smartEconomy?.TryReserveRefineryBuild(queue, type) ?? false;
 		}
 
-		internal bool CanBuildAnotherSmartEconomyRefinery()
+		internal bool TryReserveSmartEconomyMissingRefinery(ProductionQueue queue, string type)
 		{
-			return SmartEconomyRefineryTypes.Any(type => IsCurrentlyBuildable(type) &&
-				(!Info.BuildingLimits.TryGetValue(type, out var limit) || CountActors(new[] { type }) < limit));
+			return smartEconomy?.TryReserveMissingRefineryBuild(queue, type) ?? false;
+		}
+
+		internal bool TryReserveSmartEconomyControlledRefinery(ProductionQueue queue, string type)
+		{
+			if (!SmartEconomyEnabled)
+				return true;
+
+			return SmartEconomySerializesMissingRefinery ?
+				TryReserveSmartEconomyMissingRefinery(queue, type) :
+				TryReserveSmartEconomyRefinery(queue, type);
+		}
+
+		internal bool CanBuildAnotherSmartEconomyRefinery(string type)
+		{
+			return SmartEconomyRefineryTypes.Contains(type) && IsCurrentlyBuildable(type);
 		}
 
 		internal void LogSmartEconomy(string format, params object[] args)
@@ -779,11 +812,9 @@ namespace OpenRA.Mods.Common.Traits
 		// Require at least one refinery, unless we can't build it.
 		public bool HasAdequateRefineryCount =>
 			!Info.RefineryTypes.Any() ||
-			AIUtils.CountBuildingByCommonName(Info.RefineryTypes, player) >= MinimumRefineryCount ||
+			AIUtils.CountBuildingByCommonName(Info.RefineryTypes, player) > 0 ||
 			AIUtils.CountBuildingByCommonName(Info.PowerTypes, player) == 0 ||
 			AIUtils.CountBuildingByCommonName(Info.ConstructionYardTypes, player) == 0;
-
-		int MinimumRefineryCount => AIUtils.CountBuildingByCommonName(Info.BarracksTypes, player) > 0 ? Info.InititalMinimumRefineryCount + Info.AdditionalMinimumRefineryCount : Info.InititalMinimumRefineryCount;
 
 		List<MiniYamlNode> IGameSaveTraitData.IssueTraitData(Actor self)
 		{
@@ -810,6 +841,11 @@ namespace OpenRA.Mods.Common.Traits
 				new MiniYamlNode("SmartEconomyRefineryBuildOutstanding", FieldSaver.FormatValue(smartEconomy?.RefineryBuildOutstanding ?? false)),
 				new MiniYamlNode("SmartEconomyRefineryBuildExpiryTick", FieldSaver.FormatValue(smartEconomy?.RefineryBuildExpiryTick ?? 0)),
 				new MiniYamlNode("SmartEconomyRefineryBuildTargetCount", FieldSaver.FormatValue(smartEconomy?.RefineryBuildTargetCount ?? 0)),
+				new MiniYamlNode("SmartEconomyRefineryReservationQueueIds", FieldSaver.FormatValue(smartEconomy?.RefineryReservationQueueIds ?? System.Array.Empty<uint>())),
+				new MiniYamlNode("SmartEconomyRefineryReservationTypes", FieldSaver.FormatValue(smartEconomy?.RefineryReservationTypes ?? System.Array.Empty<string>())),
+				new MiniYamlNode("SmartEconomyRefineryReservationExpiryTicks", FieldSaver.FormatValue(smartEconomy?.RefineryReservationExpiryTicks ?? System.Array.Empty<int>())),
+				new MiniYamlNode("SmartEconomyRefineryReservationTargetCounts", FieldSaver.FormatValue(smartEconomy?.RefineryReservationTargetCounts ?? System.Array.Empty<int>())),
+				new MiniYamlNode("SmartEconomyRefineryReservationCosts", FieldSaver.FormatValue(smartEconomy?.RefineryReservationCosts ?? System.Array.Empty<int>())),
 				new MiniYamlNode("SmartEconomyMcvRequestOutstanding", FieldSaver.FormatValue(smartEconomy?.McvRequestOutstanding ?? false)),
 				new MiniYamlNode("SmartEconomyMcvRequestExpiryTick", FieldSaver.FormatValue(smartEconomy?.McvRequestExpiryTick ?? 0)),
 				new MiniYamlNode("SmartEconomyMcvRequestTargetAssets", FieldSaver.FormatValue(smartEconomy?.McvRequestTargetAssets ?? 0)),
@@ -875,6 +911,11 @@ namespace OpenRA.Mods.Common.Traits
 			var smartRefineryOutstandingNode = data.FirstOrDefault(n => n.Key == "SmartEconomyRefineryBuildOutstanding");
 			var smartRefineryExpiryNode = data.FirstOrDefault(n => n.Key == "SmartEconomyRefineryBuildExpiryTick");
 			var smartRefineryTargetNode = data.FirstOrDefault(n => n.Key == "SmartEconomyRefineryBuildTargetCount");
+			var smartRefineryQueueIdsNode = data.FirstOrDefault(n => n.Key == "SmartEconomyRefineryReservationQueueIds");
+			var smartRefineryTypesNode = data.FirstOrDefault(n => n.Key == "SmartEconomyRefineryReservationTypes");
+			var smartRefineryExpiryTicksNode = data.FirstOrDefault(n => n.Key == "SmartEconomyRefineryReservationExpiryTicks");
+			var smartRefineryTargetCountsNode = data.FirstOrDefault(n => n.Key == "SmartEconomyRefineryReservationTargetCounts");
+			var smartRefineryCostsNode = data.FirstOrDefault(n => n.Key == "SmartEconomyRefineryReservationCosts");
 			var smartMcvOutstandingNode = data.FirstOrDefault(n => n.Key == "SmartEconomyMcvRequestOutstanding");
 			var smartMcvExpiryNode = data.FirstOrDefault(n => n.Key == "SmartEconomyMcvRequestExpiryTick");
 			var smartMcvTargetNode = data.FirstOrDefault(n => n.Key == "SmartEconomyMcvRequestTargetAssets");
@@ -902,6 +943,15 @@ namespace OpenRA.Mods.Common.Traits
 					new SmartEconomyPressure(
 						cashEvidenceNode != null ? FieldLoader.GetValue<int>("SmartEconomyCashEvidenceTicks", cashEvidenceNode.Value.Value) : 0,
 						cashActiveNode != null && FieldLoader.GetValue<bool>("SmartEconomyCashPressureActive", cashActiveNode.Value.Value)));
+
+			if (smartEconomy != null && smartRefineryQueueIdsNode != null && smartRefineryTypesNode != null &&
+				smartRefineryExpiryTicksNode != null && smartRefineryTargetCountsNode != null && smartRefineryCostsNode != null)
+				smartEconomy.LoadRefineryReservations(
+					FieldLoader.GetValue<uint[]>("SmartEconomyRefineryReservationQueueIds", smartRefineryQueueIdsNode.Value.Value),
+					FieldLoader.GetValue<string[]>("SmartEconomyRefineryReservationTypes", smartRefineryTypesNode.Value.Value),
+					FieldLoader.GetValue<int[]>("SmartEconomyRefineryReservationExpiryTicks", smartRefineryExpiryTicksNode.Value.Value),
+					FieldLoader.GetValue<int[]>("SmartEconomyRefineryReservationTargetCounts", smartRefineryTargetCountsNode.Value.Value),
+					FieldLoader.GetValue<int[]>("SmartEconomyRefineryReservationCosts", smartRefineryCostsNode.Value.Value));
 
 			var firstTowerNode = data.FirstOrDefault(n => n.Key == "FirstTowerPlacementComplete");
 			if (firstTowerNode != null)

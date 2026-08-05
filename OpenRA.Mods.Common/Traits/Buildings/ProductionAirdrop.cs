@@ -9,6 +9,7 @@
  */
 #endregion
 
+using System.Collections.Generic;
 using System.Linq;
 using OpenRA.Activities;
 using OpenRA.Mods.Common.Activities;
@@ -37,8 +38,14 @@ namespace OpenRA.Mods.Common.Traits
 		public override object Create(ActorInitializer init) { return new ProductionAirdrop(init, this); }
 	}
 
-	class ProductionAirdrop : Production
+	class ProductionAirdrop : Production, IPendingProductionActors, IGameSaveTraitData
 	{
+		readonly List<string> pendingLaunches = new List<string>();
+		readonly Dictionary<Actor, string> pendingDeliveries = new Dictionary<Actor, string>();
+
+		IEnumerable<string> IPendingProductionActors.PendingActorTypes => pendingLaunches.Concat(
+			pendingDeliveries.Where(kv => !kv.Key.IsDead && kv.Key.IsInWorld).Select(kv => kv.Value));
+
 		public ProductionAirdrop(ActorInitializer init, ProductionAirdropInfo info)
 			: base(init, info) { }
 
@@ -82,10 +89,12 @@ namespace OpenRA.Mods.Common.Traits
 			foreach (var tower in self.TraitsImplementing<INotifyDelivery>())
 				tower.IncomingDelivery(self);
 
+			pendingLaunches.Add(producee.Name);
 			owner.World.AddFrameEndTask(w =>
 			{
 				if (!self.IsInWorld || self.IsDead)
 				{
+					pendingLaunches.Remove(producee.Name);
 					owner.PlayerActor.Trait<PlayerResources>().GiveCash(refundableValue);
 					return;
 				}
@@ -96,6 +105,8 @@ namespace OpenRA.Mods.Common.Traits
 					new OwnerInit(owner),
 					new FacingInit(spawnFacing)
 				});
+				pendingLaunches.Remove(producee.Name);
+				pendingDeliveries.Add(actor, producee.Name);
 
 				var exitCell = self.Location + exit.ExitCell;
 				actor.QueueActivity(new Land(actor, Target.FromActor(self), WDist.Zero, WVec.Zero, info.Facing, clearCells: new CPos[1] { exitCell }));
@@ -103,6 +114,7 @@ namespace OpenRA.Mods.Common.Traits
 				{
 					if (!self.IsInWorld || self.IsDead)
 					{
+						pendingDeliveries.Remove(actor);
 						owner.PlayerActor.Trait<PlayerResources>().GiveCash(refundableValue);
 						return;
 					}
@@ -110,7 +122,11 @@ namespace OpenRA.Mods.Common.Traits
 					foreach (var cargo in self.TraitsImplementing<INotifyDelivery>())
 						cargo.Delivered(self);
 
-					self.World.AddFrameEndTask(ww => DoProduction(self, producee, exit, productionType, inits));
+					self.World.AddFrameEndTask(ww =>
+					{
+						pendingDeliveries.Remove(actor);
+						DoProduction(self, producee, exit, productionType, inits, refundableValue);
+					});
 					Game.Sound.PlayNotification(self.World.Map.Rules, self.Owner, "Speech", info.ReadyAudio, self.Owner.Faction.InternalName);
 				}));
 
@@ -119,6 +135,38 @@ namespace OpenRA.Mods.Common.Traits
 			});
 
 			return true;
+		}
+
+		List<MiniYamlNode> IGameSaveTraitData.IssueTraitData(Actor self)
+		{
+			var pending = pendingDeliveries.Where(kv => !kv.Key.IsDead && kv.Key.IsInWorld)
+				.OrderBy(kv => kv.Key.ActorID).ToArray();
+			return new List<MiniYamlNode>()
+			{
+				new MiniYamlNode("PendingDeliveryActorIds", FieldSaver.FormatValue(pending.Select(kv => kv.Key.ActorID).ToArray())),
+				new MiniYamlNode("PendingDeliveryTypes", FieldSaver.FormatValue(pending.Select(kv => kv.Value).ToArray()))
+			};
+		}
+
+		void IGameSaveTraitData.ResolveTraitData(Actor self, List<MiniYamlNode> data)
+		{
+			if (self.World.IsReplay)
+				return;
+
+			var idsNode = data.FirstOrDefault(n => n.Key == "PendingDeliveryActorIds");
+			var typesNode = data.FirstOrDefault(n => n.Key == "PendingDeliveryTypes");
+			if (idsNode == null || typesNode == null)
+				return;
+
+			var ids = FieldLoader.GetValue<uint[]>("PendingDeliveryActorIds", idsNode.Value.Value);
+			var types = FieldLoader.GetValue<string[]>("PendingDeliveryTypes", typesNode.Value.Value);
+			pendingDeliveries.Clear();
+			for (var i = 0; i < ids.Length && i < types.Length; i++)
+			{
+				var actor = self.World.GetActorById(ids[i]);
+				if (actor != null && !actor.IsDead && actor.IsInWorld)
+					pendingDeliveries.Add(actor, types[i]);
+			}
 		}
 	}
 }
