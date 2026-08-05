@@ -189,6 +189,7 @@ Player:
 					CheckRadius: 7c0
     SupportPowerBotModule@b:
 		RequiresCondition: enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai
+		DebugLogging: true
 		Decisions:
 			Airstrike:
 				OrderName: AirstrikePowerInfoOrder
@@ -1365,6 +1366,7 @@ Player:
 			proc: 20
 			pyle: 15
 			hand: 15
+			stealth: 2
 			hq: 5
 			weap: 25
 			afld: 25
@@ -1403,7 +1405,7 @@ Player:
 		RequiresCondition: enable-ironreaper-ai
 		SquadSize: 20
         MaxBaseRadius: 49
-		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck, tran
+		ExcludeFromSquadsTypes: harv, sharv, mcv, a10, e6, rmbo, truck, tran
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
@@ -1431,13 +1433,14 @@ Player:
 			e6: 7
             rmbo: 2
 			harv: 100
+			sharv: 100
 			ltnk: 11
 			ftnk: 6
             ctnk: 0
 			arty: 57
 			mtnk: 1
 			mlrs: 59
-			stnk: 2
+			stnk: 15
 			apc: 1
 			bggy: 1
 			bike: 1
@@ -1470,6 +1473,7 @@ Player:
             jeep: 25
 			htnk: 50
             harv: 50
+			sharv: 50
 			msam: 4
             mhq: 2
 			heli: 20
