@@ -63,5 +63,10 @@ namespace OpenRA.Mods.Common.Traits
 			return squadValue > 0 && defendingValue > 0 && requiredValueRatio > 0 &&
 				squadValue >= (long)defendingValue * requiredValueRatio;
 		}
+
+		public static int BufferedRange(int rangeCells, int bufferCells)
+		{
+			return rangeCells > 0 ? rangeCells + Math.Max(0, bufferCells) : 0;
+		}
 	}
 }

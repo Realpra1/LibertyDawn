@@ -339,8 +339,10 @@ namespace OpenRA.Mods.Common.Traits
 			var dangerous = false;
 			foreach (var threat in threats)
 			{
-				var detectorRange = threat.DetectorRangeCells + Info.DetectorRangeBufferCells;
-				var weaponRange = threat.WeaponRangeCells + Info.ThreatRangeBufferCells;
+				var detectorRange = StealthTankSquadPolicy.BufferedRange(threat.DetectorRangeCells,
+					Info.DetectorRangeBufferCells);
+				var weaponRange = StealthTankSquadPolicy.BufferedRange(threat.WeaponRangeCells,
+					Info.ThreatRangeBufferCells);
 				var targetDistance = (threat.Actor.CenterPosition - target.CenterPosition).Length / 1024;
 				var endpointDanger = (detectorRange > 0 && targetDistance <= detectorRange) ||
 					(weaponRange > 0 && targetDistance <= weaponRange &&

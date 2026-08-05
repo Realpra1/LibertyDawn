@@ -57,5 +57,12 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(StealthTankSquadPolicy.CanCarefullyClear(squadValue, defendingValue, requiredRatio),
 				Is.EqualTo(expected));
 		}
+
+		[Test]
+		public void SafetyBufferDoesNotInventAThreatCapability()
+		{
+			Assert.That(StealthTankSquadPolicy.BufferedRange(0, 2), Is.Zero);
+			Assert.That(StealthTankSquadPolicy.BufferedRange(5, 2), Is.EqualTo(7));
+		}
 	}
 }
