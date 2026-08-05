@@ -11,6 +11,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using OpenRA.Mods.Common.Activities;
 using OpenRA.Primitives;
 using OpenRA.Traits;
@@ -23,6 +24,16 @@ namespace OpenRA.Mods.Common.Traits
 		[FieldLoader.Require]
 		[Desc("e.g. Infantry, Vehicles, Aircraft, Buildings")]
 		public readonly string[] Produces = Array.Empty<string>();
+
+		[ActorReference]
+		[Desc("Actor types whose transition from queued or in-flight production to live actors must share an owner-wide limit.")]
+		public readonly HashSet<string> OwnerActorLimitTypes = new HashSet<string>();
+
+		[Desc("Maximum live, queued, and in-flight OwnerActorLimitTypes. Zero disables the limit.")]
+		public readonly int OwnerActorLimit = 0;
+
+		[Desc("Apply OwnerActorLimit only when the producer owner is a bot.")]
+		public readonly bool OwnerActorLimitBotsOnly = false;
 
 		public override object Create(ActorInitializer init) { return new Production(init, this); }
 	}
@@ -45,7 +56,8 @@ namespace OpenRA.Mods.Common.Traits
 			base.Created(self);
 		}
 
-		public virtual void DoProduction(Actor self, ActorInfo producee, ExitInfo exitinfo, string productionType, TypeDictionary inits)
+		public virtual void DoProduction(Actor self, ActorInfo producee, ExitInfo exitinfo, string productionType,
+			TypeDictionary inits, int refundableValue = 0)
 		{
 			var exit = CPos.Zero;
 			var exitLocations = new List<CPos>();
@@ -87,6 +99,16 @@ namespace OpenRA.Mods.Common.Traits
 
 			self.World.AddFrameEndTask(w =>
 			{
+				if (!CanCreateWithinOwnerActorLimit(w, self, producee))
+				{
+					if (refundableValue > 0)
+						self.Owner.PlayerActor.Trait<PlayerResources>().GiveCash(refundableValue);
+
+					Log.Write("debug", "Produced actor {0} from {1} suppressed and refunded for {2}: owner limit {3}.",
+						producee.Name, self.Info.Name, self.Owner, Info.OwnerActorLimit);
+					return;
+				}
+
 				var newUnit = self.World.CreateActor(producee.Name, td);
 
 				var move = newUnit.TraitOrDefault<IMove>();
@@ -102,6 +124,25 @@ namespace OpenRA.Mods.Common.Traits
 				foreach (var notify in notifyOthers)
 					notify.Trait.UnitProducedByOther(notify.Actor, self, newUnit, productionType, td);
 			});
+		}
+
+		bool CanCreateWithinOwnerActorLimit(World world, Actor self, ActorInfo producee)
+		{
+			if (Info.OwnerActorLimit <= 0 || !Info.OwnerActorLimitTypes.Contains(producee.Name) ||
+				(Info.OwnerActorLimitBotsOnly && !self.Owner.IsBot))
+				return true;
+
+			var live = world.Actors.Count(a => a.Owner == self.Owner && !a.IsDead &&
+				Info.OwnerActorLimitTypes.Contains(a.Info.Name));
+			var queued = world.ActorsWithTrait<ProductionQueue>()
+				.Where(q => q.Actor.Owner == self.Owner && !q.Actor.IsDead && q.Actor.IsInWorld)
+				.Sum(q => q.Trait.AllQueued().Count(i => Info.OwnerActorLimitTypes.Contains(i.Item)));
+			var pending = world.ActorsWithTrait<IPendingProductionActors>()
+				.Where(p => p.Actor.Owner == self.Owner && !p.Actor.IsDead && p.Actor.IsInWorld)
+				.Sum(p => p.Trait.PendingActorTypes.Count(Info.OwnerActorLimitTypes.Contains));
+
+			return SharedActorLimitPolicy.AllowedAmount(1, live + queued + pending,
+				SharedActorLimitReservations.Reserved(world, self.Owner), Info.OwnerActorLimit) == 1;
 		}
 
 		protected virtual Exit SelectExit(Actor self, ActorInfo producee, string productionType, Func<Exit, bool> p)
@@ -126,7 +167,7 @@ namespace OpenRA.Mods.Common.Traits
 			var exit = SelectExit(self, producee, productionType);
 			if (exit != null || self.OccupiesSpace == null || !producee.HasTraitInfo<IOccupySpaceInfo>())
 			{
-				DoProduction(self, producee, exit?.Info, productionType, inits);
+				DoProduction(self, producee, exit?.Info, productionType, inits, refundableValue);
 				return true;
 			}
 
@@ -142,5 +183,10 @@ namespace OpenRA.Mods.Common.Traits
 			return mobileInfo == null ||
 				mobileInfo.CanEnterCell(self.World, self, self.Location + s.ExitCell, ignoreActor: self);
 		}
+	}
+
+	public interface IPendingProductionActors
+	{
+		IEnumerable<string> PendingActorTypes { get; }
 	}
 }

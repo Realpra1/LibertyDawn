@@ -106,7 +106,8 @@ namespace OpenRA.Mods.Common.Traits
 			return true;
 		}
 
-		public override void DoProduction(Actor self, ActorInfo producee, ExitInfo exitinfo, string productionType, TypeDictionary inits)
+		public override void DoProduction(Actor self, ActorInfo producee, ExitInfo exitinfo, string productionType,
+			TypeDictionary inits, int refundableValue = 0)
 		{
 			var exit = CPos.Zero;
 			var exitLocations = new List<CPos>();

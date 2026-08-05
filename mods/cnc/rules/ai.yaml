@@ -518,7 +518,7 @@ Player:
 		AdaptiveUnitCap: true
 		AdaptiveUnitCapMinimum: 300
 		HarvesterTypes: harv, sharv
-		HarvesterLimit: 75
+		HarvesterLimit: 90
 		UnitCapDebugLogging: true
 		LearnHumanBuiltUnits: true
 		SampledUnitChance: 0.05
@@ -614,7 +614,7 @@ Player:
 		AdaptiveUnitCap: true
 		AdaptiveUnitCapMinimum: 300
 		HarvesterTypes: harv, sharv
-		HarvesterLimit: 75
+		HarvesterLimit: 90
 		UnitCapDebugLogging: true
 		LearnHumanBuiltUnits: true
 		SampledUnitChance: 0.05
@@ -710,7 +710,7 @@ Player:
 		AdaptiveUnitCap: true
 		AdaptiveUnitCapMinimum: 300
 		HarvesterTypes: harv, sharv
-		HarvesterLimit: 75
+		HarvesterLimit: 90
 		UnitCapDebugLogging: true
 		LearnHumanBuiltUnits: true
 		SampledUnitChance: 0.05
@@ -777,7 +777,6 @@ Player:
 		ProductionTypes: pyle,hand,weap,afld,hpad,hq
 		SiloTypes: silo
 		BuildingLimits:
-            proc: 25
             weap: 15
             nuk2: 8
 			afld: 15
@@ -848,7 +847,7 @@ Player:
 		AdaptiveUnitCap: true
 		AdaptiveUnitCapMinimum: 300
 		HarvesterTypes: harv, sharv
-		HarvesterLimit: 75
+		HarvesterLimit: 90
 		UnitCapDebugLogging: true
 		LearnHumanBuiltUnits: true
 		SampledUnitChance: 0.05
@@ -956,7 +955,6 @@ Player:
 		ProductionTypes: pyle,hand,weap,afld,hpad,hq
 		SiloTypes: silo
 		BuildingLimits:
-            proc: 25
             weap: 15
             nuk2: 8
 			afld: 1
@@ -1021,7 +1019,7 @@ Player:
 		AdaptiveUnitCap: true
 		AdaptiveUnitCapMinimum: 300
 		HarvesterTypes: harv, sharv
-		HarvesterLimit: 75
+		HarvesterLimit: 90
 		UnitCapDebugLogging: true
 		LearnHumanBuiltUnits: true
 		SampledUnitChance: 0.05
@@ -1136,7 +1134,6 @@ Player:
 		MaximumWallSegments: 150
 		WallPathCheckLocomotor: wheeled
 		BuildingLimits:
-            proc: 25
 			pyle: 3
 			hand: 3
 			hq: 1
@@ -1316,7 +1313,7 @@ Player:
 		AdaptiveUnitCap: true
 		AdaptiveUnitCapMinimum: 300
 		HarvesterTypes: harv, sharv
-		HarvesterLimit: 75
+		HarvesterLimit: 90
 		UnitCapDebugLogging: true
 		LearnHumanBuiltUnits: true
 		SampledUnitChance: 0.05
@@ -1451,7 +1448,6 @@ Player:
 		ProductionTypes: pyle,hand,weap,afld,hpad, hq
 		SiloTypes: silo
 		BuildingLimits:
-            proc: 25
             weap: 15
             nuk2: 8
 			afld: 15
@@ -1535,7 +1531,7 @@ Player:
 		AdaptiveUnitCap: true
 		AdaptiveUnitCapMinimum: 300
 		HarvesterTypes: harv, sharv
-		HarvesterLimit: 75
+		HarvesterLimit: 90
 		UnitCapDebugLogging: true
 		LearnHumanBuiltUnits: true
 		SampledUnitChance: 0.05
@@ -1711,7 +1707,7 @@ Player:
 		AdaptiveUnitCap: true
 		AdaptiveUnitCapMinimum: 300
 		HarvesterTypes: harv, sharv
-		HarvesterLimit: 75
+		HarvesterLimit: 90
 		UnitCapDebugLogging: true
 		LearnHumanBuiltUnits: true
 		SampledUnitChance: 0.05
@@ -1857,7 +1853,7 @@ Player:
 		AdaptiveUnitCap: true
 		AdaptiveUnitCapMinimum: 300
 		HarvesterTypes: harv, sharv
-		HarvesterLimit: 75
+		HarvesterLimit: 90
 		UnitCapDebugLogging: true
 		LearnHumanBuiltUnits: true
 		SampledUnitChance: 0.05

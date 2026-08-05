@@ -13,7 +13,7 @@ Do not combine this skill with `coding-workflow` (the coding skill). This skill 
 - Do not exceed granted authority. If credentials, permission, required files, or a safe path are unavailable, record the blocker and stop without asking.
 - Treat the task sheet and repository files as authoritative over conversational memory.
 - From a repository clone, use `AUTONOMOUS-CNC-TASKS.md`, `AUTONOMOUS-CNC-STATE.md`, `DEFERRED_WORK.md`, and `AUTONOMOUS-CNC-REPORTS/` at the repository root as the default durable workflow files. Do not depend on files from another machine's Codex home directory.
-- Do not stop for questions, status checks, minor corrections, or small side requests. Answer or apply them, then continue the autonomous loop. Pause only when the user explicitly says stop/pause or an actual blocker prevents progress.
+- Do not stop for questions, status checks, minor corrections, small side requests, or task completion. Answer or apply them, then continue with the current cycle or next eligible task. Pause only when the user explicitly says stop/pause or an actual blocker prevents progress.
 - For long unattended runs, use a reversible session-scoped mechanism to prevent inactivity standby when the environment permits it. Do not change the permanent power plan. Record the helper/process identity and restore normal sleep behavior whenever the autonomous run pauses or ends.
 
 ## Task selection and isolation
@@ -43,6 +43,7 @@ Repeat at most thirty times total, including the adversarial edge-case cycles be
 
 1. Build and run focused unit/static checks. Fix every relevant build error or warning.
 2. Use focused setup maps to accelerate early cycles when useful, but run the full game engine with real bot types. Before normal acceptance passes, include a fully enabled scenario with all relevant ordinary AI modules and use an ordinary test match when the behavior depends on emergent game conditions. A passive/custom bot or isolated manager fixture cannot prove completion alone.
+   On Linux and other unattended environments, prefer the repository's explicit headless MAX launch path for engine tests that do not require graphics or input. Prove from the current run that headless MAX activated, the intended ordinary bots and map loaded, simulation ticks advanced, the final observable outcome occurred, and logs/replay or benchmark evidence flushed. Headless MAX does not replace a task's required graphical, rendering, input, or platform-specific checks.
 3. Prefer real full-match evidence, especially for adversarial and final testing. Launch debug games in the background, poll in intervals no longer than 60 seconds, and normally cap a test at 30 minutes. A required full-match test may run longer within reason while it is still making useful progress.
 4. Prove from current logs that the intended map, bots, actors, options, and scenario loaded and that the final player-visible outcome occurred. Intermediate states such as request, reservation, loading, movement, or target selection are not a pass.
 5. Compare logs/replay evidence with every desired and forbidden behavior. Instrument mission purpose, reservation owner, competing consumer, candidate rejection, state transition, and final outcome when those cannot otherwise be distinguished.
@@ -72,6 +73,6 @@ After thirty unsuccessful loops, deliver the safest useful result as `first iter
 2. Update `AUTONOMOUS-CNC-STATE.md` and save a concise report under `AUTONOMOUS-CNC-REPORTS/<task>.md` covering behavior, design choices, assumptions, test-cycle count, tests, logs, PR, and remaining risks. Commit these coordinator updates with the cumulative task branch so another machine can resume from its remote PR head.
 3. Push the feature branch and open the PR; never merge it or close other PRs.
 4. After local and game evidence is complete, wait for the PR's required GitHub checks. Fix failures and rerun checks within the task's test-loop budget. Mark the task `complete` only when required checks are green; use `first iteration` when checks cannot be made green.
-5. Before selecting another task, reread this skill, the task sheet, and the state file. Continue from those durable sources and disregard stale memory.
+5. Between evidence cycles, after any context compaction, and before selecting another task, reread this skill, the task sheet, and the state file. Keep only the current task's detailed specification in its report or a dedicated current-task file; keep stable coordinator files concise. Continue from those sources and disregard stale memory.
 
-Codex cannot deliberately clear its own context or start a new turn after yielding. Continue within the active autonomous run; automatic context compaction is safe because durable state is reread before every task.
+Codex cannot deliberately clear its own context or start a new turn after yielding. Continue within the active autonomous run; durable state makes automatic context compaction safe.

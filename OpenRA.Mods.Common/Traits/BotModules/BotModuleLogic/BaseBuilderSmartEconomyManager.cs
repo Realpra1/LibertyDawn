@@ -10,6 +10,7 @@
 #endregion
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using OpenRA.Traits;
 
@@ -17,40 +18,82 @@ namespace OpenRA.Mods.Common.Traits
 {
 	class BaseBuilderSmartEconomyManager
 	{
+		sealed class RefineryReservation
+		{
+			public readonly uint QueueActorId;
+			public readonly string Type;
+			public readonly int ExpiryTick;
+			public readonly int TargetCount;
+			public readonly int Cost;
+
+			public RefineryReservation(uint queueActorId, string type, int expiryTick, int targetCount, int cost)
+			{
+				QueueActorId = queueActorId;
+				Type = type;
+				ExpiryTick = expiryTick;
+				TargetCount = targetCount;
+				Cost = cost;
+			}
+		}
+
 		readonly BaseBuilderBotModule baseBuilder;
 		readonly World world;
 		readonly Player player;
 		readonly PlayerResources playerResources;
 		readonly PlayerStatistics playerStatistics;
 		readonly IBotRequestUnitProduction[] unitProduction;
+		readonly HashSet<string> harvesterTypes;
+		readonly Dictionary<uint, RefineryReservation> refineryReservations = new Dictionary<uint, RefineryReservation>();
 		readonly bool enabled;
 
 		int nextScanTick;
+		int postLoadResumeTick;
 		int nextMcvRequestTick;
 		int nextProgressLogTick;
+		int nextRefineryBlockedLogTick;
 		int waitingHarvesters;
 		int spendableCash;
-		bool refineryBuildOutstanding;
-		int refineryBuildExpiryTick;
-		int refineryBuildTargetCount;
+		int liveHarvesters;
+		int queuedHarvesters;
+		int requestedHarvesters;
+		int liveRefineries;
+		int queuedRefineries;
+		int reservedRefineries;
+		int idleRefineryQueues;
+		int refineryCashShortfall;
+		int effectiveParallelRefineryLimit;
+		int combatUnitQueues;
+		int totalUnitQueues;
 		bool mcvRequestOutstanding;
 		int mcvRequestExpiryTick;
 		int mcvRequestTargetAssets;
 		SmartEconomyPressure refineryPressure;
 		SmartEconomyPressure cashPressure;
+		SmartEconomyRefineryDemand refineryDemand;
 
-		public bool WantsRefinery => enabled && refineryPressure.Active && waitingHarvesters > 0 && !refineryBuildOutstanding;
-		public bool WantsProductionCapacity => enabled && cashPressure.Active;
-		public bool WantsSilo => enabled && SmartEconomyPolicy.StoragePressure(playerResources.Resources,
+		bool RequestsReady => world.WorldTick >= postLoadResumeTick;
+
+		public bool WantsRefinery => RequestsReady && enabled && liveRefineries > 0 &&
+			refineryPressure.Active && refineryDemand.AvailableRequests > 0;
+		public bool Enabled => enabled;
+		public bool WantsProductionCapacity => RequestsReady && enabled && cashPressure.Active;
+		public bool WantsSilo => RequestsReady && enabled && SmartEconomyPolicy.StoragePressure(playerResources.Resources,
 			playerResources.ResourceCapacity, baseBuilder.Info.SmartEconomyStorageThresholdPercent);
+		public bool SerializesMissingRefinery => RequestsReady && enabled &&
+			baseBuilder.CountActors(baseBuilder.SmartEconomyRefineryTypes) == 0;
 		public bool ShouldReserveCashForRefinery { get; private set; }
 
 		public int NextScanTick => nextScanTick;
 		public int NextMcvRequestTick => nextMcvRequestTick;
 		public int NextProgressLogTick => nextProgressLogTick;
-		public bool RefineryBuildOutstanding => refineryBuildOutstanding;
-		public int RefineryBuildExpiryTick => refineryBuildExpiryTick;
-		public int RefineryBuildTargetCount => refineryBuildTargetCount;
+		public bool RefineryBuildOutstanding => refineryReservations.Count > 0;
+		public int RefineryBuildExpiryTick => refineryReservations.Values.Select(r => r.ExpiryTick).DefaultIfEmpty(0).Max();
+		public int RefineryBuildTargetCount => refineryReservations.Values.Select(r => r.TargetCount).DefaultIfEmpty(0).Max();
+		public uint[] RefineryReservationQueueIds => refineryReservations.Keys.OrderBy(id => id).ToArray();
+		public string[] RefineryReservationTypes => refineryReservations.OrderBy(r => r.Key).Select(r => r.Value.Type).ToArray();
+		public int[] RefineryReservationExpiryTicks => refineryReservations.OrderBy(r => r.Key).Select(r => r.Value.ExpiryTick).ToArray();
+		public int[] RefineryReservationTargetCounts => refineryReservations.OrderBy(r => r.Key).Select(r => r.Value.TargetCount).ToArray();
+		public int[] RefineryReservationCosts => refineryReservations.OrderBy(r => r.Key).Select(r => r.Value.Cost).ToArray();
 		public bool McvRequestOutstanding => mcvRequestOutstanding;
 		public int McvRequestExpiryTick => mcvRequestExpiryTick;
 		public int McvRequestTargetAssets => mcvRequestTargetAssets;
@@ -66,6 +109,7 @@ namespace OpenRA.Mods.Common.Traits
 			this.playerResources = playerResources;
 			playerStatistics = player.PlayerActor.Trait<PlayerStatistics>();
 			this.unitProduction = unitProduction;
+			harvesterTypes = baseBuilder.SmartEconomyHarvesterTypes;
 			enabled = !baseBuilder.Info.SmartEconomyExcludedBotTypes.Contains(player.BotType);
 		}
 
@@ -79,16 +123,27 @@ namespace OpenRA.Mods.Common.Traits
 			var previousRefineryPressure = refineryPressure.Active;
 			var previousCashPressure = cashPressure.Active;
 
-			waitingHarvesters = CountWaitingHarvestersNearRefineries();
-			var refineryPressureObserved = refineryPressure.Active ? waitingHarvesters > 0 :
-				waitingHarvesters >= Math.Max(1, baseBuilder.Info.SmartEconomyWaitingHarvesterThreshold);
-			refineryPressure = SmartEconomyPolicy.UpdatePressure(refineryPressure, refineryPressureObserved,
-				elapsed, baseBuilder.Info.SmartEconomyRefineryPressureDuration,
-				baseBuilder.Info.SmartEconomyRefineryPressureRelease);
-			ShouldReserveCashForRefinery = enabled && refineryPressure.Active && waitingHarvesters > 0 &&
-				baseBuilder.CanBuildAnotherSmartEconomyRefinery();
-
 			spendableCash = Math.Max(0, playerResources.Cash + playerResources.Resources);
+			UpdateRefineryBuildState();
+			waitingHarvesters = CountWaitingHarvestersNearRefineries();
+			RefreshRefineryDemand(bot);
+			var capacityDeficitObserved = refineryDemand.Deficit > 0;
+			var congestionObserved = refineryPressure.Active ? waitingHarvesters > 0 :
+				waitingHarvesters >= Math.Max(1, baseBuilder.Info.SmartEconomyWaitingHarvesterThreshold);
+			var refineryPressureObserved = capacityDeficitObserved || congestionObserved;
+			var refineryActivationTicks = capacityDeficitObserved ?
+				baseBuilder.Info.SmartEconomyRefineryCapacityPressureDuration :
+				baseBuilder.Info.SmartEconomyRefineryPressureDuration;
+			refineryPressure = SmartEconomyPolicy.UpdatePressure(refineryPressure, refineryPressureObserved,
+				elapsed, refineryActivationTicks,
+				baseBuilder.Info.SmartEconomyRefineryPressureRelease);
+			RecalculateRefineryDemand();
+			var minimumRefineryCost = MinimumBuildableRefineryCost();
+			refineryCashShortfall = enabled && refineryPressure.Active && refineryDemand.AvailableRequests > 0 &&
+				minimumRefineryCost > 0 ? SmartEconomyPolicy.RefineryCashShortfall(spendableCash,
+					minimumRefineryCost, liveRefineries, queuedRefineries, reservedRefineries, idleRefineryQueues) : 0;
+			ShouldReserveCashForRefinery = refineryCashShortfall > 0;
+
 			var cashThreshold = cashPressure.Active ? baseBuilder.Info.SmartEconomyExcessCashReleaseThreshold :
 				baseBuilder.Info.SmartEconomyExcessCashThreshold;
 			var cashPressureObserved = !baseBuilder.OpeningActive && baseBuilder.Info.SmartEconomyExcessCashThreshold > 0 &&
@@ -96,14 +151,14 @@ namespace OpenRA.Mods.Common.Traits
 			cashPressure = SmartEconomyPolicy.UpdatePressure(cashPressure, cashPressureObserved, elapsed,
 				baseBuilder.Info.SmartEconomyExcessCashPressureDuration,
 				baseBuilder.Info.SmartEconomyExcessCashPressureRelease);
+			RecalculateRefineryDemand();
 
 			if (previousRefineryPressure != refineryPressure.Active || previousCashPressure != cashPressure.Active)
 				baseBuilder.LogSmartEconomy(
-					"{0} pressure transition: refinery={1} waiters={2} evidence={3}; cash={4} funds={5} evidence={6}",
-					player, refineryPressure.Active, waitingHarvesters, refineryPressure.EvidenceTicks,
-					cashPressure.Active, spendableCash, cashPressure.EvidenceTicks);
+					"{0} pressure transition: refinery={1} capacity-deficit={2} waiters={3} evidence={4}; cash={5} funds={6} evidence={7}",
+					player, refineryPressure.Active, refineryDemand.Deficit, waitingHarvesters,
+					refineryPressure.EvidenceTicks, cashPressure.Active, spendableCash, cashPressure.EvidenceTicks);
 
-			UpdateRefineryBuildState();
 			UpdateExpansionRequestState(bot);
 			LogProgress(bot);
 
@@ -128,49 +183,109 @@ namespace OpenRA.Mods.Common.Traits
 			var silos = baseBuilder.CountActors(baseBuilder.Info.SiloTypes);
 			var productionBuildings = baseBuilder.CountActors(baseBuilder.Info.ProductionTypes);
 			baseBuilder.LogSmartEconomy(
-				"{0} status: enabled={1}, waiters={2}, refinery-pressure={3}/{4}, stored={5}/{6}, funds={7}, earned={8}, spent={9}, income={10}, army={11}, assets={12}, refineries={13}, refinery-outstanding={14}/{15}, silos={16}, production={17}, cash-pressure={18}/{19}, expansion={20} yards+{21} mcvs+{22} requested+{23} queued/{24} desired, expansion-ready={25}, mcv-outstanding={26}/{27}",
-				player, enabled, waitingHarvesters, refineryPressure.EvidenceTicks, refineryPressure.Active,
-				playerResources.Resources, playerResources.ResourceCapacity, spendableCash, playerResources.Earned,
-				playerResources.Spent, playerStatistics.Income, playerStatistics.ArmyValue, playerStatistics.AssetsValue,
-				refineries, refineryBuildOutstanding, refineryBuildTargetCount, silos, productionBuildings,
-				cashPressure.EvidenceTicks, cashPressure.Active,
-				constructionYards, liveMcvs, requestedMcvs, queuedMcvs, desiredExpansionAssets, expansionArmyReady,
-				mcvRequestOutstanding, mcvRequestTargetAssets);
+				"{0} status: enabled={1}, harvesters={2} live+{3} queued+{4} requested ({5} free-from-pending), waiters={6}, refinery-pressure={7}/{8}, refineries={9} live+{10} queued+{11} reserved/{12} desired, deficit={13}/{14} available, idle-facts={15}, refinery-cash-shortfall={16}, combat-vehicle-queues={17}/{18}, stored={19}/{20}, funds={21}, earned={22}, spent={23}, income={24}, army={25}, assets={26}, silos={27}, production={28}, cash-pressure={29}/{30}, expansion={31} yards+{32} mcvs+{33} requested+{34} queued/{35} desired, expansion-ready={36}, mcv-outstanding={37}/{38}",
+				player, enabled, liveHarvesters, queuedHarvesters, requestedHarvesters,
+				(queuedRefineries + reservedRefineries) * Math.Max(0, baseBuilder.Info.SmartEconomyFreeHarvestersPerRefinery),
+				waitingHarvesters, refineryPressure.EvidenceTicks, refineryPressure.Active, refineries,
+				queuedRefineries, reservedRefineries, refineryDemand.DesiredRefineries, refineryDemand.Deficit,
+				refineryDemand.AvailableRequests, idleRefineryQueues, refineryCashShortfall, combatUnitQueues,
+				totalUnitQueues, playerResources.Resources, playerResources.ResourceCapacity, spendableCash,
+				playerResources.Earned, playerResources.Spent, playerStatistics.Income, playerStatistics.ArmyValue,
+				playerStatistics.AssetsValue, silos, productionBuildings, cashPressure.EvidenceTicks,
+				cashPressure.Active, constructionYards, liveMcvs, requestedMcvs, queuedMcvs,
+				desiredExpansionAssets, expansionArmyReady, mcvRequestOutstanding, mcvRequestTargetAssets);
 		}
 
-		public bool TryReserveRefineryBuild(string type)
+		public bool TryReserveRefineryBuild(ProductionQueue queue, string type)
 		{
-			if (!WantsRefinery || !baseBuilder.SmartEconomyRefineryTypes.Contains(type) || QueuedRefineries() > 0)
+			if (!WantsRefinery || queue == null || queue.AllQueued().Any() ||
+				!baseBuilder.SmartEconomyRefineryTypes.Contains(type) || refineryReservations.ContainsKey(queue.Actor.ActorID))
 				return false;
 
-			refineryBuildOutstanding = true;
-			refineryBuildTargetCount = baseBuilder.CountActors(baseBuilder.SmartEconomyRefineryTypes) + 1;
-			refineryBuildExpiryTick = world.WorldTick + Math.Max(1, baseBuilder.Info.SmartEconomyRefineryBuildTimeout);
-			baseBuilder.LogSmartEconomy("{0} reserved congestion-relief refinery: type={1}, target-count={2}",
-				player, type, refineryBuildTargetCount);
+			var queuedQueueIds = QueuedRefineryQueueIds();
+			if (!baseBuilder.CanBuildAnotherSmartEconomyRefinery(type))
+				return false;
+
+			var cost = queue.GetProductionCost(world.Map.Rules.Actors[type]);
+			var queuedRemainingCost = QueuedRefineryRemainingCost();
+			var reservedCost = refineryReservations.Values
+				.Where(r => !queuedQueueIds.Contains(r.QueueActorId)).Sum(r => r.Cost);
+			if (!SmartEconomyPolicy.CanFundRefinery(spendableCash, queuedRemainingCost, reservedCost, cost))
+			{
+				if (baseBuilder.Info.SmartEconomyDebugLogging && world.WorldTick >= nextRefineryBlockedLogTick)
+				{
+					nextRefineryBlockedLogTick = world.WorldTick +
+						Math.Max(1, baseBuilder.Info.SmartEconomyProgressLogInterval);
+					baseBuilder.LogSmartEconomy(
+						"{0} deferred refinery on Fact {1}: funds={2}, queued-remaining={3}, reserved={4}, next-cost={5}",
+						player, queue.Actor.ActorID, spendableCash, queuedRemainingCost, reservedCost, cost);
+				}
+
+				return false;
+			}
+
+			var targetCount = refineryDemand.CommittedRefineries + 1;
+			refineryReservations.Add(queue.Actor.ActorID, new RefineryReservation(queue.Actor.ActorID, type,
+				world.WorldTick + Math.Max(1, baseBuilder.Info.SmartEconomyRefineryBuildTimeout), targetCount, cost));
+			reservedRefineries++;
+			RecalculateRefineryDemand();
+			baseBuilder.LogSmartEconomy(
+				"{0} reserved capacity refinery: type={1}, fact={2}, cost={3}, target-count={4}, remaining-deficit={5}, parallel={6}/{7}",
+				player, type, queue.Actor.ActorID, cost, targetCount, refineryDemand.Deficit,
+				queuedRefineries + reservedRefineries, effectiveParallelRefineryLimit);
+			return true;
+		}
+
+		public bool TryReserveMissingRefineryBuild(ProductionQueue queue, string type)
+		{
+			if (queue == null || queue.AllQueued().Any() || !baseBuilder.SmartEconomyRefineryTypes.Contains(type) ||
+				!baseBuilder.CanBuildAnotherSmartEconomyRefinery(type))
+				return false;
+
+			var live = baseBuilder.CountActors(baseBuilder.SmartEconomyRefineryTypes);
+			var queuedQueueIds = QueuedRefineryQueueIds();
+			if (!SmartEconomyPolicy.NeedsSerializedFirstRefinery(enabled, live, queuedQueueIds.Count,
+				refineryReservations.Count))
+				return false;
+
+			var cost = queue.GetProductionCost(world.Map.Rules.Actors[type]);
+			refineryReservations.Add(queue.Actor.ActorID, new RefineryReservation(queue.Actor.ActorID, type,
+				world.WorldTick + Math.Max(1, baseBuilder.Info.SmartEconomyRefineryBuildTimeout), 1, cost));
+			reservedRefineries++;
+			RecalculateRefineryDemand();
+			baseBuilder.LogSmartEconomy(
+				"{0} reserved serialized missing refinery: type={1}, fact={2}, cost={3}; holding other Facts until one is live",
+				player, type, queue.Actor.ActorID, cost);
 			return true;
 		}
 
 		void UpdateRefineryBuildState()
 		{
-			if (!refineryBuildOutstanding)
+			if (refineryReservations.Count == 0)
 				return;
 
 			var live = baseBuilder.CountActors(baseBuilder.SmartEconomyRefineryTypes);
-			if (live >= refineryBuildTargetCount)
+			var queuedQueueIds = QueuedRefineryQueueIds();
+			foreach (var reservation in refineryReservations.Values.OrderBy(r => r.TargetCount)
+				.ThenBy(r => r.QueueActorId).ToArray())
 			{
-				refineryBuildOutstanding = false;
-				baseBuilder.LogSmartEconomy("{0} congestion-relief refinery completed: refineries={1}/{2}",
-					player, live, refineryBuildTargetCount);
-				return;
+				if (live >= reservation.TargetCount)
+				{
+					refineryReservations.Remove(reservation.QueueActorId);
+					baseBuilder.LogSmartEconomy(
+						"{0} capacity refinery completed: fact={1}, refineries={2}/{3}",
+						player, reservation.QueueActorId, live, reservation.TargetCount);
+					continue;
+				}
+
+				if (queuedQueueIds.Contains(reservation.QueueActorId) || world.WorldTick < reservation.ExpiryTick)
+					continue;
+
+				refineryReservations.Remove(reservation.QueueActorId);
+				baseBuilder.LogSmartEconomy(
+					"{0} capacity refinery reservation expired: fact={1}, type={2}, refineries={3}/{4}",
+					player, reservation.QueueActorId, reservation.Type, live, reservation.TargetCount);
 			}
-
-			if (QueuedRefineries() > 0 || world.WorldTick < refineryBuildExpiryTick)
-				return;
-
-			refineryBuildOutstanding = false;
-			baseBuilder.LogSmartEconomy("{0} congestion-relief refinery reservation expired: refineries={1}/{2}",
-				player, live, refineryBuildTargetCount);
 		}
 
 		void UpdateExpansionRequestState(IBot bot)
@@ -254,11 +369,81 @@ namespace OpenRA.Mods.Common.Traits
 				.Sum(q => q.Trait.AllQueued().Count(item => baseBuilder.Info.SmartEconomyMcvTypes.Contains(item.Item)));
 		}
 
-		int QueuedRefineries()
+		void RefreshRefineryDemand(IBot bot)
+		{
+			var queuedQueueIds = QueuedRefineryQueueIds();
+			liveHarvesters = baseBuilder.CountActors(harvesterTypes);
+			queuedHarvesters = QueuedActors(harvesterTypes) + PendingProductionActors(harvesterTypes);
+			requestedHarvesters = RequestedActors(bot, harvesterTypes);
+			liveRefineries = baseBuilder.CountActors(baseBuilder.SmartEconomyRefineryTypes);
+			queuedRefineries = QueuedActors(baseBuilder.SmartEconomyRefineryTypes);
+			reservedRefineries = refineryReservations.Values.Count(r => !queuedQueueIds.Contains(r.QueueActorId));
+			idleRefineryQueues = OwnedProductionQueues().Count(q => !q.Trait.AllQueued().Any() &&
+				q.Trait.BuildableItems().Any(a => baseBuilder.SmartEconomyRefineryTypes.Contains(a.Name)));
+
+			var unitQueues = OwnedProductionQueues().Where(q =>
+				q.Trait.BuildableItems().Any(a => harvesterTypes.Contains(a.Name))).ToArray();
+			totalUnitQueues = unitQueues.Length;
+			combatUnitQueues = unitQueues.Count(q => q.Trait.AllQueued().Any(i => !harvesterTypes.Contains(i.Item)));
+			RecalculateRefineryDemand();
+		}
+
+		void RecalculateRefineryDemand()
+		{
+			var pendingRefineries = queuedRefineries + reservedRefineries;
+			effectiveParallelRefineryLimit = SmartEconomyPolicy.EffectiveParallelRefineryLimit(idleRefineryQueues,
+				pendingRefineries, baseBuilder.Info.SmartEconomyMaximumParallelRefineries, liveRefineries > 0);
+			refineryDemand = SmartEconomyPolicy.RefineryDemand(liveHarvesters, queuedHarvesters,
+				requestedHarvesters, liveRefineries, queuedRefineries, reservedRefineries,
+				baseBuilder.Info.SmartEconomyFreeHarvestersPerRefinery,
+				baseBuilder.Info.SmartEconomyHarvestersPerRefinery,
+				effectiveParallelRefineryLimit,
+				refineryPressure.Active && waitingHarvesters > 0);
+		}
+
+		IEnumerable<TraitPair<ProductionQueue>> OwnedProductionQueues()
 		{
 			return world.ActorsWithTrait<ProductionQueue>()
-				.Where(q => q.Actor.Owner == player && !q.Actor.IsDead && q.Actor.IsInWorld)
-				.Sum(q => q.Trait.AllQueued().Count(item => baseBuilder.SmartEconomyRefineryTypes.Contains(item.Item)));
+				.Where(q => q.Actor.Owner == player && !q.Actor.IsDead && q.Actor.IsInWorld);
+		}
+
+		int QueuedActors(HashSet<string> types)
+		{
+			return OwnedProductionQueues().Sum(q => q.Trait.AllQueued().Count(item => types.Contains(item.Item)));
+		}
+
+		int PendingProductionActors(HashSet<string> types)
+		{
+			return world.ActorsWithTrait<IPendingProductionActors>()
+				.Where(p => p.Actor.Owner == player && !p.Actor.IsDead && p.Actor.IsInWorld)
+				.Sum(p => p.Trait.PendingActorTypes.Count(types.Contains));
+		}
+
+		int RequestedActors(IBot bot, HashSet<string> types)
+		{
+			return types.Sum(type => unitProduction.Where(r => r.IsTraitEnabled())
+				.Select(r => r.RequestedProductionCount(bot, type)).DefaultIfEmpty(0).Max());
+		}
+
+		HashSet<uint> QueuedRefineryQueueIds()
+		{
+			return OwnedProductionQueues().Where(q => q.Trait.AllQueued()
+				.Any(item => baseBuilder.SmartEconomyRefineryTypes.Contains(item.Item)))
+				.Select(q => q.Actor.ActorID).ToHashSet();
+		}
+
+		int QueuedRefineryRemainingCost()
+		{
+			return OwnedProductionQueues().SelectMany(q => q.Trait.AllQueued())
+				.Where(item => baseBuilder.SmartEconomyRefineryTypes.Contains(item.Item))
+				.Sum(item => item.RemainingCost);
+		}
+
+		int MinimumBuildableRefineryCost()
+		{
+			return OwnedProductionQueues().SelectMany(q => q.Trait.BuildableItems()
+				.Where(a => baseBuilder.SmartEconomyRefineryTypes.Contains(a.Name))
+				.Select(a => q.Trait.GetProductionCost(a))).Where(cost => cost > 0).DefaultIfEmpty(0).Min();
 		}
 
 		int CountWaitingHarvestersNearRefineries()
@@ -293,19 +478,46 @@ namespace OpenRA.Mods.Common.Traits
 			bool savedMcvRequestOutstanding, int savedMcvRequestExpiryTick, int savedMcvRequestTargetAssets,
 			SmartEconomyPressure savedRefineryPressure, SmartEconomyPressure savedCashPressure)
 		{
-			nextScanTick = savedNextScanTick;
+			postLoadResumeTick = SmartEconomyPolicy.PostLoadResumeTick(world.WorldTick,
+				baseBuilder.Info.SmartEconomyScanInterval);
+			nextScanTick = Math.Max(savedNextScanTick, postLoadResumeTick);
 			nextMcvRequestTick = savedNextMcvRequestTick;
 			nextProgressLogTick = savedNextProgressLogTick;
-			refineryBuildOutstanding = savedRefineryBuildOutstanding;
-			refineryBuildExpiryTick = savedRefineryBuildExpiryTick;
-			refineryBuildTargetCount = savedRefineryBuildTargetCount;
+			refineryReservations.Clear();
+			if (savedRefineryBuildOutstanding)
+				refineryReservations.Add(0, new RefineryReservation(0, string.Empty,
+					savedRefineryBuildExpiryTick, savedRefineryBuildTargetCount, 0));
 			mcvRequestOutstanding = savedMcvRequestOutstanding;
 			mcvRequestExpiryTick = savedMcvRequestExpiryTick;
 			mcvRequestTargetAssets = savedMcvRequestTargetAssets;
 			refineryPressure = savedRefineryPressure;
 			cashPressure = savedCashPressure;
-			ShouldReserveCashForRefinery = enabled && refineryPressure.Active && waitingHarvesters > 0 &&
-				baseBuilder.CanBuildAnotherSmartEconomyRefinery();
+			ShouldReserveCashForRefinery = false;
+			baseBuilder.LogSmartEconomy("{0} restored: deferring new economy requests until tick {1}",
+				player, postLoadResumeTick);
+		}
+
+		public void LoadRefineryReservations(uint[] queueActorIds, string[] types, int[] expiryTicks,
+			int[] targetCounts, int[] costs)
+		{
+			var count = new[]
+			{
+				queueActorIds?.Length ?? 0, types?.Length ?? 0, expiryTicks?.Length ?? 0,
+				targetCounts?.Length ?? 0, costs?.Length ?? 0
+			}.Min();
+			if (count == 0)
+				return;
+
+			refineryReservations.Clear();
+			for (var i = 0; i < count; i++)
+			{
+				var queueActorId = queueActorIds[i];
+				if (refineryReservations.ContainsKey(queueActorId))
+					continue;
+
+				refineryReservations.Add(queueActorId, new RefineryReservation(queueActorId, types[i],
+					expiryTicks[i], targetCounts[i], costs[i]));
+			}
 		}
 	}
 }

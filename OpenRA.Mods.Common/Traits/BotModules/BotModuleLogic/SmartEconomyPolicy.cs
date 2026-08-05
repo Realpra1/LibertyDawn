@@ -26,6 +26,25 @@ namespace OpenRA.Mods.Common.Traits
 		}
 	}
 
+	public readonly struct SmartEconomyRefineryDemand
+	{
+		public readonly int CommittedHarvesters;
+		public readonly int CommittedRefineries;
+		public readonly int DesiredRefineries;
+		public readonly int Deficit;
+		public readonly int AvailableRequests;
+
+		public SmartEconomyRefineryDemand(int committedHarvesters, int committedRefineries,
+			int desiredRefineries, int deficit, int availableRequests)
+		{
+			CommittedHarvesters = Math.Max(0, committedHarvesters);
+			CommittedRefineries = Math.Max(0, committedRefineries);
+			DesiredRefineries = Math.Max(0, desiredRefineries);
+			Deficit = Math.Max(0, deficit);
+			AvailableRequests = Math.Max(0, availableRequests);
+		}
+	}
+
 	/// <summary>
 	/// Pure deterministic policy used by the base builder's bounded economy sampler.
 	/// Keeping time accumulation and expansion sizing independent of World makes the
@@ -33,6 +52,12 @@ namespace OpenRA.Mods.Common.Traits
 	/// </summary>
 	public static class SmartEconomyPolicy
 	{
+		public static int PostLoadResumeTick(int currentTick, int settleTicks)
+		{
+			return (int)Math.Min(int.MaxValue,
+				(long)Math.Max(0, currentTick) + Math.Max(1, settleTicks));
+		}
+
 		public static SmartEconomyPressure UpdatePressure(SmartEconomyPressure current,
 			bool pressureObserved, int elapsedTicks, int activationTicks, int releaseTicks)
 		{
@@ -74,6 +99,60 @@ namespace OpenRA.Mods.Common.Traits
 
 			var threshold = Math.Clamp(thresholdPercent, 0, 100);
 			return (long)Math.Max(0, storedResources) * 100 >= (long)resourceCapacity * threshold;
+		}
+
+		public static SmartEconomyRefineryDemand RefineryDemand(int liveHarvesters, int queuedHarvesters,
+			int requestedHarvesters, int liveRefineries, int queuedRefineries, int reservedRefineries,
+			int freeHarvestersPerPendingRefinery, int harvestersPerRefinery, int maximumParallelRefineries,
+			bool sustainedCongestion = false)
+		{
+			var pendingRefineries = Math.Max(0, queuedRefineries) + Math.Max(0, reservedRefineries);
+			var committedRefineries = Math.Max(0, liveRefineries) + pendingRefineries;
+			var committedHarvesters = Math.Max(0, liveHarvesters) + Math.Max(0, queuedHarvesters) +
+				Math.Max(0, requestedHarvesters) + pendingRefineries * Math.Max(0, freeHarvestersPerPendingRefinery);
+			var refineryCapacity = Math.Max(1, harvestersPerRefinery);
+			var ratioTarget = (committedHarvesters + refineryCapacity - 1) / refineryCapacity;
+			var congestionTarget = Math.Max(0, liveRefineries) + (sustainedCongestion ? 1 : 0);
+			var desired = Math.Max(congestionTarget, ratioTarget);
+			var deficit = Math.Max(0, desired - committedRefineries);
+			var parallelCapacity = Math.Max(0, maximumParallelRefineries) - pendingRefineries;
+
+			return new SmartEconomyRefineryDemand(committedHarvesters, committedRefineries, desired,
+				deficit, Math.Min(deficit, Math.Max(0, parallelCapacity)));
+		}
+
+		public static int RefineryCashShortfall(int spendableCash, int refineryCost,
+			int liveRefineries, int queuedRefineries, int reservedRefineries, int idleRefineryQueues)
+		{
+			if (liveRefineries > 0 || queuedRefineries > 0 || reservedRefineries > 0 || idleRefineryQueues <= 0)
+				return 0;
+
+			return Math.Max(0, Math.Max(0, refineryCost) - Math.Max(0, spendableCash));
+		}
+
+		public static bool NeedsSerializedFirstRefinery(bool enabled, int liveRefineries,
+			int queuedRefineries, int reservedRefineries)
+		{
+			return enabled && liveRefineries <= 0 && queuedRefineries <= 0 && reservedRefineries <= 0;
+		}
+
+		public static bool CanFundRefinery(int spendableCash, int queuedRemainingCost,
+			int reservedCost, int refineryCost)
+		{
+			var committedCost = (long)Math.Max(0, queuedRemainingCost) + Math.Max(0, reservedCost) +
+				Math.Max(0, refineryCost);
+			return Math.Max(0, spendableCash) >= committedCost;
+		}
+
+		public static int EffectiveParallelRefineryLimit(int idleRefineryQueues, int pendingRefineries,
+			int configuredLimit, bool preserveProductionQueue)
+		{
+			var pending = Math.Max(0, pendingRefineries);
+			var usableQueues = pending + Math.Max(0, idleRefineryQueues);
+			if (preserveProductionQueue && usableQueues > 1)
+				usableQueues = Math.Max(pending, (usableQueues + 1) / 2);
+
+			return Math.Min(Math.Max(0, configuredLimit), usableQueues);
 		}
 
 		public static int DesiredExpansionAssets(int spendableCash, int threshold, int maximumAssets)
