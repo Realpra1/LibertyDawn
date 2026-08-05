@@ -230,6 +230,7 @@ World:
                 ExplosionChance: 20
                 MinimumDamage: 100
                 Explosions: ChemtankExplodeOnce
+                ExplosionImpactType: BlueTiberiumExplosion
                 ExplodeInto: BlueTiberium, BlueTiberium, BlueTiberium, Tiberium, Nothing
 				MaxDensity: 10
                 SpreadInterval: 1125
@@ -253,6 +254,7 @@ World:
                 ExplosionChance: 100
                 MinimumDamage: 100
                 Explosions: AtomicTib, TiberiumMeteor
+                ExplosionImpactType: RedTiberiumExplosion
                 ExplodeInto: BlueTiberium, Tiberium, Nothing
 				MaxDensity: 20
                 SpreadInterval: 1125
@@ -267,6 +269,7 @@ World:
                     15: 6000
                     20: 6000
 	ResourceClaimLayer:
+	TiberiumExplosionOptions:
 	WarheadDebugOverlay:
 	CustomTerrainDebugOverlay:
 	MapCreeps:

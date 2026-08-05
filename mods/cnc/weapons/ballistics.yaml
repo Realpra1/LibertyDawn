@@ -127,6 +127,7 @@ Grenade:
 		ImpactActors: true
         
 TiberiumMeteor:
+	ImpactType: RedTiberiumExplosion
 	Inherits: ^BallisticWeapon
 	ReloadDelay: 50
 	Range: 20c0

@@ -103,9 +103,13 @@ HARV:
 	Explodes:
 		RequiresCondition: !no-tiberium
 		Weapon: TiberiumExplosion
+		LoadedResourceImpactTypes:
+			BlueTiberium: BlueTiberiumExplosion
+			RedTiberium: RedTiberiumExplosion
     Explodes@unstable:
 		RequiresCondition: unstable-tiberium
 		Weapon: AtomicHarv
+		ImpactType: RedTiberiumExplosion
     Blink:
 		RequiresCondition: unstable-tiberium
         Interval: 13
@@ -183,9 +187,13 @@ SHARV:
 	Explodes:
 		RequiresCondition: !no-tiberium
 		Weapon: TiberiumExplosion
+		LoadedResourceImpactTypes:
+			BlueTiberium: BlueTiberiumExplosion
+			RedTiberium: RedTiberiumExplosion
     Explodes@unstable:
 		RequiresCondition: unstable-tiberium
 		Weapon: Atomic
+		ImpactType: RedTiberiumExplosion
     Blink:
 		RequiresCondition: unstable-tiberium
         Interval: 13

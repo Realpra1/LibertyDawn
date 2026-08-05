@@ -123,6 +123,7 @@
 
 ChemtankExplodeOnce:
 	Inherits@ChemtankExplode: ^ChemtankExplode
+	ImpactType: BlueTiberiumExplosion
     Warhead@1Dam: SpreadDamage
 		Spread: 750
 		Damage: 13800

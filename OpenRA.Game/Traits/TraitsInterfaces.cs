@@ -541,6 +541,11 @@ namespace OpenRA.Traits
 		void DoImpact(in Target target, WarheadArgs args);
 	}
 
+	public interface IImpactTypeSuppressor
+	{
+		bool SuppressImpact(string impactType);
+	}
+
 	public interface IRulesetLoaded<TInfo> { void RulesetLoaded(Ruleset rules, TInfo info); }
 	public interface IRulesetLoaded : IRulesetLoaded<ActorInfo>, ITraitInfoInterface { }
 

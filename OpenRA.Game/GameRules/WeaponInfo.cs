@@ -72,6 +72,9 @@ namespace OpenRA.GameRules
 
 	public sealed class WeaponInfo
 	{
+		[Desc("Optional semantic impact type that world traits may suppress.")]
+		public readonly string ImpactType = null;
+
 		[Desc("The maximum range the weapon can fire.")]
 		public readonly WDist Range = WDist.Zero;
 
@@ -223,6 +226,9 @@ namespace OpenRA.GameRules
 		public void Impact(in Target target, WarheadArgs args)
 		{
 			var world = args.SourceActor.World;
+			if (IsImpactSuppressed(world))
+				return;
+
 			foreach (var warhead in Warheads)
 			{
 				if (warhead.Delay > 0)
@@ -234,6 +240,12 @@ namespace OpenRA.GameRules
 				else
 					warhead.DoImpact(target, args);
 			}
+		}
+
+		public bool IsImpactSuppressed(World world)
+		{
+			return !string.IsNullOrEmpty(ImpactType) && world.WorldActor
+				.TraitsImplementing<IImpactTypeSuppressor>().Any(s => s.SuppressImpact(ImpactType));
 		}
 
 		/// <summary>Applies all the weapon's warheads to the target. Only use for projectile-less, special-case impacts.</summary>

@@ -9,6 +9,8 @@
  */
 #endregion
 
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using OpenRA.GameRules;
 using OpenRA.Primitives;
@@ -52,6 +54,12 @@ namespace OpenRA.Mods.Common.Traits
 			"Footprint (explosion on each occupied cell).")]
 		public readonly ExplosionType Type = ExplosionType.CenterPosition;
 
+		[Desc("Optional semantic impact type that world traits may suppress before this explosion fires.")]
+		public readonly string ImpactType = null;
+
+		[Desc("Optional impact types keyed by carried Harvester resource type. The explosion is suppressed when every loaded resource maps to a suppressed impact type.")]
+		public readonly Dictionary<string, string> LoadedResourceImpactTypes = new Dictionary<string, string>();
+
 		[Desc("Offset of the explosion from the center of the exploding actor (or cell).")]
 		public readonly WVec Offset = WVec.Zero;
 
@@ -84,6 +92,7 @@ namespace OpenRA.Mods.Common.Traits
 	public class Explodes : ConditionalTrait<ExplodesInfo>, INotifyKilled, INotifyDamage
 	{
 		readonly IHealth health;
+		readonly Harvester harvester;
 		BuildingInfo buildingInfo;
 		Armament[] armaments;
 
@@ -91,6 +100,7 @@ namespace OpenRA.Mods.Common.Traits
 			: base(info)
 		{
 			health = self.Trait<IHealth>();
+			harvester = self.TraitOrDefault<Harvester>();
 		}
 
 		protected override void Created(Actor self)
@@ -112,6 +122,11 @@ namespace OpenRA.Mods.Common.Traits
 			if (!Info.DeathTypes.IsEmpty && !e.Damage.DamageTypes.Overlaps(Info.DeathTypes))
 				return;
 
+			if (IsImpactSuppressed(self.World, Info.ImpactType) || LoadedResourceExplosionIsSuppressed(
+				harvester?.Contents, Info.LoadedResourceImpactTypes,
+				impactType => IsImpactSuppressed(self.World, impactType)))
+				return;
+
 			var weapon = ChooseWeaponForExplosion(self);
 			if (weapon == null)
 				return;
@@ -131,6 +146,32 @@ namespace OpenRA.Mods.Common.Traits
 
 			// Use .FromPos since this actor is killed. Cannot use Target.FromActor
 			weapon.Impact(Target.FromPos(self.CenterPosition + Info.Offset), source);
+		}
+
+		static bool IsImpactSuppressed(World world, string impactType)
+		{
+			return !string.IsNullOrEmpty(impactType) && world.WorldActor
+				.TraitsImplementing<IImpactTypeSuppressor>().Any(s => s.SuppressImpact(impactType));
+		}
+
+		public static bool LoadedResourceExplosionIsSuppressed(IReadOnlyDictionary<string, int> contents,
+			IReadOnlyDictionary<string, string> impactTypes, Func<string, bool> isSuppressed)
+		{
+			if (contents == null || contents.Count == 0 || impactTypes == null || impactTypes.Count == 0)
+				return false;
+
+			var foundPayload = false;
+			foreach (var content in contents)
+			{
+				if (content.Value <= 0)
+					continue;
+
+				foundPayload = true;
+				if (!impactTypes.TryGetValue(content.Key, out var impactType) || !isSuppressed(impactType))
+					return false;
+			}
+
+			return foundPayload;
 		}
 
 		WeaponInfo ChooseWeaponForExplosion(Actor self)
