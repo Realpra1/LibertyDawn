@@ -37,7 +37,7 @@ namespace OpenRA.Mods.Common.UtilityCommands
 				"Please do not edit it directly, but add new `[Desc(\"String\")]` tags to the source code. This file has been " +
 				"automatically generated for version {0} of OpenRA.", version);
 			Console.WriteLine();
-			Console.WriteLine("All settings can be changed by starting the game via a command-line parameter like `Game.Mod=ra`.");
+			Console.WriteLine("All settings can be changed by starting the game via a command-line parameter like `Game.Mod=cnc`.");
 			Console.WriteLine();
 			Console.WriteLine("## Location");
 			Console.WriteLine("* Windows: `%APPDATA%\\OpenRA\\settings.yaml`");

@@ -1,32 +1,17 @@
 @echo off
 title OpenRA
-for /F "delims==\ " %%x in ("%*") do (
-  if "%%~x" EQU "Game.Mod" (goto launch)
-)
-
-:choosemod
-set /P mod="Select mod (ra, cnc, d2k, ts) or --exit: "
-if /I "%mod%" EQU "--exit" (exit /b)
-if "%mod%" EQU "ra" (goto launchmod)
-if "%mod%" EQU "cnc" (goto launchmod)
-if "%mod%" EQU "ts" (goto launchmod)
-if "%mod%" EQU "d2k" (goto launchmod)
-echo.
-echo Unknown mod: %mod%
-echo.
-goto choosemod
-
-:launchmod
+echo %* | %SystemRoot%\System32\findstr.exe /I /C:"Game.Mod=ra" /C:"Game.Mod=d2k" /C:"Game.Mod=ts" >nul
+if not errorlevel 1 goto unsupportedmod
 cd %~dp0%
-bin\OpenRA.exe Engine.EngineDir=".." Engine.LaunchPath="%~dpf0" Game.Mod=%mod% %*
-goto end
-:launch
-cd %~dp0%
-bin\OpenRA.exe Engine.EngineDir=".." Engine.LaunchPath="%~dpf0" %*
+bin\OpenRA.exe Engine.EngineDir=".." Engine.LaunchPath="%~dpf0" Game.Mod=cnc %*
 
 :end
 if %errorlevel% neq 0 goto crashdialog
 exit /b
+
+:unsupportedmod
+echo LibertyDawn supports only Game.Mod=cnc.
+exit /b 2
 
 :crashdialog
 set logs=%AppData%\OpenRA\Logs

@@ -74,7 +74,7 @@ function Version-Command
 	if ($version -ne $null)
 	{
 		$version | out-file ".\VERSION"
-		$mods = @("mods/ra/mod.yaml", "mods/cnc/mod.yaml", "mods/d2k/mod.yaml", "mods/ts/mod.yaml", "mods/modcontent/mod.yaml", "mods/all/mod.yaml")
+		$mods = @("mods/cnc/mod.yaml", "mods/modcontent/mod.yaml", "mods/all/mod.yaml")
 		foreach ($mod in $mods)
 		{
 			$replacement = (gc $mod) -Replace "Version:.*", ("Version: {0}" -f $version)
@@ -99,15 +99,8 @@ function Test-Command
 		return
 	}
 
-	Write-Host "Testing mods..." -ForegroundColor Cyan
-	Write-Host "Testing Tiberian Sun mod MiniYAML..." -ForegroundColor Cyan
-	InvokeCommand "$utilityPath ts --check-yaml"
-	Write-Host "Testing Dune 2000 mod MiniYAML..." -ForegroundColor Cyan
-	InvokeCommand "$utilityPath d2k --check-yaml"
-	Write-Host "Testing Tiberian Dawn mod MiniYAML..." -ForegroundColor Cyan
+	Write-Host "Testing LibertyDawn Tiberian Dawn mod MiniYAML..." -ForegroundColor Cyan
 	InvokeCommand "$utilityPath cnc --check-yaml"
-	Write-Host "Testing Red Alert mod MiniYAML..." -ForegroundColor Cyan
-	InvokeCommand "$utilityPath ra --check-yaml"
 }
 
 function Check-Command
@@ -124,10 +117,10 @@ function Check-Command
 	if ((CheckForUtility) -eq 0)
 	{
 		Write-Host "Checking for explicit interface violations..." -ForegroundColor Cyan
-		InvokeCommand "$utilityPath all --check-explicit-interfaces"
+		InvokeCommand "$utilityPath cnc --check-explicit-interfaces"
 
 		Write-Host "Checking for incorrect conditional trait interface overrides..." -ForegroundColor Cyan
-		InvokeCommand "$utilityPath all --check-conditional-trait-interface-overrides"
+		InvokeCommand "$utilityPath cnc --check-conditional-trait-interface-overrides"
 	}
 }
 
@@ -136,7 +129,7 @@ function Check-Scripts-Command
 	if ((Get-Command "luac.exe" -ErrorAction SilentlyContinue) -ne $null)
 	{
 		Write-Host "Testing Lua scripts..." -ForegroundColor Cyan
-		foreach ($script in ls "mods/*/maps/*/*.lua")
+		foreach ($script in Get-ChildItem "mods/cnc/maps" -Filter "*.lua" -Recurse)
 		{
 			luac -p $script
 		}
@@ -144,7 +137,7 @@ function Check-Scripts-Command
 		{
 			luac -p $script
 		}
-		foreach ($script in ls "mods/*/scripts/*.lua")
+		foreach ($script in Get-ChildItem "mods/cnc/scripts", "mods/common/scripts" -Filter "*.lua" -Recurse)
 		{
 			luac -p $script
 		}
@@ -220,11 +213,11 @@ if ($args.Length -eq 0)
 	Write-Host "Command list:"
 	Write-Host ""
 	Write-Host "  all, a              Builds the game and its development tools."
-	Write-Host "  version, v          Sets the version strings for the default mods to the"
+	Write-Host "  version, v          Sets the version strings for the CNC support mods to the"
 	Write-Host "                      latest version for the current Git branch."
 	Write-Host "  clean, c            Removes all built and copied files. Use the 'all' and"
 	Write-Host "                      'dependencies' commands to restore removed files."
-	Write-Host "  test, t             Tests the default mods for errors."
+	Write-Host "  test, t             Tests the LibertyDawn CNC mod for errors."
 	Write-Host "  check, ck           Checks .cs files for StyleCop violations."
 	Write-Host "  check-scripts, cs   Checks .lua files for syntax errors."
 	Write-Host ""
