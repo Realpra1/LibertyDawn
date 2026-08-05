@@ -575,6 +575,9 @@ namespace OpenRA.Mods.Common.Traits
 
 			bot.QueueOrder(new Order("Sell", building, false));
 			nextEmergencySaleTick = world.WorldTick + Info.EmergencySellInterval;
+
+			// Re-scan before ordinary squads can claim the newly spawned sale survivors.
+			scanTicks = 1;
 			Debug("sold nonessential {0}#{1} for emergency scout recovery", building.Info.Name, building.ActorID);
 		}
 
