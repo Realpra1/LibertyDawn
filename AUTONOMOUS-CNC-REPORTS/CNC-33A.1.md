@@ -1,6 +1,6 @@
 # CNC-33A.1: Early vehicle-production priority
 
-- Status: in progress
+- Status: complete
 - Cycles used: 30 of 30
 - Branch: `agent/cnc33a1-vehicle-production-priority`
 - Base: green CNC-24.7 PR #64 head `42ca957a2c`
@@ -63,7 +63,7 @@ Forbidden outcomes are a refinery count cap; more than half of active Facts comm
 
 ## Result and remaining risk
 
-The first iteration's VIKI loss is corrected: early vehicle production now arrives materially sooner, refinery/factory construction stays balanced without a refinery count cap, low-cash streaming no longer livelocks, cash is spent aggressively, and ordinary, scarce, 10K, literal-zero, save/load, harvester-cap, SkyNet, release-quiet, and natural-outcome gates pass. Because cycle 24 found a late defect, the run used the full 30-cycle budget; the three distinct post-fix adversarial regressions and final ordinary regression are clean. Publication and required GitHub checks remain before marking the task complete.
+The first iteration's VIKI loss is corrected: early vehicle production now arrives materially sooner, refinery/factory construction stays balanced without a refinery count cap, low-cash streaming no longer livelocks, cash is spent aggressively, and ordinary, scarce, 10K, literal-zero, save/load, harvester-cap, SkyNet, release-quiet, and natural-outcome gates pass. Because cycle 24 found a late defect, the run used the full 30-cycle budget; the three distinct post-fix adversarial regressions and final ordinary regression are clean. Draft PR #65 is mergeable; implementation/report head `42c5ece169` passed Linux in 2m17s and Windows in 4m20s.
 
 ## Audit findings
 
