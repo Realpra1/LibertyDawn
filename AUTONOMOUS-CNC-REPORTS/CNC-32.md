@@ -1,6 +1,6 @@
 # CNC-32: Remove Unsupported Mods from Normal Workflows
 
-- Status: implementation and local validation complete; exact-head GitHub checks pending
+- Status: complete
 - Cycles used: 15 of 30
 - Branch: `agent/cnc32-remove-unsupported`
 - Base: `origin/agent/cnc31-red-tiberium-bomb-trucks` at `5b341c4433`
@@ -53,4 +53,4 @@ Packaging publish is serialized with `-m:1` because multiple solution projects o
 
 The recurring invalid user `TibTest.oramap` cache warning predates this task and is recorded in `DEFERRED_WORK.md`; timestamped current runs had no new fatal, Lua, or unhandled error. At the user's request during final validation, approximately 6.5 GiB of generated `AUTONOMOUS-CNC-LOGS` and OpenRA runtime logs were moved to the Windows Recycle Bin to address critical disk pressure. They remain recoverable until the user empties the bin, but are no longer present at their original ignored paths. Durable results are preserved in this report.
 
-Full Windows installer compilation and native Linux/macOS package assembly require platform packaging toolchains unavailable on this Windows host. The common real packaging path, generated payload, Linux shortcut/appdata functions, platform script syntax/static calls, and a real packaged game were validated locally; GitHub Linux/Windows checks remain the publication gate.
+Full Windows installer compilation and native Linux/macOS package assembly require platform packaging toolchains unavailable on this Windows host. The common real packaging path, generated payload, Linux shortcut/appdata functions, platform script syntax/static calls, and a real packaged game were validated locally. Draft PR #59 is mergeable; publication head `b5921e9220` passed Linux in 1m58s and Windows in 5m09s.
