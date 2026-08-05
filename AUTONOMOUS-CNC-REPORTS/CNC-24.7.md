@@ -32,7 +32,7 @@ Forbidden outcomes are shared mutable support or map artifacts, colliding logs/r
 - Every child gets a new support directory and settings file, immutable Content link, copied map or versioned server-side save, benchmark prefix, console/log/replay/save paths, Xvfb starting display, and engine-assigned ephemeral loopback endpoint. Command and per-run JSON evidence are retained beside batch JSON/TSV summaries. One headless-only start record captures the actual loaded map and accepted bot/faction/team/spawn roster without restoring release diagnostic spam.
 - A failed, timed-out, or invalid child is judged independently while healthy siblings continue. SIGINT/SIGTERM terminates each child process group with a bounded TERM/KILL cleanup, and a batch succeeds only when every child passes its own activation, tick, exit, pattern, artifact, crash, and benchmark gates.
 - `Launch.ExitAtTick` provides a graceful bounded headless exit that logs the reached world tick and flushes benchmark/replay output. It is rejected outside headless automation. Existing natural-game and single-game launch behavior is unchanged.
-- The example manifest defines three ordinary five-bot Empire Earth workloads, including one automated save. Four Python standard-library tests cover validation, serial/concurrent scheduling, sibling failure isolation, and server-side save staging; Linux CI runs them.
+- The example manifest defines three ordinary five-bot Empire Earth workloads, including one automated save. Four Python standard-library tests cover validation, serial/concurrent scheduling, sibling failure isolation, and server-side save staging.
 
 ## Engine evidence
 
