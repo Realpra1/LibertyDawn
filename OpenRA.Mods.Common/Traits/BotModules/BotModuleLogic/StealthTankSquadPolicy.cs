@@ -106,5 +106,12 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			return rangeCells > 0 ? rangeCells + Math.Max(0, bufferCells) : 0;
 		}
+
+		public static int TransitThreatRange(int detectorRangeCells, int weaponRangeCells,
+			bool weaponIsEngaged, bool canKiteTarget)
+		{
+			var weaponRange = weaponIsEngaged && !canKiteTarget ? weaponRangeCells : 0;
+			return Math.Max(detectorRangeCells, weaponRange);
+		}
 	}
 }

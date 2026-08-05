@@ -116,5 +116,17 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(StealthTankSquadPolicy.BufferedRange(0, 2), Is.Zero);
 			Assert.That(StealthTankSquadPolicy.BufferedRange(5, 2), Is.EqualTo(7));
 		}
+
+		[TestCase(0, 7, false, false, 0)]
+		[TestCase(0, 7, true, false, 7)]
+		[TestCase(5, 7, false, false, 5)]
+		[TestCase(5, 7, true, false, 7)]
+		[TestCase(5, 7, true, true, 5)]
+		public void TransitOnlyTreatsEngagedWeaponsAsCrossfire(int detectorRange, int weaponRange,
+			bool weaponIsEngaged, bool canKiteTarget, int expected)
+		{
+			Assert.That(StealthTankSquadPolicy.TransitThreatRange(detectorRange, weaponRange,
+				weaponIsEngaged, canKiteTarget), Is.EqualTo(expected));
+		}
 	}
 }

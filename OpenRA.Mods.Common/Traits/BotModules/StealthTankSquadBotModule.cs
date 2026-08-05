@@ -131,6 +131,7 @@ namespace OpenRA.Mods.Common.Traits
 			public int WeaponRangeCells;
 			public int DetectorRangeCells;
 			public int Value;
+			public bool WeaponIsEngaged;
 		}
 
 		static readonly BitSet<TargetableType> TankTargetTypes = new BitSet<TargetableType>("Tank");
@@ -282,7 +283,9 @@ namespace OpenRA.Mods.Common.Traits
 				Actor = actor,
 				WeaponRangeCells = weaponRange,
 				DetectorRangeCells = detectorRange,
-				Value = Math.Max(1, actor.Info.TraitInfoOrDefault<ValuedInfo>()?.Cost ?? 1)
+				Value = Math.Max(1, actor.Info.TraitInfoOrDefault<ValuedInfo>()?.Cost ?? 1),
+				WeaponIsEngaged = actor.CurrentActivity != null &&
+					actor.CurrentActivity.ActivitiesImplementing<IActivityNotifyStanceChanged>().Any()
 			};
 		}
 
@@ -448,8 +451,9 @@ namespace OpenRA.Mods.Common.Traits
 			group.LastOrderTick = world.WorldTick;
 			var crush = Info.CrushInfantryTargets && role == StealthTankSquadRole.Harass &&
 				selected.GetEnabledTargetTypes().Overlaps(InfantryTargetTypes);
-			var routed = role == StealthTankSquadRole.Harass && Info.AvoidResourceTypes.Count > 0 &&
-				IssueHazardAwareOrder(group, selected, threats, ownRange, crush);
+			var routed = Info.AvoidResourceTypes.Count > 0 &&
+				IssueHazardAwareOrder(group, selected, threats, ownRange, crush,
+					role == StealthTankSquadRole.Attack && selectedDanger > 0);
 			if (!routed)
 			{
 				var order = crush ? new Order("Move", null, Target.FromCell(world, selected.Location), false,
@@ -484,7 +488,7 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				var cells = world.Map.FindTilesInAnnulus(anchor.Location, 0, Info.ResourceWaitingSearchRadius)
 					.Where(c => resourceLayer.GetResource(c).Type != null && !IsResourceHazard(c) &&
-						!IsThreatenedCell(c, null, threats, ownRange) &&
+						!IsTransitThreatenedCell(c, null, threats, ownRange) &&
 						mobile.CanEnterCell(c) && domainIndex.IsPassable(first.Location, c, mobile.Locomotor))
 					.OrderBy(c => (c - first.Location).LengthSquared)
 					.ThenBy(c => c.Y).ThenBy(c => c.X).Take(1).ToArray();
@@ -502,7 +506,8 @@ namespace OpenRA.Mods.Common.Traits
 			}
 		}
 
-		bool IssueHazardAwareOrder(SpecialistGroup group, Actor target, List<Threat> threats, int ownRange, bool crush)
+		bool IssueHazardAwareOrder(SpecialistGroup group, Actor target, List<Threat> threats, int ownRange,
+			bool crush, bool allowDangerousEndpoint)
 		{
 			if (resourceLayer == null || ownRange <= 0)
 				return false;
@@ -512,7 +517,7 @@ namespace OpenRA.Mods.Common.Traits
 			var waypointCount = 0;
 			foreach (var unit in group.Units.Where(IsEligible))
 			{
-				var path = HazardAwarePath(unit, target, threats, ownRange, crush);
+				var path = HazardAwarePath(unit, target, threats, ownRange, crush, allowDangerousEndpoint);
 				if (path == null || path.Count == 0)
 				{
 					bot.QueueOrder(new Order("Stop", unit, false));
@@ -561,11 +566,12 @@ namespace OpenRA.Mods.Common.Traits
 		bool HasHazardAwareRoute(SpecialistGroup group, Actor target, List<Threat> threats, int ownRange, bool crush)
 		{
 			var unit = group.Units.FirstOrDefault(IsEligible);
-			var path = unit == null ? null : HazardAwarePath(unit, target, threats, ownRange, crush);
+			var path = unit == null ? null : HazardAwarePath(unit, target, threats, ownRange, crush, false);
 			return path != null && path.Count > 0;
 		}
 
-		List<CPos> HazardAwarePath(Actor unit, Actor target, List<Threat> threats, int ownRange, bool crush)
+		List<CPos> HazardAwarePath(Actor unit, Actor target, List<Threat> threats, int ownRange,
+			bool crush, bool allowDangerousEndpoint)
 		{
 			var mobile = unit.TraitOrDefault<Mobile>();
 			if (mobile == null)
@@ -575,7 +581,8 @@ namespace OpenRA.Mods.Common.Traits
 				world.Map.FindTilesInAnnulus(target.Location,
 					Math.Max(1, ownRange - 1), Math.Max(1, ownRange)))
 				.Where(c => mobile.CanEnterCell(c, check: BlockedByActor.Immovable) &&
-					!IsResourceHazard(c) && !IsThreatenedCell(c, target, threats, ownRange))
+					!IsResourceHazard(c) && (allowDangerousEndpoint ||
+						!IsEndpointThreatenedCell(c, target, threats, ownRange)))
 				.ToHashSet();
 			if (approachCells.Count == 0)
 				return null;
@@ -583,7 +590,7 @@ namespace OpenRA.Mods.Common.Traits
 			List<CPos> path;
 			using (var search = PathSearch.ToTargetCellByPredicate(world, mobile.Locomotor, unit,
 				new[] { unit.Location }, approachCells.Contains, BlockedByActor.Immovable,
-				c => IsResourceHazard(c) || IsThreatenedCell(c, target, threats, ownRange) ?
+				c => IsResourceHazard(c) || IsTransitThreatenedCell(c, target, threats, ownRange) ?
 					PathGraph.PathCostForInvalidPath : 0))
 				path = mobile.Pathfinder.FindPath(search);
 
@@ -611,7 +618,7 @@ namespace OpenRA.Mods.Common.Traits
 			return result;
 		}
 
-		bool IsThreatenedCell(CPos cell, Actor intendedTarget, IEnumerable<Threat> threats, int ownRange)
+		bool IsEndpointThreatenedCell(CPos cell, Actor intendedTarget, IEnumerable<Threat> threats, int ownRange)
 		{
 			var position = world.Map.CenterOfCell(cell);
 			foreach (var threat in threats)
@@ -625,6 +632,28 @@ namespace OpenRA.Mods.Common.Traits
 				var canKiteTarget = threat.Actor == intendedTarget && detectorRange <= 0 &&
 					ownRange >= threat.WeaponRangeCells + Info.KiteRangeMarginCells;
 				var range = Math.Max(detectorRange, canKiteTarget ? 0 : weaponRange);
+				if (range > 0 && (position - threat.Actor.CenterPosition).Length <= range * 1024)
+					return true;
+			}
+
+			return false;
+		}
+
+		bool IsTransitThreatenedCell(CPos cell, Actor intendedTarget, IEnumerable<Threat> threats, int ownRange)
+		{
+			var position = world.Map.CenterOfCell(cell);
+			foreach (var threat in threats)
+			{
+				var detectorRange = StealthTankSquadPolicy.BufferedRange(threat.DetectorRangeCells,
+					Info.DetectorRangeBufferCells);
+				var ignoreWeapon = threat.Actor.GetEnabledTargetTypes()
+					.Overlaps(Info.IgnoredHarassmentWeaponThreatTypes);
+				var weaponRange = StealthTankSquadPolicy.BufferedRange(ignoreWeapon ? 0 : threat.WeaponRangeCells,
+					Info.ThreatRangeBufferCells);
+				var canKiteTarget = threat.Actor == intendedTarget && detectorRange <= 0 &&
+					ownRange >= threat.WeaponRangeCells + Info.KiteRangeMarginCells;
+				var range = StealthTankSquadPolicy.TransitThreatRange(detectorRange, weaponRange,
+					threat.WeaponIsEngaged, canKiteTarget);
 				if (range > 0 && (position - threat.Actor.CenterPosition).Length <= range * 1024)
 					return true;
 			}
@@ -700,7 +729,8 @@ namespace OpenRA.Mods.Common.Traits
 					ownRange >= threat.WeaponRangeCells + Info.KiteRangeMarginCells;
 
 				var routeDanger = SegmentPassesWithin(start, target.CenterPosition, threat.Actor.CenterPosition,
-					Math.Max(detectorRange, canKiteTarget ? 0 : weaponRange));
+					StealthTankSquadPolicy.TransitThreatRange(detectorRange, weaponRange,
+						threat.WeaponIsEngaged, canKiteTarget));
 				if (!endpointDanger && !routeDanger)
 					continue;
 
