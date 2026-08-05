@@ -106,7 +106,8 @@ namespace OpenRA.Mods.Common.Traits
 
 		protected override void TraitEnabled(Actor self)
 		{
-			scanTicks = world.LocalRandom.Next(1, Info.ScanInterval + 1);
+			// Establish reservations before the ordinary squad manager can claim newly available tanks.
+			scanTicks = 1;
 		}
 
 		protected override void TraitDisabled(Actor self)
