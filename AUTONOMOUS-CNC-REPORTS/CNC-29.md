@@ -1,6 +1,6 @@
 # CNC-29: Stealth Chemical Harassment Squad
 
-- Status: local gates passed; final GitHub CI pending
+- Status: complete
 - Cycles used: 13 of 30
 - Branch: `agent/cnc29-stealth-chem-squad`
 - Base: `origin/agent/cnc28-stealth-chem`
@@ -52,6 +52,7 @@ Ignored raw logs, fixture packages, and the full-match replay are under `AUTONOM
 - Existing stealth-tank live allocation and role targeting passed unchanged.
 - Three consecutive clean post-fix adversarial passes completed, including one full natural match.
 - The recurring map-cache warning naming the user's pre-existing invalid `TibTest.oramap` is unrelated to the CNC-29 fixtures.
+- GitHub implementation/report head `c3eed0f7f9`: Linux passed in 3m15s and Windows passed in 4m35s; PR #56 is mergeable.
 
 ## Deferred boundary
 
