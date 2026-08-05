@@ -187,6 +187,31 @@ Player:
 		EmergencySellInterval: 1500
 		MinimumCollectorHealthPercent: 75
 		DebugLogging: true
+	RedTiberiumBombBotModule:
+		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai || enable-Easiest-ai
+		StealthHarvesterTypes: sharv
+		HarvesterTypes: harv, sharv
+		UnstableResourceTypes: RedTiberium
+		ScanInterval: 50
+		LaunchPercentPerMinute: 5
+		GameTicksPerMinute: 1500
+		MaximumStoredLaunches: 1
+		MaximumTargetCandidates: 32
+		TargetApproachRadius: 1
+		MissionStallInterval: 250
+		OrderRetryInterval: 75
+		DebugSummaryInterval: 500
+		TargetPriorities:
+			fact: 10000
+			eye: 9000
+			tmpl: 9000
+			hq: 9000
+			proc: 8500
+			weap: 8000
+			afld: 8000
+			hpad: 7000
+			resonator: 6500
+		DebugLogging: true
 	OpeningGarrisonBotModule:
 		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai || enable-Easiest-ai
 		BarracksTypes: pyle, hand

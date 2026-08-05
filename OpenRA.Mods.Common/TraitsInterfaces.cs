@@ -549,6 +549,12 @@ namespace OpenRA.Mods.Common.Traits
 	}
 
 	[RequireExplicitImplementation]
+	public interface IBotHarvesterResourcePolicy
+	{
+		bool CanHarvestResource(Actor harvester, string resourceType);
+	}
+
+	[RequireExplicitImplementation]
 	public interface IBotRequestPauseUnitProduction
 	{
 		bool PauseUnitProduction { get; }

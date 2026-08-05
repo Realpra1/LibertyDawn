@@ -121,6 +121,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly IResourceLayer resourceLayer;
 		readonly ResourceClaimLayer claimLayer;
 		readonly Dictionary<string, int> contents = new Dictionary<string, int>();
+		IBotHarvesterResourcePolicy[] botResourcePolicies = Array.Empty<IBotHarvesterResourcePolicy>();
 		int conditionToken = Actor.InvalidConditionToken;
 		int unstableConditionToken = Actor.InvalidConditionToken;
 
@@ -156,6 +157,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		protected override void Created(Actor self)
 		{
+			botResourcePolicies = self.Owner.PlayerActor.TraitsImplementing<IBotHarvesterResourcePolicy>().ToArray();
 			UpdateCondition(self);
 
 			// Note: This is queued in a FrameEndTask because otherwise the activity is dropped/overridden while moving out of a factory.
@@ -301,7 +303,7 @@ namespace OpenRA.Mods.Common.Traits
 			return contents.Count == 0;
 		}
 
-		public bool CanHarvestCell(Actor self, CPos cell)
+		public bool CanHarvestCell(Actor self, CPos cell, bool ignoreBotResourcePolicies = false)
 		{
 			// Resources only exist in the ground layer
 			if (cell.Layer != 0)
@@ -312,7 +314,8 @@ namespace OpenRA.Mods.Common.Traits
 				return false;
 
 			// Can the harvester collect this kind of resource?
-			return Info.Resources.Contains(resourceType);
+			return Info.Resources.Contains(resourceType) && (ignoreBotResourcePolicies ||
+				botResourcePolicies.All(p => p.CanHarvestResource(self, resourceType)));
 		}
 
 		IEnumerable<IOrderTargeter> IIssueOrder.Orders
@@ -354,7 +357,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		void IResolveOrder.ResolveOrder(Actor self, Order order)
 		{
-			if (order.OrderString == "Harvest")
+			if (order.OrderString == "Harvest" || order.OrderString == "HarvestUnstable")
 			{
 				// NOTE: An explicit harvest order allows the harvester to decide which refinery to deliver to.
 				LinkProc(self, null);
@@ -373,7 +376,8 @@ namespace OpenRA.Mods.Common.Traits
 				}
 
 				// FindResources takes care of calling INotifyHarvesterAction
-				self.QueueActivity(order.Queued, new FindAndDeliverResources(self, loc));
+				self.QueueActivity(order.Queued,
+					new FindAndDeliverResources(self, loc, order.OrderString == "HarvestUnstable"));
 				self.ShowTargetLines();
 			}
 			else if (order.OrderString == "Deliver")

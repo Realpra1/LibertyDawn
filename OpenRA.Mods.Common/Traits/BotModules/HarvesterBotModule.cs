@@ -65,6 +65,7 @@ namespace OpenRA.Mods.Common.Traits
 		IResourceLayer resourceLayer;
 		ResourceClaimLayer claimLayer;
 		IBotRequestUnitProduction[] requestUnitProduction;
+		IBotUnitReservations[] unitReservations;
 		int scanForIdleHarvestersTicks;
 
 		public HarvesterBotModule(Actor self, HarvesterBotModuleInfo info)
@@ -78,6 +79,7 @@ namespace OpenRA.Mods.Common.Traits
 		protected override void Created(Actor self)
 		{
 			requestUnitProduction = self.Owner.PlayerActor.TraitsImplementing<IBotRequestUnitProduction>().ToArray();
+			unitReservations = self.Owner.PlayerActor.TraitsImplementing<IBotUnitReservations>().ToArray();
 		}
 
 		protected override void TraitEnabled(Actor self)
@@ -113,6 +115,9 @@ namespace OpenRA.Mods.Common.Traits
 			// Find idle harvesters and give them orders:
 			foreach (var h in harvesters)
 			{
+				if (unitReservations != null && unitReservations.Any(r => r.IsUnitReserved(h.Key)))
+					continue;
+
 				if (!h.Key.IsIdle)
 				{
 					// Ignore this actor if FindAndDeliverResources is working fine or it is performing a different activity

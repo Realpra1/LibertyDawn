@@ -29,8 +29,9 @@ namespace OpenRA.Mods.Common.Activities
 		readonly CPos targetCell;
 		readonly INotifyHarvesterAction[] notifyHarvesterActions;
 		readonly MoveCooldownHelper moveCooldownHelper;
+		readonly bool ignoreBotResourcePolicies;
 
-		public HarvestResource(Actor self, CPos targetCell)
+		public HarvestResource(Actor self, CPos targetCell, bool ignoreBotResourcePolicies = false)
 		{
 			harv = self.Trait<Harvester>();
 			harvInfo = self.Info.TraitInfo<HarvesterInfo>();
@@ -40,6 +41,7 @@ namespace OpenRA.Mods.Common.Activities
 			claimLayer = self.World.WorldActor.Trait<ResourceClaimLayer>();
 			resourceLayer = self.World.WorldActor.Trait<IResourceLayer>();
 			this.targetCell = targetCell;
+			this.ignoreBotResourcePolicies = ignoreBotResourcePolicies;
 			notifyHarvesterActions = self.TraitsImplementing<INotifyHarvesterAction>().ToArray();
 			moveCooldownHelper = new MoveCooldownHelper(self.World, move as Mobile);
 		}
@@ -79,7 +81,7 @@ namespace OpenRA.Mods.Common.Activities
 				return false;
 			}
 
-			if (!harv.CanHarvestCell(self, self.Location))
+			if (!harv.CanHarvestCell(self, self.Location, ignoreBotResourcePolicies))
 				return true;
 
 			// Turn to one of the harvestable facings
