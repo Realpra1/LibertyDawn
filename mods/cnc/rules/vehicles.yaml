@@ -368,8 +368,11 @@ FTNK:
 CTNK:
 	Inherits: ^Tank
 	Inherits@EXPERIENCE: ^GainsExperience
-	Inherits@CLOAK: ^AcceptsCloakCrate
 	Inherits@AUTOTARGET: ^AutoTargetGroundAssaultMove
+	Inherits@CLOAKED: ^Cloakable
+	Cloak:
+		-RequiresCondition:
+	-GrantConditionInRange@StealthGenReceiver:
 	Valued:
 		Cost: 600
 	Tooltip:
