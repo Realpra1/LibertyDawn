@@ -10,7 +10,7 @@ when the dependency section directs it.
 
 - Worker: `worker-3`
 - Task: `CNC-43 — MCV crush flavor`
-- Status: `Testing complete; publication pending`
+- Status: `Complete - testing`
 - Common base branch/SHA: `agent/cnc38-early-viki-infantry-rush` / `09ccdac3c1ecb5134a4751f2bcbd8a7970dfe6bf`
 - Task branch: `agent/round-20260806-cnc43-mcv-crush-flavor`
 - Intended PR base: `agent/cnc38-early-viki-infantry-rush`
@@ -24,7 +24,7 @@ when the dependency section directs it.
 - Liberty Dawn design reference: `.agents/references/LIBERTY-DAWN-DESIGN.md`
 - Full-engine game tests completed: `36`
 - Sol-xhigh policy escalation: `unused (requires at least 10 game tests; one maximum)`
-- PR: `none`
+- PR: `#78 — https://github.com/Realpra1/LibertyDawn/pull/78 — mergeable CLEAN; no status checks reported/configured`
 
 ## Integrated repair assignment
 
@@ -712,9 +712,9 @@ silently exceed the budget.
 
 ## Handoff receipt
 
-- Proposed status: Pending publication; target is `Complete - testing` after required PR checks.
-- Final branch/head: `agent/round-20260806-cnc43-mcv-crush-flavor` / pending commit.
-- PR and checks: pending.
+- Proposed status: `Complete - testing`.
+- Final branch/head: `agent/round-20260806-cnc43-mcv-crush-flavor` / final receipt commit on PR #78 (exact SHA reported in the handoff response).
+- PR and checks: #78, https://github.com/Realpra1/LibertyDawn/pull/78; mergeable `CLEAN`; GitHub reports no status checks on the branch and no required checks.
 - Cycles used: 1/20 isolated config cycles.
 - Acceptance evidence: Seed 43001 literal pair and seed 43003 final matched pair. Changed MCV killed crate/infantry/SBAG/BRIK/APC/GUN with MCV attribution and deployed; pinned base retained crate/infantry only and deployed.
 - Adversarial evidence: Corridor class matrix plus Mammoth/STNK/MTNK controls and allied safety; seed 43004 ordinary production/repack lifecycle; seed 43005 natural Empire Earth endurance.

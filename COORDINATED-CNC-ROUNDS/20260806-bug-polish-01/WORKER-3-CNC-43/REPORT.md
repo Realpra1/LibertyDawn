@@ -192,8 +192,14 @@ Publication-time check:
 
 Branch: `agent/round-20260806-cnc43-mcv-crush-flavor`.
 
-PR/check status will be filled after publication. The PR base is
-`agent/cnc38-early-viki-infantry-rush`; it must not be merged by this worker.
+PR #78: https://github.com/Realpra1/LibertyDawn/pull/78
+
+The branch was rebased onto current intended base
+`e09177bb8ddb4bce18fd028f6a0a3b72d79da9b0`; the only conflict was the expected
+coordinator-created worker-state add/add, resolved by preserving this completed
+state. GitHub reports the PR mergeable and `CLEAN`. No status checks are
+reported for the branch and `gh pr checks --required` reports no required
+checks. The PR remains open and was not merged.
 
 ## Deferred work
 
