@@ -610,6 +610,7 @@
 	Inherits@selection: ^SelectableCombatUnit
 	Inherits@handicaps: ^PlayerHandicaps
 	Huntable:
+	Mutant:
 	OwnerLostAction:
 		Action: Kill
 	Health:

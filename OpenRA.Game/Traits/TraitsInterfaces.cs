@@ -541,6 +541,26 @@ namespace OpenRA.Traits
 		void DoImpact(in Target target, WarheadArgs args);
 	}
 
+	public interface IImpactTypeSuppressor
+	{
+		bool SuppressImpact(string impactType);
+	}
+
+	public interface IImpactTypeSuppressionBypass
+	{
+		bool BypassImpactSuppression(string impactType);
+	}
+
+	public interface IMutantCreationSuppressor
+	{
+		bool SuppressMutantCreation { get; }
+	}
+
+	public interface IActorCreationSuppressor
+	{
+		bool SuppressActorCreation(Actor actor);
+	}
+
 	public interface IRulesetLoaded<TInfo> { void RulesetLoaded(Ruleset rules, TInfo info); }
 	public interface IRulesetLoaded : IRulesetLoaded<ActorInfo>, ITraitInfoInterface { }
 

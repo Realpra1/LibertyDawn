@@ -314,6 +314,13 @@ namespace OpenRA
 
 		public void Add(Actor a)
 		{
+			if (WorldActor != null && WorldActor.TraitsImplementing<IActorCreationSuppressor>()
+				.Any(s => s.SuppressActorCreation(a)))
+			{
+				a.Dispose();
+				return;
+			}
+
 			a.IsInWorld = true;
 			actors.Add(a.ActorID, a);
 			ActorAdded(a);

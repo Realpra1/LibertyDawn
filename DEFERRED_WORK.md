@@ -18,6 +18,8 @@ This file preserves unresolved findings from the retired autonomous task reports
 
 ## Specialist behavior and testing
 
+- A CNC-37 contention fixture that deliberately transported a recon bike in a Chinook reached its drop cell but repeatedly retried and debug-logged `Unload` while the passenger remained inside. Production transport logging is disabled, and ordinary Mammoth-drop evidence was not implicated; revalidate vehicle unloading and rate-limit unchanged retry diagnostics in a future transport pass.
 - Healthy-building engineer pairs previously stayed committed while the target remained healthy, which could suppress useful reassessment. The new engineer-correction task changes the capture threshold to 80% and should revalidate pair retargeting.
 - A stale local user map named `TibTest.oramap` once lacked `map.yaml` and caused launcher startup failure. Keep autonomous launchers on validated packaged maps or validate custom-map packages before counting a game cycle.
 - Map obstructions can force the opening barracks rally point away from the preferred cell beneath the construction yard. This is an accepted fallback unless it causes blocked production.
+- Harden `launch-ai-parallel.py` interruption cleanup through the `xvfb-run` wrapper. Interrupting an invalid-content batch left two CPU-bound `OpenRA.dll` grandchildren orphaned even though the wrapper processes were finalized; explicit PID cleanup was required. Also clarify that `--content` expects the parent content root containing `cnc/`, not the `cnc/` directory itself.

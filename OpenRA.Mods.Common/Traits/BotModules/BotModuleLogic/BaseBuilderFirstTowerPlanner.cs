@@ -20,10 +20,14 @@ namespace OpenRA.Mods.Common.Traits
 		readonly Player player;
 		CPos? plannedLocation;
 		string plannedType;
+		string reservedBuildType;
+		int reservedBuildTick;
 
 		BaseBuilderBotModuleInfo Info => baseBuilder.Info;
 
 		public bool Complete { get; set; }
+		public bool HasBuildCommitment => reservedBuildType != null ||
+			baseBuilder.CountQueuedOrPendingActors(Info.FirstTowerTypes) > 0;
 
 		public BaseBuilderFirstTowerPlanner(BaseBuilderBotModule baseBuilder, Player player)
 		{
@@ -41,11 +45,35 @@ namespace OpenRA.Mods.Common.Traits
 				.Where(a => a.Owner == player && a.IsInWorld && !a.IsDead && Info.FirstTowerTypes.Contains(a.Info.Name))
 				.OrderBy(a => a.ActorID).FirstOrDefault();
 			if (tower == null)
+			{
+				if (reservedBuildType != null &&
+					baseBuilder.CountQueuedOrPendingActors(new[] { reservedBuildType }) == 0 &&
+					world.WorldTick - reservedBuildTick >= System.Math.Max(1, Info.OpeningRequestRetryDelay))
+				{
+					LogDecision("{0} released stalled preferred first-tower build {1} for retry.",
+						player, reservedBuildType);
+					reservedBuildType = null;
+				}
+
 				return;
+			}
 
 			Complete = true;
+			reservedBuildType = null;
 			LogDecision("{0} completed first-tower placement: {1} at {2}; planned={3}.",
 				player, tower.Info.Name, tower.Location, plannedLocation?.ToString() ?? "existing");
+		}
+
+		public bool TryReserveBuild(string actorType)
+		{
+			if (Complete || reservedBuildType != null || !Info.FirstTowerTypes.Contains(actorType) ||
+				baseBuilder.CountQueuedOrPendingActors(Info.FirstTowerTypes) > 0)
+				return false;
+
+			reservedBuildType = actorType;
+			reservedBuildTick = world.WorldTick;
+			LogDecision("{0} reserved preferred first-tower build: {1}.", player, actorType);
+			return true;
 		}
 
 		public bool AppliesTo(string actorType)

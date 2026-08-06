@@ -35,7 +35,12 @@ namespace OpenRA.Effects
 		public void Tick(World world)
 		{
 			if (--delay <= 0)
-				world.AddFrameEndTask(w => { w.Remove(this); wh.DoImpact(target, args); });
+				world.AddFrameEndTask(w =>
+				{
+					w.Remove(this);
+					if (!args.Weapon.IsImpactSuppressed(w, args.SourceActor))
+						wh.DoImpact(target, args);
+				});
 		}
 
 		public IEnumerable<IRenderable> Render(WorldRenderer wr) { yield break; }

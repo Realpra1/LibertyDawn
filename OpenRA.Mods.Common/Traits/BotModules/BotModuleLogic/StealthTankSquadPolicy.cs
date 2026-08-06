@@ -7,6 +7,7 @@
 #endregion
 
 using System;
+using System.Linq;
 
 namespace OpenRA.Mods.Common.Traits
 {
@@ -58,10 +59,10 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		public static long TargetScore(int priority, int economicValue, int distanceCells,
-			int currentTargetBonusPercent, int clusterMultiplierPercent = 100)
+			int currentTargetBonusPercent, int clusterMultiplierPercent = 100, int distancePenalty = 1)
 		{
 			var score = Math.Max(0, priority) * (long)Math.Max(1, economicValue) /
-				Math.Max(1, distanceCells + 6);
+				Math.Max(1, Math.Max(0, distanceCells) * Math.Max(1, distancePenalty) + 6);
 			return score * Math.Max(100, currentTargetBonusPercent) / 100 *
 				Math.Max(100, clusterMultiplierPercent) / 100;
 		}
@@ -79,9 +80,38 @@ namespace OpenRA.Mods.Common.Traits
 				squadValue >= (long)defendingValue * requiredValueRatio;
 		}
 
+		public static bool CanAttemptDefenderClear(int consecutiveNoSafeTargetScans, int requiredScans,
+			int squadValue, int defendingValue, int requiredValueRatio)
+		{
+			return consecutiveNoSafeTargetScans >= Math.Max(0, requiredScans) &&
+				CanCarefullyClear(squadValue, defendingValue, requiredValueRatio);
+		}
+
+		public static int SelectDefenderClearOpportunity(int[] defendingValues, long[] unlockedScores, int weakestCount)
+		{
+			if (defendingValues == null || unlockedScores == null || weakestCount <= 0 ||
+				defendingValues.Length == 0 || defendingValues.Length != unlockedScores.Length)
+				return -1;
+
+			return Enumerable.Range(0, defendingValues.Length)
+				.OrderBy(i => Math.Max(0, defendingValues[i]))
+				.ThenBy(i => i)
+				.Take(weakestCount)
+				.OrderByDescending(i => unlockedScores[i])
+				.ThenBy(i => i)
+				.First();
+		}
+
 		public static int BufferedRange(int rangeCells, int bufferCells)
 		{
 			return rangeCells > 0 ? rangeCells + Math.Max(0, bufferCells) : 0;
+		}
+
+		public static int TransitThreatRange(int detectorRangeCells, int weaponRangeCells,
+			bool weaponIsEngaged, bool canKiteTarget)
+		{
+			var weaponRange = weaponIsEngaged && !canKiteTarget ? weaponRangeCells : 0;
+			return Math.Max(detectorRangeCells, weaponRange);
 		}
 	}
 }

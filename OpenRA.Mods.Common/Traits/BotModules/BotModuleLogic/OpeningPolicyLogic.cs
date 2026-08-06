@@ -28,9 +28,12 @@ namespace OpenRA.Mods.Common.Traits
 
 			var buildable = new HashSet<string>(buildableTypes);
 			for (var i = 0; i < orderedGoals.Count; i++)
-				if (!completedGoals.Contains(i) && !reservedGoals.Contains(i) &&
-					orderedGoals[i].Any(buildable.Contains))
-					return i;
+			{
+				if (completedGoals.Contains(i))
+					continue;
+
+				return !reservedGoals.Contains(i) && orderedGoals[i].Any(buildable.Contains) ? i : -1;
+			}
 
 			return -1;
 		}

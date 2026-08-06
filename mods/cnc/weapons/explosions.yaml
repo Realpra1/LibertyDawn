@@ -123,6 +123,7 @@
 
 ChemtankExplodeOnce:
 	Inherits@ChemtankExplode: ^ChemtankExplode
+	ImpactType: BlueTiberiumExplosion
     Warhead@1Dam: SpreadDamage
 		Spread: 750
 		Damage: 13800
@@ -525,6 +526,10 @@ TiberiumExplosion:
 	Warhead@4Res: CreateResource
 		AddsResourceType: Tiberium
 		Size: 1,1
+
+BlueTiberiumCargoExplosion:
+	Inherits: TiberiumExplosion
+	ImpactType: BlueTiberiumExplosion
         
 ViceExplosion:
 	Warhead@4Res: CreateResource
