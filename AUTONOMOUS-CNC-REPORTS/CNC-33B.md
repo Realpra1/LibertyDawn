@@ -1,9 +1,11 @@
 # CNC-33B: Unstable Harvester Decloak and Deploy
 
-- Status: locally complete; awaiting required PR checks
+- Status: complete; draft PR #71 required checks green
 - Cycles used: 30 of 30
 - Branch: `agent/cnc33b-red-tiberium-deploy`
 - Base: `origin/agent/cnc30-1-bounded-exploration` at `78ae3946ec`
+- PR: https://github.com/Realpra1/LibertyDawn/pull/71
+- Green implementation head: `67d8c0fb63` (Linux 2m13s; Windows 3m10s)
 
 ## Literal acceptance
 
