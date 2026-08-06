@@ -16,7 +16,7 @@ using OpenRA.Traits;
 
 namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 {
-	public enum SquadType { Assault, Air, Rush, Protection, Naval }
+	public enum SquadType { Assault, Air, Rush, Protection, Naval, GeneralAttack }
 
 	public class Squad
 	{
@@ -70,6 +70,14 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		internal int AirNextTargetReviewTick;
 		internal bool AirEscapingLocalAa;
 
+		// General-attack reinforcements remain squad-owned while traveling, but do not pull the
+		// established formation center home or inflate its strategic strength before they arrive.
+		internal readonly HashSet<uint> GroundReinforcements = new HashSet<uint>();
+		internal int GroundNextTargetReviewTick;
+		WPos groundLastFormationCenter;
+		bool hasGroundFormationCenter;
+		bool groundHoldingForReinforcements;
+
 		public Squad(IBot bot, SquadManagerBotModule squadManager, SquadType type)
 			: this(bot, squadManager, type, null) { }
 
@@ -87,6 +95,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			{
 				case SquadType.Assault:
 				case SquadType.Rush:
+				case SquadType.GeneralAttack:
 					FuzzyStateMachine.ChangeState(this, new GroundUnitsIdleState(), true);
 					break;
 				case SquadType.Air:
@@ -104,7 +113,16 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		public void Update()
 		{
 			if (IsValid)
+			{
+				if (Type == SquadType.GeneralAttack)
+				{
+					UpdateGroundReinforcements();
+					if (GroundFormationUnits(bootstrapIfEmpty: true).Count == 0)
+						return;
+				}
+
 				FuzzyStateMachine.Update(this);
+			}
 		}
 
 		/// <summary>
@@ -291,6 +309,103 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			SquadManager.Info.AirSquadDefinitions.TryGetValue(AirSquadDefinition, out var definition) ?
 			definition.Profile : "Generic";
 
+		internal List<Actor> GroundFormationUnits(bool bootstrapIfEmpty = false)
+		{
+			var formation = Units.Where(a => !GroundReinforcements.Contains(a.ActorID) &&
+				!SquadManager.IsUnitProtectingBase(a)).ToList();
+			if (formation.Count == 0 && bootstrapIfEmpty)
+			{
+				var replacement = Units.Where(a => !SquadManager.IsUnitProtectingBase(a))
+					.OrderBy(a => hasGroundFormationCenter ?
+					(a.CenterPosition - groundLastFormationCenter).LengthSquared : (long)a.ActorID)
+					.ThenBy(a => a.ActorID).FirstOrDefault();
+				if (replacement != null)
+				{
+					GroundReinforcements.Remove(replacement.ActorID);
+					formation.Add(replacement);
+				}
+			}
+
+			return formation;
+		}
+
+		internal WPos GroundFormationCenter
+		{
+			get
+			{
+				var formation = GroundFormationUnits(bootstrapIfEmpty: true);
+				if (formation.Count > 0)
+				{
+					groundLastFormationCenter = formation.Select(a => a.CenterPosition).Average();
+					hasGroundFormationCenter = true;
+				}
+
+				return groundLastFormationCenter;
+			}
+		}
+
+		internal void MarkGroundReinforcement(Actor actor)
+		{
+			if (actor != null)
+				GroundReinforcements.Add(actor.ActorID);
+		}
+
+		internal void CleanGroundMembership()
+		{
+			var live = new HashSet<uint>(Units.Select(a => a.ActorID));
+			GroundReinforcements.RemoveWhere(id => !live.Contains(id));
+			GroundFormationUnits(bootstrapIfEmpty: true);
+		}
+
+		internal bool ShouldHoldForGroundReinforcements()
+		{
+			var formationCount = GroundFormationUnits(bootstrapIfEmpty: true).Count;
+			var reinforcementCount = Units.Count(a => GroundReinforcements.Contains(a.ActorID) &&
+				!SquadManager.IsUnitProtectingBase(a));
+			var minimum = SquadManager.Info.GroundReinforcementHoldMinimum > 0 ?
+				SquadManager.Info.GroundReinforcementHoldMinimum : System.Math.Max(2, SquadManager.Info.SquadSize / 2);
+			var hold = StrategicGroundScoring.ShouldHoldForReinforcements(formationCount,
+				reinforcementCount, minimum, SquadManager.Info.GroundReinforcementHoldRatioPercent);
+
+			if (hold != groundHoldingForReinforcements && SquadManager.Info.GroundTargetDebugLogging)
+				Log.Write("debug", "Ground formation [{0}] regroup {1}: formation={2} reinforcements={3} minimum={4} ratio={5}%.",
+					Bot.Player.PlayerName, hold ? "holding" : "resuming", formationCount,
+					reinforcementCount, minimum, SquadManager.Info.GroundReinforcementHoldRatioPercent);
+
+			groundHoldingForReinforcements = hold;
+			return hold;
+		}
+
+		void UpdateGroundReinforcements()
+		{
+			CleanGroundMembership();
+			var formation = GroundFormationUnits(bootstrapIfEmpty: true);
+			if (formation.Count == 0 || GroundReinforcements.Count == 0)
+				return;
+
+			var center = GroundFormationCenter;
+			var destination = World.Map.CellContaining(center);
+			var joinDistance = WDist.FromCells(SquadManager.Info.GroundReinforcementJoinRadius).Length;
+			var joinDistanceSquared = (long)joinDistance * joinDistance;
+			foreach (var reinforcement in Units.Where(a => GroundReinforcements.Contains(a.ActorID) &&
+				!SquadManager.IsUnitProtectingBase(a))
+				.OrderBy(a => a.ActorID).ToList())
+			{
+				if ((reinforcement.CenterPosition - center).LengthSquared <= joinDistanceSquared)
+				{
+					GroundReinforcements.Remove(reinforcement.ActorID);
+					if (SquadManager.Info.GroundTargetDebugLogging)
+						Log.Write("debug", "Ground formation [{0}] reinforcement {1}#{2} joined: formation={3} remaining={4}.",
+							Bot.Player.PlayerName, reinforcement.Info.Name, reinforcement.ActorID,
+							GroundFormationUnits().Count, GroundReinforcements.Count);
+
+					continue;
+				}
+
+				Bot.QueueOrder(new Order("AttackMove", reinforcement, Target.FromCell(World, destination), false));
+			}
+		}
+
 		public MiniYaml Serialize()
 		{
 			var nodes = new MiniYaml("", new List<MiniYamlNode>()
@@ -315,6 +430,13 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 			if (hasAirFormationCenter)
 				nodes.Nodes.Add(new MiniYamlNode("AirFormationCenter", FieldSaver.FormatValue(airLastFormationCenter)));
+
+			if (GroundReinforcements.Count > 0)
+				nodes.Nodes.Add(new MiniYamlNode("GroundReinforcements",
+					FieldSaver.FormatValue(GroundReinforcements.OrderBy(id => id).ToArray())));
+
+			if (hasGroundFormationCenter)
+				nodes.Nodes.Add(new MiniYamlNode("GroundFormationCenter", FieldSaver.FormatValue(groundLastFormationCenter)));
 
 			return nodes;
 		}
@@ -360,7 +482,22 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				squad.hasAirFormationCenter = true;
 			}
 
+			var groundReinforcementsNode = yaml.Nodes.FirstOrDefault(n => n.Key == "GroundReinforcements");
+			if (groundReinforcementsNode != null)
+				squad.GroundReinforcements.UnionWith(
+					FieldLoader.GetValue<uint[]>("GroundReinforcements", groundReinforcementsNode.Value.Value));
+
+			var groundFormationCenterNode = yaml.Nodes.FirstOrDefault(n => n.Key == "GroundFormationCenter");
+			if (groundFormationCenterNode != null)
+			{
+				squad.groundLastFormationCenter =
+					FieldLoader.GetValue<WPos>("GroundFormationCenter", groundFormationCenterNode.Value.Value);
+				squad.hasGroundFormationCenter = true;
+			}
+
 			squad.CleanAirMembership();
+			if (squad.Type == SquadType.GeneralAttack)
+				squad.CleanGroundMembership();
 
 			return squad;
 		}

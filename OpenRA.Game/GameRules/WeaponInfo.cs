@@ -72,6 +72,13 @@ namespace OpenRA.GameRules
 
 	public sealed class WeaponInfo
 	{
+		[Desc("Optional semantic impact type that world traits may suppress.")]
+		public readonly string ImpactType = null;
+
+		[WeaponReference]
+		[Desc("Optional weapon used instead when mutant creation is disabled.")]
+		public readonly string NonMutatingWeapon = null;
+
 		[Desc("The maximum range the weapon can fire.")]
 		public readonly WDist Range = WDist.Zero;
 
@@ -223,6 +230,17 @@ namespace OpenRA.GameRules
 		public void Impact(in Target target, WarheadArgs args)
 		{
 			var world = args.SourceActor.World;
+			if (IsImpactSuppressed(world, args.SourceActor))
+				return;
+
+			var impactWeapon = NonMutatingImpactWeapon(world);
+			if (impactWeapon != this)
+			{
+				args.Weapon = impactWeapon;
+				impactWeapon.Impact(target, args);
+				return;
+			}
+
 			foreach (var warhead in Warheads)
 			{
 				if (warhead.Delay > 0)
@@ -234,6 +252,24 @@ namespace OpenRA.GameRules
 				else
 					warhead.DoImpact(target, args);
 			}
+		}
+
+		public bool IsImpactSuppressed(World world, Actor sourceActor = null)
+		{
+			return !string.IsNullOrEmpty(ImpactType) &&
+				(sourceActor == null || sourceActor.Disposed ||
+					!sourceActor.TraitsImplementing<IImpactTypeSuppressionBypass>()
+					.Any(b => b.BypassImpactSuppression(ImpactType))) && world.WorldActor
+				.TraitsImplementing<IImpactTypeSuppressor>().Any(s => s.SuppressImpact(ImpactType));
+		}
+
+		public WeaponInfo NonMutatingImpactWeapon(World world)
+		{
+			if (string.IsNullOrEmpty(NonMutatingWeapon) || !world.WorldActor
+				.TraitsImplementing<IMutantCreationSuppressor>().Any(s => s.SuppressMutantCreation))
+				return this;
+
+			return world.Map.Rules.Weapons[NonMutatingWeapon.ToLowerInvariant()];
 		}
 
 		/// <summary>Applies all the weapon's warheads to the target. Only use for projectile-less, special-case impacts.</summary>

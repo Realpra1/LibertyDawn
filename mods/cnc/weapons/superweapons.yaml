@@ -100,6 +100,8 @@ Atomic:
 		Duration: 20
         
 AtomicHarv:
+	ImpactType: RedTiberiumExplosion
+	NonMutatingWeapon: BlueTiberiumCargoExplosion
 	ValidTargets: Ground, Water, Air, Trees
 	Report: nukemisl.aud
 	Warhead@1Dam_impact: SpreadDamage
@@ -201,6 +203,8 @@ AtomicHarv:
 		Duration: 20
 
 AtomicTib:
+	ImpactType: RedTiberiumExplosion
+	NonMutatingWeapon: ChemtankExplodeOnce
 	ValidTargets: Ground, Water, Air, Trees
 	Report: nukemisl.aud
     Warhead@1Dam_impact: SpreadDamage

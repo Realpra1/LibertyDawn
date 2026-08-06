@@ -9,6 +9,8 @@
  */
 #endregion
 
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using OpenRA.GameRules;
 using OpenRA.Primitives;
@@ -52,11 +54,22 @@ namespace OpenRA.Mods.Common.Traits
 			"Footprint (explosion on each occupied cell).")]
 		public readonly ExplosionType Type = ExplosionType.CenterPosition;
 
+		[Desc("Optional semantic impact type that world traits may suppress before this explosion fires.")]
+		public readonly string ImpactType = null;
+
+		[WeaponReference]
+		[Desc("Optional weapon used instead when mutant creation is disabled.")]
+		public readonly string NonMutatingWeapon = null;
+
+		[Desc("Optional impact types keyed by carried Harvester resource type. The explosion is suppressed when every loaded resource maps to a suppressed impact type.")]
+		public readonly Dictionary<string, string> LoadedResourceImpactTypes = new Dictionary<string, string>();
+
 		[Desc("Offset of the explosion from the center of the exploding actor (or cell).")]
 		public readonly WVec Offset = WVec.Zero;
 
 		public WeaponInfo WeaponInfo { get; private set; }
 		public WeaponInfo EmptyWeaponInfo { get; private set; }
+		public WeaponInfo NonMutatingWeaponInfo { get; private set; }
 
 		public override object Create(ActorInitializer init) { return new Explodes(this, init.Self); }
 		public override void RulesetLoaded(Ruleset rules, ActorInfo ai)
@@ -77,6 +90,14 @@ namespace OpenRA.Mods.Common.Traits
 				EmptyWeaponInfo = emptyWeapon;
 			}
 
+			if (!string.IsNullOrEmpty(NonMutatingWeapon))
+			{
+				var nonMutatingWeaponToLower = NonMutatingWeapon.ToLowerInvariant();
+				if (!rules.Weapons.TryGetValue(nonMutatingWeaponToLower, out var nonMutatingWeapon))
+					throw new YamlException($"Weapons Ruleset does not contain an entry '{nonMutatingWeaponToLower}'");
+				NonMutatingWeaponInfo = nonMutatingWeapon;
+			}
+
 			base.RulesetLoaded(rules, ai);
 		}
 	}
@@ -84,6 +105,7 @@ namespace OpenRA.Mods.Common.Traits
 	public class Explodes : ConditionalTrait<ExplodesInfo>, INotifyKilled, INotifyDamage
 	{
 		readonly IHealth health;
+		readonly Harvester harvester;
 		BuildingInfo buildingInfo;
 		Armament[] armaments;
 
@@ -91,6 +113,7 @@ namespace OpenRA.Mods.Common.Traits
 			: base(info)
 		{
 			health = self.Trait<IHealth>();
+			harvester = self.TraitOrDefault<Harvester>();
 		}
 
 		protected override void Created(Actor self)
@@ -112,9 +135,17 @@ namespace OpenRA.Mods.Common.Traits
 			if (!Info.DeathTypes.IsEmpty && !e.Damage.DamageTypes.Overlaps(Info.DeathTypes))
 				return;
 
+			if (IsImpactSuppressed(self, Info.ImpactType) || LoadedResourceExplosionIsSuppressed(
+				harvester?.Contents, Info.LoadedResourceImpactTypes,
+				impactType => IsImpactSuppressed(self, impactType)))
+				return;
+
 			var weapon = ChooseWeaponForExplosion(self);
 			if (weapon == null)
 				return;
+
+			if (NonMutatingImpactIsRequired(self.World, Info.ImpactType) && Info.NonMutatingWeaponInfo != null)
+				weapon = Info.NonMutatingWeaponInfo;
 
 			var source = Info.DamageSource == DamageSource.Self ? self : e.Attacker;
 			if (weapon.Report != null && weapon.Report.Any())
@@ -131,6 +162,40 @@ namespace OpenRA.Mods.Common.Traits
 
 			// Use .FromPos since this actor is killed. Cannot use Target.FromActor
 			weapon.Impact(Target.FromPos(self.CenterPosition + Info.Offset), source);
+		}
+
+		static bool IsImpactSuppressed(Actor self, string impactType)
+		{
+			return !string.IsNullOrEmpty(impactType) &&
+				!self.TraitsImplementing<IImpactTypeSuppressionBypass>()
+					.Any(b => b.BypassImpactSuppression(impactType)) && self.World.WorldActor
+				.TraitsImplementing<IImpactTypeSuppressor>().Any(s => s.SuppressImpact(impactType));
+		}
+
+		static bool NonMutatingImpactIsRequired(World world, string impactType)
+		{
+			return !string.IsNullOrEmpty(impactType) && world.WorldActor
+				.TraitsImplementing<IMutantCreationSuppressor>().Any(s => s.SuppressMutantCreation);
+		}
+
+		public static bool LoadedResourceExplosionIsSuppressed(IReadOnlyDictionary<string, int> contents,
+			IReadOnlyDictionary<string, string> impactTypes, Func<string, bool> isSuppressed)
+		{
+			if (contents == null || contents.Count == 0 || impactTypes == null || impactTypes.Count == 0)
+				return false;
+
+			var foundPayload = false;
+			foreach (var content in contents)
+			{
+				if (content.Value <= 0)
+					continue;
+
+				foundPayload = true;
+				if (!impactTypes.TryGetValue(content.Key, out var impactType) || !isSuppressed(impactType))
+					return false;
+			}
+
+			return foundPayload;
 		}
 
 		WeaponInfo ChooseWeaponForExplosion(Actor self)

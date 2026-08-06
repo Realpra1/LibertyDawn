@@ -79,7 +79,7 @@ namespace OpenRA.Mods.Common.Traits
 	public class RedTiberiumBombBotModule : ConditionalTrait<RedTiberiumBombBotModuleInfo>,
 		IBotTick, IBotUnitReservations, IBotHarvesterResourcePolicy, IGameSaveTraitData
 	{
-		enum MissionState { Harvesting, Armed, WaitingToDetonate }
+		enum MissionState { Harvesting, Armed, WaitingToDetonate, DeployOrdered }
 
 		sealed class Mission
 		{
@@ -371,11 +371,24 @@ namespace OpenRA.Mods.Common.Traits
 			mission.LastTargetHp = TargetHp(target);
 			if (IsAtTarget(harvester, target, mission.Destination))
 			{
-				if (mission.State != MissionState.WaitingToDetonate)
+				var detonation = harvester.TraitOrDefault<UnstableHarvesterDetonation>();
+				if (detonation?.CanDetonate == true &&
+					world.WorldTick - mission.LastOrderTick >= Info.OrderRetryInterval)
+				{
+					bot.QueueOrder(new Order("DetonateUnstableHarvester", harvester, false));
+					mission.State = MissionState.DeployOrdered;
+					mission.LastOrderTick = world.WorldTick;
+					Debug("ordered ready {0}#{1} to deploy at {2} in blast range of {3}#{4}; unstable-age={5}",
+						harvester.Info.Name, harvester.ActorID, harvester.Location, target.Info.Name,
+						target.ActorID, detonation.UnstableTicks);
+				}
+				else if (mission.State != MissionState.WaitingToDetonate &&
+					mission.State != MissionState.DeployOrdered)
 				{
 					mission.State = MissionState.WaitingToDetonate;
-					Debug("arrived {0}#{1} at {2} in blast range of {3}#{4}; waiting for unstable detonation",
-						harvester.Info.Name, harvester.ActorID, harvester.Location, target.Info.Name, target.ActorID);
+					Debug("arrived {0}#{1} at {2} in blast range of {3}#{4}; waiting for deploy readiness age={5}",
+						harvester.Info.Name, harvester.ActorID, harvester.Location, target.Info.Name, target.ActorID,
+						detonation?.UnstableTicks ?? -1);
 				}
 
 				return;

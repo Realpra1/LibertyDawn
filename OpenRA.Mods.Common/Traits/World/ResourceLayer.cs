@@ -90,6 +90,9 @@ namespace OpenRA.Mods.Common.Traits
 			[Desc("Weapon(s) to use if resource explodes.")]
 			public readonly HashSet<string> Explosions = null;
 
+			[Desc("Optional semantic impact type that world traits may suppress.")]
+			public readonly string ExplosionImpactType = null;
+
 			public HashSet<WeaponInfo> ExplosionsInfo = new HashSet<WeaponInfo>();
 
 			[Desc("Chance of exploding when damaged.")]
@@ -590,7 +593,7 @@ namespace OpenRA.Mods.Common.Traits
 		void ScheduleDelayedExplosion(Actor source, ResourceLayerInfo.ResourceTypeInfo resourceInfo, CPos cell,
 			int waitForTime, bool isInstability)
 		{
-			if (delayedExplosions.ContainsKey(cell))
+			if (ExplosionIsSuppressed(resourceInfo) || delayedExplosions.ContainsKey(cell))
 				return;
 
 			var explosion = new DelayedResourceExplosion(++nextDelayedExplosionToken, Content[cell].Type, isInstability);
@@ -604,6 +607,9 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				var content = Content[cell];
 				if (content.Type == null || !info.ResourceTypes.TryGetValue(content.Type, out var resourceInfo))
+					return;
+
+				if (ExplosionIsSuppressed(resourceInfo))
 					return;
 
 				if (damage < resourceInfo.MinimumDamage)
@@ -656,6 +662,7 @@ namespace OpenRA.Mods.Common.Traits
 		int IResourceLayer.RemoveResource(string resourceType, CPos cell, int amount) { return RemoveResource(resourceType, cell, amount); }
 		void IResourceLayer.DamageResource(Actor source, CPos cell, int damage) { DamageResource(source, cell, damage); }
 		void IResourceLayer.ClearResources(CPos cell) { ClearResources(cell); }
+		bool IResourceLayer.IsExplosionPending(CPos cell) { return delayedExplosions.ContainsKey(cell); }
 		bool IResourceLayer.IsVisible(CPos cell) { return !world.FogObscures(cell); }
 		bool IResourceLayer.IsEmpty => resCells < 1;
 		IResourceLayerInfo IResourceLayer.Info => info;
@@ -962,6 +969,12 @@ namespace OpenRA.Mods.Common.Traits
 			if (!delayedExplosions.TryGetValue(cell, out var explosion))
 				return;
 
+			if (ExplosionIsSuppressed(resourceInfo))
+			{
+				delayedExplosions.Remove(cell);
+				return;
+			}
+
 			var content = Content[cell];
 			var maxStageEvolvesTo = content.Type != null && info.ResourceTypes.TryGetValue(content.Type, out var currentResourceInfo) ?
 				GetEvolvesTo(cell, currentResourceInfo) : null;
@@ -984,6 +997,9 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			try
 			{
+				if (ExplosionIsSuppressed(resourceInfo))
+					return;
+
 				foreach (var weapon in resourceInfo.ExplosionsInfo)
 				{
 					if (weapon.Projectile != null)
@@ -1026,6 +1042,13 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				Log.Write("debug", ex.Message + "\n" + ex.StackTrace);
 			}
+		}
+
+		bool ExplosionIsSuppressed(ResourceLayerInfo.ResourceTypeInfo resourceInfo)
+		{
+			return !string.IsNullOrEmpty(resourceInfo.ExplosionImpactType) && world.WorldActor
+				.TraitsImplementing<IImpactTypeSuppressor>()
+				.Any(s => s.SuppressImpact(resourceInfo.ExplosionImpactType));
 		}
 
 		void ResourceProjectile(Actor source, WeaponInfo weapon, CPos cell)

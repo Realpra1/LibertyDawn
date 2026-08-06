@@ -62,6 +62,56 @@ Player:
 	GrantConditionOnBotOwner@Easiest:
 		Condition: enable-Easiest-ai
 		Bots: Easiest
+	EconomyArtilleryBotModule:
+		RequiresCondition: enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai
+		RequiredPrerequisites: upgrade.economy2
+		ArtilleryTypes: mlrs
+		AntiAirTypes: msam
+		TankTypes: mtnk
+		InfantryTypes: e1
+		EscortValuePercent: 5
+		ScanInterval: 25
+		OrderInterval: 25
+		MaximumTargetCandidates: 48
+		DefenderDistanceCells: 2
+		ScoutSafetyRadiusCells: 5
+		ScoutRangeMarginCells: 1
+		DebugLogging: false
+	CovertHarassmentBotModule:
+		RequiresCondition: enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai
+		RequiredPrerequisites: upgrade.covert1
+		CoreTypes: bike, bggy
+		SupportTypes: arty
+		TowerTypes: gun, sam, obli, gtwr, atwr
+		TargetPriorities:
+			harv: 10000
+			sharv: 10000
+			arty: 7500
+			mlrs: 7000
+			nuk2: 6500
+			proc: 6000
+			hq: 5500
+			eye: 5500
+			tmpl: 5500
+			weap: 5000
+			afld: 5000
+			fact: 4500
+			nuke: 3500
+			gun: 3000
+			sam: 3000
+			obli: 3000
+			gtwr: 3000
+			atwr: 3000
+		MinimumCoreUnits: 2
+		MaximumCoreUnits: 12
+		CoreUnitsPerSupport: 3
+		MaximumSupportUnits: 4
+		SupportJoinRadiusCells: 5
+		SupportFollowDistanceCells: 3
+		ScanInterval: 50
+		OrderInterval: 50
+		MaximumTargetCandidates: 48
+		DebugLogging: false
 	TransportManagerBotModule:
 		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai || enable-Easiest-ai
 		TransportHelicopterTypes: tran
@@ -122,6 +172,17 @@ Player:
 		CarefulClearValueRatio: 5
 		MinimumLateHarassmentGroupSize: 3
 		TargetSwitchImprovementPercent: 25
+		HarassmentDistancePenalty: 3
+		HarvesterTypes: harv, sharv
+		HarvesterWaitingAnchorTypes: proc, resonator
+		ResourceWaitingSearchRadius: 20
+		ResourceWaitingOrderInterval: 750
+		AvoidResourceTypes: BlueTiberium
+		PendingResourceExplosionAvoidanceRadius: 1
+		HazardRouteWaypointSpacing: 4
+		DefenderClearFallbackScans: 20
+		DefenderClearValueRatio: 1
+		DefenderClearWeakestCandidates: 3
 		HarassmentTargetPriorities:
 			harv: 10000
 			sharv: 10000
@@ -179,6 +240,11 @@ Player:
 		ScanInterval: 250
 		CoarseCellSize: 6
 		MaximumRegionCandidates: 32
+		NormalScoutLimit: 10
+		NormalScoutActorPriorities:
+			e5: 300
+			e4: 200
+			e1: 100
 		AssignmentStallInterval: 500
 		EmergencyCashThreshold: 0
 		McvTypes: mcv, fact
@@ -754,6 +820,28 @@ Player:
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: false
 		MaximumWallSegments: 24
+		EnableOpeningPolicy: true
+		OpeningPowerTypes: nuk2, nuke
+		OpeningSiloTypes: silo
+		OpeningDefenseTypes: gtwr, gun
+		OpeningBarracksTypes: pyle, hand
+		OpeningRefineryTypes: proc
+		OpeningFactoryTypes: weap, afld
+		OpeningAdditionalFactoryTypes: afld
+		OpeningAdditionalFactoryCount: 2
+		OpeningRadarTypes: hq
+		OpeningHelipadTypes: hpad
+		OpeningOptionalStructureTypes: silo, gtwr, gun
+		OpeningHarvesterTypes: harv, sharv
+		OpeningMcvType: mcv
+		OpeningSoldierCount: 0
+		OpeningHarvesterCount: 5
+		OpeningMcvCount: 1
+		OpeningRequestRetryDelay: 250
+		OpeningDebugLogging: false
+		AirRepairBuildingTypes: hpad
+		AirUnitsPerRepairBuilding: 4
+		AirRepairCapacityDebugLogging: false
 		FirstTowerTypes: gtwr, gun, atwr, obli
 		FirstTowerSearchRadius: 20
 		FirstTowerDebugLogging: false
@@ -829,6 +917,9 @@ Player:
     SquadManagerBotModule@brutalis:
 		RequiresCondition: enable-brutalis-ai
 		SquadSize: 20
+		UseStrategicGroundTargeting: true
+		UseCohesiveGroundSquad: true
+		GroundTargetDebugLogging: false
 		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck, tran
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
@@ -936,6 +1027,22 @@ Player:
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: false
 		MaximumWallSegments: 24
+		EnableOpeningPolicy: true
+		OpeningPowerTypes: nuk2, nuke
+		OpeningSiloTypes: silo
+		OpeningDefenseTypes: gtwr, gun
+		OpeningBarracksTypes: pyle, hand
+		OpeningRefineryTypes: proc
+		OpeningFactoryTypes: weap, afld
+		OpeningRadarTypes: hq
+		OpeningOptionalStructureTypes: silo, gtwr, gun
+		OpeningHarvesterTypes: harv, sharv
+		OpeningMcvType: mcv
+		OpeningSoldierCount: 0
+		OpeningHarvesterCount: 5
+		OpeningMcvCount: 1
+		OpeningRequestRetryDelay: 250
+		OpeningDebugLogging: false
 		FirstTowerTypes: gtwr, gun, atwr, obli
 		FirstTowerSearchRadius: 20
 		FirstTowerDebugLogging: false
@@ -1008,6 +1115,9 @@ Player:
     SquadManagerBotModule@viki:
 		RequiresCondition: enable-viki-ai
 		SquadSize: 30
+		UseStrategicGroundTargeting: true
+		UseCohesiveGroundSquad: true
+		GroundTargetDebugLogging: false
 		ExcludeFromSquadsTypes: harv, sharv, mcv, a10, e6, rmbo, truck, tran
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
@@ -1039,7 +1149,7 @@ Player:
 			sharv: 100
 			arty: 39
 			mlrs: 39
-            stnk: 15
+			stnk: 40
             msam: 1
             ctnk: 2
 			bggy: 1
@@ -1062,7 +1172,7 @@ Player:
 			arty: 3000
 			mtnk: 5000
 			mlrs: 3000
-			stnk: 5000
+			stnk: 1500
 			apc: 5000
 			bggy: 4000
 			bike: 5000
@@ -1091,13 +1201,13 @@ Player:
 		EnableOpeningPolicy: true
 		OpeningPowerTypes: nuk2, nuke
 		OpeningSiloTypes: silo
-		OpeningDefenseTypes: gtwr, gun
+		OpeningDefenseTypes: obli, gtwr, gun
 		OpeningBarracksTypes: pyle, hand
 		OpeningRefineryTypes: proc
 		OpeningFactoryTypes: weap, afld
 		OpeningRadarTypes: hq
 		OpeningHelipadTypes: hpad
-		OpeningOptionalStructureTypes: silo, gtwr, gun
+		OpeningOptionalStructureTypes: silo, obli, gtwr, gun
 		OpeningHarvesterTypes: harv, sharv
 		OpeningDefenseUnlockTypes: upgrade.recon1
 		OpeningMcvType: mcv
@@ -1106,7 +1216,11 @@ Player:
 		OpeningMcvCount: 1
 		OpeningRequestRetryDelay: 250
 		OpeningDebugLogging: false
+		AirRepairBuildingTypes: hpad
+		AirUnitsPerRepairBuilding: 4
+		AirRepairCapacityDebugLogging: false
 		FirstTowerTypes: gtwr, gun, atwr, obli
+		PrioritizeOpeningFirstTower: true
 		FirstTowerSearchRadius: 20
 		FirstTowerDebugLogging: false
 		BuildingQueues: Building.Nod, Building.GDI
@@ -1190,6 +1304,9 @@ Player:
 		RequiresCondition: enable-skynet-ai
 		SquadSize: 10
 		AttackForceInterval: 50
+		UseStrategicGroundTargeting: true
+		UseCohesiveGroundSquad: true
+		GroundTargetDebugLogging: false
 		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck, tran
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
@@ -1357,7 +1474,8 @@ Player:
             upgrade.recon3: 1
             downgrade.covert: 1
             downgrade.economy: 1
-        UnitDelays:
+		UnitDelays:
+			downgrade.economy: 5000
 			harv: 0
 			ltnk: 5000
 			ftnk: 5000
@@ -1425,6 +1543,10 @@ Player:
 		OpeningMcvCount: 1
 		OpeningRequestRetryDelay: 250
 		OpeningDebugLogging: false
+		AirRepairBuildingTypes: hpad
+		AirUnitsPerRepairBuilding: 4
+		MinimumPostOpeningAirRepairBuildings: 2
+		AirRepairCapacityDebugLogging: false
 		FirstTowerTypes: gtwr, gun, atwr, obli
 		FirstTowerSearchRadius: 20
 		FirstTowerDebugLogging: false
@@ -1519,6 +1641,9 @@ Player:
     SquadManagerBotModule@ironreaper:
 		RequiresCondition: enable-ironreaper-ai
 		SquadSize: 20
+		UseStrategicGroundTargeting: true
+		UseCohesiveGroundSquad: true
+		GroundTargetDebugLogging: false
         MaxBaseRadius: 49
 		ExcludeFromSquadsTypes: harv, sharv, mcv, a10, e6, rmbo, truck, tran
 		ConstructionYardTypes: fact

@@ -46,5 +46,36 @@ namespace OpenRA.Test
 			Assert.That(RedTiberiumBombPolicy.HasStalled(499, 250, 250), Is.False);
 			Assert.That(RedTiberiumBombPolicy.HasStalled(500, 250, 250), Is.True);
 		}
+
+		[TestCase(false, 3000, false)]
+		[TestCase(true, 2249, false)]
+		[TestCase(true, 2250, true)]
+		[TestCase(true, 2999, true)]
+		[TestCase(true, 3000, true)]
+		public void UnstableWarningUsesExactFinalThirtySecondBoundary(bool unstable, int age, bool expected)
+		{
+			Assert.That(UnstableHarvesterDetonationPolicy.IsWarningActive(unstable, age, 3000, 750),
+				Is.EqualTo(expected));
+		}
+
+		[TestCase(false, 3000, false)]
+		[TestCase(true, 2999, false)]
+		[TestCase(true, 3000, true)]
+		[TestCase(true, 4000, true)]
+		public void ExplicitDetonationNeedsContinuousTwoMinuteCargoAge(bool unstable, int age, bool expected)
+		{
+			Assert.That(UnstableHarvesterDetonationPolicy.CanDetonate(unstable, age, 3000, 750),
+				Is.EqualTo(expected));
+		}
+
+		[TestCase(false, false, false)]
+		[TestCase(true, true, false)]
+		[TestCase(true, false, true)]
+		public void SemanticRedSuppressionOnlyDisablesAutomaticDetonation(bool unstable, bool suppressed,
+			bool expected)
+		{
+			Assert.That(UnstableHarvesterDetonationPolicy.ShouldEnableAutomaticDetonation(unstable, suppressed),
+				Is.EqualTo(expected));
+		}
 	}
 }

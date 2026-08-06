@@ -91,6 +91,7 @@ namespace OpenRA.Mods.Common.Traits
 		int IResourceLayer.RemoveResource(string resourceType, CPos cell, int amount) { return RemoveResource(resourceType, cell, amount); }
 		void IResourceLayer.DamageResource(Actor source, CPos cell, int damage) { return; }
 		void IResourceLayer.ClearResources(CPos cell) { ClearResources(cell); }
+		bool IResourceLayer.IsExplosionPending(CPos cell) { return false; }
 		bool IResourceLayer.IsVisible(CPos cell) { return Map.Contains(cell); }
 		bool IResourceLayer.IsEmpty => false;
 		IResourceLayerInfo IResourceLayer.Info => info;

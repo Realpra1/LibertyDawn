@@ -16,7 +16,7 @@ using OpenRA.Traits;
 
 namespace OpenRA.Mods.Common.Traits
 {
-	[Desc("Collects currently visible crates and explores stale map regions during economic emergencies.")]
+	[Desc("Collects currently visible crates and explores stale map regions with bounded ordinary scouts or unrestricted emergency recovery.")]
 	public class CrateCollectorBotModuleInfo : ConditionalTraitInfo
 	{
 		[Desc("Ticks between bounded crate/exploration scans. Zero disables the module.")]
@@ -30,6 +30,13 @@ namespace OpenRA.Mods.Common.Traits
 
 		[Desc("Maximum stale regions considered for each new scout assignment.")]
 		public readonly int MaximumRegionCandidates = 32;
+
+		[Desc("Maximum simultaneous exploration assignments outside emergency recovery.")]
+		public readonly int NormalScoutLimit = 10;
+
+		[ActorReference(dictionaryReference: LintDictionaryReference.Keys)]
+		[Desc("Ordinary explorer actor priorities. Higher values are preferred; unlisted actors are not used.")]
+		public readonly Dictionary<string, int> NormalScoutActorPriorities = new Dictionary<string, int>();
 
 		[Desc("Ticks without getting closer before an assignment is released and replanned.")]
 		public readonly int AssignmentStallInterval = 500;
@@ -65,6 +72,8 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			base.RulesetLoaded(rules, ai);
 			if (ScanInterval <= 0 || InitialScanDelay <= 0 || CoarseCellSize <= 0 || MaximumRegionCandidates <= 0 ||
+				NormalScoutLimit <= 0 || NormalScoutActorPriorities.Count == 0 ||
+				NormalScoutActorPriorities.Any(kv => kv.Value <= 0) ||
 				AssignmentStallInterval < ScanInterval || EmergencyCashThreshold < 0 ||
 				EmergencySellInterval <= 0 || MinimumCollectorHealthPercent <= 0 ||
 				MinimumCollectorHealthPercent > 100 || string.IsNullOrEmpty(CrateCrushClass))
@@ -101,6 +110,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly Player player;
 		readonly Dictionary<uint, Assignment> assignments = new Dictionary<uint, Assignment>();
 		readonly List<Region> regions = new List<Region>();
+		int[] coverageRanks = Array.Empty<int>();
 		PlayerResources resources;
 		DomainIndex domainIndex;
 		IBotUnitReservations[] otherUnitReservations;
@@ -109,6 +119,7 @@ namespace OpenRA.Mods.Common.Traits
 		int[] lastVisibleTicks = Array.Empty<int>();
 		int scanTicks;
 		int nextEmergencySaleTick;
+		int coverageCursor;
 		bool initialScanPending;
 
 		public CrateCollectorBotModule(Actor self, CrateCollectorBotModuleInfo info)
@@ -163,11 +174,12 @@ namespace OpenRA.Mods.Common.Traits
 			RefreshRegionVisibility();
 			var emergency = IsEmergency();
 			var temporarilyBlocked = ReviewAssignments(emergency);
+			if (!emergency)
+				TrimNormalScoutAssignments();
+
 			var visibleCrates = VisibleCrates();
 
-			if (!emergency)
-				ReleaseScoutAssignments("emergency ended");
-			else if (visibleCrates.Any(c => !assignments.Values.Any(a =>
+			if (emergency && visibleCrates.Any(c => !assignments.Values.Any(a =>
 				a.Kind == AssignmentKind.Crate && a.TargetActorId == c.ActorID)))
 				ReleaseScoutAssignments("visible crate takes priority");
 
@@ -178,14 +190,32 @@ namespace OpenRA.Mods.Common.Traits
 			AssignVisibleCrates(bot, visibleCrates, collectors);
 
 			collectors.RemoveAll(a => assignments.ContainsKey(a.ActorID));
-			if (emergency)
-				AssignScouts(bot, collectors);
+			var scoutLimit = emergency ? int.MaxValue : Math.Max(0, Info.NormalScoutLimit - ScoutAssignmentCount());
+			var scoutCandidates = emergency ? collectors.OrderBy(a => a.ActorID).ToList() :
+				CrateExplorationPolicy.SelectNormalScoutCandidates(collectors.Select(a => a.Info.Name).ToList(),
+					Info.NormalScoutActorPriorities, collectors.Count).Select(i => collectors[i]).ToList();
+			AssignScouts(bot, scoutCandidates, scoutLimit, emergency);
 
 			if (emergency && !world.Actors.Any(IsPotentialCollector))
 				TryEmergencySale(bot);
 
-			Debug("scan emergency={0} visible-crates={1} assignments={2} collectors={3}",
-				emergency, visibleCrates.Count, assignments.Count, collectors.Count);
+			var otherReserved = 0;
+			var loadedOrBoarding = 0;
+			if (Info.DebugLogging)
+				foreach (var actor in world.Actors.Where(IsPotentialCollector))
+				{
+					var passenger = actor.TraitOrDefault<Passenger>();
+					if (passenger?.Transport != null || passenger?.ReservedCargo != null)
+						loadedOrBoarding++;
+					else if ((otherUnitReservations != null && otherUnitReservations.Any(r => r.IsUnitReserved(actor))) ||
+						(transportReservations != null && transportReservations.Any(r => r.IsTransportReserved(actor))))
+						otherReserved++;
+				}
+
+			Debug("scan emergency={0} visible-crates={1} assignments={2} scouts={3}/{4} collectors={5} cursor={6} other-reserved={7} cargo={8}",
+				emergency, visibleCrates.Count, assignments.Count, ScoutAssignmentCount(),
+				emergency ? -1 : Info.NormalScoutLimit, collectors.Count, coverageCursor,
+				otherReserved, loadedOrBoarding);
 			initialScanPending = false;
 		}
 
@@ -193,7 +223,7 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			var width = (world.Map.MapSize.X + Info.CoarseCellSize - 1) / Info.CoarseCellSize;
 			var byIndex = new Dictionary<int, Region>();
-			foreach (var cell in world.Map.AllCells.Where(c => c.Layer == 0))
+			foreach (var cell in world.Map.AllCells.Where(c => c.Layer == 0 && world.Map.Contains(c)))
 			{
 				var x = Math.Clamp(cell.X / Info.CoarseCellSize, 0, width - 1);
 				var y = Math.Max(0, cell.Y / Info.CoarseCellSize);
@@ -220,6 +250,14 @@ namespace OpenRA.Mods.Common.Traits
 			}
 
 			lastVisibleTicks = Enumerable.Repeat(-1, regions.Count).ToArray();
+			var coverageOrder = CrateExplorationPolicy.BuildDistributedCoverageOrder(
+				regions.Select(RegionCenter).ToList());
+			coverageRanks = new int[regions.Count];
+			for (var rank = 0; rank < coverageOrder.Length; rank++)
+				coverageRanks[coverageOrder[rank]] = rank;
+
+			Debug("built playable exploration grid regions={0} cells={1}", regions.Count,
+				regions.Sum(r => r.Cells.Count));
 		}
 
 		CPos RegionCenter(Region region)
@@ -260,8 +298,8 @@ namespace OpenRA.Mods.Common.Traits
 					if (!IsVisibleCrate(crate))
 						releaseReason = "crate gone or hidden";
 				}
-				else if (!emergency)
-					releaseReason = "emergency ended";
+				else if (!emergency && !IsNormalScout(unit))
+					releaseReason = "not eligible for ordinary exploration";
 				else if (assignment.RegionIndex < 0 || assignment.RegionIndex >= regions.Count ||
 					lastVisibleTicks[assignment.RegionIndex] == world.WorldTick)
 					releaseReason = "region reached";
@@ -289,6 +327,28 @@ namespace OpenRA.Mods.Common.Traits
 			return temporarilyBlocked;
 		}
 
+		bool IsNormalScout(Actor actor)
+		{
+			return actor != null && Info.NormalScoutActorPriorities.ContainsKey(actor.Info.Name);
+		}
+
+		int ScoutAssignmentCount()
+		{
+			return assignments.Count(kv => kv.Value.Kind == AssignmentKind.Scout);
+		}
+
+		void TrimNormalScoutAssignments()
+		{
+			var keep = assignments.Where(kv => kv.Value.Kind == AssignmentKind.Scout)
+				.Select(kv => new { UnitId = kv.Key, Unit = world.GetActorById(kv.Key) })
+				.Where(x => IsNormalScout(x.Unit))
+				.OrderByDescending(x => Info.NormalScoutActorPriorities[x.Unit.Info.Name])
+				.ThenBy(x => x.UnitId).Take(Info.NormalScoutLimit).Select(x => x.UnitId).ToHashSet();
+			foreach (var unitId in assignments.Where(kv => kv.Value.Kind == AssignmentKind.Scout && !keep.Contains(kv.Key))
+				.Select(kv => kv.Key).OrderBy(id => id).ToList())
+				ReleaseAssignment(unitId, "ordinary exploration limit or priority");
+		}
+
 		void ReleaseScoutAssignments(string reason)
 		{
 			foreach (var unitId in assignments.Where(kv => kv.Value.Kind == AssignmentKind.Scout)
@@ -302,9 +362,12 @@ namespace OpenRA.Mods.Common.Traits
 				return;
 
 			assignments.Remove(unitId);
-			Debug("released {0}#{1} kind={2} target={3} region={4}: {5}",
+			Debug("released {0}#{1} kind={2} target={3} region={4} coverage-rank={5} destination={6}: {7}",
 				world.GetActorById(unitId)?.Info.Name ?? "missing", unitId, assignment.Kind,
-				assignment.TargetActorId, assignment.RegionIndex, reason);
+				assignment.TargetActorId, assignment.RegionIndex,
+				assignment.RegionIndex >= 0 && assignment.RegionIndex < coverageRanks.Length ?
+					coverageRanks[assignment.RegionIndex] : -1,
+				assignment.Destination, reason);
 		}
 
 		List<Actor> VisibleCrates()
@@ -457,26 +520,45 @@ namespace OpenRA.Mods.Common.Traits
 			return true;
 		}
 
-		void AssignScouts(IBot bot, List<Actor> collectors)
+		void AssignScouts(IBot bot, List<Actor> collectors, int assignmentLimit, bool emergency)
 		{
+			if (assignmentLimit <= 0 || regions.Count == 0)
+				return;
+
 			var assignedRegions = assignments.Values.Where(a => a.Kind == AssignmentKind.Scout && a.RegionIndex >= 0)
 				.Select(a => a.RegionIndex).ToHashSet();
-			foreach (var collector in collectors.OrderBy(a => a.ActorID))
+			var assignedCount = 0;
+			foreach (var collector in collectors)
 			{
-				var ranked = CrateExplorationPolicy.RankRegions(lastVisibleTicks, assignedRegions)
+				if (assignedCount >= assignmentLimit)
+					break;
+
+				var ranked = CrateExplorationPolicy.RankRegions(lastVisibleTicks, assignedRegions,
+					coverageRanks, coverageCursor)
 					.Where(i => lastVisibleTicks[i] != world.WorldTick).Take(Info.MaximumRegionCandidates);
 				var selectedRegion = -1;
+				var lastConsideredRegion = -1;
 				var destination = default(CPos);
 				List<CPos> airRoute = null;
 				foreach (var regionIndex in ranked)
+				{
+					lastConsideredRegion = regionIndex;
 					if (TryFindScoutDestination(collector, regionIndex, out destination, out airRoute))
 					{
 						selectedRegion = regionIndex;
 						break;
 					}
+				}
+
+				if (lastConsideredRegion >= 0)
+					coverageCursor = (coverageRanks[lastConsideredRegion] + 1) % regions.Count;
 
 				if (selectedRegion < 0)
+				{
+					Debug("rejected {0}#{1} -> scout: no reachable region among bounded candidates; cursor={2}",
+						collector.Info.Name, collector.ActorID, coverageCursor);
 					continue;
+				}
 
 				if (collector.TraitOrDefault<Aircraft>() != null)
 					QueueAirRoute(bot, collector, airRoute, destination, false);
@@ -485,9 +567,11 @@ namespace OpenRA.Mods.Common.Traits
 
 				assignments[collector.ActorID] = NewAssignment(AssignmentKind.Scout, collector,
 					destination, 0, selectedRegion);
+				assignedCount++;
 				assignedRegions.Add(selectedRegion);
-				Debug("assigned {0}#{1} -> scout region={2} cell={3}", collector.Info.Name,
-					collector.ActorID, selectedRegion, destination);
+				Debug("assigned {0}#{1} -> scout region={2} coverage-rank={3} cell={4} mode={5} cursor={6}",
+					collector.Info.Name, collector.ActorID, selectedRegion, coverageRanks[selectedRegion], destination,
+					emergency ? "urgent" : "ordinary", coverageCursor);
 			}
 		}
 
@@ -617,6 +701,7 @@ namespace OpenRA.Mods.Common.Traits
 				new MiniYamlNode("CrateScanTicks", FieldSaver.FormatValue(scanTicks)),
 				new MiniYamlNode("CrateInitialScanPending", FieldSaver.FormatValue(initialScanPending)),
 				new MiniYamlNode("CrateNextEmergencySaleTick", FieldSaver.FormatValue(nextEmergencySaleTick)),
+				new MiniYamlNode("CrateCoverageCursor", FieldSaver.FormatValue(coverageCursor)),
 				new MiniYamlNode("CrateRegionLastVisibleTicks", FieldSaver.FormatValue(lastVisibleTicks)),
 				new MiniYamlNode("CrateAssignments", "", assignments.OrderBy(kv => kv.Key).Select(kv =>
 					new MiniYamlNode("Assignment", "", new List<MiniYamlNode>
@@ -648,6 +733,10 @@ namespace OpenRA.Mods.Common.Traits
 						break;
 					case "CrateNextEmergencySaleTick":
 						nextEmergencySaleTick = FieldLoader.GetValue<int>(node.Key, node.Value.Value);
+						break;
+					case "CrateCoverageCursor":
+						var loadedCursor = FieldLoader.GetValue<int>(node.Key, node.Value.Value);
+						coverageCursor = regions.Count == 0 ? 0 : ((loadedCursor % regions.Count) + regions.Count) % regions.Count;
 						break;
 					case "CrateRegionLastVisibleTicks":
 						var loaded = FieldLoader.GetValue<int[]>(node.Key, node.Value.Value);
