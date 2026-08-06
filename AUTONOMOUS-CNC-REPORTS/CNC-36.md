@@ -23,7 +23,7 @@ Forbidden outcomes include creating multiple artillery clusters; reserving the w
 
 ## Evidence
 
-Local implementation and engine evidence are complete at 21/30 cycles; publication and required GitHub checks remain.
+CNC-36 is complete at 21/30 cycles on mergeable draft PR #74. Required Linux and Windows checks passed at implementation/report head `3b9efc3a41`.
 
 ## Implementation
 
@@ -45,3 +45,10 @@ Local implementation and engine evidence are complete at 21/30 cycles; publicati
 ## Remaining risk
 
 Safe scouting is deliberately conservative: if no reserved rifle has a reachable destination clear of nearby ground weapons, the battery waits rather than advancing blindly. This can leave a retained hidden building unbombarded until another rifle becomes available, but preserves the task's safety requirement and ordinary modules continue the wider battle.
+
+## Publication
+
+- Branch: `agent/cnc36-economy-artillery`
+- Base: `agent/cnc35-general-attack-squad`
+- Draft PR: https://github.com/Realpra1/LibertyDawn/pull/74
+- Required checks: Linux passed in 2m09s; Windows passed in 3m30s.
