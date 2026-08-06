@@ -10,6 +10,7 @@
 #endregion
 
 using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 using OpenRA.Mods.Common.Traits;
 using OpenRA.Traits;
@@ -96,6 +97,45 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(reservations.TryReserve(10, 201, SpecialistAssignmentPurpose.Capture, 1), Is.True);
 			Assert.That(reservations.IsReserved(200), Is.False);
 			Assert.That(reservations.Claimants(201), Is.EqualTo(new uint[] { 10 }));
+		}
+
+		[Test]
+		public void SharedReservationsRestoreBothIncumbentPurposesDeterministically()
+		{
+			var captureFirst = new SpecialistTargetReservations();
+			var restoredCapture = captureFirst.Restore(new[]
+			{
+				new SpecialistTargetReservationState(11, 100, SpecialistAssignmentPurpose.Capture, 2),
+				new SpecialistTargetReservationState(10, 100, SpecialistAssignmentPurpose.Capture, 2)
+			});
+
+			Assert.That(restoredCapture.Select(r => r.SpecialistId), Is.EqualTo(new uint[] { 10, 11 }));
+			Assert.That(captureFirst.Claimants(100), Is.EqualTo(new uint[] { 10, 11 }));
+			Assert.That(captureFirst.TryReserve(20, 100, SpecialistAssignmentPurpose.Demolition, 1), Is.False);
+
+			var demolitionFirst = new SpecialistTargetReservations();
+			var restoredDemolition = demolitionFirst.Restore(new[]
+			{
+				new SpecialistTargetReservationState(20, 200, SpecialistAssignmentPurpose.Demolition, 1)
+			});
+
+			Assert.That(restoredDemolition.Select(r => r.SpecialistId), Is.EqualTo(new uint[] { 20 }));
+			Assert.That(demolitionFirst.TryReserve(10, 200, SpecialistAssignmentPurpose.Capture, 1), Is.False);
+		}
+
+		[Test]
+		public void SharedReservationRestoreDropsIncompletePairsButKeepsValidAssignments()
+		{
+			var reservations = new SpecialistTargetReservations();
+			var restored = reservations.Restore(new[]
+			{
+				new SpecialistTargetReservationState(10, 100, SpecialistAssignmentPurpose.Capture, 2),
+				new SpecialistTargetReservationState(20, 200, SpecialistAssignmentPurpose.Demolition, 1)
+			});
+
+			Assert.That(restored.Select(r => r.SpecialistId), Is.EqualTo(new uint[] { 20 }));
+			Assert.That(reservations.IsReserved(100), Is.False);
+			Assert.That(reservations.Claimants(200), Is.EqualTo(new uint[] { 20 }));
 		}
 
 		[Test]

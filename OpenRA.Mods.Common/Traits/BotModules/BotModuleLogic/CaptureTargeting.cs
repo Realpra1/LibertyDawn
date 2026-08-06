@@ -20,6 +20,23 @@ namespace OpenRA.Mods.Common.Traits
 		Demolition
 	}
 
+	public readonly struct SpecialistTargetReservationState
+	{
+		public readonly uint SpecialistId;
+		public readonly uint TargetId;
+		public readonly SpecialistAssignmentPurpose Purpose;
+		public readonly int MaximumClaimants;
+
+		public SpecialistTargetReservationState(uint specialistId, uint targetId,
+			SpecialistAssignmentPurpose purpose, int maximumClaimants)
+		{
+			SpecialistId = specialistId;
+			TargetId = targetId;
+			Purpose = purpose;
+			MaximumClaimants = maximumClaimants;
+		}
+	}
+
 	public sealed class SpecialistTargetReservations
 	{
 		sealed class Reservation
@@ -73,6 +90,43 @@ namespace OpenRA.Mods.Common.Traits
 			reservation.Claimants.Add(specialistId);
 			targetBySpecialist.Add(specialistId, targetId);
 			return true;
+		}
+
+		public IReadOnlyList<SpecialistTargetReservationState> Restore(
+			IEnumerable<SpecialistTargetReservationState> savedReservations)
+		{
+			byTarget.Clear();
+			targetBySpecialist.Clear();
+
+			var restored = new List<SpecialistTargetReservationState>();
+			var restoredSpecialists = new HashSet<uint>();
+			foreach (var group in savedReservations
+				.OrderBy(r => r.TargetId)
+				.ThenBy(r => r.Purpose)
+				.ThenBy(r => r.SpecialistId)
+				.GroupBy(r => r.TargetId))
+			{
+				var reservations = group.ToArray();
+				var purpose = reservations[0].Purpose;
+				var maximumClaimants = reservations[0].MaximumClaimants;
+				if (group.Key == 0 || reservations.Any(r => r.SpecialistId == 0 ||
+					r.Purpose != purpose || r.MaximumClaimants != maximumClaimants) ||
+					reservations.Select(r => r.SpecialistId).Distinct().Count() != reservations.Length ||
+					reservations.Any(r => restoredSpecialists.Contains(r.SpecialistId)) ||
+					reservations.Length != maximumClaimants || maximumClaimants < 1 || maximumClaimants > 2 ||
+					(purpose == SpecialistAssignmentPurpose.Demolition && maximumClaimants != 1))
+					continue;
+
+				foreach (var reservation in reservations)
+				{
+					TryReserve(reservation.SpecialistId, reservation.TargetId,
+						reservation.Purpose, reservation.MaximumClaimants);
+					restoredSpecialists.Add(reservation.SpecialistId);
+					restored.Add(reservation);
+				}
+			}
+
+			return restored;
 		}
 
 		public void Release(uint specialistId)
