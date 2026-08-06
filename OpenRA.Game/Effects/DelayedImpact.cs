@@ -38,7 +38,7 @@ namespace OpenRA.Effects
 				world.AddFrameEndTask(w =>
 				{
 					w.Remove(this);
-					if (!args.Weapon.IsImpactSuppressed(w))
+					if (!args.Weapon.IsImpactSuppressed(w, args.SourceActor))
 						wh.DoImpact(target, args);
 				});
 		}

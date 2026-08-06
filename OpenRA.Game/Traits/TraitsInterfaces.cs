@@ -546,6 +546,11 @@ namespace OpenRA.Traits
 		bool SuppressImpact(string impactType);
 	}
 
+	public interface IImpactTypeSuppressionBypass
+	{
+		bool BypassImpactSuppression(string impactType);
+	}
+
 	public interface IMutantCreationSuppressor
 	{
 		bool SuppressMutantCreation { get; }
