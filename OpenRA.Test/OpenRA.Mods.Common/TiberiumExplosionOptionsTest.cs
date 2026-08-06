@@ -53,5 +53,17 @@ namespace OpenRA.Test
 			Assert.That(Explodes.LoadedResourceExplosionIsSuppressed(mixedColors, impactTypes, t => true), Is.True);
 			Assert.That(Explodes.LoadedResourceExplosionIsSuppressed(mixedGreen, impactTypes, t => true), Is.False);
 		}
+
+		[TestCase(false, true, false, false, false)]
+		[TestCase(true, false, false, false, false)]
+		[TestCase(true, true, true, false, false)]
+		[TestCase(true, true, false, true, false)]
+		[TestCase(true, true, false, false, true)]
+		public void MutantCreationPolicyPreservesExistingActors(bool noMutants, bool isMutant,
+			bool spawnedByMap, bool hasEnteredWorld, bool expected)
+		{
+			Assert.That(TiberiumExplosionOptions.ShouldSuppressMutantActor(noMutants, isMutant,
+				spawnedByMap, hasEnteredWorld), Is.EqualTo(expected));
+		}
 	}
 }

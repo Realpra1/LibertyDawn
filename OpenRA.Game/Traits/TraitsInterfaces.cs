@@ -546,6 +546,16 @@ namespace OpenRA.Traits
 		bool SuppressImpact(string impactType);
 	}
 
+	public interface IMutantCreationSuppressor
+	{
+		bool SuppressMutantCreation { get; }
+	}
+
+	public interface IActorCreationSuppressor
+	{
+		bool SuppressActorCreation(Actor actor);
+	}
+
 	public interface IRulesetLoaded<TInfo> { void RulesetLoaded(Ruleset rules, TInfo info); }
 	public interface IRulesetLoaded : IRulesetLoaded<ActorInfo>, ITraitInfoInterface { }
 

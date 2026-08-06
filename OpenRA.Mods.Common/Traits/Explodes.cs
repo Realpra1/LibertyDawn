@@ -57,6 +57,10 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Optional semantic impact type that world traits may suppress before this explosion fires.")]
 		public readonly string ImpactType = null;
 
+		[WeaponReference]
+		[Desc("Optional weapon used instead when mutant creation is disabled.")]
+		public readonly string NonMutatingWeapon = null;
+
 		[Desc("Optional impact types keyed by carried Harvester resource type. The explosion is suppressed when every loaded resource maps to a suppressed impact type.")]
 		public readonly Dictionary<string, string> LoadedResourceImpactTypes = new Dictionary<string, string>();
 
@@ -65,6 +69,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		public WeaponInfo WeaponInfo { get; private set; }
 		public WeaponInfo EmptyWeaponInfo { get; private set; }
+		public WeaponInfo NonMutatingWeaponInfo { get; private set; }
 
 		public override object Create(ActorInitializer init) { return new Explodes(this, init.Self); }
 		public override void RulesetLoaded(Ruleset rules, ActorInfo ai)
@@ -83,6 +88,14 @@ namespace OpenRA.Mods.Common.Traits
 				if (!rules.Weapons.TryGetValue(emptyWeaponToLower, out var emptyWeapon))
 					throw new YamlException($"Weapons Ruleset does not contain an entry '{emptyWeaponToLower}'");
 				EmptyWeaponInfo = emptyWeapon;
+			}
+
+			if (!string.IsNullOrEmpty(NonMutatingWeapon))
+			{
+				var nonMutatingWeaponToLower = NonMutatingWeapon.ToLowerInvariant();
+				if (!rules.Weapons.TryGetValue(nonMutatingWeaponToLower, out var nonMutatingWeapon))
+					throw new YamlException($"Weapons Ruleset does not contain an entry '{nonMutatingWeaponToLower}'");
+				NonMutatingWeaponInfo = nonMutatingWeapon;
 			}
 
 			base.RulesetLoaded(rules, ai);
@@ -131,6 +144,9 @@ namespace OpenRA.Mods.Common.Traits
 			if (weapon == null)
 				return;
 
+			if (NonMutatingImpactIsRequired(self.World, Info.ImpactType) && Info.NonMutatingWeaponInfo != null)
+				weapon = Info.NonMutatingWeaponInfo;
+
 			var source = Info.DamageSource == DamageSource.Self ? self : e.Attacker;
 			if (weapon.Report != null && weapon.Report.Any())
 				Game.Sound.Play(SoundType.World, weapon.Report, self.World, self.CenterPosition);
@@ -152,6 +168,12 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			return !string.IsNullOrEmpty(impactType) && world.WorldActor
 				.TraitsImplementing<IImpactTypeSuppressor>().Any(s => s.SuppressImpact(impactType));
+		}
+
+		static bool NonMutatingImpactIsRequired(World world, string impactType)
+		{
+			return !string.IsNullOrEmpty(impactType) && world.WorldActor
+				.TraitsImplementing<IMutantCreationSuppressor>().Any(s => s.SuppressMutantCreation);
 		}
 
 		public static bool LoadedResourceExplosionIsSuppressed(IReadOnlyDictionary<string, int> contents,

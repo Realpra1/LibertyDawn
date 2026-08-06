@@ -526,6 +526,10 @@ TiberiumExplosion:
 	Warhead@4Res: CreateResource
 		AddsResourceType: Tiberium
 		Size: 1,1
+
+BlueTiberiumCargoExplosion:
+	Inherits: TiberiumExplosion
+	ImpactType: BlueTiberiumExplosion
         
 ViceExplosion:
 	Warhead@4Res: CreateResource

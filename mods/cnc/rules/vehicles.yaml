@@ -110,6 +110,7 @@ HARV:
 		RequiresCondition: unstable-tiberium
 		Weapon: AtomicHarv
 		ImpactType: RedTiberiumExplosion
+		NonMutatingWeapon: BlueTiberiumCargoExplosion
     Blink:
 		RequiresCondition: unstable-tiberium
         Interval: 13
@@ -194,6 +195,7 @@ SHARV:
 		RequiresCondition: unstable-tiberium
 		Weapon: Atomic
 		ImpactType: RedTiberiumExplosion
+		NonMutatingWeapon: BlueTiberiumCargoExplosion
     Blink:
 		RequiresCondition: unstable-tiberium
         Interval: 13

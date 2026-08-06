@@ -15,11 +15,12 @@ using OpenRA.Traits;
 namespace OpenRA.Mods.Common.Traits
 {
 	[TraitLocation(SystemActors.World)]
-	[Desc("Controls independent red and blue Tiberium explosion lobby options.")]
+	[Desc("Controls Tiberium explosion and mutation lobby options.")]
 	public class TiberiumExplosionOptionsInfo : TraitInfo, ILobbyOptions
 	{
 		public const string RedOptionId = "noredtiberiumexplosions";
 		public const string BlueOptionId = "nobluetiberiumexplosions";
+		public const string MutantsOptionId = "nomutants";
 
 		[Desc("Semantic impact type used by red Tiberium explosions.")]
 		public readonly string RedImpactType = "RedTiberiumExplosion";
@@ -41,6 +42,13 @@ namespace OpenRA.Mods.Common.Traits
 		public readonly bool BlueCheckboxVisible = true;
 		public readonly int BlueCheckboxDisplayOrder = 21;
 
+		public readonly string MutantsCheckboxLabel = "No mutants ever";
+		public readonly string MutantsCheckboxDescription = "Prevents new mutants from being created";
+		public readonly bool MutantsCheckboxEnabled = false;
+		public readonly bool MutantsCheckboxLocked = false;
+		public readonly bool MutantsCheckboxVisible = true;
+		public readonly int MutantsCheckboxDisplayOrder = 22;
+
 		[Desc("Write semantic explosion option decisions to debug.log.")]
 		public readonly bool DebugLogging = false;
 
@@ -50,17 +58,21 @@ namespace OpenRA.Mods.Common.Traits
 				RedCheckboxVisible, RedCheckboxDisplayOrder, RedCheckboxEnabled, RedCheckboxLocked);
 			yield return new LobbyBooleanOption(BlueOptionId, BlueCheckboxLabel, BlueCheckboxDescription,
 				BlueCheckboxVisible, BlueCheckboxDisplayOrder, BlueCheckboxEnabled, BlueCheckboxLocked);
+			yield return new LobbyBooleanOption(MutantsOptionId, MutantsCheckboxLabel, MutantsCheckboxDescription,
+				MutantsCheckboxVisible, MutantsCheckboxDisplayOrder, MutantsCheckboxEnabled, MutantsCheckboxLocked);
 		}
 
 		public override object Create(ActorInitializer init) { return new TiberiumExplosionOptions(init.Self, this); }
 	}
 
-	public class TiberiumExplosionOptions : IImpactTypeSuppressor, INotifyCreated
+	public class TiberiumExplosionOptions : IImpactTypeSuppressor, IMutantCreationSuppressor,
+		IActorCreationSuppressor, INotifyCreated
 	{
 		readonly TiberiumExplosionOptionsInfo info;
 		readonly World world;
 		bool noRedExplosions;
 		bool noBlueExplosions;
+		bool noMutants;
 
 		public TiberiumExplosionOptions(Actor self, TiberiumExplosionOptionsInfo info)
 		{
@@ -74,6 +86,22 @@ namespace OpenRA.Mods.Common.Traits
 				.OptionOrDefault(TiberiumExplosionOptionsInfo.RedOptionId, info.RedCheckboxEnabled);
 			noBlueExplosions = self.World.LobbyInfo.GlobalSettings
 				.OptionOrDefault(TiberiumExplosionOptionsInfo.BlueOptionId, info.BlueCheckboxEnabled);
+			noMutants = self.World.LobbyInfo.GlobalSettings
+				.OptionOrDefault(TiberiumExplosionOptionsInfo.MutantsOptionId, info.MutantsCheckboxEnabled);
+		}
+
+		bool IMutantCreationSuppressor.SuppressMutantCreation => noMutants;
+
+		bool IActorCreationSuppressor.SuppressActorCreation(Actor actor)
+		{
+			var mutant = actor.TraitOrDefault<Mutant>();
+			var suppressed = ShouldSuppressMutantActor(noMutants, mutant != null,
+				mutant?.SpawnedByMap ?? false, mutant?.HasEnteredWorld ?? false);
+			if (suppressed && info.DebugLogging)
+				Log.Write("debug", "Tiberium mutation option: suppressed actor={0}, owner={1}, tick={2}",
+					actor.Info.Name, actor.Owner?.InternalName ?? "none", world.WorldTick);
+
+			return suppressed;
 		}
 
 		bool IImpactTypeSuppressor.SuppressImpact(string impactType)
@@ -92,6 +120,12 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			return (noRedExplosions && string.Equals(impactType, redImpactType, StringComparison.OrdinalIgnoreCase)) ||
 				(noBlueExplosions && string.Equals(impactType, blueImpactType, StringComparison.OrdinalIgnoreCase));
+		}
+
+		public static bool ShouldSuppressMutantActor(bool noMutants, bool isMutant, bool spawnedByMap,
+			bool hasEnteredWorld)
+		{
+			return noMutants && isMutant && !spawnedByMap && !hasEnteredWorld;
 		}
 	}
 }

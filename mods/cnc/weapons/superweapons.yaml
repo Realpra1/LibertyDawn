@@ -101,6 +101,7 @@ Atomic:
         
 AtomicHarv:
 	ImpactType: RedTiberiumExplosion
+	NonMutatingWeapon: BlueTiberiumCargoExplosion
 	ValidTargets: Ground, Water, Air, Trees
 	Report: nukemisl.aud
 	Warhead@1Dam_impact: SpreadDamage
@@ -203,6 +204,7 @@ AtomicHarv:
 
 AtomicTib:
 	ImpactType: RedTiberiumExplosion
+	NonMutatingWeapon: ChemtankExplodeOnce
 	ValidTargets: Ground, Water, Air, Trees
 	Report: nukemisl.aud
     Warhead@1Dam_impact: SpreadDamage

@@ -128,6 +128,7 @@ Grenade:
         
 TiberiumMeteor:
 	ImpactType: RedTiberiumExplosion
+	NonMutatingWeapon: ChemtankExplodeOnce
 	Inherits: ^BallisticWeapon
 	ReloadDelay: 50
 	Range: 20c0
