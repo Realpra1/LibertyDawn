@@ -10,7 +10,7 @@ when the dependency section directs it.
 
 - Worker: `worker-4-cnc-43a`
 - Task: `CNC-43A — Flame Tank balance`
-- Status: `Publication`
+- Status: `Complete - testing`
 - Common base branch/SHA: `agent/cnc38-early-viki-infantry-rush` / `09ccdac3c1ecb5134a4751f2bcbd8a7970dfe6bf`
 - Task branch: `agent/round-20260806-cnc43a-flame-tank-balance`
 - Intended PR base: `agent/cnc38-early-viki-infantry-rush`
@@ -24,7 +24,7 @@ when the dependency section directs it.
 - Liberty Dawn design reference: `.agents/references/LIBERTY-DAWN-DESIGN.md`
 - Full-engine game tests completed: `36` (including labeled diagnostic/invalid runs that advanced far enough to expose evidence; four tick-0 packaging failures excluded)
 - Sol-xhigh policy escalation: `unused (requires at least 10 game tests; one maximum)`
-- PR: `none`
+- PR: `#79 https://github.com/Realpra1/LibertyDawn/pull/79`
 
 ## Integrated repair assignment
 
@@ -844,9 +844,9 @@ silently exceed the budget.
 
 ## Handoff receipt
 
-- Proposed status: `Complete - testing`, pending green individual-PR checks
-- Final branch/head: `agent/round-20260806-cnc43a-flame-tank-balance`; product head `6f3a33ea165e0b4b90d0e4a9c974b70a12f78a12`
-- PR and checks: pending publication
+- Proposed status: `Complete - testing`
+- Final branch/head: `agent/round-20260806-cnc43a-flame-tank-balance`; product head `6f3a33ea165e0b4b90d0e4a9c974b70a12f78a12`; tested PR head before this docs-only receipt `bcff2af985a3fbc205a0d8b4e03c9cc4ee0dc03d`
+- PR and checks: `#79 https://github.com/Realpra1/LibertyDawn/pull/79`; `MERGEABLE/CLEAN`; assigned base is unprotected and GitHub reported no required checks, no check rollup, and no workflow runs after polling
 - Cycles used: `2/20`
 - Acceptance evidence: final literal v4 proves 36000 HP and 5544 Heavy burst vs pinned control 30000/5040, with exact five-class and death parity
 - Adversarial evidence: true tanks remain equal-credit winners/holders; fixed turrets, range, MLRS, and Orca remain a hard stop; ordinary natural FTNK production/contact and a post-load damaged FTNK were exercised

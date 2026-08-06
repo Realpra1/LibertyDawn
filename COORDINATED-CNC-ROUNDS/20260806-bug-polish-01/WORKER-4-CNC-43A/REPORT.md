@@ -2,7 +2,7 @@
 
 ## Status
 
-Publication-ready after 2 of 20 isolated code cycles and 36 completion-worthy full-engine games. Proposed handoff is `Complete - testing`, contingent on the individual PR checks remaining green. Four tick-0 custom-map/save staging failures are documented in ignored evidence but excluded from the game count because they never exercised gameplay.
+Complete - testing after 2 of 20 isolated code cycles and 36 completion-worthy full-engine games. Four tick-0 custom-map/save staging failures are documented in ignored evidence but excluded from the game count because they never exercised gameplay.
 
 Task branch: `agent/round-20260806-cnc43a-flame-tank-balance`
 
@@ -134,4 +134,4 @@ CNC-43 PR #78 (`agent/round-20260806-cnc43-mcv-crush-flavor`, product commit `4f
 
 ## Publication
 
-Individual PR: pending. Required checks and final branch-head receipt will be added after publication. Do not merge this task PR directly.
+Individual PR: [#79](https://github.com/Realpra1/LibertyDawn/pull/79), against `agent/cnc38-early-viki-infantry-rush`. At tested head `bcff2af985a3fbc205a0d8b4e03c9cc4ee0dc03d`, GitHub reported `MERGEABLE/CLEAN`. The assigned base branch is unprotected and GitHub reported no required checks, no check rollup, and no workflow runs after polling; final local `make test` is green. This receipt update is documentation-only. Do not merge this task PR directly.
