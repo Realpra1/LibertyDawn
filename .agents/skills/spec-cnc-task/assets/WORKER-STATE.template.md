@@ -82,6 +82,10 @@ before publication. Do not read its worker spec.
 
 {{GAME_TESTS}}
 
+### Old-behavior control and required improvement
+
+{{CONTROL_BASELINE_AND_METRICS}}
+
 ### Adversarial cases
 
 {{ADVERSARIAL_TESTS}}
@@ -140,6 +144,28 @@ unit/static checks as useful baseline gates before or alongside it; do not delay
 game evidence while accumulating unit-only confidence. Keep available game slots
 working while other agents code or analyze because simulation is cheaper than
 missing human feedback.
+
+For every change to AI strategy, priorities, economy, production, targeting,
+recovery, or tactics, compare against old behavior repeatedly throughout the loop.
+Prefer a same-build feature-disabled control. If unavailable, run the recorded
+base SHA or named known-good older AI commit from an isolated worktree. Record the
+exact control commit/toggle, content/config checksum, map, factions, seed, starts,
+options, initial state, opponents, and metrics. Keep these matched so the intended
+behavior is the meaningful difference. Use both game slots for paired control and
+changed-AI runs when practical; make the first behavioral test such a pair when
+the feature toggle or recorded control build is ready.
+
+The changed AI must materially outperform old behavior in scenarios that actually
+exercise the change. Judge match outcome together with task-relevant measures such
+as survival, objective completion, tech timing, income/spending, army/economic
+value, useful damage/kills, losses, idle queues/units, recovery time, and CPU cost.
+If it loses, ties, or gains only marginally, assume a likely implementation error,
+bad strategic policy, or displaced regression until evidence rules those out.
+Inspect code and logs, vary adversarial scenarios, and fix the cause; do not call
+feature-activation logs a success. Because matches can vary, repeat materially
+useful comparisons before blaming noise. A non-strategic change need not win more,
+but it must not degrade the relevant old-AI behavior without an explicit accepted
+tradeoff in the spec.
 
 Treat all tests as attempts to break the implementation. Compilation, lint, and
 static analysis are baseline gates; every unit, integration, save/load, replay, or
@@ -218,8 +244,11 @@ does not invalidate the acceptance scenario; it must also try to break the code.
 Prefer a matched differential as the golden adversarial test when the behavior
 can be toggled: keep faction, map, seed, starts, options, and initial state aligned
 and enable the behavior for only one side. When the scenario materially exercises
-the feature, require a decisive advantage; investigate a loss, tie, or marginal
-gain rather than calling it proof, and document unavoidable nondeterminism.
+the feature, require a decisive advantage over the old-behavior control;
+investigate a loss, tie, or marginal gain rather than calling it proof, and
+document unavoidable nondeterminism. Do not substitute unrelated different AI
+personalities for the old-behavior control unless the spec explicitly needs that
+secondary benchmark.
 
 Run at least one real full match at the fastest applicable speed to a natural
 conclusion. For AI/engine behavior use headless MAX; use graphical modes when the
@@ -267,7 +296,8 @@ risks. The reviewer and integrated release determine final status.
 
 The task report must cover behavior, design choices, assumptions, cycle count,
 tests, seeds/artifact paths, diagnostics removed or retained, performance and
-determinism, PR/checks, deferred work, and remaining risks.
+determinism, old-control configuration and comparative results, PR/checks,
+deferred work, and remaining risks.
 
 Push the task branch and open one individual PR. Do not merge it. Wait for every
 required GitHub check; diagnose and fix relevant failures within the isolated
@@ -292,6 +322,7 @@ silently exceed the budget.
 - Cycles used:
 - Acceptance evidence:
 - Adversarial evidence:
+- Old-behavior control and comparative result:
 - Final regression:
 - Error/warning and diagnostic-cleanup result:
 - Performance/determinism result:

@@ -37,19 +37,28 @@ state, coordinator state, or the PR; write only the requested review file.
    ordinary-AI simulation, normally headless MAX. Reject unit-test-only early
    cycles, passive/custom-bot substitution, or delayed game testing when the full
    simulation could have supplied cheap feedback from cycle 1.
-9. Reject a test portfolio made of repeated happy paths. Except for one initial
-   full-engine harness/basic-path smoke, require every unit/integration/game test to state a
+9. For an AI strategy/policy change, require a valid old-behavior control: prefer
+   the same build with the feature disabled, otherwise the recorded base or named
+   older control commit. Verify matched content, map, faction, seed, starts,
+   options, initial state, and opponents plus task-relevant outcome/quality
+   metrics. Treat unexplained repeated loss, parity, or marginal improvement as a
+   likely correctness or strategic-policy defect and block completion; feature
+   activation logs do not prove benefit. When infrastructure allowed it, confirm
+   the first behavioral test paired changed and old behavior.
+10. Reject a test portfolio made of repeated happy paths. Except for one initial
+   full-engine harness/basic-path smoke, require every unit/integration/game test
+   to state a
    credible failure hypothesis, harder or different perturbation, expected failure
    signal, and observed pass/failure evidence. Confirm difficulty increased as
    soon as behavior first worked and that unexpected results changed the next
    test or implementation decision.
-10. List findings by severity with file/line, failure mechanism, affected spec
+11. List findings by severity with file/line, failure mechanism, affected spec
    clause, and smallest safe correction. Avoid cosmetic preferences.
-11. Nominate one `required_fix`: the highest-impact correction compatible with the
+12. Nominate one `required_fix`: the highest-impact correction compatible with the
    task. Use `none` when no worthwhile issue exists. Critical compile, corruption,
    security, or deterministic-simulation failures remain release blockers even
    though the ordinary review-response budget is one code/test cycle.
-12. The worker may reject a finding with concrete evidence. Record the disagreement
+13. The worker may reject a finding with concrete evidence. Record the disagreement
    rather than arguing indefinitely.
 
 Write the requested review file and return only verdict (`ready`, `ready with one

@@ -47,6 +47,13 @@ Do not use three repetitions of the same passing match as three cycles. After a
 candidate passes one scenario, make the next materially harder or different and
 record its failure hypothesis and signal in integration state.
 
+For every included strategic AI change, compare the release head against its
+recorded feature-disabled, base-SHA, or named older-behavior control under matched
+full-AI conditions. Require material improvement in scenarios that exercise the
+change. Treat repeated release parity, marginal gain, or loss as likely merge
+damage, regression, or bad policy and return it for repair unless concrete
+task-specific evidence proves an acceptable tradeoff.
+
 When fixes are needed:
 
 1. Add the current release head, integration-note path, repair branch, repair PR
@@ -76,8 +83,8 @@ the safest proven subset/result and report unresolved tasks as first iteration.
   natural conclusion for AI/engine rounds, plus graphical/platform checks for any
   feature MAX cannot prove. Reject sole reliance on reloaded states.
 - Use the global build/game slots and isolated MAX-game support directories.
-- Record release heads, merge order, conflicts, tests, repairs, exclusions, and
-  remaining risks in the integration state.
+- Record release heads, merge order, conflicts, tests, repairs, exclusions,
+  old-control comparisons, and remaining risks in the integration state.
 - Send final structured receipts to the Task Maker. Promote the draft release PR
   to the product release PR, but never merge it into `bleed`; the user does that.
 

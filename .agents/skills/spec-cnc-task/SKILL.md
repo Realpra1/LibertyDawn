@@ -50,6 +50,8 @@ contract, not a summary.
     accelerate the first event, but the full game engine and normal AI must be
     active from test 1. Treat unit tests and passive fixtures as supplementary;
     the repository already has them and they cannot replace simulation feedback.
+    For an AI behavior change, make test 1 a matched changed-versus-old-control
+    pair whenever the available toggle/build infrastructure permits it.
 12. For routing or transport, include ordinary connected and island/blocked
     topology such as Archipelago. For persisted behavior, include save/load and
     reject a reloaded state as sole acceptance. For hot paths, define a bounded
@@ -70,6 +72,19 @@ contract, not a summary.
     managers, save/load, and duration as relevant. Treat tests as the substitute
     for human playtest feedback: they must challenge assumptions and generate the
     evidence used for the next implementation decision.
+16. For every AI strategy, priority, production, economy, targeting, recovery, or
+    tactical change, define an old-behavior control and comparative success
+    metrics. Prefer a feature-disabled control in the same build; otherwise use
+    the recorded pre-change base SHA or a named known-good older AI commit in an
+    isolated worktree. Keep map, factions, seed, starts, options, initial state,
+    content, and opponents matched so the behavior is the intended difference.
+17. Require the changed AI to materially outperform old behavior in scenarios
+    that exercise the change, using outcome plus task-relevant measures such as
+    survival, objective completion, tech timing, economy/army value, useful damage,
+    losses, idle time, or simulation cost. Treat repeated parity, marginal gain,
+    or a loss as strong evidence of an implementation error or bad strategic
+    policy. Require investigation and correction or a concrete task-specific
+    explanation; logs showing the feature fired are never enough.
 
 Keep the coordinator state concise; all task detail belongs in this worker state.
 Return only the task ID, worker-state path, base SHA, and material cross-worker
