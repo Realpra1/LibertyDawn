@@ -4,6 +4,8 @@
 
 Implemented a per-bot deterministic reservation authority shared by Engineer capture and Commando demolition selection, including compatible exact two-Engineer capture pairs. Autonomous AI C4 now carries a latched safety context from order acceptance through travel, planting, delayed detonation, and bridge/demolishable consumers. Ownership changes to a disallowed relationship cancel or disarm that autonomous action permanently; a later hostile relationship requires a fresh assignment. Explicit manual/forced and authored script demolition remain outside this safety context.
 
+The review response adds explicit `CaptureManagerBotModule` save data for both scan timers, capture and demolition assignments, claimant cardinality, assignment/progress history, target-health history, and deferred-target retry state. Reload validates live actors, purpose, relationship, activity, pair completeness, and duplicate/cross-purpose claims before deterministically rebuilding reservations in ActorID order.
+
 Proposed handoff is **First iteration - testing**. The literal simultaneous-selection and capture-during-travel requirements pass, including a fresh combined regression and both travel/post-plant save-load boundaries. The packet's stronger completion bar also requests a defended natural-production match and an exercised ordinary transport takeover in the final combined scenario; those were not established by the available evidence and remain integration-review risks.
 
 ## Design choices
@@ -18,17 +20,17 @@ Proposed handoff is **First iteration - testing**. The literal simultaneous-sele
 ## Assumptions
 
 - Cross-purpose reservations are intentionally per bot/player. Allied or unrelated bot captures cannot participate in that local reservation authority and are protected by live C4 revalidation instead.
-- Save/load replays serialized orders; the autonomous order marker and resulting activity/safety state are reconstructed deterministically by the engine order stream.
+- Save/load restores capture-manager assignment/reservation state explicitly; autonomous C4 order/activity safety remains serialized by the existing engine order stream.
 - CNC-39 remains the owner of capture thresholds, scoring, husks, healthy-building policy, and reassessment tuning. Its named dependency branch remained at the pinned base SHA through the final pre-publication check, so there was no dependency commit to integrate.
 
 ## Cycle count
 
-10 isolated product-code cycles were used. Full-engine game counter: 48, including explicitly labeled invalid harness/setup runs.
+11 isolated product-code cycles were used. Full-engine game counter: 65, including explicitly labeled invalid harness/setup runs.
 
 ## Focused and broad checks
 
-- Focused `CaptureTargetingTest`: 9/9 passed after the final product change.
-- Full `OpenRA.Test`: 443/443 passed.
+- Focused `CaptureTargetingTest`: 11/11 passed after the final product change.
+- Full `OpenRA.Test`: 445/445 passed.
 - `make all`: passed, 0 warnings/errors.
 - `make check`: passed, including explicit-interface and conditional-trait checks.
 - `make check-scripts`: passed.
@@ -36,7 +38,7 @@ Proposed handoff is **First iteration - testing**. The literal simultaneous-sele
 - `git diff --check`: passed.
 - No Red Alert, Dune 2000, or Tiberian Sun content was built or tested separately.
 
-Focused additions cover compatible Engineer pair claims, capture/demolition exclusion in both claim orders, and latched relationship/finality safety. Existing target scoring/tiebreak coverage remains green.
+Focused additions cover compatible Engineer pair claims, capture/demolition exclusion in both claim orders, latched relationship/finality safety, stable restoration in both purpose directions, and rejection of incomplete capture pairs without losing an independent valid assignment. Existing target scoring/tiebreak coverage remains green.
 
 ## Literal acceptance and old-control comparison
 
@@ -95,6 +97,17 @@ Narrative/policy: `analysis/worker-2-cnc-39a/cycle-8b/`.
 
 ## Persistence
 
+### Capture-manager assignment boundary (review response)
+
+Artifact root: `analysis/worker-2-cnc-39a/cycle-11/`; seed 39085. Final fresh artifacts are `save-runs-6/capture-incumbent-save` and `save-runs-6/demolition-incumbent-save`; their exact reloads are `load-runs-2/capture-incumbent-load` and `load-runs-2/demolition-incumbent-load`. Map SHA-256 values are `f8ace4af6b15155479a685540fbde8f3ccb145100a7cc0a2863c3a5fbc50f28d` for capture incumbent and `697541adbc7fbd34dcc0a59dc9c6ac96a45ca8c94be5b28f93a349659d090ab7` for demolition incumbent. Tick-25 save SHA-256 values are `597a57b7c4b0852b6732a275b4ca80a3b0f799a3a43e35e9df00d82ed6b257a6` and `1785630a544fa67c36f044183efe2b00257456297479eef81335a768b15611c4`, respectively.
+
+- Capture incumbent: fresh assigned `e6#154` to `weap#156` at tick 1 and saved during travel at tick 25. Reload restored the exact claim at tick 27 with assigned tick 1, last-progress tick 25, and one claimant. Fresh and reload both kept `rmbo#155` idle at tick 101, released after the incumbent ownership transfer at tick 151, selected demolition at tick 152, destroyed the target at tick 1496, and recorded it dead at tick 1801.
+- Demolition incumbent: fresh assigned `rmbo#155` at tick 1, accepted C4 at tick 6, and saved during travel at tick 25. Reload restored the exact claim at tick 27 with assigned tick 1, last-progress tick 25, and one claimant. Fresh and reload both kept the Engineer idle at tick 101, canceled/released C4 after the incumbent transfer at tick 151, selected the exact Engineer pair at tick 152, completed capture at tick 301, and recorded the target alive under `Multi0` at tick 601.
+
+Thus reload preserves the paid incumbent and excludes the opposite purpose until a real release; it does not merely converge eventually. The four final games passed without fatal, desync, or Lua exceptions. The final fresh pair ran at about 337.01 aggregate valid world ticks/sec and the reload pair at about 336.883. Earlier cycle-11 fixture-tuning runs and the superseded tick-5 saves are explicitly excluded from acceptance; runs that entered a world still count in the full-engine total.
+
+Factual/policy review: `cycle-11/persistence-commenter-2/NARRATIVE.md` and `cycle-11/persistence-policy-2/POLICY-REVIEW.md`; policy verdict **APPROVE**.
+
 ### Travel/cancellation boundary
 
 Fresh save artifact: `save-run/ladder-save-tick99`; reload artifact: `load-run-2/ladder-load-tick99`.
@@ -127,19 +140,22 @@ Transport ownership was preserved in code by releasing local assignment/reservat
 - Exact ticks varied between concurrent processes (first capture by 12 ticks; later events by smaller amounts), and travel-save reload completion varied up to 21 ticks. No target/purpose choice changed.
 - Clean ladder: ~249.6 world ticks/sec.
 - Combined regression: ~239.7 world ticks/sec.
+- Review-response fresh persistence pair: ~337.01 aggregate world ticks/sec; reload pair: ~336.883.
 - Script matched pair: changed ~159.625 versus control ~159.629 world ticks/sec, effectively identical.
 - Earlier matched travel runs were about 199.7 world ticks/sec for both changed and control.
 - No repeatable median regression over 5%, unbounded growth, new GC spike, fatal, or desync was observed. The implementation adds no per-tick world scan.
 
 ## Diagnostics
 
-Retained diagnostics are gated by the existing bot debug switch and emit once per meaningful selection/release/C4 transition. They include tick, actor IDs, target owner/relationship, and accept/cancel/plant/disarm/final state. No production-default noisy probe logging or test-only product toggle remains.
+Retained diagnostics are gated by the existing bot debug switch and emit once per meaningful selection/release/C4 transition. They include tick, actor IDs, target owner/relationship, and accept/cancel/plant/disarm/final state. Successful restored assignments additionally report original assigned tick, last-progress tick, and claimant count once at load. No production-default noisy probe logging or test-only product toggle remains.
 
 ## Dependency and publication
 
 Pinned base/intended PR base: `agent/cnc38-early-viki-infantry-rush` at `09ccdac3c1ecb5134a4751f2bcbd8a7970dfe6bf`.
 
 The named CNC-39 dependency branch `agent/round-20260806-cnc39-engineer-correction` remained at the same pinned SHA on every check through pre-publication. There were no CNC-39 product commits to inspect or integrate.
+
+Review-response product commit: `f3fbbb4da48a66739bfc7195a3f3b4f91e5e3d16`.
 
 Draft PR: `#80` — https://github.com/Realpra1/LibertyDawn/pull/80, targeting
 `agent/cnc38-early-viki-infantry-rush`. Local required checks passed; GitHub
