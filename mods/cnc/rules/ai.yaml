@@ -112,6 +112,49 @@ Player:
 		OrderInterval: 50
 		MaximumTargetCandidates: 48
 		DebugLogging: false
+	EarlyInfantryRushBotModule:
+		RequiresCondition: enable-viki-ai
+		RequiredPrerequisites: upgrade.covert1
+		GrenadierType: e2
+		ChemicalType: e5
+		ChemicalTargetPriorities:
+			harv: 10000
+			sharv: 10000
+			proc: 7500
+			nuk2: 6000
+			nuke: 5000
+		GrenadierTargetPriorities:
+			fact: 10000
+			proc: 9000
+			weap: 8500
+			afld: 8500
+			hpad: 8000
+			hq: 7500
+			eye: 7500
+			tmpl: 7500
+			nuk2: 6500
+			nuke: 5500
+			pyle: 4500
+			hand: 4500
+		ConstructionAssetTypes: fact, mcv
+		RefineryAssetTypes: proc, resonator
+		HarvesterAssetTypes: harv, sharv
+		GrenadierGroupSize: 10
+		MaximumGrenadierGroups: 2
+		MaximumChemicalWarriors: 4
+		EarlyGameEndTick: 9000
+		RequestInterval: 50
+		OrderInterval: 25
+		InitialReservationTicks: 5
+		MaximumTargetCandidates: 48
+		ChemicalApproachRadiusCells: 3
+		FormationRadiusCells: 5
+		FormationSpacingCells: 2
+		FormationToleranceCells: 1
+		EnemyAvoidanceRadiusCells: 6
+		ReformDistanceCells: 5
+		PostKillHoldTicks: 75
+		DebugLogging: false
 	TransportManagerBotModule:
 		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai || enable-Easiest-ai
 		TransportHelicopterTypes: tran

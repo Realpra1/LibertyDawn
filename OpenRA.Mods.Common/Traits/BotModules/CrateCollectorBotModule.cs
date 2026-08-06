@@ -161,6 +161,13 @@ namespace OpenRA.Mods.Common.Traits
 				(initialScanPending && IsSuitableCollector(actor)));
 		}
 
+		// Specialist modules may outrank provisional ordinary exploration while still respecting
+		// a collector that has already committed to a crate or coverage assignment.
+		internal bool HasAssignment(Actor actor)
+		{
+			return actor != null && assignments.ContainsKey(actor.ActorID);
+		}
+
 		void IBotTick.BotTick(IBot bot)
 		{
 			if (IsTraitDisabled || player.WinState != WinState.Undefined || --scanTicks > 0)
