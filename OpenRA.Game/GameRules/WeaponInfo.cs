@@ -257,7 +257,8 @@ namespace OpenRA.GameRules
 		public bool IsImpactSuppressed(World world, Actor sourceActor = null)
 		{
 			return !string.IsNullOrEmpty(ImpactType) &&
-				(sourceActor == null || !sourceActor.TraitsImplementing<IImpactTypeSuppressionBypass>()
+				(sourceActor == null || sourceActor.Disposed ||
+					!sourceActor.TraitsImplementing<IImpactTypeSuppressionBypass>()
 					.Any(b => b.BypassImpactSuppression(ImpactType))) && world.WorldActor
 				.TraitsImplementing<IImpactTypeSuppressor>().Any(s => s.SuppressImpact(ImpactType));
 		}

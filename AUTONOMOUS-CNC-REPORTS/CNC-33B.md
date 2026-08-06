@@ -47,3 +47,7 @@ Focused tests cover ticks 2,249/2,250/2,999/3,000; unstable/empty state; default
 ## Remaining risk
 
 The isolated final deploy fixtures use a Stealth Harvester because that is the ordinary bomb-module unit. Ordinary HARV uses the same timer/deploy trait and its weapon-level semantic bypass is source-actor aware, but its manual deployment was established by shared policy/rules validation rather than a separate final-cycle observable. The 30-cycle ceiling was reached after three clean final-code adversarials; no known functional failure remains.
+
+## Post-completion correction
+
+CNC-34's first ordinary match exposed a trait-access exception when a resource explosion retained an already disposed infantry source. The actor-aware weapon gate now skips bypass-trait lookup for disposed sources, which cannot be an active explicit harvester deployment. The reproducing ordinary match and strict validation pass on the corrected cumulative head.
