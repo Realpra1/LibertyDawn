@@ -1145,13 +1145,13 @@ Player:
 		EnableOpeningPolicy: true
 		OpeningPowerTypes: nuk2, nuke
 		OpeningSiloTypes: silo
-		OpeningDefenseTypes: gtwr, gun
+		OpeningDefenseTypes: obli, gtwr, gun
 		OpeningBarracksTypes: pyle, hand
 		OpeningRefineryTypes: proc
 		OpeningFactoryTypes: weap, afld
 		OpeningRadarTypes: hq
 		OpeningHelipadTypes: hpad
-		OpeningOptionalStructureTypes: silo, gtwr, gun
+		OpeningOptionalStructureTypes: silo, obli, gtwr, gun
 		OpeningHarvesterTypes: harv, sharv
 		OpeningDefenseUnlockTypes: upgrade.recon1
 		OpeningMcvType: mcv
