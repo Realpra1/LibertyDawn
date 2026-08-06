@@ -36,4 +36,4 @@ Static verification passes: strict zero-warning Debug `make check`, strict zero-
 
 Design result: one VIKI-only persisted specialist manager owns bounded early requests, at most two lifetime grenadier launches, and at most four lifetime chemical missions. It reserves provisional actors ahead of ordinary exploration, respects already-active crate/transport/protection/resupply claims, uses deterministic target and formation ordering, reforms away from mobile armed threats, and retains lifetime caps across branch loss and save/load. No balance, weapon, unit, or structure definition changed. Remaining risk is intentionally tactical: a group may be heavily depleted by a defended rush, and chemical missions release when the unit or target ceases to be valid rather than forcing an unsafe stale order.
 
-Publication and required GitHub checks are pending.
+Draft PR #77 targets `bleed`, is mergeable, and both duplicated Linux and Windows workflows passed at implementation head `1ac8e6accea2`. CNC-38 is complete at 18/30 cycles: https://github.com/Realpra1/LibertyDawn/pull/77
