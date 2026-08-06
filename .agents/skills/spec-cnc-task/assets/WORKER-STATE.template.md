@@ -20,6 +20,10 @@ when the dependency section directs it.
 - Game capacity: `2`
 - Large-build capacity: `1`
 - Task report: `{{TASK_REPORT_PATH}}`
+- Match-analysis directory: `{{ABSOLUTE_ANALYSIS_DIRECTORY}}`
+- Liberty Dawn design reference: `.agents/references/LIBERTY-DAWN-DESIGN.md`
+- Full-engine game tests completed: `0`
+- Sol-xhigh policy escalation: `unused (requires at least 10 game tests; one maximum)`
 - PR: `none`
 
 ## Integrated repair assignment
@@ -67,6 +71,14 @@ writable branch; the task scope and behavioral contract do not change.
 
 If this section names another task PR, inspect that PR's commits while working and
 before publication. Do not read its worker spec.
+
+## Spec-time policy consultation
+
+- Proposed-policy narrative: `{{SPEC_POLICY_NARRATIVE_PATH_OR_NOT_APPLICABLE}}`
+- Sol-high policy review: `{{SPEC_POLICY_REVIEW_PATH_OR_NOT_APPLICABLE}}`
+- Verdict and confidence: `{{SPEC_POLICY_VERDICT}}`
+- Recommendations adopted as testable hypotheses: `{{SPEC_POLICY_ADOPTED}}`
+- Recommendations rejected or deferred, with reason: `{{SPEC_POLICY_REJECTED}}`
 
 ## Acceptance and tests
 
@@ -206,6 +218,45 @@ For each cycle:
 6. Remove or reduce obsolete/noisy diagnostics after they answer the question.
 7. Update the cycle journal before making another code change.
 
+## Match narrative and policy-feedback loop
+
+After every materially judged full-engine match or paired control batch:
+
+1. Increment `Full-engine game tests completed` for each game, including an
+   invalid setup that still ran far enough to expose evidence; label invalid runs.
+2. Copy (do not symlink) only the authorized current/control logs, manifests,
+   summaries, and metrics into the role output directory's `inputs/` subtree. In
+   that directory, write a strict JSON Commenter job containing only their absolute
+   `artifacts` paths, optional `design_reference`, and the absolute `output` path
+   ending in `NARRATIVE.md`. Launch a no-history fresh `commenter` role (Terra 5.6
+   medium). Do not stage source code, this worker state, the task sheet,
+   implementation notes, or inline job-file commentary.
+3. Read its factual `NARRATIVE.md`. Verify cited artifacts/ticks and use it to
+   understand exact control differences, causal win/loss sequence, and what the
+   losing AI did well. Correct the input/evidence rather than editing the narrative
+   into a preferred story.
+4. For AI-policy work, copy that narrative (do not symlink) to the Policy Reviewer
+   output directory as `inputs/NARRATIVE.md`. Write a strict JSON job there with
+   exactly the absolute `design_reference`, staged `narrative`, and `output` paths;
+   output must end in `POLICY-REVIEW.md`. Launch a no-history fresh
+   `policy-reviewer` role (Terra 5.6 medium). Questions embedded in the narrative
+   are the worker's questions to this playtester; the job contains no inline
+   context.
+5. Read the `POLICY-REVIEW.md` before choosing the next code change. Treat advice
+   as hypotheses: record what inspired the next test/change and what was rejected
+   with reasons. Never substitute the review for adversarial game evidence.
+
+Detailed narratives/reviews stay under the ignored analysis directory. Preserve
+their paths plus concise factual and policy conclusions in the cycle journal and
+task report. A paired two-game batch may share one Commenter and Policy Reviewer.
+
+If a policy problem persists after at least ten completed full-engine game tests,
+the worker may ask exactly one Sol 5.6 xhigh `policy-escalation` instance. First
+write a new narrative stating the game-test count, repeated failure pattern,
+attempted policies, evidence for/against each, and focused questions. The escalated
+reviewer still reads only the design document and narrative. Record use in the
+assignment field. Never invoke it before test 10 or invoke it twice for one task.
+
 Prefer the full engine and real bot types. On Linux use the explicit headless MAX
 path when graphics/input are irrelevant. Prove the current run loaded the intended
 map, bots, actors, options, activated headless MAX, advanced ticks, flushed logs,
@@ -311,8 +362,8 @@ silently exceed the budget.
 
 ## Cycle journal
 
-| Cycle | Commit/change | Failure hypothesis and perturbation | Checks/games | Failure/pass evidence | Decision/next harder test |
-|---|---|---|---|---|---|
+| Cycle | Commit/change | Failure hypothesis and perturbation | Checks/games | Narrative/policy review | Failure/pass evidence | Decision/next harder test |
+|---|---|---|---|---|---|---|
 
 ## Handoff receipt
 
@@ -323,6 +374,8 @@ silently exceed the budget.
 - Acceptance evidence:
 - Adversarial evidence:
 - Old-behavior control and comparative result:
+- Match narratives and routine policy-review conclusions:
+- Sol-xhigh policy escalation (unused, or test count/path/conclusion):
 - Final regression:
 - Error/warning and diagnostic-cleanup result:
 - Performance/determinism result:

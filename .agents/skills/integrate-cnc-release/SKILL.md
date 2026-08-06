@@ -47,6 +47,20 @@ Do not use three repetitions of the same passing match as three cycles. After a
 candidate passes one scenario, make the next materially harder or different and
 record its failure hypothesis and signal in integration state.
 
+After every materially judged integrated match or paired batch, launch a fresh
+Terra-medium Commenter on the assigned artifacts. For AI-policy rounds, pass only
+its narrative and the Liberty Dawn design reference to a fresh Terra-medium Policy
+Reviewer. Record factual narrative, policy verdict, advice adopted/rejected, and
+the harder test or repair it inspired before judging the next candidate. These
+reviews inform but never replace full-engine evidence.
+
+Use no-history sessions and the coordinator launcher's strict JSON envelopes for
+both roles: Commenter gets only artifact paths, optional design-reference path, and
+`NARRATIVE.md` output; Policy Reviewer gets exactly design-reference, narrative,
+and `POLICY-REVIEW.md` output paths. Copy only authorized evidence into the
+Commenter's `inputs/` subtree and copy its narrative (never symlink either) to the
+Policy Reviewer's `inputs/NARRATIVE.md` before launch.
+
 For every included strategic AI change, compare the release head against its
 recorded feature-disabled, base-SHA, or named older-behavior control under matched
 full-AI conditions. Require material improvement in scenarios that exercise the

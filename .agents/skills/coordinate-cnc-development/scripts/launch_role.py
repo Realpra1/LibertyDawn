@@ -17,9 +17,92 @@ ROLES = {
     "task-maker": ("gpt-5.6-terra", "medium", "make-cnc-task/SKILL.md"),
     "speccer": ("gpt-5.6-sol", "xhigh", "spec-cnc-task/SKILL.md"),
     "worker": ("gpt-5.6-sol", "high", None),
+    "commenter": ("gpt-5.6-terra", "medium", "comment-cnc-match/SKILL.md"),
+    "policy-reviewer": ("gpt-5.6-terra", "medium", "review-cnc-policy/SKILL.md"),
+    "policy-speccer": ("gpt-5.6-sol", "high", "review-cnc-policy/SKILL.md"),
+    "policy-escalation": ("gpt-5.6-sol", "xhigh", "review-cnc-policy/SKILL.md"),
     "reviewer": ("gpt-5.6-sol", "high", "review-cnc-pr/SKILL.md"),
     "integrator": ("gpt-5.6-sol", "high", "integrate-cnc-release/SKILL.md"),
 }
+
+POLICY_ROLES = {"policy-reviewer", "policy-speccer", "policy-escalation"}
+
+
+def _resolved_path(value: object, field: str) -> pathlib.Path:
+    if not isinstance(value, str) or not value:
+        raise SystemExit(f"Analysis job field {field!r} must be a non-empty path")
+    path = pathlib.Path(value)
+    if not path.is_absolute():
+        raise SystemExit(f"Analysis job field {field!r} must be an absolute path")
+    return path.resolve()
+
+
+def validate_analysis_job(args: argparse.Namespace) -> None:
+    """Reject analysis-role jobs that are not strict path-only envelopes."""
+    if args.role != "commenter" and args.role not in POLICY_ROLES:
+        return
+
+    try:
+        job = json.loads(args.job_file.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise SystemExit(f"Analysis role job must be valid JSON: {error}") from error
+    if not isinstance(job, dict):
+        raise SystemExit("Analysis role job must be a JSON object")
+
+    output_dir = args.output_dir.resolve()
+    if args.job_file.resolve().parent != output_dir:
+        raise SystemExit("Analysis role job file must be directly inside --output-dir")
+
+    expected_output = "NARRATIVE.md" if args.role == "commenter" else "POLICY-REVIEW.md"
+    output = _resolved_path(job.get("output"), "output")
+    if output.parent != output_dir or output.name != expected_output:
+        raise SystemExit(
+            f"Analysis role output must be {output_dir / expected_output}"
+        )
+
+    if "design_reference" in job:
+        design_path = _resolved_path(job["design_reference"], "design_reference")
+        expected_design = (
+            args.worktree.resolve()
+            / ".agents"
+            / "references"
+            / "LIBERTY-DAWN-DESIGN.md"
+        )
+        if design_path != expected_design or not design_path.is_file():
+            raise SystemExit(
+                "design_reference must name the worktree Liberty Dawn design document"
+            )
+
+    if args.role == "commenter":
+        allowed = {"artifacts", "design_reference", "output"}
+        if set(job) - allowed or not {"artifacts", "output"} <= set(job):
+            raise SystemExit(
+                "Commenter job permits only artifacts, optional design_reference, and output"
+            )
+        artifacts = job["artifacts"]
+        if not isinstance(artifacts, list) or not artifacts:
+            raise SystemExit("Commenter job artifacts must be a non-empty path list")
+        input_dir = output_dir / "inputs"
+        for index, value in enumerate(artifacts):
+            artifact = _resolved_path(value, f"artifacts[{index}]")
+            if not artifact.is_file() or not artifact.is_relative_to(input_dir):
+                raise SystemExit(
+                    f"Commenter artifact must be a staged regular file under {input_dir}: "
+                    f"{artifact}"
+                )
+        return
+
+    if set(job) != {"design_reference", "narrative", "output"}:
+        raise SystemExit(
+            "Policy Reviewer job must contain only design_reference, narrative, and output"
+        )
+    narrative = _resolved_path(job["narrative"], "narrative")
+    expected_narrative = output_dir / "inputs" / "NARRATIVE.md"
+    if not narrative.is_file() or narrative != expected_narrative:
+        raise SystemExit(
+            "Policy Reviewer narrative must be the staged input "
+            f"{expected_narrative}"
+        )
 
 
 def parse_args() -> argparse.Namespace:
@@ -40,6 +123,9 @@ def build_command(args: argparse.Namespace) -> tuple[list[str], str]:
     job_file = args.job_file.resolve()
     output_dir = args.output_dir.resolve()
     last_message = output_dir / "last-message.md"
+    analysis_role = args.role == "commenter" or args.role in POLICY_ROLES
+    session_directory = output_dir if analysis_role else worktree
+    sandbox = "workspace-write" if analysis_role else "danger-full-access"
 
     if instruction_name:
         instruction_file = worktree / ".agents" / "skills" / instruction_name
@@ -63,9 +149,9 @@ def build_command(args: argparse.Namespace) -> tuple[list[str], str]:
         "--ephemeral",
         "--json",
         "-C",
-        str(worktree),
+        str(session_directory),
         "-s",
-        "danger-full-access",
+        sandbox,
         "-a",
         "never",
         "-m",
@@ -92,6 +178,7 @@ def main() -> int:
     if not args.job_file.is_file():
         raise SystemExit(f"Job file does not exist: {args.job_file}")
 
+    validate_analysis_job(args)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     command, prompt = build_command(args)
     metadata = {

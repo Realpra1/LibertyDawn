@@ -52,13 +52,23 @@ state, coordinator state, or the PR; write only the requested review file.
    signal, and observed pass/failure evidence. Confirm difficulty increased as
    soon as behavior first worked and that unexpected results changed the next
    test or implementation decision.
-11. List findings by severity with file/line, failure mechanism, affected spec
+11. Verify a fresh Terra Commenter produced a factual narrative after every
+   materially judged match/batch and that every AI-policy narrative received a
+   fresh Terra Policy Review before the next worker decision. For AI-policy specs,
+   require the recorded Sol-high spec consultation. Permit at most one Sol-xhigh
+   policy escalation, only after the recorded tenth game test. Flag leaked source,
+   logs, task/spec context, or outcome-driven rewriting across the Policy Reviewer's
+   design-document-plus-narrative boundary.
+12. Treat Commenter and Policy Reviewer output as interpretation, not completion
+   evidence. Confirm the worker checked cited facts, documented adopted/rejected
+   advice, and validated recommendations through later adversarial full-AI games.
+13. List findings by severity with file/line, failure mechanism, affected spec
    clause, and smallest safe correction. Avoid cosmetic preferences.
-12. Nominate one `required_fix`: the highest-impact correction compatible with the
+14. Nominate one `required_fix`: the highest-impact correction compatible with the
    task. Use `none` when no worthwhile issue exists. Critical compile, corruption,
    security, or deterministic-simulation failures remain release blockers even
    though the ordinary review-response budget is one code/test cycle.
-13. The worker may reject a finding with concrete evidence. Record the disagreement
+15. The worker may reject a finding with concrete evidence. Record the disagreement
    rather than arguing indefinitely.
 
 Write the requested review file and return only verdict (`ready`, `ready with one

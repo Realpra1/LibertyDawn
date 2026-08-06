@@ -85,6 +85,18 @@ contract, not a summary.
     or a loss as strong evidence of an implementation error or bad strategic
     policy. Require investigation and correction or a concrete task-specific
     explanation; logs showing the feature fired are never enough.
+18. Before finalizing any AI-behavior or policy spec, write a concise proposed-
+    policy narrative containing current/control behavior, proposed rule of thumb,
+    expected situations and counters, predicted benefit/tradeoffs, forbidden
+    blunders, and focused questions. Copy it (not symlink it) to the review role's
+    `inputs/NARRATIVE.md`, then put a strict JSON job beside the output with exactly
+    the absolute `design_reference`, staged `narrative`, and `output` paths. Launch
+    `policy-speccer` through the coordinator role launcher so a no-history fresh Sol
+    5.6 high Policy Reviewer reads only that narrative and
+    `.agents/references/LIBERTY-DAWN-DESIGN.md`. Record its verdict, review path,
+    useful recommendations, rejected recommendations with reasons, and the
+    adversarial tests it inspired in the worker state. Skip only when policy is
+    genuinely irrelevant, recording why.
 
 Keep the coordinator state concise; all task detail belongs in this worker state.
 Return only the task ID, worker-state path, base SHA, and material cross-worker

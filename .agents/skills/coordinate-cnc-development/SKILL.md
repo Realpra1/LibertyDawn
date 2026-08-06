@@ -46,6 +46,12 @@ COORDINATED-CNC-ROUNDS/<round-id>/
   WORKER-<worker>-<task>/REPORT.md
 ```
 
+Keep `.agents/references/LIBERTY-DAWN-DESIGN.md` as the shared strategic reference.
+Store detailed per-match narratives and policy reviews under the ignored round
+analysis area, for example `.worktrees/coordinated-cnc/<round>/analysis/<worker>/`;
+commit concise conclusions and paths in worker state/report rather than flooding
+Git with every generated analysis.
+
 Commit local state during normal task/release pushes. A task branch contains only
 its own worker state. After task and release PRs are merged or closed, remove
 obsolete active-round files in an ordinary cleanup PR after preserving concise
@@ -62,15 +68,21 @@ Use a fresh context whenever practical:
 | Task Maker | Terra 5.6 medium | User request/status receipt, task sheet |
 | Speccer | Sol 5.6 xhigh | One task packet, repository, worker-state output path |
 | Worker | Sol 5.6 high | One worker `STATE.md` only |
+| Commenter | Terra 5.6 medium | Assigned match/control logs and optional design doc |
+| Policy Reviewer | Terra 5.6 medium | Design doc plus one match narrative |
+| Spec Policy Reviewer | Sol 5.6 high | Design doc plus proposed-policy narrative |
+| Escalated Policy Reviewer | Sol 5.6 xhigh | Once after at least ten persistent-problem game tests |
 | Reviewer | Sol 5.6 high | One task PR, its worker state, evidence |
 | Integrator | Sol 5.6 high | Reviewed branch heads and integration state |
 
-Prefer native fresh agents while slots exist. Because the native four-agent limit
-includes the coordinator, use `scripts/launch_role.py` for additional independent
-Codex sessions. Do not share a mutable worktree. The launcher tells each session
-to read/work its role-instruction file and job file without asking the coordinator
-to preload that role. Its worker prompt points only at the worker state, which is
-the worker's complete contract.
+Prefer native fresh agents while slots exist. Spawn every native delegated role
+with no inherited conversation history; for native Commenter and Policy Reviewer
+sessions this means an explicit no-history fork such as `fork_turns="none"`.
+Because the native four-agent limit includes the coordinator, use
+`scripts/launch_role.py` for additional independent Codex sessions. Do not share a
+mutable worktree. The launcher tells each session to read/work its role-instruction
+file and job file without asking the coordinator to preload that role. Its worker
+prompt points only at the worker state, which is the worker's complete contract.
 Put launcher event/process output under the ignored `.worktrees/` coordination
 area; keep only concise durable results in tracked state.
 
@@ -80,9 +92,27 @@ Use it only with an exact authorized Liberty Dawn worktree and task-local job fi
 never point it at a home directory, workspace root shared by another writer, or an
 unrelated repository.
 
+Commenter and Policy Reviewer sessions instead run from their dedicated output
+directory under `workspace-write` with approval policy `never`; they cannot mutate
+the repository worktree. Keep each such output directory exclusive to one running
+role.
+
 Use exact model IDs `gpt-5.6-terra` and `gpt-5.6-sol`. Use the role's reasoning
 effort from the table. Do not silently substitute a weaker model; record the
 blocker or receive a user override.
+
+Commenter and Policy Reviewer launcher jobs must be strict JSON path envelopes
+stored directly in their output directory. Commenter keys are `artifacts`, optional
+`design_reference`, and `output`; its output is `NARRATIVE.md`. Policy-role keys
+are exactly `design_reference`, `narrative`, and `output`; its output is
+`POLICY-REVIEW.md`. The launcher rejects extra inline context, a different design
+document, missing inputs, relative paths, or outputs outside the role directory.
+Before launch, copy only authorized Commenter game evidence into that role
+directory's `inputs/` subtree. Copy the one proposed or factual narrative to the
+Policy Reviewer directory as `inputs/NARRATIVE.md`; do not use symlinks. The
+launcher rejects analysis inputs outside these staged roots.
+Run the launcher with `--print-command` to validate the same envelope before a
+native no-history spawn; give that agent only the role-instruction and job paths.
 
 ## Start a round
 
@@ -98,8 +128,9 @@ blocker or receive a user override.
    claim and active task PR as excluded after restart. Once the batch is claimed,
    have a Task Maker mark those rows `in progress`.
 4. Launch a fresh Speccer for each packet, one at a time. It creates that worker's
-   `STATE.md` using the dedicated spec skill and records cross-task/PR concerns
-   when the Task Reader identifies them.
+   `STATE.md` using the dedicated spec skill, consults one Sol-high Policy Reviewer
+   through a proposed-policy narrative for AI-policy work, and records useful
+   policy and cross-task/PR concerns.
 5. Create five branches and worktrees from the recorded base. Put only the
    assigned state file into each task branch. A fixed five-task round is allowed;
    record dependency or overlap concerns but do not silently reorder the user's
@@ -127,6 +158,10 @@ an existing task require a new or revised spec before selection.
 - Treat full-engine ordinary-AI simulations as cheap primary feedback, not a late
   acceptance expense. Queue them from each worker's first behavioral test and keep
   game slots busy while other workers inspect, code, build, or analyze evidence.
+- After each materially judged match or paired batch, launch a fresh Terra-medium
+  Commenter. For AI-policy work, pass its narrative to a fresh Terra-medium Policy
+  Reviewer before the worker chooses the next change. These model sessions do not
+  consume local game slots and can analyze while another simulation runs.
 - Run `scripts/with_resource_slots.py` around shared builds and game batches.
 - A worker may reserve two game slots for a two-game comparison. Use the existing
   `launch-ai-parallel.py` inside the reservation.

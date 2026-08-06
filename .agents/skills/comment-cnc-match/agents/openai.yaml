@@ -1,0 +1,6 @@
+interface:
+  display_name: "Comment CNC Match"
+  short_description: "Turn CNC match logs into factual narratives"
+  default_prompt: "Use $comment-cnc-match to turn these full-game logs into a factual control-comparison narrative."
+policy:
+  allow_implicit_invocation: false
