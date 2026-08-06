@@ -1,0 +1,6 @@
+interface:
+  display_name: "Spec CNC Task"
+  short_description: "Create an isolated executable CNC task spec"
+  default_prompt: "Use $spec-cnc-task to turn this task packet into a worker state file."
+policy:
+  allow_implicit_invocation: false

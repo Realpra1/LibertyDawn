@@ -3,14 +3,14 @@
 ## Workflow
 
 - Supported game/mod: LibertyDawn Command & Conquer (`cnc`) only. Do not build, test, package, or modify Red Alert, Dune 2000, or Tiberian Sun unless shared engine compilation makes it unavoidable.
-- CNC-19 starts from freshly fetched `origin/bleed`, which contains the user's latest merged work.
-- Starting with CNC-20, base each task branch and pull request on the preceding task PR branch so the series is cumulative. Do not push directly to `bleed` and do not close earlier PRs.
-- PR #49 is the integration checkpoint that collects the cumulative series through CNC-26A plus the portable Codex workflow into `bleed`. After it and any task-sheet follow-up merge, begin the next eligible task recorded in `AUTONOMOUS-CNC-STATE.md` (currently CNC-66) from freshly fetched `origin/bleed`, then resume the cumulative per-task branch rule.
+- Use the coordinated workflow in `.agents/skills/coordinate-cnc-development/`. Only a Task Maker role edits this sheet; the coordinator, speccers, workers, reviewers, and integrator receive isolated role-specific files instead.
+- Start each development round from one freshly fetched and recorded checkpoint, normally `origin/bleed` or the user-designated release base. Base every task branch in that round on the exact same commit and open one individual PR per task.
+- After individual testing and review, locally merge the reviewed task heads into one stable release branch, advance its tested candidate head through integrated repair rounds, and publish its single final release PR to `bleed`. Do not push directly to `bleed` or invoke GitHub merge on the individual task PRs.
 - CNC-26C is permanently pinned as the final task. Complete every other pending task first, and insert all future tasks before CNC-26C regardless of their identifier or when they are added. CNC-26C also remains ineligible until its required user-design questions are answered.
 - The aged insane PR may be inspected for ideas and provenance, but its code is not an authoritative base. Preserve LibertyDawn balance, resource growth, harvester logic, and later improvements.
-- A task is `complete` only after its required behavior, regression checks, adversarial edge-case cycles, report, and green GitHub checks pass. Otherwise mark it `first iteration` or `to be resumed`, recording the number of cycles used.
+- A worker may propose `complete - testing` or `first iteration - testing` after its isolated implementation, game evidence, report, PR, review response, and green required checks. Final `complete` or `first iteration` requires the integrated release result. Record cycle counts and evidence.
 
-Status values: `pending`, `in progress`, `complete`, `first iteration`, `to be resumed`.
+Status values: `draft`, `pending`, `in progress`, `complete - testing`, `first iteration - testing`, `complete`, `first iteration`, `to be resumed`.
 
 | ID | Status | Task |
 |---|---|---|

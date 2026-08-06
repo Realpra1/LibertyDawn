@@ -1,0 +1,6 @@
+interface:
+  display_name: "Review CNC PR"
+  short_description: "Review one CNC task PR against its spec"
+  default_prompt: "Use $review-cnc-pr to review this CNC task PR and identify its highest-impact fix."
+policy:
+  allow_implicit_invocation: false

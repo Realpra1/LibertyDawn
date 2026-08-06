@@ -1,0 +1,6 @@
+interface:
+  display_name: "Read CNC Task"
+  short_description: "Select one CNC task for isolated specification"
+  default_prompt: "Use $read-cnc-task to extract the next eligible CNC task into a focused packet."
+policy:
+  allow_implicit_invocation: false
