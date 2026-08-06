@@ -867,6 +867,9 @@ Player:
     SquadManagerBotModule@brutalis:
 		RequiresCondition: enable-brutalis-ai
 		SquadSize: 20
+		UseStrategicGroundTargeting: true
+		UseCohesiveGroundSquad: true
+		GroundTargetDebugLogging: false
 		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck, tran
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
@@ -1062,6 +1065,9 @@ Player:
     SquadManagerBotModule@viki:
 		RequiresCondition: enable-viki-ai
 		SquadSize: 30
+		UseStrategicGroundTargeting: true
+		UseCohesiveGroundSquad: true
+		GroundTargetDebugLogging: false
 		ExcludeFromSquadsTypes: harv, sharv, mcv, a10, e6, rmbo, truck, tran
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
@@ -1248,6 +1254,9 @@ Player:
 		RequiresCondition: enable-skynet-ai
 		SquadSize: 10
 		AttackForceInterval: 50
+		UseStrategicGroundTargeting: true
+		UseCohesiveGroundSquad: true
+		GroundTargetDebugLogging: false
 		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck, tran
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
@@ -1582,6 +1591,9 @@ Player:
     SquadManagerBotModule@ironreaper:
 		RequiresCondition: enable-ironreaper-ai
 		SquadSize: 20
+		UseStrategicGroundTargeting: true
+		UseCohesiveGroundSquad: true
+		GroundTargetDebugLogging: false
         MaxBaseRadius: 49
 		ExcludeFromSquadsTypes: harv, sharv, mcv, a10, e6, rmbo, truck, tran
 		ConstructionYardTypes: fact

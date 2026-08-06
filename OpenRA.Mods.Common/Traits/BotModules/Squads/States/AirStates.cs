@@ -1276,6 +1276,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		protected static void ApplyAirTargetPlan(Squad owner, AirTargetPlan plan)
 		{
 			var info = owner.SquadManager.Info;
+			if (plan.ClearsAa)
+				owner.SquadManager.MarkGroundTargetForAirSupport(plan.Actor);
+
 			owner.TargetActor = plan.Actor;
 			owner.AirRoute.Clear();
 			owner.AirRouteQueued = false;

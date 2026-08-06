@@ -317,6 +317,56 @@ namespace OpenRA.Mods.Common.Traits
 			"Allied actors are never entered or reserved; the aircraft waits within their configured aura instead.")]
 		public readonly HashSet<string> AirPassiveRepairActors = new HashSet<string>();
 
+		[Desc("Use bounded strategic-cell target selection for one cohesive general ground attack squad.")]
+		public readonly bool UseStrategicGroundTargeting = false;
+
+		[Desc("Keep one general ground attack squad and attach later eligible units as reinforcements.")]
+		public readonly bool UseCohesiveGroundSquad = false;
+
+		[Desc("Width and height in map cells of one coarse ground strategic cell.")]
+		public readonly int GroundInfluenceCellSize = 6;
+
+		[Desc("Ticks between rebuilding the enemy list shared by strategic ground squads.")]
+		public readonly int GroundInfluenceCacheInterval = 125;
+
+		[Desc("Nearest, highest-value, and nearest harvester cells evaluated by each ground scan.")]
+		public readonly int GroundTargetClosestCandidates = 12;
+		public readonly int GroundTargetHighestValueCandidates = 8;
+		public readonly int GroundTargetHarvesterCandidates = 8;
+
+		[Desc("Generic strategic target values. GroundTargetPriority overrides individual actor types.")]
+		public readonly int GroundTargetHarvesterValue = 7000;
+		public readonly int GroundTargetProductionValue = 3500;
+		public readonly int GroundTargetBuildingValue = 2500;
+		public readonly int GroundTargetUnitValue = 1000;
+		public readonly int GroundTargetDefencelessBonus = 2500;
+
+		[Desc("Per-actor strategic ground target values. Values in one coarse cell are summed.")]
+		public readonly Dictionary<string, int> GroundTargetPriority = new Dictionary<string, int>();
+
+		[Desc("Distance cost per cell, neutral movement speed, geometric defender decay percentage,",
+			"and attacker-to-defender ratio considered effectively undefended.")]
+		public readonly int GroundTargetDistancePenalty = 8;
+		public readonly int GroundTargetReferenceSpeed = 100;
+		public readonly int GroundDefenderOvermatchDecayPercent = 50;
+		public readonly int GroundEffectivelyUndefendedRatio = 5;
+
+		[Desc("Cells from the established formation center at which an incoming ground reinforcement joins it.")]
+		public readonly int GroundReinforcementJoinRadius = 5;
+
+		[Desc("Minimum incoming units before the formation waits to regroup. Zero derives half SquadSize.")]
+		public readonly int GroundReinforcementHoldMinimum = 0;
+
+		[Desc("Incoming-unit count as a percentage of formation size that triggers a regroup hold.")]
+		public readonly int GroundReinforcementHoldRatioPercent = 100;
+
+		[Desc("Extra finite priority and lifetime for anti-air actors marked by an air squad's clearing plan.")]
+		public readonly int GroundAirMarkedAaBonus = 7500;
+		public readonly int GroundAirMarkedAaDuration = 500;
+
+		[Desc("Write strategic ground target, formation, and air-mark decisions to debug.log.")]
+		public readonly bool GroundTargetDebugLogging = false;
+
 		[Desc("Per-actor-type target score overrides for Orca-type air squads (squads containing at least",
 			"one actor of type OrcaArchetypeActor), keyed by target ActorName - same shape as UnitsToBuild",
 			"elsewhere in this mod. Checked before the generic AirTarget*Value classification; actor types",
@@ -418,6 +468,21 @@ namespace OpenRA.Mods.Common.Traits
 			if (HealthRetreatThreshold < 0 || HealthRetreatThreshold >= 1)
 				throw new YamlException("HealthRetreatThreshold must be at least zero and less than one.");
 
+			if (GroundInfluenceCellSize <= 0 || GroundInfluenceCacheInterval <= 0 || GroundTargetReferenceSpeed <= 0 ||
+				GroundEffectivelyUndefendedRatio <= 0 || GroundReinforcementJoinRadius <= 0 ||
+				GroundReinforcementHoldMinimum < 0 || GroundReinforcementHoldRatioPercent <= 0)
+				throw new YamlException("Ground strategic cell, cache, speed, overmatch, and reinforcement values must be positive.");
+
+			if (GroundTargetClosestCandidates < 0 || GroundTargetHighestValueCandidates < 0 ||
+				GroundTargetHarvesterCandidates < 0 ||
+				GroundTargetClosestCandidates + GroundTargetHighestValueCandidates <= 0)
+				throw new YamlException("At least one ground target candidate count must be greater than zero.");
+
+			if (GroundTargetDistancePenalty < 0 || GroundDefenderOvermatchDecayPercent < 0 ||
+				GroundDefenderOvermatchDecayPercent > 100 || GroundTargetDefencelessBonus < 0 ||
+				GroundAirMarkedAaBonus < 0 || GroundAirMarkedAaDuration < 0)
+				throw new YamlException("Ground strategic penalties, percentages, and air-mark values are invalid.");
+
 			foreach (var actorName in AirPassiveRepairActors)
 			{
 				if (!rules.Actors.TryGetValue(actorName, out var actor) ||
@@ -449,6 +514,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly List<Actor> unitsHangingAroundTheBase = new List<Actor>();
 		readonly Dictionary<string, AdaptiveAirRiskController> adaptiveAirRisk =
 			new Dictionary<string, AdaptiveAirRiskController>(StringComparer.OrdinalIgnoreCase);
+		readonly Dictionary<uint, int> airMarkedGroundTargets = new Dictionary<uint, int>();
 
 		// Units that the bot already knows about. Any unit not on this list needs to be given a role.
 		readonly List<Actor> activeUnits = new List<Actor>();
@@ -490,6 +556,35 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			return adaptiveAirRisk.TryGetValue(profile, out var controller) ?
 				controller.MultiplierBasisPoints / (float)AdaptiveAirRiskController.BasisPointsPerMultiplier : 1f;
+		}
+
+		internal void MarkGroundTargetForAirSupport(Actor actor)
+		{
+			if (!Info.UseStrategicGroundTargeting || Info.GroundAirMarkedAaBonus <= 0 ||
+				Info.GroundAirMarkedAaDuration <= 0 || !IsPreferredEnemyUnit(actor))
+				return;
+
+			var expiry = World.WorldTick + Info.GroundAirMarkedAaDuration;
+			if (!airMarkedGroundTargets.TryGetValue(actor.ActorID, out var currentExpiry) || currentExpiry < expiry)
+				airMarkedGroundTargets[actor.ActorID] = expiry;
+
+			if (Info.GroundTargetDebugLogging)
+				Log.Write("debug", "Ground air mark [{0}] {1}#{2}: bonus={3} expires={4}.",
+					Player.PlayerName, actor.Info.Name, actor.ActorID, Info.GroundAirMarkedAaBonus, expiry);
+		}
+
+		internal int GroundAirTargetBonus(Actor actor)
+		{
+			if (actor == null || !airMarkedGroundTargets.TryGetValue(actor.ActorID, out var expiry))
+				return 0;
+
+			if (actor.IsDead || !actor.IsInWorld || World.WorldTick >= expiry)
+			{
+				airMarkedGroundTargets.Remove(actor.ActorID);
+				return 0;
+			}
+
+			return Info.GroundAirMarkedAaBonus;
 		}
 
 		// Use for proactive targeting.
@@ -567,12 +662,18 @@ namespace OpenRA.Mods.Common.Traits
 
 		void CleanSquads()
 		{
+			foreach (var id in airMarkedGroundTargets.Where(m => World.WorldTick >= m.Value)
+				.Select(m => m.Key).ToList())
+				airMarkedGroundTargets.Remove(id);
+
 			Squads.RemoveAll(s => !s.IsValid);
 			foreach (var s in Squads)
 			{
 				s.Units.RemoveAll(a => unitCannotBeOrdered(a) || IsReservedForSpecialBehavior(a));
 				if (s.Type == SquadType.Air)
 					s.CleanAirMembership();
+				else if (s.Type == SquadType.GeneralAttack)
+					s.CleanGroundMembership();
 			}
 		}
 
@@ -585,6 +686,11 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			return IsReservedForTransport(actor) ||
 				(unitReservations != null && unitReservations.Any(r => r.IsUnitReserved(actor)));
+		}
+
+		internal bool IsUnitProtectingBase(Actor actor)
+		{
+			return actor != null && Squads.Any(s => s.Type == SquadType.Protection && s.Units.Contains(actor));
 		}
 
 		// HACK: Use of this function requires that there is one squad of this type.
@@ -788,6 +894,17 @@ namespace OpenRA.Mods.Common.Traits
 
 					ships.Units.Add(a);
 				}
+				else if (Info.UseCohesiveGroundSquad)
+				{
+					var ground = GetSquadOfType(SquadType.GeneralAttack);
+					if (ground == null)
+						unitsHangingAroundTheBase.Add(a);
+					else
+					{
+						ground.Units.Add(a);
+						ground.MarkGroundReinforcement(a);
+					}
+				}
 				else
 					unitsHangingAroundTheBase.Add(a);
 
@@ -803,11 +920,15 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			// Create an attack force when we have enough units around our base.
 			// (don't bother leaving any behind for defense)
-			var randomizedSquadSize = Info.SquadSize + World.LocalRandom.Next(Info.SquadSizeRandomBonus);
+			var randomizedSquadSize = Info.UseCohesiveGroundSquad ? Info.SquadSize :
+				Info.SquadSize + World.LocalRandom.Next(Info.SquadSizeRandomBonus);
 
 			if (unitsHangingAroundTheBase.Count >= randomizedSquadSize)
 			{
-				var attackForce = RegisterNewSquad(bot, SquadType.Assault);
+				var attackForce = Info.UseCohesiveGroundSquad ? GetSquadOfType(SquadType.GeneralAttack) : null;
+				if (attackForce == null)
+					attackForce = RegisterNewSquad(bot,
+						Info.UseCohesiveGroundSquad ? SquadType.GeneralAttack : SquadType.Assault);
 
 				foreach (var a in unitsHangingAroundTheBase)
 					attackForce.Units.Add(a);
@@ -863,10 +984,20 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				var ownUnits = World.FindActorsInCircle(World.Map.CenterOfCell(GetRandomBaseCenter()), WDist.FromCells(Info.ProtectUnitScanRadius))
 					.Where(unit => unit.Owner == Player && !Info.ProtectionTypes.Contains(unit.Info.Name) &&
-						!Info.AirUnitsTypes.Contains(unit.Info.Name) && unit.Info.HasTraitInfo<AttackBaseInfo>());
+						!Info.AirUnitsTypes.Contains(unit.Info.Name) && unit.Info.HasTraitInfo<AttackBaseInfo>())
+					.OrderBy(unit => unit.ActorID).ToList();
 
 				foreach (var a in ownUnits)
+				{
 					protectSq.Units.Add(a);
+					foreach (var ground in Squads.Where(s => s.Type == SquadType.GeneralAttack && s.Units.Contains(a)))
+						ground.MarkGroundReinforcement(a);
+				}
+
+				if (Info.GroundTargetDebugLogging && ownUnits.Count > 0)
+					Log.Write("debug", "Ground protection [{0}] activated against {1}#{2}: defenders={3} general-shared={4}.",
+						Player.PlayerName, attacker.Info.Name, attacker.ActorID, ownUnits.Count,
+						ownUnits.Count(a => Squads.Any(s => s.Type == SquadType.GeneralAttack && s.Units.Contains(a))));
 			}
 		}
 
@@ -932,6 +1063,23 @@ namespace OpenRA.Mods.Common.Traits
 			if (IsTraitDisabled || e.DamageState != DamageState.Dead || e.PreviousDamageState == DamageState.Dead ||
 				e.Attacker == null || e.Attacker.Owner != Player || Player.RelationshipWith(damaged.Owner) != PlayerRelationship.Enemy)
 				return;
+
+			if (Info.GroundTargetDebugLogging)
+			{
+				var groundSquad = Squads.FirstOrDefault(s => s.Type == SquadType.GeneralAttack &&
+					s.GroundFormationUnits().Contains(e.Attacker));
+				if (groundSquad != null)
+					Log.Write("debug", "Ground outcome [{0}] destroyed {1}#{2}: attacker={3}#{4} mission-target={5} formation={6} reinforcements={7}.",
+						Player.PlayerName, damaged.Info.Name, damaged.ActorID, e.Attacker.Info.Name,
+						e.Attacker.ActorID, groundSquad.TargetActor == damaged,
+						groundSquad.GroundFormationUnits().Count, groundSquad.GroundReinforcements.Count);
+
+				var protectionSquad = Squads.FirstOrDefault(s => s.Type == SquadType.Protection && s.Units.Contains(e.Attacker));
+				if (protectionSquad != null)
+					Log.Write("debug", "Ground protection outcome [{0}] destroyed {1}#{2}: defender={3}#{4}.",
+						Player.PlayerName, damaged.Info.Name, damaged.ActorID,
+						e.Attacker.Info.Name, e.Attacker.ActorID);
+			}
 
 			var profile = AirProfileFor(e.Attacker);
 			if (profile == null || !adaptiveAirRisk.TryGetValue(profile, out var controller))
