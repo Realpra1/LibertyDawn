@@ -49,5 +49,5 @@ The coordinator deliberately uses visible, same-domain objectives and ordinary e
 
 - Branch: `agent/cnc37-covert-harassment`
 - Base: `agent/cnc36-economy-artillery`
-- Draft PR: pending
-- Required checks: pending
+- Draft PR: https://github.com/Realpra1/LibertyDawn/pull/75
+- Required checks: Linux passed in 2m05s; Windows passed in 3m42s at implementation/report head `7961b962db`.
