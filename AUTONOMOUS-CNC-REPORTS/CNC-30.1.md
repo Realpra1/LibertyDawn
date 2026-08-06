@@ -1,6 +1,6 @@
 # CNC-30.1: Bounded Map-Wide Exploration
 
-- Status: in progress
+- Status: complete
 - Cycles used: 20 of 30
 - Branch: `agent/cnc30-1-bounded-exploration`
 - Base: `origin/agent/cnc33a3-no-mutants` at `52c2514939`
@@ -50,4 +50,4 @@ The three clean post-acceptance adversarial cases are the live emergency/recover
 - `make check`: strict Debug build passed with zero warnings/errors; both explicit-interface validators passed.
 - `dotnet test OpenRA.Test/OpenRA.Test.csproj --no-restore`: 394/394 passed, including 10 focused crate-policy cases.
 - `make test`: Release build passed with zero warnings/errors and exhaustive CNC sequences, rules, scripts, and maps passed MiniYAML validation.
-- `git diff --check` passed. Local implementation and evidence are complete; task status remains in progress until the cumulative draft PR's required GitHub checks pass.
+- `git diff --check` passed. Draft PR #70 is mergeable; its implementation head passed Linux CI in 2m09s and Windows CI in 3m32s. PR: https://github.com/Realpra1/LibertyDawn/pull/70
