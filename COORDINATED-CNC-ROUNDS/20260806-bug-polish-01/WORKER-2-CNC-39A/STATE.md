@@ -791,8 +791,8 @@ silently exceed the budget.
 ## Handoff receipt
 
 - Proposed status: `First iteration - testing`
-- Final branch/head: `agent/round-20260806-cnc39a-engineer-commando` / product commit `0c6accf17a` (handoff metadata commit follows)
-- PR and checks: draft PR `#80`, https://github.com/Realpra1/LibertyDawn/pull/80; local required checks passed; GitHub checks awaited after the metadata push
+- Final branch/head: `agent/round-20260806-cnc39a-engineer-commando` / product commit `0c6accf17a`; validated base-integration commit `43151f8cdd` (final receipt commit follows)
+- PR and checks: draft PR `#80`, https://github.com/Realpra1/LibertyDawn/pull/80; local required checks passed; GitHub reports `MERGEABLE`/`CLEAN` at `43151f8cdd` with no configured checks
 - Cycles used: `10/20`
 - Acceptance evidence: simultaneous pair `cycle-3/changed-run`; travel cancellation `cycle-9/changed-run`; post-plant disarm `cycle-5/changed-run-8`; combined core regression `cycle-10/combined-run-2`
 - Adversarial evidence: natural repeated ladder `cycle-10/ladder-clean-run`; scripted-friendly compatibility `script-changed-run`/`script-control-run`; travel and post-plant persistence; blocked recovery `cycle-7/changed-run-2`
