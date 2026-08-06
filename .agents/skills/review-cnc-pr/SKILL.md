@@ -33,19 +33,23 @@ state, coordinator state, or the PR; write only the requested review file.
    adversarial scenarios, final acceptance regression, save/load where relevant,
    diagnostic cleanup, and required checks satisfy the worker contract. Missing
    or unexercised evidence is a finding, not an assumption.
-8. Reject a test portfolio made of repeated happy paths. Except for one initial
-   harness/basic-path smoke, require every unit/integration/game test to state a
+8. Require the first behavioral test after implementation to be a full-engine
+   ordinary-AI simulation, normally headless MAX. Reject unit-test-only early
+   cycles, passive/custom-bot substitution, or delayed game testing when the full
+   simulation could have supplied cheap feedback from cycle 1.
+9. Reject a test portfolio made of repeated happy paths. Except for one initial
+   full-engine harness/basic-path smoke, require every unit/integration/game test to state a
    credible failure hypothesis, harder or different perturbation, expected failure
    signal, and observed pass/failure evidence. Confirm difficulty increased as
    soon as behavior first worked and that unexpected results changed the next
    test or implementation decision.
-9. List findings by severity with file/line, failure mechanism, affected spec
+10. List findings by severity with file/line, failure mechanism, affected spec
    clause, and smallest safe correction. Avoid cosmetic preferences.
-10. Nominate one `required_fix`: the highest-impact correction compatible with the
+11. Nominate one `required_fix`: the highest-impact correction compatible with the
    task. Use `none` when no worthwhile issue exists. Critical compile, corruption,
    security, or deterministic-simulation failures remain release blockers even
    though the ordinary review-response budget is one code/test cycle.
-11. The worker may reject a finding with concrete evidence. Record the disagreement
+12. The worker may reject a finding with concrete evidence. Record the disagreement
    rather than arguing indefinitely.
 
 Write the requested review file and return only verdict (`ready`, `ready with one

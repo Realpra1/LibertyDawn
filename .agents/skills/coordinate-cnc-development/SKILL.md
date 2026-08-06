@@ -124,6 +124,9 @@ an existing task require a new or revised spec before selection.
 ## Resource scheduling
 
 - Start with two total game slots and one large-build slot across all workers.
+- Treat full-engine ordinary-AI simulations as cheap primary feedback, not a late
+  acceptance expense. Queue them from each worker's first behavioral test and keep
+  game slots busy while other workers inspect, code, build, or analyze evidence.
 - Run `scripts/with_resource_slots.py` around shared builds and game batches.
 - A worker may reserve two game slots for a two-game comparison. Use the existing
   `launch-ai-parallel.py` inside the reservation.

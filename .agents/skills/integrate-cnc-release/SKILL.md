@@ -37,7 +37,10 @@ code-change cycles against the combined branch. Each uses a separate worktree an
 the existing task state plus current integration notes. A worker that passes may
 stop; reactivate it if later fixes touch its behavior.
 
-Make every integrated test try to break the combined code. Target cross-task
+Begin every integrated round with full-engine ordinary-AI simulations from test 1;
+do not spend a preliminary round on unit-only confidence. Treat those games as
+cheap feedback and run focused build/unit gates alongside them where resources
+permit. Make every integrated test try to break the combined code. Target cross-task
 interference, merge-order assumptions, shared queues/resources/actors, changed
 timing, state invalidation, save/load, longer duration, and heavier unit pressure.
 Do not use three repetitions of the same passing match as three cycles. After a

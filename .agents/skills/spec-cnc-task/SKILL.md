@@ -44,18 +44,25 @@ contract, not a summary.
     exact evidence needed to distinguish request, rejection, reservation owner,
     competing consumer, state transition, order, and final outcome. Require noisy
     temporary diagnostics to be removed before publication.
-11. Require early engine evidence: for AI or emergent behavior, schedule the first
-    real-AI game by cycle 10 and begin adversarial work by cycle 12 at the latest.
+11. Make the first behavioral test after the first implementation change a
+    full-engine simulation with ordinary real AI and relevant normal modules,
+    normally at headless MAX. A focused custom map and obvious cheese setup may
+    accelerate the first event, but the full game engine and normal AI must be
+    active from test 1. Treat unit tests and passive fixtures as supplementary;
+    the repository already has them and they cannot replace simulation feedback.
 12. For routing or transport, include ordinary connected and island/blocked
     topology such as Archipelago. For persisted behavior, include save/load and
     reject a reloaded state as sole acceptance. For hot paths, define a bounded
     CPU/allocation expectation and measurement or credible regression signal.
 13. Write a concise implementation/publication plan covering desired and forbidden
     behavior, ownership, instrumentation, tests, task report, PR, and checks.
-14. Make every planned test adversarial in purpose. For each unit, integration, or
+14. Treat full-AI game simulations as cheap primary feedback that substitutes for
+    expensive human playtesting. Make every planned test adversarial in purpose.
+    For each unit, integration, or
     game test, name the failure hypothesis, condition being stressed or changed,
     expected failure signal, and player-visible pass evidence. Allow one minimal
-    cheese-in-front-of-the-mouse smoke scenario to prove the harness/basic path;
+    cheese-in-front-of-the-mouse smoke scenario to prove the harness/basic path,
+    but run even that smoke inside the full engine with ordinary AI;
     after it first works, immediately increase difficulty instead of repeating the
     same happy path.
 15. Build a difficulty ladder that varies timing, state transitions, geometry,

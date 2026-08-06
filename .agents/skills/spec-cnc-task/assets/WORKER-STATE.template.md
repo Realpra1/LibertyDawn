@@ -130,6 +130,17 @@ run focused checks, and execute up to two materially useful games needed to judg
 that change. Merely reading logs or correcting an invalid harness without a
 product change does not begin another cycle; record it honestly.
 
+Treat full-engine simulations with ordinary AI as cheap primary feedback. The
+first behavioral test after the first implementation change must be a full-engine
+ordinary-AI game, normally headless MAX, with every relevant normal module enabled
+from test 1. A focused custom map, pre-spawned actors, short distance, or obvious
+cheese setup may make the event immediate, but it must not replace the real engine
+or ordinary AI with a passive/custom bot or isolated manager fixture. Run focused
+unit/static checks as useful baseline gates before or alongside it; do not delay
+game evidence while accumulating unit-only confidence. Keep available game slots
+working while other agents code or analyze because simulation is cheaper than
+missing human feedback.
+
 Treat all tests as attempts to break the implementation. Compilation, lint, and
 static analysis are baseline gates; every unit, integration, save/load, replay, or
 game test must exercise a regression risk, boundary, invalidation, contention,
@@ -143,8 +154,8 @@ failure/recovery path, or assumption under pressure. Before running it, record:
 The existing broad regression suite counts as an adversarial gate against breaking
 unrelated behavior, but it does not replace targeted falsification of this task.
 
-One initial cheese-in-front-of-the-mouse smoke setup may establish that the test
-harness and simplest behavior work. As soon as it passes, change at least one
+One initial full-engine cheese-in-front-of-the-mouse smoke setup may establish
+that the harness and simplest behavior work. As soon as it passes, change at least one
 meaningful dimension—timing, map geometry, resources, missing/destroyed assets,
 unit count, pressure, competing orders, save/load boundary, or match duration—and
 make every later test harder or materially different. Never spend cycles on
@@ -157,9 +168,11 @@ For each cycle:
 
 1. Reread this state, current diff, and previous evidence.
 2. Implement or revise the smallest evidence-driven change.
-3. Run focused unit/static checks and fix relevant errors or warnings.
-4. Run the simplest not-yet-proven adversarial scenario that can falsify the
-   current implementation while proving the requested outcome if it survives.
+3. Run focused unit/static checks and fix relevant errors or warnings without
+   treating them as a substitute for the game.
+4. From cycle 1, run the simplest not-yet-proven full-engine ordinary-AI
+   adversarial scenario that can falsify the current implementation while proving
+   the requested outcome if it survives.
 5. Diagnose results against desired and forbidden behavior. Add bounded
    instrumentation when evidence cannot distinguish mission purpose, candidate
    rejection, reservation owner, competing consumer, movement/order, contention,
@@ -183,9 +196,9 @@ seed, map, duration, starting actors/resources, bots, or focused setup; do not p
 an unexercised path. Judge every unexpected behavior explicitly as acceptable or
 defective.
 
-Use ordinary full matches for emergent AI behavior. Run the first real-AI engine
-game no later than cycle 10 and begin adversarial testing no later than cycle 12;
-start earlier whenever the first acceptance implementation is testable.
+Use ordinary full matches for emergent AI behavior. Full-engine real-AI testing
+starts in cycle 1 and remains the main feedback loop; increase difficulty as soon
+as the first behavior works rather than postponing games until late acceptance.
 
 After normal acceptance first passes, require at least three distinct clean
 adversarial scenarios after the latest relevant fix. Every adversarial scenario
