@@ -727,6 +727,7 @@ namespace OpenRA.Mods.Common.Traits
 		int RemoveResource(string resourceType, CPos cell, int amount = 1);
 		void DamageResource(Actor source, CPos cell, int damage);
 		void ClearResources(CPos cell);
+		bool IsExplosionPending(CPos cell);
 
 		bool IsVisible(CPos cell);
 		bool IsEmpty { get; }

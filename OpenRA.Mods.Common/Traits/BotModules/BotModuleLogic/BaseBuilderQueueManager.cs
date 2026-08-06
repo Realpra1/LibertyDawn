@@ -234,7 +234,10 @@ namespace OpenRA.Mods.Common.Traits
 				if (!baseBuilder.Info.BuildingLimits.ContainsKey(actor.Name))
 					return true;
 
-				return playerBuildings.Count(a => a.Info.Name == actor.Name) < baseBuilder.Info.BuildingLimits[actor.Name];
+				var committed = playerBuildings.Count(a => a.Info.Name == actor.Name) +
+					baseBuilder.CountQueuedOrPendingActors(new[] { actor.Name }) +
+					(baseBuilder.IsOpeningStructureReserved(actor.Name) ? 1 : 0);
+				return committed < baseBuilder.Info.BuildingLimits[actor.Name];
 			});
 
 			if (orderBy != null)
@@ -292,33 +295,6 @@ namespace OpenRA.Mods.Common.Traits
 				return enclosureWall;
 			}
 
-			// Once the first refinery is live, establish the configured share of useful
-			// vehicle-factory capacity before any refinery source can consume those Facts.
-			if (baseBuilder.SmartEconomyWantsEarlyVehicleProductionCapacity)
-			{
-				var vehicleFactories = buildableThings.Where(a => baseBuilder.Info.VehiclesFactoryTypes.Contains(a.Name))
-					.OrderByDescending(a => AdaptiveWeighting.ProductionBuildingScore(
-						baseBuilder.AdaptiveProductionBuildingDemand(a), playerBuildings.Count(b => b.Info.Name == a.Name)))
-					.ThenBy(a => a.Name, StringComparer.Ordinal).ToArray();
-				foreach (var vehicleFactory in vehicleFactories)
-				{
-					if (HasSufficientPowerForActor(vehicleFactory) &&
-						baseBuilder.TryReserveSmartEconomyVehicleFactory(queue, vehicleFactory.Name))
-					{
-						baseBuilder.LogSmartEconomy("{0} decided to build {1}: early vehicle-production priority",
-							queue.Actor.Owner, DisplayName(vehicleFactory.Name));
-						return vehicleFactory;
-					}
-				}
-
-				if (power != null && vehicleFactories.Any(v => !HasSufficientPowerForActor(v)))
-				{
-					baseBuilder.LogSmartEconomy("{0} decided to build {1}: early vehicle factory requires power",
-						queue.Actor.Owner, DisplayName(power.Name));
-					return power;
-				}
-			}
-
 			var opening = baseBuilder.OpeningBuilding(buildableThings);
 			if (opening != null)
 			{
@@ -372,57 +348,34 @@ namespace OpenRA.Mods.Common.Traits
 				}
 			}
 
-			// Stored-resource pressure is orthogonal to refinery throughput. A defense queue
-			// that can build silos should create headroom before spending on optional defenses.
-			if (baseBuilder.SmartEconomyWantsSilo)
+			// Aircraft production and repair are independent activities, but each occupied pad
+			// can service only one aircraft at a time. Scale repair capacity with the live fleet.
+			var airRepair = baseBuilder.AirRepairCapacityBuilding(buildableThings);
+			if (airRepair != null && HasSufficientPowerForActor(airRepair) &&
+				baseBuilder.TryReserveAirRepairCapacity(queue, airRepair.Name))
 			{
-				var silo = GetProducibleBuilding(baseBuilder.Info.SiloTypes, buildableThings);
-				if (silo != null && HasSufficientPowerForActor(silo))
-				{
-					baseBuilder.LogSmartEconomy("{0} decided to build {1}: storage pressure",
-						queue.Actor.Owner, DisplayName(silo.Name));
-					return silo;
-				}
-
-				if (power != null && silo != null && !HasSufficientPowerForActor(silo))
-				{
-					baseBuilder.LogSmartEconomy("{0} decided to build {1}: pressured silo requires power",
-						queue.Actor.Owner, DisplayName(power.Name));
-					return power;
-				}
+				AIUtils.BotDebug("{0} decided to build {1}: aircraft repair-capacity demand",
+					queue.Actor.Owner, DisplayName(airRepair.Name));
+				return airRepair;
 			}
 
-			// Make sure that we can spend as fast as we are earning
-			var availableFunds = Math.Max(0, playerResources.Cash + playerResources.Resources);
-			if ((baseBuilder.Info.NewProductionCashThreshold > 0 && availableFunds > baseBuilder.Info.NewProductionCashThreshold) ||
-				baseBuilder.SmartEconomyWantsProductionCapacity)
+			if (power != null && airRepair != null && !HasSufficientPowerForActor(airRepair))
 			{
-				var productionCandidates = buildableThings.Where(a => baseBuilder.Info.ProductionTypes.Contains(a.Name)).ToList();
-				if (baseBuilder.AdaptiveProductionDebugLogging && productionCandidates.Count > 0)
-					baseBuilder.LogAdaptiveProduction("{0} production-building scores (funds {1}): {2}", player, availableFunds,
-						string.Join(", ", productionCandidates.OrderBy(a => a.Name).Select(a =>
-						{
-							var demand = baseBuilder.AdaptiveProductionBuildingDemand(a);
-							var owned = playerBuildings.Count(b => b.Info.Name == a.Name);
-							return FormattableString.Invariant(
-								$"{DisplayName(a.Name)} demand={demand:0.00} owned={owned} score={AdaptiveWeighting.ProductionBuildingScore(demand, owned):0.00}");
-						})));
+				AIUtils.BotDebug("{0} decided to build {1}: aircraft repair capacity requires power",
+					queue.Actor.Owner, DisplayName(power.Name));
+				return power;
+			}
 
-				var production = GetProducibleBuilding(baseBuilder.Info.ProductionTypes, productionCandidates,
-					a => AdaptiveWeighting.ProductionBuildingScore(baseBuilder.AdaptiveProductionBuildingDemand(a),
-						playerBuildings.Count(b => b.Info.Name == a.Name)));
+			// Preserve the original random production-building selector when cash is floating.
+			// Smart economy only decides refinery work; all other choices retain authored limits.
+			var availableFunds = Math.Max(0, playerResources.Cash + playerResources.Resources);
+			if (baseBuilder.Info.NewProductionCashThreshold > 0 && availableFunds > baseBuilder.Info.NewProductionCashThreshold)
+			{
+				var production = GetProducibleBuilding(baseBuilder.Info.ProductionTypes, buildableThings);
 				if (production != null && HasSufficientPowerForActor(production))
 				{
-					var demand = baseBuilder.AdaptiveProductionBuildingDemand(production);
-					var owned = playerBuildings.Count(b => b.Info.Name == production.Name);
-					AIUtils.BotDebug("{0} decided to build {1}: Priority override (production, adaptive demand {2:0.00})",
-						queue.Actor.Owner, DisplayName(production.Name), demand);
-					if (baseBuilder.AdaptiveProductionDebugLogging)
-						baseBuilder.LogAdaptiveProduction(
-							"{0} selected production building {1}: demand={2:0.00} owned={3} score={4:0.00} funds={5}",
-							player, DisplayName(production.Name), demand, owned,
-							AdaptiveWeighting.ProductionBuildingScore(demand, owned), availableFunds);
-
+					AIUtils.BotDebug("{0} decided to build {1}: Priority override (production)",
+						queue.Actor.Owner, DisplayName(production.Name));
 					return production;
 				}
 
@@ -453,7 +406,7 @@ namespace OpenRA.Mods.Common.Traits
 			}
 
 			// Create some head room for resource storage if we really need it
-			if (!baseBuilder.Info.EnableSmartEconomy && playerResources.Resources > 0.8 * playerResources.ResourceCapacity)
+			if (playerResources.Resources > 0.8 * playerResources.ResourceCapacity)
 			{
 				var silo = GetProducibleBuilding(baseBuilder.Info.SiloTypes, buildableThings);
 				if (silo != null && HasSufficientPowerForActor(silo))

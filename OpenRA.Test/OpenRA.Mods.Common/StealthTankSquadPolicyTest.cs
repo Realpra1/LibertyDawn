@@ -67,6 +67,8 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(StealthTankSquadPolicy.TargetScore(1000, 2000, 20, 100), Is.GreaterThan(baseline));
 			Assert.That(StealthTankSquadPolicy.TargetScore(1000, 1000, 40, 100), Is.LessThan(baseline));
 			Assert.That(StealthTankSquadPolicy.TargetScore(1000, 1000, 20, 125), Is.GreaterThan(baseline));
+			Assert.That(StealthTankSquadPolicy.TargetScore(1000, 1000, 20, 100, 100, 3),
+				Is.LessThan(baseline));
 		}
 
 		[Test]
@@ -89,11 +91,42 @@ namespace OpenRA.Test.Mods.Common
 				Is.EqualTo(expected));
 		}
 
+		[TestCase(19, 20, 5000, 1000, 5, false)]
+		[TestCase(20, 20, 4999, 1000, 5, false)]
+		[TestCase(20, 20, 5000, 1000, 5, true)]
+		public void DefenderClearingRequiresPatienceAndOvermatch(int scans, int requiredScans,
+			int squadValue, int defendingValue, int requiredRatio, bool expected)
+		{
+			Assert.That(StealthTankSquadPolicy.CanAttemptDefenderClear(scans, requiredScans,
+				squadValue, defendingValue, requiredRatio), Is.EqualTo(expected));
+		}
+
+		[Test]
+		public void DefenderClearingChoosesBestUnlockFromWeakestPackages()
+		{
+			Assert.That(StealthTankSquadPolicy.SelectDefenderClearOpportunity(
+				new[] { 300, 100, 200, 50 }, new long[] { 9000, 1000, 8000, 500 }, 3), Is.EqualTo(2));
+			Assert.That(StealthTankSquadPolicy.SelectDefenderClearOpportunity(
+				new[] { 300, 100, 200, 50 }, new long[] { 9000, 1000, 8000, 500 }, 2), Is.EqualTo(1));
+		}
+
 		[Test]
 		public void SafetyBufferDoesNotInventAThreatCapability()
 		{
 			Assert.That(StealthTankSquadPolicy.BufferedRange(0, 2), Is.Zero);
 			Assert.That(StealthTankSquadPolicy.BufferedRange(5, 2), Is.EqualTo(7));
+		}
+
+		[TestCase(0, 7, false, false, 0)]
+		[TestCase(0, 7, true, false, 7)]
+		[TestCase(5, 7, false, false, 5)]
+		[TestCase(5, 7, true, false, 7)]
+		[TestCase(5, 7, true, true, 5)]
+		public void TransitOnlyTreatsEngagedWeaponsAsCrossfire(int detectorRange, int weaponRange,
+			bool weaponIsEngaged, bool canKiteTarget, int expected)
+		{
+			Assert.That(StealthTankSquadPolicy.TransitThreatRange(detectorRange, weaponRange,
+				weaponIsEngaged, canKiteTarget), Is.EqualTo(expected));
 		}
 	}
 }
