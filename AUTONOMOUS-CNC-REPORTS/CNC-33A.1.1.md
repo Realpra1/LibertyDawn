@@ -4,7 +4,7 @@
 - Cycles used: 30 of 30
 - Branch: `agent/cnc33a1-1-hard-ai-openings`
 - Base: green CNC-33A.2 PR #67 head `7d7bb3b1c3`
-- Pull request: pending
+- Pull request: draft PR #68
 
 ## Literal acceptance
 
