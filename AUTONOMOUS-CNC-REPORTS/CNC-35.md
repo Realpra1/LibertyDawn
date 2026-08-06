@@ -61,4 +61,4 @@ Authoritative raw evidence is ignored under `.build/cnc35/evidence/`, especially
 - Air marks are deliberately advisory and short-lived. If aircraft destroy the AA before the ground scan, the dead mark is discarded and the ground force chooses its next best opportunity.
 - The cycle-30 combined fixture had only one enemy target, so the reservation race and general target choice were evidenced in adjacent integrated games rather than in the same surviving-target moment.
 
-Publication: pending draft PR and required checks at the time this report was written.
+Publication: draft PR #73 (`agent/cnc35-general-attack-squad` into `agent/cnc34-first-economy-obelisk`) at implementation commit `bc0eab3acd`. Required Linux and Windows CI passed in 2m09s and 3m27s respectively.
