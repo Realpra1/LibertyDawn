@@ -57,10 +57,78 @@ output.
 
 ## Full-engine evidence
 
-Thirty-six full-engine game tests were completed, including invalid harness runs
+Forty-six full-engine game tests were completed, including invalid harness runs
 that produced materially judged evidence. All games used the global capacity
 lock, isolated support directories, headless MAX, ordinary real AI players, and
 fresh artifacts.
+
+### Review response: ordinary long-pressure MCV recovery
+
+The required CNC-43-EVIDENCE-1 response used seed 43043 on normal connected
+Empire Earth geometry with matched changed and pinned-base packages (package
+SHA-256 `bf289b584ed449dc7ddd3fa4170385cfee1b49d63d1df5e031486e0e1b0b24e9`).
+Both sides used the same four ordinary VIKI/Brutalis/SkyNet players and teams,
+5,000 starting cash, normal AI modules, Yard undeploy, and no configured game
+exit. Map rules only enabled bounded diagnostic logging on the ordinary bot
+modules; they did not override actors, locomotors, targets, crush behavior,
+production policy, or AI order policy.
+
+The target VIKI deployed its initial MCV at tick 13 and completed a 16-wall
+enclosure. Once it had a live factory and HQ, six Multi2 units applied real
+hostile pressure. The first hostile damage triggered a deterministic one-HP
+threshold so the next hostile artillery hit killed the Yard; the bounded wave
+was then removed while all ordinary enemy modules continued. At Yard loss:
+
+- Changed tick 5,931: cash 0/resources 443, zero Yards/MCVs, one factory, two
+  harvesters, 16 walls.
+- Base tick 4,431: cash 1/resources 563, zero Yards/MCVs, one factory, two
+  harvesters, 16 walls.
+
+Both VIKI instances entered the ordinary externally managed MCV production path
+through their sole `Vehicle.*` queue (`combat-vehicle-queues=1/1`) and spent
+4,000 while cash and production were contended. The status stream records the
+pending MCV request; the request call itself has no tick-bearing log. The
+tick-bearing production-spend marker is emitted when UnitBuilder accepts that
+request, reserves the free queue, queues `StartProduction`, and records the MCV
+as queued: tick 6,672 changed and 4,908 base. Changed produced at 8,408 with cash
+1/resources 4,119; base produced at 6,823 with cash 0/resources 3,076. The
+instrumentation therefore proves request accounting plus the exact
+reservation/queue and normal-production ticks, although it cannot name the exact
+non-MCV item occupying the queue at each instant.
+
+Changed's recovery MCV moved at tick 8,470 and deployed at 9,282; base moved at
+6,888 and deployed at 7,187. Both move records name
+`McvManagerBotModule` as owner and report `scripted_mcv_orders=0`,
+`combat_orders=0`, and `crush_orders=0`. Neither recovery MCV died. Both retained
+all 16 enclosure walls throughout the recovery interval; no claim is made about
+individual wall topology. The owner/counter evidence rules out the instrumented
+scripted, combat, and crush paths, though the logs do not expose every internal
+engine order packet.
+
+Both runs reached natural game over beyond tick 20,000 with exit code 0 and no
+configured exit, fatal Lua error, unhandled exception, desync, or recovery-MCV
+death. Changed's target won at tick 22,770 after expanding to multiple Yards;
+base's target lost at tick 22,997, long after successful recovery. This outcome
+difference is not attributed to the locomotor: the preceding matched v4
+repetition had the opposite winner direction, showing normal adaptive-match
+divergence.
+
+Runner throughput also diverged in v5 (78.522 changed versus 110.104 base valid
+ticks/sec), but repeated aggregate per-world-tick telemetry did not reproduce a
+regression: v4 changed/base means were 184.870/178.899 ms (+3.34%), while v5
+were 215.411/243.805 ms (-11.65%); their two-run arithmetic means favor changed
+by about 5.3%. Workload and outcome divergence prevent a causal performance
+claim in either direction. The dedicated locomotor still adds no per-tick code
+or allocation.
+
+Ten full-engine games were added in this review response: early pairs exposed
+only harness enablement, timing, actor-lifetime, pressure-threshold, and assertion
+faults; the final v5 pair passed all lifecycle and natural-completion assertions.
+No product defect was found, no product/config code changed, and the isolated
+cycle count remains one. Raw evidence is ignored under
+`analysis/worker-3-cnc-43/games/review-long-pressure-{changed,base}-v5/`.
+Fresh factual narrative:
+`analysis/worker-3-cnc-43/commenters/review-long-pressure-v5/NARRATIVE.md`.
 
 ### Literal changed/base differential
 
@@ -176,6 +244,13 @@ pathfinder avoidance. These were corrected only in ignored harnesses. Final
 instrumentation is bounded to setup, production, target removal/kill, arrival,
 transform, safety, and final one-shot markers. No diagnostic ships in product.
 
+The review-response harness similarly progressed through enablement, trigger,
+actor-lifetime, pressure-threshold, and assertion corrections without touching
+product code. Its final matched package and lobby controls were identical. The
+v4/v5 reversal in winner direction and non-repeating throughput delta are
+reported as ordinary simulation/workload divergence, not evidence of a product
+regression or benefit.
+
 ## Dependencies
 
 Publication-time check:
@@ -201,6 +276,10 @@ state. GitHub reports the PR mergeable and `CLEAN`. No status checks are
 reported for the branch and `gh pr checks --required` reports no required
 checks. The PR remains open and was not merged.
 
+The CNC-43-EVIDENCE-1 review response adds only this durable state/report
+summary. Its maps, manifests, logs, replays, benchmark CSVs, and factual
+Commenter narrative remain ignored evidence outside Git.
+
 ## Deferred work
 
 No product changes are deferred. Optional harness infrastructure improvement:
@@ -210,9 +289,14 @@ post-processing. This is outside CNC-43's config-only scope.
 
 ## Remaining risks
 
-No known task defect. The natural-match artifact lacks winner identity, and
-terrain equality is resolved-rule/static evidence rather than per-terrain timed
-runtime telemetry. Both are low-risk for a static actor-scoped locomotor whose
-exact table is copied from and compared against the pinned MCV values. All normal
-production/repack paths and hostile/allied collision boundaries passed in the full
-engine.
+No known task defect. The long-pressure instrumentation identifies McvManager
+ownership and zero scripted/combat/crush counters but cannot prove exclusive
+authorship of every internal engine order packet. It records queue contention
+without naming the exact blocking item at every request. Repeated ordinary AI
+runs can diverge in workload, winner, and wall-clock throughput, so no strategic
+or performance effect is inferred from a single pair. Terrain equality remains
+resolved-rule/static evidence rather than per-terrain timed runtime telemetry.
+These are low-risk limitations for a static actor-scoped locomotor whose exact
+table is copied from and compared against the pinned MCV values. All normal
+production/repack/recovery paths and hostile/allied collision boundaries passed
+in the full engine.
