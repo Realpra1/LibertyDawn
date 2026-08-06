@@ -3,10 +3,10 @@
 - Task sheet: `AUTONOMOUS-CNC-TASKS.md`
 - Deferred work: `DEFERRED_WORK.md`
 - Completed tasks: `CNC-19` (11 cycles, PR #38 green); `CNC-20` (12 cycles, PR #39 green); `CNC-21` (12 cycles, PR #40 green); `CNC-22` (8 cycles, PR #41 green); `CNC-23` (11 cycles, PR #42 green); `CNC-24` (14 cycles, PR #43 green); `CNC-24.5` (20 cycles, PR #45 green); `CNC-24.6` (14 cycles, PR #46 green); `CNC-24.7` (27 cycles, PR #64 green); `CNC-25` (22 resumed cycles plus retained 28-cycle history, PR #44 green); `CNC-26` (12 cycles, PR #47 green); `CNC-26A` (11 cycles, PR #48 green); `CNC-66` (4 cycles, PR #51 green); `CNC-26B` (8 cycles, PR #53 green); `CNC-27` (15 cycles, PR #54 green); `CNC-28` (10 cycles, PR #55 green); `CNC-29` (13 cycles, PR #56 green); `CNC-30` (19 cycles, PR #57 green); `CNC-31` (30 cycles, PR #58 green); `CNC-32` (15 cycles, PR #59 green); `CNC-33A.1` (30 cycles, PR #65 green)
-- Active task: none; `CNC-33A.3` reached the 30-cycle cap as a safe first iteration; draft PR publication/checks are pending.
+- Active task: none; `CNC-33A.3` reached the 30-cycle cap as a safe first iteration in draft PR #69; GitHub checks are pending.
 - Next eligible: `CNC-30.1` bounded map-wide exploration.
 - Integration checkpoints: merged PR #49 contains cumulative work through CNC-26A; merged PR #62 contains stable cumulative work through CNC-33A; merged PR #63 disables release AI debug-log switches on `bleed`.
-- Current cumulative base: local `agent/cnc33a3-no-mutants` publication head; the next task must branch from its freshly pushed remote ref.
+- Current cumulative base: `origin/agent/cnc33a3-no-mutants` (draft PR #69 head); the next task must branch from its freshly fetched remote ref.
 - Publication: one task branch and pull request; never push directly to `bleed`
 - CNC-33A.2 result: independent default-off red/blue semantic gates pass the full option matrix, field/red-cargo paths, ordinary-damage regression, release-quiet configuration, real bots, replay, and a natural tick-45,000 match. The capped first iteration still lacks an isolated custom-map reload and a clean blue loaded-cargo observable; see `AUTONOMOUS-CNC-REPORTS/CNC-33A.2.md`.
 - CNC-33A result: uncapped refineries; shared 90 direct/free harvester target; literal-zero critical recovery only; no throughput production pause; 10K/swapped/save-load and SkyNet gates passed. Final locked-faction VIKI regression failed, so publication is capped as `first iteration` at 33/33.
