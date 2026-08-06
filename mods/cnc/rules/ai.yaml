@@ -77,6 +77,41 @@ Player:
 		ScoutSafetyRadiusCells: 5
 		ScoutRangeMarginCells: 1
 		DebugLogging: false
+	CovertHarassmentBotModule:
+		RequiresCondition: enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai
+		RequiredPrerequisites: upgrade.covert1
+		CoreTypes: bike, bggy
+		SupportTypes: arty
+		TowerTypes: gun, sam, obli, gtwr, atwr
+		TargetPriorities:
+			harv: 10000
+			sharv: 10000
+			arty: 7500
+			mlrs: 7000
+			nuk2: 6500
+			proc: 6000
+			hq: 5500
+			eye: 5500
+			tmpl: 5500
+			weap: 5000
+			afld: 5000
+			fact: 4500
+			nuke: 3500
+			gun: 3000
+			sam: 3000
+			obli: 3000
+			gtwr: 3000
+			atwr: 3000
+		MinimumCoreUnits: 2
+		MaximumCoreUnits: 12
+		CoreUnitsPerSupport: 3
+		MaximumSupportUnits: 4
+		SupportJoinRadiusCells: 5
+		SupportFollowDistanceCells: 3
+		ScanInterval: 50
+		OrderInterval: 50
+		MaximumTargetCandidates: 48
+		DebugLogging: false
 	TransportManagerBotModule:
 		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai || enable-Easiest-ai
 		TransportHelicopterTypes: tran
