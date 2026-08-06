@@ -58,7 +58,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			return false;
 		}
 
-		protected static bool CanAttackTarget(Actor a, Actor target)
+		internal static bool CanAttackTarget(Actor a, Actor target)
 		{
 			if (!a.Info.HasTraitInfo<AttackBaseInfo>())
 				return false;
@@ -82,10 +82,16 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 		protected virtual bool ShouldFlee(Squad squad, Func<IEnumerable<Actor>, bool> flee)
 		{
-			if (!squad.IsValid)
+			return ShouldFlee(squad, squad.Units, flee);
+		}
+
+		protected static bool ShouldFlee(Squad squad, IReadOnlyList<Actor> decisionUnits,
+			Func<IEnumerable<Actor>, bool> flee)
+		{
+			if (!squad.IsValid || decisionUnits == null || decisionUnits.Count == 0)
 				return false;
 
-			var randomSquadUnit = squad.Units.Random(squad.Random);
+			var randomSquadUnit = decisionUnits.Random(squad.Random);
 			var dangerRadius = squad.SquadManager.Info.DangerScanRadius;
 			var units = squad.World.FindActorsInCircle(randomSquadUnit.CenterPosition, WDist.FromCells(dangerRadius)).ToList();
 

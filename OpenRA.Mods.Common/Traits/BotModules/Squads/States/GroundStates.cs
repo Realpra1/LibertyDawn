@@ -16,14 +16,29 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 {
 	abstract class GroundStateBase : StateBase
 	{
+		protected static bool UsesStrategicTargeting(Squad owner)
+		{
+			return owner.Type == SquadType.GeneralAttack && owner.SquadManager.Info.UseStrategicGroundTargeting;
+		}
+
+		protected static System.Collections.Generic.List<Actor> DecisionUnits(Squad owner)
+		{
+			return owner.Type == SquadType.GeneralAttack ?
+				owner.GroundFormationUnits(bootstrapIfEmpty: true) : owner.Units;
+		}
+
 		protected virtual bool ShouldFlee(Squad owner)
 		{
-			return ShouldFlee(owner, enemies => !AttackOrFleeFuzzy.Default.CanAttack(owner.Units, enemies));
+			var units = DecisionUnits(owner);
+			return ShouldFlee(owner, units, enemies => !AttackOrFleeFuzzy.Default.CanAttack(units, enemies));
 		}
 
 		protected Actor FindClosestEnemy(Squad owner)
 		{
-			return owner.SquadManager.FindClosestEnemy(owner.Units.First().CenterPosition);
+			if (UsesStrategicTargeting(owner))
+				return StrategicGroundTargeting.FindBestTarget(owner)?.Actor;
+
+			return owner.SquadManager.FindClosestEnemy(DecisionUnits(owner).First().CenterPosition);
 		}
 	}
 
@@ -45,15 +60,25 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				owner.TargetActor = closestEnemy;
 			}
 
-			var enemyUnits = owner.World.FindActorsInCircle(owner.TargetActor.CenterPosition, WDist.FromCells(owner.SquadManager.Info.IdleScanRadius))
+			var strategic = UsesStrategicTargeting(owner);
+			var enemyUnits = strategic ? null : owner.World.FindActorsInCircle(owner.TargetActor.CenterPosition,
+				WDist.FromCells(owner.SquadManager.Info.IdleScanRadius))
 				.Where(owner.SquadManager.IsPreferredEnemyUnit).ToList();
 
-			if (enemyUnits.Count == 0)
+			if (!strategic && enemyUnits.Count == 0)
 				return;
 
-			if (AttackOrFleeFuzzy.Default.CanAttack(owner.Units, enemyUnits))
+			var units = DecisionUnits(owner);
+			if (owner.Type == SquadType.GeneralAttack && owner.ShouldHoldForGroundReinforcements())
 			{
-				owner.Bot.QueueOrder(new Order("AttackMove", null, Target.FromCell(owner.World, owner.TargetActor.Location), false, groupedActors: owner.Units.ToArray()));
+				owner.Bot.QueueOrder(new Order("Stop", null, false, groupedActors: units.ToArray()));
+				return;
+			}
+
+			if (strategic || AttackOrFleeFuzzy.Default.CanAttack(units, enemyUnits))
+			{
+				owner.Bot.QueueOrder(new Order("AttackMove", null, Target.FromCell(owner.World,
+					owner.TargetActor.Location), false, groupedActors: units.ToArray()));
 
 				// We have gathered sufficient units. Attack the nearest enemy unit.
 				owner.FuzzyStateMachine.ChangeState(owner, new GroundUnitsAttackMoveState(), true);
@@ -90,7 +115,23 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				}
 			}
 
-			var leader = owner.Units.ClosestTo(owner.TargetActor.CenterPosition);
+			if (UsesStrategicTargeting(owner) && owner.World.WorldTick >= owner.GroundNextTargetReviewTick)
+			{
+				owner.GroundNextTargetReviewTick = owner.World.WorldTick +
+					owner.SquadManager.Info.GroundInfluenceCacheInterval;
+				var replacement = StrategicGroundTargeting.FindBestTarget(owner);
+				if (replacement != null)
+					owner.TargetActor = replacement.Actor;
+			}
+
+			var units = DecisionUnits(owner);
+			if (owner.Type == SquadType.GeneralAttack && owner.ShouldHoldForGroundReinforcements())
+			{
+				owner.Bot.QueueOrder(new Order("Stop", null, false, groupedActors: units.ToArray()));
+				return;
+			}
+
+			var leader = units.ClosestTo(owner.TargetActor.CenterPosition);
 			if (leader == null)
 				return;
 
@@ -115,20 +156,31 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				return;
 			}
 
-			var ownUnits = owner.World.FindActorsInCircle(leader.CenterPosition, WDist.FromCells(owner.Units.Count) / 3)
-				.Where(a => a.Owner == owner.Units.First().Owner && owner.Units.Contains(a)).ToHashSet();
+			var ownUnits = owner.World.FindActorsInCircle(leader.CenterPosition, WDist.FromCells(units.Count) / 3)
+				.Where(a => a.Owner == units.First().Owner && units.Contains(a)).ToHashSet();
 
-			if (ownUnits.Count < owner.Units.Count)
+			if (ownUnits.Count < units.Count)
 			{
 				// Since units have different movement speeds, they get separated while approaching the target.
 				// Let them regroup into tighter formation.
 				owner.Bot.QueueOrder(new Order("Stop", leader, false));
 
-				var units = owner.Units.Where(a => !ownUnits.Contains(a)).ToArray();
-				owner.Bot.QueueOrder(new Order("AttackMove", null, Target.FromCell(owner.World, leader.Location), false, groupedActors: units));
+				var separatedUnits = units.Where(a => !ownUnits.Contains(a)).ToArray();
+				owner.Bot.QueueOrder(new Order("AttackMove", null, Target.FromCell(owner.World,
+					leader.Location), false, groupedActors: separatedUnits));
 			}
 			else
 			{
+				if (UsesStrategicTargeting(owner))
+				{
+					owner.Bot.QueueOrder(new Order("AttackMove", null, Target.FromCell(owner.World,
+						owner.TargetActor.Location), false, groupedActors: units.ToArray()));
+					if (ShouldFlee(owner))
+						owner.FuzzyStateMachine.ChangeState(owner, new GroundUnitsFleeState(), true);
+
+					return;
+				}
+
 				var enemies = owner.World.FindActorsInCircle(leader.CenterPosition, WDist.FromCells(owner.SquadManager.Info.AttackScanRadius))
 					.Where(owner.SquadManager.IsPreferredEnemyUnit);
 				var target = enemies.ClosestTo(leader.CenterPosition);
@@ -138,7 +190,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					owner.FuzzyStateMachine.ChangeState(owner, new GroundUnitsAttackState(), true);
 				}
 				else
-					owner.Bot.QueueOrder(new Order("AttackMove", null, Target.FromCell(owner.World, owner.TargetActor.Location), false, groupedActors: owner.Units.ToArray()));
+					owner.Bot.QueueOrder(new Order("AttackMove", null, Target.FromCell(owner.World,
+						owner.TargetActor.Location), false, groupedActors: units.ToArray()));
 			}
 
 			if (ShouldFlee(owner))
@@ -173,7 +226,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				}
 			}
 
-			var leader = owner.Units.ClosestTo(owner.TargetActor.CenterPosition);
+			var units = DecisionUnits(owner);
+			var leader = units.ClosestTo(owner.TargetActor.CenterPosition);
 			if (leader.Location != lastLeaderLocation)
 			{
 				lastLeaderLocation = leader.Location;
@@ -195,7 +249,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				return;
 			}
 
-			foreach (var a in owner.Units)
+			foreach (var a in units)
 				if (!BusyAttack(a))
 					owner.Bot.QueueOrder(new Order("Attack", a, Target.FromActor(owner.TargetActor), false));
 
@@ -219,6 +273,10 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			owner.FuzzyStateMachine.ChangeState(owner, new GroundUnitsIdleState(), true);
 		}
 
-		public void Deactivate(Squad owner) { owner.Units.Clear(); }
+		public void Deactivate(Squad owner)
+		{
+			if (owner.Type != SquadType.GeneralAttack)
+				owner.Units.Clear();
+		}
 	}
 }
