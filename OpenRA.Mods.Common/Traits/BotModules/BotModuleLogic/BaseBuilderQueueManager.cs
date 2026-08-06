@@ -40,6 +40,8 @@ namespace OpenRA.Mods.Common.Traits
 
 		WaterCheck waterState = WaterCheck.NotChecked;
 
+		public bool IsDefenseQueue => baseBuilder.Info.DefenseQueues.Contains(category);
+
 		public BaseBuilderQueueManager(BaseBuilderBotModule baseBuilder, string category, Player p, PowerManager pm,
 			PlayerResources pr, IResourceLayer rl)
 		{
@@ -246,6 +248,25 @@ namespace OpenRA.Mods.Common.Traits
 			return available.RandomOrDefault(world.LocalRandom);
 		}
 
+		ActorInfo PreferredOpeningFirstTower(IEnumerable<ActorInfo> buildables)
+		{
+			if (!baseBuilder.Info.PrioritizeOpeningFirstTower || !baseBuilder.OpeningActive ||
+				baseBuilder.FirstTowerPlanner.Complete)
+				return null;
+
+			foreach (var type in baseBuilder.Info.OpeningDefenseTypes)
+			{
+				if (!baseBuilder.Info.FirstTowerTypes.Contains(type))
+					continue;
+
+				var tower = GetProducibleBuilding(new HashSet<string> { type }, buildables);
+				if (tower != null)
+					return tower;
+			}
+
+			return null;
+		}
+
 		bool HasSufficientPowerForActor(ActorInfo actorInfo)
 		{
 			return playerPower == null || (actorInfo.TraitInfos<PowerInfo>().Where(i => i.EnabledByDefault)
@@ -307,6 +328,24 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				AIUtils.BotDebug("{0} decided to build {1}: parallel opening policy", queue.Actor.Owner, DisplayName(opening.Name));
 				return opening;
+			}
+
+			// Defense queues are independent from the ordered building queue. Give their first
+			// build to the configured opening-defense preference instead of the shuffled fallback.
+			var firstTower = PreferredOpeningFirstTower(buildableThings);
+			if (firstTower != null)
+			{
+				if (!HasSufficientPowerForActor(firstTower))
+					return null;
+
+				if (baseBuilder.FirstTowerPlanner.TryReserveBuild(firstTower.Name))
+				{
+					AIUtils.BotDebug("{0} decided to build {1}: preferred opening first tower",
+						queue.Actor.Owner, DisplayName(firstTower.Name));
+					return firstTower;
+				}
+
+				return null;
 			}
 
 			// Next is to build up a strong economy
