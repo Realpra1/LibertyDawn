@@ -2,7 +2,7 @@
 
 ## Status
 
-Complete - testing after 2 of 20 isolated code cycles and 36 completion-worthy full-engine games. Four tick-0 custom-map/save staging failures are documented in ignored evidence but excluded from the game count because they never exercised gameplay.
+Complete - testing after 2 of 20 isolated code cycles and 40 completion-worthy full-engine games. Four tick-0 custom-map/save staging failures are documented in ignored evidence but excluded from the game count because they never exercised gameplay.
 
 Task branch: `agent/round-20260806-cnc43a-flame-tank-balance`
 
@@ -95,21 +95,26 @@ Artifacts and roles: `analysis/worker-4-cnc-43a/{harness/defense-v1,defense-v1}/
 
 ## Ordinary natural match and persistence
 
-An analysis-only copy of ordinary connected Empire Earth4 enabled existing bounded AI production logging and event-driven FTNK creation/first-damage/kill observations; it did not change bot policy, production weights, actors, starts, or combat. Map SHA-256: `30b86077afbdad2bf5a74c873395176c9a28a39d5b597b4d60f022ee29910ab9`. Seed 43032; SkyNet/Nod spawn 1 versus Brutalis/GDI spawn 17; 20,000 cash; Headless MAX; natural conclusion.
+An analysis-only copy of ordinary connected Empire Earth4 enabled bounded AI production logging and event-driven FTNK creation/first-damage/kill observations; it did not change bot policy, production weights, actors, starts, or combat. The initial map SHA-256 was `30b86077afbdad2bf5a74c873395176c9a28a39d5b597b4d60f022ee29910ab9`. Its first matched pair naturally produced/contacted FTNK and concluded, but did not name the winner or record terminal force/economy state. Review correctly rejected that omission as incomplete natural-conclusion acceptance.
 
-- Both builds naturally reached Recon II, produced FTNK, entered combat, saved at tick 18,500, wrote replay/benchmark artifacts, and reached natural game over without fatal/desync/rules/Lua errors.
-- Changed observed 203 completed FTNK creations at 36,000 max HP, 186 first-damage events, and 162 kills over the longer trajectory. Control observed 48 completed creations at 30,000 HP, 28 first-damage events, and 22 kills before its earlier conclusion. Production-request counts can exceed completed observations when queued units remain at termination.
-- Changed reached at least tick 55,000 and 512.572 seconds; control at least tick 20,000 and 137.198 seconds. The changed combat trajectory diverged strongly, so this single pair is exercise/regression evidence rather than a causal performance or win claim. The staged artifacts do not name the winning side.
-- Commenter/policy paths: `analysis/worker-4-cnc-43a/natural-v1/{commenter,policy}/`. Both identified the missing terminal winner/scoreboard as an interpretation limit. That recommendation is retained for future policy studies; it does not invalidate production/contact/natural-conclusion acceptance.
+The one review-response cycle retained Empire Earth4, seed 43032, SkyNet/Nod spawn 1, Brutalis/GDI spawn 17, 20,000 cash, normal bots/modules, and Headless MAX, while adding bounded map-local defeat and terminal-state capture only. The corrected map SHA-256 was `a4af116d7c1ce9d7f5de07b13ebd4251a7cb0723bfa59a5cb8d4f422e66a33bb`, identical in both packaged runtime copies.
+
+- The first response pair reached natural conclusion and named SkyNet as winner, but the terminal-table recorder attempted to value the bookkeeping `player` actor and raised a Lua error at the defeat callback. Those two games are labeled invalid evidence. The analysis-only repair skipped that non-valued actor; no product or bot-policy file changed.
+- The fresh corrected pair passed with exit code 0, saves at tick 18,500, replays, benchmarks, all required patterns, and no fatal/desync/rules/Lua errors. Both naturally reached Recon II and exercised FTNK production/contact.
+- Changed SkyNet won at defeat tick 29,720. It observed 26 FTNK creations at 36,000 max HP, 26 first-damage contacts, 23 kills, and three terminal FTNK survivors. Winner terminal state was cash 7,046 plus 2,359/2,400 resources, army 196/value 148,180, statics 291/value 147,650, 212 units and 64 buildings killed, and losses of 304 units/25 buildings. Losing Brutalis had cash 2, no resources/capacity, five Mammoths, seven Obelisks, army 5/value 8,500, statics 10/value 13,500, and 15 total actors.
+- Control SkyNet won at defeat tick 25,027. It observed 34 FTNK creations at 30,000 max HP, 18 first-damage contacts, eight logged kills, and 25 terminal FTNK survivors. Winner terminal state was cash 3,186 plus 2,193/2,250 resources, army 236/value 185,650, statics 290/value 138,200, 148 units and 60 buildings killed, and losses of 139 units/two buildings. Losing Brutalis had cash 1,645, no resources/capacity, two Mammoths, six Obelisks and one SAM, army 2/value 3,400, statics 10/value 12,650, and 12 total actors.
+- The launch summaries report only the last 5,000-tick progress sample (`25,000`); the explicit defeat/winner callbacks at 29,720 and 25,027 are the authoritative terminal ticks. Both games then recorded natural game-over and clean exit.
+- Fresh isolated roles are at `analysis/worker-4-cnc-43a/natural-terminal-v2/{commenter,policy}/`. The Commenter called the pair matched and usable. The Policy Reviewer returned `mixed; medium confidence`: control won 4,693 ticks sooner with much lower attrition and more surviving force, but the reviewer explicitly could not attribute the single-pair result to FTNK durability and requested multi-seed/replay-derived AI-policy study.
+- No CNC-43A product defect is exposed. The broader commitment/withdrawal recommendation is deferred: AI changes are forbidden by this task, one adaptive match cannot establish causality, both builds won naturally, and the focused literal, true-tank, and defense/air evidence remains green.
 
 The changed tick-18,500 save was staged with its exact custom map and reloaded through tick 20,000. An FTNK created before the save was damaged by a Mammoth at tick 18,572 and reported 30,852/36,000 afterward; ordinary SkyNet/Brutalis production and combat continued and the bounded process exited cleanly. The passing run is `analysis/worker-4-cnc-43a/harness/natural-v1/changed-load-run-v4/`; roles are `analysis/worker-4-cnc-43a/save-load-v1/{commenter,policy}/`.
 
 ## Evidence loop and policy decisions
 
-- 36 full-engine games are counted, including labeled diagnostic/invalid games that advanced far enough to expose an evidence problem. Four tick-0 Lua/map-availability packaging failures are excluded.
-- Required fresh Commenter and routine Policy Reviewer outputs exist for every materially judged batch. Direct `codex exec --ephemeral` was used with the mandated role skill, Terra 5.6 medium, workspace sandbox, and strict path-only jobs because the shared helper initially encountered a CLI compatibility issue; no role received source, worker state, or implementation notes.
+- 40 full-engine games are counted, including the two response games that exposed the terminal-recorder defect and the two fresh corrected games. Four tick-0 Lua/map-availability packaging failures are excluded.
+- Required fresh Commenter and routine Policy Reviewer outputs exist for every materially judged batch. Prior roles used direct `codex exec --ephemeral`; the response used native no-history Terra 5.6 medium roles after validating the same strict path-only envelopes. No role received source, worker state, or implementation notes.
 - Reviews repeatedly distinguished narrow combat facts from whole-AI strategy. Their calls for literal localization, true-tank/defense pressure, natural production, and save/load were adopted and tested.
-- Recommendations to retune AI production/commitment, hold HP constant, or change composition are rejected for this task: the authoritative contract explicitly requires both the HP and Heavy-damage changes and forbids AI changes. The natural match plus focused counter/defense games supply the strategic guardrails appropriate to this content-only task.
+- Recommendations to retune AI production/commitment, hold HP constant, or change composition are rejected for this task: the authoritative contract explicitly requires both the HP and Heavy-damage changes and forbids AI changes. The response Policy Reviewer’s mixed verdict is retained as a future multi-seed/replay-derived policy hypothesis, not treated as causal evidence from one adaptive pair. The named natural wins plus focused counter/defense games supply the strategic guardrails appropriate to this content-only task.
 - Sol-xhigh escalation was not used; no persistent policy problem warranted it.
 
 ## Performance, determinism, and diagnostics
@@ -126,11 +131,11 @@ CNC-43 PR #78 (`agent/round-20260806-cnc43-mcv-crush-flavor`, product commit `4f
 
 ## Deferred work and known limitations
 
-- Future natural-match policy studies should record named winner/defeat tick, terminal economy/force/scoreboard, and replay-derived target/route evidence. This task does not add broad telemetry.
+- Future natural-match policy studies should add multi-seed and replay-derived target/route/withdrawal evidence. The review response now records named winner, defeat tick, and terminal economy/force state without adding product telemetry.
 - Three separated FTNK remained unengaged at the final Mammoth bound; the conclusion is deliberately “Mammoths held decisively,” not “Mammoths wiped every FTNK.”
 - Natural production and combat are adaptive and diverge after the requested balance change. One natural pair cannot attribute the longer match to a single mechanism.
 - The existing fixed repair step means a full 36,000-HP FTNK takes more repair steps than at 30,000 HP. Scaling repair was explicitly forbidden and remains unchanged.
-- No known product failure remains. Publication and required GitHub checks are the only pending gates.
+- No known product failure remains. The sole review correction is complete; publication receipt and required GitHub checks are the only pending gates.
 
 ## Publication
 
