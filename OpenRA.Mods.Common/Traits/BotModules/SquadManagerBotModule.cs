@@ -984,7 +984,8 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				var ownUnits = World.FindActorsInCircle(World.Map.CenterOfCell(GetRandomBaseCenter()), WDist.FromCells(Info.ProtectUnitScanRadius))
 					.Where(unit => unit.Owner == Player && !Info.ProtectionTypes.Contains(unit.Info.Name) &&
-						!Info.AirUnitsTypes.Contains(unit.Info.Name) && unit.Info.HasTraitInfo<AttackBaseInfo>())
+						!Info.AirUnitsTypes.Contains(unit.Info.Name) && unit.Info.HasTraitInfo<AttackBaseInfo>() &&
+						!IsReservedForSpecialBehavior(unit))
 					.OrderBy(unit => unit.ActorID).ToList();
 
 				foreach (var a in ownUnits)

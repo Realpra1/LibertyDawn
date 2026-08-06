@@ -62,6 +62,21 @@ Player:
 	GrantConditionOnBotOwner@Easiest:
 		Condition: enable-Easiest-ai
 		Bots: Easiest
+	EconomyArtilleryBotModule:
+		RequiresCondition: enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai
+		RequiredPrerequisites: upgrade.economy2
+		ArtilleryTypes: mlrs
+		AntiAirTypes: msam
+		TankTypes: mtnk
+		InfantryTypes: e1
+		EscortValuePercent: 5
+		ScanInterval: 25
+		OrderInterval: 25
+		MaximumTargetCandidates: 48
+		DefenderDistanceCells: 2
+		ScoutSafetyRadiusCells: 5
+		ScoutRangeMarginCells: 1
+		DebugLogging: false
 	TransportManagerBotModule:
 		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai || enable-Easiest-ai
 		TransportHelicopterTypes: tran
