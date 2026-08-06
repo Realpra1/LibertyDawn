@@ -1145,13 +1145,13 @@ Player:
 		EnableOpeningPolicy: true
 		OpeningPowerTypes: nuk2, nuke
 		OpeningSiloTypes: silo
-		OpeningDefenseTypes: gtwr, gun
+		OpeningDefenseTypes: obli, gtwr, gun
 		OpeningBarracksTypes: pyle, hand
 		OpeningRefineryTypes: proc
 		OpeningFactoryTypes: weap, afld
 		OpeningRadarTypes: hq
 		OpeningHelipadTypes: hpad
-		OpeningOptionalStructureTypes: silo, gtwr, gun
+		OpeningOptionalStructureTypes: silo, obli, gtwr, gun
 		OpeningHarvesterTypes: harv, sharv
 		OpeningDefenseUnlockTypes: upgrade.recon1
 		OpeningMcvType: mcv
@@ -1164,6 +1164,7 @@ Player:
 		AirUnitsPerRepairBuilding: 4
 		AirRepairCapacityDebugLogging: false
 		FirstTowerTypes: gtwr, gun, atwr, obli
+		PrioritizeOpeningFirstTower: true
 		FirstTowerSearchRadius: 20
 		FirstTowerDebugLogging: false
 		BuildingQueues: Building.Nod, Building.GDI
@@ -1414,7 +1415,8 @@ Player:
             upgrade.recon3: 1
             downgrade.covert: 1
             downgrade.economy: 1
-        UnitDelays:
+		UnitDelays:
+			downgrade.economy: 5000
 			harv: 0
 			ltnk: 5000
 			ftnk: 5000

@@ -36,6 +36,9 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Anti-ground defense types whose first completed structure is placed beside the initial construction yard.")]
 		public readonly HashSet<string> FirstTowerTypes = new HashSet<string>();
 
+		[Desc("Reserve the first buildable OpeningDefenseTypes actor before ordinary shuffled defense selection.")]
+		public readonly bool PrioritizeOpeningFirstTower = false;
+
 		[Desc("Maximum cells searched around the preferred first-tower position when it is blocked.")]
 		public readonly int FirstTowerSearchRadius = 20;
 
@@ -521,8 +524,16 @@ namespace OpenRA.Mods.Common.Traits
 			FirstTowerPlanner.Update();
 			SetRallyPointsForNewProductionBuildings(bot);
 
-			foreach (var b in builders)
-				b.Tick(bot);
+			if (Info.PrioritizeOpeningFirstTower && !FirstTowerPlanner.Complete)
+			{
+				foreach (var b in builders.Where(b => b.IsDefenseQueue))
+					b.Tick(bot);
+				foreach (var b in builders.Where(b => !b.IsDefenseQueue))
+					b.Tick(bot);
+			}
+			else
+				foreach (var b in builders)
+					b.Tick(bot);
 		}
 
 		internal bool OpeningActive => Info.EnableOpeningPolicy && !openingCompletionLogged && !OpeningComplete;
@@ -729,6 +740,7 @@ namespace OpenRA.Mods.Common.Traits
 				nextOpeningHarvesterRequestTick = world.WorldTick + System.Math.Max(1, Info.OpeningUnitRequestCooldown);
 
 			if (!completedStructures.Contains(OpeningDefenseGoal) && completedStructures.Contains(OpeningRadarGoal) &&
+				(!Info.PrioritizeOpeningFirstTower || !FirstTowerPlanner.HasBuildCommitment) &&
 				Info.OpeningDefenseUnlockTypes.Length > 0 && CountActors(Info.OpeningDefenseUnlockTypes) == 0 &&
 				world.WorldTick >= nextOpeningDefenseUnlockRequestTick &&
 				RequestFirstAvailable(bot, Info.OpeningDefenseUnlockTypes, "opening defense unlock"))
