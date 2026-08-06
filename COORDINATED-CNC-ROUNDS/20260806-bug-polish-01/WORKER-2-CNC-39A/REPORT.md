@@ -141,7 +141,9 @@ Pinned base/intended PR base: `agent/cnc38-early-viki-infantry-rush` at `09ccdac
 
 The named CNC-39 dependency branch `agent/round-20260806-cnc39-engineer-correction` remained at the same pinned SHA on every check through pre-publication. There were no CNC-39 product commits to inspect or integrate.
 
-PR/check details are recorded in the worker state after publication.
+Draft PR: `#80` — https://github.com/Realpra1/LibertyDawn/pull/80, targeting
+`agent/cnc38-early-viki-infantry-rush`. Local required checks passed; GitHub
+checks are awaited after the handoff-metadata push.
 
 ## Deferred work
 

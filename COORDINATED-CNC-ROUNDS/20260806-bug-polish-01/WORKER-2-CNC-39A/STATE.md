@@ -10,7 +10,7 @@ when the dependency section directs it.
 
 - Worker: `worker-2-cnc-39a`
 - Task: `CNC-39A — Engineer/commando target coordination`
-- Status: `Implementing`
+- Status: `First iteration - testing`
 - Common base branch/SHA: `agent/cnc38-early-viki-infantry-rush` / `09ccdac3c1ecb5134a4751f2bcbd8a7970dfe6bf`
 - Task branch: `agent/round-20260806-cnc39a-engineer-commando`
 - Intended PR base: `agent/cnc38-early-viki-infantry-rush`
@@ -26,7 +26,7 @@ when the dependency section directs it.
 - Liberty Dawn design reference: `.agents/references/LIBERTY-DAWN-DESIGN.md`
 - Full-engine game tests completed: `48`
 - Sol-xhigh policy escalation: `unused (requires at least 10 game tests; one maximum)`
-- PR: `none`
+- PR: `#80` — https://github.com/Realpra1/LibertyDawn/pull/80
 
 ## Integrated repair assignment
 
@@ -790,18 +790,18 @@ silently exceed the budget.
 
 ## Handoff receipt
 
-- Proposed status:
-- Final branch/head:
-- PR and checks:
-- Cycles used:
-- Acceptance evidence:
-- Adversarial evidence:
-- Old-behavior control and comparative result:
-- Match narratives and routine policy-review conclusions:
-- Sol-xhigh policy escalation (unused, or test count/path/conclusion):
-- Final regression:
-- Error/warning and diagnostic-cleanup result:
-- Performance/determinism result:
-- Deferred work:
-- Known failures/risks:
-- Relevant artifact paths:
+- Proposed status: `First iteration - testing`
+- Final branch/head: `agent/round-20260806-cnc39a-engineer-commando` / product commit `0c6accf17a` (handoff metadata commit follows)
+- PR and checks: draft PR `#80`, https://github.com/Realpra1/LibertyDawn/pull/80; local required checks passed; GitHub checks awaited after the metadata push
+- Cycles used: `10/20`
+- Acceptance evidence: simultaneous pair `cycle-3/changed-run`; travel cancellation `cycle-9/changed-run`; post-plant disarm `cycle-5/changed-run-8`; combined core regression `cycle-10/combined-run-2`
+- Adversarial evidence: natural repeated ladder `cycle-10/ladder-clean-run`; scripted-friendly compatibility `script-changed-run`/`script-control-run`; travel and post-plant persistence; blocked recovery `cycle-7/changed-run-2`
+- Old-behavior control and comparative result: pinned `09ccdac3c1` overlapped capture/demolition in the simultaneous fixture and destroyed a newly friendly factory in the planted-charge race; changed split useful objectives and disarmed the stale charge
+- Match narratives and routine policy-review conclusions: fresh Terra factual/policy outputs for every judged batch under `analysis/worker-2-cnc-39a/`; final reviews accept the ownership-safe policy and identify defender/transport evidence as the remaining completion gap
+- Sol-xhigh policy escalation (unused, or test count/path/conclusion): `unused`
+- Final regression: `cycle-10/combined-run-2/combined-final` passed to tick 2400 at about 239.7 world ticks/sec; exact Engineer pair captured the shared target, Commando destroyed the alternate, allied race canceled before plant, hostile follow-up completed
+- Error/warning and diagnostic-cleanup result: focused 9/9; full unit 443/443; `make all`, `make check`, `make check-scripts`, `make test` passed; 0 final build warnings/errors; no fatal/desync; retained transition diagnostics are BotDebug-gated
+- Performance/determinism result: stable target ActorIDs/purpose order/outcomes across repeats and reloads; no repeatable >5% regression; exact event ticks vary slightly between processes/reload
+- Deferred work: exercised ordinary transport takeover; defended natural-production match; UI force-target scope; CNC-50 broader late-game recovery
+- Known failures/risks: final combined run did not force defenders/repair/transport; natural specialist evidence used pre-staged actors; manual UI force-target not directly exercised; invalid harness runs are labeled and excluded
+- Relevant artifact paths: task `REPORT.md`; `analysis/worker-2-cnc-39a/cycle-3/`, `cycle-5/`, `cycle-7/`, `cycle-9/`, and `cycle-10/`
