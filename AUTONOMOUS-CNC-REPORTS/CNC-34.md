@@ -1,9 +1,11 @@
 # CNC-34: First Economy Tower
 
-- Status: locally complete; awaiting required PR checks
+- Status: complete; draft PR #72 required checks green
 - Cycles used: 30 of 30
 - Branch: `agent/cnc34-first-economy-obelisk`
 - Base: `origin/agent/cnc33b-red-tiberium-deploy` at `3ccf143607`
+- PR: https://github.com/Realpra1/LibertyDawn/pull/72
+- Green implementation head: `7f2095fcf8` (Linux 2m16s; Windows 3m41s)
 
 ## Literal acceptance
 
