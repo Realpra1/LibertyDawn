@@ -3,8 +3,8 @@
 - Task sheet: `AUTONOMOUS-CNC-TASKS.md`
 - Deferred work: `DEFERRED_WORK.md`
 - Completed tasks: `CNC-19` (11 cycles, PR #38 green); `CNC-20` (12 cycles, PR #39 green); `CNC-21` (12 cycles, PR #40 green); `CNC-22` (8 cycles, PR #41 green); `CNC-23` (11 cycles, PR #42 green); `CNC-24` (14 cycles, PR #43 green); `CNC-24.5` (20 cycles, PR #45 green); `CNC-24.6` (14 cycles, PR #46 green); `CNC-24.7` (27 cycles, PR #64 green); `CNC-25` (22 resumed cycles plus retained 28-cycle history, PR #44 green); `CNC-26` (12 cycles, PR #47 green); `CNC-26A` (11 cycles, PR #48 green); `CNC-66` (4 cycles, PR #51 green); `CNC-26B` (8 cycles, PR #53 green); `CNC-27` (15 cycles, PR #54 green); `CNC-28` (10 cycles, PR #55 green); `CNC-29` (13 cycles, PR #56 green); `CNC-30` (19 cycles, PR #57 green); `CNC-30.1` (20 cycles, PR #70 green); `CNC-31` (30 cycles, PR #58 green); `CNC-32` (15 cycles, PR #59 green); `CNC-33A.1` (30 cycles, PR #65 green)
-- Active task: none; `CNC-30.1` is complete in draft PR #70.
-- Next eligible: `CNC-33B` red-Tiberium harvester decloak/deploy behavior.
+- Active task: `CNC-33B` red-Tiberium harvester decloak/deploy behavior on `agent/cnc33b-red-tiberium-deploy`, based on the exact green remote head of PR #70.
+- Next eligible after the active task: `CNC-34` first economy tower.
 - Integration checkpoints: merged PR #49 contains cumulative work through CNC-26A; merged PR #62 contains stable cumulative work through CNC-33A; merged PR #63 disables release AI debug-log switches on `bleed`.
 - Current cumulative base: `origin/agent/cnc30-1-bounded-exploration` (draft PR #70 head); the next task must branch from its freshly fetched remote ref.
 - Publication: one task branch and pull request; never push directly to `bleed`

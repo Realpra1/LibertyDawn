@@ -88,7 +88,7 @@ HARV:
 		Range: 2c0
     Cloak:
 		UncloakOn: Attack, Damage
-		RequiresCondition: StealthGen || cloak-crate-collected
+		RequiresCondition: (StealthGen || cloak-crate-collected) && !unstable-warning
 	ActorLostNotification:
 		Notification: HarvesterLost
 	SpawnActorOnDeath:
@@ -112,12 +112,18 @@ HARV:
 		ImpactType: RedTiberiumExplosion
 		NonMutatingWeapon: BlueTiberiumCargoExplosion
     Blink:
-		RequiresCondition: unstable-tiberium
+		RequiresCondition: unstable-warning
         Interval: 13
-        StartDelay: 2250
         BlinkColor: FF9999
-    ChangesHealth:
-		RequiresCondition: unstable-tiberium
+	UnstableHarvesterDetonation:
+		DetonationDelay: 3000
+		WarningDuration: 750
+		WarningCondition: unstable-warning
+		AutoDetonationCondition: unstable-auto-detonation
+		ImpactType: RedTiberiumExplosion
+		DebugLogging: false
+	ChangesHealth:
+		RequiresCondition: unstable-auto-detonation
 		Step: -100000
 		Delay: 3000
 		StartIfBelow: 101
@@ -137,7 +143,7 @@ SHARV:
 	Inherits@CLOAKED: ^Cloakable
     Cloak:
 		UncloakOn: Attack, Damage, Heal
-        -RequiresCondition:
+		RequiresCondition: !unstable-warning
     -GrantConditionInRange@StealthGenReceiver:
 	Valued:
 		Cost: 1150
@@ -197,12 +203,18 @@ SHARV:
 		ImpactType: RedTiberiumExplosion
 		NonMutatingWeapon: BlueTiberiumCargoExplosion
     Blink:
-		RequiresCondition: unstable-tiberium
+		RequiresCondition: unstable-warning
         Interval: 13
-        StartDelay: 2250
         BlinkColor: FF9999
-    ChangesHealth:
-		RequiresCondition: unstable-tiberium
+	UnstableHarvesterDetonation:
+		DetonationDelay: 3000
+		WarningDuration: 750
+		WarningCondition: unstable-warning
+		AutoDetonationCondition: unstable-auto-detonation
+		ImpactType: RedTiberiumExplosion
+		DebugLogging: false
+	ChangesHealth:
+		RequiresCondition: unstable-auto-detonation
 		Step: -100000
 		Delay: 3000
 		StartIfBelow: 101

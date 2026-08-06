@@ -230,7 +230,7 @@ namespace OpenRA.GameRules
 		public void Impact(in Target target, WarheadArgs args)
 		{
 			var world = args.SourceActor.World;
-			if (IsImpactSuppressed(world))
+			if (IsImpactSuppressed(world, args.SourceActor))
 				return;
 
 			var impactWeapon = NonMutatingImpactWeapon(world);
@@ -254,9 +254,11 @@ namespace OpenRA.GameRules
 			}
 		}
 
-		public bool IsImpactSuppressed(World world)
+		public bool IsImpactSuppressed(World world, Actor sourceActor = null)
 		{
-			return !string.IsNullOrEmpty(ImpactType) && world.WorldActor
+			return !string.IsNullOrEmpty(ImpactType) &&
+				(sourceActor == null || !sourceActor.TraitsImplementing<IImpactTypeSuppressionBypass>()
+					.Any(b => b.BypassImpactSuppression(ImpactType))) && world.WorldActor
 				.TraitsImplementing<IImpactTypeSuppressor>().Any(s => s.SuppressImpact(ImpactType));
 		}
 

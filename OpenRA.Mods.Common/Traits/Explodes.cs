@@ -135,9 +135,9 @@ namespace OpenRA.Mods.Common.Traits
 			if (!Info.DeathTypes.IsEmpty && !e.Damage.DamageTypes.Overlaps(Info.DeathTypes))
 				return;
 
-			if (IsImpactSuppressed(self.World, Info.ImpactType) || LoadedResourceExplosionIsSuppressed(
+			if (IsImpactSuppressed(self, Info.ImpactType) || LoadedResourceExplosionIsSuppressed(
 				harvester?.Contents, Info.LoadedResourceImpactTypes,
-				impactType => IsImpactSuppressed(self.World, impactType)))
+				impactType => IsImpactSuppressed(self, impactType)))
 				return;
 
 			var weapon = ChooseWeaponForExplosion(self);
@@ -164,9 +164,11 @@ namespace OpenRA.Mods.Common.Traits
 			weapon.Impact(Target.FromPos(self.CenterPosition + Info.Offset), source);
 		}
 
-		static bool IsImpactSuppressed(World world, string impactType)
+		static bool IsImpactSuppressed(Actor self, string impactType)
 		{
-			return !string.IsNullOrEmpty(impactType) && world.WorldActor
+			return !string.IsNullOrEmpty(impactType) &&
+				!self.TraitsImplementing<IImpactTypeSuppressionBypass>()
+					.Any(b => b.BypassImpactSuppression(impactType)) && self.World.WorldActor
 				.TraitsImplementing<IImpactTypeSuppressor>().Any(s => s.SuppressImpact(impactType));
 		}
 
