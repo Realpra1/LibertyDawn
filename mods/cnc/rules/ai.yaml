@@ -1088,7 +1088,7 @@ Player:
 			sharv: 100
 			arty: 39
 			mlrs: 39
-            stnk: 15
+			stnk: 40
             msam: 1
             ctnk: 2
 			bggy: 1
@@ -1111,7 +1111,7 @@ Player:
 			arty: 3000
 			mtnk: 5000
 			mlrs: 3000
-			stnk: 5000
+			stnk: 1500
 			apc: 5000
 			bggy: 4000
 			bike: 5000
