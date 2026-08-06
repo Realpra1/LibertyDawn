@@ -28,8 +28,10 @@ contract, not a summary.
    traps, and diagnostic blind spots. State explicitly when another worker's PR
    may alter the solution and tell this worker which branch/PR commits to monitor.
 6. Specify modular ownership: policy/config belongs in the owning rules/config;
-   algorithmic invariants belong in code. Avoid prescribing an implementation
-   when several designs can meet the observable contract.
+   algorithmic invariants belong in code. Identify responsibility boundaries,
+   likely cohesion problems, and oversized classes/functions that may need a
+   focused split. Avoid prescribing an implementation when several designs can
+   meet the observable contract.
 7. Define focused checks, current-control comparison, ordinary real-AI games,
    matched differential evidence where possible, contention tests, at least three
    distinct adversarial scenarios, and a final literal regression.
@@ -38,6 +40,29 @@ contract, not a summary.
    the player-visible result are not acceptance.
 9. Record the common base SHA, task branch, intended PR base, cycle budget of 20,
    global resource-lock path/capacity, and all durable output paths.
+10. Specify useful bounded diagnostics, handled error/warning boundaries, and the
+    exact evidence needed to distinguish request, rejection, reservation owner,
+    competing consumer, state transition, order, and final outcome. Require noisy
+    temporary diagnostics to be removed before publication.
+11. Require early engine evidence: for AI or emergent behavior, schedule the first
+    real-AI game by cycle 10 and begin adversarial work by cycle 12 at the latest.
+12. For routing or transport, include ordinary connected and island/blocked
+    topology such as Archipelago. For persisted behavior, include save/load and
+    reject a reloaded state as sole acceptance. For hot paths, define a bounded
+    CPU/allocation expectation and measurement or credible regression signal.
+13. Write a concise implementation/publication plan covering desired and forbidden
+    behavior, ownership, instrumentation, tests, task report, PR, and checks.
+14. Make every planned test adversarial in purpose. For each unit, integration, or
+    game test, name the failure hypothesis, condition being stressed or changed,
+    expected failure signal, and player-visible pass evidence. Allow one minimal
+    cheese-in-front-of-the-mouse smoke scenario to prove the harness/basic path;
+    after it first works, immediately increase difficulty instead of repeating the
+    same happy path.
+15. Build a difficulty ladder that varies timing, state transitions, geometry,
+    resources, missing/destroyed assets, unit counts, enemy pressure, competing
+    managers, save/load, and duration as relevant. Treat tests as the substitute
+    for human playtest feedback: they must challenge assumptions and generate the
+    evidence used for the next implementation decision.
 
 Keep the coordinator state concise; all task detail belongs in this worker state.
 Return only the task ID, worker-state path, base SHA, and material cross-worker

@@ -8,8 +8,10 @@ description: Read the Liberty Dawn autonomous CNC task sheet and select exactly 
 Use Terra 5.6 medium. Do not modify Git, product code, task-sheet state, or
 coordinator state; write only the requested task-packet file.
 
-1. Read applicable `AGENTS.md`, `AUTONOMOUS-CNC-TASKS.md`, the supplied exclusion
-   list, and only the state/report/PR metadata needed to interpret eligibility.
+1. Read applicable `AGENTS.md`, `AUTONOMOUS-CNC-TASKS.md`, `DEFERRED_WORK.md`, the
+   supplied exclusion list, and only the state/report/PR metadata needed to
+   interpret eligibility. Route only deferred constraints relevant to the selected
+   task; do not summarize the rest.
 2. Select the first eligible task not excluded by the coordinator. Respect pinned,
    blocked, prerequisite, user-question, completed, first-iteration, and active-PR
    rules written in the task sheet.
@@ -32,6 +34,8 @@ coordinator state; write only the requested task-packet file.
 ## Authoritative task text
 
 ## Relevant linked notes
+
+## Relevant deferred constraints
 
 ## Selection rationale
 ```

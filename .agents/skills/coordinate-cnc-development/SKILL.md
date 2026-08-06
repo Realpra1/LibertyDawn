@@ -14,12 +14,22 @@ new sessions.
 - Read applicable `AGENTS.md`, this skill, and `COORDINATED-CNC-STATE.md`.
 - Do not read the task sheet, worker specs, task reports, code diffs, or role-skill
   bodies into coordinator context. Route those artifacts to fresh role sessions.
+- Do not ask implementation or preference questions. Let the focused role inspect
+  the repository, choose the strongest safe option, and record material assumptions.
+- Do not exceed granted authority. Record credentials, permission, missing-file,
+  unsafe-path, or unavailable-model blockers and stop only the affected workstream.
 - Treat conversation as control input. Answer status questions and record notes,
   then continue unless the user explicitly pauses or a real blocker prevents work.
 - Never push to or merge `bleed`. The user promotes the final release PR.
 - Keep task-sheet writes single-owner: only a Task Maker session may edit it.
 - Keep coordinator-state writes single-owner: only the coordinator may edit it.
 - Let workers update only their own state/report and code branch.
+- Preserve unrelated local work. Fetch before trusting remote branch state; never
+  discard or rewrite an unknown change to manufacture a clean checkpoint.
+
+For a long unattended round, use a reversible session-scoped keep-awake mechanism
+when the host permits it. Record its process identity and restore normal sleep
+behavior whenever the round pauses or ends; never change a permanent power plan.
 
 ## Durable layout
 
@@ -82,7 +92,11 @@ blocker or receive a user override.
    `assets/COORDINATOR-STATE.template.md`.
 3. For worker slots 1 through 5, launch a fresh Task Reader one at a time. Give it
    the already-selected task IDs so it cannot duplicate them. Receive one task
-   packet only; do not read the packet yourself.
+   packet only; do not read the packet yourself. Immediately and atomically record
+   the returned task ID, worker slot, packet path, selection time, and `claimed`
+   phase in coordinator state before launching another reader. Treat every durable
+   claim and active task PR as excluded after restart. Once the batch is claimed,
+   have a Task Maker mark those rows `in progress`.
 4. Launch a fresh Speccer for each packet, one at a time. It creates that worker's
    `STATE.md` using the dedicated spec skill and records cross-task/PR concerns
    when the Task Reader identifies them.
@@ -94,7 +108,11 @@ blocker or receive a user override.
    slots are exhausted. Workers may code while other workers' games run.
 
 If fewer than five eligible tasks exist, run the available tasks rather than
-inventing work.
+inventing work. If none exist but coordinator state contains reviewed task heads
+awaiting combination, launch the Integrator instead of creating an empty round. If
+there is neither eligible nor pending integration work, record the empty queue and
+remain ready without inventing a full-game proof requirement for an integration-
+only bookkeeping pass.
 
 ## Task changes from the user
 

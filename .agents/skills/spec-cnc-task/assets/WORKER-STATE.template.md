@@ -92,12 +92,30 @@ before publication. Do not read its worker spec.
 
 ## Implementation rules
 
-- Investigate and choose the smallest correct modular design. Preserve unrelated
-  behavior and user changes.
+- Do not ask implementation or preference questions. Investigate code, history,
+  controls, configs, tests, and evidence; choose the strongest safe option and
+  record material assumptions. Stop only this task for a real authority,
+  credential, missing-file, unsafe-path, or irreducible blocker.
+- Keep responsibilities separate and dependencies explicit. Prefer short,
+  cohesive classes and functions; split oversized responsibilities when that
+  improves cohesion, testability, or hot-path clarity without unrelated churn.
+  Preserve unrelated behavior and user changes.
 - Put tunable policy in the owning rules/config/save/map layer and algorithmic
-  invariants in code. Add proportionate tests and useful bounded diagnostics.
+  invariants in code. Do not duplicate policy across AI personalities or hide a
+  rules/config concern in test-only code.
+- Add proportionate unit/interface/static tests. Add useful bounded debug logging
+  and handled warnings/errors at the owning boundary: make failures actionable,
+  never silently swallow exceptions or substitute success, avoid per-tick spam,
+  and remove obsolete/noisy temporary instrumentation before publication.
+- Keep deterministic simulation hot paths bounded. Avoid repeated full-map/unit
+  scans, uncontrolled allocations, nondeterministic iteration/order, unbounded
+  retry queues, or logging that materially reduces MAX throughput. Measure or
+  explain performance-sensitive changes with current evidence.
 - Inventory and test ordinary modules that compete for the same units, queues,
   cash, reservations, targets, repair, or retargeting.
+- Record worthwhile out-of-scope fixes, refactors, and optimizations under
+  `Deferred work` in the task report/handoff; never expand scope silently or make
+  concurrent workers edit a shared deferred-work file.
 - Keep raw logs/replays/saves/profiles outside Git or under ignored
   `AUTONOMOUS-CNC-LOGS/`. Record concise paths, seeds, and conclusions here or in
   the task report.
@@ -112,29 +130,89 @@ run focused checks, and execute up to two materially useful games needed to judg
 that change. Merely reading logs or correcting an invalid harness without a
 product change does not begin another cycle; record it honestly.
 
+Treat all tests as attempts to break the implementation. Compilation, lint, and
+static analysis are baseline gates; every unit, integration, save/load, replay, or
+game test must exercise a regression risk, boundary, invalidation, contention,
+failure/recovery path, or assumption under pressure. Before running it, record:
+
+- Failure hypothesis: what plausible defect this test could expose.
+- Perturbation: what is made harder or different from the last passing test.
+- Failure signal: the exact log/state/player-visible outcome that proves breakage.
+- Pass evidence: the final observable result needed to falsify the hypothesis.
+
+The existing broad regression suite counts as an adversarial gate against breaking
+unrelated behavior, but it does not replace targeted falsification of this task.
+
+One initial cheese-in-front-of-the-mouse smoke setup may establish that the test
+harness and simplest behavior work. As soon as it passes, change at least one
+meaningful dimension—timing, map geometry, resources, missing/destroyed assets,
+unit count, pressure, competing orders, save/load boundary, or match duration—and
+make every later test harder or materially different. Never spend cycles on
+near-identical happy-path confirmations when a stronger falsification is possible.
+These tests replace much human feedback: use surprising results to challenge the
+spec's assumptions, inspect the repository/evidence, and choose the next change
+without asking the user an implementation question.
+
 For each cycle:
 
 1. Reread this state, current diff, and previous evidence.
 2. Implement or revise the smallest evidence-driven change.
 3. Run focused unit/static checks and fix relevant errors or warnings.
-4. Run the simplest scenario that proves the requested final observable outcome.
+4. Run the simplest not-yet-proven adversarial scenario that can falsify the
+   current implementation while proving the requested outcome if it survives.
 5. Diagnose results against desired and forbidden behavior. Add bounded
-   instrumentation when evidence cannot distinguish request, reservation,
-   movement, contention, state transition, and final outcome.
-6. Update the cycle journal before making another code change.
+   instrumentation when evidence cannot distinguish mission purpose, candidate
+   rejection, reservation owner, competing consumer, movement/order, contention,
+   state transition, and final outcome.
+6. Remove or reduce obsolete/noisy diagnostics after they answer the question.
+7. Update the cycle journal before making another code change.
 
 Prefer the full engine and real bot types. On Linux use the explicit headless MAX
 path when graphics/input are irrelevant. Prove the current run loaded the intended
-map, bots, actors, options, advanced ticks, flushed evidence, and produced the
-final outcome. A passive fixture or manager-only simulation is not sole proof.
+map, bots, actors, options, activated headless MAX, advanced ticks, flushed logs,
+replay/benchmark evidence where configured, and produced the final outcome. A
+passive fixture or manager-only simulation is not sole proof.
+Use focused setup maps to accelerate reproduction, but before acceptance run a
+fully enabled scenario containing every relevant ordinary module. Headless MAX
+never replaces required graphical, rendering, input, lobby, or platform checks.
 
-Use ordinary full matches for emergent AI behavior. Include a matched differential
-when the behavior can be toggled, at least one relevant resource/order contention
-case, at least three distinct clean adversarial scenarios after fixes, and a final
-rerun of literal acceptance with normal modules. Run at least one real full match
-at MAX to a natural conclusion when relevant. Use long-distance starts for
-progression and short-distance starts for rush/defense; do not waste concurrency
-on near-copy spawn swaps unless position bias matters.
+Force every inventoried competing system to act in at least one integrated test.
+For routing or transport, test both an ordinary connected map and an island or
+blocked topology such as Archipelago. If the event does not occur, change the
+seed, map, duration, starting actors/resources, bots, or focused setup; do not pass
+an unexercised path. Judge every unexpected behavior explicitly as acceptable or
+defective.
+
+Use ordinary full matches for emergent AI behavior. Run the first real-AI engine
+game no later than cycle 10 and begin adversarial testing no later than cycle 12;
+start earlier whenever the first acceptance implementation is testable.
+
+After normal acceptance first passes, require at least three distinct clean
+adversarial scenarios after the latest relevant fix. Every adversarial scenario
+must use the full engine, ordinary game AIs, and relevant normal modules. A focused
+map may force the edge case, but passive/custom bots or isolated simulations do
+not count. Define its expected failure signal, force it to occur, and inspect
+current logs/replays; a happy-path rerun is not adversarial evidence.
+
+Include hostile geometry, timing/state transitions, unusual unit counts, missing
+critical assets, destruction/capture, save/load where state persists, and shared
+resource/order contention as relevant. If a fix follows an adversarial failure,
+restart the requirement for three clean adversarial scenarios affected by that
+fix, then rerun the original literal acceptance with all normal modules. Keep that
+final regression literal, but add the strongest compatible stress dimension that
+does not invalidate the acceptance scenario; it must also try to break the code.
+
+Prefer a matched differential as the golden adversarial test when the behavior
+can be toggled: keep faction, map, seed, starts, options, and initial state aligned
+and enable the behavior for only one side. When the scenario materially exercises
+the feature, require a decisive advantage; investigate a loss, tie, or marginal
+gain rather than calling it proof, and document unavoidable nondeterminism.
+
+Run at least one real full match at the fastest applicable speed to a natural
+conclusion. For AI/engine behavior use headless MAX; use graphical modes when the
+feature concerns rendering, lobby, input, or platform behavior. Use long-distance
+starts for progression/endurance and short-distance starts for rush/defense. Do
+not waste concurrency on near-copy spawn swaps unless position bias matters.
 
 Wrap shared resources with:
 
@@ -145,7 +223,17 @@ python3 .agents/skills/coordinate-cnc-development/scripts/with_resource_slots.py
 
 Reserve two game slots when using a two-game `launch-ai-parallel.py` batch. Poll
 background games within 60 seconds, normally cap them at 30 minutes, isolate every
-runtime path, and stop them when evidence is sufficient or progress stalls.
+support directory, settings, log, replay, save, benchmark prefix, map artifact,
+port, and display, and judge each run separately. Use concurrent slots for
+materially different scenarios. Return to serial tests if contention corrupts
+timing or evidence. A required full match may exceed 30 minutes while it continues
+making useful progress; stop it when evidence is sufficient or progress stalls.
+
+For expensive setup, optionally save shortly before the critical event and reload
+after a logic change. Record the save's commit, config, seed, and tick; reject an
+incompatible or stale save. Never use reload as the sole acceptance, adversarial,
+or final-regression evidence because it may retain stale initialization or AI
+state. Confirm the result again from a fresh match.
 
 After 20 unsuccessful code-change cycles, publish the safest useful result as
 `First iteration - testing`. Do not pad cycle counts after evidence is sufficient.
@@ -164,14 +252,24 @@ adversarial cases, final regression, task checks, report, PR, and required GitHu
 checks pass. Otherwise propose `First iteration - testing` with exact failures and
 risks. The reviewer and integrated release determine final status.
 
-Push the task branch and open one individual PR. Do not merge it. When review
-returns a correction, perform at most one review-response code/test cycle, applying
-the highest-impact safe finding you agree with or recording evidence for rejection.
+The task report must cover behavior, design choices, assumptions, cycle count,
+tests, seeds/artifact paths, diagnostics removed or retained, performance and
+determinism, PR/checks, deferred work, and remaining risks.
+
+Push the task branch and open one individual PR. Do not merge it. Wait for every
+required GitHub check; diagnose and fix relevant failures within the isolated
+cycle budget and rerun them. If required checks cannot become green, propose
+`First iteration - testing` rather than completion.
+
+When review returns a correction, perform at most one review-response code/test
+cycle, applying the highest-impact safe finding you agree with or recording
+evidence for rejection. This cycle counts within the 20 isolated cycles; never
+silently exceed the budget.
 
 ## Cycle journal
 
-| Cycle | Commit/change | Checks/games | Observable evidence | Decision |
-|---|---|---|---|---|
+| Cycle | Commit/change | Failure hypothesis and perturbation | Checks/games | Failure/pass evidence | Decision/next harder test |
+|---|---|---|---|---|---|
 
 ## Handoff receipt
 
@@ -182,5 +280,8 @@ the highest-impact safe finding you agree with or recording evidence for rejecti
 - Acceptance evidence:
 - Adversarial evidence:
 - Final regression:
+- Error/warning and diagnostic-cleanup result:
+- Performance/determinism result:
+- Deferred work:
 - Known failures/risks:
 - Relevant artifact paths:

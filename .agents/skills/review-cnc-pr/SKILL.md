@@ -15,18 +15,37 @@ state, coordinator state, or the PR; write only the requested review file.
    hidden queue/order contention, save/load or replay-state omissions, nondeterminism,
    unbounded per-tick work, excess allocations/scans/logging, duplicated policy,
    brittle test-only behavior, and unrelated changes.
-3. Treat runtime game evidence and deterministic checks as evidence, not author
+3. Enforce separation of concerns and cohesion. Flag mixed responsibilities,
+   oversized or deeply nested classes/functions, unclear ownership, duplicated
+   policy, misleading names, hidden mutable state, and abstractions that make the
+   behavior harder to test or reason about. Prefer short focused methods where
+   practical, but do not demand churn or arbitrary line-count limits.
+4. Inspect error handling and diagnostics. Require actionable handled errors and
+   warnings at the correct boundary; reject swallowed exceptions, false-success
+   fallbacks, unbounded/per-tick log spam, and temporary diagnostics left noisy.
+   Confirm tests cover material failure/recovery paths.
+5. Treat runtime game evidence and deterministic checks as evidence, not author
    confidence. A code review does not replace builds, tests, CI, profiling, or a
    real match.
-4. Support performance blockers with a credible hot-path argument or measurement;
+6. Support performance blockers with a credible hot-path argument or measurement;
    do not block on speculative micro-optimization.
-5. List findings by severity with file/line, failure mechanism, affected spec
+7. Verify that real-AI/MAX, matched differential, contention, three clean
+   adversarial scenarios, final acceptance regression, save/load where relevant,
+   diagnostic cleanup, and required checks satisfy the worker contract. Missing
+   or unexercised evidence is a finding, not an assumption.
+8. Reject a test portfolio made of repeated happy paths. Except for one initial
+   harness/basic-path smoke, require every unit/integration/game test to state a
+   credible failure hypothesis, harder or different perturbation, expected failure
+   signal, and observed pass/failure evidence. Confirm difficulty increased as
+   soon as behavior first worked and that unexpected results changed the next
+   test or implementation decision.
+9. List findings by severity with file/line, failure mechanism, affected spec
    clause, and smallest safe correction. Avoid cosmetic preferences.
-6. Nominate one `required_fix`: the highest-impact correction compatible with the
+10. Nominate one `required_fix`: the highest-impact correction compatible with the
    task. Use `none` when no worthwhile issue exists. Critical compile, corruption,
    security, or deterministic-simulation failures remain release blockers even
    though the ordinary review-response budget is one code/test cycle.
-7. The worker may reject a finding with concrete evidence. Record the disagreement
+11. The worker may reject a finding with concrete evidence. Record the disagreement
    rather than arguing indefinitely.
 
 Write the requested review file and return only verdict (`ready`, `ready with one

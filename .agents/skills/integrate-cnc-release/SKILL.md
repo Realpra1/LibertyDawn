@@ -24,6 +24,11 @@ a merge conflict or integrated failure requires it.
 5. Run strict build/unit/static checks and inspect the combined diff. Push the
    stable release branch and open one draft release PR targeting `bleed`. Keep
    source PRs open. Every later RC updates this same branch and PR.
+6. Launch one fresh release-PR reviewer when a candidate appears final. Treat
+   cross-task responsibility leakage, duplicated policy, conflict damage,
+   nondeterminism, unbounded CPU work, noisy diagnostics, and missing integrated
+   evidence as release findings. If a finding causes another repair, repeat the
+   release review on the new candidate within the four-round cap.
 
 ## Integrated test rounds
 
@@ -31,6 +36,13 @@ For each candidate, ask each relevant original worker to run up to three
 code-change cycles against the combined branch. Each uses a separate worktree and
 the existing task state plus current integration notes. A worker that passes may
 stop; reactivate it if later fixes touch its behavior.
+
+Make every integrated test try to break the combined code. Target cross-task
+interference, merge-order assumptions, shared queues/resources/actors, changed
+timing, state invalidation, save/load, longer duration, and heavier unit pressure.
+Do not use three repetitions of the same passing match as three cycles. After a
+candidate passes one scenario, make the next materially harder or different and
+record its failure hypothesis and signal in integration state.
 
 When fixes are needed:
 
@@ -52,9 +64,14 @@ the safest proven subset/result and report unresolved tasks as first iteration.
 - Require the combined candidate to preserve every included task's literal
   acceptance behavior, forbidden behavior, clean adversarial evidence, and
   required checks.
-- Require a real full-engine ordinary-AI regression and natural conclusion where
-  relevant. Use shared matches for multiple tasks only when each task's scenario
-  and final outcome are actually exercised and evidenced.
+- After the latest relevant repair, require each included task's affected
+  acceptance scenario plus at least three clean task-relevant adversarial cases.
+  Shared matches may satisfy multiple tasks only when every claimed scenario,
+  competing module, expected failure signal, and final outcome is exercised and
+  evidenced separately.
+- Require at least one fresh real full-engine ordinary-AI MAX regression to its
+  natural conclusion for AI/engine rounds, plus graphical/platform checks for any
+  feature MAX cannot prove. Reject sole reliance on reloaded states.
 - Use the global build/game slots and isolated MAX-game support directories.
 - Record release heads, merge order, conflicts, tests, repairs, exclusions, and
   remaining risks in the integration state.
