@@ -75,6 +75,10 @@ namespace OpenRA.GameRules
 		[Desc("Optional semantic impact type that world traits may suppress.")]
 		public readonly string ImpactType = null;
 
+		[WeaponReference]
+		[Desc("Optional weapon used instead when mutant creation is disabled.")]
+		public readonly string NonMutatingWeapon = null;
+
 		[Desc("The maximum range the weapon can fire.")]
 		public readonly WDist Range = WDist.Zero;
 
@@ -229,6 +233,14 @@ namespace OpenRA.GameRules
 			if (IsImpactSuppressed(world))
 				return;
 
+			var impactWeapon = NonMutatingImpactWeapon(world);
+			if (impactWeapon != this)
+			{
+				args.Weapon = impactWeapon;
+				impactWeapon.Impact(target, args);
+				return;
+			}
+
 			foreach (var warhead in Warheads)
 			{
 				if (warhead.Delay > 0)
@@ -246,6 +258,15 @@ namespace OpenRA.GameRules
 		{
 			return !string.IsNullOrEmpty(ImpactType) && world.WorldActor
 				.TraitsImplementing<IImpactTypeSuppressor>().Any(s => s.SuppressImpact(ImpactType));
+		}
+
+		public WeaponInfo NonMutatingImpactWeapon(World world)
+		{
+			if (string.IsNullOrEmpty(NonMutatingWeapon) || !world.WorldActor
+				.TraitsImplementing<IMutantCreationSuppressor>().Any(s => s.SuppressMutantCreation))
+				return this;
+
+			return world.Map.Rules.Weapons[NonMutatingWeapon.ToLowerInvariant()];
 		}
 
 		/// <summary>Applies all the weapon's warheads to the target. Only use for projectile-less, special-case impacts.</summary>
