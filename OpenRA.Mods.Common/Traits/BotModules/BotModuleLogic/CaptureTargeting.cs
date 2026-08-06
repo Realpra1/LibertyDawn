@@ -10,9 +10,86 @@
 #endregion
 
 using System.Collections.Generic;
+using System.Linq;
 
 namespace OpenRA.Mods.Common.Traits
 {
+	public enum SpecialistAssignmentPurpose
+	{
+		Capture,
+		Demolition
+	}
+
+	public sealed class SpecialistTargetReservations
+	{
+		sealed class Reservation
+		{
+			public readonly SpecialistAssignmentPurpose Purpose;
+			public readonly SortedSet<uint> Claimants = new SortedSet<uint>();
+
+			public Reservation(SpecialistAssignmentPurpose purpose)
+			{
+				Purpose = purpose;
+			}
+		}
+
+		readonly Dictionary<uint, Reservation> byTarget = new Dictionary<uint, Reservation>();
+		readonly Dictionary<uint, uint> targetBySpecialist = new Dictionary<uint, uint>();
+
+		public bool IsReserved(uint targetId)
+		{
+			return byTarget.ContainsKey(targetId);
+		}
+
+		public bool IsReservedForOtherPurpose(uint targetId, SpecialistAssignmentPurpose purpose)
+		{
+			return byTarget.TryGetValue(targetId, out var reservation) && reservation.Purpose != purpose;
+		}
+
+		public IReadOnlyList<uint> Claimants(uint targetId)
+		{
+			return byTarget.TryGetValue(targetId, out var reservation) ?
+				reservation.Claimants.ToArray() : System.Array.Empty<uint>();
+		}
+
+		public bool TryReserve(uint specialistId, uint targetId, SpecialistAssignmentPurpose purpose, int maximumClaimants)
+		{
+			maximumClaimants = System.Math.Max(1, maximumClaimants);
+			if (targetBySpecialist.TryGetValue(specialistId, out var currentTarget) && currentTarget == targetId &&
+				byTarget.TryGetValue(targetId, out var currentReservation) && currentReservation.Purpose == purpose)
+				return true;
+
+			if (byTarget.TryGetValue(targetId, out var reservation) &&
+				(reservation.Purpose != purpose || reservation.Claimants.Count >= maximumClaimants))
+				return false;
+
+			Release(specialistId);
+			if (!byTarget.TryGetValue(targetId, out reservation))
+			{
+				reservation = new Reservation(purpose);
+				byTarget.Add(targetId, reservation);
+			}
+
+			reservation.Claimants.Add(specialistId);
+			targetBySpecialist.Add(specialistId, targetId);
+			return true;
+		}
+
+		public void Release(uint specialistId)
+		{
+			if (!targetBySpecialist.TryGetValue(specialistId, out var targetId))
+				return;
+
+			targetBySpecialist.Remove(specialistId);
+			if (!byTarget.TryGetValue(targetId, out var reservation))
+				return;
+
+			reservation.Claimants.Remove(specialistId);
+			if (reservation.Claimants.Count == 0)
+				byTarget.Remove(targetId);
+		}
+	}
+
 	public static class CaptureTargeting
 	{
 		public static int EconomicValue(int directValue, int transformedValue)

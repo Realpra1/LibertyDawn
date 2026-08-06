@@ -86,10 +86,45 @@ namespace OpenRA.Mods.Common.Traits
 	}
 
 	public interface IDemolishableInfo : ITraitInfoInterface { bool IsValidTarget(ActorInfo actorInfo, Actor saboteur); }
+	public static class DemolitionDebug
+	{
+		public static void Write(string format, params object[] args)
+		{
+			AIUtils.BotDebug(format, args);
+			if (Game.Settings.Debug.BotDebug)
+				Log.Write("debug", format, args);
+		}
+	}
+
+	public sealed class DemolitionSafety
+	{
+		readonly PlayerRelationship allowedRelationships;
+		bool invalidated;
+		public bool Invalidated => invalidated;
+
+		public DemolitionSafety(PlayerRelationship allowedRelationships)
+		{
+			this.allowedRelationships = allowedRelationships;
+		}
+
+		public bool IsValid(Actor target, Actor saboteur)
+		{
+			return IsValid(saboteur.Owner.RelationshipWith(target.Owner));
+		}
+
+		public bool IsValid(PlayerRelationship relationship)
+		{
+			if (!invalidated && !allowedRelationships.HasRelationship(relationship))
+				invalidated = true;
+
+			return !invalidated;
+		}
+	}
+
 	public interface IDemolishable
 	{
 		bool IsValidTarget(Actor self, Actor saboteur);
-		void Demolish(Actor self, Actor saboteur, int delay, BitSet<DamageType> damageTypes);
+		void Demolish(Actor self, Actor saboteur, int delay, BitSet<DamageType> damageTypes, DemolitionSafety safety);
 	}
 
 	// Type tag for crush class bits
