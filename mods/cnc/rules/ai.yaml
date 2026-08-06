@@ -190,6 +190,11 @@ Player:
 		ScanInterval: 250
 		CoarseCellSize: 6
 		MaximumRegionCandidates: 32
+		NormalScoutLimit: 10
+		NormalScoutActorPriorities:
+			e5: 300
+			e4: 200
+			e1: 100
 		AssignmentStallInterval: 500
 		EmergencyCashThreshold: 0
 		McvTypes: mcv, fact
