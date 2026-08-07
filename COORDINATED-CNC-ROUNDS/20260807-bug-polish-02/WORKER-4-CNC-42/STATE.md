@@ -12,7 +12,7 @@ when the dependency section directs it.
 - Task: `CNC-42 — Economy field defense`
 - Change category: `AI strategy, production/reservation, persisted stationing/routing, and economy-defense placement policy`
 - Balance authority: `Frozen except for the exact requested AI-policy surface: approximately one existing Medium Tank (mtnk), two Minigunners/riflemen (e1), and one Mobile SAM (msam) of field-defense demand per harvester/working-field context in mid/late Economy play; commit the saved station only after completed unloading; keep infantry out of every Tiberium type and all guards out of refinery traffic; and use normal SAM Site (sam) construction to defend economy structures. This permits bounded AI requests, reservations, assignment, safe routing/stationing, pursuit/re-form/release rules, and economy-oriented SAM demand/placement needed to realize that behavior. It does not permit changes to unit/weapon/structure stats, cost, HP, damage, armor, speed, range, ammunition, build time, power, prerequisites, Tiberium values/spread/damage, probabilities, resource values, general army composition, unrelated unit/building weights or fractions, or any other balance surface.`
-- Status: `Final review response/testing`
+- Status: `First iteration - testing`
 - Common base branch/SHA: `agent/cnc-20260806-bug-polish-01-release` / `419bee2531d4802bf922c3597b42c6eeb75ab250`
 - Task branch: `agent/round-20260807-cnc42-economy-field-defense`
 - Intended PR base: `agent/cnc-20260806-bug-polish-01-release`
@@ -27,7 +27,7 @@ when the dependency section directs it.
 - Full-engine game tests completed: `66` (the prior 64 through cycle 19; cycle 20 adds one invalid tick-3401 covered-anchor setup whose unsupported Lua `ActorID` observer crashed after the second SAM was already visible, plus one corrected fresh covered-anchor/general-defense run through tick 5200; that corrected run began with one powered SAM covering the active refinery/resonator/used-silo anchors, retained ordinary authored fractions and all normal modules, then visibly grew to four live general-defense SAMs while all anchors survived and no economy reservation/runtime/desync signal occurred; its launcher label failed only two overstrict regexes requiring an unavailable BotDebug sentence and exactly two rather than four sites; tick-0 content-root/configuration attempts, the earlier desyncing current-load attempt, and reused controls remain excluded)
 - Terra cycle code reviews: `cycle 5 advisory adopted: validated hazard-free paths were reduced to four-cell waypoints whose ordinary Move activities could re-path through forbidden cells; cycle 6 preserved every safe segment (`analysis/worker-4-cnc42/cycle-review-05/CYCLE-REVIEW.md`). Cycle 10 advisory adopted: the judged e1 occupancy proves owned safety must veto every ordinary movement source, not only exact routes/nudges, and needs a forced like-for-like regression (`analysis/worker-4-cnc42/cycle-review-10/CYCLE-REVIEW.md`). Cycle 15 advisory rejected after source verification: the synchronized SetMoveAlongPathSafety order is recorded in the save order stream and deterministically reconstructs both strictMovementSafety and strictAvoidCells during replay before IGameSaveTraitData resolution; SyncAttribute controls hash reporting rather than save serialization, and the cycle-15 load reproduced the live pre-boundary trace exactly (`analysis/worker-4-cnc42/cycle-review-15/CYCLE-REVIEW.md`). Cycle 16 nevertheless retained a post-load pre-scan forbidden-cell assertion. Cycle 20 advisory adopted as deferred: exact economy-SAM queue/type ownership is runtime-only and is lost when loading between reservation and placement, so that one build can fall back to ordinary placement (`analysis/worker-4-cnc42/cycle-review-20/CYCLE-REVIEW.md`); resolving and proving it requires forbidden cycle 21, therefore hand off First iteration.`
 - Sol-xhigh policy escalation: `unused (requires at least 10 game tests; one maximum)`
-- PR: `#89 https://github.com/Realpra1/LibertyDawn/pull/89 (draft; base agent/cnc-20260806-bug-polish-01-release; pre-response head 3c5c6b998ad4165aa5dabcbe41fb054a8133f4fc)`
+- PR: `#89 https://github.com/Realpra1/LibertyDawn/pull/89 (draft and mergeable; base agent/cnc-20260806-bug-polish-01-release; tested product head 84dbf5013d8b6b3c696e8d6f80f24c7be00f1a23)`
 
 ## Integrated repair assignment
 
@@ -1244,19 +1244,75 @@ handoff blocker.
 
 ## Handoff receipt
 
-- Proposed status:
-- Final branch/head:
-- PR and checks:
-- Cycles used:
-- Acceptance evidence:
-- Adversarial evidence:
-- Old-behavior control and comparative result:
-- Match narratives and routine policy-review conclusions:
-- Terra cycle code reviews and dispositions:
-- Sol-xhigh policy escalation (unused, or test count/path/conclusion):
-- Final regression:
-- Error/warning and diagnostic-cleanup result:
-- Performance/determinism result:
-- Deferred work:
-- Known failures/risks:
-- Relevant artifact paths:
+- Proposed status: `First iteration - testing`. The safest useful result is
+  published, but cycle 20 reset the clean-three requirement and exposed one
+  adopted persistence blocker; the hard cap forbids cycle 21.
+- Final branch/head: `agent/round-20260807-cnc42-economy-field-defense` at tested
+  product head `84dbf5013d8b6b3c696e8d6f80f24c7be00f1a23`; the handoff-receipt-only commit
+  follows this product head and changes no code, rules, tests, or game content.
+- PR and checks: draft PR #89, https://github.com/Realpra1/LibertyDawn/pull/89,
+  targets exact base `agent/cnc-20260806-bug-polish-01-release` and is mergeable.
+  CI run 31181233145 passed Linux .NET 6.0 in 2m33s and Windows .NET 6.0 in
+  3m34s on the tested product head.
+- Cycles used: `20/20`; cycle 20 was the one allowed final-review response.
+- Acceptance evidence: G2 showed two separated-field demand and a changed-side
+  harvester survival absent in control; G4 proved post-success unload commit,
+  zero owned resource/traffic violations, and preservation of the control-lost
+  harvester; G5 proved useful powered economy coverage and economy survival; G6
+  proved contention/invalidation/replacement; G7 proved reachable-only topology,
+  restored bounded state, and publication diagnostics-off behavior. Cycle 20
+  directly proved ordinary authored-fraction SAM construction still proceeds
+  when every economy anchor is already covered.
+- Adversarial evidence: clean G4/G6 and later G5/G7 evidence exists for earlier
+  product heads, but the relevant cycle-20 SAM ownership correction resets the
+  contractual clean-three counter. Only the fresh cycle-20 covered-anchor/general-
+  defense case follows that correction, so no post-fix clean-three is claimed.
+- Old-behavior control and comparative result: exact base
+  `419bee2531d4802bf922c3597b42c6eeb75ab250` was used for matched controls.
+  Changed behavior decisively preserved at least one economy asset in valid G2,
+  G4, G5, G6, and G7 comparisons; the accepted matched G5 pair was about 5%
+  slower, inside the 10% limit. Cycle 20 lacks an identical matched control and
+  explicit queue-decision trace, so it proves removal of suppression directly but
+  not broader strategic causality.
+- Match narratives and routine policy-review conclusions: factual Commenters and
+  routine Policy Reviewers were completed for every judged batch. The cycle-19
+  publication run was policy-compatible at high confidence. Cycle 20's factual
+  review confirms additional ordinary sites, while its policy review returns
+  `insufficient evidence`, high confidence, because no identical control, air
+  threat, spending trace, or explicit ownership decision log was present; this is
+  an evidence limitation, not a policy-failure finding.
+- Terra cycle code reviews and dispositions: cycle 5 exact-route advisory adopted
+  and fixed in cycle 6; cycle 10 all-movement safety advisory adopted and fixed in
+  cycles 11-13; cycle 15 save-order premise rejected after source inspection and
+  byte-identical replay evidence, while the extra pre-scan assertion was retained;
+  cycle 20 runtime-only exact SAM queue/type ownership advisory adopted as deferred.
+- Sol-xhigh policy escalation (unused, or test count/path/conclusion): unused
+  after 66 counted full-engine tests.
+- Final regression: not completed after the cycle-20 relevant correction. Earlier
+  literal/static, toxic-geometry, invalidation, topology, and persistence runs are
+  retained as supporting evidence but cannot satisfy the reset final gate.
+- Error/warning and diagnostic-cleanup result: focused tests passed 34/34;
+  `make check test` passed Debug/Release compilation, interface checks, and CNC
+  MiniYAML with zero warnings/errors. Task diagnostics are published disabled,
+  and no task map, raw game log, replay, save, benchmark, or build output is tracked.
+- Performance/determinism result: accepted paired MAX evidence ranged from faster
+  or effectively equal to about 5% slower, within the 10% bound. Synchronized
+  movement safety, bounded actor/route persistence, and absolute scan phase passed
+  focused and full-engine replay/load checks without runtime/desync signals.
+- Deferred work: persist or deterministically reconstruct exact economy-SAM
+  queue/type ownership across a save made after reservation but before placement;
+  add bounded ownership observability and an identical cycle-20 control with air
+  harassment; obtain three clean post-fix adversaries and the stressed fresh final
+  regression; combine CNC-41 PR #88 and rerun G4/G5/G7 on the reviewed candidate.
+- Known failures/risks: a mid-build load currently loses runtime-only economy-SAM
+  ownership and may demote that one completed build to ordinary placement. Cycle
+  20 has limited causal evidence, no post-fix clean-three/final regression, and
+  overlapping CNC-41 BaseBuilder/queue/config edits remain unintegrated.
+- Relevant artifact paths: task report
+  `COORDINATED-CNC-ROUNDS/20260807-bug-polish-02/WORKER-4-CNC-42/REPORT.md`;
+  final review `analysis/worker-4-cnc42/final-review/FINAL-REVIEW.md`; cycle-20
+  game `analysis/worker-4-cnc42/games/g5-cycle20-covered-general`; cycle-20
+  factual/policy reviews `analysis/worker-4-cnc42/g5-cycle20-comment/NARRATIVE.md`
+  and `analysis/worker-4-cnc42/g5-cycle20-policy/POLICY-REVIEW.md`; cycle-20 code
+  review `analysis/worker-4-cnc42/cycle-review-20/CYCLE-REVIEW.md`; publication
+  run `analysis/worker-4-cnc42/games/g7-archipelago/focused-cycle19-run2`.

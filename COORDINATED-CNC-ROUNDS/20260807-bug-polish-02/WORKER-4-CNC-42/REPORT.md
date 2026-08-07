@@ -953,3 +953,18 @@ planner.
   economy-reserved SAM queue/type ownership, then load a save made after
   reservation but before placement and prove the completed site still takes the
   economy-safe anchor location. This is the adopted cycle-20 review blocker.
+
+## Publication handoff
+
+The tested product head is
+`84dbf5013d8b6b3c696e8d6f80f24c7be00f1a23` on
+`agent/round-20260807-cnc42-economy-field-defense`. Draft PR #89 targets the exact
+recorded base, is mergeable, and CI run 31181233145 passed Linux .NET 6.0 and
+Windows .NET 6.0. The final branch update after that product head records only
+this handoff receipt and report publication metadata.
+
+Handoff status is `First iteration - testing`: all 20 isolated cycles and the one
+allowed final-review response are consumed. Do not infer completion from the
+green build. The adopted mid-build save/load ownership blocker, reset clean-three,
+stressed final regression, stronger cycle-20 causal control, and combined CNC-41
+validation remain required before promotion.
