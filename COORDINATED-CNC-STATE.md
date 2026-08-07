@@ -146,3 +146,8 @@ deliberately detonated red Harvester must explode regardless of lobby options;
 only spontaneous instability and loose-tiberium shot reactions are suppressible.
 The required fixture compares shot-kill, deliberate detonation, and spontaneous
 events with options on and off. CNC-86A and Round 03 were untouched.
+
+Task routing note: fresh Task Maker commit `72ae2e1c28` recorded pending `CNC-98`
+for the VIKI infantry-rush/scouting regression, linked to completed CNC-30.1 and
+CNC-38 with explicit re-specification, and pending `CNC-99` for Skynet Flame
+Trooper production diagnosis. Active Round 03 selection was unchanged.
