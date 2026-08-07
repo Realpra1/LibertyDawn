@@ -46,3 +46,8 @@ persisted invariant expressly needs it.
 
 Continuation directive: complete, integrate, and test this five-task round, then
 use its cumulative release head as the base for another round without pausing.
+
+Recovery note (2026-08-07 16:38 UTC): the shared `policy-scratchpad` lock left by
+completed speccer PID `1006013` was verified dead with no active policy-role
+process, then moved into the ignored shared-lock `stale/` quarantine. No
+canonical scratchpad content was changed; policy consultations may proceed.
