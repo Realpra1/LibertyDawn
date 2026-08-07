@@ -97,3 +97,10 @@ record that Economy guard squads appear functionally sound but are not blamed
 for the freeze. Diagnosis remains component-agnostic and must compare stronger
 hardware plus CPU, memory/GC, simulation load, and possible playtest debug/report
 disk-I/O bursts under matched scenarios before assigning a cause.
+
+CNC-96 scheduling hypothesis update: task-sheet commit `3506efaada` records
+that nominally spaced one- or two-second AI jobs may remain phase-aligned and
+overload the same recurring simulation tick. If per-tick attribution confirms
+this, preserve average decision cadence while assigning simple stable offsets
+so different squads, modules, and players plan on different ticks; avoid random
+jitter, globally slower AI, balance changes, or unnecessary scheduler theory.
