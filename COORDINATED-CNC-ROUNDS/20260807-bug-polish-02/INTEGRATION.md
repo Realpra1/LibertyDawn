@@ -150,7 +150,9 @@ matched controls where required, and any task-scoped repair candidates.
 - Draft release PR to `bleed`: https://github.com/Realpra1/LibertyDawn/pull/90
 - Included repair: Worker 4 / CNC-42 / PR #92 / reviewed head
   `aa3e1835f1d9d988af211cd2a5bd06b7ab9337c3`.
-- The CNC-42 repair PR remained open and was not merged through GitHub.
+- The CNC-42 repair was not merged with GitHub's merge action. After the local
+  merge was pushed to its stable-branch base, GitHub automatically marked PR #92
+  merged because its reviewed head had become an ancestor of that branch.
 
 ### Repair verification and merge
 
