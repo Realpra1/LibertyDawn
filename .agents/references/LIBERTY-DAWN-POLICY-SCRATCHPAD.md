@@ -1,5 +1,6 @@
 # Liberty Dawn policy scratchpad
 
-Maximum 3,000 characters. Keep only general strategic insights, especially
-theories that game evidence confirmed or disproved. Mark uncertainty and relevant
-map, faction, or situation limits. Replace weaker entries when the pad is full.
+- **Policy hypothesis; not yet match-validated:** A defensive strongpoint should concentrate layered, role-complete defenses around an asset under sustained pressure, while essential power/economy recovery and an open base-facing access lane take priority over completing the fortification.
+- **Policy hypothesis; not yet match-validated:** Defense-role coverage and structure count are separate safeguards. One multi-role actor may cover several real target roles, but several distinct actors improve resilience; temporary cash, power, or queue contention should delay coverage rather than redefine an unlocked role as unavailable.
+- **Policy hypothesis; not yet match-validated:** Local repair support counts only when its aura reaches the defended formation and units retain an approach lane. A distant repair structure does not sustain a local strongpoint.
+- **Policy hypothesis; not yet match-validated:** Prefer a shallow enemy-facing/flank wall screen with an inward gap over rings or long lines. Sell the minimum AI-owned wall segments only when a bounded before/after test shows that removal restores a required route or construction footprint; preserve special-purpose walls when a safe alternative exists.
