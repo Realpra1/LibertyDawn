@@ -10,7 +10,7 @@ when the dependency section directs it.
 
 - Worker: `worker-5-cnc-51`
 - Task: `CNC-51 — Transport-helicopter unload recovery and threat-safe landing`
-- Status: `Complete - testing`
+- Status: `Complete - testing; integrated RC2 pass/no repair`
 - Common base branch/SHA: `agent/cnc38-early-viki-infantry-rush` / `09ccdac3c1ecb5134a4751f2bcbd8a7970dfe6bf`
 - Task branch: `agent/round-20260806-cnc51-transport-unload`
 - Intended PR base: `agent/cnc38-early-viki-infantry-rush`
@@ -22,7 +22,7 @@ when the dependency section directs it.
 - Task report: `/root/github/LibertyDawn/COORDINATED-CNC-ROUNDS/20260806-bug-polish-01/WORKER-5-CNC-51/REPORT.md`
 - Match-analysis directory: `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260806-bug-polish-01/analysis/worker-5-cnc-51`
 - Liberty Dawn design reference: `.agents/references/LIBERTY-DAWN-DESIGN.md`
-- Full-engine game tests completed: `51`
+- Full-engine game tests completed: `57`
 - Game-run summary: runs 02-06 invalid fixture; run 07 discovery; run 08 blocker
   correction; run 09 negative control; run 10 accepted pinned-base failure
   reproduction; run 11 cycle-1 changed smoke pass; runs 12-13 invalid stationary-
@@ -52,17 +52,18 @@ when the dependency section directs it.
   run 51 clean aircraft-closing-envelope review regression; run 52 strict literal
   harness invalid because mission 3 selected a different real squad objective and
   completed after the tick-2000 assertion, although all three useful physical
-  handoffs released safely by tick 3500.
+  handoffs released safely by tick 3500; integrated RC2 batches 01-02 passed six
+  of six materially distinct concurrent games.
 - Sol-xhigh policy escalation: `unused (requires at least 10 game tests; one maximum)`
 - PR: `https://github.com/Realpra1/LibertyDawn/pull/81`
 
 ## Integrated repair assignment
 
-- Phase: `isolated implementation`
-- Current release branch/head: `not assigned`
-- Integration notes: `not assigned`
-- Repair branch: `not assigned`
-- Repair PR base: `not assigned`
+- Phase: `integrated RC2 complete; combined pass/no repair`
+- Current release branch/head: `agent/cnc-20260806-bug-polish-01-release` / `fd15540ffc98c70f085688fe0b38a4a6341fc6ed`
+- Integration notes: `Integrated RC2 assignment appended to this state`
+- Repair branch: `agent/round-20260806-cnc51-rc2-repair`
+- Repair PR base: `agent/cnc-20260806-bug-polish-01-release`
 - Integrated cycles used this RC: `0/3`
 - Integrated cycles used total: `0/12`
 
@@ -1566,3 +1567,141 @@ real mission deadlines, not a test exit horizon. Evidence:
   judged AI matches. Finish by updating this state/report with the exact candidate,
   scenarios, controls, artifacts, results, cycle count, resource measurements, and
   one of: combined pass/no repair, or reviewed repair head ready to merge.
+
+### Integrated RC2 journal
+
+RC2 batch 01 is predeclared against cumulative candidate
+`fd15540ffc98c70f085688fe0b38a4a6341fc6ed` (product candidate
+`b456fd89fac88d71dfadd65c47cfb7b409d44122`) from the clean repair branch. It
+trials all three shared game slots with materially different retained adversarial
+fixtures and ordinary AI modules:
+
+- Literal rescue contention hypothesis: combined capture-specialist reservation
+  and AI-rule changes can steal an actor/order, disturb deterministic claims, or
+  revive stale unload behavior. Perturbation: three independent rescues, dense
+  mobile/structure contention, edge exit, direct MSAM screen, and a moving Mammoth
+  under the complete RC2 code. Failure is fewer than 3/3 useful physical handoffs,
+  missing live revision, retained cargo/claim, timeout/safe recovery, fatal, or
+  desync. Pass requires three useful cargo-zero handoffs, exact release, the live
+  Mammoth replan, and the edge plan through tick 5200.
+- Archipelago heavy-drop hypothesis: combined target/reservation changes or
+  concurrent process pressure can serialize pickup, overlap plans, select wrong-
+  island exits, or break the explicit mixed-vehicle assault adoption. Perturbation:
+  four simultaneous Mammoth/Medium-Tank pairs across distinct islands and a live
+  edge-island objective. Failure is fewer than 4/4 loads/exits/adoptions, hold/safe
+  return/abort/travel failure, retained cargo, fatal, or desync. Pass requires four
+  distinct threat-routed plans, physical cargo-zero exits, 4/4 adoption, and target
+  damage through tick 7000.
+- Helicopter late-threat hypothesis: the integrated capture manager can compete
+  for assault infantry or the cumulative candidate can continue a stale aircraft
+  route and lose its empty carrier. Perturbation: a three-infantry forced ordinary
+  VIKI assault, one-sided fixed threats, an aircraft-route-invalidating tick-500
+  bike, post-handoff recovery, and ordinary reuse. Failure is missing revision 2,
+  withdrawal/safe return/timeout, dead carrier at tick 1000, cargo retention,
+  fatal, or desync. Pass requires 3/3 physical handoff, exact revision-2 route,
+  threat-screened carrier recovery, release, and tick-1000 survival.
+
+The batch uses isolated support/log/replay/benchmark paths and the shared
+`game` resource at capacity three. Record wall time, peak RSS, individual
+completion reliability, and whether three-way capacity should be retained before
+selecting any repair or follow-up evidence.
+
+RC2 batch 01 passed 3/3 concurrently against the exact cumulative candidate in
+21.071 seconds at 683.392 aggregate valid ticks/s. Literal rescue reached tick
+5200 in 19.060 seconds with 3/3 useful physical handoffs, a live Mammoth-driven
+revision 2, cargo zero, and exact releases. Archipelago reached tick 7000 in
+21.065 seconds with four distinct mixed-vehicle plans, 4/4 physical exits and
+adoption, target destruction, and later ordinary carrier reuse. Late-threat
+assault reached tick 2200 in 14.042 seconds: `BikeRockets` invalidated revision 1,
+revision 2 handed off 3/3 infantry, and the empty carrier recovered to assembly,
+released, and was reused. All strict patterns passed; no timeout, unsafe fallback,
+abort, fatal, or desync pattern occurred. The retained map SHAs are respectively
+`34f96775d113714607fbcb97977fd7b586d4af002c6f119d29a0b906a685c8f9`,
+`cf425f8cdb77e1df9f7a21982e65210af82adbd4841c25e552c5518d876e9e8a`,
+and `75cf809324dbecdabaa3382518b1816f6a008765eb5f04ebdb21fec2c802076d`.
+A mid-run sample observed 2,010,940 KiB across the three engine processes;
+batch 02 will capture the exact aggregate process-tree peak. Evidence:
+`AUTONOMOUS-CNC-LOGS/cnc51-rc2/rc2-batch-01-results/`.
+
+RC2 batch 02 is predeclared as a materially different three-way capacity trial.
+Covered-assembly fallback must hand off 3/3 passengers, name the new assembly
+coverage, hold for the bounded interval, choose the far-side terminal fallback,
+release, and retain the empty carrier alive/cargo-zero at tick 2000; death,
+withdrawal, safe return, timeout, fatal, or desync is failure. Aircraft closing-
+envelope rescue must name the enabled Apache `HeliAGGun` effective range 17120,
+reject its first fallback, physically hand off usefully, and release; static-only
+acceptance, timeout, withdrawal, fatal, or desync is failure. Connected natural
+endurance must reach an actual game-over with observable transport activity and
+normal economy/combat progression; crash, desync, diagnostic hold spam, no natural
+result, or task-path dishonesty is failure. The natural result remains comparable
+to the exact-base run-40 SkyNet win and 516.642 ticks/s, but is primarily a
+cumulative stability/endurance check. The batch records exact 0.25-second sampled
+aggregate process-tree peak RSS and retains capacity three only if all processes
+complete reliably without timeout or artifact corruption.
+
+RC2 batch 02 passed 3/3 concurrently against the exact candidate. Covered-
+assembly fallback reached tick 2600 in 14.039 seconds: after the 3/3 physical
+handoff, live `Patriot` coverage forced the bounded hold and far-side fallback to
+`20,38`; the carrier recovered/released and remained alive with cargo zero at
+tick 2000. The aircraft-envelope rescue reached tick 4200 in 16.047 seconds:
+`HeliAGGun` was evaluated at effective range 17120, caused revisions 2 and 3,
+then the Medium Tank physically handed off usefully at `29,29` and all claims
+released. The unforced connected endurance match reached natural game over after
+the last sampled MAX marker at tick 35000 in 90.116 seconds; normal C4/capture,
+adaptive production, transport eligibility, carrier threat-routing/staging,
+economy, and combat remained active without fatal, desync, repeated hold, or
+dishonest mission-success evidence. The batch completed in 90.124 seconds at
+463.805 aggregate valid ticks/s. Exact 0.25-second sampling measured 2,559,140
+KiB peak aggregate process-tree RSS. All six RC2 games launched and completed
+reliably with isolated artifacts, so capacity three should be retained. Map SHAs:
+`561079bace9ffacf6fd2cce889e62c041cb43710e99ef3fcf979daa7eae7d30c`,
+`ae6cc567ccc07c321b02e6ef79d99c9eb82e7f53e729620bd1d68602bb33889a`,
+and `a131db97ce1f5471baeed9bc7d323e41e6b51eceb39f431b85a57d36d8656190`.
+Evidence: `AUTONOMOUS-CNC-LOGS/cnc51-rc2/rc2-batch-02-results/` and
+`analysis/worker-5-cnc-51/integrated-rc2/rc2-batch-02-resources.json`.
+
+Integrated factual/policy reviews are at
+`analysis/worker-5-cnc-51/integrated-rc2-batch-01-comment/NARRATIVE.md`,
+`integrated-rc2-batch-01-policy/POLICY-REVIEW.md`,
+`integrated-rc2-batch-02-comment/NARRATIVE.md`, and
+`integrated-rc2-batch-02-policy/POLICY-REVIEW.md`. Batch 01 returned
+`provisionally aligned` / `medium`; batch 02 returned `pass` / `medium`.
+Reviewers endorse the survival-first replans, physical handoffs, bounded recovery,
+dynamic aircraft envelope, natural-game activity, and clean capacity-three batch.
+Suggestions for broader natural samples, more aircraft mixes, or per-job memory
+apportionment are retained as non-blocking hypotheses. A light-threat exception
+is not adopted because the authoritative contract requires zero known applicable
+threat for ordinary descent; unavailable-harvester adaptation remains outside
+CNC-51 ownership.
+
+Exact-head local verification passed: Release build with zero warnings/errors;
+97/97 focused transport, air-threat, route, and capture-targeting overlap tests;
+454/454 full Release tests; `make check`; `make check-scripts`; `make test`; and
+`git diff --check`. Draft PR #84 is open, mergeable, and points exactly to
+`fd15540ffc98c70f085688fe0b38a4a6341fc6ed`; both reported Linux jobs and both
+reported Windows jobs passed. Integrated code-change cycles remain `0/3` this RC
+and `0/12` total.
+
+## Integrated RC2 handoff receipt
+
+- Result: `combined pass/no repair`.
+- Exact cumulative candidate tested: `fd15540ffc98c70f085688fe0b38a4a6341fc6ed`;
+  product candidate `b456fd89fac88d71dfadd65c47cfb7b409d44122`.
+- Repair result: no product change, no repair commit, and no repair PR required.
+  The repair branch contains only integration assignment/handoff documentation.
+- Behavioral result: six of six full-engine ordinary-AI games passed across
+  literal rescue contention, Archipelago heavy drop, live-threat assault/reuse,
+  covered-assembly fallback, moving-aircraft envelope, and connected natural
+  endurance.
+- Resource recommendation: retain game capacity three; 6/6 reliable concurrent
+  completions, 2,559,140 KiB measured peak aggregate process-tree RSS.
+- Controls: original exact-base occupied-cell and natural comparisons remain the
+  informative old behavior controls; the integrated candidate preserved their
+  required gains, and no new control run was needed for merge-composition safety.
+- Checks/reviews: all local gates and exact-head PR Linux/Windows checks passed;
+  isolated reviews returned provisionally aligned/pass at medium confidence.
+- Remaining non-blockers: the previously documented low-frequency loaded heavy-
+  wave terminal fallback, fixture objective binding, broader natural sampling,
+  aircraft-mix breadth, and per-job resource apportionment. No unsafe landing,
+  cargo retention, claim leak, compilation, CI, or combined-task failure was
+  observed.
