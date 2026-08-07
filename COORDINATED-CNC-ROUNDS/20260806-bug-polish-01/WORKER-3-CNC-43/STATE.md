@@ -22,17 +22,17 @@ when the dependency section directs it.
 - Task report: `/root/github/LibertyDawn/COORDINATED-CNC-ROUNDS/20260806-bug-polish-01/WORKER-3-CNC-43/REPORT.md`
 - Match-analysis directory: `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260806-bug-polish-01/analysis/worker-3-cnc-43`
 - Liberty Dawn design reference: `.agents/references/LIBERTY-DAWN-DESIGN.md`
-- Full-engine game tests completed: `46`
+- Full-engine game tests completed: `52`
 - Sol-xhigh policy escalation: `unused (requires at least 10 game tests; one maximum)`
 - PR: `#78 — https://github.com/Realpra1/LibertyDawn/pull/78 — mergeable CLEAN; no status checks reported/configured`
 
 ## Integrated repair assignment
 
-- Phase: `isolated implementation`
-- Current release branch/head: `not assigned`
-- Integration notes: `not assigned`
-- Repair branch: `not assigned`
-- Repair PR base: `not assigned`
+- Phase: `combined release testing — RC2 complete`
+- Current release branch/head: `agent/cnc-20260806-bug-polish-01-release` / `fd15540ffc98c70f085688fe0b38a4a6341fc6ed`
+- Integration notes: `Integrated RC2 assignment appended to this state; no separate note path provided`
+- Repair branch: `agent/round-20260806-cnc43-rc2-repair`
+- Repair PR base: `agent/cnc-20260806-bug-polish-01-release`
 - Integrated cycles used this RC: `0/3`
 - Integrated cycles used total: `0/12`
 
@@ -710,6 +710,7 @@ silently exceed the budget.
 |---|---|---|---|---|---|---|
 | 1 | Dedicated `mcvheavywheeled` locomotor; MCV and FACT references updated | Actor scoping could spill into STNK/Mammoth, miss a class, alter terrain semantics, break transform/lifecycle, enable friendly crushing, or regress normal AI/performance. Progressed from literal changed/base lane through mixed corridor matrix, negative crushers, allied safety, ordinary production/repack, matched ordinary control, and natural endurance. | Base/changed resolved rules; `make test` before and after; 36 full-engine games including invalid harness diagnostics; final `make check`, `make check-scripts`, 438 unit tests. Seeds 43001–43005. | Fresh factual narratives under `analysis/worker-3-cnc-43/commenters/`; no policy review because this is literal config-only work. Final matched pair Commenter: no integrity blocker. | Changed MCV alone killed wall/heavywall targets and retained crate/infantry, terrain table, deployment, allied safety; base MCV did not. Mammoth reference and STNK/MTNK negatives matched. Normal VIKI produced/deployed a replacement MCV; Brutalis repacked/redeployed via McvManager. Natural match completed. | Product change accepted after one cycle. Ignored harness timing/path issues were corrected without another product cycle. Publish the minimal config diff and wait for required PR checks. |
 | Review response (test-only) | No product/config change; added ignored `CNC-43 Review Long Pressure` matched evidence harness and summaries | CNC-43-EVIDENCE-1: a short lifecycle fixture might miss recovery failure under scarce cash, a busy vehicle queue, an enclosed base, and sustained ordinary enemy pressure; the dedicated locomotor might also cause MCV combat/crush ordering or a repeated MAX regression. | 10 additional full-engine games including invalid harness iterations; final matched changed/base seed 43043 on normal connected Empire Earth geometry, 5,000 cash, four ordinary VIKI/Brutalis/SkyNet bots, natural completion beyond tick 20,000. | Fresh no-history factual Commenter: `analysis/worker-3-cnc-43/commenters/review-long-pressure-v5/NARRATIVE.md`; no policy review because product/AI policy did not change. | Both sides lost the target Yard to Multi2 pressure with cash near zero and one live factory, then VIKI spent 4,000 through its only vehicle queue, produced an MCV normally, moved it under McvManager ownership with zero scripted/combat/crush orders, and deployed it alive while its 16-wall enclosure remained intact. Both ended naturally without fatal/desync. | Required evidence fix satisfied. No product defect was exposed, so the product diff and isolated cycle count remain unchanged. Winner and wall-clock differences reversed/varied across paired v4/v5 repetitions and are not attributed to the locomotor. Publish the test-only review response. |
+| Integrated RC2 (test-only) | No product/config change; exact cumulative candidate `fd15540ffc` / code candidate `b456fd89fa` | Combined rules or competing reviewed AI changes could break MCV crush parity/safety, production/repack, or scarce-cash enclosed recovery. Three-way capacity could also exhaust the 7.8 GiB no-swap host. | 6 full-engine games: one 3-way trial, clean 2-way lifecycle/pressure retest, and clean serial enclosure-recovery confirmation. Seeds 43003, 43004, 43043. `make test`, `make check`, `make check-scripts`, 454 unit tests, resolved World/MCV/HTNK/STNK/FACT. | Fresh factual Commenters: `commenters/integrated-rc2/NARRATIVE.md` and `commenters/integrated-rc2-enclosure/NARRATIVE.md`; no policy review because CNC-43 remains literal config-only work. | Matrix/safety passed at tick 10,000. Two-way lifecycle and natural pressure both passed. Serial pressure kept 16 walls through Yard loss and recovery deployment, with normal MCV spend/production, McvManager ownership, and zero combat/crush orders. Three-way was unreliable at 6,447,160 KiB peak RSS; two-way passed at 4,094,272 KiB. | Combined pass with no repair and 0 integrated code cycles. Recommend capacity 2, not 3. Record exact candidate/artifacts and return receipt to integrator. |
 
 ## Handoff receipt
 
@@ -756,3 +757,42 @@ silently exceed the budget.
   judged AI matches. Finish by updating this state/report with the exact candidate,
   scenarios, controls, artifacts, results, cycle count, resource measurements, and
   one of: combined pass/no repair, or reviewed repair head ready to merge.
+
+## Integrated RC2 handoff receipt
+
+- Result: `combined pass / no repair`.
+- Exact candidate tested: release metadata head
+  `fd15540ffc98c70f085688fe0b38a4a6341fc6ed`, code candidate
+  `b456fd89fac88d71dfadd65c47cfb7b409d44122`, draft PR #84.
+- Repair branch: `agent/round-20260806-cnc43-rc2-repair`; no product/config
+  repair commit exists. Integrated cycles remain `0/3` this RC and `0/12` total.
+- Full-engine games: 6 new tests, bringing the task total to 52. The three-way
+  trial ran seeds 43003/43004/43043; matrix/safety passed, while lifecycle and
+  pressure returned nonzero under resource pressure. The clean two-way retest
+  passed lifecycle/repack and natural long-pressure recovery. A final serial
+  seed-43043 match jointly proved 16-wall enclosure survival and complete normal
+  recovery to natural game over after tick 34,000.
+- Critical combined evidence: MCV killed the complete crate/infantry/wall/
+  heavywall matrix and deployed; Mammoth matched; STNK/MTNK negative targets and
+  allied infantry/wall/vehicle survived. VIKI normally spent 4,000 for an MCV,
+  produced it, moved it under `McvManagerBotModule` with zero scripted/combat/
+  crush orders, and deployed at tick 8,489 with all 16 enclosure walls intact.
+- Capacity trial: three-way elapsed 37.383 seconds, peak aggregate process-tree
+  RSS 6,447,160 KiB, completion 1/3. Two-way elapsed 143.593 seconds, peak
+  4,094,272 KiB, completion 2/2. Serial peak was 1,305,896 KiB. Reduce shared
+  game capacity to two on this 7.8 GiB no-swap host.
+- Resolved rules: MCV/Mammoth crush sets remain exactly
+  `wall, heavywall, crate, infantry`; MCV keeps wheeled terrain values and speed
+  60; FACT uses `mcvheavywheeled`; STNK remains `crate, infantry`. HTNK/STNK
+  hashes still match the isolated accepted evidence.
+- Checks: `make test`, `make check`, `make check-scripts`, and 454/454 Debug unit
+  tests pass with zero build warnings/errors. PR #84 is mergeable and all four
+  reported Linux/Windows CI runs are successful.
+- Commenters: `analysis/worker-3-cnc-43/commenters/integrated-rc2/NARRATIVE.md`
+  and `analysis/worker-3-cnc-43/commenters/integrated-rc2-enclosure/NARRATIVE.md`.
+  Policy review remains intentionally skipped because no AI policy changed.
+- Artifacts: `analysis/worker-3-cnc-43/games/integrated-rc2-{three-way,two-way,enclosure-recovery}`,
+  their sibling resource JSON files, and
+  `analysis/worker-3-cnc-43/resolved/integrated-rc2`.
+- Dependency check: PR #31 remains unchanged at `4e65c05fed`; no CNC-45 remote
+  branch/ref was found. No Mammoth, target-class, or AI-order repair was made.
