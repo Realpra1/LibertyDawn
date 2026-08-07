@@ -2,7 +2,7 @@
 
 ## Status
 
-`First iteration - testing`. Cycle 1 is implemented; its matched empty-cell control/changed pair passes and a harder type/capture batch establishes the scoped behavior below. CNC-62 remains unavailable and publication-blocking, so this is not a complete handoff.
+`First iteration - testing`. Cycle 1 is implemented and RC1 integrated validation found no product repair to make. Type/capture, all-actor occupancy/removal timing, same-frame contention, A10 exclusion, and forbidden Rock terrain pass on the combined release code. CNC-62 remains unavailable and completion-blocking, so this is not a complete handoff.
 
 ## Behavior and design
 
@@ -35,14 +35,29 @@ Seed 44002 used ordinary SkyNet GDI and Brutalis Nod AIs at headless MAX. The fi
 - All three restored aircraft remained alive and accepted movement; the Apache and Orca were redirected by normal air-squad modules before the delayed assertion, providing module-adoption evidence but making their capture-time facing unverifiable. TRAN facing was verified. This batch is therefore useful evidence, not literal acceptance.
 - All three runs reached tick 425 with exit code 0 and no fatal Lua/desync signal. Factual narrative: `analysis/worker-5-cnc44/commentary/cycle-01-type-capture/NARRATIVE.md`.
 
+## RC1 integrated validation
+
+Validated release product/receipt: `394ae5eeadfffbf58a9db7c1fac91960f5158cb6` / `ffb841b48750cc54b1862fb93101d3dce3a87a3f`. Repair branch: `agent/round-20260807-cnc44-rc1-repair`. No tracked product, configuration, or test repair was made, so integrated cycle use remains `0/3` for RC1 and `0/12` total.
+
+Fourteen full-engine games are now counted overall. RC1 added seven games: three formally passing corrected scenarios and four invalid/useful predecessors that exposed only harness setup, geometry, or expected-pattern defects.
+
+- Type/capture seed 44002, corrected map SHA-256 `bbd9f969c1a2b7b0550e55340cef20674c036baf74f1e3f5444fe8ffc08bfb59`: run 001 reproduced the late-facing harness defect while still proving all three aircraft moved under normal modules. Run 002 captured facing at the transform boundary and passed at tick 425. It created exactly one `TRAN.GroundHusk`, `HELI.GroundHusk`, and `ORCA.GroundHusk`, zero A10 result; consumed all three Engineers and husks; restored exact Multi0-owned types at 25% health with captured facing; and moved all three aircraft. Narrative: `analysis/worker-5-cnc44/commentary/integrated-type-capture/NARRATIVE.md`.
+- Occupancy/contention seed 44003, final map SHA-256 `6caac82273ab4a8b9a3910070b848dd93cdcdd0c156eef00f92e5a5910372d4b`: run 001 stopped at tick 0 because the external map lacked `ScriptTriggers`; run 002 reached tick 140 and exposed a pre-existing `t17` in the intended adjacent cell. Corrected run 003 passed the exact `1/0/1/0/1/1/0` empty/live-vehicle/dead-stack/mixed/adjacent/simultaneous/A10 oracle. Four killed infantry were still `IsInWorld=true` at impact yet permitted one husk; a killed infantry plus live 35,000-HP tank rejected; the adjacent tank did not block; and same-frame TRAN created first while ORCA revalidated and rejected on that ground husk. Narrative: `analysis/worker-5-cnc44/commentary/integrated-occupancy/NARRATIVE.md`.
+- Terrain seed 44004, map SHA-256 `23b74c5583bd067b25e4018bf05f5216c5a924f3dca29f35f600f24d64ab582b`: run 001 contained stale expected cell/assertion text but logged correct behavior. Corrected run 002 formally passed at tick 150: Orca rejected at Rock cell 50,30, TRAN and HELI created on valid terrain, and A10 remained absent. Narrative: `analysis/worker-5-cnc44/commentary/integrated-terrain/NARRATIVE.md`.
+
+All valid RC1 games used ordinary SkyNet GDI and Brutalis Nod with normal modules enabled from tick 1 at headless MAX, exited cleanly, and produced replay/benchmark artifacts. No valid run logged a fatal or desync. Short focused throughput was 42.471, 27.966, and 14.991 ticks/s for materially different workloads, so no matched stress-regression claim is made.
+
+Integrated gates passed under the shared large-build lock: `make test`; focused `AircraftHuskSpawnEligibilityTest` 5/5; `make check`; and `make check-scripts`. The final Debug build had zero warnings/errors. The focused test invocation repeated the already-recorded nonblocking CA1825 style warning in the test source.
+
 ## Dependency and remaining work
 
-CNC-62 has no local branch, remote branch, or GitHub PR as of both the pre-implementation and pre-publication checks on 2026-08-07. Exact-cell crash damage and combined damage-before-eligibility evidence are therefore not yet available. CNC-40 has a remote branch but no PR, so the contract did not authorize treating it as a publication dependency. Capture-time HELI/ORCA facing, the full occupant matrix, same-frame contention, complete terrain/boundary matrix, save/load, adversarial capture invalidation, stress/natural endurance, final regression, and combined CNC-62 reruns remain. The scoped result must be published as `First iteration - testing`.
+CNC-62 still has no local branch, remote branch, or GitHub PR as of the RC1 pre-test and pre-publication checks on 2026-08-07. It is not included in release RC1. Exact-cell crash damage and combined damage-before-eligibility evidence are therefore unavailable. Capture-time HELI/ORCA facing, all-actor dead/live occupancy, same-frame contention, and Rock terrain are now proven on RC1. Literal normal-combat source-aircraft crashes, CNC-62 ordering, map-edge/off-map handling, save/load, adversarial capture invalidation/manager competition, stress/natural endurance, and the fresh final regression remain. The result must remain `First iteration - testing`.
 
 ## Publication and review
 
 - Product commit: `396c8106d9cec1c84ed0c2e44cd34ce0d0ef4772` on `agent/round-20260807-cnc44-aircraft-husks`.
 - PR: `#85`, https://github.com/Realpra1/LibertyDawn/pull/85, targeting `agent/cnc-20260806-bug-polish-01-release`; it remains open and unmerged.
+- RC1 validation receipt: draft repair PR `#91`, https://github.com/Realpra1/LibertyDawn/pull/91, targeting `agent/cnc-20260807-bug-polish-02-release`; it contains no product repair.
 - GitHub checks: Linux and Windows .NET 6.0 passed at the product head. The final handoff-metadata-only successor is rechecked before return.
 - Independent Sol-high final review: `analysis/worker-5-cnc44/final-review/REVIEW.md`; verdict `ready`, required fix `none`. The reviewer found no scoped correctness, regression, determinism, performance, scope, or diagnostic defect, while retaining the same CNC-62 and acceptance blockers.
 
