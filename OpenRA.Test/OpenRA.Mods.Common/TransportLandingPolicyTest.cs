@@ -46,6 +46,30 @@ namespace OpenRA.Test
 		}
 
 		[Test]
+		public void MovingAircraftGroundWeaponRejectsCarrierAndExitInsideClosingEnvelope()
+		{
+			var weaponRange = WDist.FromCells(4);
+			var configuredBuffer = WDist.FromCells(1);
+			var aircraftMargin = TransportLandingPolicy.MovementClosingMargin(
+				groundMovementSpeed: 0, aircraftMovementSpeed: 128, replanInterval: 75);
+
+			// The enemy aircraft is outside the static weapon-plus-buffer range, but can close
+			// far enough before the next snapshot to threaten both the landing and exit cells.
+			var carrierDistance = WDist.FromCells(13);
+			var exitDistance = WDist.FromCells(14);
+			Assert.That(TransportLandingPolicy.DealsPositiveDamage(100,
+				new Dictionary<string, int>(), new[] { "Light" }), Is.True);
+			Assert.That(TransportLandingPolicy.CoversThreatEnvelope(carrierDistance,
+				weaponRange, configuredBuffer, WDist.Zero), Is.False);
+			Assert.That(TransportLandingPolicy.CoversThreatEnvelope(exitDistance,
+				weaponRange, configuredBuffer, WDist.Zero), Is.False);
+			Assert.That(TransportLandingPolicy.CoversThreatEnvelope(carrierDistance,
+				weaponRange, configuredBuffer, aircraftMargin), Is.True);
+			Assert.That(TransportLandingPolicy.CoversThreatEnvelope(exitDistance,
+				weaponRange, configuredBuffer, aircraftMargin), Is.True);
+		}
+
+		[Test]
 		public void ExactPassengerExitsRoundTripInStableActorOrder()
 		{
 			var exits = new[]

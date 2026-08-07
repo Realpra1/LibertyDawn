@@ -20,6 +20,21 @@ namespace OpenRA.Mods.Common.Traits
 	/// <summary>Pure deterministic rules shared by the live transport unload planner and its tests.</summary>
 	public static class TransportLandingPolicy
 	{
+		public static WDist MovementClosingMargin(int groundMovementSpeed, int aircraftMovementSpeed,
+			int replanInterval)
+		{
+			var speed = Math.Max(0, Math.Max(groundMovementSpeed, aircraftMovementSpeed));
+			var distance = Math.Min(int.MaxValue, (long)speed * Math.Max(0, replanInterval));
+			return new WDist((int)distance);
+		}
+
+		public static bool CoversThreatEnvelope(WDist measuredDistance, WDist weaponRange,
+			WDist buffer, WDist movementMargin)
+		{
+			var effectiveRange = (long)weaponRange.Length + buffer.Length + movementMargin.Length;
+			return measuredDistance.Length <= effectiveRange;
+		}
+
 		public static IEnumerable<CPos> OrderedCandidates(IEnumerable<CPos> candidates, CPos objective)
 		{
 			return candidates.Distinct().OrderBy(c => (c - objective).LengthSquared)
@@ -161,16 +176,20 @@ namespace OpenRA.Mods.Common.Traits
 							!TransportLandingPolicy.DealsPositiveDamage(armament.Weapon, CarrierTargetTypes, Array.Empty<string>()))
 							continue;
 
-						var mobile = actor.TraitOrDefault<Mobile>();
-						var movement = mobile == null || mobile.IsTraitDisabled || mobile.IsTraitPaused ? 0 :
-							Math.Max(0, mobile.MovementSpeedForCell(actor, actor.Location)) * info.LandingReplanInterval;
+						var groundMovementSpeed = actor.TraitsImplementing<Mobile>()
+							.Where(m => !m.IsTraitDisabled && !m.IsTraitPaused)
+							.Select(m => Math.Max(0, m.MovementSpeedForCell(actor, actor.Location)))
+							.DefaultIfEmpty(0).Max();
+						var aircraftMovementSpeed = actor.TraitsImplementing<Aircraft>()
+							.Select(a => Math.Max(0, a.MovementSpeed)).DefaultIfEmpty(0).Max();
 						threats.Add(new Threat
 						{
 							Actor = actor,
 							Armament = armament,
 							Range = armament.MaxRange(),
 							Buffer = WDist.FromCells(info.LandingThreatRangeBufferCells),
-							MobileMargin = new WDist(movement),
+							MobileMargin = TransportLandingPolicy.MovementClosingMargin(
+								groundMovementSpeed, aircraftMovementSpeed, info.LandingReplanInterval),
 						});
 					}
 				}
@@ -264,8 +283,9 @@ namespace OpenRA.Mods.Common.Traits
 
 		bool Covers(Threat threat, CPos cell)
 		{
-			var range = (long)threat.Range.Length + threat.Buffer.Length + threat.MobileMargin.Length;
-			return (world.Map.CenterOfCell(cell) - threat.Actor.CenterPosition).HorizontalLengthSquared <= range * range;
+			return TransportLandingPolicy.CoversThreatEnvelope(
+				new WDist((world.Map.CenterOfCell(cell) - threat.Actor.CenterPosition).HorizontalLength),
+				threat.Range, threat.Buffer, threat.MobileMargin);
 		}
 
 		public static string[] TargetArmorTypes(Actor actor) { return ArmorTypes(actor); }
