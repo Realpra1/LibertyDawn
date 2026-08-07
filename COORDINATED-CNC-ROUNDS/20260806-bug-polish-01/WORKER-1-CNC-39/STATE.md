@@ -1036,3 +1036,26 @@ silently exceed the budget.
 - Exact product repair commit: `bc3ab411f8235cfbec1a31ed7187f6e7971897a9`
   (`Retire completed specialist assignments promptly`). Ready for the integrator
   to merge/cherry-pick onto the cumulative release branch.
+
+## RC2 final-review response assignment
+
+- Fresh final reviewer verdict: `ready with one fix` for candidate
+  `fd15540ffc98c70f085688fe0b38a4a6341fc6ed`, product repair
+  `bc3ab411f8235cfbec1a31ed7187f6e7971897a9`, and handoff
+  `259a6fc37d6f734ca81be9db193e62ce11bcd0c1`.
+- Durable review:
+  `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260806-bug-polish-01/reviews/worker-1-rc2/REVIEW.md`.
+- This is the single allowed review response. Obtain one fresh strict literal
+  lone-Engineer acceptance pass from the exact allocation-free product tree.
+- Correct only the evidence harness/timing: make the intended 79-percent building
+  capture-eligible before any randomized capture scan, or use a fresh deterministic
+  setup/seed that guarantees that condition. Do not change product policy or balance.
+- Require the intended building as the Engineer's initial assignment; no husk,
+  alternate, or pair order; prompt `captured` retirement; final AI ownership; zero
+  Engineers; the pressure/repair gates; clean headless MAX completion; and every
+  forbidden pattern absent.
+- Stage only the new factual artifact for a fresh Commenter and then a fresh
+  Terra-medium Policy Reviewer. Record their conclusions and exact paths in this
+  state/report. If the clean run passes, make no product change and push a corrected
+  handoff receipt. If it exposes a real defect, stay within the existing repair
+  scope, use at most this one response cycle, and rerun the affected gates.
