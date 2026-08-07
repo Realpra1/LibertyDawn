@@ -1,7 +1,7 @@
 # Coordinated CNC State
 
 - Round ID: `20260807-bug-polish-02`
-- Phase: `RC2 CI-clean; final task-status publication pending`
+- Phase: `complete; release PR ready for user review; next round initialization pending`
 - Common base branch: `agent/cnc-20260806-bug-polish-01-release`
 - Common base SHA: `419bee2531d4802bf922c3597b42c6eeb75ab250`
 - Coordinator model: `gpt-5.6-sol` / `high` (trial mismatch explicitly accepted by user)
@@ -15,8 +15,9 @@
   at RC4 task-status head `419bee2531d4`, intentionally unmerged; local gates
   and exact-head Linux/Windows CI passed
 - Release candidate: RC2 product head `83de3e880dac4ad680d73256f25d2974010587c5`;
-  final receipt head `25fff0c077322146c93f5329569ec0f180c84564`
-- Release PR: [draft #90](https://github.com/Realpra1/LibertyDawn/pull/90)
+  final task-status head `468ee64f5a0f9a9e19e260e5c5943e6e878f4705`
+- Release PR: [ready #90](https://github.com/Realpra1/LibertyDawn/pull/90),
+  mergeable with final 2× Linux/2× Windows CI passed; user decides merge
 - Integrator: `roles/integrator/process.json` complete 0; receipt follow-up
   `roles/integrator-receipt/process.json` supervisor PID `939602`
 
@@ -35,7 +36,7 @@
 | RC | Head | Included heads | Repair heads | Build/checks | Integrated tests | Result |
 |---|---|---|---|---|---|---|
 | RC1 | product `394ae5eeadff`; receipt `ffb841b48750` | CNC-87 `5170183fb882`; CNC-40 `40ed5926864c`; CNC-41 `418786381f64`; CNC-42 `260d10e9654c`; CNC-44 `df9cd6e12fd5` | receipts CNC-87 `4c75f395`, CNC-40 `bd7e2812`, CNC-44 `1ead96e9`; reviewed CNC-42 repair `aa3e1835`; CNC-41 assignment `a6d55734` | conflict-free merge; Debug/Release, interface/Lua, CNC YAML/maps, 512 tests, and release PR Linux/Windows CI passed | CNC-87, CNC-40, and CNC-44 passed; CNC-42 reviewed repair ready; CNC-41 final repair cycle active | testing |
-| RC2 | product `83de3e880dac`; receipt `25fff0c07732` | RC1 plus reviewed CNC-42 repair `aa3e1835` | CNC-42 save/load ownership and validated matched-control receipt | clean merge; locked Debug/interface, scripts, Release CNC validation, 513/513 tests, and final release PR 2× Linux/2× Windows CI passed | CNC-42 complete; CNC-41 repair excluded by final review; final candidate passed | ready for task-status publication |
+| RC2 | product `83de3e880dac`; final task-status `468ee64f5a0f` | RC1 plus reviewed CNC-42 repair `aa3e1835` | CNC-42 save/load ownership and validated matched-control receipt | clean merge; locked Debug/interface, scripts, Release CNC validation, 513/513 tests, and final release PR 2× Linux/2× Windows CI passed | CNC-87/CNC-42 complete; CNC-40/CNC-41/CNC-44 first iteration; CNC-41 repair excluded; CNC-93 queued | passed; PR ready |
 
 ## Resume note
 
