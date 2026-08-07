@@ -31,6 +31,10 @@ other worker specs.
 
 1. Read applicable `AGENTS.md` and only the artifacts allowed by the selected
    mode above.
+   Route any large build, full test/check suite, equivalent `dotnet`/`msbuild`
+   suite, or packaging build through the coordinator helper's protected
+   `--large-build-entry reviewer` mode with the round's absolute lock directory.
+   Never reconstruct a lock filename/capacity or invoke direct `flock`.
 2. Verify observable requirements and forbidden behavior before style. Look for
    hidden queue/order contention, save/load or replay-state omissions, nondeterminism,
    unbounded per-tick work, excess allocations/scans/logging, duplicated policy,
