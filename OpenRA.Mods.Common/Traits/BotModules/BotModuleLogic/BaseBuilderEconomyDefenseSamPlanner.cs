@@ -26,6 +26,11 @@ namespace OpenRA.Mods.Common.Traits
 		BaseBuilderBotModuleInfo Info => baseBuilder.Info;
 		bool Enabled => Info.EconomyDefenseBotTypes.Contains(player.BotType) &&
 			techTree.HasPrerequisites(Info.EconomyDefensePrerequisites);
+		public bool HasBuildReservation => buildOwnership.HasReservation;
+		public uint ReservationQueueActorId => buildOwnership.ReservedQueue?.Actor.ActorID ?? 0;
+		public string ReservationQueueType => buildOwnership.ReservedQueue?.Info.Type ?? "";
+		public string ReservationActorType => buildOwnership.ReservedActorType ?? "";
+		public int ReservationTick => buildOwnership.ReservedTick;
 
 		public BaseBuilderEconomyDefenseSamPlanner(BaseBuilderBotModule baseBuilder, Player player,
 			PowerManager playerPower, PlayerResources playerResources, TechTree techTree)
@@ -73,6 +78,30 @@ namespace OpenRA.Mods.Common.Traits
 		public bool OwnsPlacement(ProductionQueue queue, string actorType)
 		{
 			return Enabled && buildOwnership.Owns(queue, actorType);
+		}
+
+		public bool RestoreBuildOwnership(uint queueActorId, string queueType, string actorType, int reservedTick)
+		{
+			if (!Enabled || queueActorId == 0 || string.IsNullOrEmpty(queueType) || string.IsNullOrEmpty(actorType))
+				return false;
+
+			var queueActor = world.GetActorById(queueActorId);
+			if (queueActor == null || queueActor.Owner != player || !queueActor.IsInWorld || queueActor.IsDead)
+				return false;
+
+			var matchingQueues = queueActor.TraitsImplementing<ProductionQueue>()
+				.Where(q => string.Equals(q.Info.Type, queueType, StringComparison.Ordinal)).Take(2).ToArray();
+			if (matchingQueues.Length != 1)
+				return false;
+
+			var restored = buildOwnership.TryRestore(matchingQueues[0], actorType, reservedTick,
+				queue => queue.Actor.IsInWorld && !queue.Actor.IsDead && queue.Actor.Owner == player,
+				(queue, type) => queue.AllQueued().Any(i => i.Item == type));
+			Debug(restored ?
+				"restored build ownership type={0} queue={1}/{2} reserved-tick={3}" :
+				"discarded build ownership type={0} queue={1}/{2}: matching build unavailable",
+				actorType, queueActorId, queueType, reservedTick);
+			return restored;
 		}
 
 		public CPos? ChooseLocation(ProductionQueue queue, string actorType, ActorInfo actorInfo,

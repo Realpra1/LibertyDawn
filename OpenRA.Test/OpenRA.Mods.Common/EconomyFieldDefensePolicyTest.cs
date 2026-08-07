@@ -225,6 +225,31 @@ namespace OpenRA.Test
 				"A completed or cancelled build must release ownership for later ordinary SAMs.");
 		}
 
+		[Test]
+		public void EconomySamPlacementOwnershipRestoresOnlyToTheMatchingQueuedBuild()
+		{
+			var beforeSaveQueue = new object();
+			var loadedQueue = new object();
+			var ownership = new EconomyDefenseSamBuildOwnership<object>();
+
+			Assert.That(ownership.TryReserve(beforeSaveQueue, "sam", 1200), Is.True);
+			Assert.That(ownership.ReservedActorType, Is.EqualTo("sam"));
+			Assert.That(ownership.ReservedTick, Is.EqualTo(1200));
+
+			var restored = new EconomyDefenseSamBuildOwnership<object>();
+			Assert.That(restored.TryRestore(loadedQueue, ownership.ReservedActorType, ownership.ReservedTick,
+				queue => ReferenceEquals(queue, loadedQueue),
+				(queue, type) => ReferenceEquals(queue, loadedQueue) && type == "sam"), Is.True);
+			Assert.That(restored.Owns(loadedQueue, "sam"), Is.True,
+				"A loaded matching build must retain economy placement ownership.");
+			Assert.That(restored.Owns(beforeSaveQueue, "sam"), Is.False,
+				"Ownership must use the reconstructed queue instance, not the stale pre-save reference.");
+
+			var missingBuild = new EconomyDefenseSamBuildOwnership<object>();
+			Assert.That(missingBuild.TryRestore(loadedQueue, "sam", 1200, _ => true, (_, __) => false), Is.False,
+				"Stale save data must not redirect an ordinary build when the matching queued SAM is gone.");
+		}
+
 		[TestCase(6, 1, 7)]
 		[TestCase(0, 2, 2)]
 		[TestCase(-1, -1, 0)]

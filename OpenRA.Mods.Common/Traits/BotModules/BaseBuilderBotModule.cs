@@ -1197,6 +1197,11 @@ namespace OpenRA.Mods.Common.Traits
 				new MiniYamlNode("SmartEconomyRefineryPressureActive", FieldSaver.FormatValue(smartEconomy?.RefineryPressure.Active ?? false)),
 				new MiniYamlNode("SmartEconomyCashEvidenceTicks", FieldSaver.FormatValue(smartEconomy?.CashPressure.EvidenceTicks ?? 0)),
 				new MiniYamlNode("SmartEconomyCashPressureActive", FieldSaver.FormatValue(smartEconomy?.CashPressure.Active ?? false)),
+				new MiniYamlNode("EconomyDefenseSamReservationActive", FieldSaver.FormatValue(economyDefenseSam?.HasBuildReservation ?? false)),
+				new MiniYamlNode("EconomyDefenseSamReservationQueueActorId", FieldSaver.FormatValue(economyDefenseSam?.ReservationQueueActorId ?? 0)),
+				new MiniYamlNode("EconomyDefenseSamReservationQueueType", FieldSaver.FormatValue(economyDefenseSam?.ReservationQueueType ?? "")),
+				new MiniYamlNode("EconomyDefenseSamReservationActorType", FieldSaver.FormatValue(economyDefenseSam?.ReservationActorType ?? "")),
+				new MiniYamlNode("EconomyDefenseSamReservationTick", FieldSaver.FormatValue(economyDefenseSam?.ReservationTick ?? 0)),
 				new MiniYamlNode("FirstTowerPlacementComplete", FieldSaver.FormatValue(FirstTowerPlanner.Complete))
 			};
 			var fieldState = TiberiumFieldManager?.IssueTraitData();
@@ -1324,6 +1329,21 @@ namespace OpenRA.Mods.Common.Traits
 					FieldLoader.GetValue<string[]>("SmartEconomyVehicleFactoryReservationTypes", smartVehicleFactoryTypesNode.Value.Value),
 					FieldLoader.GetValue<int[]>("SmartEconomyVehicleFactoryReservationExpiryTicks", smartVehicleFactoryExpiryTicksNode.Value.Value),
 					FieldLoader.GetValue<int[]>("SmartEconomyVehicleFactoryReservationTargetCounts", smartVehicleFactoryTargetCountsNode.Value.Value));
+
+			var economySamActiveNode = data.FirstOrDefault(n => n.Key == "EconomyDefenseSamReservationActive");
+			var economySamQueueActorNode = data.FirstOrDefault(n => n.Key == "EconomyDefenseSamReservationQueueActorId");
+			var economySamQueueTypeNode = data.FirstOrDefault(n => n.Key == "EconomyDefenseSamReservationQueueType");
+			var economySamActorTypeNode = data.FirstOrDefault(n => n.Key == "EconomyDefenseSamReservationActorType");
+			var economySamTickNode = data.FirstOrDefault(n => n.Key == "EconomyDefenseSamReservationTick");
+			if (economyDefenseSam != null && economySamActiveNode != null &&
+				FieldLoader.GetValue<bool>("EconomyDefenseSamReservationActive", economySamActiveNode.Value.Value) &&
+				economySamQueueActorNode != null && economySamQueueTypeNode != null &&
+				economySamActorTypeNode != null && economySamTickNode != null)
+				economyDefenseSam.RestoreBuildOwnership(
+					FieldLoader.GetValue<uint>("EconomyDefenseSamReservationQueueActorId", economySamQueueActorNode.Value.Value),
+					FieldLoader.GetValue<string>("EconomyDefenseSamReservationQueueType", economySamQueueTypeNode.Value.Value),
+					FieldLoader.GetValue<string>("EconomyDefenseSamReservationActorType", economySamActorTypeNode.Value.Value),
+					FieldLoader.GetValue<int>("EconomyDefenseSamReservationTick", economySamTickNode.Value.Value));
 
 			var firstTowerNode = data.FirstOrDefault(n => n.Key == "FirstTowerPlacementComplete");
 			if (firstTowerNode != null)

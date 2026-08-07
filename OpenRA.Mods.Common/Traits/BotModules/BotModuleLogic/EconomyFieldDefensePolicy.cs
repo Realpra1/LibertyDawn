@@ -66,6 +66,9 @@ namespace OpenRA.Mods.Common.Traits
 		int reservedTick;
 
 		public bool HasReservation => queue != null;
+		public TQueue ReservedQueue => queue;
+		public string ReservedActorType => actorType;
+		public int ReservedTick => reservedTick;
 
 		public bool TryReserve(TQueue candidateQueue, string candidateActorType, int currentTick)
 		{
@@ -75,6 +78,20 @@ namespace OpenRA.Mods.Common.Traits
 			queue = candidateQueue;
 			actorType = candidateActorType;
 			reservedTick = currentTick;
+			return true;
+		}
+
+		public bool TryRestore(TQueue candidateQueue, string candidateActorType, int candidateReservedTick,
+			Func<TQueue, bool> queueIsAvailable, Func<TQueue, string, bool> matchingBuildIsQueued)
+		{
+			if (candidateQueue == null || string.IsNullOrEmpty(candidateActorType) || HasReservation ||
+				queueIsAvailable == null || matchingBuildIsQueued == null ||
+				!queueIsAvailable(candidateQueue) || !matchingBuildIsQueued(candidateQueue, candidateActorType))
+				return false;
+
+			queue = candidateQueue;
+			actorType = candidateActorType;
+			reservedTick = candidateReservedTick;
 			return true;
 		}
 
