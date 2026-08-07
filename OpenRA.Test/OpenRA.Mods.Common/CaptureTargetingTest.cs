@@ -10,8 +10,10 @@
 #endregion
 
 using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 using OpenRA.Mods.Common.Traits;
+using OpenRA.Traits;
 
 namespace OpenRA.Test.Mods.Common
 {
@@ -57,6 +59,105 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(CaptureTargeting.RequiresEngineerPair(false, 100, 50), Is.False);
 			Assert.That(CaptureTargeting.ShouldRetarget(100, 124, 25), Is.False);
 			Assert.That(CaptureTargeting.ShouldRetarget(100, 126, 25), Is.True);
+		}
+
+		[Test]
+		public void SharedReservationsAllowOnlyTheRequiredCapturePair()
+		{
+			var reservations = new SpecialistTargetReservations();
+
+			Assert.That(reservations.TryReserve(10, 100, SpecialistAssignmentPurpose.Capture, 2), Is.True);
+			Assert.That(reservations.TryReserve(11, 100, SpecialistAssignmentPurpose.Capture, 2), Is.True);
+			Assert.That(reservations.TryReserve(12, 100, SpecialistAssignmentPurpose.Capture, 2), Is.False);
+			Assert.That(reservations.Claimants(100), Is.EqualTo(new uint[] { 10, 11 }));
+		}
+
+		[Test]
+		public void SharedReservationsRetainIncumbentsAndExcludeTheOtherPurposeInEitherArrivalOrder()
+		{
+			var captureFirst = new SpecialistTargetReservations();
+			Assert.That(captureFirst.TryReserve(10, 100, SpecialistAssignmentPurpose.Capture, 1), Is.True);
+			Assert.That(captureFirst.TryReserve(10, 100, SpecialistAssignmentPurpose.Capture, 1), Is.True);
+			Assert.That(captureFirst.TryReserve(20, 100, SpecialistAssignmentPurpose.Demolition, 1), Is.False);
+
+			var demolitionFirst = new SpecialistTargetReservations();
+			Assert.That(demolitionFirst.TryReserve(20, 100, SpecialistAssignmentPurpose.Demolition, 1), Is.True);
+			Assert.That(demolitionFirst.TryReserve(10, 100, SpecialistAssignmentPurpose.Capture, 2), Is.False);
+		}
+
+		[Test]
+		public void SharedReservationsReleaseAndRetargetDeterministically()
+		{
+			var reservations = new SpecialistTargetReservations();
+			Assert.That(reservations.TryReserve(20, 200, SpecialistAssignmentPurpose.Demolition, 1), Is.True);
+			Assert.That(reservations.TryReserve(10, 200, SpecialistAssignmentPurpose.Capture, 1), Is.False);
+
+			reservations.Release(20);
+			Assert.That(reservations.TryReserve(10, 200, SpecialistAssignmentPurpose.Capture, 1), Is.True);
+			Assert.That(reservations.TryReserve(10, 201, SpecialistAssignmentPurpose.Capture, 1), Is.True);
+			Assert.That(reservations.IsReserved(200), Is.False);
+			Assert.That(reservations.Claimants(201), Is.EqualTo(new uint[] { 10 }));
+		}
+
+		[Test]
+		public void SharedReservationsRestoreBothIncumbentPurposesDeterministically()
+		{
+			var captureFirst = new SpecialistTargetReservations();
+			var restoredCapture = captureFirst.Restore(new[]
+			{
+				new SpecialistTargetReservationState(11, 100, SpecialistAssignmentPurpose.Capture, 2),
+				new SpecialistTargetReservationState(10, 100, SpecialistAssignmentPurpose.Capture, 2)
+			});
+
+			Assert.That(restoredCapture.Select(r => r.SpecialistId), Is.EqualTo(new uint[] { 10, 11 }));
+			Assert.That(captureFirst.Claimants(100), Is.EqualTo(new uint[] { 10, 11 }));
+			Assert.That(captureFirst.TryReserve(20, 100, SpecialistAssignmentPurpose.Demolition, 1), Is.False);
+
+			var demolitionFirst = new SpecialistTargetReservations();
+			var restoredDemolition = demolitionFirst.Restore(new[]
+			{
+				new SpecialistTargetReservationState(20, 200, SpecialistAssignmentPurpose.Demolition, 1)
+			});
+
+			Assert.That(restoredDemolition.Select(r => r.SpecialistId), Is.EqualTo(new uint[] { 20 }));
+			Assert.That(demolitionFirst.TryReserve(10, 200, SpecialistAssignmentPurpose.Capture, 1), Is.False);
+		}
+
+		[Test]
+		public void SharedReservationRestoreDropsIncompletePairsButKeepsValidAssignments()
+		{
+			var reservations = new SpecialistTargetReservations();
+			var restored = reservations.Restore(new[]
+			{
+				new SpecialistTargetReservationState(10, 100, SpecialistAssignmentPurpose.Capture, 2),
+				new SpecialistTargetReservationState(20, 200, SpecialistAssignmentPurpose.Demolition, 1)
+			});
+
+			Assert.That(restored.Select(r => r.SpecialistId), Is.EqualTo(new uint[] { 20 }));
+			Assert.That(reservations.IsReserved(100), Is.False);
+			Assert.That(reservations.Claimants(200), Is.EqualTo(new uint[] { 20 }));
+		}
+
+		[Test]
+		public void AutonomousDemolitionSafetyLatchesRelationshipInvalidation()
+		{
+			var safety = new DemolitionSafety(PlayerRelationship.Enemy);
+
+			Assert.That(safety.IsValid(PlayerRelationship.Enemy), Is.True);
+			Assert.That(safety.IsValid(PlayerRelationship.Ally), Is.False);
+			Assert.That(safety.Invalidated, Is.True);
+			Assert.That(safety.IsValid(PlayerRelationship.Enemy), Is.False,
+				"A later hostile relationship must not reactivate an obsolete autonomous charge.");
+		}
+
+		[Test]
+		public void AutonomousDemolitionSafetyAcceptsEveryConfiguredRelationship()
+		{
+			var safety = new DemolitionSafety(PlayerRelationship.Enemy | PlayerRelationship.Neutral);
+
+			Assert.That(safety.IsValid(PlayerRelationship.Enemy), Is.True);
+			Assert.That(safety.IsValid(PlayerRelationship.Neutral), Is.True);
+			Assert.That(safety.Invalidated, Is.False);
 		}
 	}
 }

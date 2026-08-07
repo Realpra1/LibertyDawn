@@ -26,12 +26,15 @@ namespace OpenRA.Mods.Common.Activities
 		readonly BitSet<DamageType> damageTypes;
 		readonly INotifyDemolition[] notifiers;
 		readonly EnterBehaviour enterBehaviour;
+		readonly DemolitionSafety safety;
+		readonly Actor orderedTargetActor;
 
 		Actor enterActor;
 		IDemolishable[] enterDemolishables;
 
 		public Demolish(Actor self, in Target target, EnterBehaviour enterBehaviour, int delay, int flashes,
-			int flashesDelay, int flashInterval, BitSet<DamageType> damageTypes, Color? targetLineColor)
+			int flashesDelay, int flashInterval, BitSet<DamageType> damageTypes, Color? targetLineColor,
+			DemolitionSafety safety = null)
 			: base(self, target, targetLineColor)
 		{
 			notifiers = self.TraitsImplementing<INotifyDemolition>().ToArray();
@@ -41,6 +44,15 @@ namespace OpenRA.Mods.Common.Activities
 			this.flashInterval = flashInterval;
 			this.damageTypes = damageTypes;
 			this.enterBehaviour = enterBehaviour;
+			this.safety = safety;
+			orderedTargetActor = target.Type == TargetType.Actor ? target.Actor : null;
+		}
+
+		protected override void TickInner(Actor self, in Target target, bool targetIsDeadOrHiddenActor)
+		{
+			var targetActor = target.Type == TargetType.Actor ? target.Actor : orderedTargetActor;
+			if (targetActor != null && !targetActor.IsDead && targetActor.IsInWorld && !IsSafetyValid(self, targetActor))
+				Cancel(self, true);
 		}
 
 		protected override bool TryStartEnter(Actor self, Actor targetActor)
@@ -50,7 +62,7 @@ namespace OpenRA.Mods.Common.Activities
 
 			// Make sure we can still demolish the target before entering
 			// (but not before, because this may stop the actor in the middle of nowhere)
-			if (!enterDemolishables.Any(i => i.IsValidTarget(enterActor, self)))
+			if (!IsSafetyValid(self, enterActor) || !enterDemolishables.Any(i => i.IsValidTarget(enterActor, self)))
 			{
 				Cancel(self, true);
 				return false;
@@ -68,8 +80,17 @@ namespace OpenRA.Mods.Common.Activities
 				if (targetActor != enterActor)
 					return;
 
-				if (!enterDemolishables.Any(i => i.IsValidTarget(enterActor, self)))
+				if (!IsSafetyValid(self, enterActor) || !enterDemolishables.Any(i => i.IsValidTarget(enterActor, self)))
 					return;
+
+				if (safety != null && !safety.IsValid(enterActor, self))
+					return;
+
+				if (safety != null)
+					DemolitionDebug.Write("AI autonomous C4 planted at tick {0}: {1}#{2} -> {3}#{4}, " +
+						"target-owner={5}, relationship={6}", w.WorldTick, self.Info.Name, self.ActorID,
+						enterActor.Info.Name, enterActor.ActorID, enterActor.Owner.InternalName,
+						self.Owner.RelationshipWith(enterActor.Owner));
 
 				w.Add(new FlashTarget(enterActor, Color.White, count: flashes, interval: flashInterval, delay: flashesDelay));
 
@@ -77,13 +98,30 @@ namespace OpenRA.Mods.Common.Activities
 					ind.Demolishing(self);
 
 				foreach (var d in enterDemolishables)
-					d.Demolish(enterActor, self, delay, damageTypes);
+					d.Demolish(enterActor, self, delay, damageTypes, safety);
 
 				if (enterBehaviour == EnterBehaviour.Dispose)
 					self.Dispose();
 				else if (enterBehaviour == EnterBehaviour.Suicide)
 					self.Kill(self);
 			});
+		}
+
+		bool IsSafetyValid(Actor self, Actor target)
+		{
+			if (safety == null)
+				return true;
+
+			var wasInvalidated = safety.Invalidated;
+			if (!safety.IsValid(target, self) && !wasInvalidated)
+			{
+				DemolitionDebug.Write("AI autonomous C4 canceled at tick {0}: {1}#{2} -> {3}#{4}, " +
+					"target-owner={5}, relationship={6}", self.World.WorldTick, self.Info.Name, self.ActorID,
+					target.Info.Name, target.ActorID, target.Owner.InternalName,
+					self.Owner.RelationshipWith(target.Owner));
+			}
+
+			return !safety.Invalidated;
 		}
 	}
 }

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Coordinate CNC Development"
+  short_description: "Run parallel autonomous CNC development rounds"
+  default_prompt: "Use $coordinate-cnc-development to prepare and run the next coordinated CNC development round."

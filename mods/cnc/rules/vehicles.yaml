@@ -16,7 +16,7 @@ MCV:
 		DecorationBounds: 1536, 1536
 	Mobile:
 		Speed: 60
-		Locomotor: heavywheeled
+		Locomotor: mcvheavywheeled
 	Health:
 		HP: 60000
 	Repairable:
@@ -363,7 +363,7 @@ FTNK:
 		TurnSpeed: 28
 		Speed: 92
 	Health:
-		HP: 30000
+		HP: 36000
 	Repairable:
 		HpPerStep: 2046
 	Armor:

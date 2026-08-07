@@ -1,0 +1,6 @@
+interface:
+  display_name: "Make CNC Task"
+  short_description: "Validate and update the CNC task sheet"
+  default_prompt: "Use $make-cnc-task to validate and record this CNC task request."
+policy:
+  allow_implicit_invocation: false

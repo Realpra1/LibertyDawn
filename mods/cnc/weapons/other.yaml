@@ -39,6 +39,27 @@ BigFlamer:
 		Speed: 341
 	Burst: 2
 	BurstDelays: 10
+	Warhead@1Dam: SpreadDamage
+		Versus:
+			Heavy: 22
+	Warhead@2Dam: SpreadDamage
+		Versus:
+			Heavy: 22
+	Warhead@3Dam: SpreadDamage
+		Versus:
+			Heavy: 22
+	Warhead@4Dam: SpreadDamage
+		Versus:
+			Heavy: 22
+	Warhead@5Dam: SpreadDamage
+		Versus:
+			Heavy: 22
+	Warhead@6Dam: SpreadDamage
+		Versus:
+			Heavy: 22
+	Warhead@7Dam: SpreadDamage
+		Versus:
+			Heavy: 22
 
 Chemspray:
 	Inherits@FlameWeapon: ^FlameWeapon
