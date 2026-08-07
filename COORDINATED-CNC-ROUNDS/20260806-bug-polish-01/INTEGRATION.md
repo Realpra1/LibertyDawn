@@ -1,11 +1,12 @@
-# Integration: coordinated bug/polish RC3 candidate
+# Integration: coordinated bug/polish RC4 candidate
 
 - Round: `20260806-bug-polish-01`
-- Status: RC3 combined handoffs and strict gates complete; final cumulative release-PR review remains pending
+- Status: RC4 final-review repair merged and independently verified; draft release PR ready for user review after push/CI
 - Recorded common product base: `09ccdac3c1ecb5134a4751f2bcbd8a7970dfe6bf`
 - Stable branch: `agent/cnc-20260806-bug-polish-01-release`
 - Exact combined RC2 code candidate: `b456fd89fac88d71dfadd65c47cfb7b409d44122`
 - Exact combined RC3 code candidate: `de855c42d39fc947c7d00b32b38c69e448ade6c4`
+- Exact combined RC4 code candidate: `a7d29d08d83deebb7867076a141675326553dc3f`
 - RC3 combined worker-receipt head before this integration record: `3e345413cf16dad746e88b7b1186b5b1e94c2312`
 - Release target: `bleed`
 - Original release PR: https://github.com/Realpra1/LibertyDawn/pull/82
@@ -254,3 +255,136 @@ long-pressure, natural-conclusion, and other full games use at most two slots.
 RC3 excludes no task. Draft PR #84 remains the sole successor release PR and must
 remain open until the final cumulative release review is complete; the integrator
 must not merge it into `bleed`.
+
+## RC4 final-review repair handoff
+
+The final RC3 combined review at
+`/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260806-bug-polish-01/reviews/final-rc3/REVIEW.md`
+returned `ready with one fix`. Its sole required finding was that a loaded CNC-51
+rescue could renew its safe-recovery deadline indefinitely when every useful site
+remained unsafe, retaining the active mission and its reservations forever.
+
+The supplied repair branch
+`agent/round-20260806-cnc51-rc3-final-repair` was fetched from `origin`. Exact
+handoff `2e6fa14c56dceebb7dffadc8882ced0461383d9f` descends from exact RC3 head
+`2343cf158bd378b913eeb9b3001f747be43abc0a` and contains exact product repair
+`4be958ee073f6cce62ddeb965c6664a7e7087354`. The handoff was merged locally,
+without using GitHub's merge action, as merge commit
+`a7d29d08d83deebb7867076a141675326553dc3f`; this is the exact RC4 code
+candidate. There was no merge conflict. Source task PRs remain open and no commit
+was merged or pushed to `bleed`.
+
+The RC3-to-RC4 tree delta is exactly the CNC-51 worker state receipt plus the
+reviewed repair's four product/test paths:
+
+- `TransportMissionCoordinator.cs` adds explicit parked loaded-mission ownership,
+  releases obsolete cell claims on parking, excludes parked missions from active
+  capacity, and releases both active and parked actor reservations on completion.
+- `TransportRescueRecoveryLifecycle.cs` adds the one-way
+  `Active -> Returning -> Terminal` lifecycle and assigns the recovery deadline
+  only on the first return transition.
+- `TransportManagerBotModule.cs` enters terminal recovery once, cancels the stale
+  carrier order, parks loaded ownership, retries only on the existing bounded
+  landing-hold cadence, and releases ownership only after a safe physical
+  cargo-zero handoff.
+- `TransportMissionCoordinatorTest.cs` adds the persistent-no-safe-site lifecycle
+  regression for a non-renewable deadline, one terminal transition, stale-claim
+  release, non-stealable parked actors, freed active capacity, and deterministic
+  later safe-cell claim/release.
+
+The RC4 product tree is byte-identical to product commit
+`4be958ee073f6cce62ddeb965c6664a7e7087354`; the handoff adds only the CNC-51
+state receipt after that product commit. No unrelated product, balance, task-sheet,
+skill, map, or fixture change was merged for RC4.
+
+## RC4 resolved finding and evidence
+
+The final-review finding is resolved. `RecoverTimedOutCargo` can begin return only
+from `Active`, so repeated plan failures cannot replace the preserved recovery
+deadline. Deadline expiry can enter `Terminal` only once. Terminal entry queues one
+stop, clears the obsolete plan/revision, releases exact landing/exit claims, and
+moves carrier/passenger ownership out of active mission capacity without exposing
+hidden cargo to another manager. With no plan, terminal recovery performs only the
+constant-time cargo/cadence checks each tick; exact planning and any new orders run
+only after `LandingHoldTicks`. A genuinely safe later plan may be claimed by the
+parked owner and is released only after physical unload makes cargo zero.
+
+The worker's exact full-engine evidence and fresh policy receipt were inspected
+rather than accepted from the report alone:
+
+- Run 53, ordinary Cabal/SkyNet on **Empire Earth4 Terminal Recovery**, seed
+  `510063`, map SHA
+  `6b739c128da2462d8d33f551f704a427cc48e45d126049408bf088bc02b075a8`,
+  passed at tick 6000 in 17.018 seconds (352.484 valid ticks/s). Its summary marks
+  every required pattern true and every forbidden pattern false. The debug log
+  contains exactly one parked-reserved terminal transition at preserved deadline
+  3975, cargo/reservations retained under six live threats through tick 4750, a
+  fresh safe plan after the tick-5000 opening, physical exit at `12,8`, cargo zero,
+  and exact release. It contains no deadline-renewal/order/log loop, premature
+  cargo-one release, fatal error, or desync.
+- Run 54, the unchanged three-rescue literal contention regression, seed `510057`,
+  map SHA
+  `34f96775d113714607fbcb97977fd7b586d4af002c6f119d29a0b906a685c8f9`,
+  passed at tick 5200 in 18.019 seconds (288.489 valid ticks/s). All three rescues
+  physically handed off with cargo zero and released; mission 2 retained its live
+  Mammoth revision-2 route and mission 3 retained the map-edge exit. All required
+  patterns are true and timeout, safe-recovery, fatal, and desync patterns are
+  absent.
+- The factual narrative at
+  `analysis/worker-5-cnc-51/rc3-terminal-comment/NARRATIVE.md` agrees with the
+  staged summary/debug artifacts. The fresh policy receipt at
+  `analysis/worker-5-cnc-51/rc3-terminal-policy/POLICY-REVIEW.md` is `approved`
+  with no requested policy change: retaining loaded ownership under known danger,
+  resuming only when a safe physical recovery exists, and releasing only after
+  cargo zero match the survival-first design.
+
+The final Sol-high reviewer already used its one allowed response. RC4 confirms
+that exact stated finding is resolved; no new or expanded review round was
+invented.
+
+## RC4 scope and invariant audit
+
+- The RC3-to-RC4 product delta is byte-for-byte the exact CNC-51 repair. No
+  `mods/cnc/rules`, weapon, balance, map, fixture, or unsupported-game product file
+  changed. The cumulative balance/config freeze remains exactly as recorded for
+  RC3: authorized CNC-43A Flame Tank values, CNC-43 MCV locomotion/crush rules,
+  CNC-39 solo-capture threshold, and CNC-51 transport configuration only.
+- New diagnostics use the existing `Debug` helper gated by `Info.DebugLogging`;
+  production CNC configuration remains false. The terminal transition is logged
+  once and unchanged plan failures are silent between bounded hold cadences.
+- The lifecycle uses no RNG or unordered choice. Existing stable actor/cell/route
+  ordering is unchanged; the only new state transition is monotonic and its
+  deadline addition is overflow bounded.
+- Reservation semantics are explicit: parking releases stale landing/exit claims,
+  preserves the exact carrier/passenger actor reservations, frees active mission
+  capacity, permits later exact cell claims by that same parked owner, and releases
+  all claims/reservations only on physical completion. No competing save schema or
+  transport policy owner was introduced; in-flight mission save persistence
+  remains the previously recorded out-of-scope behavior.
+- `AdvanceTerminalRecovery` adds no per-tick collection or LINQ allocation. While
+  parked without a plan it performs only cargo and integer cadence checks; bounded
+  planner/route work and order allocation occur only on the existing
+  `LandingHoldTicks` cadence or a material plan transition.
+
+## RC4 gates
+
+Every build-dependent command ran on exact RC4 code candidate
+`a7d29d08d83deebb7867076a141675326553dc3f` under the canonical capacity-one
+`large-build` lock.
+
+- Focused Debug transport, air-threat, threat-aware-route, and capture-targeting
+  filter: passed 98/98, with 0 failed and 0 skipped. This includes the new
+  persistent-no-safe-site recovery lifecycle regression.
+- `make check`: passed; Debug build succeeded with 0 warnings and 0 errors, and
+  both explicit-interface checks completed cleanly.
+- Full Release `OpenRA.Test`: passed 455/455, with 0 failed and 0 skipped.
+- `make check-scripts`: passed Lua syntax validation.
+- CNC-only `make test`: passed; Release build succeeded with 0 warnings and 0
+  errors, followed by CNC MiniYAML, all five default sequence sets, and every CNC
+  map.
+- `git diff --check
+  09ccdac3c1ecb5134a4751f2bcbd8a7970dfe6bf..a7d29d08d83deebb7867076a141675326553dc3f`:
+  passed. Working-tree `git diff --check` also passed before this record update.
+
+RC4 excludes no task. Draft PR #84 remains the sole successor product release PR
+to `bleed`; the integrator leaves it open for the user and does not merge it.
