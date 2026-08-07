@@ -41,7 +41,7 @@ class LaunchRoleTest(unittest.TestCase):
                 "artifacts": [str(artifact)],
                 "output": str(output_dir / "NARRATIVE.md"),
             }
-        else:
+        elif role in launch_role.POLICY_ROLES:
             task_context = inputs / "TASK-CONTEXT.md"
             narrative = inputs / "NARRATIVE.md"
             task_context.write_text("Task CNC-87\n", encoding="utf-8")
@@ -54,6 +54,8 @@ class LaunchRoleTest(unittest.TestCase):
                 "narrative": str(narrative),
                 "output": str(output_dir / "POLICY-REVIEW.md"),
             }
+        else:
+            job = {}
         job_file = output_dir / "job.json"
         job_file.write_text(json.dumps(job), encoding="utf-8")
         return argparse.Namespace(
@@ -91,12 +93,7 @@ class LaunchRoleTest(unittest.TestCase):
 
     @unittest.skipUnless(shutil.which("codex"), "installed Codex CLI required")
     def test_installed_cli_parser_accepts_production_and_rejects_legacy_control(self):
-        for role in (
-            "commenter",
-            "policy-reviewer",
-            "policy-speccer",
-            "policy-escalation",
-        ):
+        for role in sorted(launch_role.ROLES):
             with self.subTest(role=role):
                 args = self.make_args(role)
                 command, _ = launch_role.build_command(args)
