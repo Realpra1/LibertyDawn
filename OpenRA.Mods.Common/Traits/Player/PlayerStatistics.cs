@@ -213,6 +213,83 @@ namespace OpenRA.Mods.Common.Traits
 		// Exponentially-decayed kills/losses value ratio, blended once per rollover window. Starts at 1
 		// ("break-even") so an untested type neither boosts nor suppresses its own authored weight.
 		public double DecayedScore = 1;
+
+		public void RecordCompletedOutcome(int economicValue)
+		{
+			var creditedValue = Math.Max(0, economicValue);
+			KillsCount++;
+			KillsValue += creditedValue;
+			MinuteKillsValue += creditedValue;
+		}
+	}
+
+	public static class SpecialistAdaptiveEvidence
+	{
+		public static int EconomicValue(bool transformed, int directValue, int replacementValue)
+		{
+			return Math.Max(0, transformed ? replacementValue : directValue);
+		}
+	}
+
+	readonly struct AdaptiveOutcomeDelta
+	{
+		public readonly int CreditedValue;
+		public readonly int BeforeCount;
+		public readonly int AfterCount;
+		public readonly int BeforeValue;
+		public readonly int AfterValue;
+
+		public AdaptiveOutcomeDelta(int creditedValue, int beforeCount, int afterCount, int beforeValue, int afterValue)
+		{
+			CreditedValue = creditedValue;
+			BeforeCount = beforeCount;
+			AfterCount = afterCount;
+			BeforeValue = beforeValue;
+			AfterValue = afterValue;
+		}
+	}
+
+	static class CompletedSpecialistOutcome
+	{
+		public static bool TryRecord(World world, string kind, Player player, string specialistType,
+			int economicValue, out AdaptiveOutcomeDelta delta)
+		{
+			var playerStatistics = player.PlayerActor.TraitOrDefault<PlayerStatistics>();
+			if (playerStatistics == null)
+			{
+				delta = default;
+				if (Game.Settings.Debug.BotDebug)
+					Log.Write("debug", "Adaptive specialist outcome warning at tick {0}: " +
+						"kind={1}, player={2}, specialist={3}, reason=missing-player-statistics",
+						world.WorldTick, kind, player.InternalName, specialistType);
+
+				return false;
+			}
+
+			var stats = playerStatistics.AdaptiveStats[specialistType];
+			var creditedValue = Math.Max(0, economicValue);
+			var beforeCount = stats.KillsCount;
+			var beforeValue = stats.KillsValue;
+			stats.RecordCompletedOutcome(creditedValue);
+			delta = new AdaptiveOutcomeDelta(creditedValue, beforeCount, stats.KillsCount, beforeValue, stats.KillsValue);
+			return true;
+		}
+
+		public static void WriteLog(World world, string kind, string specialistType, uint specialistId,
+			Player specialistPlayer, string targetType, uint targetId, string targetOldOwner,
+			string valueSource, string replacementType, bool genericAccounting, AdaptiveOutcomeDelta delta)
+		{
+			if (!Game.Settings.Debug.BotDebug)
+				return;
+
+			Log.Write("debug", "Adaptive specialist outcome at tick {0}: kind={1}, specialist={2}#{3}, " +
+				"player={4}, target={5}#{6}, target-old-owner={7}, replacement={8}, value-source={9}, " +
+				"credited-sample=1, credited-value={10}, ledger-count={11}->{12}, ledger-value={13}->{14}, generic={15}",
+				world.WorldTick, kind, specialistType, specialistId, specialistPlayer.InternalName,
+				targetType, targetId, targetOldOwner, replacementType ?? "none", valueSource,
+				delta.CreditedValue, delta.BeforeCount, delta.AfterCount, delta.BeforeValue, delta.AfterValue,
+				genericAccounting);
+		}
 	}
 
 	public class ArmyUnit
@@ -276,6 +353,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly UpdatesPlayerStatisticsInfo info;
 		readonly string actorName;
 		readonly int cost = 0;
+		IAdaptiveKillValue[] adaptiveKillValues;
 
 		PlayerStatistics playerStats;
 		bool includedInArmyValue = false;
@@ -341,15 +419,36 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				attackerStats.KillsCost += cost;
 
-				var killStats = attackerStats.AdaptiveStats[e.Attacker.Info.Name];
-				killStats.KillsCount++;
-				killStats.KillsValue += cost;
-				killStats.MinuteKillsValue += cost;
+				AdaptiveKillEvidence? specialistEvidence = null;
+				foreach (var adaptiveKillValue in adaptiveKillValues)
+				{
+					specialistEvidence = adaptiveKillValue.GetAdaptiveKillValue(self, e.Attacker);
+					if (specialistEvidence.HasValue)
+						break;
+				}
+
+				if (specialistEvidence.HasValue)
+				{
+					var evidence = specialistEvidence.Value;
+					if (CompletedSpecialistOutcome.TryRecord(self.World, "building-demolition", evidence.SpecialistPlayer,
+						evidence.SpecialistType, evidence.EconomicValue, out var delta))
+						CompletedSpecialistOutcome.WriteLog(self.World, "building-demolition", evidence.SpecialistType,
+							evidence.SpecialistId, evidence.SpecialistPlayer, self.Info.Name, self.ActorID, self.Owner.InternalName,
+							"direct-sell-value", null, true, delta);
+				}
+				else
+				{
+					var killStats = attackerStats.AdaptiveStats[e.Attacker.Info.Name];
+					killStats.KillsCount++;
+					killStats.KillsValue += cost;
+					killStats.MinuteKillsValue += cost;
+				}
 			}
 		}
 
 		void INotifyCreated.Created(Actor self)
 		{
+			adaptiveKillValues = self.TraitsImplementing<IAdaptiveKillValue>().ToArray();
 			includedInArmyValue = info.AddToArmyValue;
 			if (includedInArmyValue)
 			{
