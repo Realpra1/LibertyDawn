@@ -1,7 +1,7 @@
 # Coordinated CNC State
 
 - Round ID: `20260807-bug-polish-03`
-- Phase: `task selection; 1/5 claims recorded`
+- Phase: `task selection; 2/5 claims recorded`
 - Common base branch: `agent/cnc-20260807-bug-polish-02-release`
 - Common base SHA: `468ee64f5a0f9a9e19e260e5c5943e6e878f4705`
 - Coordinator model: `gpt-5.6-sol` / `high` (trial mismatch explicitly accepted by user)
@@ -22,7 +22,7 @@
 | Worker | Task | Branch | Worktree | State | Process/result | PR | Review | Integrated status |
 |---|---|---|---|---|---|---|---|---|
 | 1 | CNC-45 Economy troop production/use | | | `claimed` at `2026-08-07T15:05:12Z`; packet `COORDINATED-CNC-ROUNDS/20260807-bug-polish-03/TASK-PACKET-1.md` | reader `/root/round03_task_reader_1` complete | | | |
-| 2 | unassigned | | | | | | | |
+| 2 | CNC-46 Defense clusters | | | `claimed` at `2026-08-07T15:06:39Z`; packet `COORDINATED-CNC-ROUNDS/20260807-bug-polish-03/TASK-PACKET-2.md` | reader `/root/round03_task_reader_2` complete | | | |
 | 3 | unassigned | | | | | | | |
 | 4 | unassigned | | | | | | | |
 | 5 | unassigned | | | | | | | |
