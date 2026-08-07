@@ -104,3 +104,10 @@ overload the same recurring simulation tick. If per-tick attribution confirms
 this, preserve average decision cadence while assigning simple stable offsets
 so different squads, modules, and players plan on different ticks; avoid random
 jitter, globally slower AI, balance changes, or unnecessary scheduler theory.
+
+CNC-96 guard-planning hypothesis update: task-sheet commit `a103b7c2a8`
+records a conditional total-work reduction only if profiling implicates guard
+planning. Avoid one expensive independent planner per Harvester; prefer shared
+local Tiberium-field guard groups, bounded low-frequency enemy checks, and
+ordinary move/guard/attack orders. This does not presume Economy squads are the
+freeze cause, and requires behavioral control comparison before adoption.
