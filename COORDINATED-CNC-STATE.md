@@ -38,3 +38,8 @@ Record only routing, process identity, branch heads, phase, blockers, and concis
 results here. Keep task specifications and detailed evidence in worker state and
 reports. The prior round's durable details remain in
 `COORDINATED-CNC-ROUNDS/20260806-bug-polish-01/`.
+
+User acceptance clarification for review/integration: require correct save/load,
+replay/no-desync behavior, and sensible restored AI state; do not require a loaded
+game to reproduce an uninterrupted game's exact actor decisions or ticks unless a
+task-specific persisted invariant expressly needs it.
