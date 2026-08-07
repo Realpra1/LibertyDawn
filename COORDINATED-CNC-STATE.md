@@ -91,3 +91,9 @@ restorable targets (linked to CNC-44 history). Neither was deduplicated. CNC-96
 can be sharpened later with CPU/GPU/RAM/OS, map/match conditions, freeze
 frequency, and freeze duration; absence of those details does not alter the
 active Round 03 batch.
+
+CNC-96 evidence updates: task-sheet commits `2b7e3b3299` and `a128a2f1ad`
+record that Economy guard squads appear functionally sound but are not blamed
+for the freeze. Diagnosis remains component-agnostic and must compare stronger
+hardware plus CPU, memory/GC, simulation load, and possible playtest debug/report
+disk-I/O bursts under matched scenarios before assigning a cause.
