@@ -20,7 +20,8 @@ namespace OpenRA.Mods.Common.Traits
 		readonly PowerManager playerPower;
 		readonly PlayerResources playerResources;
 		readonly TechTree techTree;
-		readonly Dictionary<uint, int> reservations = new Dictionary<uint, int>();
+		readonly EconomyDefenseSamBuildOwnership<ProductionQueue> buildOwnership =
+			new EconomyDefenseSamBuildOwnership<ProductionQueue>();
 
 		BaseBuilderBotModuleInfo Info => baseBuilder.Info;
 		bool Enabled => Info.EconomyDefenseBotTypes.Contains(player.BotType) &&
@@ -37,18 +38,13 @@ namespace OpenRA.Mods.Common.Traits
 			this.techTree = techTree;
 		}
 
-		public bool Controls(string actorType)
-		{
-			return Enabled && Info.EconomyDefenseSamTypes.Contains(actorType);
-		}
-
 		public ActorInfo ChooseBuilding(ProductionQueue queue, IEnumerable<ActorInfo> buildables)
 		{
 			if (!Enabled || queue == null || queue.AllQueued().Any())
 				return null;
 
-			RefreshReservations();
-			if (reservations.Count > 0)
+			RefreshBuildOwnership();
+			if (buildOwnership.HasReservation)
 				return null;
 
 			var live = baseBuilder.CountActors(Info.EconomyDefenseSamTypes);
@@ -62,7 +58,9 @@ namespace OpenRA.Mods.Common.Traits
 					Info.EconomyDefenseMaximumSamSites, uncovered != null))
 					continue;
 
-				reservations.Add(queue.Actor.ActorID, world.WorldTick);
+				if (!buildOwnership.TryReserve(queue, sam.Name, world.WorldTick))
+					continue;
+
 				Debug("reserved build type={0} anchor={1} priority={2} live={3} pending={4} power={5}",
 					sam.Name, uncovered.Value.ActorId, uncovered.Value.Priority, live, pending,
 					playerPower?.ExcessPower ?? int.MaxValue);
@@ -72,10 +70,16 @@ namespace OpenRA.Mods.Common.Traits
 			return null;
 		}
 
-		public CPos? ChooseLocation(string actorType, ActorInfo actorInfo, BuildingInfo buildingInfo,
+		public bool OwnsPlacement(ProductionQueue queue, string actorType)
+		{
+			return Enabled && buildOwnership.Owns(queue, actorType);
+		}
+
+		public CPos? ChooseLocation(ProductionQueue queue, string actorType, ActorInfo actorInfo,
+			BuildingInfo buildingInfo,
 			bool distanceToBaseIsImportant)
 		{
-			if (!Controls(actorType))
+			if (!OwnsPlacement(queue, actorType))
 				return null;
 
 			var anchor = FirstUncoveredAnchor();
@@ -189,17 +193,11 @@ namespace OpenRA.Mods.Common.Traits
 			return cells;
 		}
 
-		void RefreshReservations()
+		void RefreshBuildOwnership()
 		{
-			foreach (var reservation in reservations.ToArray())
-			{
-				var actor = world.GetActorById(reservation.Key);
-				var queued = actor != null && actor.TraitsImplementing<ProductionQueue>()
-					.Any(q => q.AllQueued().Any(i => Info.EconomyDefenseSamTypes.Contains(i.Item)));
-				if (queued || actor == null || actor.IsDead ||
-					world.WorldTick - reservation.Value >= Math.Max(1, Info.StructureProductionActiveDelay))
-					reservations.Remove(reservation.Key);
-			}
+			buildOwnership.Refresh(world.WorldTick, Info.StructureProductionActiveDelay,
+				queue => queue.Actor != null && queue.Actor.IsInWorld && !queue.Actor.IsDead,
+				(queue, actorType) => queue.AllQueued().Any(i => i.Item == actorType));
 		}
 
 		void Debug(string format, params object[] args)

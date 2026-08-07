@@ -174,13 +174,14 @@ namespace OpenRA.Mods.Common.Traits
 				}
 				else
 				{
-					if (baseBuilder.ControlsEconomyDefenseSam(actorInfo.Name))
-						location = baseBuilder.EconomyDefenseSamLocation(currentBuilding.Item, actorInfo,
+					var economySamPlacement = baseBuilder.OwnsEconomyDefenseSam(queue, actorInfo.Name);
+					if (economySamPlacement)
+						location = baseBuilder.EconomyDefenseSamLocation(queue, currentBuilding.Item, actorInfo,
 							actorInfo.TraitInfo<BuildingInfo>(), true);
 					else if (baseBuilder.FirstTowerPlanner.AppliesTo(actorInfo.Name))
 						location = baseBuilder.FirstTowerPlanner.ChooseLocation(actorInfo, actorInfo.TraitInfo<BuildingInfo>());
 
-					if (location == null && !baseBuilder.ControlsEconomyDefenseSam(actorInfo.Name))
+					if (location == null && !economySamPlacement)
 					{
 						// Check if Building is a defense and if we should place it towards the enemy or not.
 						if (actorInfo.HasTraitInfo<AttackBaseInfo>() && world.LocalRandom.Next(100) < baseBuilder.Info.PlaceDefenseTowardsEnemyChance)
@@ -524,8 +525,6 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				var name = frac.Key;
 				if (limitedFractions.ContainsKey(name))
-					continue;
-				if (baseBuilder.ControlsEconomyDefenseSam(name))
 					continue;
 
 				// While a smart AI has no live refinery, every refinery source shares the one

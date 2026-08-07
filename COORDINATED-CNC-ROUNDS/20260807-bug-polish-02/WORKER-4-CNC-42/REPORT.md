@@ -7,8 +7,9 @@ Publication-ready isolated first iteration on
 `419bee2531d4802bf922c3597b42c6eeb75ab250`. Proposed handoff is
 `First iteration - testing`: the implementation, focused gates, repeated matched
 comparisons, save/load defect repair, and debug-disabled publication regression
-pass, but the exact post-persistence clean-three plus strongest final-regression
-bar remains for reviewed combined testing.
+pass. The one allowed final-review response also repairs ordinary SAM construction
+ownership. The exact post-response clean-three plus strongest final-regression bar
+remains for reviewed combined testing.
 
 ## Dependency inspection
 
@@ -839,6 +840,57 @@ policy-compatible at high confidence with no bounded concern. Artifacts:
 `analysis/worker-4-cnc42/g7-cycle19-comment/NARRATIVE.md`, and
 `analysis/worker-4-cnc42/g7-cycle19-policy/POLICY-REVIEW.md`.
 
+### Cycle 20 final-review response: ordinary SAM ownership
+
+The final Sol-high PR review blocked publication on one concrete defect: Economy
+II identified SAM control only by actor type, removed every SAM from the ordinary
+authored `BuildingFractions` path, and sent every completed SAM through
+economy-only placement. Once all economy anchors were covered, normal general
+base air-defense production could therefore be suppressed or cancelled.
+
+Cycle 20, the one permitted response and the isolated cap, retains economy build
+ownership on the exact runtime production-queue object plus actor type from
+selection through placement. Only that matching queued build uses economy
+placement; ordinary SAMs keep their unchanged authored fraction and normal
+general-defense placement. A focused test covers exact queue/type identity,
+queued-lifetime retention, and release after completion/cancellation. Focused
+tests passed 34/34. `make check test` passed Debug and Release compilation,
+interface checks, and CNC MiniYAML with zero warnings/errors.
+
+The fresh full-engine regression deliberately began with all economy anchors
+covered by the powered SAM at 47,17: active Refinery, Resonator, and materially
+used Silo squared distances were 50, 37, and 37 against effective coverage
+radius-squared 64. It used ordinary Brutalis/Skynet, all normal modules, the real
+unchanged one-percent authored SAM fraction, and no BaseBuilder trait override;
+100 ordinary pre-placed walls made the fraction eligible. One SAM remained through
+tick 3701. Sites at 42,35 and 47,35 appeared by tick 3801, and 40,35 appeared by
+tick 4801, all outside the economy-anchor placement annuli. At tick 5001 four SAMs
+and all three economy anchors were alive. The engine exited 0 at tick 5200 with
+replay/benchmarks and no economy reservation, Lua/runtime, or desync signal.
+
+The launcher status remained failed only because two predeclared expressions were
+overstrict: BotDebug did not emit an optional authored-fraction sentence, and the
+outcome required exactly two sites rather than the observed four. The preceding
+attempt is counted as an invalid advanced setup: it created a second site by tick
+3401 and then crashed when its observer used unsupported Lua `ActorID`. A tick-0
+wrong-content-root attempt is excluded. The factual Commenter confirms the direct
+additional-site observation but limits causality for lack of a matched control and
+queue-decision trace. Routine Policy Review returns `insufficient evidence`, high
+confidence, for strategic benefit—not a finding that the ownership repair is
+unsound—and recommends bounded ownership observability plus an identical control.
+Those recommendations, the post-fix clean-three, and final stressed literal run
+cannot begin a cycle 21 and remain handoff work. The mandatory cycle-20 Terra
+review adds one valid implementation blocker: exact queue/type ownership is not
+persisted, so loading after economy reservation but before placement can demote
+that completed build to ordinary placement. This advisory is adopted; persisting
+or deterministically reconstructing ownership plus an exact mid-build load
+regression would require forbidden cycle 21. Artifacts:
+`analysis/worker-4-cnc42/final-review/FINAL-REVIEW.md`,
+`analysis/worker-4-cnc42/games/g5-cycle20-covered-general`,
+`analysis/worker-4-cnc42/g5-cycle20-comment/NARRATIVE.md`, and
+`analysis/worker-4-cnc42/g5-cycle20-policy/POLICY-REVIEW.md`, and
+`analysis/worker-4-cnc42/cycle-review-20/CYCLE-REVIEW.md`.
+
 ## Final isolated assessment
 
 - Behavior: post-unload committed field contexts drive bounded 1/2/1 mixed
@@ -857,19 +909,22 @@ policy-compatible at high confidence with no bounded concern. Artifacts:
   of reachable economy while withholding the unreachable actor. Recorded MAX
   cost ranged from effectively equal/faster to about 5% slower in the accepted
   matched G5 pair, within the required 10% bound.
-- Evidence total: 64 counted full-engine tests through 19 product-change cycles.
+- Evidence total: 66 counted full-engine tests through 20 product-change cycles.
   Invalid advanced setups are labeled; tick-0/map-unavailable attempts and reused
-  controls are excluded. Required Terra cycle reviews at 5/10/15 were completed;
+  controls are excluded. Required Terra cycle reviews at 5/10/15/20 were completed;
   their two safety advisories were adopted and the cycle-15 serialization premise
-  was rejected with source and replay evidence. Sol-xhigh policy escalation was
-  unused.
-- Status rationale: propose `First iteration - testing`, not completion. Cycle 18
-  is a relevant persistence fix, so the strict clean-three counter was not rebuilt
-  with three distinct post-fix fresh adversaries, and the strongest specified
-  two-separated-field final regression was not rerun after that counter. The
-  cycle-19 publication game is clean fresh topology evidence but does not alone
-  satisfy those two bars. Combined testing must also resolve CNC-41 PR #88's
-  overlapping BaseBuilder/queue/config branches and rerun G4/G5/G7.
+  was rejected with source and replay evidence. The cycle-20 save/load ownership
+  advisory is adopted as deferred because no cycle 21 is permitted. Sol-xhigh
+  policy escalation was unused.
+- Status rationale: propose `First iteration - testing`, not completion. The
+  final-review response is a relevant cycle-20 behavior correction, so the strict
+  clean-three counter resets again; no cycle remains for three fresh adversaries
+  or the strongest specified two-separated-field final regression. The cycle-20
+  full-engine case proves ordinary SAM construction remains available but lacks a
+  matched control and explicit queue-decision trace. Combined testing must also
+  persist exact economy-SAM queue/type ownership across a save made between
+  reservation and placement, resolve CNC-41 PR #88's overlapping
+  BaseBuilder/queue/config branches, and rerun G4/G5/G7.
 
 ## Diagnostics and retained seams
 
@@ -878,7 +933,8 @@ those explicit rules flags for future evidence builds. No task map, raw log,
 replay, save, benchmark, or build output is tracked. Retained product seams are
 the post-unload field-station trait, owner-aware external production requests,
 field-defense reservation module, exact synchronized path/safety order, nudge and
-cell-entry validators, and the narrow BaseBuilder economy-SAM planner.
+cell-entry validators, and the narrow exact-queue-owned BaseBuilder economy-SAM
+planner.
 
 ## Deferred work
 
@@ -889,3 +945,11 @@ cell-entry validators, and the narrow BaseBuilder economy-SAM planner.
 - Completion evidence: obtain three distinct clean post-persistence adversaries
   and the strongest specified fresh literal final regression before promoting
   beyond `First iteration - testing`.
+- SAM ownership evidence: add bounded queue/selection/completion ownership
+  diagnostics in an evidence configuration and run an identical covered-anchor
+  old-behavior control plus air harassment, without changing authored fractions
+  or balance.
+- Save/load ownership: persist or deterministically reconstruct the exact
+  economy-reserved SAM queue/type ownership, then load a save made after
+  reservation but before placement and prove the completed site still takes the
+  economy-safe anchor location. This is the adopted cycle-20 review blocker.

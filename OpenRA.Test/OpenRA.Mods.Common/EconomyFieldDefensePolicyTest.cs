@@ -202,6 +202,29 @@ namespace OpenRA.Test
 				maximum, uncovered), Is.EqualTo(expected));
 		}
 
+		[Test]
+		public void EconomySamPlacementOwnershipFollowsTheExactQueueAndBuild()
+		{
+			var economyQueue = new object();
+			var ordinaryQueue = new object();
+			var ownership = new EconomyDefenseSamBuildOwnership<object>();
+
+			Assert.That(ownership.TryReserve(economyQueue, "sam", 10), Is.True);
+			Assert.That(ownership.Owns(economyQueue, "sam"), Is.True);
+			Assert.That(ownership.Owns(ordinaryQueue, "sam"), Is.False,
+				"An ordinary SAM from another queue must retain normal BaseBuilder placement.");
+			Assert.That(ownership.Owns(economyQueue, "gtwr"), Is.False);
+
+			ownership.Refresh(100, 5, _ => true, (queue, type) =>
+				ReferenceEquals(queue, economyQueue) && type == "sam");
+			Assert.That(ownership.Owns(economyQueue, "sam"), Is.True,
+				"Ownership must survive while the reserved SAM is queued or awaiting placement.");
+
+			ownership.Refresh(100, 5, _ => true, (_, __) => false);
+			Assert.That(ownership.HasReservation, Is.False,
+				"A completed or cancelled build must release ownership for later ordinary SAMs.");
+		}
+
 		[TestCase(6, 1, 7)]
 		[TestCase(0, 2, 2)]
 		[TestCase(-1, -1, 0)]

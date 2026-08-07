@@ -471,15 +471,17 @@ namespace OpenRA.Mods.Common.Traits
 			return economyDefenseSam?.ChooseBuilding(queue, buildables);
 		}
 
-		internal bool ControlsEconomyDefenseSam(string actorType)
+		internal bool OwnsEconomyDefenseSam(ProductionQueue queue, string actorType)
 		{
-			return economyDefenseSam?.Controls(actorType) == true;
+			return economyDefenseSam?.OwnsPlacement(queue, actorType) == true;
 		}
 
-		internal CPos? EconomyDefenseSamLocation(string actorType, ActorInfo actorInfo, BuildingInfo buildingInfo,
+		internal CPos? EconomyDefenseSamLocation(ProductionQueue queue, string actorType, ActorInfo actorInfo,
+			BuildingInfo buildingInfo,
 			bool distanceToBaseIsImportant)
 		{
-			return economyDefenseSam?.ChooseLocation(actorType, actorInfo, buildingInfo, distanceToBaseIsImportant);
+			return economyDefenseSam?.ChooseLocation(queue, actorType, actorInfo, buildingInfo,
+				distanceToBaseIsImportant);
 		}
 
 		internal bool AdaptiveProductionDebugLogging => unitBuilders.Any(u =>

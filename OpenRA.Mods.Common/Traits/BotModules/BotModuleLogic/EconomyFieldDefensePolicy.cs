@@ -54,6 +54,52 @@ namespace OpenRA.Mods.Common.Traits
 		}
 	}
 
+	/// <summary>
+	/// Tracks the exact production queue and actor type reserved by economy SAM demand.
+	/// Actor type alone is insufficient because ordinary authored SAM production must keep
+	/// using the normal BaseBuilder placement policy.
+	/// </summary>
+	public sealed class EconomyDefenseSamBuildOwnership<TQueue> where TQueue : class
+	{
+		TQueue queue;
+		string actorType;
+		int reservedTick;
+
+		public bool HasReservation => queue != null;
+
+		public bool TryReserve(TQueue candidateQueue, string candidateActorType, int currentTick)
+		{
+			if (candidateQueue == null || string.IsNullOrEmpty(candidateActorType) || HasReservation)
+				return false;
+
+			queue = candidateQueue;
+			actorType = candidateActorType;
+			reservedTick = currentTick;
+			return true;
+		}
+
+		public bool Owns(TQueue candidateQueue, string candidateActorType)
+		{
+			return ReferenceEquals(queue, candidateQueue) &&
+				string.Equals(actorType, candidateActorType, StringComparison.Ordinal);
+		}
+
+		public void Refresh(int currentTick, int timeout, Func<TQueue, bool> queueIsAvailable,
+			Func<TQueue, string, bool> matchingBuildIsQueued)
+		{
+			if (!HasReservation)
+				return;
+
+			if (!queueIsAvailable(queue) ||
+				(!matchingBuildIsQueued(queue, actorType) && currentTick - reservedTick >= Math.Max(1, timeout)))
+			{
+				queue = null;
+				actorType = null;
+				reservedTick = 0;
+			}
+		}
+	}
+
 	/// <summary>World-independent transition and demand rules for economy field defense.</summary>
 	public static class EconomyFieldDefensePolicy
 	{
