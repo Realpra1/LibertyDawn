@@ -1705,3 +1705,38 @@ and `0/12` total.
   aircraft-mix breadth, and per-job resource apportionment. No unsafe landing,
   cargo retention, claim leak, compilation, CI, or combined-task failure was
   observed.
+
+## RC3 final combined-review response assignment
+
+- Exact base candidate: `2343cf158bd378b913eeb9b3001f747be43abc0a`
+  (code candidate `de855c42d39fc947c7d00b32b38c69e448ade6c4`,
+  draft PR #84).
+- Fresh final release review verdict: `ready with one fix`.
+- Review:
+  `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260806-bug-polish-01/reviews/final-rc3/REVIEW.md`.
+- This is the one final combined-review response cycle. Fix the existing CNC51
+  contract defect where a loaded route-failure rescue can renew its safe-recovery
+  deadline forever, retaining the carrier/passenger mission and reservations.
+- Preserve the first safe-return deadline or introduce one separate terminal
+  deadline set only on transition to `Returning`. An already-returning mission must
+  not recursively receive another full deadline.
+- At terminal expiry, transition exactly once to an explicit safe terminal/recovery
+  state: cancel obsolete route/unload intent, release stale landing-cell claims,
+  avoid repeated orders/logs, and deliberately retain or transfer ownership so no
+  other module steals a carrier that still contains hidden cargo. Never claim
+  success or simply release a mission while its passenger remains aboard, and never
+  force an unsafe unload merely to terminate.
+- Add a narrow deterministic lifecycle regression with every useful recovery site
+  unavailable beyond both original and recovery bounds. Assert one terminal
+  transition, no unsafe unload, no renewed-deadline loop, no stale cell claims, no
+  leaked/stealable carrier-passenger ownership, and sensible deterministic behavior
+  if a safe site later opens.
+- Use full-engine headless MAX testing from the first behavioral test. A custom map
+  that holds the persistent-no-safe-site state is appropriate and must be followed
+  by a fresh factual Commenter and Terra-medium Policy Reviewer. Keep normal/full
+  simulation concurrency at two; three is permitted only for short bounded fixtures.
+- Rerun the affected focused transport tests, the existing CNC51 literal scenario,
+  full engine tests, CNC-only validation, and `git diff --check`. Balance is frozen.
+  Do not broaden transport policy, retune values to fake a result, or change unrelated
+  AI behavior. Commit the product repair separately, then update/push state/report
+  with exact evidence and a handoff head ready for RC4 integration.
