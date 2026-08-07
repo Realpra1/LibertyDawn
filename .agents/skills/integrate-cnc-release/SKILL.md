@@ -21,13 +21,19 @@ a merge conflict or integrated failure requires it.
    the resulting head is RC1. Do not call GitHub's merge action on source PRs.
 4. Resolve mechanical conflicts. Return behavioral conflicts to the responsible
    worker or a focused repair agent; do not guess silently.
-5. Run strict build/unit/static checks and inspect the combined diff. Push the
+5. Run strict build/unit/static checks and inspect the combined diff. Route every
+   large build, full test/check suite, equivalent `dotnet`/`msbuild` suite, and
+   packaging build through the coordinator helper's protected
+   `--large-build-entry integrator` mode with the round's absolute lock directory;
+   never reconstruct a lock filename/capacity or invoke direct `flock`. Push the
    stable release branch and open one draft release PR targeting `bleed`. Keep
    source PRs open. Every later RC updates this same branch and PR.
 6. Launch one fresh release-PR reviewer when a candidate appears final. Treat
    cross-task responsibility leakage, duplicated policy, conflict damage,
    nondeterminism, unbounded CPU work, noisy diagnostics, and missing integrated
-   evidence as release findings. If a finding causes another repair, repeat the
+   evidence as release findings. Reject balance changes not expressly authorized
+   by the owning task; balance tuning cannot be used to manufacture an integrated
+   pass. If a finding causes another repair, repeat the
    release review on the new candidate within the four-round cap.
 
 ## Integrated test rounds
@@ -56,10 +62,12 @@ reviews inform but never replace full-engine evidence.
 
 Use no-history sessions and the coordinator launcher's strict JSON envelopes for
 both roles: Commenter gets only artifact paths, optional design-reference path, and
-`NARRATIVE.md` output; Policy Reviewer gets exactly design-reference, narrative,
-and `POLICY-REVIEW.md` output paths. Copy only authorized evidence into the
+`NARRATIVE.md` output; Policy Reviewer gets exactly design-reference, short staged
+task-context, narrative, and `POLICY-REVIEW.md` output paths. Copy only authorized evidence into the
 Commenter's `inputs/` subtree and copy its narrative (never symlink either) to the
-Policy Reviewer's `inputs/NARRATIVE.md` before launch.
+Policy Reviewer's `inputs/NARRATIVE.md` before launch. Stage `TASK-CONTEXT.md` with
+task ID/title, why, change category, in/out-of-scope behavior, and explicit balance
+authority; never pass the full task sheet/spec or a preferred verdict.
 
 For every included strategic AI change, compare the release head against its
 recorded feature-disabled, base-SHA, or named older-behavior control under matched
@@ -96,7 +104,9 @@ the safest proven subset/result and report unresolved tasks as first iteration.
 - Require at least one fresh real full-engine ordinary-AI MAX regression to its
   natural conclusion for AI/engine rounds, plus graphical/platform checks for any
   feature MAX cannot prove. Reject sole reliance on reloaded states.
-- Use the global build/game slots and isolated MAX-game support directories.
+- Use `with_resource_slots.py --large-build-entry integrator` for the global
+  capacity-one build slot, generic capacity-two `game` reservations for games,
+  and isolated MAX-game support directories.
 - Record release heads, merge order, conflicts, tests, repairs, exclusions,
   old-control comparisons, and remaining risks in the integration state.
 - Send final structured receipts to the Task Maker. Promote the draft release PR

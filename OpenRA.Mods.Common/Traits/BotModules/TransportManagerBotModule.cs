@@ -61,10 +61,21 @@ namespace OpenRA.Mods.Common.Traits
 		public readonly int MaximumActiveMissions = 4;
 		public readonly int TransportHelicopterLimit = 10;
 		public readonly int PersistentBlockedScans = 3;
+		public readonly int BlockedDiagnosticIntervalScans = 8;
 		public readonly int MaximumCandidatesPerScan = 32;
 		public readonly int MoveIntentMaximumAge = 1500;
 		public readonly int PickupRangeCells = 3;
 		public readonly int UnloadRangeCells = 4;
+		public readonly int LandingSearchRadiusCells = 8;
+		public readonly int LandingUsefulnessRadiusCells = 16;
+		public readonly int LandingMaximumCandidates = 128;
+		public readonly int LandingReplanInterval = 75;
+		public readonly int LandingHoldTicks = 300;
+		public readonly int SafeReturnLandingSearchRadiusCells = 8;
+		public readonly int SafeReturnUsefulnessRadiusCells = 64;
+		public readonly int LandingThreatRangeBufferCells = 1;
+		public readonly int LandingCoarseCellSize = 4;
+		public readonly int LandingRouteThreatPenalty = 100;
 		public readonly int MissionTimeoutTicks = 3000;
 		public readonly int IdleServiceInterval = 250;
 		public readonly int IdleStagingRadius = 10;
@@ -75,6 +86,8 @@ namespace OpenRA.Mods.Common.Traits
 		public readonly int AssaultGatherTimeoutTicks = 750;
 		public readonly int AssaultCooldownTicks = 7500;
 		public readonly int AssaultOrderRetryTicks = 75;
+		public readonly int AssaultLandingSearchRadiusCells = 8;
+		public readonly int AssaultLandingUsefulnessRadiusCells = 16;
 		public readonly int HeavyDropMinimumGameTicks = 7500;
 		public readonly int HeavyDropMinimumPassengers = 8;
 		public readonly int HeavyDropMaximumPassengers = 10;
@@ -88,6 +101,8 @@ namespace OpenRA.Mods.Common.Traits
 		public readonly int HeavyDropLandingRadius = 8;
 		public readonly int HeavyDropFormationRadius = 8;
 		public readonly int HeavyDropFormationSpacing = 3;
+		public readonly int HeavyDropLandingSearchRadiusCells = 3;
+		public readonly int HeavyDropLandingUsefulnessRadiusCells = 16;
 		public readonly int HeavyDropUnloadRangeCells = 1;
 		public readonly int HeavyDropDefenseRadius = 7;
 		public readonly int HeavyDropMaximumDefenderValue = 3400;
@@ -98,18 +113,25 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			base.RulesetLoaded(rules, ai);
 			if (ScanInterval <= 0 || MaximumActiveMissions <= 0 || TransportHelicopterLimit <= 0 ||
-				PersistentBlockedScans <= 0 || MaximumCandidatesPerScan <= 0 || MoveIntentMaximumAge <= 0 ||
-				PickupRangeCells <= 0 || UnloadRangeCells <= 0 || MissionTimeoutTicks <= 0 ||
+				PersistentBlockedScans <= 0 || BlockedDiagnosticIntervalScans <= 0 ||
+				MaximumCandidatesPerScan <= 0 || MoveIntentMaximumAge <= 0 ||
+				PickupRangeCells <= 0 || UnloadRangeCells <= 0 || LandingSearchRadiusCells <= 0 ||
+				LandingUsefulnessRadiusCells <= 0 || LandingMaximumCandidates <= 0 || LandingReplanInterval <= 0 ||
+				LandingHoldTicks <= 0 || LandingThreatRangeBufferCells < 0 || LandingCoarseCellSize <= 0 ||
+				SafeReturnLandingSearchRadiusCells <= 0 || SafeReturnUsefulnessRadiusCells <= 0 ||
+				LandingRouteThreatPenalty < 0 || MissionTimeoutTicks <= 0 ||
 				IdleServiceInterval <= 0 || IdleStagingRadius <= 0 || RepairHealthPercent <= 0 || RepairHealthPercent > 100 ||
 				AssaultSelectionPercent < 0 || AssaultSelectionPercent > 100 || MinimumAssaultPassengers <= 0 ||
 				MaximumAssaultPassengers < MinimumAssaultPassengers || AssaultGatherTimeoutTicks <= 0 || AssaultCooldownTicks <= 0 ||
-				AssaultOrderRetryTicks <= 0 || HeavyDropMinimumGameTicks < 0 || HeavyDropMinimumPassengers <= 0 ||
+				AssaultOrderRetryTicks <= 0 || AssaultLandingSearchRadiusCells <= 0 ||
+				AssaultLandingUsefulnessRadiusCells <= 0 || HeavyDropMinimumGameTicks < 0 || HeavyDropMinimumPassengers <= 0 ||
 				HeavyDropMaximumPassengers < HeavyDropMinimumPassengers || HeavyDropConcurrentBoarding <= 0 ||
 				HeavyDropConcurrentBoarding > HeavyDropMaximumPassengers || HeavyDropBoardingRetryTicks <= 0 ||
 				HeavyDropGatherTimeoutTicks <= 0 ||
 				HeavyDropMissionTimeoutTicks <= HeavyDropGatherTimeoutTicks ||
 				HeavyDropCooldownTicks <= 0 || HeavyDropReplanInterval <= 0 || HeavyDropTargetCandidateLimit <= 0 ||
 				HeavyDropLandingRadius <= 0 || HeavyDropFormationRadius <= 0 || HeavyDropFormationSpacing <= 0 ||
+				HeavyDropLandingSearchRadiusCells <= 0 || HeavyDropLandingUsefulnessRadiusCells <= 0 ||
 				HeavyDropUnloadRangeCells < 0 || HeavyDropDefenseRadius <= 0 || HeavyDropMaximumDefenderValue < 0 ||
 				HeavyDropMaximumAaDanger < 0)
 				throw new YamlException("AI transport counts, ranges, intervals, timeouts, and repair threshold must be positive and valid.");
@@ -133,6 +155,13 @@ namespace OpenRA.Mods.Common.Traits
 			public int DeadlineTick;
 			public MissionStage Stage;
 			public int LastOrderTick;
+			public int PlanFailureTick;
+			public int LastRoutedPlanRevision;
+			public TransportUnloadPlan UnloadPlan;
+			public readonly TransportRescueRecoveryLifecycle Recovery = new TransportRescueRecoveryLifecycle();
+			public CPos? RecoveryObjective;
+			public bool Returning => Recovery.Phase != TransportRescueRecoveryPhase.Active;
+			public bool Terminal => Recovery.Phase == TransportRescueRecoveryPhase.Terminal;
 
 			public Mission(int id, Actor transport, Actor passenger, CPos destination, int tick, int deadlineTick)
 			{
@@ -154,8 +183,10 @@ namespace OpenRA.Mods.Common.Traits
 		readonly World world;
 		readonly Player player;
 		readonly TransportMissionCoordinator coordinator;
+		readonly TransportUnloadPlanner unloadPlanner;
 		readonly List<Mission> missions = new List<Mission>();
 		readonly Dictionary<uint, BlockedObservation> blocked = new Dictionary<uint, BlockedObservation>();
+		readonly Dictionary<uint, CPos> safeIdleStagingCells = new Dictionary<uint, CPos>();
 		readonly InfantryAssaultTransportManager infantryAssault;
 		readonly HeavyDropTransportManager heavyDrop;
 		IBot bot;
@@ -171,10 +202,12 @@ namespace OpenRA.Mods.Common.Traits
 			world = self.World;
 			player = self.Owner;
 			coordinator = new TransportMissionCoordinator(info.MaximumActiveMissions);
-			infantryAssault = new InfantryAssaultTransportManager(world, player, info, coordinator,
-				IssueRoutedMove, RequestTransportHelicopter, IsReservedForOtherBehavior);
-			heavyDrop = new HeavyDropTransportManager(world, player, info, coordinator,
-				IssueRoutedMove, RequestTransportHelicopter, () => squadManager, IsReservedForOtherBehavior);
+			unloadPlanner = new TransportUnloadPlanner(world, player, info, coordinator);
+			infantryAssault = new InfantryAssaultTransportManager(world, player, info, coordinator, unloadPlanner,
+				IssueRoutedMove, RequestTransportHelicopter, IsReservedForOtherBehavior, RememberSafeIdleStaging);
+			heavyDrop = new HeavyDropTransportManager(world, player, info, coordinator, unloadPlanner,
+				IssueRoutedMove, RequestTransportHelicopter, () => squadManager, IsReservedForOtherBehavior,
+				RememberSafeIdleStaging);
 		}
 
 		protected override void Created(Actor self)
@@ -232,6 +265,7 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				scanTicks = Info.ScanInterval;
 				RefreshSquadManager();
+				unloadPlanner.RefreshSnapshot();
 				AdvanceMissions();
 
 				// Reserve a complete strategic wave before opportunistic one-unit transport missions
@@ -283,7 +317,13 @@ namespace OpenRA.Mods.Common.Traits
 					continue;
 				}
 
-				if (world.WorldTick > mission.DeadlineTick)
+				if (mission.Recovery.TryEnterTerminal(world.WorldTick))
+				{
+					EnterTerminalRecovery(mission);
+					continue;
+				}
+
+				if (!mission.Returning && world.WorldTick > mission.DeadlineTick)
 				{
 					if (cargo.IsEmpty())
 						FinishMission(i, "timed out before pickup");
@@ -293,19 +333,40 @@ namespace OpenRA.Mods.Common.Traits
 					continue;
 				}
 
+				if (mission.Terminal)
+				{
+					AdvanceTerminalRecovery(mission, cargo, i);
+					continue;
+				}
+
 				if (mission.Stage == MissionStage.Gathering)
 					AdvanceGathering(mission, cargo, i);
 				else if (mission.Stage == MissionStage.Travelling)
 					AdvanceTravel(mission);
 				else if (cargo.IsEmpty())
 				{
+					Debug("mission {0} physical handoff: passenger={1} cell={2} cargo=0 objective={3} outcome={4}",
+						mission.Id, mission.Passenger, mission.Passenger.Location, mission.Destination,
+						mission.Returning ? "safe-recovery" : "useful-rescue");
 					bot.QueueOrder(new Order("Move", mission.Passenger,
 						Target.FromCell(world, mission.Destination), false));
-					FinishMission(i, "rescue complete");
+					FinishMission(i, mission.Returning ? "safe recovery unload complete" : "rescue complete");
 				}
-				else if (IsCarrierIdle(mission.Transport) && ReadyToRetry(mission))
+				else if (!EnsureUnloadPlan(mission, mission.UnloadPlan?.Objective ??
+					mission.RecoveryObjective ?? mission.Destination, out var reason))
+					HandlePlanFailure(mission, reason);
+				else if ((mission.Transport.Location - mission.UnloadPlan.CarrierCell).LengthSquared >
+					Info.UnloadRangeCells * Info.UnloadRangeCells)
 				{
-					bot.QueueOrder(new Order("Unload", mission.Transport, false));
+					mission.Stage = MissionStage.Travelling;
+					if (IssueUnloadPlanRoute(mission))
+						mission.LastOrderTick = world.WorldTick;
+					else
+						HandlePlanFailure(mission, "replanned unload route failed");
+				}
+				else if (ReadyToRetry(mission))
+				{
+					QueuePlannedUnload(mission);
 					mission.LastOrderTick = world.WorldTick;
 				}
 			}
@@ -316,9 +377,13 @@ namespace OpenRA.Mods.Common.Traits
 			if (cargo.Passengers.Any(a => a == mission.Passenger))
 			{
 				mission.Stage = MissionStage.Travelling;
-				IssueRoutedMove(mission.Transport, mission.Destination);
 				mission.LastOrderTick = world.WorldTick;
-				Debug("mission {0} travelling to {1}", mission.Id, mission.Destination);
+				if (EnsureUnloadPlan(mission, mission.Destination, out var reason) && IssueUnloadPlanRoute(mission))
+					Debug("mission {0} travelling to planned carrier={1} exit={2} objective={3} revision={4} snapshot={5}",
+						mission.Id, mission.UnloadPlan.CarrierCell, mission.UnloadPlan.ExitCells[0],
+						mission.Destination, mission.UnloadPlan.Revision, mission.UnloadPlan.SnapshotTick);
+				else
+					HandlePlanFailure(mission, reason ?? "threat route failed");
 				return;
 			}
 
@@ -349,20 +414,260 @@ namespace OpenRA.Mods.Common.Traits
 
 		void AdvanceTravel(Mission mission)
 		{
-			if ((mission.Transport.Location - mission.Destination).LengthSquared <=
+			var objective = mission.UnloadPlan?.Objective ?? mission.RecoveryObjective ?? mission.Destination;
+			if (!EnsureUnloadPlan(mission, objective, out var reason))
+			{
+				HandlePlanFailure(mission, reason);
+				return;
+			}
+
+			if (mission.LastRoutedPlanRevision != mission.UnloadPlan.Revision)
+			{
+				if (IssueUnloadPlanRoute(mission))
+					mission.LastOrderTick = world.WorldTick;
+				else
+					HandlePlanFailure(mission, "replacement threat route failed");
+
+				return;
+			}
+
+			if ((mission.Transport.Location - mission.UnloadPlan.CarrierCell).LengthSquared <=
 				Info.UnloadRangeCells * Info.UnloadRangeCells)
 			{
 				mission.Stage = MissionStage.Unloading;
 				mission.LastOrderTick = world.WorldTick;
-				bot.QueueOrder(new Order("Unload", mission.Transport, false));
+				QueuePlannedUnload(mission);
+				Debug("mission {0} committing exact unload: carrier={1} exit={2} objective={3} revision={4} snapshot={5}",
+					mission.Id, mission.UnloadPlan.CarrierCell, mission.UnloadPlan.ExitCells[0],
+					mission.UnloadPlan.Objective, mission.UnloadPlan.Revision, mission.UnloadPlan.SnapshotTick);
 				return;
 			}
 
 			if (IsCarrierIdle(mission.Transport) && ReadyToRetry(mission))
 			{
-				IssueRoutedMove(mission.Transport, mission.Destination);
-				mission.LastOrderTick = world.WorldTick;
+				if (IssueUnloadPlanRoute(mission))
+					mission.LastOrderTick = world.WorldTick;
+				else
+					HandlePlanFailure(mission, "threat route failed");
 			}
+		}
+
+		bool EnsureUnloadPlan(Mission mission, CPos objective, out string rejection)
+		{
+			var previous = mission.UnloadPlan;
+			var invalidation = "none";
+			if (previous != null && previous.Objective == objective)
+			{
+				if (unloadPlanner.Revalidate(mission.Id, mission.Transport, new[] { mission.Passenger },
+					previous, Info.LandingUsefulnessRadiusCells, out rejection))
+				{
+					mission.PlanFailureTick = 0;
+					return true;
+				}
+
+				invalidation = rejection;
+			}
+			else if (previous != null)
+			{
+				invalidation = "objective changed";
+			}
+
+			var revision = (previous?.Revision ?? 0) + 1;
+			if (!unloadPlanner.TryPlan(mission.Id, mission.Transport, new[] { mission.Passenger }, objective,
+				Info.LandingSearchRadiusCells, Info.LandingUsefulnessRadiusCells, revision,
+				out var replacement, out rejection))
+			{
+				mission.UnloadPlan = null;
+				return false;
+			}
+
+			mission.UnloadPlan = replacement;
+			mission.PlanFailureTick = 0;
+			if (previous == null || previous.CarrierCell != replacement.CarrierCell ||
+				!previous.ExitCells.SequenceEqual(replacement.ExitCells))
+				Debug("mission {0} selected unload plan: objective={1} carrier={2} exits={3} revision={4} " +
+					"snapshot={5} threats={6} candidates={7} firstRejection={8} firstThreatRejection={9} " +
+					"replannedBecause={10}",
+					mission.Id, objective, replacement.CarrierCell,
+					string.Join(",", replacement.ExitCells), replacement.Revision, replacement.SnapshotTick,
+					unloadPlanner.SnapshotThreatCount, replacement.CandidatesEvaluated,
+					replacement.FirstRejection ?? "none", replacement.FirstThreatRejection ?? "none", invalidation);
+
+			return true;
+		}
+
+		bool IssueUnloadPlanRoute(Mission mission)
+		{
+			var route = unloadPlanner.Route(mission.Transport, mission.UnloadPlan);
+			if (route == null || (route.Count == 0 && mission.Transport.Location != mission.UnloadPlan.CarrierCell))
+			{
+				Debug("mission {0} rejected unload route: planner returned failed route for carrier={1}",
+					mission.Id, mission.UnloadPlan?.CarrierCell);
+				return false;
+			}
+
+			var queued = false;
+			foreach (var waypoint in route)
+			{
+				bot.QueueOrder(new Order("Move", mission.Transport, Target.FromCell(world, waypoint), queued));
+				queued = true;
+			}
+
+			mission.LastRoutedPlanRevision = mission.UnloadPlan.Revision;
+			Debug("mission {0} routed to safe unload carrier={1}: result={2} waypoints={3} snapshot={4} revision={5}",
+				mission.Id, mission.UnloadPlan.CarrierCell, route.Count == 1 ? "same-sector/direct-safe" : "threat-aware",
+				route.Count, mission.UnloadPlan.SnapshotTick, mission.UnloadPlan.Revision);
+			return true;
+		}
+
+		void QueuePlannedUnload(Mission mission)
+		{
+			bot.QueueOrder(TransportUnloadOrder.Create(world, mission.Transport, mission.UnloadPlan));
+		}
+
+		void HandlePlanFailure(Mission mission, string reason)
+		{
+			if (mission.PlanFailureTick == 0)
+			{
+				mission.PlanFailureTick = world.WorldTick;
+				bot.QueueOrder(new Order("Stop", mission.Transport, false));
+				Debug("mission {0} holding without unload plan: {1}", mission.Id, reason);
+			}
+
+			if (world.WorldTick - mission.PlanFailureTick < Info.LandingHoldTicks)
+				return;
+
+			if (!mission.Returning)
+			{
+				RecoverTimedOutCargo(mission, "bounded unload-plan hold expired");
+				return;
+			}
+
+			if (TryPlanRecoveryFallback(mission, out var fallbackRejection) && IssueUnloadPlanRoute(mission))
+			{
+				mission.Stage = MissionStage.Travelling;
+				mission.LastOrderTick = world.WorldTick;
+				Debug("mission {0} terminal safe fallback: searchCenter={1}, recoveryObjective={2}, " +
+					"carrier={3}, exit={4}", mission.Id, mission.Transport.Location,
+					mission.RecoveryObjective, mission.UnloadPlan.CarrierCell, mission.UnloadPlan.ExitCells[0]);
+				return;
+			}
+
+			mission.PlanFailureTick = world.WorldTick;
+			Debug("mission {0} bounded safe hold renewed: recoveryObjective={1}, reason={2}",
+				mission.Id, mission.RecoveryObjective, fallbackRejection);
+		}
+
+		void EnterTerminalRecovery(Mission mission)
+		{
+			bot.QueueOrder(new Order("Stop", mission.Transport, false));
+			mission.UnloadPlan = null;
+			mission.Stage = MissionStage.Travelling;
+			mission.PlanFailureTick = world.WorldTick;
+			mission.LastRoutedPlanRevision = 0;
+			coordinator.ParkLoadedMission(mission.Id);
+			Debug("mission {0} terminal loaded recovery: carrier={1} passenger={2} recoveryObjective={3} " +
+				"deadline={4} outcome=parked-reserved", mission.Id, mission.Transport, mission.Passenger,
+				mission.RecoveryObjective, mission.Recovery.DeadlineTick);
+		}
+
+		void AdvanceTerminalRecovery(Mission mission, Cargo cargo, int index)
+		{
+			if (cargo.IsEmpty())
+			{
+				Debug("mission {0} physical handoff after terminal recovery: passenger={1} cell={2} cargo=0 objective={3}",
+					mission.Id, mission.Passenger, mission.Passenger.Location, mission.Destination);
+				bot.QueueOrder(new Order("Move", mission.Passenger,
+					Target.FromCell(world, mission.Destination), false));
+				FinishMission(index, "terminal safe recovery unload complete");
+				return;
+			}
+
+			if (mission.UnloadPlan == null)
+			{
+				if (world.WorldTick - mission.PlanFailureTick < Info.LandingHoldTicks)
+					return;
+
+				if (TryPlanRecoveryFallback(mission, out var rejection) && IssueUnloadPlanRoute(mission))
+				{
+					mission.Stage = MissionStage.Travelling;
+					mission.LastOrderTick = world.WorldTick;
+					Debug("mission {0} resumed terminal safe recovery: recoveryObjective={1} carrier={2} exit={3}",
+						mission.Id, mission.RecoveryObjective, mission.UnloadPlan.CarrierCell,
+						mission.UnloadPlan.ExitCells[0]);
+					return;
+				}
+
+				coordinator.ReleaseCells(mission.Id);
+				mission.UnloadPlan = null;
+				mission.PlanFailureTick = world.WorldTick;
+				return;
+			}
+
+			var objective = mission.RecoveryObjective ?? mission.Destination;
+			if (!EnsureUnloadPlan(mission, objective, out var reason))
+			{
+				ParkTerminalPlan(mission, reason);
+				return;
+			}
+
+			if (mission.LastRoutedPlanRevision != mission.UnloadPlan.Revision)
+			{
+				if (IssueUnloadPlanRoute(mission))
+					mission.LastOrderTick = world.WorldTick;
+				else
+					ParkTerminalPlan(mission, "replacement threat route failed");
+
+				return;
+			}
+
+			if ((mission.Transport.Location - mission.UnloadPlan.CarrierCell).LengthSquared <=
+				Info.UnloadRangeCells * Info.UnloadRangeCells)
+			{
+				mission.Stage = MissionStage.Unloading;
+				mission.LastOrderTick = world.WorldTick;
+				QueuePlannedUnload(mission);
+				Debug("mission {0} committing terminal exact unload: carrier={1} exit={2} objective={3} " +
+					"revision={4} snapshot={5}", mission.Id, mission.UnloadPlan.CarrierCell,
+					mission.UnloadPlan.ExitCells[0], mission.UnloadPlan.Objective,
+					mission.UnloadPlan.Revision, mission.UnloadPlan.SnapshotTick);
+				return;
+			}
+
+			if (IsCarrierIdle(mission.Transport) && ReadyToRetry(mission))
+			{
+				if (IssueUnloadPlanRoute(mission))
+					mission.LastOrderTick = world.WorldTick;
+				else
+					ParkTerminalPlan(mission, "threat route failed");
+			}
+		}
+
+		void ParkTerminalPlan(Mission mission, string reason)
+		{
+			bot.QueueOrder(new Order("Stop", mission.Transport, false));
+			coordinator.ReleaseCells(mission.Id);
+			mission.UnloadPlan = null;
+			mission.PlanFailureTick = world.WorldTick;
+			mission.LastRoutedPlanRevision = 0;
+			Debug("mission {0} terminal recovery plan invalidated: recoveryObjective={1} reason={2}",
+				mission.Id, mission.RecoveryObjective, reason);
+		}
+
+		bool TryPlanRecoveryFallback(Mission mission, out string rejection)
+		{
+			var objective = mission.RecoveryObjective ?? mission.Destination;
+			var revision = (mission.UnloadPlan?.Revision ?? 0) + 1;
+			if (!unloadPlanner.TryPlanWithoutClaim(mission.Id, mission.Transport, new[] { mission.Passenger },
+				mission.Transport.Location, objective, Info.SafeReturnLandingSearchRadiusCells,
+				Info.SafeReturnUsefulnessRadiusCells, revision, Array.Empty<CPos>(),
+				out var replacement, out rejection) ||
+				!unloadPlanner.TryClaimPlans(mission.Id, new[] { replacement }, out rejection))
+				return false;
+
+			mission.UnloadPlan = replacement;
+			mission.PlanFailureTick = 0;
+			return true;
 		}
 
 		bool TryCreateRescueMission()
@@ -395,14 +700,18 @@ namespace OpenRA.Mods.Common.Traits
 				if (++observation.Count < Info.PersistentBlockedScans)
 					continue;
 
-				Debug("confirmed persistent route failure for {0} to {1} after {2} scans",
-					actor, destination, observation.Count);
+				var logObservation = observation.Count == Info.PersistentBlockedScans ||
+					(observation.Count - Info.PersistentBlockedScans) % Info.BlockedDiagnosticIntervalScans == 0;
+				if (logObservation)
+					Debug("confirmed persistent route failure for {0} to {1} after {2} scans",
+						actor, destination, observation.Count);
 
 				var transport = FindAvailableTransport(actor);
 				if (transport == null)
 				{
-					Debug("blocked {0} to {1} is eligible but no healthy empty transport is available",
-						actor, destination);
+					if (logObservation)
+						Debug("blocked {0} to {1} is eligible but no healthy empty transport is available",
+							actor, destination);
 					RequestTransportHelicopter();
 					return false;
 				}
@@ -486,6 +795,7 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				if (NeedsRepair(transport))
 				{
+					safeIdleStagingCells.Remove(transport.ActorID);
 					var repairable = transport.TraitOrDefault<Repairable>();
 					var repair = repairable?.FindRepairBuilding(transport);
 					if (repair != null)
@@ -496,6 +806,14 @@ namespace OpenRA.Mods.Common.Traits
 						continue;
 					}
 				}
+				else if (safeIdleStagingCells.TryGetValue(transport.ActorID, out var safeStagingCell))
+				{
+					if ((transport.Location - safeStagingCell).LengthSquared <=
+						Info.UnloadRangeCells * Info.UnloadRangeCells)
+						continue;
+
+					safeIdleStagingCells.Remove(transport.ActorID);
+				}
 
 				if ((transport.Location - baseCenter).LengthSquared > Info.IdleStagingRadius * Info.IdleStagingRadius)
 				{
@@ -503,6 +821,12 @@ namespace OpenRA.Mods.Common.Traits
 					Debug("staged idle {0} at base", transport);
 				}
 			}
+		}
+
+		void RememberSafeIdleStaging(Actor transport, CPos cell)
+		{
+			if (transport != null)
+				safeIdleStagingCells[transport.ActorID] = cell;
 		}
 
 		void IssueRoutedMove(Actor transport, CPos destination, Order finalOrder = null)
@@ -526,15 +850,22 @@ namespace OpenRA.Mods.Common.Traits
 				bot.QueueOrder(finalOrder);
 		}
 
-		void RecoverTimedOutCargo(Mission mission)
+		void RecoverTimedOutCargo(Mission mission, string reason = "mission deadline expired")
 		{
+			if (!mission.Recovery.TryBeginReturn(world.WorldTick, Info.MissionTimeoutTicks))
+				return;
+
 			var baseCenter = squadManager?.GetRandomBaseCenter() ?? mission.Transport.Location;
-			mission.Stage = MissionStage.Unloading;
+			mission.RecoveryObjective = baseCenter;
+			mission.Stage = MissionStage.Travelling;
 			mission.LastOrderTick = world.WorldTick;
-			mission.DeadlineTick = world.WorldTick + Info.MissionTimeoutTicks;
-			IssueRoutedMove(mission.Transport, baseCenter,
-				new Order("Unload", mission.Transport, true));
-			Debug("mission {0} timed out carrying cargo; returning to base for safe unload", mission.Id);
+			mission.UnloadPlan = null;
+			mission.PlanFailureTick = 0;
+			if (EnsureUnloadPlan(mission, baseCenter, out var rejection) && IssueUnloadPlanRoute(mission))
+				Debug("mission {0} withdrawing for planned safe unload: reason={1} carrier={2} exit={3}",
+					mission.Id, reason, mission.UnloadPlan.CarrierCell, mission.UnloadPlan.ExitCells[0]);
+			else
+				HandlePlanFailure(mission, $"safe recovery plan unavailable: {rejection}");
 		}
 
 		bool NeedsRepair(Actor actor)

@@ -1157,6 +1157,11 @@
 		CrushClasses: wall
         CrushSound: xplos.aud
 
+^AircraftGroundHusk:
+	Inherits: ^Husk
+	Tooltip:
+		GenericName: Destroyed Aircraft
+
 ^LightHusk:
 	Inherits: ^Husk
 	Health:

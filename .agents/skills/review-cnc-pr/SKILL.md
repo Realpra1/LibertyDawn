@@ -1,20 +1,47 @@
 ---
 name: review-cnc-pr
-description: Review one completed Liberty Dawn CNC task pull request against its isolated worker specification and evidence, focusing on correctness, regressions, code quality, technical debt, readability, determinism, and simulation CPU cost. Use as the single independent review gate before a task branch enters a coordinated release candidate.
+description: Review either an in-progress Liberty Dawn CNC worker diff at a five-cycle checkpoint or one completed task pull request, focusing on correctness, regressions, code quality, technical debt, readability, determinism, and simulation CPU cost. Use for advisory Terra-medium cycle reviews and the final independent Sol-high gate before a task enters a coordinated release candidate.
 ---
 
-# Review One CNC PR
+# Review CNC Worker Code
 
-Use a fresh Sol 5.6 high session. Do not modify Git, product code, task-sheet
-state, coordinator state, or the PR; write only the requested review file.
+The job must declare one mode:
 
-1. Read applicable `AGENTS.md`, the assigned worker state/spec, PR diff and commits,
-   relevant surrounding code, test evidence, required checks, and no other worker
-   specs.
+- `cycle`: use a fresh Terra 5.6 medium session after isolated product-change
+  cycles 5, 10, 15, and 20 that occur. Review the cumulative current diff and
+  latest evidence while the worker can still react inside its normal budget.
+- `final`: use a fresh Sol 5.6 high session for the completed task PR.
+
+Do not modify Git, product code, worker state, task-sheet state, coordinator
+state, or a PR; write only the requested review file. Never create tasks, expand
+scope, recommend balance changes outside explicit authority, or optimize for a
+preferred test result.
+
+In `cycle` mode, read only the assigned worker state, cumulative diff from its
+recorded base, relevant surrounding code, and evidence through the named cycle.
+Return at most one high-value compatible concern. Do not penalize final evidence,
+CI, publication, or later adversarial cases merely because they are not due yet.
+The worker records whether it adopts or rejects the concern; an adopted product
+change starts the next ordinary code-change cycle. This advisory review does not
+replace the final gate or grant extra cycles.
+
+In `final` mode, read the assigned worker state/spec, task report, PR diff and
+commits, relevant surrounding code, test evidence, and required checks. Read no
+other worker specs.
+
+1. Read applicable `AGENTS.md` and only the artifacts allowed by the selected
+   mode above.
+   Route any large build, full test/check suite, equivalent `dotnet`/`msbuild`
+   suite, or packaging build through the coordinator helper's protected
+   `--large-build-entry reviewer` mode with the round's absolute lock directory.
+   Never reconstruct a lock filename/capacity or invoke direct `flock`.
 2. Verify observable requirements and forbidden behavior before style. Look for
    hidden queue/order contention, save/load or replay-state omissions, nondeterminism,
    unbounded per-tick work, excess allocations/scans/logging, duplicated policy,
-   brittle test-only behavior, and unrelated changes.
+   brittle test-only behavior, and unrelated changes. Treat balance as frozen
+   unless the worker contract expressly authorizes the exact surface; block cost,
+   HP, damage, armor, speed, timing, power, prerequisite, probability, resource,
+   or similar tuning used to make unrelated acceptance evidence pass.
 3. Enforce separation of concerns and cohesion. Flag mixed responsibilities,
    oversized or deeply nested classes/functions, unclear ownership, duplicated
    policy, misleading names, hidden mutable state, and abstractions that make the
@@ -29,15 +56,15 @@ state, coordinator state, or the PR; write only the requested review file.
    real match.
 6. Support performance blockers with a credible hot-path argument or measurement;
    do not block on speculative micro-optimization.
-7. Verify that real-AI/MAX, matched differential, contention, three clean
+7. In `final` mode, verify that real-AI/MAX, matched differential, contention, three clean
    adversarial scenarios, final acceptance regression, save/load where relevant,
    diagnostic cleanup, and required checks satisfy the worker contract. Missing
    or unexercised evidence is a finding, not an assumption.
-8. Require the first behavioral test after implementation to be a full-engine
+8. In `final` mode, require the first behavioral test after implementation to be a full-engine
    ordinary-AI simulation, normally headless MAX. Reject unit-test-only early
    cycles, passive/custom-bot substitution, or delayed game testing when the full
    simulation could have supplied cheap feedback from cycle 1.
-9. For an AI strategy/policy change, require a valid old-behavior control: prefer
+9. In `final` mode, for an AI strategy/policy change, require a valid old-behavior control: prefer
    the same build with the feature disabled, otherwise the recorded base or named
    older control commit. Verify matched content, map, faction, seed, starts,
    options, initial state, and opponents plus task-relevant outcome/quality
@@ -45,31 +72,35 @@ state, coordinator state, or the PR; write only the requested review file.
    likely correctness or strategic-policy defect and block completion; feature
    activation logs do not prove benefit. When infrastructure allowed it, confirm
    the first behavioral test paired changed and old behavior.
-10. Reject a test portfolio made of repeated happy paths. Except for one initial
+10. In `final` mode, reject a test portfolio made of repeated happy paths. Except for one initial
    full-engine harness/basic-path smoke, require every unit/integration/game test
    to state a
    credible failure hypothesis, harder or different perturbation, expected failure
    signal, and observed pass/failure evidence. Confirm difficulty increased as
    soon as behavior first worked and that unexpected results changed the next
    test or implementation decision.
-11. Verify a fresh Terra Commenter produced a factual narrative after every
+11. In `final` mode, verify a fresh Terra Commenter produced a factual narrative after every
    materially judged match/batch and that every AI-policy narrative received a
    fresh Terra Policy Review before the next worker decision. For AI-policy specs,
    require the recorded Sol-high spec consultation. Permit at most one Sol-xhigh
    policy escalation, only after the recorded tenth game test. Flag leaked source,
-   logs, task/spec context, or outcome-driven rewriting across the Policy Reviewer's
-   design-document-plus-narrative boundary.
-12. Treat Commenter and Policy Reviewer output as interpretation, not completion
+   logs, full task/spec context, or outcome-driven rewriting across the Policy
+   Reviewer's design-document-plus-short-task-context-plus-narrative boundary.
+12. In `final` mode, treat Commenter and Policy Reviewer output as interpretation, not completion
    evidence. Confirm the worker checked cited facts, documented adopted/rejected
    advice, and validated recommendations through later adversarial full-AI games.
 13. List findings by severity with file/line, failure mechanism, affected spec
    clause, and smallest safe correction. Avoid cosmetic preferences.
-14. Nominate one `required_fix`: the highest-impact correction compatible with the
-   task. Use `none` when no worthwhile issue exists. Critical compile, corruption,
-   security, or deterministic-simulation failures remain release blockers even
-   though the ordinary review-response budget is one code/test cycle.
+14. In `cycle` mode, nominate at most one `advisory_concern`, using `none` when no
+   worthwhile issue exists. In `final` mode, nominate one `required_fix`: the
+   highest-impact correction compatible with the task, or `none`. Critical
+   compile, corruption, security, or deterministic-simulation failures remain
+   release blockers even though the ordinary final review-response budget is one
+   code/test cycle.
 15. The worker may reject a finding with concrete evidence. Record the disagreement
    rather than arguing indefinitely.
 
-Write the requested review file and return only verdict (`ready`, `ready with one
-fix`, or `blocked`), `required_fix`, and its path to the coordinator.
+Write the requested review file. For `cycle`, return only verdict (`clear` or
+`advisory concern`), `advisory_concern`, and its path. For `final`, return only
+verdict (`ready`, `ready with one fix`, or `blocked`), `required_fix`, and its path
+to the coordinator.

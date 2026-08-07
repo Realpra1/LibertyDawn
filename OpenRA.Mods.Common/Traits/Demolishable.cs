@@ -28,11 +28,14 @@ namespace OpenRA.Mods.Common.Traits
 		public override object Create(ActorInitializer init) { return new Demolishable(this); }
 	}
 
-	public class Demolishable : ConditionalTrait<DemolishableInfo>, IDemolishable, ITick
+	public class Demolishable : ConditionalTrait<DemolishableInfo>, IDemolishable, IAdaptiveKillValue, ITick
 	{
 		class DemolishAction
 		{
 			public readonly Actor Saboteur;
+			public readonly Player SpecialistPlayer;
+			public readonly string SpecialistType;
+			public readonly uint SpecialistId;
 			public readonly int Token;
 			public int Delay;
 			public readonly BitSet<DamageType> DamageTypes;
@@ -42,6 +45,9 @@ namespace OpenRA.Mods.Common.Traits
 				DemolitionSafety safety)
 			{
 				Saboteur = saboteur;
+				SpecialistPlayer = saboteur.Owner;
+				SpecialistType = saboteur.Info.Name;
+				SpecialistId = saboteur.ActorID;
 				Delay = delay;
 				Token = token;
 				DamageTypes = damageTypes;
@@ -51,6 +57,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		readonly List<DemolishAction> actions = new List<DemolishAction>();
 		readonly List<DemolishAction> removeActions = new List<DemolishAction>();
+		DemolishAction resolvingAction;
 
 		public Demolishable(DemolishableInfo info)
 			: base(info) { }
@@ -63,6 +70,15 @@ namespace OpenRA.Mods.Common.Traits
 		bool IDemolishable.IsValidTarget(Actor self, Actor saboteur)
 		{
 			return !IsTraitDisabled;
+		}
+
+		AdaptiveKillEvidence? IAdaptiveKillValue.GetAdaptiveKillValue(Actor self, Actor attacker)
+		{
+			if (resolvingAction?.Saboteur != attacker || !self.Info.HasTraitInfo<BuildingInfo>())
+				return null;
+
+			return new AdaptiveKillEvidence(resolvingAction.SpecialistPlayer, resolvingAction.SpecialistType,
+				resolvingAction.SpecialistId, self.GetSellValue());
 		}
 
 		void IDemolishable.Demolish(Actor self, Actor saboteur, int delay, BitSet<DamageType> damageTypes,
@@ -107,7 +123,15 @@ namespace OpenRA.Mods.Common.Traits
 								"relationship={4}", self.World.WorldTick, self.Info.Name, self.ActorID,
 								self.Owner.InternalName, a.Saboteur.Owner.RelationshipWith(self.Owner));
 
-						self.Kill(a.Saboteur, a.DamageTypes);
+						resolvingAction = a;
+						try
+						{
+							self.Kill(a.Saboteur, a.DamageTypes);
+						}
+						finally
+						{
+							resolvingAction = null;
+						}
 					}
 					else if (a.Token != Actor.InvalidConditionToken)
 					{

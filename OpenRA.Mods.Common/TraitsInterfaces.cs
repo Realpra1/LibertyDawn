@@ -127,6 +127,27 @@ namespace OpenRA.Mods.Common.Traits
 		void Demolish(Actor self, Actor saboteur, int delay, BitSet<DamageType> damageTypes, DemolitionSafety safety);
 	}
 
+	public readonly struct AdaptiveKillEvidence
+	{
+		public readonly Player SpecialistPlayer;
+		public readonly string SpecialistType;
+		public readonly uint SpecialistId;
+		public readonly int EconomicValue;
+
+		public AdaptiveKillEvidence(Player specialistPlayer, string specialistType, uint specialistId, int economicValue)
+		{
+			SpecialistPlayer = specialistPlayer;
+			SpecialistType = specialistType;
+			SpecialistId = specialistId;
+			EconomicValue = economicValue;
+		}
+	}
+
+	public interface IAdaptiveKillValue
+	{
+		AdaptiveKillEvidence? GetAdaptiveKillValue(Actor self, Actor attacker);
+	}
+
 	// Type tag for crush class bits
 	public class CrushClass { }
 
@@ -234,6 +255,22 @@ namespace OpenRA.Mods.Common.Traits
 		void Harvested(Actor self, string resourceType);
 		void Docked();
 		void Undocked();
+	}
+
+	[RequireExplicitImplementation]
+	public interface INotifyHarvesterUnload
+	{
+		void UnloadStarted(Actor self, Actor refinery);
+		void UnloadCompleted(Actor self, Actor refinery);
+		void UnloadAborted(Actor self, Actor refinery);
+	}
+
+	public interface IHarvesterFieldStation
+	{
+		bool HasPendingField { get; }
+		CPos PendingField { get; }
+		bool HasCommittedField { get; }
+		CPos CommittedField { get; }
 	}
 
 	[RequireExplicitImplementation]
@@ -483,6 +520,11 @@ namespace OpenRA.Mods.Common.Traits
 		bool CanEnterTargetNow(Actor self, in Target target);
 	}
 
+	public interface IMobileCellValidator
+	{
+		bool IsValidCell(Actor self, CPos cell);
+	}
+
 	public interface IWrapMove
 	{
 		Activity WrapMove(Activity moveInner);
@@ -569,6 +611,14 @@ namespace OpenRA.Mods.Common.Traits
 		void RequestUnitProduction(IBot bot, string requestedActor);
 		void CancelRequestedUnitProduction(IBot bot, string requestedActor);
 		int RequestedProductionCount(IBot bot, string requestedActor);
+	}
+
+	[RequireExplicitImplementation]
+	public interface IBotRequestOwnedUnitProduction
+	{
+		void RequestUnitProduction(IBot bot, string requestOwner, string requestedActor);
+		void CancelRequestedUnitProduction(IBot bot, string requestOwner, string requestedActor);
+		int RequestedProductionCount(IBot bot, string requestOwner, string requestedActor);
 	}
 
 	[RequireExplicitImplementation]

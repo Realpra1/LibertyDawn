@@ -9,6 +9,7 @@
  */
 #endregion
 
+using System.Collections.Generic;
 using System.Linq;
 using OpenRA.Primitives;
 using OpenRA.Traits;
@@ -58,7 +59,35 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Should an actor spawn after the player has been defeated (e.g. after surrendering)?")]
 		public readonly bool SpawnAfterDefeat = true;
 
+		[Desc("Only spawn when the target actor is a Husk that can exist on the terrain and no live actor occupies the cell.",
+			"The check occurs at the final frame-end creation boundary after the dying actor has been removed.")]
+		public readonly bool RequiresValidHuskCell = false;
+
+		public override void RulesetLoaded(Ruleset rules, ActorInfo ai)
+		{
+			base.RulesetLoaded(rules, ai);
+
+			if (!RequiresValidHuskCell)
+				return;
+
+			var actorName = Actor.ToLowerInvariant();
+			if (!rules.Actors.TryGetValue(actorName, out var actorInfo) || !actorInfo.HasTraitInfo<HuskInfo>())
+				throw new YamlException($"{ai.Name} requires {actorName} to define Husk when {nameof(RequiresValidHuskCell)} is enabled.");
+		}
+
 		public override object Create(ActorInitializer init) { return new SpawnActorOnDeath(init, this); }
+	}
+
+	public static class HuskSpawnCellEligibility
+	{
+		public static bool HasLiveBlocker(IEnumerable<bool> actorDeadStates)
+		{
+			foreach (var isDead in actorDeadStates)
+				if (!isDead)
+					return true;
+
+			return false;
+		}
 	}
 
 	public class SpawnActorOnDeath : ConditionalTrait<SpawnActorOnDeathInfo>, INotifyKilled, INotifyRemovedFromWorld
@@ -140,7 +169,54 @@ namespace OpenRA.Mods.Common.Traits
 				.Select(ihm => ihm.HuskActor(self))
 				.FirstOrDefault(a => a != null);
 
-			self.World.AddFrameEndTask(w => w.CreateActor(huskActor ?? Info.Actor, td));
+			var actorName = huskActor ?? Info.Actor;
+			var sourceName = self.Info.Name;
+			var sourceId = self.ActorID;
+			var location = self.Location + Info.Offset;
+			self.World.AddFrameEndTask(w =>
+			{
+				if (Info.RequiresValidHuskCell)
+				{
+					var actorInfo = w.Map.Rules.Actors[actorName.ToLowerInvariant()];
+					var huskInfo = actorInfo.TraitInfoOrDefault<HuskInfo>();
+					if (huskInfo == null)
+					{
+						Log.Write("debug", "Death-spawn placement source={0}#{1} actor={2} cell={3} result=rejected reason=missing-husk-trait",
+							sourceName, sourceId, actorName, location);
+						return;
+					}
+
+					if (!w.Map.Contains(location))
+					{
+						Log.Write("debug", "Death-spawn placement source={0}#{1} actor={2} cell={3} result=rejected reason=outside-map",
+							sourceName, sourceId, actorName, location);
+						return;
+					}
+
+					var terrain = w.Map.GetTerrainInfo(location).Type;
+					if (!huskInfo.AllowedTerrain.Contains(terrain))
+					{
+						Log.Write("debug", "Death-spawn placement source={0}#{1} actor={2} cell={3} terrain={4} result=rejected reason=terrain",
+							sourceName, sourceId, actorName, location, terrain);
+						return;
+					}
+
+					var cellActors = w.ActorMap.GetActorsAt(location).OrderBy(a => a.ActorID).ToArray();
+					if (HuskSpawnCellEligibility.HasLiveBlocker(cellActors.Select(a => a.IsDead)))
+					{
+						var blockers = cellActors.Where(a => !a.IsDead)
+							.Select(a => $"{a.Info.Name}#{a.ActorID}");
+						Log.Write("debug", "Death-spawn placement source={0}#{1} actor={2} cell={3} terrain={4} result=rejected reason=occupied blockers={5}",
+							sourceName, sourceId, actorName, location, terrain, blockers.JoinWith(","));
+						return;
+					}
+				}
+
+				var spawned = w.CreateActor(actorName, td);
+				if (Info.RequiresValidHuskCell)
+					Log.Write("debug", "Death-spawn placement source={0}#{1} actor={2}#{3} cell={4} result=created",
+						sourceName, sourceId, spawned.Info.Name, spawned.ActorID, location);
+			});
 		}
 	}
 }

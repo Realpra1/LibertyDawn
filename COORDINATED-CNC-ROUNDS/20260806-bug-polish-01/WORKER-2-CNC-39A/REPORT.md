@@ -176,3 +176,97 @@ checks are awaited after the handoff-metadata push.
 - A first save reload attempt and several early map fixtures were invalid harness/setup runs; every such run is labeled and excluded from acceptance.
 - The changed travel run's broad forbidden predicate flagged a valid later plant on a different hostile target; independent review and the target-specific ladder/combined harnesses corrected the oracle.
 - Manual force-target scope is protected structurally by the absence of the autonomous marker but is not directly exercised through UI input.
+
+## Integrated RC2 validation
+
+### Candidate and scope
+
+Validated cumulative release candidate
+`fd15540ffc98c70f085688fe0b38a4a6341fc6ed`, whose product-code head is
+`b456fd89fac88d71dfadd65c47cfb7b409d44122` and draft release PR is `#84`.
+The repair worktree head during testing was
+`c3c714dbf092d7dd4470ef3e5e4da9d03664812a`; its only delta from the assigned
+candidate was the worker's RC2 assignment-state file. No product or rules change
+was made, so integrated code-cycle use is `0/3` for RC2 and `0/12` total.
+
+The RC2 question was whether shared capture/demolition reservations, autonomous
+C4 travel/plant/damage safety, deterministic hostile follow-up, and CNC-39's
+merged capture reassessment coexist. Fixed old-behavior controls were not rerun:
+the integration risk is candidate coexistence, and the isolated pinned-base
+controls already prove the original collision and friendly demolition.
+
+### Full-engine results
+
+Artifact root: `analysis/worker-2-cnc-39a/rc2/`. Four additional full-engine
+games were judged, bringing the durable counter from 65 to 69.
+
+- `three-way-run/rc2-combined` passed at seed 39084 through tick 2400. The exact
+  Engineer pair captured shared `weap#158` at tick 102 while the Commando
+  demolished alternate `nuke#159` at 539. Its later assignment against
+  `fact#161` canceled at 793 after allied capture, with no plant; it then
+  demolished continuously hostile `nuke#162` at 1826. Both captured structures
+  survived with the expected owners.
+- `three-way-run/rc2-postplant` passed at seed 39051 through tick 1400. C4 planted
+  against enemy `weap#157` at tick 81; allied capture completed at 135; the charge
+  disarmed at 136; no final harmful action occurred and the friendly target
+  survived at its recorded 53,900 HP.
+- The capacity-3 ladder process performed the required first/second allied
+  cancellations and hostile third demolition, but an earlier natural conclusion
+  skipped its old tick-2501 marker and the launcher could not infer a maximum
+  tick from Lua's `tick=` lines. It is labeled an invalid harness result, not a
+  product pass or failure.
+- `ladder-rerun/rc2-ownership-ladder-corrected` closed that evidence gap at seed
+  39082. It captured the first two targets at ticks 96 and 342, canceled their
+  autonomous C4 orders at 97 and 343, planted only against hostile `nuke#160` at
+  1617, destroyed it at 1663, and reached the tick-2501 final state with both
+  allied targets alive and the Commando idle. It passed to natural game over at
+  249.657 valid world ticks/sec.
+
+There were no fatal errors, desyncs, Lua exceptions, same-target cross-purpose
+claims, autonomous plants against the captured buildings, or autonomous final
+actions against an allied target.
+
+### Resource-capacity trial
+
+The first capacity-3 reservation waited about 58 seconds, then launched all three
+games together. Active batch time was 12.034 seconds. All three processes exited
+cleanly; two existing harnesses passed and the ladder had the stale-oracle issue
+described above. A live sample two seconds into execution recorded 1,017,884 KiB
+RSS across the three game/Xvfb process pairs. The initial sampler followed only
+its parent session, so its claimed peak is invalid and is not used. The corrected
+serial process-tree sampler measured a 677,544 KiB peak and 10.151 seconds elapsed.
+
+A subsequent clean three-slot reservation could not acquire all locks for more
+than eleven minutes while other workers continuously used one or two slots. This
+is strong scheduling evidence to restore the shared default to two slots.
+Three-way execution was stable once started, but its exclusive acquisition,
+roughly 151 effective ticks/sec per game in the concurrent batch versus 249.657
+serial for the ladder, and observed memory footprint do not justify retaining
+capacity three as the default.
+
+### Reviews and checks
+
+The initial batch factual review is `rc2/commenter/NARRATIVE.md`; its policy review
+is `rc2/policy-review/POLICY-REVIEW.md`. The corrected ladder factual review is
+`rc2/commenter-ladder-corrected/NARRATIVE.md`; its policy review is
+`rc2/policy-ladder-corrected/POLICY-REVIEW.md`. Both policy reviews judged the
+behavior `mostly sensible` at medium confidence and advised no product repair for
+the invalid harness result. They correctly retain the long final hostile-target
+travel as a future bounded-telemetry question rather than grounds for an
+unscoped target-priority or balance change.
+
+Candidate checks passed:
+
+- Release build: 0 warnings, 0 errors.
+- Focused `CaptureTargetingTest`: 15/15.
+- Full `OpenRA.Test`: 454/454.
+- `make check`, `make check-scripts`, `make test`, and `git diff --check`.
+
+### RC2 handoff
+
+Result: **combined pass/no repair**. The original status remains **First iteration
+- testing** because the pre-existing completion gaps were not in this RC2 repair
+scope: ordinary transport takeover is still not directly exercised, the natural
+production/defender scenario is incomplete, and manual UI force-target behavior
+has only structural/script-scope coverage. These are unchanged risks, not
+combined-candidate regressions.

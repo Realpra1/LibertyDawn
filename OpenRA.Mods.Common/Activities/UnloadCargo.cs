@@ -27,6 +27,7 @@ namespace OpenRA.Mods.Common.Activities
 		readonly Mobile mobile;
 		readonly bool assignTargetOnFirstRun;
 		readonly WDist unloadRange;
+		readonly IReadOnlyDictionary<uint, CPos> exactExitCells;
 
 		Target destination;
 		bool takeOffAfterUnload;
@@ -49,9 +50,25 @@ namespace OpenRA.Mods.Common.Activities
 			this.unloadRange = unloadRange;
 		}
 
+		public UnloadCargo(Actor self, in Target destination, WDist unloadRange,
+			IReadOnlyDictionary<uint, CPos> exactExitCells,
+			bool unloadAll = true)
+			: this(self, destination, unloadRange, unloadAll)
+		{
+			this.exactExitCells = exactExitCells;
+		}
+
 		public (CPos Cell, SubCell SubCell)? ChooseExitSubCell(Actor passenger)
 		{
 			var pos = passenger.Trait<IPositionable>();
+			if (exactExitCells != null)
+			{
+				if (!exactExitCells.TryGetValue(passenger.ActorID, out var exactExitCell))
+					return null;
+
+				var subCell = pos.GetAvailableSubCell(exactExitCell);
+				return subCell == SubCell.Invalid ? ((CPos, SubCell)?)null : (exactExitCell, subCell);
+			}
 
 			return cargo.CurrentAdjacentCells
 				.Shuffle(self.World.SharedRandom)
@@ -63,6 +80,8 @@ namespace OpenRA.Mods.Common.Activities
 		IEnumerable<CPos> BlockedExitCells(Actor passenger)
 		{
 			var pos = passenger.Trait<IPositionable>();
+			if (exactExitCells != null && exactExitCells.TryGetValue(passenger.ActorID, out var exactExitCell))
+				return new[] { exactExitCell };
 
 			// Find the cells that are blocked by transient actors
 			return cargo.CurrentAdjacentCells

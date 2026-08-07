@@ -46,6 +46,18 @@ review output. Never infer an event merely because code was intended to produce 
 6. Always identify what each AI did well, especially a losing AI. Distinguish a
    sensible decision overwhelmed by circumstances from a true blunder, without
    turning this factual narrative into the policy verdict.
+7. When stable actor IDs and sufficient events exist, follow two or three
+   representative individual units in detail rather than relying only on global
+   totals. Prefer a changed-feature unit that succeeded, one that failed or was
+   lost, and optionally an effective losing-AI unit. Reconstruct creation, mission
+   or assignment, map region/position and route over time, orders/replans, time to
+   first useful action, contacts and targets, damage, retreat/repair/unload, kills
+   or other useful effects, idle/stall duration, lifespan, how quickly/why it died,
+   and final outcome. Compare the
+   same role in control when evidence permits. These short unit stories supplement
+   the match-level causal account; they do not replace it. If supplied logs or
+   replay metrics lack stable identity/event coverage, say exactly what is unknown
+   and what bounded instrumentation would make the trace possible.
 
 ## Output
 
@@ -57,6 +69,7 @@ Write the requested `NARRATIVE.md` with:
 ## Evidence integrity and setup
 ## Outcome in one paragraph
 ## Chronological narrative
+## Individual unit stories
 ## Changed AI versus old-behavior control
 ## Why the changed AI won or lost
 ## Why the control won or lost

@@ -150,6 +150,7 @@ namespace OpenRA.Mods.Common.Traits
 				var type = BuildingType.Building;
 				CPos? location = null;
 				string orderString = "PlaceBuilding";
+				var fieldPlacement = false;
 
 				// Check if Building is a plug for other Building
 				var actorInfo = world.Map.Rules.Actors[currentBuilding.Item];
@@ -165,6 +166,14 @@ namespace OpenRA.Mods.Common.Traits
 						location = possibleBuilding.Actor.Location + possibleBuilding.Trait.Info.Offset;
 					}
 				}
+				else if (baseBuilder.TiberiumFieldManager != null &&
+					baseBuilder.TiberiumFieldManager.TryGetPlacement(
+						queue.Actor.ActorID, actorInfo.Name, out location, out var fieldLineBuild))
+				{
+					fieldPlacement = true;
+					if (fieldLineBuild)
+						orderString = "LineBuild";
+				}
 				else if (baseBuilder.WallPlanner != null && baseBuilder.WallPlanner.IsWallType(actorInfo.Name))
 				{
 					// Walls are laid out in lines by the wall planner rather than dropped on some
@@ -174,10 +183,14 @@ namespace OpenRA.Mods.Common.Traits
 				}
 				else
 				{
-					if (baseBuilder.FirstTowerPlanner.AppliesTo(actorInfo.Name))
+					var economySamPlacement = baseBuilder.OwnsEconomyDefenseSam(queue, actorInfo.Name);
+					if (economySamPlacement)
+						location = baseBuilder.EconomyDefenseSamLocation(queue, currentBuilding.Item, actorInfo,
+							actorInfo.TraitInfo<BuildingInfo>(), true);
+					else if (baseBuilder.FirstTowerPlanner.AppliesTo(actorInfo.Name))
 						location = baseBuilder.FirstTowerPlanner.ChooseLocation(actorInfo, actorInfo.TraitInfo<BuildingInfo>());
 
-					if (location == null)
+					if (location == null && !economySamPlacement)
 					{
 						// Check if Building is a defense and if we should place it towards the enemy or not.
 						if (actorInfo.HasTraitInfo<AttackBaseInfo>() && world.LocalRandom.Next(100) < baseBuilder.Info.PlaceDefenseTowardsEnemyChance)
@@ -193,6 +206,9 @@ namespace OpenRA.Mods.Common.Traits
 
 				if (location == null)
 				{
+					if (fieldPlacement)
+						baseBuilder.TiberiumFieldManager.PlacementFailed("reserved site became illegal before placement");
+
 					AIUtils.BotDebug($"{player} has nowhere to place {DisplayName(currentBuilding.Item)}");
 					bot.QueueOrder(Order.CancelProduction(queue.Actor, currentBuilding.Item, 1));
 					failCount += failCount;
@@ -217,6 +233,8 @@ namespace OpenRA.Mods.Common.Traits
 						ExtraData = queue.Actor.ActorID,
 						SuppressVisualFeedback = true
 					});
+					if (fieldPlacement)
+						baseBuilder.TiberiumFieldManager.PlacementOrdered();
 
 					return true;
 				}
@@ -375,6 +393,17 @@ namespace OpenRA.Mods.Common.Traits
 				return null;
 			}
 
+			// Once the authored opening and power prerequisites are satisfied, an uncovered
+			// economy anchor may reserve one normal SAM build. Existing powered overlapping
+			// coverage and a single in-flight reservation suppress duplicate sites.
+			var economySam = baseBuilder.EconomyDefenseSamBuilding(queue, buildableThings);
+			if (economySam != null)
+			{
+				AIUtils.BotDebug("{0} decided to build {1}: uncovered economy air approach",
+					queue.Actor.Owner, DisplayName(economySam.Name));
+				return economySam;
+			}
+
 			// Next is to build up a strong economy
 			if (!baseBuilder.HasAdequateRefineryCount)
 			{
@@ -430,6 +459,16 @@ namespace OpenRA.Mods.Common.Traits
 				AIUtils.BotDebug("{0} decided to build {1}: aircraft repair capacity requires power",
 					queue.Actor.Owner, DisplayName(power.Name));
 				return power;
+			}
+
+			// Field development is discretionary and serialized globally. It is considered only
+			// after opening/refinery/power/repair owners, and it applies its own cash and route gate.
+			var fieldBuilding = baseBuilder.TiberiumFieldManager?.TryChooseBuilding(queue, buildableThings);
+			if (fieldBuilding != null)
+			{
+				AIUtils.BotDebug("{0} decided to build {1}: reserved Tiberium field project",
+					queue.Actor.Owner, DisplayName(fieldBuilding.Name));
+				return fieldBuilding;
 			}
 
 			// Preserve the original random production-building selector when cash is floating.
@@ -510,6 +549,11 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				var name = frac.Key;
 				if (limitedFractions.ContainsKey(name))
+					continue;
+
+				// An enabled field manager owns every Resonator request so a generic fraction cannot
+				// create an unassigned actor or duplicate a queue reservation.
+				if (baseBuilder.TiberiumFieldManager?.OwnsActorType(name) == true)
 					continue;
 
 				// While a smart AI has no live refinery, every refinery source shares the one

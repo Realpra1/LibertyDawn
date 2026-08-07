@@ -62,6 +62,33 @@ Player:
 	GrantConditionOnBotOwner@Easiest:
 		Condition: enable-Easiest-ai
 		Bots: Easiest
+	EconomyFieldDefenseBotModule:
+		RequiresCondition: enable-brutalis-ai || enable-ironreaper-ai
+		RequiredPrerequisites: upgrade.economy2
+		HarvesterTypes: harv, sharv
+		TankTypes: mtnk
+		InfantryTypes: e1
+		AntiAirTypes: msam
+		AvoidResourceTypes: Tiberium, BlueTiberium, RedTiberium
+		TanksPerHarvester: 1
+		InfantryPerHarvester: 2
+		AntiAirPerHarvester: 1
+		ScanInterval: 25
+		OrderInterval: 25
+		StationMinimumRadiusCells: 2
+		StationMaximumRadiusCells: 6
+		FormationToleranceCells: 1
+		EngagementLeashCells: 8
+		RefineryLaneLengthCells: 7
+		RefineryLaneHalfWidthCells: 1
+		MaximumRouteCells: 96
+		ResourceSafetyMarginCells: 2
+		ResourceModifierSafetyMarginCells: 1
+		RouteStallTicks: 250
+		RouteRetryTicks: 250
+		MaximumCandidatesPerRole: 48
+		MaximumOutstandingRequestsPerRole: 2
+		DebugLogging: false
 	EconomyArtilleryBotModule:
 		RequiresCondition: enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai
 		RequiredPrerequisites: upgrade.economy2
@@ -174,9 +201,20 @@ Player:
 		MaximumActiveMissions: 4
 		TransportHelicopterLimit: 10
 		PersistentBlockedScans: 3
+		BlockedDiagnosticIntervalScans: 8
 		MaximumCandidatesPerScan: 32
 		MoveIntentMaximumAge: 1500
 		MissionTimeoutTicks: 3000
+		LandingSearchRadiusCells: 8
+		LandingUsefulnessRadiusCells: 16
+		LandingMaximumCandidates: 128
+		LandingReplanInterval: 75
+		LandingHoldTicks: 300
+		SafeReturnLandingSearchRadiusCells: 8
+		SafeReturnUsefulnessRadiusCells: 64
+		LandingThreatRangeBufferCells: 1
+		LandingCoarseCellSize: 4
+		LandingRouteThreatPenalty: 100
 		RepairHealthPercent: 50
 		AssaultSelectionPercent: 50
 		MinimumAssaultPassengers: 3
@@ -184,6 +222,8 @@ Player:
 		AssaultGatherTimeoutTicks: 750
 		AssaultCooldownTicks: 7500
 		AssaultOrderRetryTicks: 75
+		AssaultLandingSearchRadiusCells: 8
+		AssaultLandingUsefulnessRadiusCells: 16
 		HeavyDropMinimumGameTicks: 0
 		HeavyDropMinimumPassengers: 8
 		HeavyDropMaximumPassengers: 10
@@ -197,6 +237,8 @@ Player:
 		HeavyDropLandingRadius: 8
 		HeavyDropFormationRadius: 8
 		HeavyDropFormationSpacing: 3
+		HeavyDropLandingSearchRadiusCells: 3
+		HeavyDropLandingUsefulnessRadiusCells: 16
 		HeavyDropUnloadRangeCells: 1
 		HeavyDropDefenseRadius: 7
 		HeavyDropMaximumDefenderValue: 3400
@@ -533,7 +575,7 @@ Player:
 		MaximumCaptureTargetOptions: 15
 		CaptureDistanceBias: 10
 		CaptureRetargetImprovement: 25
-		SoloBuildingCaptureHealth: 50
+		SoloBuildingCaptureHealth: 80
 		CheckCaptureTargetsForVisibility: false
 		CapturableRelationships: Enemy, Neutral
 		DebugLogging: false
@@ -857,6 +899,17 @@ Player:
     BaseBuilderBotModule@brutalis:
 		RequiresCondition: enable-brutalis-ai || enable-wavemaker-ai
 		EnableSmartEconomy: true
+		EnableTiberiumFieldPolicy: true
+		TiberiumFieldTreeTypes: split2, split3, splitblue, splitred
+		TiberiumFieldRedTreeTypes: splitred
+		TiberiumFieldResonatorTypes: resonator
+		TiberiumFieldPowerTypes: nuk2, nuke
+		TiberiumFieldWallTypes: brik, sbag
+		TiberiumFieldGateBuildingTypes: fix, nuk2, nuke, proc, silo, pyle, hand, weap, afld, fact
+		TiberiumFieldPerimeterStandoff: 4
+		TiberiumFieldExtensionStep: 6
+		TiberiumFieldMaintenanceInterval: 1500
+		TiberiumFieldDebugLogging: true
 		SmartEconomyRefineryTypes: proc
 		SmartEconomyMcvTypes: mcv
 		SmartEconomyDebugLogging: false
@@ -897,6 +950,20 @@ Player:
         MinBaseRadius: 6
         MaxBaseRadius: 49
         MaximumDefenseRadius: 49
+		EconomyDefenseBotTypes: brutalis
+		EconomyDefensePrerequisites: upgrade.economy2
+		EconomyDefenseSamTypes: sam
+		EconomyDefenseRefineryTypes: proc
+		EconomyDefenseResonatorTypes: resonator
+		EconomyDefenseSiloTypes: silo
+		EconomyDefenseMaximumSamSites: 4
+		EconomyDefenseSamMinimumRadius: 2
+		EconomyDefenseSamMaximumRadius: 8
+		EconomyDefenseSamCoverageMarginCells: 2
+		EconomyDefenseRefineryLaneLengthCells: 7
+		EconomyDefenseRefineryLaneHalfWidthCells: 1
+		EconomyDefenseUsedSiloThresholdPercent: 25
+		EconomyDefenseSamDebugLogging: false
         PlaceDefenseTowardsEnemyChance: 90
         PlaceAsDefenses: nuke, hand, pyle, weap, afld, proc
         PlaceAsDefenseChance: 33
@@ -1484,7 +1551,7 @@ Player:
 		WeightedUnitSelection: true
 		AdaptiveProductionDebugLogging: false
 		AdaptiveProductionLogInterval: 250
-		AdaptiveTypes: e1, e2, e3, e4, e5, rmbo, ltnk, ftnk, ctnk, arty, mtnk, mlrs, stnk, apc, bggy, bike, jeep, htnk, heli, orca
+		AdaptiveTypes: e1, e2, e3, e4, e5, e6, rmbo, ltnk, ftnk, ctnk, arty, mtnk, mlrs, stnk, apc, bggy, bike, jeep, htnk, heli, orca
 		EconomyTypes: harv
 		UnitsToBuild:
 			e1: 65
@@ -1564,6 +1631,17 @@ Player:
     BaseBuilderBotModule@ironreaper:
 		RequiresCondition: enable-ironreaper-ai
 		EnableSmartEconomy: true
+		EnableTiberiumFieldPolicy: true
+		TiberiumFieldTreeTypes: split2, split3, splitblue, splitred
+		TiberiumFieldRedTreeTypes: splitred
+		TiberiumFieldResonatorTypes: resonator
+		TiberiumFieldPowerTypes: nuk2, nuke
+		TiberiumFieldWallTypes: brik, sbag
+		TiberiumFieldGateBuildingTypes: fix, nuk2, nuke, proc, silo, pyle, hand, weap, afld, fact
+		TiberiumFieldPerimeterStandoff: 4
+		TiberiumFieldExtensionStep: 6
+		TiberiumFieldMaintenanceInterval: 1500
+		TiberiumFieldDebugLogging: true
 		SmartEconomyRefineryTypes: proc
 		SmartEconomyMcvTypes: mcv
 		SmartEconomyDebugLogging: false
@@ -1602,6 +1680,20 @@ Player:
         MinBaseRadius: 6
         MaxBaseRadius: 49
         MaximumDefenseRadius: 49
+		EconomyDefenseBotTypes: ironreaper
+		EconomyDefensePrerequisites: upgrade.economy2
+		EconomyDefenseSamTypes: sam
+		EconomyDefenseRefineryTypes: proc
+		EconomyDefenseResonatorTypes: resonator
+		EconomyDefenseSiloTypes: silo
+		EconomyDefenseMaximumSamSites: 4
+		EconomyDefenseSamMinimumRadius: 2
+		EconomyDefenseSamMaximumRadius: 8
+		EconomyDefenseSamCoverageMarginCells: 2
+		EconomyDefenseRefineryLaneLengthCells: 7
+		EconomyDefenseRefineryLaneHalfWidthCells: 1
+		EconomyDefenseUsedSiloThresholdPercent: 25
+		EconomyDefenseSamDebugLogging: false
         PlaceDefenseTowardsEnemyChance: 90
 		ConstructionYardTypes: fact
 		RefineryTypes: proc, resonator

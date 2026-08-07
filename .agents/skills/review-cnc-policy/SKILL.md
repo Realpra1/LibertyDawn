@@ -1,6 +1,6 @@
 ---
 name: review-cnc-policy
-description: Judge whether a Liberty Dawn AI policy or observed match behavior makes strategic sense using only the shared Liberty Dawn design reference and a factual match or proposed-policy narrative. Use for Terra-medium post-match playtester feedback, Sol-high consultation during CNC task specification, or one Sol-xhigh escalation after a worker has at least ten persistent-problem game tests.
+description: Judge whether a Liberty Dawn AI policy or observed match behavior makes strategic sense using only the shared Liberty Dawn design reference, a short task/scope description, and a factual match or proposed-policy narrative. Use for Terra-medium post-match playtester feedback, Sol-high consultation during CNC task specification, or one Sol-xhigh escalation after a worker has at least ten persistent-problem game tests.
 ---
 
 # Review CNC Policy
@@ -22,11 +22,13 @@ them with adversarial full-AI games; this role cannot certify completion.
 ## Strict context isolation
 
 Aside from these role instructions and a validated JSON job containing only the
-three paths `design_reference`, `narrative`, and `output`, read only. The narrative
-is a staged regular-file copy at the role directory's `inputs/NARRATIVE.md`:
+four paths `design_reference`, `task_context`, `narrative`, and `output`, read
+only. Both assigned inputs are staged regular-file copies under `inputs/`:
 
 1. `.agents/references/LIBERTY-DAWN-DESIGN.md`.
-2. One assigned `NARRATIVE.md`. At spec time this is a proposed-policy narrative
+2. One short `TASK-CONTEXT.md` stating the task, why it exists, change category,
+   explicit in-scope/out-of-scope behavior, and balance authority.
+3. One assigned `NARRATIVE.md`. At spec time this is a proposed-policy narrative
    describing current behavior, intended behavior, control policy, predicted
    situations/counters, and questions rather than completed match events.
 
@@ -36,30 +38,65 @@ do not escape the boundary to investigate it yourself.
 
 ## Review method
 
-1. Check whether the behavior follows Liberty Dawn's survival-first philosophy,
+1. Restate the expected behavior and scope from `TASK-CONTEXT.md`, then judge
+   whether the narrative exercises and satisfies it. Help the Worker or Speccer
+   understand the game and solve this assigned task sensibly; do not substitute a
+   different objective merely because the observed AI won.
+2. Check whether the behavior follows Liberty Dawn's survival-first philosophy,
    mixed-unit/counterplay design, cyclical technology, living-resource economy,
    structure/unit roles, and the intended personality of Brutalis, VIKI, Skynet,
    Iron Reaper, or the relevant easier AI.
-2. Judge decisions in context: timing, resources, threats, map size/geometry,
+3. Judge decisions in context: timing, resources, threats, map size/geometry,
    available technology, losses, and what the old-behavior control did. Do not use
    outcome bias—a loser may have acted sensibly, while a winner may have survived
    a bad policy through luck, position, reaction speed, or opponent failure.
-3. Identify sensible rules of thumb, excessive blunders, over-specialization,
+4. Identify sensible rules of thumb, excessive blunders, over-specialization,
    wrong unit/structure combinations, poor timing, failure to recover, and missed
    opportunities that a competent human would notice.
-4. Explain whether changed behavior is genuinely better than the control policy.
+5. Explain whether changed behavior is genuinely better than the control policy.
    Treat repeated parity, marginal gain, or loss in an exercised scenario as a
    likely error or bad strategic policy unless the narrative supports an accepted
    tradeoff or unavoidable nondeterminism.
-5. Answer every worker/speccer question directly. When uncertain, state what
+6. Answer every worker/speccer question directly. When uncertain, state what
    additional adversarial full-AI scenario would distinguish the alternatives.
    For rare situations, prefer a deliberately constructed full-engine custom-map
    setup with ordinary AIs/modules, followed by natural-match evidence when
    reasonably reachable. Identify when natural frequency depends on an unfinished
    prerequisite behavior and recommend explicit later revalidation rather than
    waiting indefinitely or blaming the current policy for a missing trigger.
-6. Recommend policy-level changes and next tests, not source files or code edits.
+7. Recommend policy-level changes and next tests, not source files or code edits.
    Prefer a few prioritized, falsifiable recommendations over a long wish list.
+   Keep recommendations inside the change boundary stated by the narrative. For
+   a balance-only or other non-AI change, treat altered AI composition/outcomes as
+   emergent evidence: recommend balance-scoped tuning and discriminating games,
+   not new AI production, targeting, retreat, or squad policy. Record a suspected
+   AI-policy problem as an out-of-scope observation unless the supplied change
+   itself changed that policy. Never create, queue, or spec a new task; task-sheet
+   ownership belongs to the Task Maker and coordinator.
+8. Treat balance as frozen unless `TASK-CONTEXT.md` expressly authorizes the
+   specific balance surface. Never recommend or accept changing cost, HP, damage,
+   armor, speed, timing, power, prerequisites, probabilities, resource values, or
+   similar tuning to make an unrelated behavior task pass. Call such a change an
+   invalid scope escape that can fake the requested result.
+9. For an expressly authorized balance-only task, judge the bounded local effect
+   first. Expect the affected unit to do modestly better or worse in the intended
+   interaction and expect an adaptive builder to rate/select it accordingly when
+   observed utility changes. Use survival, useful damage, exchange value, learned
+   rating, and selection frequency as primary evidence; treat whole-match result
+   and global composition as secondary regression signals unless the task says
+   otherwise. Do not turn one noisy match into new AI-policy requirements.
+10. Consider simulation CPU cost and policy complexity. Prefer a cheap robust rule
+    of thumb when it captures most of the benefit of a global optimizer; require a
+    complex scheduler/reservation system to beat that simpler control in both
+    game value and measured MAX-simulation cost.
+
+For harvesting questions, useful hypotheses include reusing the threat map and
+fleeing active attackers before adding global route optimization. Economy can
+sustain defended fields with Resonators; Recon can make harvesting safer through
+map control; Covert can greedily exploit remote fields with stealth harvesters.
+On Archipelago, sleeping some harvesters or limiting active harvesters relative to
+reachable available Tiberium may preserve field growth. Treat these as faction-
+and-map-specific alternatives to test, not universal requirements.
 
 ## Output
 
@@ -72,6 +109,7 @@ Write the requested `POLICY-REVIEW.md` with:
 - Confidence: high | medium | low
 
 ## Why the verdict follows from Liberty Dawn
+## Expected behavior for this task
 ## Decisions that made sense
 ## What the losing AI still did well
 ## Strategic blunders or bad rules of thumb

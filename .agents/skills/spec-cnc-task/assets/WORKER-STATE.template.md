@@ -10,6 +10,8 @@ when the dependency section directs it.
 
 - Worker: `{{WORKER_ID}}`
 - Task: `{{TASK_ID}} — {{TITLE}}`
+- Change category: `{{CHANGE_CATEGORY}}`
+- Balance authority: `{{EXPLICIT_BALANCE_AUTHORITY_OR_FROZEN}}`
 - Status: `Specified`
 - Common base branch/SHA: `{{BASE_BRANCH}}` / `{{BASE_SHA}}`
 - Task branch: `{{TASK_BRANCH}}`
@@ -23,6 +25,7 @@ when the dependency section directs it.
 - Match-analysis directory: `{{ABSOLUTE_ANALYSIS_DIRECTORY}}`
 - Liberty Dawn design reference: `.agents/references/LIBERTY-DAWN-DESIGN.md`
 - Full-engine game tests completed: `0`
+- Terra cycle code reviews: `none yet; required after cycles 5/10/15/20 that occur`
 - Sol-xhigh policy escalation: `unused (requires at least 10 game tests; one maximum)`
 - PR: `none`
 
@@ -119,6 +122,15 @@ before publication. Do not read its worker spec.
 - Put tunable policy in the owning rules/config/save/map layer and algorithmic
   invariants in code. Do not duplicate policy across AI personalities or hide a
   rules/config concern in test-only code.
+- Treat balance as frozen unless `Balance authority` above expressly permits the
+  specific surface. Never change cost, HP, damage, armor, speed, timing, power,
+  prerequisites, probabilities, resource values, or comparable tuning to make a
+  behavior test pass. Unauthorized balance changes invalidate the result because
+  they can fake improvement. Record a needed balance change as deferred work.
+- For an expressly authorized balance-only task, test its bounded local effect
+  first: affected-unit survival, useful damage, exchange value, adaptive rating,
+  and selection frequency as relevant. Treat whole-match outcome/composition as
+  secondary regression evidence unless the task explicitly makes it primary.
 - Add proportionate unit/interface/static tests. Add useful bounded debug logging
   and handled warnings/errors at the owning boundary: make failures actionable,
   never silently swallow exceptions or substitute success, avoid per-tick spam,
@@ -228,6 +240,23 @@ For each cycle:
 6. Remove or reduce obsolete/noisy diagnostics after they answer the question.
 7. Update the cycle journal before making another code change.
 
+## Interim code-review loop
+
+After product-change cycles 5, 10, 15, and 20 that occur, and before the next
+product change or publication, launch a fresh Terra 5.6 medium
+`cycle-reviewer`. Give it a job declaring `cycle` mode and only this state path,
+the recorded base SHA, current branch/head and cumulative scoped diff, relevant
+evidence through that cycle, and a task-local output path such as
+`{{ABSOLUTE_ANALYSIS_DIRECTORY}}/cycle-review-05/CYCLE-REVIEW.md`.
+
+The reviewer writes only its review artifact and returns at most one
+`advisory_concern`. Read it, verify its evidence, and record whether it is adopted
+or rejected and why. An adopted product change begins the next ordinary cycle;
+the review grants no extra cycles. At cycle 20, either reject the concern with
+evidence or hand off `First iteration - testing` if resolving it would require
+cycle 21. A clear review does not replace adversarial games, Commenter/Policy
+Review, CI, or the final Sol-high task-PR review and one-response gate.
+
 ## Match narrative and policy-feedback loop
 
 After every materially judged full-engine match or paired control batch:
@@ -238,18 +267,26 @@ After every materially judged full-engine match or paired control batch:
    summaries, and metrics into the role output directory's `inputs/` subtree. In
    that directory, write a strict JSON Commenter job containing only their absolute
    `artifacts` paths, optional `design_reference`, and the absolute `output` path
-   ending in `NARRATIVE.md`. Launch a no-history fresh `commenter` role (Terra 5.6
-   medium). Do not stage source code, this worker state, the task sheet,
+   ending in `NARRATIVE.md`. Launch the fresh `commenter` through the coordinator
+   role launcher; the worker selects only the role and cannot reconstruct or
+   override its pinned Terra 5.6 medium configuration. Do not stage source code,
+   this worker state, the task sheet,
    implementation notes, or inline job-file commentary.
 3. Read its factual `NARRATIVE.md`. Verify cited artifacts/ticks and use it to
    understand exact control differences, causal win/loss sequence, and what the
    losing AI did well. Correct the input/evidence rather than editing the narrative
    into a preferred story.
 4. For AI-policy work, copy that narrative (do not symlink) to the Policy Reviewer
-   output directory as `inputs/NARRATIVE.md`. Write a strict JSON job there with
-   exactly the absolute `design_reference`, staged `narrative`, and `output` paths;
-   output must end in `POLICY-REVIEW.md`. Launch a no-history fresh
-   `policy-reviewer` role (Terra 5.6 medium). Questions embedded in the narrative
+   output directory as `inputs/NARRATIVE.md`. Also write
+   `inputs/TASK-CONTEXT.md`: a short factual description containing task ID/title,
+   expected change, why, change category, explicit in-scope/out-of-scope behavior,
+   and the exact `Balance authority` above. Do not include source, implementation
+   preferences, the full spec, or desired review conclusions. Write a strict JSON
+   job there with exactly the absolute `design_reference`, staged `task_context`,
+   staged `narrative`, and `output` paths; output must end in `POLICY-REVIEW.md`.
+   Launch `policy-reviewer` through the coordinator role launcher; the worker
+   selects only the role and cannot reconstruct or override its pinned Terra 5.6
+   medium configuration. Questions embedded in the narrative
    are the worker's questions to this playtester; the job contains no inline
    context.
 5. Read the `POLICY-REVIEW.md` before choosing the next code change. Treat advice
@@ -332,6 +369,12 @@ materially different scenarios. Return to serial tests if contention corrupts
 timing or evidence. A required full match may exceed 30 minutes while it continues
 making useful progress; stop it when evidence is sufficient or progress stalls.
 
+Route every large build, full `make test`/`make check`, equivalent full
+`dotnet`/`msbuild` suite, and packaging build through the same helper with
+`--large-build-entry worker` and the absolute lock directory above. This protected
+entry owns canonical capacity one; do not supply `--resource large-build`, a
+capacity, a lock filename, an alias, or direct `flock`.
+
 For expensive setup, optionally save shortly before the critical event and reload
 after a logic change. Record the save's commit, config, seed, and tick; reject an
 incompatible or stale save. Never use reload as the sole acceptance, adversarial,
@@ -372,7 +415,7 @@ silently exceed the budget.
 
 ## Cycle journal
 
-| Cycle | Commit/change | Failure hypothesis and perturbation | Checks/games | Narrative/policy review | Failure/pass evidence | Decision/next harder test |
+| Cycle | Commit/change | Failure hypothesis and perturbation | Checks/games | Narrative/policy/cycle-code review | Failure/pass evidence | Decision/next harder test |
 |---|---|---|---|---|---|---|
 
 ## Handoff receipt
@@ -385,6 +428,7 @@ silently exceed the budget.
 - Adversarial evidence:
 - Old-behavior control and comparative result:
 - Match narratives and routine policy-review conclusions:
+- Terra cycle code reviews and dispositions:
 - Sol-xhigh policy escalation (unused, or test count/path/conclusion):
 - Final regression:
 - Error/warning and diagnostic-cleanup result:

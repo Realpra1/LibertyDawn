@@ -108,6 +108,66 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Write fleet-based air repair-capacity decisions to debug.log.")]
 		public readonly bool AirRepairCapacityDebugLogging = false;
 
+		[Desc("Enable bounded one-project-at-a-time development of configured Tiberium blossom trees.")]
+		public readonly bool EnableTiberiumFieldPolicy = false;
+
+		[Desc("Bot types that retain the same BaseBuilder configuration but disable Tiberium field projects for matched controls.")]
+		public readonly HashSet<string> TiberiumFieldExcludedBotTypes = new HashSet<string>();
+
+		[Desc("Actor types treated as durable Tiberium field identities.")]
+		public readonly HashSet<string> TiberiumFieldTreeTypes = new HashSet<string>();
+
+		[Desc("Configured tree types that require containment before Resonator activation.")]
+		public readonly HashSet<string> TiberiumFieldRedTreeTypes = new HashSet<string>();
+
+		[Desc("Ordered Resonator alternatives owned exclusively by the field policy while enabled.")]
+		public readonly string[] TiberiumFieldResonatorTypes = System.Array.Empty<string>();
+
+		[Desc("Ordered ordinary Power Plant alternatives used for remote field extension.")]
+		public readonly string[] TiberiumFieldPowerTypes = System.Array.Empty<string>();
+
+		[Desc("Ordered containment wall alternatives. Do not include mined chain-link walls.")]
+		public readonly string[] TiberiumFieldWallTypes = System.Array.Empty<string>();
+
+		[Desc("Owned stable building types whose accessible edge may anchor a field entrance.")]
+		public readonly string[] TiberiumFieldGateBuildingTypes = System.Array.Empty<string>();
+
+		[Desc("Cells between a red field's contained actors and its perimeter.")]
+		public readonly int TiberiumFieldPerimeterStandoff = 4;
+
+		[Desc("Target useful progress in cells for each necessary Power Plant extension.")]
+		public readonly int TiberiumFieldExtensionStep = 6;
+
+		[Desc("Ticks between bounded live-tree observations.")]
+		public readonly int TiberiumFieldScanInterval = 50;
+
+		[Desc("Ticks between repeated field deferral summaries while the reason is unchanged.")]
+		public readonly int TiberiumFieldProgressLogInterval = 750;
+
+		[Desc("Cells around a tree used to rank observed useful resource demand.")]
+		public readonly int TiberiumFieldDemandRadius = 6;
+
+		[Desc("Ticks between missing-only maintenance scans of active red enclosures.")]
+		public readonly int TiberiumFieldMaintenanceInterval = 1500;
+
+		[Desc("Spendable cash protected from a new discretionary field commitment.")]
+		public readonly int TiberiumFieldProtectedCash = 5000;
+
+		[Desc("Ticks to retain a field queue reservation before production accepts it.")]
+		public readonly int TiberiumFieldReservationTimeout = 750;
+
+		[Desc("Ticks to wait for a placed Resonator to become live and powered.")]
+		public readonly int TiberiumFieldPlacementTimeout = 3000;
+
+		[Desc("Consecutive failed field placements before entering a visible deferred state.")]
+		public readonly int TiberiumFieldMaximumRetries = 3;
+
+		[Desc("Ticks to defer a field project after bounded placement failures.")]
+		public readonly int TiberiumFieldRetryDelay = 1500;
+
+		[Desc("Write bounded field identity, reservation, placement, and coverage transitions to debug.log.")]
+		public readonly bool TiberiumFieldDebugLogging = false;
+
 		[Desc("Production queues AI uses for buildings.")]
 		public readonly HashSet<string> BuildingQueues = new HashSet<string> { "Building" };
 
@@ -170,6 +230,40 @@ namespace OpenRA.Mods.Common.Traits
 
 		[Desc("Maximum range at which to build defensive structures near a combat hotspot.")]
 		public readonly int MaximumDefenseRadius = 20;
+
+		[Desc("Bot types that may use normal SAM construction for economy coverage.")]
+		public readonly HashSet<string> EconomyDefenseBotTypes = new HashSet<string>();
+
+		[Desc("Prerequisites required before economy SAM coverage becomes active.")]
+		public readonly string[] EconomyDefensePrerequisites = System.Array.Empty<string>();
+
+		[Desc("Anti-air defense structures owned by the economy-coverage placement policy.")]
+		public readonly HashSet<string> EconomyDefenseSamTypes = new HashSet<string>();
+
+		[Desc("Economy anchor types, in priority groups: unloading refineries, resonators, then used silos.")]
+		public readonly HashSet<string> EconomyDefenseRefineryTypes = new HashSet<string>();
+		public readonly HashSet<string> EconomyDefenseResonatorTypes = new HashSet<string>();
+		public readonly HashSet<string> EconomyDefenseSiloTypes = new HashSet<string>();
+
+		[Desc("Maximum total live or pending SAM sites owned by economy coverage.")]
+		public readonly int EconomyDefenseMaximumSamSites = 0;
+
+		[Desc("Minimum and maximum cells from the selected economy anchor to search for a SAM site.")]
+		public readonly int EconomyDefenseSamMinimumRadius = 2;
+		public readonly int EconomyDefenseSamMaximumRadius = 8;
+
+		[Desc("Reserve this many cells of weapon range beyond the anchor for its likely air approach.")]
+		public readonly int EconomyDefenseSamCoverageMarginCells = 2;
+
+		[Desc("Refinery approach corridor excluded from economy SAM footprints.")]
+		public readonly int EconomyDefenseRefineryLaneLengthCells = 7;
+		public readonly int EconomyDefenseRefineryLaneHalfWidthCells = 1;
+
+		[Desc("Stored-resource percentage required before a silo is a material economy anchor.")]
+		public readonly int EconomyDefenseUsedSiloThresholdPercent = 25;
+
+		[Desc("Write bounded economy SAM selection, coverage, and placement diagnostics to debug.log.")]
+		public readonly bool EconomyDefenseSamDebugLogging = false;
 
 		[Desc("Try to build another production building if there is too much cash.")]
 		public readonly int NewProductionCashThreshold = 5000;
@@ -313,6 +407,35 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("When should the AI start building specific buildings.")]
 		public readonly Dictionary<string, int> BuildingDelays = null;
 
+		public override void RulesetLoaded(Ruleset rules, ActorInfo ai)
+		{
+			base.RulesetLoaded(rules, ai);
+			if (EconomyDefenseSamTypes.Count == 0)
+				return;
+
+			if (EconomyDefenseBotTypes.Count == 0 || EconomyDefensePrerequisites.Length == 0 ||
+				EconomyDefenseRefineryTypes.Count == 0 || EconomyDefenseMaximumSamSites <= 0 ||
+				EconomyDefenseSamMinimumRadius < 0 ||
+				EconomyDefenseSamMaximumRadius < EconomyDefenseSamMinimumRadius ||
+				EconomyDefenseSamCoverageMarginCells < 0 || EconomyDefenseRefineryLaneLengthCells <= 0 ||
+				EconomyDefenseRefineryLaneHalfWidthCells < 0 || EconomyDefenseUsedSiloThresholdPercent < 0 ||
+				EconomyDefenseUsedSiloThresholdPercent > 100)
+				throw new YamlException("Economy SAM bot/prerequisite/actor types, cap, radii, lane, and silo threshold must be configured and valid.");
+
+			foreach (var actorType in EconomyDefenseSamTypes.Concat(EconomyDefenseRefineryTypes)
+				.Concat(EconomyDefenseResonatorTypes).Concat(EconomyDefenseSiloTypes))
+				if (!rules.Actors.ContainsKey(actorType))
+					throw new YamlException($"Economy SAM actor '{actorType}' does not exist.");
+
+			foreach (var samType in EconomyDefenseSamTypes)
+			{
+				var actor = rules.Actors[samType];
+				if (actor.TraitInfoOrDefault<BuildingInfo>() == null ||
+					!actor.TraitInfos<ArmamentInfo>().Any())
+					throw new YamlException($"Economy SAM actor '{samType}' must be a building with an armament.");
+			}
+		}
+
 		public override object Create(ActorInitializer init) { return new BaseBuilderBotModule(init.Self, this); }
 	}
 
@@ -341,12 +464,14 @@ namespace OpenRA.Mods.Common.Traits
 
 		internal BaseBuilderWallPlanner WallPlanner { get; private set; }
 		internal BaseBuilderFirstTowerPlanner FirstTowerPlanner { get; private set; }
+		internal BaseBuilderTiberiumFieldManager TiberiumFieldManager { get; private set; }
 
 		readonly World world;
 		readonly Player player;
 		PowerManager playerPower;
 		PlayerResources playerResources;
 		PlayerStatistics playerStatistics;
+		TechTree techTree;
 		IResourceLayer resourceLayer;
 		IBotPositionsUpdated[] positionsUpdatedModules;
 		IBotRequestUnitProduction[] unitProduction;
@@ -370,6 +495,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly Dictionary<uint, AirRepairBuildingReservation> airRepairBuildingReservations =
 			new Dictionary<uint, AirRepairBuildingReservation>();
 		BaseBuilderSmartEconomyManager smartEconomy;
+		BaseBuilderEconomyDefenseSamPlanner economyDefenseSam;
 
 		readonly List<BaseBuilderQueueManager> builders = new List<BaseBuilderQueueManager>();
 		UnitBuilderBotModule[] unitBuilders;
@@ -386,6 +512,7 @@ namespace OpenRA.Mods.Common.Traits
 			playerPower = self.Owner.PlayerActor.TraitOrDefault<PowerManager>();
 			playerResources = self.Owner.PlayerActor.Trait<PlayerResources>();
 			playerStatistics = self.Owner.PlayerActor.Trait<PlayerStatistics>();
+			techTree = self.Owner.PlayerActor.Trait<TechTree>();
 			resourceLayer = self.World.WorldActor.TraitOrDefault<IResourceLayer>();
 			positionsUpdatedModules = self.Owner.PlayerActor.TraitsImplementing<IBotPositionsUpdated>().ToArray();
 			unitBuilders = self.Owner.PlayerActor.TraitsImplementing<UnitBuilderBotModule>().ToArray();
@@ -393,8 +520,31 @@ namespace OpenRA.Mods.Common.Traits
 			rallyPointManagers = self.Owner.PlayerActor.TraitsImplementing<IBotRallyPointManager>().ToArray();
 			WallPlanner = new BaseBuilderWallPlanner(this, player);
 			FirstTowerPlanner = new BaseBuilderFirstTowerPlanner(this, player);
+			TiberiumFieldManager = new BaseBuilderTiberiumFieldManager(this, player,
+				playerResources, playerPower, resourceLayer);
 			if (Info.EnableSmartEconomy)
 				smartEconomy = new BaseBuilderSmartEconomyManager(this, player, playerResources, unitProduction);
+			if (Info.EconomyDefenseSamTypes.Count > 0)
+				economyDefenseSam = new BaseBuilderEconomyDefenseSamPlanner(this, player, playerPower,
+					playerResources, techTree);
+		}
+
+		internal ActorInfo EconomyDefenseSamBuilding(ProductionQueue queue, IEnumerable<ActorInfo> buildables)
+		{
+			return economyDefenseSam?.ChooseBuilding(queue, buildables);
+		}
+
+		internal bool OwnsEconomyDefenseSam(ProductionQueue queue, string actorType)
+		{
+			return economyDefenseSam?.OwnsPlacement(queue, actorType) == true;
+		}
+
+		internal CPos? EconomyDefenseSamLocation(ProductionQueue queue, string actorType, ActorInfo actorInfo,
+			BuildingInfo buildingInfo,
+			bool distanceToBaseIsImportant)
+		{
+			return economyDefenseSam?.ChooseLocation(queue, actorType, actorInfo, buildingInfo,
+				distanceToBaseIsImportant);
 		}
 
 		internal bool AdaptiveProductionDebugLogging => unitBuilders.Any(u =>
@@ -521,6 +671,7 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			UpdateOpening(bot);
 			smartEconomy?.Tick(bot);
+			TiberiumFieldManager?.Tick();
 			FirstTowerPlanner.Update();
 			SetRallyPointsForNewProductionBuildings(bot);
 
@@ -988,18 +1139,27 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		// Require at least one refinery, unless we can't build it.
-		public bool HasAdequateRefineryCount =>
-			!Info.RefineryTypes.Any() ||
-			AIUtils.CountBuildingByCommonName(Info.RefineryTypes, player) > 0 ||
-			AIUtils.CountBuildingByCommonName(Info.PowerTypes, player) == 0 ||
-			AIUtils.CountBuildingByCommonName(Info.ConstructionYardTypes, player) == 0;
+		public bool HasAdequateRefineryCount
+		{
+			get
+			{
+				// Smart-economy profiles must use the actual unloading refinery set so an
+				// authored Resonator alias cannot satisfy core recovery. Preserve the original
+				// common-name behavior for every profile that does not enable smart economy.
+				var refineryTypes = Info.EnableSmartEconomy ? SmartEconomyRefineryTypes : Info.RefineryTypes;
+				return !refineryTypes.Any() ||
+					AIUtils.CountBuildingByCommonName(refineryTypes, player) > 0 ||
+					AIUtils.CountBuildingByCommonName(Info.PowerTypes, player) == 0 ||
+					AIUtils.CountBuildingByCommonName(Info.ConstructionYardTypes, player) == 0;
+			}
+		}
 
 		List<MiniYamlNode> IGameSaveTraitData.IssueTraitData(Actor self)
 		{
 			if (IsTraitDisabled)
 				return null;
 
-			return new List<MiniYamlNode>()
+			var data = new List<MiniYamlNode>()
 			{
 				new MiniYamlNode("InitialBaseCenter", FieldSaver.FormatValue(initialBaseCenter)),
 				new MiniYamlNode("DefenseCenter", FieldSaver.FormatValue(defenseCenter)),
@@ -1037,8 +1197,18 @@ namespace OpenRA.Mods.Common.Traits
 				new MiniYamlNode("SmartEconomyRefineryPressureActive", FieldSaver.FormatValue(smartEconomy?.RefineryPressure.Active ?? false)),
 				new MiniYamlNode("SmartEconomyCashEvidenceTicks", FieldSaver.FormatValue(smartEconomy?.CashPressure.EvidenceTicks ?? 0)),
 				new MiniYamlNode("SmartEconomyCashPressureActive", FieldSaver.FormatValue(smartEconomy?.CashPressure.Active ?? false)),
+				new MiniYamlNode("EconomyDefenseSamReservationActive", FieldSaver.FormatValue(economyDefenseSam?.HasBuildReservation ?? false)),
+				new MiniYamlNode("EconomyDefenseSamReservationQueueActorId", FieldSaver.FormatValue(economyDefenseSam?.ReservationQueueActorId ?? 0)),
+				new MiniYamlNode("EconomyDefenseSamReservationQueueType", FieldSaver.FormatValue(economyDefenseSam?.ReservationQueueType ?? "")),
+				new MiniYamlNode("EconomyDefenseSamReservationActorType", FieldSaver.FormatValue(economyDefenseSam?.ReservationActorType ?? "")),
+				new MiniYamlNode("EconomyDefenseSamReservationTick", FieldSaver.FormatValue(economyDefenseSam?.ReservationTick ?? 0)),
 				new MiniYamlNode("FirstTowerPlacementComplete", FieldSaver.FormatValue(FirstTowerPlanner.Complete))
 			};
+			var fieldState = TiberiumFieldManager?.IssueTraitData();
+			if (fieldState != null)
+				data.Add(fieldState);
+
+			return data;
 		}
 
 		void IGameSaveTraitData.ResolveTraitData(Actor self, List<MiniYamlNode> data)
@@ -1160,9 +1330,26 @@ namespace OpenRA.Mods.Common.Traits
 					FieldLoader.GetValue<int[]>("SmartEconomyVehicleFactoryReservationExpiryTicks", smartVehicleFactoryExpiryTicksNode.Value.Value),
 					FieldLoader.GetValue<int[]>("SmartEconomyVehicleFactoryReservationTargetCounts", smartVehicleFactoryTargetCountsNode.Value.Value));
 
+			var economySamActiveNode = data.FirstOrDefault(n => n.Key == "EconomyDefenseSamReservationActive");
+			var economySamQueueActorNode = data.FirstOrDefault(n => n.Key == "EconomyDefenseSamReservationQueueActorId");
+			var economySamQueueTypeNode = data.FirstOrDefault(n => n.Key == "EconomyDefenseSamReservationQueueType");
+			var economySamActorTypeNode = data.FirstOrDefault(n => n.Key == "EconomyDefenseSamReservationActorType");
+			var economySamTickNode = data.FirstOrDefault(n => n.Key == "EconomyDefenseSamReservationTick");
+			if (economyDefenseSam != null && economySamActiveNode != null &&
+				FieldLoader.GetValue<bool>("EconomyDefenseSamReservationActive", economySamActiveNode.Value.Value) &&
+				economySamQueueActorNode != null && economySamQueueTypeNode != null &&
+				economySamActorTypeNode != null && economySamTickNode != null)
+				economyDefenseSam.RestoreBuildOwnership(
+					FieldLoader.GetValue<uint>("EconomyDefenseSamReservationQueueActorId", economySamQueueActorNode.Value.Value),
+					FieldLoader.GetValue<string>("EconomyDefenseSamReservationQueueType", economySamQueueTypeNode.Value.Value),
+					FieldLoader.GetValue<string>("EconomyDefenseSamReservationActorType", economySamActorTypeNode.Value.Value),
+					FieldLoader.GetValue<int>("EconomyDefenseSamReservationTick", economySamTickNode.Value.Value));
+
 			var firstTowerNode = data.FirstOrDefault(n => n.Key == "FirstTowerPlacementComplete");
 			if (firstTowerNode != null)
 				FirstTowerPlanner.Complete = FieldLoader.GetValue<bool>("FirstTowerPlacementComplete", firstTowerNode.Value.Value);
+
+			TiberiumFieldManager?.ResolveTraitData(data);
 		}
 	}
 }
