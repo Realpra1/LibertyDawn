@@ -1,7 +1,7 @@
 # Coordinated CNC State
 
 - Round ID: `20260807-bug-polish-02`
-- Phase: `four specs complete; speccer 5 active`
+- Phase: `all five specs complete; worker branches being created`
 - Common base branch: `agent/cnc-20260806-bug-polish-01-release`
 - Common base SHA: `419bee2531d4802bf922c3597b42c6eeb75ab250`
 - Coordinator model: `gpt-5.6-sol` / `high` (trial mismatch explicitly accepted by user)
@@ -23,7 +23,7 @@
 | 2 | CNC-40 Adaptive specialists | `agent/round-20260807-cnc40-adaptive-specialists` | `.worktrees/coordinated-cnc/20260807-bug-polish-02/workers/worker-2-cnc40` | spec complete at `WORKER-2-CNC-40/STATE.md`; capture/C4 overlap warning recorded | `roles/speccer-2/process.json` complete 0 | | | |
 | 3 | CNC-41 Economy Tiberium fields | `agent/round-20260807-cnc41-economy-tiberium-fields` | `.worktrees/coordinated-cnc/20260807-bug-polish-02/workers/worker-3-cnc41` | spec complete at `WORKER-3-CNC-41/STATE.md`; CNC42 dependency warning recorded | `roles/speccer-3/process.json` complete 0 | | | |
 | 4 | CNC-42 Economy field defense | `agent/round-20260807-cnc42-economy-field-defense` | `.worktrees/coordinated-cnc/20260807-bug-polish-02/workers/worker-4-cnc42` | spec complete at `WORKER-4-CNC-42/STATE.md`; CNC41 overlap warning recorded | `roles/speccer-4/process.json` complete 0 | | | |
-| 5 | CNC-44 Aircraft husks | `agent/round-20260807-cnc44-aircraft-husks` | `.worktrees/coordinated-cnc/20260807-bug-polish-02/workers/worker-5-cnc44` | claimed; speccing active; packet `COORDINATED-CNC-ROUNDS/20260807-bug-polish-02/TASK-PACKET-5.md` | `roles/speccer-5/process.json` running | | | |
+| 5 | CNC-44 Aircraft husks | `agent/round-20260807-cnc44-aircraft-husks` | `.worktrees/coordinated-cnc/20260807-bug-polish-02/workers/worker-5-cnc44` | spec complete at `WORKER-5-CNC-44/STATE.md`; CNC62 publication-blocking crash-damage dependency recorded | `roles/speccer-5/process.json` complete 0 | | | |
 
 ## Release rounds
 
