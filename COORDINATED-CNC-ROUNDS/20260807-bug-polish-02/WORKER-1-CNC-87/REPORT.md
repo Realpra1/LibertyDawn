@@ -3,7 +3,8 @@
 ## Current result
 
 Implementation and adversarial testing are complete in three product-change
-cycles. The result establishes an enforced external analysis-role path, real installed-Codex
+cycles plus one test-only final-review response cycle. The result establishes an
+enforced external analysis-role path, real installed-Codex
 parser validation, one protected capacity-one large-build entry policy, and
 complete assigned-process-tree supervision. Four real CNC games and their fresh
 Commenter paths pass.
@@ -106,8 +107,12 @@ ticks/s) without startup, fatal, desync, or termination regression.
 ## Deferred work and remaining risks
 
 - Draft PR #86 targets the recorded common base:
-  `https://github.com/Realpra1/LibertyDawn/pull/86`. Complete the final independent
-  reviewer verification, required Linux/Windows GitHub checks, and publication
-  receipt.
+  `https://github.com/Realpra1/LibertyDawn/pull/86`. The final Sol-high
+  review-response verification returned `ready` with `required_fix: none` on
+  reviewed head `531c5e58acd3d1f63c460ab25f80bc1180de8376`. Linux and Windows
+  .NET 6 GitHub checks passed on that head. There is no deferred task-scope work.
+- Integration sequencing remains explicit: unchanged concurrent worktrees can
+  still invoke the prior generic helper, so the Integrator must include this PR
+  and require the protected entry paths before claiming round-wide capacity one.
 - Evaluate portability explicitly: complete process-tree enforcement uses Linux
   `prctl` and `/proc`, matching the coordinated Linux host contract.

@@ -12,7 +12,7 @@ when the dependency section directs it.
 - Task: `CNC-87 — Repair current Codex CLI launching, nested-role configuration, and large-build resource enforcement for coordinated external roles.`
 - Change category: `coordinated-development orchestration/tooling correctness and resource-concurrency enforcement (non-gameplay)`
 - Balance authority: `Frozen. No game balance, rules, AI strategy/policy, economy, timing, unit, structure, map, or gameplay changes are authorized.`
-- Status: `Publication pending`
+- Status: `Complete - testing`
 - Common base branch/SHA: `agent/cnc-20260806-bug-polish-01-release` / `419bee2531d4802bf922c3597b42c6eeb75ab250`
 - Task branch: `agent/round-20260807-cnc87-role-launch-lock`
 - Intended PR base: `agent/cnc-20260806-bug-polish-01-release`
@@ -27,7 +27,7 @@ when the dependency section directs it.
 - Full-engine game tests completed: `4`
 - Terra cycle code reviews: `none yet; required after cycles 5/10/15/20 that occur`
 - Sol-xhigh policy escalation: `unused (requires at least 10 game tests; one maximum)`
-- PR: `#86 — https://github.com/Realpra1/LibertyDawn/pull/86 (draft; checks running)`
+- PR: `#86 — https://github.com/Realpra1/LibertyDawn/pull/86 (draft; Linux/Windows checks passed on reviewed response head)`
 
 ## Integrated repair assignment
 
@@ -866,19 +866,19 @@ silently exceed the budget.
 
 ## Handoff receipt
 
-- Proposed status:
-- Final branch/head:
-- PR and checks:
-- Cycles used:
-- Acceptance evidence:
-- Adversarial evidence:
-- Old-behavior control and comparative result:
-- Match narratives and routine policy-review conclusions:
-- Terra cycle code reviews and dispositions:
-- Sol-xhigh policy escalation (unused, or test count/path/conclusion):
-- Final regression:
-- Error/warning and diagnostic-cleanup result:
-- Performance/determinism result:
-- Deferred work:
-- Known failures/risks:
-- Relevant artifact paths:
+- Proposed status: `Complete - testing`
+- Final branch/head: `agent/round-20260807-cnc87-role-launch-lock`; reviewed implementation/review-response head `531c5e58acd3d1f63c460ab25f80bc1180de8376` plus this final receipt commit.
+- PR and checks: `#86 — https://github.com/Realpra1/LibertyDawn/pull/86`; draft against `agent/cnc-20260806-bug-polish-01-release`; Linux and Windows .NET 6 checks passed on the reviewed response head. Final receipt-only head will be rechecked before handoff.
+- Cycles used: `4/20` (three product cycles plus the one allowed test-only final-review response cycle).
+- Acceptance evidence: Installed `codex-cli 0.146.0` accepted every constructed role command with production parser exit 0, rejected legacy `-a never` with exit 2, and emitted zero agent events. Exact four analysis mappings, strict envelopes, protected argv/session/sandbox/output/supervision fields, both large-build entry orders, process-tree ordering, stale/failure recovery, mixed guard, and independent game capacity all pass.
+- Adversarial evidence: Scenario 1 Worker release 237101.794 then Integrator acquire 237101.804 with seed 87001 tick 10000. Scenario 2 Integrator exit 7/tree resolution 237500.219 then Worker acquire 237500.233, stale text ignored, seed 87002 tick 15000. Scenario 3 cancellation exit 143, detached PID 751035 reaped, release 237768.708 then Integrator entry 237768.771; mixed names rejected; seed 87003 natural game over tick 20000. Final literal Worker child-tree resolution 238291.196/release 238291.198 then Integrator acquire 238291.223, while exact `game-1.lock` remained independent.
+- Old-behavior control and comparative result: Base split lock allowed maximum concurrency 2, Integrator entry in 14.8 ms, and both `large-build.lock`/`large-build-1.lock`; changed actual paths have maximum concurrency 1 and one canonical identity. Base wrapper returned in 0.0712 s while a detached descendant lived and a second holder completed; changed release follows complete child-tree resolution or targeted termination/reaping. Base and changed CLI both retain the supported approval config; changed adds the executable regression and removes the native analysis bypass.
+- Match narratives and routine policy-review conclusions: Four valid ordinary-AI games completed; fresh enforced Commenters are under `cycle-01-game/commenter`, `scenario-02-failure-stale/commenter`, `scenario-03-cancel-natural/commenter`, and `final-acceptance/commenter`. Every receipt is Terra 5.6 medium, exit 0, and factual. Routine policy review was correctly skipped because no gameplay/AI policy changed.
+- Terra cycle code reviews and dispositions: none due; only four cycles occurred. Final Sol-high review returned one valid test-harness fix, adopted in cycle 4; verification returned `ready`, `required_fix: none`.
+- Sol-xhigh policy escalation (unused, or test count/path/conclusion): unused; only four game tests and no policy problem.
+- Final regression: 20/20 Python portfolio pass with all 11 role commands sent through the installed parser. Five worker/integrator resource-suite repetitions pass with `ResourceWarning` as error, independently repeated by the final reviewer. Final guarded CNC `make test` and `make check` pass with zero warnings/errors and all persistent build descendants reaped before release. Final seed 87001 game reached tick 10000, exit 0, and its real Commenter receipt exposes exact protected runtime fields.
+- Error/warning and diagnostic-cleanup result: Missing Codex, invalid option/policy/envelope, inaccessible lock path, mixed namespace, timeout, nonzero child, signal, stale metadata, and unsafe process-tree cases are actionable and nonzero. Diagnostics are one bounded JSON line per transition; no per-poll spam, raw logs, build output, replay, save, temporary print, or `__pycache__` is tracked.
+- Performance/determinism result: Fast focused suite normally 3.5–6.1 s, 50 ms low-CPU bounded lock polling, five clean repetitions. Four valid games reached their configured/natural endpoints at 135.25–312.486 valid ticks/s under varying shared-host load with no fatal/desync/startup regression. No game/AI code changed.
+- Deferred work: none in task scope. Integrator must not claim round-wide capacity-one enforcement until this PR is present in the candidate and active participants use the changed entry paths.
+- Known failures/risks: Linux `prctl`/`/proc` are intentionally required for complete tree enforcement on the coordinated Linux host. An unchanged concurrent worktree can still invoke the old generic helper until integration; this is an integration sequencing constraint, not a failure of the changed paths. The initial tick-0 no-Xvfb attempt was invalid harness setup and excluded from game count.
+- Relevant artifact paths: task `REPORT.md`; `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260807-bug-polish-02/analysis/worker-1-cnc87/` including `cycle-01-game`, `scenario-02-failure-stale`, `scenario-03-cancel-natural`, `final-acceptance`, `final-review`, and `final-review-verification`.
