@@ -27,7 +27,7 @@ when the dependency section directs it.
 - Full-engine game tests completed: `4`
 - Terra cycle code reviews: `none yet; required after cycles 5/10/15/20 that occur`
 - Sol-xhigh policy escalation: `unused (requires at least 10 game tests; one maximum)`
-- PR: `none`
+- PR: `#86 — https://github.com/Realpra1/LibertyDawn/pull/86 (draft; checks running)`
 
 ## Integrated repair assignment
 

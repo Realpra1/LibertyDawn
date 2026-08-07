@@ -96,7 +96,8 @@ ticks/s) without startup, fatal, desync, or termination regression.
 
 ## Deferred work and remaining risks
 
-- Complete commit/push/draft PR, final independent Sol-high review, required
-  GitHub checks, and publication receipt.
+- Draft PR #86 targets the recorded common base:
+  `https://github.com/Realpra1/LibertyDawn/pull/86`. Complete the final independent
+  Sol-high review, required Linux/Windows GitHub checks, and publication receipt.
 - Evaluate portability explicitly: complete process-tree enforcement uses Linux
   `prctl` and `/proc`, matching the coordinated Linux host contract.
