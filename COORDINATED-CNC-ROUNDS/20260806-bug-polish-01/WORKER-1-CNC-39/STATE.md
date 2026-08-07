@@ -10,7 +10,7 @@ when the dependency section directs it.
 
 - Worker: `worker-1-cnc-39`
 - Task: `CNC-39 — Engineer correction`
-- Status: `Complete - integrated RC2 repair ready`
+- Status: `Complete - RC2 repair and strict final-review response ready`
 - Common base branch/SHA: `agent/cnc38-early-viki-infantry-rush` / `09ccdac3c1ecb5134a4751f2bcbd8a7970dfe6bf`
 - Task branch: `agent/round-20260806-cnc39-engineer-correction`
 - Intended PR base: `agent/cnc38-early-viki-infantry-rush`
@@ -23,13 +23,13 @@ when the dependency section directs it.
 - Task report: `/root/github/LibertyDawn/COORDINATED-CNC-ROUNDS/20260806-bug-polish-01/WORKER-1-CNC-39/REPORT.md`
 - Match-analysis directory: `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260806-bug-polish-01/analysis/worker-1-cnc-39`
 - Liberty Dawn design reference: `.agents/references/LIBERTY-DAWN-DESIGN.md`
-- Full-engine game tests completed: `72`
+- Full-engine game tests completed: `73`
 - Sol-xhigh policy escalation: `unused (requires at least 10 game tests; one maximum)`
 - PR: `individual draft PR #83; cumulative RC2 draft PR #84`
 
 ## Integrated repair assignment
 
-- Phase: `integrated testing - RC2 repair ready`
+- Phase: `integrated testing - RC2 final-review response satisfied`
 - Current release branch/head: `agent/cnc-20260806-bug-polish-01-release` / `fd15540ffc98c70f085688fe0b38a4a6341fc6ed`
 - Integration notes: `Integrated RC2 assignment and evidence journal below`
 - Repair branch: `agent/round-20260806-cnc39-rc2-repair`
@@ -843,38 +843,40 @@ silently exceed the budget.
 
 ## Handoff receipt
 
-- Proposed status: `Reviewed RC2 repair head ready to merge`
+- Proposed status: `Reviewed RC2 repair head ready to merge; final-review fix satisfied`
 - Final branch/head: `agent/round-20260806-cnc39-rc2-repair`; exact product
   repair `bc3ab411f8235cfbec1a31ed7187f6e7971897a9`
 - PR and checks: original draft PR #83 and cumulative draft PR #84; local final
   focused/full/build/CNC-content gates green; repair branch is the integrator handoff
 - Cycles used: `8/20 isolated; 2/3 integrated RC2; 2/12 integrated total`
 - Acceptance evidence: original matched threshold/exact-boundary evidence plus
-  RC2 fresh literal `games/rc2-final-regression-01`
+  exact allocation-free strict literal pass `games/rc2-final-review-response-01`
 - Adversarial evidence: RC2 crossing repair and allocation-free rerun both pass
   exact crossing, surplus release, reservation, sabotage, capture, and final state
 - Old-behavior control and comparative result: unchanged from isolated report;
   immutable base retained stale pair while CNC-39 completed both better solo uses
 - Match narratives and routine policy-review conclusions: RC2 post-repair crossing
-  and literal reviews pass; paired allocation-free review supports handoff while
-  correctly rejecting its raced literal run as strict acceptance evidence
+  and literal reviews pass; the fresh final-response Commenter verifies the strict
+  outcome chain and its Policy Reviewer accepts it as focused acceptance evidence
+  without treating one fixture as a broad strategic comparison
 - Sol-xhigh policy escalation (unused, or test count/path/conclusion): unused
-- Final regression: fresh seed 39124 passed before allocation-only cleanup;
-  tick 478 capture, tick 479 retirement, correct tick-1201 final state
+- Final regression: exact allocation-free tree, fresh seed 39207; initial intended
+  assignment tick 100, capture tick 525, prompt retirement tick 526, correct
+  tick-1201 final state, and every forbidden pattern absent
 - Error/warning and diagnostic-cleanup result: final builds zero warnings/errors;
   prompt sabotage/capture diagnostics correct; no temporary dump remains
 - Performance/determinism result: planning remains 125-tick/15-target bounded;
   prompt retirement scans only active assignments without temporary collections;
   recommend game capacity two after measured two-way contention
-- Deferred work: fixture should delay capture assertions until scripted buildings
-  are capture-eligible; transport/backoff and CNC-39A policy remain out of scope
-- Known failures/risks: concurrent literal allocation-free run is invalid strict
-  acceptance due tick-6 husk assignment, but retargeted/captured correctly; per-tick
-  active-assignment scan is bounded but lacks a matched long-duration microbenchmark
+- Deferred work: reusable fixtures should preplace capture targets when randomized
+  tick-zero scans matter; transport/backoff and CNC-39A policy remain out of scope
+- Known failures/risks: the earlier tick-6 fixture race remains recorded as invalid
+  evidence and is superseded by the preplaced-target strict pass; the bounded
+  per-tick active-assignment scan still lacks a matched long-duration microbenchmark
 - Relevant artifact paths: `games/rc2-crossing-01`,
   `games/rc2-crossing-repair-01`, `games/rc2-final-regression-01`,
   `games/rc2-crossing-allocationfree-01`, `games/rc2-final-allocationfree-01`,
-  and matching `reviews/rc2-*` directories
+  `games/rc2-final-review-response-01`, and matching `reviews/rc2-*` directories
 
 ## Integrated RC2 assignment
 
@@ -1059,3 +1061,57 @@ silently exceed the budget.
   state/report. If the clean run passes, make no product change and push a corrected
   handoff receipt. If it exposes a real defect, stay within the existing repair
   scope, use at most this one response cycle, and rerun the affected gates.
+- Review-response game planned, fresh seed 39207: test exact allocation-free
+  product repair `bc3ab411f8235cfbec1a31ed7187f6e7971897a9` with the intended
+  79-percent target preplaced by the map so it is capture-eligible before any
+  randomized bot scan. Failure hypothesis: the prior fixture race hid a genuine
+  lone-assignment/retirement regression, or an early scan still selects the husk,
+  an alternate, or a pair. Perturbation: preplace only the intended target while
+  retaining the ordinary Cabal/Brutalis bots, one dynamically spawned Engineer,
+  tempting transformed MCV husk, pressure/repair crossing, all normal modules,
+  headless MAX, and a fresh process/seed. Failure signal: a non-target initial
+  assignment, pair order, sabotage-only loss, non-prompt/misclassified retirement,
+  wrong final owner/count, unexercised pressure or repair gate, runtime/rules
+  fault, or failure to reach tick 1250. Pass evidence: the first and only E6
+  assignment is the 79000/100000 intended building, prompt `captured` retirement,
+  final Multi0 ownership with zero Engineers, untouched husk, both pressure gates,
+  every forbidden pattern absent, and a clean bounded exit. This is an ignored
+  evidence-harness correction and consumes no product code-change cycle.
+- Review-response game result: passed all required and forbidden assertions from
+  a fresh process on map checksum
+  `61a96071eb958db71965709b82356c21036713585a3018fcb56ca2772dbf520c`.
+  Headless MAX started the ordinary Cabal-versus-Brutalis match at tick 0; the
+  sole `e6#13` initially selected only the intended `79000/100000`
+  `cnc39finaltarget#8` at tick 100. Ownership changed from Multi1 to Multi0 at
+  tick 525 and prompt maintenance retired the assignment as `captured` at tick
+  526. Tick 1201 independently recorded Multi0 ownership, zero Engineers, one
+  untouched MCV husk, one capture, and both pressure/repair gates. The engine
+  exited cleanly at tick 1250 in 6.006 seconds; the batch reported 207.921 valid
+  ticks/second. No product file changed and integrated counters remain 2/3 RC2
+  and 2/12 total. Artifact: `games/rc2-final-review-response-01`.
+- Fresh Commenter conclusion: the staged evidence proves the tick-100 assignment,
+  tick-525 ownership change, tick-526 retirement, tick-1201 final state, and
+  absence of every forbidden pattern; it correctly limits conclusions to this
+  focused scenario. Artifact:
+  `reviews/rc2-final-review-response-commenter/NARRATIVE.md`.
+- Fresh Terra-medium Policy Reviewer verdict: `mostly sensible` with medium
+  confidence and explicit acceptance as successful focused evidence. Its advice
+  not to infer broad strategic superiority is adopted. A new same-seed old-policy
+  control and expanded route/repair telemetry are not required for this narrow
+  review response because the original task already preserves matched threshold
+  and stale-pair controls, the final reviewer requested only exact-tree literal
+  proof, and no new strategic-improvement claim is made. Artifact:
+  `reviews/rc2-final-review-response-policy/POLICY-REVIEW.md`.
+- Publication dependency recheck after `git fetch --prune`: open CNC-39A PR #80
+  remains unchanged at reviewed head
+  `937ef0204870ff2eca39c413af7431adb279c082`; its commits were rechecked. The
+  separate observed `agent/round-20260806-cnc39a-rc2-repair` branch is at
+  `4c140dc37ae858c0eee03eb46ed2dd06d5cda581`, while open release PR #84 still
+  points at assigned candidate `fd15540ffc98c70f085688fe0b38a4a6341fc6ed` with
+  green Linux/Windows checks. This response creates no competing reservation API.
+- Final-review disposition: required fix satisfied. The earlier raced post-cleanup
+  literal artifact remains honestly failed evidence but is superseded by this
+  strict exact-product-tree pass. No response product change or extra gate rerun
+  is justified; final cycle-2 code/build/test gates remain the applicable green
+  gates for exact product repair
+  `bc3ab411f8235cfbec1a31ed7187f6e7971897a9`.
