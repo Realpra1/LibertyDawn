@@ -141,7 +141,8 @@ namespace OpenRA.Mods.Common.Traits
 		public override object Create(ActorInitializer init) { return new UnitBuilderBotModule(init.Self, this); }
 	}
 
-	public class UnitBuilderBotModule : ConditionalTrait<UnitBuilderBotModuleInfo>, IBotTick, IBotNotifyIdleBaseUnits, IBotRequestUnitProduction, IGameSaveTraitData
+	public class UnitBuilderBotModule : ConditionalTrait<UnitBuilderBotModuleInfo>, IBotTick, IBotNotifyIdleBaseUnits,
+		IBotRequestUnitProduction, IBotRequestOwnedUnitProduction, IGameSaveTraitData
 	{
 		enum ExternalBuildRequestResult
 		{
@@ -155,7 +156,19 @@ namespace OpenRA.Mods.Common.Traits
 		readonly World world;
 		readonly Player player;
 
-		readonly List<string> queuedBuildRequests = new List<string>();
+		sealed class ExternalBuildRequest
+		{
+			public readonly string ActorType;
+			public readonly string Owner;
+
+			public ExternalBuildRequest(string actorType, string owner)
+			{
+				ActorType = actorType;
+				Owner = owner;
+			}
+		}
+
+		readonly List<ExternalBuildRequest> queuedBuildRequests = new List<ExternalBuildRequest>();
 		readonly HashSet<string> sampledUnitTypes = new HashSet<string>();
 
 		IBotRequestPauseUnitProduction[] requestPause;
@@ -250,7 +263,7 @@ namespace OpenRA.Mods.Common.Traits
 				for (var i = 0; i < queuedBuildRequests.Count;)
 				{
 					var buildRequest = queuedBuildRequests[i];
-					var result = BuildUnit(bot, buildRequest);
+					var result = BuildUnit(bot, buildRequest.ActorType);
 					if (result == ExternalBuildRequestResult.WaitingForQueue)
 					{
 						i++;
@@ -260,8 +273,9 @@ namespace OpenRA.Mods.Common.Traits
 					queuedBuildRequests.RemoveAt(i);
 					if (result == ExternalBuildRequestResult.Unavailable)
 					{
-						LogAdaptiveProduction("{0} canceled unavailable external request for {1}",
-							player, world.Map.Rules.Actors.ContainsKey(buildRequest) ? DisplayName(buildRequest) : buildRequest);
+						LogAdaptiveProduction("{0} canceled unavailable external request for {1}", player,
+							world.Map.Rules.Actors.ContainsKey(buildRequest.ActorType) ?
+								DisplayName(buildRequest.ActorType) : buildRequest.ActorType);
 						continue;
 					}
 
@@ -426,17 +440,32 @@ namespace OpenRA.Mods.Common.Traits
 
 		void IBotRequestUnitProduction.RequestUnitProduction(IBot bot, string requestedActor)
 		{
-			queuedBuildRequests.Add(requestedActor);
+			queuedBuildRequests.Add(new ExternalBuildRequest(requestedActor, null));
 		}
 
 		void IBotRequestUnitProduction.CancelRequestedUnitProduction(IBot bot, string requestedActor)
 		{
-			queuedBuildRequests.RemoveAll(r => r == requestedActor);
+			queuedBuildRequests.RemoveAll(r => r.Owner == null && r.ActorType == requestedActor);
 		}
 
 		int IBotRequestUnitProduction.RequestedProductionCount(IBot bot, string requestedActor)
 		{
-			return queuedBuildRequests.Count(r => r == requestedActor);
+			return queuedBuildRequests.Count(r => r.ActorType == requestedActor);
+		}
+
+		void IBotRequestOwnedUnitProduction.RequestUnitProduction(IBot bot, string requestOwner, string requestedActor)
+		{
+			queuedBuildRequests.Add(new ExternalBuildRequest(requestedActor, requestOwner));
+		}
+
+		void IBotRequestOwnedUnitProduction.CancelRequestedUnitProduction(IBot bot, string requestOwner, string requestedActor)
+		{
+			queuedBuildRequests.RemoveAll(r => r.Owner == requestOwner && r.ActorType == requestedActor);
+		}
+
+		int IBotRequestOwnedUnitProduction.RequestedProductionCount(IBot bot, string requestOwner, string requestedActor)
+		{
+			return queuedBuildRequests.Count(r => r.Owner == requestOwner && r.ActorType == requestedActor);
 		}
 
 		void BuildUnit(IBot bot, string category, bool buildRandom)
@@ -915,7 +944,8 @@ namespace OpenRA.Mods.Common.Traits
 
 			return new List<MiniYamlNode>()
 			{
-				new MiniYamlNode("QueuedBuildRequests", FieldSaver.FormatValue(queuedBuildRequests.ToArray())),
+				new MiniYamlNode("QueuedBuildRequests", FieldSaver.FormatValue(queuedBuildRequests.Select(r => r.ActorType).ToArray())),
+				new MiniYamlNode("QueuedBuildRequestOwners", FieldSaver.FormatValue(queuedBuildRequests.Select(r => r.Owner ?? "").ToArray())),
 				new MiniYamlNode("IdleUnitCount", FieldSaver.FormatValue(idleUnitCount)),
 				new MiniYamlNode("SampledUnitTypes", FieldSaver.FormatValue(sampledUnitTypes.OrderBy(t => t, StringComparer.Ordinal).ToArray()))
 			};
@@ -930,7 +960,13 @@ namespace OpenRA.Mods.Common.Traits
 			if (queuedBuildRequestsNode != null)
 			{
 				queuedBuildRequests.Clear();
-				queuedBuildRequests.AddRange(FieldLoader.GetValue<string[]>("QueuedBuildRequests", queuedBuildRequestsNode.Value.Value));
+				var actorTypes = FieldLoader.GetValue<string[]>("QueuedBuildRequests", queuedBuildRequestsNode.Value.Value);
+				var ownersNode = data.FirstOrDefault(n => n.Key == "QueuedBuildRequestOwners");
+				var owners = ownersNode == null ? Array.Empty<string>() :
+					FieldLoader.GetValue<string[]>("QueuedBuildRequestOwners", ownersNode.Value.Value);
+				for (var i = 0; i < actorTypes.Length; i++)
+					queuedBuildRequests.Add(new ExternalBuildRequest(actorTypes[i],
+						i < owners.Length && !string.IsNullOrEmpty(owners[i]) ? owners[i] : null));
 			}
 
 			var idleUnitCountNode = data.FirstOrDefault(n => n.Key == "IdleUnitCount");

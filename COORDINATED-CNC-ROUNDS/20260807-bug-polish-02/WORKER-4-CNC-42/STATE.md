@@ -12,20 +12,20 @@ when the dependency section directs it.
 - Task: `CNC-42 — Economy field defense`
 - Change category: `AI strategy, production/reservation, persisted stationing/routing, and economy-defense placement policy`
 - Balance authority: `Frozen except for the exact requested AI-policy surface: approximately one existing Medium Tank (mtnk), two Minigunners/riflemen (e1), and one Mobile SAM (msam) of field-defense demand per harvester/working-field context in mid/late Economy play; commit the saved station only after completed unloading; keep infantry out of every Tiberium type and all guards out of refinery traffic; and use normal SAM Site (sam) construction to defend economy structures. This permits bounded AI requests, reservations, assignment, safe routing/stationing, pursuit/re-form/release rules, and economy-oriented SAM demand/placement needed to realize that behavior. It does not permit changes to unit/weapon/structure stats, cost, HP, damage, armor, speed, range, ammunition, build time, power, prerequisites, Tiberium values/spread/damage, probabilities, resource values, general army composition, unrelated unit/building weights or fractions, or any other balance surface.`
-- Status: `Specified`
+- Status: `Implementation/testing`
 - Common base branch/SHA: `agent/cnc-20260806-bug-polish-01-release` / `419bee2531d4802bf922c3597b42c6eeb75ab250`
 - Task branch: `agent/round-20260807-cnc42-economy-field-defense`
 - Intended PR base: `agent/cnc-20260806-bug-polish-01-release`
 - Cycle budget: `20` isolated code-change cycles
-- Cycles used: `0`
+- Cycles used: `19`
 - Game/build lock directory: `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260807-bug-polish-02/locks`
 - Game capacity: `2`
 - Large-build capacity: `1`
 - Task report: `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260807-bug-polish-02/workers/worker-4-cnc42/COORDINATED-CNC-ROUNDS/20260807-bug-polish-02/WORKER-4-CNC-42/REPORT.md`
 - Match-analysis directory: `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260807-bug-polish-02/analysis/worker-4-cnc42`
 - Liberty Dawn design reference: `.agents/references/LIBERTY-DAWN-DESIGN.md`
-- Full-engine game tests completed: `0`
-- Terra cycle code reviews: `none yet; required after cycles 5/10/15/20 that occur`
+- Full-engine game tests completed: `64` (the prior 60 through cycle 17; cycle 18 adds one tick-6500 invalid setup whose map-level player-trait debug override changed trait processing order, one corrected exact-rules-shape fresh run through tick 6500, and one exact legacy cycle-17 load through tick 5200; cycle 19 adds one fresh publication-configuration run through tick 6500 with all task debug switches disabled; the corrected cycle-18 fresh run wrote a new absolute-phase save and passed lifecycle/topology/safety/outcome/runtime assertions despite its deliberately overstrict cycle-17 defender-235 marker not recurring; the legacy load restored the original 25-tick scan phase and reproduced defender 235's tick-3401 resource release with the defined raid/economy outcome; the publication run wrote a new save, retained the defined outcome, and emitted no task debug/runtime/desync signal; map-unavailable/tick-0 platform attempts and the earlier desyncing current-load attempt remain excluded; reused controls are not recounted)
+- Terra cycle code reviews: `cycle 5 advisory adopted: validated hazard-free paths were reduced to four-cell waypoints whose ordinary Move activities could re-path through forbidden cells; cycle 6 preserved every safe segment (`analysis/worker-4-cnc42/cycle-review-05/CYCLE-REVIEW.md`). Cycle 10 advisory adopted: the judged e1 occupancy proves owned safety must veto every ordinary movement source, not only exact routes/nudges, and needs a forced like-for-like regression (`analysis/worker-4-cnc42/cycle-review-10/CYCLE-REVIEW.md`). Cycle 15 advisory rejected after source verification: the synchronized SetMoveAlongPathSafety order is recorded in the save order stream and deterministically reconstructs both strictMovementSafety and strictAvoidCells during replay before IGameSaveTraitData resolution; SyncAttribute controls hash reporting rather than save serialization, and the cycle-15 load reproduced the live pre-boundary movement trace exactly (`analysis/worker-4-cnc42/cycle-review-15/CYCLE-REVIEW.md`). Cycle 16 will nevertheless retain a post-load pre-scan forbidden-cell assertion as defense-in-depth evidence.`
 - Sol-xhigh policy escalation: `unused (requires at least 10 game tests; one maximum)`
 - PR: `none`
 
@@ -269,6 +269,34 @@ Observable contract and bounded interpretation:
   has no field-defense owner and generic SAM placement. PR #74/commit
   `3b9efc3a4135a1a8cdc273bc392d2ccc0edca093` is relevant history for specialist
   reservation/persistence patterns; it is already contained in the common base.
+- Worker pre-change dependency inspection on 2026-08-07 found local and remote
+  branch `agent/round-20260807-cnc41-economy-tiberium-fields` at
+  `ab7997c89b`; its scoped diff from the common base contains only CNC-41's worker
+  contract and no product/config commits or reusable API. No matching GitHub PR
+  was open. CNC-42 therefore keeps its field/traffic seams narrow and will inspect
+  CNC-41 again before any shared `ai.yaml`/BaseBuilder change and publication.
+- The required cycle-5 dependency recheck on 2026-08-07 found the same local and
+  remote head `ab7997c89b8a2d545b894aef2a08e615e957032e`; the open-PR list still
+  contained no CNC-41 PR. There remains no reviewed field/traffic/placement API
+  to consume before CNC-42's future BaseBuilder work.
+- The required pre-BaseBuilder cycle-10 dependency recheck on 2026-08-07 again
+  found local, remote-tracking, and live remote head
+  `ab7997c89b8a2d545b894aef2a08e615e957032e`; its only scoped commit/file is the
+  CNC-41 worker contract, and the open-PR list still contains no CNC-41 PR. CNC-42
+  therefore has no reviewed CNC-41 placement or traffic API to consume and must
+  keep the economy-SAM seam independently narrow.
+- The required publication recheck on 2026-08-07 found CNC-41 PR #88 at live
+  remote head `418786381f64b1cae4ff9a8d1d943c78d5666646`, with product commit
+  `aa4e97972d8a0cb7f4780babcdffa4fa363c2299`. Its scoped product diff adds an
+  internal `BaseBuilderTiberiumFieldManager`, pure `TiberiumFieldPolicy`, two
+  additive BaseBuilder config blocks, and queue placement/selection branches in
+  the same three files CNC-42 touches: `BaseBuilderBotModule.cs`,
+  `BaseBuilderQueueManager.cs`, and `mods/cnc/rules/ai.yaml`. It exposes no shared
+  live field-identity, entrance, or traffic interface for CNC-42 to consume.
+  CNC-42 therefore does not stack the unreviewed dependency branch; integration
+  must combine the two independent managers/config blocks and order their queue
+  branches deliberately, then rerun toxic geometry, static-SAM, and Archipelago
+  persistence evidence on the reviewed combined candidate.
 
 ## Likely wrong approaches and challenges
 
@@ -1008,6 +1036,174 @@ silently exceed the budget.
 
 | Cycle | Commit/change | Failure hypothesis and perturbation | Checks/games | Narrative/policy/cycle-code review | Failure/pass evidence | Decision/next harder test |
 |---|---|---|---|---|---|---|
+| 1 | Uncommitted cycle diff: exact unload-complete event, persistent harvester field context, Economy field reservation/assignment, resource/traffic-safe formations | Early commit, ordinary-squad theft, unsafe route, or no changed/control difference; identical one-harvester cheese smoke with exact initial 1/2/1 and timed raid | Policy tests 6/6; Release build; `make test`; G1 changed/control seed 424201, both tick 3000 | G0 factual/policy reviews approved control premise; G1 paths pending | First commit only at tick 726 after delivery; changed eventually retained mtnk/msam/one tracked rifle locally while control dispersed them. Failed exact composition because PROC supplied a second harvester and protection delayed tank/AA. Repeated 25-tick e1 reform orders are a forbidden failure. | Cycle 2: suppress en-route churn while retaining pursuit break, improve bounded no-route state, correct G1 harness to one pre-placed harvester, and repeat paired smoke with no exact composition ambiguity. |
+| 2 | Progress-sensitive route ownership, pursuit/leash distinction, bounded route-rejection retry, and explicit unload diagnostics; corrected PROC-free-actor smoke harness | En-route defenders still churn every scan or fail the exact one-field role target; identical paired seed 424201 with one scripted initial harvester and tick-1800 stop | Policy tests 6/6; `make test`; `make check`; changed/control both passed tick 1800 | `analysis/worker-4-cnc42/g1-cycle2-comment/NARRATIVE.md`; routine policy verdict `insufficient evidence`, high confidence | Completed empty unload at tick 787 preceded bot commit at 801; exact fields=1/tanks=1/infantry=2/aa=1 at 1001; no 25-tick same-defender churn. Changed tank/MSAM held field cells while control remained at base. Raid preceded the screen, so no combat/economy improvement is claimed. | Pass G1 execution smoke. Cycle 3: add owned missing-role production and persisted assignment state, then G2 two-separated-field paired raids only after screens form, measuring deliveries, exchanges, and base tradeoff. |
+| 3 | Owner-keyed external production requests with save-compatible UnitBuilder serialization; field/assignment/destination save data; refinery/low-power request gates and stale-field cleanup | Missing roles duplicate/stale or two-field breadth fails under normal production; paired G2 seed 424302 with only one mtnk/one e1 preplaced and fixed post-commit bike/e3/heli raids | Policy tests 11/11; Release build/`make test`; G2 changed/control both clean through tick 5000 (initial tick-0 Lua parse pair excluded) | `analysis/worker-4-cnc42/g2-separated-comment/NARRATIVE.md`; routine policy `insufficient evidence`, high confidence | Both original fields committed correctly and changed formed partial local screens, delaying left loss 284 ticks and killing 2/8 bikes vs control 0/8, but both harvesters died. No owned request logged: provider was cached absent while condition-disabled during early trait creation. Normal expansion grew to six committed fields. | Fail. Cycle 4: resolve enabled owned-production provider at request time, preserve measured original-field cohort in evidence, and repeat the post-commit paired raid with verified pre-contact tanks/e1/MSAM. |
+| 4 | Resolve active owned-production provider at each scan/cancel across all providers; per-field composition diagnostics pin the original cohort | Provider fix still fails or one field monopolizes sequential demand; same G2 seed/raids with measured original fields and attempted higher lobby cash | Policy tests 11/11; Release `make test`; changed/control both passed launch manifests through tick 5000 | `analysis/worker-4-cnc42/g2-cycle4-comment/NARRATIVE.md`; routine policy verdict `mixed`, high confidence | Owned requests worked. Left reached pre-contact 1/2/1; right stayed 1/2/0 until reassignment after left died. Changed killed heli+bike and preserved refineries, but left/right harvesters died at 4138/4886 vs control 4025/4945; no decisive survival gain. MSAM 369 then churned idle retries every 25 ticks from 3651-4126. | Fail G2 survival. Cycle 5: allow two bounded outstanding role requests to exploit parallel queues and suppress idle en-route retries until stall timeout; rerun with explicit simultaneous pre-contact assertions. |
+| 5 | Allow two bounded owner-keyed outstanding requests per missing role and suppress idle route retry until the configured 250-tick stall timeout | Parallel demand may still monopolize one field or idle defenders may retain forbidden 25-tick churn; same two-field raid with a pre-contact spatial 1/2/1 assertion at both original fields | Policy tests 11/11; changed passed through tick 5000; concurrent current control advanced through tick 2001 but ended naturally before raids and is invalid for outcome comparison; prior identical-base cycle-4 control reused without recounting | `analysis/worker-4-cnc42/g2-cycle5-comment/NARRATIVE.md`; routine policy verdict `mostly sensible`, medium confidence; cycle review advisory adopted from `analysis/worker-4-cnc42/cycle-review-05/CYCLE-REVIEW.md` | Changed reached spatial 1/2/1 at both original fields by tick 3401, killed heli+bike, and kept the right harvester alive through tick 5000 where valid control lost it at 4945. Left harvester still died (4052 vs control 4025); refinery health tradeoff was mixed. Representative idle retries were about 250 ticks apart, eliminating the cycle-4 25-tick loop. Reviewer found that four-cell waypoint spacing did not guarantee the issued ordinary moves retained the validated hazard-free path. | Qualified first decisive G2 seed, not acceptance. Adopt review: cycle 6 must issue the validated route without unsafe segment re-pathing and prove it in G4 toxic geometry; static SAM/unload-traffic/invalidation boundaries remain unproven. |
+| 6 | Synchronized bounded `MoveAlongPath` order/activity preserves every validated adjacent cell and rechecks resource safety per segment; configured only on field role actors; rate-limited actual resource/traffic occupancy diagnostics | Exact order may fail serialization or still re-path through the new blue/red barrier; five harvesters, green/blue/red geometry, congested refineries, attempted storage-full abort, later paired raids and bike kites | Exact-route/policy tests 12/12; Release build and `make test` passed with zero warnings; corrected G4 changed/control both reached tick 6000 (initial no-Xvfb tick-0 pair excluded) | `analysis/worker-4-cnc42/g4-cycle6-comment/NARRATIVE.md`; routine policy verdict `mixed`, high confidence | Exact orders executed and changed formed useful original-field screens (tick 4001 left 2/2/2, right 1/3/1 vs control 0/0/0 and 0/1/0), preserving the right harvester at 34,434 health vs control 11,000. Failed mandatory safety: multiple e1 resource occupancies from tick 1801 onward plus vehicle/MSAM cases, after station orders and during pursuit/resource evolution. Storage abort was unexercised because capacity was still 0 at tick 0. | Fail G4 zero-resource rule. Review confirms safety must be continuous across hold/pursuit/re-form/recovery. Cycle 7: own/restore defensive stance, exact non-attack routing, and a resource-growth margin; rerun corrected abort timing plus toxic route. |
+| 7 | Own and restore each reserved actor's prior stance, clear inherited attack activity, use `Defend` plus exact non-attack routes, and require a one-cell resource margin; reject repeated serialized route cells | Prior pursuit may survive stance change or diagonal/evolving resource may overtake held/pathing actors; G4 retimed storage after capacity initialization and repeated paired raids/kites | Exact-route/policy tests 12/12; Release build and `make test` passed with zero warnings; G4 changed/control both reached tick 6000 | `analysis/worker-4-cnc42/g4-cycle7-comment/NARRATIVE.md`; routine policy verdict `Fail — exercised policy violation`, high confidence | Changed killed both bikes before the second kite and kept both original harvesters/refineries pristine with strong local screens, but control also kept the economy pristine and killed 3/8 raiders vs changed 2/8. Mandatory safety still failed: five e1 and three tank resource occupancies. Positive 8300/8300 storage was reached, yet AI spending reopened capacity and commits occurred before release, so the aborted/full-storage boundary remained unexercised. | Fail. Diagonal Tiberium spread is outside the one-cell Euclidean annulus and overlapping per-field destinations permit displacement. Cycle 8: two-cell spread buffer, globally unique formation cells, safe release fallback, and a continuously saturated plus explicitly cancelled unload harness. |
+| 8 | Cover diagonal spread with a two-cell resource margin and use one globally unique formation-cell set across all active fields; harness continuously holds storage full and cancels one dock before release | Diagonal growth or cross-field destination overlap still pushes infantry into resources; full-storage cancellation may commit anyway | Policy tests 12/12; Release build and `make test` passed with zero warnings; changed reached tick 6000, control ended naturally around tick 3801 before raids | `analysis/worker-4-cnc42/g4-cycle8-comment/NARRATIVE.md`; routine policy verdict `Fail`, high confidence | Unload boundary passed: no commit before tick-751 cancel/tick-901 release; first commits tick 1001. Resource violations fell from eight to two e1-only late cases; no tank/MSAM/traffic violation. Both e1 appeared several cells from their last exact destination and were released. Changed killed 5/8 raiders and preserved both harvesters/refineries, but early control invalidates comparison. | Fail. Evidence points to ordinary `Mobile.Nudge` displacement, which queues an unconstrained move outside exact-route ownership. Cycle 9: activate a resource-safe nudge-cell validator only while the field module owns an actor, preserving normal movement after release; repeat G4 with a valid control. |
+| 9 | Add an owner-activated `INudgeCellValidator`; exact field routes reject unsafe nudge destinations with their synchronized resource margin, and release restores ordinary nudge behavior | Ordinary collision displacement may still bypass the exact route and put an owned e1 on Tiberium; same toxic/full-storage scenario with raids advanced so the old control reaches them | Policy/exact-route tests 12/12; Release `make test` passed with zero warnings; changed naturally ended after observed tick 5000 and control reached tick 6000 | `analysis/worker-4-cnc42/g4-cycle9-comment/NARRATIVE.md`; routine policy verdict `Pass with duration-evidence limitation`, high confidence | Changed had no resource/traffic violation, no pre-release commit, both original harvesters alive (35,000/33,000) at tick 3751, and 8/8 raid callbacks before natural end. Control reacted faster at tick 3751 but lost the left harvester at tick 3915 and retained one raider through tick 6000. Throughput was effectively identical (~249.65 vs ~249.70 ticks/s). Changed launcher status failed only its configured tick-6000 minimum. | First clean adversarial after the latest safety fix, not full acceptance or duration proof. Cycle 10: add bounded economy-aware static-SAM preference after rechecking CNC-41, then exercise powered existing-coverage/non-duplication, legal placement, refinery access, and a changed arm that reaches the configured minimum. |
+| 10 | Add Economy-II/Bot-type-gated SAM anchor policy and BaseBuilder planner: refinery/resonator/used-silo priority, powered existing coverage, four-site cap, narrow legal traffic-free placement, and bounded diagnostics | Existing coverage may duplicate, low power may spam, generic placement may miss the economy, or static placement may obstruct field/traffic safety; G5 starts with overlapping left coverage, holds low power, restores it, then applies paired raids through tick 6500 | Focused policy tests 18/18; Release `make test`/CNC MiniYAML passed with zero warnings; first paired harness attempt advanced to tick 801 then failed identically on unavailable Lua `table.concat`; corrected judged changed/control both reached tick 6500 | `analysis/worker-4-cnc42/g5-cycle10-comment/NARRATIVE.md`; routine policy verdict `FAIL`, high confidence; mandatory review `analysis/worker-4-cnc42/cycle-review-10/CYCLE-REVIEW.md` advisory adopted | Both arms retained exactly one SAM under low power. Changed placed economy sites at 67,16 and 76,16, preserved both harvesters and pristine refineries, and killed 7/8; control's generic site at 70,30 was outside right-refinery weapon range, it lost the right harvester, damaged the left refinery to 73,485, and killed 6/8. Changed failed mandatory safety when e1 364 occupied Tiberium at 76,17 on tick 3726; later release occurred at tick 3951. Changed also issued a second reservation while one SAM was pending, although only useful distinct coverage was ultimately placed. Throughput differed by <0.1%. Reviewer found no stronger determinism/save/contention/performance/SAM defect, but confirmed exact routes/nudges do not veto all ordinary movement sources. | Fail G5 safety despite decisive economy benefit. Adopt review: cycle 11 must enforce the owned predicate at every Mobile cell transition, project active resource-modifier exposure into routing/station cells, and strictly serialize SAM requests; rerun the same forced G5 differential with causal movement markers. |
+| 11 | Generalize the owned movement validator to every `Mobile.CanEnterCell` transition; project active resource-modifier ranges plus one cell into owned safety; require one in-flight economy SAM request | A combat/ordinary transition may still put an owned e1 in growing resource, projected safety may strand screens, or SAM demand may overlap; unchanged G5 seed 424307 with active resonators, low-power recovery, growing resources, and paired raids | Focused policy tests 22/22; Release `make test`/CNC MiniYAML passed with zero warnings; changed logged through the tick-6001 duration snapshot but exited 1 on an exact-route exception; control passed tick 6500 | `analysis/worker-4-cnc42/g5-cycle11-comment/NARRATIVE.md`; routine policy verdict rejects runtime acceptance but retains strategy and recommends infantry-only strict resource exclusion, high confidence 0.94 (`analysis/worker-4-cnc42/g5-cycle11-policy/POLICY-REVIEW.md`) | No e1 resource occupancy and every economy-SAM reservation reported `pending=0`; changed placed sites at 67,16 and 76,18, kept both harvesters plus pristine refineries, and killed 4/8 by tick 6001. Control lost the right harvester, left the survivor at 7,000 and right refinery at 3,777, and killed 2/8. Changed twice claimed MSAM 395 while it was already on Tiberium and immediately released it for no safe route. At tick 6026 an actor already in its destination cell produced a one-cell path, and `MoveAlongPath.CreateOrder` threw; exit/benchmark acceptance failed. | Fail runtime. Cycle 12: treat a one-cell path as already arrived, reject initially unsafe claims, retain absolute resource safety only for e1 and absolute refinery-lane safety for all roles, and rerun G5 with class-specific occupancy assertions. |
+| 12 | Treat same-cell subcell offsets as arrived and withhold one-cell exact orders; reject hard-unsafe claims; enforce current/projected resource vetoes only for infantry while vehicles prefer safe routes then fall back; retain all-role refinery traffic veto | The crash may recur or class-specific fallback may mask e1/traffic violations and weaken coverage; unchanged G5 seed 424307 through tick 6500, followed without code change by G4 dense green/blue/red geometry, full-storage cancellation, five fields, narrow traffic, and kites | Focused policy tests 23/23; Release `make test` and Debug `make check` passed with zero warnings/errors; G5 changed/control both passed tick 6500; post-cycle G4 changed passed tick 6000 and current control naturally ended after observed tick 3901, with prior valid same-seed tick-6000 control reused | G5 reviews: `analysis/worker-4-cnc42/g5-cycle12-{comment,policy}` PASS; G4 reviews: `analysis/worker-4-cnc42/g4-post-cycle12-{comment,policy}` bounded policy failure, high confidence 0.87 | G5 had no crash/e1/traffic/SAM-overlap signal; changed retained both harvesters/refineries and killed 7/8 while control lost both. G4 retained hard safety and delayed first loss 594 ticks, but logged 24 tank/MSAM preference misses across all resource types, lost one harvester at 4509, and killed 3/8 at outcome/4/8 late versus prior valid control's 5/8 and 7/8. The current natural-end control's simultaneous 8/8 disappearance is not duration evidence. | G5 literal acceptance is superseded as clean-streak evidence by the relevant G4 failure; clean-three resets to zero after cycle 13. Adopt fail-closed resource-clear vehicle station/reform. Defer new ingress-direction inference until isolating the permissive fallback against the earlier strict-current-resource G4 result. |
+| 13 | Reject current resource cells and their configured margin for every owned role at claim, destination, exact path, nudge, and ordinary Mobile transition; retain projected modifier exclusion only for infantry | Fail-closed vehicles may become route-starved or still cross the long mixed-resource barrier through another movement source; repeat G4 seed 424306 with five harvesters, forced full-storage cancellation, narrow traffic, and paired kites | Focused policy tests 24/24; Release `make test`, Debug `make check`, and final Release `make test` passed with zero warnings/errors; changed passed tick 6000; current control advanced through the tick-3751 outcome then ended naturally/duration-invalid; prior valid control reused without recounting | `analysis/worker-4-cnc42/g4-cycle13-comment/NARRATIVE.md`; routine policy verdict approve, high confidence 0.86 (`analysis/worker-4-cnc42/g4-cycle13-policy/POLICY-REVIEW.md`) | Changed logged zero hard or preferred resource/traffic occupancy, committed only after storage release, formed five fields by tick 1326, retained both original harvesters through tick 6000, and kept them at 34,000/34,525 with pristine refineries at tick 3751. The valid old control left one harvester at 16,250 then lost it at tick 3915. Changed killed 2/8 early and 3/8 late versus control's 5/8 and 7/8, but preventing the control economy loss is decisive and the screen remained bounded/safe. | First clean adversarial after the latest relevant fix. Reviewer flags aggregate local unit count/opportunity cost as the next risk; rerun G5 to ensure strict vehicles retain literal/static acceptance, then force constrained changing-field release/invalidation evidence. |
+
+| 14 | Replace host-only movement-safety mutation with a synchronized, canonical, bounded actor order carrying the refinery/projected-hazard snapshot | Post-commit save replay may diverge because bot modules do not run during replay and therefore did not reproduce the safety toggle; fresh G7 save at tick 3200 followed by exact current-code reload | Focused policy/exact-route tests 25/25; fresh G7 passed tick 6500 and wrote save SHA `039aeb44...`; exact reload reproduced the live trace through tick 3201, then exited 1 resolving saved field-defense data | `analysis/worker-4-cnc42/g7-cycle14-comment/NARRATIVE.md`; routine policy verdict `insufficient evidence`, high confidence (`analysis/worker-4-cnc42/g7-cycle14-policy/POLICY-REVIEW.md`) | Synchronization diagnosis passed: live/replay sample traces are byte-identical through the saved frame and the prior frame-1066 desync is gone. Persistence still fails: `FieldLoader.ParseCPos` throws on `DestinationCells` because generic `CPos[]` formatting flattens comma-delimited cells into an unparseable array. Fresh topology remained safe/unreachable-aware but lost the main harvester at tick 2137; this is not accepted policy evidence. | Fail persistence; clean-three remains reset. Cycle 15 changes only destination-cell save representation to integer `CPos.Bits`, repeats a fresh two-station save plus exact load/raid window, then completes the mandatory cycle-15 code review before any further product change. |
+
+| 15 | Persist destination cells as integer `CPos.Bits` arrays and reconstruct cells explicitly, with a direct generic save-loader round trip | Parse-safe representation may still lose/duplicate ownership or continue differently after load; fresh G7 save at tick 3200 and exact load through both raids | Focused policy/save tests 26/26; fresh passed tick 6500; exact save SHA `3f640bef...` loaded without crash/desync and reached tick 5200, but launcher failed one expected release marker | `analysis/worker-4-cnc42/g7-cycle15-comment/NARRATIVE.md`; routine policy verdict `mixed`, high confidence; cycle-15 advisory rejected after source verification (`analysis/worker-4-cnc42/cycle-review-15/CYCLE-REVIEW.md`) | Fresh and replay traces matched through tick 3201 and restored composition logged at tick 3202. Reload then diverged materially: uninterrupted fresh lost harvester 230 and released its field at tick 4076, while reload kept both measured harvesters alive (25,000/35,000) and grew to three fields. This proves parse repair but fails exact continuation; route cooldown/progress/rejection state is not persisted. | Fail persistence continuity; clean-three remains reset. Reviews require exact field/harvester lifecycle equivalence before policy judgment. Cycle 16 will serialize only bounded behavior-affecting route timing/progress/rejection state, then repeat the fresh save/load raid with actor-level restoration and pre-scan safety assertions. |
+
+| 16 | Persist bounded actor-keyed last-order cooldowns, route progress, and future route-rejection deadlines; restore only live owned assigned actors/bounded rejected candidates; add actor-level restoration diagnostics | Cleared route state may emit an immediate duplicate route and alter post-load harvester lifecycle; fresh G7 save at tick 3200, exact load, actor-level route restoration, no tick-3202 idle retry, and matched health/release assertions | Focused persistence/policy tests 27/27; Release `make test` and Debug `make check` passed with zero warnings/errors; fresh passed tick 6500; exact save SHA `ca4e45e5...` loaded exit 0 through tick 5200, with launcher failed only on an overstrict exact raid-kill count | `analysis/worker-4-cnc42/g7-cycle16-comment/NARRATIVE.md`; routine policy verdict `mixed`, medium confidence (`analysis/worker-4-cnc42/g7-cycle16-policy/POLICY-REVIEW.md`) | Load restored seven route records at tick 3201, emitted no tick-3202 idle retry, logged no resource/traffic/desync/runtime failure, retained the unreachable MSAM, grew to four fields, and matched fresh original-harvester health exactly (34,888/34,902) with both alive and no field-230 release. Fresh killed 3/6 raids while load killed 2/6; a save-boundary station transition repeated one tick later as `new-destination`, not an unpersisted idle route. | Partial persistence pass only; no clean-three credit. Reviews treat the surviving E3 and loaded screen decline to 0 tanks/3 infantry/0 AA as strategically material. Cycle 17 adds bounded per-release ownership/role-vacancy and per-raider target/damage telemetry, then reruns fresh/exact load before any speculative policy change. |
+
+| 17 | Split defender release diagnostics into concrete validity/reservation owners plus active role vacancy and bounded eligible replacement; task-local stable-label raider/defender damage timeline; no balance/tactical change | The cycle-16 one-kill divergence may be caused by an invalid release, uncompensated vacancy, or different post-save combat contact; same focused G7 save/load, with exact causal telemetry | Focused tests 27/27; Debug `make check` and Release `make test` passed with zero warnings/errors; one wrong-map tick-6500 setup invalid; corrected fresh passed tick 6500 and exact save SHA `44a2d9cd...` load passed tick 5200 | `analysis/worker-4-cnc42/g7-cycle17-comment/NARRATIVE.md`; routine Policy Review `conditional pass`, one bounded continuity follow-up (`analysis/worker-4-cnc42/g7-cycle17-policy/POLICY-REVIEW.md`) | Both corrected arms killed the main bike at 3321 and E3 at 3531 with identical damage events; the SAM killed the helicopter at 3350 fresh/3355 load, so both reached 3/6. Main harvester health matched exactly at 23,031; far health differed by 400. Fresh released MSAM 235 at tick 3401 for `resource` with no eligible replacement, while load retained it and scanned on the one-tick-later cadence. No generic other-owner release, safety, topology, lifecycle, runtime, or desync failure occurred. | Diagnostic pass, not yet clean credit. Adopt the bounded review concern: cycle 18 persists the absolute scan phase so the missed load boundary does not permanently shift the resource-safety decision; repeat the same fresh/exact-load checkpoint without tactical tuning. |
+| 18 | Persist an absolute next Economy field-defense scan tick with legacy countdown fallback; resume at the next original cadence tick when load resolution has already passed the saved scan boundary | A relative countdown restored after the bot tick permanently phase-shifts scans by one tick and changes defender 235's resource release into a reform; same G7 fresh/save/load checkpoint must agree on defender 235's first resource-safety decision | Focused tests 33/33 after the legacy refinement; Debug/Release compile, interface checks, and CNC MiniYAML passed with zero warnings/errors. First fresh attempt reached tick 6500 but is invalid because a task-map player-trait override changed bot trait ordering. Corrected exact-rules-shape fresh reached tick 6500, saved absolute `NextScanTick: 3201`, and had no safety/traffic/runtime/desync failure. Exact legacy cycle-17 load passed through tick 5200. | `analysis/worker-4-cnc42/g7-cycle18-comment/NARRATIVE.md`; routine Policy Review `PASS, with bounded follow-up concern`, medium-high confidence (`analysis/worker-4-cnc42/g7-cycle18-policy/POLICY-REVIEW.md`) | Corrected fresh reached `raid=3/6`, zero harvester losses, and pristine processors. Natural assignment ordering did not repeat the cycle-17 tick-3401 resource release, so its launcher failed only that deliberately overstrict marker, but it remains the independent fresh/new-save baseline. The exact legacy load restored `saved=1` as `next=3201 current=3201 ticks=25`, released defender 235 at tick 3401 for `resource` with no eligible replacement and no tick-3402 re-form, reached `raid=3/6`, lost no harvester, and kept both processors pristine without safety/traffic/runtime/desync failure. | The bounded persistence defect and cycle-17 review concern pass their exact regression. Reject actor ID 235 as a required fresh-run oracle because actor identity and natural assignment order are save-specific; the new-format fresh save plus exact legacy event jointly prove the bounded phase behavior. Cycle 19 disables evidence logging and proves the publication configuration without tactical tuning. |
+| 19 | Disable task-owned mobile field-defense and Brutalis/Iron Reaper economy-SAM debug switches; move the task G7 archive out of the product map tree without changing code or policy | Diagnostics cleanup could accidentally alter behavior or leave task debug output enabled; fresh exact-rules-shape Archipelago run keeps storage cancellation, later unload, topology, replacement, save boundary, and paired raids while explicitly forbidding both task debug prefixes | Focused policy/persistence tests 33/33; Debug and Release builds, interface checks, and CNC MiniYAML passed with zero warnings/errors. Fresh publication configuration passed through tick 6500 at 270.5 ticks/s and wrote save SHA `0ba298b2...`; post-cleanup CNC MiniYAML passed without seeing the task map; one no-content configuration stop and one wrong content-root tick-0 UI launch are excluded. | `analysis/worker-4-cnc42/g7-cycle19-comment/NARRATIVE.md`; routine Policy Review `policy-compatible`, high confidence, no bounded concern (`analysis/worker-4-cnc42/g7-cycle19-policy/POLICY-REVIEW.md`) | All required setup/state/raid markers were present; tick-4201 outcome was `raid=3/6 harvLosses=0`, main/far harvesters were 34,120/35,000 and 35,000/35,000, the shared processor was pristine, unreachable MSAM stayed at 91,96, task debug prefixes were absent, and no runtime/desync signal occurred. | Publication configuration and its independent reviews pass. Publish the safest useful result without further product change; propose `First iteration - testing` because the post-persistence clean-three and exact stressed final-regression bar were not completed within the isolated cycle budget. |
+
+Post-cycle-13 evidence without a product change: the fresh G5 changed/control pair
+both passed tick 6500. Changed remained free of hard/preferred resource and traffic
+signals, placed four distinct useful economy SAMs, retained both original
+harvesters and pristine refineries, and achieved the same 6/8 outcome kills as
+control; control lost its right harvester and left refinery. Changed throughput
+was about 5% below control, within the required 10%. Fresh factual and policy
+reviews accepted the literal/static result with a moderate 0.74 policy confidence
+(`analysis/worker-4-cnc42/g5-post-cycle13-{comment,policy}`).
+
+G6 then forced six committed contexts, ordinary Economy-artillery competition,
+a destroyed reserved Mobile SAM, a destroyed committed extra harvester, and paired
+remote raids. The first pair counted because both advanced materially, although
+the control ended naturally/duration-invalid; a harness-only duration sentinel
+produced a clean corrected pair through tick 6500. Changed released/replaced the
+Mobile SAM within 100/150 ticks and released the dead harvester's field within 200
+ticks, reduced demand from six to five fields, logged no resource/traffic signal,
+kept both original harvesters and both refineries alive, and had 3/8 raid kills at
+tick 4201 versus control's lost right harvester, damaged right refinery, and 0/8.
+Changed ran about 11% faster. Fresh policy review supports the bounded release and
+replacement result at moderate confidence (`analysis/worker-4-cnc42/g6-comment/NARRATIVE.md`,
+`analysis/worker-4-cnc42/g6-policy/POLICY-REVIEW.md`). This is clean adversarial
+two; topology, persistence, and field-exhaustion proportionality remain next.
+
+G7 exercised stock Archipelago and a focused Archipelago-derived topology with
+reachable economy contexts plus an unreachable-domain Mobile SAM. The valid
+focused cycle-13 changed/control pair passed tick 6500 at essentially identical
+throughput; changed kept both measured harvesters alive and the unreachable actor
+fixed at 91,96 while control lost its far harvester. A pre-commit negative save
+loaded cleanly, and an old-control post-commit save also loaded cleanly. The
+cycle-13 changed post-commit save desynchronized while replaying its recorded
+orders, isolating a product persistence defect and beginning cycle 14.
+
+Cycle 14 synchronized the field-owned movement-safety state with a canonical,
+bounded actor order. A fresh focused run passed tick 6500 and wrote a current save
+at tick 3200. Its exact reload reproduced every sampled live position through
+tick 3201, eliminating the prior replay desync, but then crashed before the loaded
+world's first tick while parsing the field module's comma-flattened `CPos[]`
+destination data. Fresh factual review classifies persistence as an evidence
+blocker; routine Policy Review returns `insufficient evidence`, high confidence,
+and requires serialization repair before combat-policy judgment. The latest
+relevant fix therefore has no clean adversarial credit.
+
+Cycle 15 made destination persistence parse-safe by storing integer `CPos.Bits`.
+Its fresh run passed tick 6500 and exact save SHA `3f640bef...` loaded without a
+crash or desync through tick 5200. The restored composition appeared at tick 3202
+and the unreachable actor remained fixed. Continuation nevertheless diverged:
+the uninterrupted run lost harvester 230 and released its field at tick 4076,
+while reload kept both measured harvesters alive at 25,000/35,000 through outcome
+and later grew from two to three fields. The missing release marker is therefore
+a real state mismatch, not a harness false negative. Assignment/destination state
+is persisted, but behavior-affecting route cooldown, progress, and rejection state
+is cleared on restore. Required cycle-15 factual/policy and code reviews were
+completed before the next product change. The fresh Commenter confirms that the missing
+release is a substantive persistence-equivalence failure rather than a launcher
+failure (`analysis/worker-4-cnc42/g7-cycle15-comment/NARRATIVE.md`). Routine
+Policy Review returns `mixed`, high confidence, and requires lifecycle equivalence
+plus bounded actor-level restoration/combat telemetry before judging the apparent
+reload improvement (`analysis/worker-4-cnc42/g7-cycle15-policy/POLICY-REVIEW.md`).
+The cycle-15 code reviewer alleged that replay would retain the synchronized
+strict-safety boolean but lose its unsaved avoid-cell set. Source verification
+rejects that premise: game saves replay the recorded synchronized safety order,
+whose resolver reconstructs both values before trait-data restoration; `[Sync]`
+only contributes to the sync hash. The byte-identical live/replay pre-boundary
+trace supports that path. Cycle 16 still keeps a pre-first-scan forbidden-cell
+assertion to guard the invariant (`analysis/worker-4-cnc42/cycle-review-15/CYCLE-REVIEW.md`).
+
+Cycle 16 persisted the bounded behavior-affecting route state as nested primitive
+scalars. A fresh run passed tick 6500 and wrote exact current save SHA-256
+`ca4e45e5df0144ade825be7c88bfcf67b59384b85438517027277781d0c6d8cc`.
+The load restored seven actor route records at tick 3201 and did not reproduce
+cycle 15's immediate tick-3202 idle retry. It exited normally at tick 5200 with
+no exception, desync, resource, traffic, topology, or harvester-release signal.
+Both fresh and load retained the original harvesters at exactly 34,888 and 34,902
+health through the tick-4201 outcome and both grew to four fields. The launcher
+status is failed solely because its exact fresh `raid=3/6` regex observed `2/6`
+after load. This is a real one-kill combat continuation variance, but it does not
+violate the predeclared harvester lifecycle, assignment, safety, or field-release
+oracle. A field station that transitioned during the save boundary was reprocessed
+one tick later as `new-destination`; no restored defender received the forbidden
+immediate `idle-retry`. The Commenter classifies exact-load equivalence as
+limited/failed despite the correct lifecycle, because the main E3 survives and
+the loaded composition later declines to zero tanks and zero AA
+(`analysis/worker-4-cnc42/g7-cycle16-comment/NARRATIVE.md`). Routine Policy Review
+returns `mixed`, medium confidence, and likewise withholds acceptance: every
+post-load release must identify its concrete owner/invalidity, active-field role
+vacancy, eligible replacement, and causal combat timeline before the one-kill
+difference can be judged (`analysis/worker-4-cnc42/g7-cycle16-policy/POLICY-REVIEW.md`).
+Cycle 17 therefore changes diagnostics, not balance or unproven policy.
+
+Cycle 17's first launch reached tick 6500 but used the inherited cycle-16 ignored
+map copy, so it is counted as an invalid setup and excluded from the useful pair.
+The corrected fresh run used map SHA-256 `892fa9de...`, passed tick 6500, and
+wrote save SHA-256 `44a2d9cdb4394647c9d3e342d556730927bb80203392b9a11529965d36926b15`.
+Its exact load passed tick 5200. Both continuations killed the main bike at tick
+3321 and the main E3 at tick 3531 through identical attributed damage chains;
+the covering SAM killed the helicopter at tick 3350 fresh versus 3355 load, so
+both satisfied the required `3/6` checkpoint. Main harvester health was exactly
+23,031 in both and the far harvester differed by only 400 health. The diagnostic
+separated releases into missing actors, refinery traffic, and resource
+invalidation with active role/replacement facts; it found no generic competing
+reservation owner behind the main result. One persistence variance remains:
+fresh released MSAM 235 for current resource at tick 3401 while load retained it
+and performed field scans one tick later. The fresh Commenter verifies the
+corrected pair and invalid inherited-map exclusion
+(`analysis/worker-4-cnc42/g7-cycle17-comment/NARRATIVE.md`). Routine Policy Review
+returns a conditional pass with one bounded follow-up: make defender 235's first
+post-save resource-safety release/re-form decision agree without tactical tuning
+(`analysis/worker-4-cnc42/g7-cycle17-policy/POLICY-REVIEW.md`).
+
+Raw save inspection identifies the bounded cause. The tick-3200 save stores
+`EconomyFieldDefenseScanTicks: 1`, and uninterrupted play consumes that countdown
+at tick 3201. Load resolution occurs after bot processing at tick 3201, so
+restoring the same relative value first scans at tick 3202 and permanently moves
+the 25-tick phase to 3402. The save contains field 230's AA assignment and actor
+235's `LastOrder: 2926`; missing assignment/cooldown is not the cause. Cycle 18
+will persist the absolute next scan tick and, when its boundary scan has already
+been missed, resume at the next original cadence tick (3226, then 3401). It will
+retain legacy countdown loading and make no balance or tactical change.
+
+Cycle 18 implements that bounded phase repair. A first fresh run reached tick
+6500 but is invalid because its task-map `Player` trait override altered bot-trait
+processing order. The corrected exact-rules-shape fresh run reached tick 6500,
+wrote the new absolute `EconomyFieldDefenseNextScanTick: 3201` save field, retained
+both harvesters and pristine processors, reached `raid=3/6`, and logged no safety,
+traffic, runtime, or desync failure. Its naturally different assignment ordering
+did not reproduce actor 235's old resource event, so the overstrict marker alone
+failed. Loading cycle 17's exact legacy save under the final fallback then restored
+`saved=1 next=3201 current=3201 ticks=25`, released MSAM 235 at tick 3401 for
+current resource with no eligible replacement, emitted no forbidden tick-3402
+re-form, and retained the defined `raid=3/6`, zero-harvester-loss, pristine-
+processor outcome through tick 5200. This directly closes the routine review's
+one bounded persistence concern without tactical or balance tuning.
+
+Cycle 19 disables all three task-owned evidence switches in the published CNC
+rules and moves the untracked G7 archive out of `mods/cnc/maps` into the ignored
+analysis area with its SHA unchanged. All 33 focused tests, Debug/Release builds,
+interface checks, and CNC MiniYAML passed with zero warnings/errors. A fresh
+debug-disabled Archipelago run then passed tick 6500 at 270.5 ticks/s, wrote save
+SHA-256 `0ba298b2dd31ac8e918d75f0baf277c98a55d4cfdc4b39f597235b7411b8efce`,
+emitted neither task debug prefix, retained both harvesters and a pristine
+processor at the tick-4201 `raid=3/6 harvLosses=0` outcome, kept the unreachable
+MSAM at 91,96, and logged no runtime or desync failure. The initial no-content
+configuration stop and a wrong content-root mod-content UI launch advanced no
+game ticks and remain excluded.
 
 ## Handoff receipt
 

@@ -70,15 +70,32 @@ namespace OpenRA.Mods.Common.Activities
 
 				case DockingState.Dock:
 					if (!IsCanceling && Refinery.IsInWorld && !Refinery.IsDead && !Harv.IsTraitDisabled)
+					{
+						foreach (var notify in self.TraitsImplementing<INotifyHarvesterUnload>())
+							notify.UnloadStarted(self, Refinery);
+
 						OnStateDock(self);
+					}
 					else
 						dockingState = DockingState.Undock;
 
 					return false;
 
 				case DockingState.Loop:
-					if (IsCanceling || !Refinery.IsInWorld || Refinery.IsDead || Harv.IsTraitDisabled || Harv.TickUnload(self, Refinery))
+					if (IsCanceling || !Refinery.IsInWorld || Refinery.IsDead || Harv.IsTraitDisabled)
+					{
+						foreach (var notify in self.TraitsImplementing<INotifyHarvesterUnload>())
+							notify.UnloadAborted(self, Refinery);
+
 						dockingState = DockingState.Undock;
+					}
+					else if (Harv.TickUnload(self, Refinery))
+					{
+						foreach (var notify in self.TraitsImplementing<INotifyHarvesterUnload>())
+							notify.UnloadCompleted(self, Refinery);
+
+						dockingState = DockingState.Undock;
+					}
 
 					return false;
 

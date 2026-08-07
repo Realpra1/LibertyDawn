@@ -174,10 +174,13 @@ namespace OpenRA.Mods.Common.Traits
 				}
 				else
 				{
-					if (baseBuilder.FirstTowerPlanner.AppliesTo(actorInfo.Name))
+					if (baseBuilder.ControlsEconomyDefenseSam(actorInfo.Name))
+						location = baseBuilder.EconomyDefenseSamLocation(currentBuilding.Item, actorInfo,
+							actorInfo.TraitInfo<BuildingInfo>(), true);
+					else if (baseBuilder.FirstTowerPlanner.AppliesTo(actorInfo.Name))
 						location = baseBuilder.FirstTowerPlanner.ChooseLocation(actorInfo, actorInfo.TraitInfo<BuildingInfo>());
 
-					if (location == null)
+					if (location == null && !baseBuilder.ControlsEconomyDefenseSam(actorInfo.Name))
 					{
 						// Check if Building is a defense and if we should place it towards the enemy or not.
 						if (actorInfo.HasTraitInfo<AttackBaseInfo>() && world.LocalRandom.Next(100) < baseBuilder.Info.PlaceDefenseTowardsEnemyChance)
@@ -375,6 +378,17 @@ namespace OpenRA.Mods.Common.Traits
 				return null;
 			}
 
+			// Once the authored opening and power prerequisites are satisfied, an uncovered
+			// economy anchor may reserve one normal SAM build. Existing powered overlapping
+			// coverage and a single in-flight reservation suppress duplicate sites.
+			var economySam = baseBuilder.EconomyDefenseSamBuilding(queue, buildableThings);
+			if (economySam != null)
+			{
+				AIUtils.BotDebug("{0} decided to build {1}: uncovered economy air approach",
+					queue.Actor.Owner, DisplayName(economySam.Name));
+				return economySam;
+			}
+
 			// Next is to build up a strong economy
 			if (!baseBuilder.HasAdequateRefineryCount)
 			{
@@ -510,6 +524,8 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				var name = frac.Key;
 				if (limitedFractions.ContainsKey(name))
+					continue;
+				if (baseBuilder.ControlsEconomyDefenseSam(name))
 					continue;
 
 				// While a smart AI has no live refinery, every refinery source shares the one
