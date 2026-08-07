@@ -373,6 +373,15 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Empty cells left between the construction yard footprint and its enclosure.")]
 		public readonly int ConstructionYardEnclosureMargin = 1;
 
+		[Desc("Width of the deliberate vehicle access opening in the construction-yard enclosure.")]
+		public readonly int ConstructionYardEnclosureAccessWidth = 3;
+
+		[Desc("Absolute world tick when construction-yard enclosure planning, reservations, and repairs stop.")]
+		public readonly int ConstructionYardEnclosureCutoffTick = 7500;
+
+		[Desc("Ticks between bounded missing-cell maintenance scans for the construction-yard enclosure.")]
+		public readonly int ConstructionYardEnclosureMaintenanceInterval = 250;
+
 		[Desc("Write construction-yard enclosure planning and failure diagnostics to debug.log.")]
 		public readonly bool ConstructionYardEnclosureDebugLogging = false;
 
@@ -669,6 +678,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		void IBotTick.BotTick(IBot bot)
 		{
+			WallPlanner?.Tick();
 			UpdateOpening(bot);
 			smartEconomy?.Tick(bot);
 			TiberiumFieldManager?.Tick();
@@ -1204,6 +1214,9 @@ namespace OpenRA.Mods.Common.Traits
 				new MiniYamlNode("EconomyDefenseSamReservationTick", FieldSaver.FormatValue(economyDefenseSam?.ReservationTick ?? 0)),
 				new MiniYamlNode("FirstTowerPlacementComplete", FieldSaver.FormatValue(FirstTowerPlanner.Complete))
 			};
+			var enclosureState = WallPlanner?.IssueTraitData();
+			if (enclosureState != null)
+				data.Add(enclosureState);
 			var fieldState = TiberiumFieldManager?.IssueTraitData();
 			if (fieldState != null)
 				data.Add(fieldState);
@@ -1349,6 +1362,7 @@ namespace OpenRA.Mods.Common.Traits
 			if (firstTowerNode != null)
 				FirstTowerPlanner.Complete = FieldLoader.GetValue<bool>("FirstTowerPlacementComplete", firstTowerNode.Value.Value);
 
+			WallPlanner?.ResolveTraitData(data);
 			TiberiumFieldManager?.ResolveTraitData(data);
 		}
 	}
