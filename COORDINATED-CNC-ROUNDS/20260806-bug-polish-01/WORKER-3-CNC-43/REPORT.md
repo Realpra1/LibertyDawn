@@ -300,3 +300,116 @@ These are low-risk limitations for a static actor-scoped locomotor whose exact
 table is copied from and compared against the pinned MCV values. All normal
 production/repack/recovery paths and hostile/allied collision boundaries passed
 in the full engine.
+
+## Integrated RC2 validation
+
+### Candidate and result
+
+Tested the exact cumulative RC2 release metadata head
+`fd15540ffc98c70f085688fe0b38a4a6341fc6ed` and code candidate
+`b456fd89fac88d71dfadd65c47cfb7b409d44122` from repair branch
+`agent/round-20260806-cnc43-rc2-repair`. Result: **combined pass, no repair**.
+No product/config change was made, so integrated code-change cycles remain 0/3
+for RC2 and 0/12 total.
+
+Six fresh full-engine games bring the CNC-43 total from 46 to 52. All used the
+shared game lock, isolated support directories/maps/replays/benchmarks/displays,
+ordinary real AI modules, and headless MAX.
+
+### Combined adversarial behavior
+
+The seed-43003 matrix/safety run passed at tick 10,000. The normal MCV killed or
+removed crate, infantry, SBAG, BRIK, APC, and GUN targets with exact MCV
+attribution, remained alive, and deployed. Mammoth completed the same matrix.
+STNK retained only crate/infantry crushing, MTNK retained its negative behavior,
+and allied infantry, wall, and vehicle survived while the MCV killed only the
+hostile wall. No fatal/desync signal occurred.
+
+The clean two-way seed-43004 lifecycle run passed at tick 12,000. VIKI's normal
+vehicle queue produced an MCV and ordinary McvManager deployment created a Yard;
+Brutalis repacked a normal Yard to MCV and redeployed it. This jointly exercises
+the dedicated live-actor locomotor and `FACT.TransformsIntoMobile` validation in
+the cumulative build.
+
+The seed-43043 long-pressure confirmation used four ordinary
+VIKI/Brutalis/SkyNet players, 5,000 cash, real queue contention, an enclosed
+target base, hostile Yard destruction, and natural conclusion. Critical events:
+
+- initial MCV deployment: tick 13;
+- recovery trigger with one factory and all 16 walls: tick 5,183;
+- Yard killed by `arty/Multi2`, still 16 walls: tick 5,252;
+- normal VIKI 4,000-credit MCV production spend: tick 5,688;
+- recovery MCV produced: tick 7,525;
+- movement owned by `McvManagerBotModule`, with zero scripted/combat/crush
+  orders: tick 7,590;
+- normal transform removal/deployment to one Yard, all 16 walls intact: tick
+  8,489;
+- natural game over after tick 34,000, exit code 0, with no fatal, exception,
+  desync, configured-exit, or recovery-MCV-death marker.
+
+### Capacity trial and performance
+
+The requested three-way trial launched matrix, lifecycle, and long pressure
+together. Matrix passed; lifecycle reached every required success marker but
+returned nonzero during benchmark/shutdown processing; long pressure reached
+normal Yard destruction and MCV queue spend but ended before MCV production.
+Batch elapsed time was 37.383 seconds, completion was 1/3, and sampled peak
+aggregate process-tree RSS was 6,447,160 KiB on a 7.8 GiB host with no swap.
+
+The two-way retest passed both lifecycle and long pressure: 2/2 completion,
+143.593 seconds elapsed, 223.186 valid world ticks/second, and peak aggregate RSS
+4,094,272 KiB. The serial enclosure confirmation passed in 473.825 seconds in a
+Debug rebuild, with peak 1,305,896 KiB. The data establishes that three-way is
+unreliable on this host, while two-way completed cleanly with about 2.24 GiB less
+sampled peak RSS. Recommend reducing the shared capacity to two. The differing
+batch workloads mean this is an operational reliability conclusion, not a claim
+that CNC-43 changes runtime cost.
+
+### Resolved rules and checks
+
+Integrated resolved outputs are under
+`analysis/worker-3-cnc-43/resolved/integrated-rc2`:
+
+- MCV `mcvheavywheeled` and Mammoth `heavytracked` both resolve to exactly
+  `wall, heavywall, crate, infantry`.
+- MCV terrain remains Clear 90, Rough 63, Road/Bridge 190, all Tiberium 63,
+  Beach 50; `Mobile.Speed` remains 60.
+- FACT uses `mcvheavywheeled`; STNK uses shared `heavywheeled` with only
+  `crate, infantry`.
+- HTNK SHA-256 remains
+  `839a151a4c7dbfe900f1a610eebde402ade0a1697a39dd805b734279f920c704`;
+  STNK remains
+  `2071a71415682d9a30a42420bc8ff557c6241d61a926b6837d4ab6d938de4296`.
+
+Current cumulative gates pass: `make test`, `make check`, `make check-scripts`,
+and 454/454 Debug unit tests, with zero build warnings/errors. `git diff --check`
+passes and the repair branch has no product delta from the recorded candidate.
+Draft PR #84 is mergeable; all four reported Linux/Windows CI checks are green.
+
+PR #31 remains unchanged at `4e65c05fed4e809578aea39a15fbac0f630cf66d`.
+No CNC-45 remote branch/ref was found, and no Mammoth, target class, AI order, or
+balance value was changed.
+
+### Evidence and review
+
+Primary artifacts:
+
+- `analysis/worker-3-cnc-43/games/integrated-rc2-three-way` and sibling resource
+  JSON;
+- `analysis/worker-3-cnc-43/games/integrated-rc2-two-way` and sibling resource
+  JSON;
+- `analysis/worker-3-cnc-43/games/integrated-rc2-enclosure-recovery` and sibling
+  resource JSON;
+- `analysis/worker-3-cnc-43/commenters/integrated-rc2/NARRATIVE.md`;
+- `analysis/worker-3-cnc-43/commenters/integrated-rc2-enclosure/NARRATIVE.md`.
+
+Fresh no-history factual Commenters verified the causal sequences and run
+integrity. No Policy Reviewer was launched because CNC-43 remains literal
+config-only behavior and no AI policy changed. No diagnostics ship in product;
+the measurement wrapper, manifests, maps, logs, replays, and benchmarks are
+ignored evidence only.
+
+Remaining risk is unchanged: bounded logs identify McvManager ownership and zero
+instrumented combat/crush orders but do not expose every internal order packet.
+The cumulative full-engine matrix, lifecycle, enclosed recovery, natural match,
+resolved-rule, and build evidence exposed no CNC-43 defect.

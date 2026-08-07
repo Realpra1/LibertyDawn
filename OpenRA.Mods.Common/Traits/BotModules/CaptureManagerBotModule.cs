@@ -69,7 +69,8 @@ namespace OpenRA.Mods.Common.Traits
 			public readonly Actor Actor;
 			public readonly int Value;
 			public readonly bool IsBuilding;
-			public readonly int HealthPercent;
+			public readonly int HitPoints;
+			public readonly int MaxHitPoints;
 
 			public CaptureCandidate(Actor actor, int value)
 			{
@@ -77,8 +78,8 @@ namespace OpenRA.Mods.Common.Traits
 				Value = value;
 				IsBuilding = actor.Info.HasTraitInfo<BuildingInfo>();
 				var health = actor.TraitOrDefault<IHealth>();
-				HealthPercent = health == null || health.MaxHP <= 0 ? 100 :
-					(int)(100L * health.HP / health.MaxHP);
+				HitPoints = health?.HP ?? 0;
+				MaxHitPoints = health?.MaxHP ?? 0;
 			}
 		}
 
@@ -128,6 +129,12 @@ namespace OpenRA.Mods.Common.Traits
 				lastTargetHealth = targetHealth;
 				LastProgressTick = worldTick;
 			}
+
+			public SpecialistAssignment WithMaximumClaimants(int maximumClaimants)
+			{
+				return new SpecialistAssignment(Target, TargetHealth, AssignedTick, maximumClaimants,
+					lastSpecialistPosition, lastTargetHealth, LastProgressTick);
+			}
 		}
 
 		readonly struct DeferredTarget
@@ -163,6 +170,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly Predicate<Actor> unitCannotBeOrdered;
 		readonly int maximumCaptureTargetOptions;
 		IBotTransportReservations[] transportReservations;
+		DomainIndex domainIndex;
 		int minCaptureDelayTicks;
 		int minDemolitionDelayTicks;
 
@@ -194,6 +202,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		protected override void Created(Actor self)
 		{
+			domainIndex = world.WorldActor.TraitOrDefault<DomainIndex>();
 			transportReservations = self.Owner.PlayerActor.TraitsImplementing<IBotTransportReservations>().ToArray();
 			base.Created(self);
 		}
@@ -207,6 +216,12 @@ namespace OpenRA.Mods.Common.Traits
 
 		void IBotTick.BotTick(IBot bot)
 		{
+			// Capture and demolition consume their specialist before the next reassessment can run.
+			// Retire only those unavailable actors promptly so a pair's sabotage is observed before
+			// its survivor changes ownership, while keeping planning and world scans on their cadence.
+			RetireUnavailableAssignments(bot, activeCapturers, "capture", SpecialistAssignmentPurpose.Capture);
+			RetireUnavailableAssignments(bot, activeDemolitionUnits, "demolition", SpecialistAssignmentPurpose.Demolition);
+
 			var scanCapture = --minCaptureDelayTicks <= 0;
 			var scanDemolition = --minDemolitionDelayTicks <= 0;
 			if (scanCapture || scanDemolition)
@@ -253,7 +268,6 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			if (!Info.CapturingActorTypes.Any() || player.WinState != WinState.Undefined)
 				return;
-
 			var capturers = world.ActorsHavingTrait<IPositionable>()
 				.Where(a => a.Owner == player && (a.IsIdle || activeCapturers.ContainsKey(a)) &&
 					Info.CapturingActorTypes.Contains(a.Info.Name) && a.Info.HasTraitInfo<CapturesInfo>() &&
@@ -303,17 +317,9 @@ namespace OpenRA.Mods.Common.Traits
 
 			var reserved = new HashSet<int>();
 			var retainedPairActors = new HashSet<Actor>();
-			foreach (var group in activeCapturers.Where(pair => !pair.Key.IsDead && pair.Key.IsInWorld)
-				.GroupBy(pair => pair.Value.Target))
-			{
-				var targetIndex = Array.FindIndex(candidates, candidate => candidate.Actor == group.Key);
-				if (targetIndex < 0 || group.Count() < 2 || !RequiresPair(candidates[targetIndex]))
-					continue;
-
-				reserved.Add(targetIndex);
-				foreach (var pair in group)
-					retainedPairActors.Add(pair.Key);
-			}
+			ReserveActiveSoloTargets(candidates, reserved);
+			ReassessActivePairs(bot, candidates, capturers, reserved, retainedPairActors);
+			ReserveActiveSoloTargets(candidates, reserved);
 
 			var remaining = capturers.Where(capturer => !retainedPairActors.Contains(capturer.Actor)).ToList();
 			AssignHealthyBuildingPairs(bot, candidates, remaining, reserved);
@@ -338,12 +344,14 @@ namespace OpenRA.Mods.Common.Traits
 					(targetIndex == incumbentIndex || targetIndex < 0 || !CaptureTargeting.ShouldRetarget(
 						scores[incumbentIndex], scores[targetIndex], Info.CaptureRetargetImprovement)))
 				{
+					DebugHighestPriorityRejection(capturer, candidates, unavailable, incumbentIndex);
 					reserved.Add(incumbentIndex);
 					continue;
 				}
 
 				if (targetIndex < 0 || scores[targetIndex] < 0)
 				{
+					DebugHighestPriorityRejection(capturer, candidates, unavailable, -1);
 					if (activeCapturers.Remove(capturer.Actor))
 					{
 						targetReservations.Release(capturer.Actor.ActorID);
@@ -355,6 +363,7 @@ namespace OpenRA.Mods.Common.Traits
 					continue;
 				}
 
+				DebugHighestPriorityRejection(capturer, candidates, unavailable, targetIndex);
 				reserved.Add(targetIndex);
 				var target = candidates[targetIndex];
 				var action = incumbentIndex >= 0 ? "retarget" : "capture";
@@ -371,13 +380,220 @@ namespace OpenRA.Mods.Common.Traits
 				bot.QueueOrder(new Order("CaptureActor", capturer.Actor, Target.FromActor(target.Actor), false));
 				AIUtils.BotDebug("AI ({0}): Ordered {1} to capture {2}", player.ClientIndex, capturer.Actor, target.Actor);
 				Debug("{0} {1}#{2} -> {3}#{4}: value={5}, distance-cells={6:0.0}, score={7:0.0}, " +
-					"building={8}, health={9}%{10}", action,
+					"building={8}, health={9}/{10}{11}", action,
 					capturer.Actor.Info.Name, capturer.Actor.ActorID, target.Actor.Info.Name, target.Actor.ActorID,
-					target.Value, DistanceCells(distances[targetIndex]), scores[targetIndex], target.IsBuilding, target.HealthPercent,
+					target.Value, DistanceCells(distances[targetIndex]), scores[targetIndex], target.IsBuilding,
+					target.HitPoints, target.MaxHitPoints,
 					incumbentIndex >= 0 ? string.Format(", previous={0}#{1}, previous-score={2:0.0}",
 						oldTarget.Actor.Info.Name, oldTarget.Actor.ActorID, scores[incumbentIndex]) : string.Empty);
 				activeCapturers[capturer.Actor] = new SpecialistAssignment(capturer.Actor, target.Actor, world.WorldTick, 1);
 			}
+		}
+
+		void ReserveActiveSoloTargets(CaptureCandidate[] candidates, HashSet<int> reserved)
+		{
+			foreach (var group in activeCapturers.GroupBy(entry => entry.Value.Target))
+			{
+				if (group.Count() != 1)
+					continue;
+
+				var targetIndex = Array.FindIndex(candidates, candidate => candidate.Actor == group.Key);
+				if (targetIndex >= 0 && !RequiresPair(candidates[targetIndex]))
+					reserved.Add(targetIndex);
+			}
+		}
+
+		void ReassessActivePairs(IBot bot, CaptureCandidate[] candidates,
+			TraitPair<CaptureManager>[] capturers, HashSet<int> reserved, HashSet<Actor> retainedActors)
+		{
+			var capturerByActor = capturers.ToDictionary(capturer => capturer.Actor);
+			var groups = activeCapturers.Where(entry => !entry.Key.IsDead && entry.Key.IsInWorld)
+				.GroupBy(entry => entry.Value.Target).OrderBy(group => group.Key.ActorID).ToArray();
+
+			foreach (var group in groups)
+			{
+				var assignments = group.OrderBy(entry => entry.Key.ActorID).ToArray();
+				if (assignments.Length < 2)
+					continue;
+
+				var targetIndex = Array.FindIndex(candidates, candidate => candidate.Actor == group.Key);
+				if (targetIndex < 0)
+					continue;
+
+				if (!RequiresPair(candidates[targetIndex]))
+				{
+					var retained = assignments[0];
+					foreach (var surplus in assignments.Skip(1))
+					{
+						bot.QueueOrder(new Order("Stop", surplus.Key, false));
+						activeCapturers.Remove(surplus.Key);
+						targetReservations.Release(surplus.Key.ActorID);
+						Debug("capture pair surplus stopped and released {0}#{1}: target={2}#{3}, " +
+							"health={4}/{5}, solo-eligible=true",
+							surplus.Key.Info.Name, surplus.Key.ActorID, candidates[targetIndex].Actor.Info.Name,
+							candidates[targetIndex].Actor.ActorID, candidates[targetIndex].HitPoints,
+							candidates[targetIndex].MaxHitPoints);
+					}
+
+					// Persist the surviving incumbent as a one-claimant assignment. This keeps the
+					// shared reservation and save/restore cardinality aligned after the pair shrinks.
+					activeCapturers[retained.Key] = retained.Value.WithMaximumClaimants(1);
+
+					continue;
+				}
+
+				var pair = assignments.Select(assignment => capturerByActor.TryGetValue(assignment.Key, out var capturer) ?
+					capturer : default(TraitPair<CaptureManager>)).Where(capturer => capturer.Actor != null).Take(2).ToArray();
+				if (pair.Length < 2)
+					continue;
+
+				foreach (var surplus in assignments.Where(assignment => pair.All(capturer => capturer.Actor != assignment.Key)))
+				{
+					bot.QueueOrder(new Order("Stop", surplus.Key, false));
+					activeCapturers.Remove(surplus.Key);
+					targetReservations.Release(surplus.Key.ActorID);
+				}
+
+				if (pair.Any(capturer => !CanCapture(capturer, candidates[targetIndex].Actor)))
+				{
+					foreach (var capturer in pair)
+					{
+						activeCapturers.Remove(capturer.Actor);
+						targetReservations.Release(capturer.Actor.ActorID);
+						bot.QueueOrder(new Order("Stop", capturer.Actor, false));
+					}
+
+					Debug("capture pair dissolved {0}#{1}+{2}#{3} -> {4}#{5}: target invalid or unreachable",
+						pair[0].Actor.Info.Name, pair[0].Actor.ActorID, pair[1].Actor.Info.Name,
+						pair[1].Actor.ActorID, candidates[targetIndex].Actor.Info.Name, candidates[targetIndex].Actor.ActorID);
+					continue;
+				}
+
+				var currentScore = CaptureTargeting.PairScore(CaptureScore(pair[0].Actor, candidates[targetIndex]),
+					CaptureScore(pair[1].Actor, candidates[targetIndex]));
+				var unavailable = new HashSet<int>(reserved) { targetIndex };
+				var distinct = CaptureTargeting.BestDistinctTargetAllocation(
+					SoloScores(pair[0], candidates), SoloScores(pair[1], candidates), unavailable);
+				var alternatePairIndex = BestPairTargetIndex(pair, candidates, unavailable, out var alternatePairScore);
+				var replacementScore = Math.Max(distinct.Score, alternatePairScore);
+
+				if (!CaptureTargeting.ShouldRetarget(currentScore, replacementScore, Info.CaptureRetargetImprovement))
+				{
+					reserved.Add(targetIndex);
+					foreach (var capturer in pair)
+						retainedActors.Add(capturer.Actor);
+
+					Debug("capture pair retained {0}#{1}+{2}#{3} -> {4}#{5}: current={6:0.0}, " +
+						"distinct-solos={7:0.0}, alternate-pair={8:0.0}, margin={9}%",
+						pair[0].Actor.Info.Name, pair[0].Actor.ActorID, pair[1].Actor.Info.Name,
+						pair[1].Actor.ActorID, candidates[targetIndex].Actor.Info.Name,
+						candidates[targetIndex].Actor.ActorID, currentScore, distinct.Score, alternatePairScore,
+						Info.CaptureRetargetImprovement);
+					continue;
+				}
+
+				foreach (var capturer in pair)
+					activeCapturers.Remove(capturer.Actor);
+
+				if (alternatePairIndex >= 0 && alternatePairScore > distinct.Score)
+				{
+					var replacement = candidates[alternatePairIndex];
+					reserved.Add(alternatePairIndex);
+					var pairReserved = pair.All(capturer => targetReservations.TryReserve(capturer.Actor.ActorID,
+						replacement.Actor.ActorID, SpecialistAssignmentPurpose.Capture, 2));
+					if (!pairReserved)
+					{
+						foreach (var capturer in pair)
+						{
+							targetReservations.Release(capturer.Actor.ActorID);
+							bot.QueueOrder(new Order("Stop", capturer.Actor, false));
+						}
+
+						continue;
+					}
+
+					foreach (var capturer in pair)
+					{
+						bot.QueueOrder(new Order("CaptureActor", capturer.Actor, Target.FromActor(replacement.Actor), false));
+						activeCapturers[capturer.Actor] = new SpecialistAssignment(
+							capturer.Actor, replacement.Actor, world.WorldTick, 2);
+						retainedActors.Add(capturer.Actor);
+					}
+
+					Debug("capture pair retargeted {0}#{1}+{2}#{3}: {4}#{5} score={6:0.0} -> " +
+						"{7}#{8} score={9:0.0}, margin={10}%",
+						pair[0].Actor.Info.Name, pair[0].Actor.ActorID, pair[1].Actor.Info.Name,
+						pair[1].Actor.ActorID, candidates[targetIndex].Actor.Info.Name,
+						candidates[targetIndex].Actor.ActorID, currentScore, replacement.Actor.Info.Name,
+						replacement.Actor.ActorID, alternatePairScore, Info.CaptureRetargetImprovement);
+					continue;
+				}
+
+				var targets = new[] { distinct.FirstTarget, distinct.SecondTarget };
+				for (var i = 0; i < pair.Length; i++)
+				{
+					var capturer = pair[i].Actor;
+					var replacementIndex = targets[i];
+					if (replacementIndex < 0)
+					{
+						targetReservations.Release(capturer.ActorID);
+						bot.QueueOrder(new Order("Stop", capturer, false));
+						retainedActors.Add(capturer);
+						continue;
+					}
+
+					var replacement = candidates[replacementIndex];
+					reserved.Add(replacementIndex);
+					if (!targetReservations.TryReserve(capturer.ActorID, replacement.Actor.ActorID,
+						SpecialistAssignmentPurpose.Capture, 1))
+					{
+						targetReservations.Release(capturer.ActorID);
+						bot.QueueOrder(new Order("Stop", capturer, false));
+						retainedActors.Add(capturer);
+						continue;
+					}
+
+					bot.QueueOrder(new Order("CaptureActor", capturer, Target.FromActor(replacement.Actor), false));
+					activeCapturers[capturer] = new SpecialistAssignment(capturer, replacement.Actor, world.WorldTick, 1);
+					retainedActors.Add(capturer);
+				}
+
+				Debug("capture pair dissolved {0}#{1}+{2}#{3} -> distinct solos {4},{5}: " +
+					"current={6:0.0}, replacement={7:0.0}, margin={8}%",
+					pair[0].Actor.Info.Name, pair[0].Actor.ActorID, pair[1].Actor.Info.Name,
+					pair[1].Actor.ActorID, distinct.FirstTarget, distinct.SecondTarget, currentScore,
+					distinct.Score, Info.CaptureRetargetImprovement);
+			}
+		}
+
+		double[] SoloScores(TraitPair<CaptureManager> capturer, CaptureCandidate[] candidates)
+		{
+			return candidates.Select(candidate => RequiresPair(candidate) ||
+				IsTargetDeferred(capturer.Actor, candidate.Actor) || !CanCapture(capturer, candidate.Actor) ?
+				-1d : CaptureScore(capturer.Actor, candidate)).ToArray();
+		}
+
+		int BestPairTargetIndex(TraitPair<CaptureManager>[] pair, CaptureCandidate[] candidates,
+			HashSet<int> unavailable, out double bestScore)
+		{
+			var best = -1;
+			bestScore = -1;
+			for (var i = 0; i < candidates.Length; i++)
+			{
+				if (unavailable.Contains(i) || !RequiresPair(candidates[i]) ||
+					pair.Any(capturer => !CanCapture(capturer, candidates[i].Actor)))
+					continue;
+
+				var score = CaptureTargeting.PairScore(CaptureScore(pair[0].Actor, candidates[i]),
+					CaptureScore(pair[1].Actor, candidates[i]));
+				if (score > bestScore)
+				{
+					best = i;
+					bestScore = score;
+				}
+			}
+
+			return best;
 		}
 
 		void AssignHealthyBuildingPairs(IBot bot, CaptureCandidate[] candidates,
@@ -404,9 +620,11 @@ namespace OpenRA.Mods.Common.Traits
 					if (pair.Length < 2)
 						continue;
 
-					var pairScore = pair.Min(capturer => CaptureScore(capturer.Actor, candidates[i]));
-					var alternativeScore = pair.Max(capturer => BestSoloScore(capturer, candidates, reserved));
-					if (pairScore <= alternativeScore || pairScore <= bestPairScore)
+					var pairScore = CaptureTargeting.PairScore(CaptureScore(pair[0].Actor, candidates[i]),
+						CaptureScore(pair[1].Actor, candidates[i]));
+					var alternative = CaptureTargeting.BestDistinctTargetAllocation(
+						SoloScores(pair[0], candidates), SoloScores(pair[1], candidates), reserved);
+					if (pairScore <= alternative.Score || pairScore <= bestPairScore)
 						continue;
 
 					bestTargetIndex = i;
@@ -419,48 +637,110 @@ namespace OpenRA.Mods.Common.Traits
 
 				var target = candidates[bestTargetIndex];
 				reserved.Add(bestTargetIndex);
+				var pairReserved = bestPair.All(capturer => targetReservations.TryReserve(capturer.Actor.ActorID,
+					target.Actor.ActorID, SpecialistAssignmentPurpose.Capture, 2));
+				if (!pairReserved)
+				{
+					Debug("capture pair rejected: {0}#{1} is reserved for demolition",
+						target.Actor.Info.Name, target.Actor.ActorID);
+					foreach (var reservedCapturer in bestPair)
+						targetReservations.Release(reservedCapturer.Actor.ActorID);
+
+					return;
+				}
+
 				foreach (var capturer in bestPair)
 				{
-					if (!targetReservations.TryReserve(capturer.Actor.ActorID, target.Actor.ActorID,
-						SpecialistAssignmentPurpose.Capture, 2))
-					{
-						Debug("capture pair rejected: {0}#{1} is reserved for demolition",
-							target.Actor.Info.Name, target.Actor.ActorID);
-						foreach (var reservedCapturer in bestPair)
-							targetReservations.Release(reservedCapturer.Actor.ActorID);
-
-						return;
-					}
-
 					bot.QueueOrder(new Order("CaptureActor", capturer.Actor, Target.FromActor(target.Actor), false));
 					activeCapturers[capturer.Actor] = new SpecialistAssignment(capturer.Actor, target.Actor, world.WorldTick, 2);
 					remaining.Remove(capturer);
 				}
 
-				Debug("capture pair {0}#{1}+{2}#{3} -> {4}#{5}: value={6}, health={7}%, pair-score={8:0.0}",
+				Debug("capture pair {0}#{1}+{2}#{3} -> {4}#{5}: value={6}, health={7}/{8}, pair-score={9:0.0}",
 					bestPair[0].Actor.Info.Name, bestPair[0].Actor.ActorID, bestPair[1].Actor.Info.Name,
 					bestPair[1].Actor.ActorID, target.Actor.Info.Name, target.Actor.ActorID, target.Value,
-					target.HealthPercent, bestPairScore);
+					target.HitPoints, target.MaxHitPoints, bestPairScore);
 			}
-		}
-
-		double BestSoloScore(TraitPair<CaptureManager> capturer, CaptureCandidate[] candidates, HashSet<int> reserved)
-		{
-			return candidates.Select((candidate, index) => reserved.Contains(index) || RequiresPair(candidate) ||
-				IsTargetDeferred(capturer.Actor, candidate.Actor) || !CanCapture(capturer, candidate.Actor) ?
-				-1d : CaptureScore(capturer.Actor, candidate)).Max();
 		}
 
 		bool RequiresPair(CaptureCandidate candidate)
 		{
-			return CaptureTargeting.RequiresEngineerPair(candidate.IsBuilding, candidate.HealthPercent,
-				Info.SoloBuildingCaptureHealth);
+			return CaptureTargeting.RequiresEngineerPair(candidate.IsBuilding, candidate.HitPoints,
+				candidate.MaxHitPoints, Info.SoloBuildingCaptureHealth);
 		}
 
-		static bool CanCapture(TraitPair<CaptureManager> capturer, Actor target)
+		bool CanCapture(TraitPair<CaptureManager> capturer, Actor target)
+		{
+			return CanCaptureByRules(capturer, target) && HasReachableCaptureApproach(capturer.Actor, target);
+		}
+
+		static bool CanCaptureByRules(TraitPair<CaptureManager> capturer, Actor target)
 		{
 			var captureManager = target.TraitOrDefault<CaptureManager>();
 			return captureManager != null && captureManager.CanBeTargetedBy(target, capturer.Actor, capturer.Trait);
+		}
+
+		bool HasReachableCaptureApproach(Actor capturer, Actor target)
+		{
+			var mobile = capturer.TraitOrDefault<Mobile>();
+			return mobile == null || domainIndex == null ||
+				Util.AdjacentCells(world, Target.FromActor(target)).Any(cell =>
+					mobile.CanStayInCell(cell) &&
+					mobile.CanEnterCell(cell, check: BlockedByActor.Immovable) &&
+					domainIndex.IsPassable(capturer.Location, cell, mobile.Locomotor));
+		}
+
+		void DebugHighestPriorityRejection(TraitPair<CaptureManager> capturer,
+			CaptureCandidate[] candidates, HashSet<int> unavailable, int selectedIndex)
+		{
+			if (!Info.DebugLogging)
+				return;
+
+			var selectedScore = selectedIndex < 0 ? -1 : CaptureScore(capturer.Actor, candidates[selectedIndex]);
+			var rejected = candidates.Select((candidate, index) => new
+				{
+					Candidate = candidate,
+					Index = index,
+					Score = CaptureScore(capturer.Actor, candidate)
+				})
+				.Where(entry => entry.Index != selectedIndex && entry.Score > selectedScore)
+				.OrderByDescending(entry => entry.Score).ThenBy(entry => entry.Candidate.Actor.ActorID)
+				.Select(entry => new
+					{
+						entry.Candidate,
+						entry.Score,
+						Reason = CaptureRejectionReason(capturer, entry.Candidate, entry.Index, unavailable)
+					})
+				.FirstOrDefault(entry => entry.Reason != null);
+			if (rejected == null)
+				return;
+
+			Debug("capture {0}#{1} candidate {2}#{3} rejected={4}: value={5}, distance-cells={6:0.0}, " +
+				"score={7:0.0}, building={8}, health={9}/{10}", capturer.Actor.Info.Name,
+				capturer.Actor.ActorID, rejected.Candidate.Actor.Info.Name, rejected.Candidate.Actor.ActorID,
+				rejected.Reason, rejected.Candidate.Value,
+				DistanceCells(DistanceSquared(capturer.Actor, rejected.Candidate.Actor)), rejected.Score,
+				rejected.Candidate.IsBuilding, rejected.Candidate.HitPoints, rejected.Candidate.MaxHitPoints);
+		}
+
+		string CaptureRejectionReason(TraitPair<CaptureManager> capturer, CaptureCandidate candidate,
+			int candidateIndex, HashSet<int> unavailable)
+		{
+			if (unavailable.Contains(candidateIndex))
+			{
+				var owner = activeCapturers.Where(entry => entry.Value.Target == candidate.Actor)
+					.Select(entry => entry.Key).OrderBy(actor => actor.ActorID).FirstOrDefault();
+				return owner == null ? "reserved-by-capture" :
+					string.Format("reserved-by-capture:{0}#{1}", owner.Info.Name, owner.ActorID);
+			}
+
+			if (!CanCaptureByRules(capturer, candidate.Actor))
+				return "capture-ineligible";
+
+			if (!HasReachableCaptureApproach(capturer.Actor, candidate.Actor))
+				return "unreachable-approach";
+
+			return RequiresPair(candidate) ? "requires-pair" : null;
 		}
 
 		double CaptureScore(Actor capturer, CaptureCandidate candidate)
@@ -560,30 +840,54 @@ namespace OpenRA.Mods.Common.Traits
 			SpecialistAssignmentPurpose purpose)
 		{
 			foreach (var pair in assignments.Where(pair => ShouldRetireAssignment(pair.Key, pair.Value, purpose)).ToArray())
-			{
-				var target = pair.Value.Target;
-				var targetRemoved = target.IsDead || !target.IsInWorld;
-				var targetHealth = targetRemoved ? 0 : target.TraitOrDefault<IHealth>()?.HP ?? 0;
-				var relationshipInvalid = !targetRemoved && !HasValidRelationship(target, purpose);
-				var nonProgressing = world.WorldTick - pair.Value.LastProgressTick > StalledAssignmentTicks(purpose);
-				var result = targetRemoved ? "target-removed" :
-					target.Owner == player ? "captured" :
-					targetHealth < pair.Value.TargetHealth ? "sabotaged" :
-					pair.Key.IsDead || !pair.Key.IsInWorld ? "specialist-lost" :
-					relationshipInvalid ? "relationship-invalid" :
-					nonProgressing ? "non-progressing" : "specialist-idle";
-				Debug("{0} {1}#{2} released from {3}#{4}: result={5}", action, pair.Key.Info.Name,
-					pair.Key.ActorID, target.Info.Name, target.ActorID, result);
-				if (result == "non-progressing")
-				{
-					deferredTargets[pair.Key] = new DeferredTarget(target,
-						world.WorldTick + StalledAssignmentTicks(purpose));
-					bot.QueueOrder(new Order("Stop", pair.Key, false));
-				}
+				RetireAssignment(bot, assignments, pair, action, purpose);
+		}
 
-				assignments.Remove(pair.Key);
-				targetReservations.Release(pair.Key.ActorID);
+		void RetireUnavailableAssignments(IBot bot, Dictionary<Actor, SpecialistAssignment> assignments, string action,
+			SpecialistAssignmentPurpose purpose)
+		{
+			while (true)
+			{
+				var unavailable = default(KeyValuePair<Actor, SpecialistAssignment>);
+				foreach (var pair in assignments)
+					if (unitCannotBeOrdered(pair.Key))
+					{
+						unavailable = pair;
+						break;
+					}
+
+				if (unavailable.Key == null)
+					return;
+
+				RetireAssignment(bot, assignments, unavailable, action, purpose);
 			}
+		}
+
+		void RetireAssignment(IBot bot, Dictionary<Actor, SpecialistAssignment> assignments,
+			KeyValuePair<Actor, SpecialistAssignment> pair, string action, SpecialistAssignmentPurpose purpose)
+		{
+			var target = pair.Value.Target;
+			var targetRemoved = target.IsDead || !target.IsInWorld;
+			var targetHealth = targetRemoved ? 0 : target.TraitOrDefault<IHealth>()?.HP ?? 0;
+			var relationshipInvalid = !targetRemoved && !HasValidRelationship(target, purpose);
+			var nonProgressing = world.WorldTick - pair.Value.LastProgressTick > StalledAssignmentTicks(purpose);
+			var result = targetRemoved ? "target-removed" :
+				target.Owner == player ? "captured" :
+				targetHealth < pair.Value.TargetHealth ? "sabotaged" :
+				pair.Key.IsDead || !pair.Key.IsInWorld ? "specialist-lost" :
+				relationshipInvalid ? "relationship-invalid" :
+				nonProgressing ? "non-progressing" : "specialist-idle";
+			Debug("{0} {1}#{2} released from {3}#{4}: result={5}", action, pair.Key.Info.Name,
+				pair.Key.ActorID, target.Info.Name, target.ActorID, result);
+			if (result == "non-progressing")
+			{
+				deferredTargets[pair.Key] = new DeferredTarget(target,
+					world.WorldTick + StalledAssignmentTicks(purpose));
+				bot.QueueOrder(new Order("Stop", pair.Key, false));
+			}
+
+			assignments.Remove(pair.Key);
+			targetReservations.Release(pair.Key.ActorID);
 		}
 
 		bool ShouldRetireAssignment(Actor specialist, SpecialistAssignment assignment,

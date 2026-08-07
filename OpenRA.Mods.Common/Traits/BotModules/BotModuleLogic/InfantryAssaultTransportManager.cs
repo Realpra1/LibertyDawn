@@ -9,6 +9,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using OpenRA.Mods.Common.Activities;
 using OpenRA.Traits;
 
 namespace OpenRA.Mods.Common.Traits
@@ -19,28 +20,38 @@ namespace OpenRA.Mods.Common.Traits
 	/// </summary>
 	public sealed class InfantryAssaultTransportManager
 	{
-		enum MissionStage { Gathering, Travelling, Unloading }
+		enum MissionStage { Gathering, Travelling, Unloading, RecoveringCarrier }
 
 		sealed class Mission
 		{
 			public readonly int Id;
 			public readonly Actor Transport;
+			public readonly Actor Target;
 			public readonly List<Actor> Passengers;
 			public readonly CPos Destination;
+			public readonly CPos AssemblyCell;
 			public readonly int CreatedTick;
 			public readonly UnitStance? OriginalStance;
 			public readonly bool UsesAircraft;
 			public MissionStage Stage;
 			public int LastOrderTick;
 			public bool EmergencyUnload;
+			public bool Returning;
+			public bool CarrierRecoveryFallback;
+			public int CarrierRecoveryDeadlineTick;
+			public int PlanFailureTick;
+			public int LastRoutedPlanRevision;
+			public TransportUnloadPlan UnloadPlan;
 
-			public Mission(int id, Actor transport, List<Actor> passengers, CPos destination,
-				int createdTick, UnitStance? originalStance, bool usesAircraft)
+			public Mission(int id, Actor transport, Actor target, List<Actor> passengers, CPos destination,
+				CPos assemblyCell, int createdTick, UnitStance? originalStance, bool usesAircraft)
 			{
 				Id = id;
 				Transport = transport;
+				Target = target;
 				Passengers = passengers;
 				Destination = destination;
+				AssemblyCell = assemblyCell;
 				CreatedTick = LastOrderTick = createdTick;
 				OriginalStance = originalStance;
 				UsesAircraft = usesAircraft;
@@ -51,25 +62,31 @@ namespace OpenRA.Mods.Common.Traits
 		readonly Player player;
 		readonly TransportManagerBotModuleInfo info;
 		readonly TransportMissionCoordinator coordinator;
+		readonly TransportUnloadPlanner unloadPlanner;
 		readonly Action<Actor, CPos, Order> issueRoutedAirMove;
 		readonly Action requestTransportHelicopter;
 		readonly Func<Actor, bool> isReservedForOtherBehavior;
+		readonly Action<Actor, CPos> rememberSafeIdleStaging;
 		UnitBuilderBotModule[] production;
 		Mission mission;
 		bool selected;
 		int nextMissionTick;
 
 		public InfantryAssaultTransportManager(World world, Player player, TransportManagerBotModuleInfo info,
-			TransportMissionCoordinator coordinator, Action<Actor, CPos, Order> issueRoutedAirMove,
-			Action requestTransportHelicopter, Func<Actor, bool> isReservedForOtherBehavior)
+			TransportMissionCoordinator coordinator, TransportUnloadPlanner unloadPlanner,
+			Action<Actor, CPos, Order> issueRoutedAirMove,
+			Action requestTransportHelicopter, Func<Actor, bool> isReservedForOtherBehavior,
+			Action<Actor, CPos> rememberSafeIdleStaging)
 		{
 			this.world = world;
 			this.player = player;
 			this.info = info;
 			this.coordinator = coordinator;
+			this.unloadPlanner = unloadPlanner;
 			this.issueRoutedAirMove = issueRoutedAirMove;
 			this.requestTransportHelicopter = requestTransportHelicopter;
 			this.isReservedForOtherBehavior = isReservedForOtherBehavior;
+			this.rememberSafeIdleStaging = rememberSafeIdleStaging;
 		}
 
 		public void Initialize(UnitBuilderBotModule[] production)
@@ -114,18 +131,27 @@ namespace OpenRA.Mods.Common.Traits
 				return;
 			}
 
-			if (world.WorldTick - mission.CreatedTick >= info.MissionTimeoutTicks && mission.Stage != MissionStage.Unloading)
+			if (!mission.Returning && world.WorldTick - mission.CreatedTick >= info.MissionTimeoutTicks &&
+				mission.Stage != MissionStage.Unloading && mission.Stage != MissionStage.RecoveringCarrier)
 			{
-				BeginUnload(bot, "mission timeout", true);
+				if (mission.UsesAircraft)
+					BeginSafeReturn(bot, cargo, "mission timeout");
+				else
+					BeginUnload(bot, cargo, "mission timeout", true);
+
 				return;
 			}
 
-			if (mission.Stage == MissionStage.Gathering)
+			if (mission.Stage == MissionStage.RecoveringCarrier)
+				AdvanceCarrierRecovery(bot);
+			else if (mission.Stage == MissionStage.Gathering)
 				AdvanceGathering(bot, cargo);
 			else if (mission.Stage == MissionStage.Travelling)
 				AdvanceTravel(bot);
 			else if (cargo.IsEmpty())
-				FinishMission(bot, mission.EmergencyUnload ? "emergency unload complete" : "assault handoff", false);
+				CompleteHandoff(bot);
+			else if (mission.UsesAircraft)
+				AdvanceAircraftUnloading(bot, cargo);
 			else if (ReadyToRetry())
 			{
 				bot.QueueOrder(new Order("Unload", mission.Transport, false));
@@ -141,11 +167,28 @@ namespace OpenRA.Mods.Common.Traits
 			var cargo = actor.TraitOrDefault<Cargo>();
 			if (cargo == null || cargo.IsEmpty())
 			{
+				if (mission.Stage == MissionStage.RecoveringCarrier)
+				{
+					Debug("mission {0} retained carrier recovery after damage={1} at {2}",
+						mission.Id, attack.Damage.Value, actor.Location);
+					return;
+				}
+
 				FinishMission(bot, "transport attacked before loading", true);
 				return;
 			}
 
-			BeginUnload(bot, "transport damaged", true);
+			if (!mission.UsesAircraft)
+			{
+				BeginUnload(bot, cargo, "transport damaged", true);
+				return;
+			}
+
+			if (NeedsRepair(actor))
+				BeginSafeReturn(bot, cargo, "carrier seriously damaged");
+			else
+				Debug("mission {0} retained safe plan after incidental carrier damage={1}",
+					mission.Id, attack.Damage.Value);
 		}
 
 		void AdvanceGathering(IBot bot, Cargo cargo)
@@ -156,7 +199,18 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				mission.Stage = MissionStage.Travelling;
 				mission.LastOrderTick = world.WorldTick;
-				IssueTravelOrder(bot);
+				if (mission.UsesAircraft)
+				{
+					if (!EnsureAircraftPlan(cargo, mission.Destination, out var rejection) ||
+						!IssueAircraftPlanRoute(bot))
+					{
+						HandleAircraftPlanFailure(bot, cargo, rejection ?? "threat route failed");
+						return;
+					}
+				}
+				else
+					IssueTravelOrder(bot);
+
 				Debug("mission {0} travelling with {1}/{2} passengers to {3}", mission.Id,
 					cargo.PassengerCount, mission.Passengers.Count, mission.Destination);
 				return;
@@ -167,8 +221,10 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				if (cargo.IsEmpty())
 					FinishMission(bot, "insufficient passengers", true);
+				else if (mission.UsesAircraft)
+					BeginSafeReturn(bot, cargo, "insufficient passengers");
 				else
-					BeginUnload(bot, "insufficient passengers", false);
+					BeginUnload(bot, cargo, "insufficient passengers", false);
 
 				return;
 			}
@@ -190,19 +246,386 @@ namespace OpenRA.Mods.Common.Traits
 
 		void AdvanceTravel(IBot bot)
 		{
-			if ((mission.Transport.Location - mission.Destination).LengthSquared <=
-				info.UnloadRangeCells * info.UnloadRangeCells)
+			if (mission.UsesAircraft)
 			{
-				BeginUnload(bot, "destination reached", false);
+				AdvanceAircraftTravel(bot);
 				return;
 			}
 
-			if ((mission.Transport.IsIdle || mission.Transport.CurrentActivity == null) && ReadyToRetry())
+			if ((mission.Transport.Location - mission.Destination).LengthSquared <=
+				info.UnloadRangeCells * info.UnloadRangeCells)
+			{
+				BeginUnload(bot, mission.Transport.Trait<Cargo>(), "destination reached", false);
+				return;
+			}
+
+			if (IsCarrierIdle(mission.Transport) && ReadyToRetry())
 			{
 				IssueTravelOrder(bot);
 				mission.LastOrderTick = world.WorldTick;
 				Debug("mission {0} reissued travel order to {1}", mission.Id, mission.Destination);
 			}
+		}
+
+		void AdvanceAircraftTravel(IBot bot)
+		{
+			var cargo = mission.Transport.Trait<Cargo>();
+			var objective = mission.Returning ? mission.AssemblyCell : mission.Destination;
+			if (!EnsureAircraftPlan(cargo, objective, out var rejection))
+			{
+				HandleAircraftPlanFailure(bot, cargo, rejection);
+				return;
+			}
+
+			if (mission.LastRoutedPlanRevision != mission.UnloadPlan.Revision)
+			{
+				if (IssueAircraftPlanRoute(bot))
+					mission.LastOrderTick = world.WorldTick;
+				else
+					HandleAircraftPlanFailure(bot, cargo, "replacement threat route failed");
+
+				return;
+			}
+
+			if ((mission.Transport.Location - mission.UnloadPlan.CarrierCell).LengthSquared <=
+				info.UnloadRangeCells * info.UnloadRangeCells)
+			{
+				mission.Stage = MissionStage.Unloading;
+				mission.LastOrderTick = world.WorldTick;
+				bot.QueueOrder(TransportUnloadOrder.Create(world, mission.Transport, mission.UnloadPlan));
+				Debug("mission {0} committing exact aircraft unload: carrier={1} exits={2} objective={3} " +
+					"revision={4} snapshot={5} outcome={6}", mission.Id, mission.UnloadPlan.CarrierCell,
+					string.Join(",", mission.UnloadPlan.ExitCells), objective, mission.UnloadPlan.Revision,
+					mission.UnloadPlan.SnapshotTick, mission.Returning ? "safe-return" : "assault");
+				return;
+			}
+
+			if (IsCarrierIdle(mission.Transport) && ReadyToRetry())
+			{
+				if (IssueAircraftPlanRoute(bot))
+					mission.LastOrderTick = world.WorldTick;
+				else
+					HandleAircraftPlanFailure(bot, cargo, "threat route failed");
+			}
+		}
+
+		void AdvanceAircraftUnloading(IBot bot, Cargo cargo)
+		{
+			var objective = mission.Returning ? mission.AssemblyCell : mission.Destination;
+			if (!EnsureAircraftPlan(cargo, objective, out var rejection))
+			{
+				HandleAircraftPlanFailure(bot, cargo, rejection);
+				return;
+			}
+
+			if ((mission.Transport.Location - mission.UnloadPlan.CarrierCell).LengthSquared >
+				info.UnloadRangeCells * info.UnloadRangeCells)
+			{
+				mission.Stage = MissionStage.Travelling;
+				if (IssueAircraftPlanRoute(bot))
+					mission.LastOrderTick = world.WorldTick;
+				else
+					HandleAircraftPlanFailure(bot, cargo, "replanned unload route failed");
+				return;
+			}
+
+			if (ReadyToRetry())
+			{
+				bot.QueueOrder(TransportUnloadOrder.Create(world, mission.Transport, mission.UnloadPlan));
+				mission.LastOrderTick = world.WorldTick;
+			}
+		}
+
+		bool EnsureAircraftPlan(Cargo cargo, CPos objective, out string rejection)
+		{
+			var passengers = cargo.Passengers.Where(a => mission.Passengers.Contains(a) && !a.IsDead)
+				.OrderBy(a => a.ActorID).ToArray();
+			var previous = mission.UnloadPlan;
+			var invalidation = "none";
+			if (previous != null && previous.Objective == objective)
+			{
+				if (unloadPlanner.Revalidate(mission.Id, mission.Transport, passengers, previous,
+					info.AssaultLandingUsefulnessRadiusCells, out rejection))
+				{
+					mission.PlanFailureTick = 0;
+					return true;
+				}
+
+				invalidation = rejection;
+			}
+			else if (previous != null)
+			{
+				invalidation = "objective changed";
+			}
+
+			var revision = (previous?.Revision ?? 0) + 1;
+			if (!unloadPlanner.TryPlan(mission.Id, mission.Transport, passengers, objective,
+				info.AssaultLandingSearchRadiusCells, info.AssaultLandingUsefulnessRadiusCells,
+				revision, out var replacement, out rejection))
+			{
+				mission.UnloadPlan = null;
+				return false;
+			}
+
+			mission.UnloadPlan = replacement;
+			mission.PlanFailureTick = 0;
+			if (previous == null || previous.CarrierCell != replacement.CarrierCell ||
+				!previous.ExitCells.SequenceEqual(replacement.ExitCells))
+				Debug("mission {0} selected aircraft unload plan: objective={1} carrier={2} exits={3} " +
+					"revision={4} snapshot={5} threats={6} candidates={7} firstThreatRejection={8} replannedBecause={9}",
+					mission.Id, objective, replacement.CarrierCell, string.Join(",", replacement.ExitCells),
+					replacement.Revision, replacement.SnapshotTick, unloadPlanner.SnapshotThreatCount,
+					replacement.CandidatesEvaluated, replacement.FirstThreatRejection ?? "none", invalidation);
+
+			return true;
+		}
+
+		bool IssueAircraftPlanRoute(IBot bot)
+		{
+			var route = unloadPlanner.Route(mission.Transport, mission.UnloadPlan);
+			if (route == null || (route.Count == 0 && mission.Transport.Location != mission.UnloadPlan.CarrierCell))
+				return false;
+
+			var queued = false;
+			foreach (var waypoint in route)
+			{
+				bot.QueueOrder(new Order("Move", mission.Transport, Target.FromCell(world, waypoint), queued));
+				queued = true;
+			}
+
+			mission.LastRoutedPlanRevision = mission.UnloadPlan.Revision;
+			Debug("mission {0} routed aircraft plan: carrier={1} waypoints={2} snapshot={3} revision={4}",
+				mission.Id, mission.UnloadPlan.CarrierCell, route.Count, mission.UnloadPlan.SnapshotTick,
+				mission.UnloadPlan.Revision);
+			return true;
+		}
+
+		void HandleAircraftPlanFailure(IBot bot, Cargo cargo, string rejection)
+		{
+			if (mission.PlanFailureTick == 0)
+			{
+				mission.PlanFailureTick = world.WorldTick;
+				bot.QueueOrder(new Order("Stop", mission.Transport, false));
+				Debug("mission {0} holding aircraft without unload plan: objective={1} reason={2}",
+					mission.Id, mission.Returning ? mission.AssemblyCell : mission.Destination, rejection);
+			}
+
+			if (world.WorldTick - mission.PlanFailureTick < info.LandingHoldTicks)
+				return;
+
+			if (!mission.Returning)
+			{
+				BeginSafeReturn(bot, cargo, "bounded assault-plan hold expired");
+				return;
+			}
+
+			if (TryPlanSafeReturnFallback(cargo, out var fallbackRejection) && IssueAircraftPlanRoute(bot))
+			{
+				mission.Stage = MissionStage.Travelling;
+				mission.LastOrderTick = world.WorldTick;
+				Debug("mission {0} terminal safe fallback: searchCenter={1}, assembly={2}, carrier={3}, exits={4}",
+					mission.Id, mission.Transport.Location, mission.AssemblyCell, mission.UnloadPlan.CarrierCell,
+					string.Join(",", mission.UnloadPlan.ExitCells));
+				return;
+			}
+
+			mission.PlanFailureTick = world.WorldTick;
+			Debug("mission {0} bounded safe hold renewed: assembly={1}, reason={2}",
+				mission.Id, mission.AssemblyCell, fallbackRejection);
+		}
+
+		bool TryPlanSafeReturnFallback(Cargo cargo, out string rejection)
+		{
+			var passengers = cargo.Passengers.Where(a => mission.Passengers.Contains(a) && !a.IsDead)
+				.OrderBy(a => a.ActorID).ToArray();
+			var revision = (mission.UnloadPlan?.Revision ?? 0) + 1;
+			if (!unloadPlanner.TryPlanWithoutClaim(mission.Id, mission.Transport, passengers,
+				mission.Transport.Location, mission.AssemblyCell, info.SafeReturnLandingSearchRadiusCells,
+				info.SafeReturnUsefulnessRadiusCells, revision, Array.Empty<CPos>(),
+				out var replacement, out rejection) ||
+				!unloadPlanner.TryClaimPlans(mission.Id, new[] { replacement }, out rejection))
+				return false;
+
+			mission.UnloadPlan = replacement;
+			mission.PlanFailureTick = 0;
+			return true;
+		}
+
+		void BeginSafeReturn(IBot bot, Cargo cargo, string reason)
+		{
+			mission.Returning = true;
+			mission.CarrierRecoveryFallback = false;
+			mission.EmergencyUnload = false;
+			mission.Stage = MissionStage.Travelling;
+			mission.UnloadPlan = null;
+			mission.PlanFailureTick = 0;
+			mission.LastOrderTick = world.WorldTick;
+			coordinator.ReleaseCells(mission.Id);
+			if (EnsureAircraftPlan(cargo, mission.AssemblyCell, out var rejection) && IssueAircraftPlanRoute(bot))
+				Debug("mission {0} withdrawing to safe assembly unload: reason={1} carrier={2} exits={3}",
+					mission.Id, reason, mission.UnloadPlan.CarrierCell, string.Join(",", mission.UnloadPlan.ExitCells));
+			else
+				HandleAircraftPlanFailure(bot, cargo, "safe assembly plan unavailable: " + rejection);
+		}
+
+		void CompleteHandoff(IBot bot)
+		{
+			if (!mission.UsesAircraft)
+			{
+				FinishMission(bot, mission.EmergencyUnload ? "emergency unload complete" : "assault handoff", false);
+				return;
+			}
+
+			// The retained plan is narrowed as passengers physically exit. Handoff must include every
+			// surviving mission passenger that is now back in the world, not only the last unload order.
+			var delivered = mission.Passengers.Where(IsUsable)
+				.OrderBy(a => a.ActorID).ToArray();
+			if (!mission.Returning && delivered.Length > 0)
+			{
+				var destination = IsUsable(mission.Target) ? mission.Target.Location : mission.Destination;
+				bot.QueueOrder(new Order("AttackMove", null, Target.FromCell(world, destination), false,
+					groupedActors: delivered));
+				Debug("mission {0} physical aircraft handoff: passengers={1} actualCells={2} destination={3} " +
+					"cargo=0 outcome=assault", mission.Id, delivered.Length,
+					string.Join(",", delivered.Select(a => a.ActorID + ":" + a.Location)), destination);
+				BeginCarrierRecovery(bot);
+				return;
+			}
+			else
+				Debug("mission {0} physical aircraft handoff: passengers={1} assembly={2} cargo=0 outcome=safe-return",
+					mission.Id, delivered.Length, mission.AssemblyCell);
+
+			FinishMission(bot, mission.Returning ? "safe aircraft return complete" : "air assault handoff", false);
+		}
+
+		void BeginCarrierRecovery(IBot bot)
+		{
+			mission.Returning = true;
+			mission.Stage = MissionStage.RecoveringCarrier;
+			mission.UnloadPlan = null;
+			mission.PlanFailureTick = 0;
+			mission.LastOrderTick = world.WorldTick;
+			mission.CarrierRecoveryDeadlineTick = world.WorldTick + info.MissionTimeoutTicks;
+			coordinator.ReleaseCells(mission.Id);
+			if (EnsureCarrierRecoveryPlan(out var rejection) && IssueAircraftPlanRoute(bot))
+				Debug("mission {0} began post-handoff carrier recovery: assembly={1} carrier={2} revision={3}",
+					mission.Id, mission.AssemblyCell, mission.UnloadPlan.CarrierCell, mission.UnloadPlan.Revision);
+			else
+				HandleCarrierRecoveryFailure(bot, rejection ?? "carrier recovery route failed");
+		}
+
+		void AdvanceCarrierRecovery(IBot bot)
+		{
+			if (!EnsureCarrierRecoveryPlan(out var rejection))
+			{
+				HandleCarrierRecoveryFailure(bot, rejection);
+				return;
+			}
+
+			if (mission.LastRoutedPlanRevision != mission.UnloadPlan.Revision)
+			{
+				if (IssueAircraftPlanRoute(bot))
+					mission.LastOrderTick = world.WorldTick;
+				else
+					HandleCarrierRecoveryFailure(bot, "replacement carrier recovery route failed");
+
+				return;
+			}
+
+			if ((mission.Transport.Location - mission.UnloadPlan.CarrierCell).LengthSquared <=
+				info.UnloadRangeCells * info.UnloadRangeCells)
+			{
+				Debug("mission {0} post-handoff carrier recovered: location={1} planned={2} assembly={3}",
+					mission.Id, mission.Transport.Location, mission.UnloadPlan.CarrierCell, mission.AssemblyCell);
+				if (mission.CarrierRecoveryFallback)
+					rememberSafeIdleStaging(mission.Transport, mission.UnloadPlan.CarrierCell);
+
+				FinishMission(bot, "air assault carrier recovered", false);
+				return;
+			}
+
+			if (IsCarrierIdle(mission.Transport) && ReadyToRetry())
+			{
+				if (IssueAircraftPlanRoute(bot))
+					mission.LastOrderTick = world.WorldTick;
+				else
+					HandleCarrierRecoveryFailure(bot, "carrier recovery route failed");
+			}
+		}
+
+		bool EnsureCarrierRecoveryPlan(out string rejection)
+		{
+			var previous = mission.UnloadPlan;
+			if (previous != null && previous.Objective == mission.AssemblyCell &&
+				unloadPlanner.Revalidate(mission.Id, mission.Transport, Array.Empty<Actor>(), previous, 0, out rejection))
+			{
+				mission.PlanFailureTick = 0;
+				return true;
+			}
+
+			var revision = (previous?.Revision ?? 0) + 1;
+			if (!unloadPlanner.TryPlanCarrierRecovery(mission.Id, mission.Transport, mission.AssemblyCell,
+				info.SafeReturnLandingSearchRadiusCells, revision, out var replacement, out rejection))
+			{
+				mission.UnloadPlan = null;
+				return false;
+			}
+
+			mission.UnloadPlan = replacement;
+			mission.CarrierRecoveryFallback = false;
+			mission.PlanFailureTick = 0;
+			Debug("mission {0} selected post-handoff carrier recovery: assembly={1} carrier={2} revision={3} " +
+				"snapshot={4} threats={5} candidates={6} firstThreatRejection={7}", mission.Id,
+				mission.AssemblyCell, replacement.CarrierCell, replacement.Revision, replacement.SnapshotTick,
+				unloadPlanner.SnapshotThreatCount, replacement.CandidatesEvaluated,
+				replacement.FirstThreatRejection ?? "none");
+			return true;
+		}
+
+		void HandleCarrierRecoveryFailure(IBot bot, string rejection)
+		{
+			if (world.WorldTick >= mission.CarrierRecoveryDeadlineTick)
+			{
+				Debug("mission {0} terminal empty-carrier recovery timeout: assembly={1} location={2} reason={3}",
+					mission.Id, mission.AssemblyCell, mission.Transport.Location, rejection);
+				FinishMission(bot, "empty carrier recovery timed out", false);
+				return;
+			}
+
+			if (mission.PlanFailureTick == 0)
+			{
+				mission.PlanFailureTick = world.WorldTick;
+				bot.QueueOrder(new Order("Stop", mission.Transport, false));
+				Debug("mission {0} holding empty carrier for safe recovery: assembly={1} reason={2}",
+					mission.Id, mission.AssemblyCell, rejection);
+			}
+
+			if (world.WorldTick - mission.PlanFailureTick < info.LandingHoldTicks)
+				return;
+
+			var revision = (mission.UnloadPlan?.Revision ?? 0) + 1;
+			var fallbackCenter = world.Map.Clamp(mission.AssemblyCell +
+				(mission.AssemblyCell - mission.Transport.Location).Sign() * info.SafeReturnLandingSearchRadiusCells);
+			if (unloadPlanner.TryPlanCarrierRecovery(mission.Id, mission.Transport,
+				fallbackCenter, mission.AssemblyCell, info.SafeReturnLandingSearchRadiusCells,
+				revision, out var replacement, out var fallbackRejection))
+			{
+				mission.UnloadPlan = replacement;
+				mission.PlanFailureTick = 0;
+				if (IssueAircraftPlanRoute(bot))
+				{
+					mission.CarrierRecoveryFallback = true;
+					mission.LastOrderTick = world.WorldTick;
+					Debug("mission {0} empty-carrier terminal fallback: searchCenter={1} assembly={2} " +
+						"carrier={3} revision={4}", mission.Id, fallbackCenter,
+						mission.AssemblyCell, replacement.CarrierCell, replacement.Revision);
+					return;
+				}
+			}
+
+			mission.PlanFailureTick = world.WorldTick;
+			Debug("mission {0} bounded empty-carrier recovery hold: assembly={1} reason={2}",
+				mission.Id, mission.AssemblyCell, fallbackRejection ?? rejection);
 		}
 
 		void IssueTravelOrder(IBot bot)
@@ -213,7 +636,7 @@ namespace OpenRA.Mods.Common.Traits
 				bot.QueueOrder(new Order("Move", mission.Transport, Target.FromCell(world, mission.Destination), false));
 		}
 
-		void BeginUnload(IBot bot, string reason, bool emergency)
+		void BeginUnload(IBot bot, Cargo cargo, string reason, bool emergency)
 		{
 			if (mission == null)
 				return;
@@ -278,7 +701,8 @@ namespace OpenRA.Mods.Common.Traits
 				return false;
 
 			var stance = transport.TraitOrDefault<AutoTarget>()?.Stance;
-			mission = new Mission(missionId, transport, passengers, destination, world.WorldTick, stance, usesAircraft);
+			mission = new Mission(missionId, transport, target, passengers, destination, transport.Location,
+				world.WorldTick, stance, usesAircraft);
 			nextMissionTick = world.WorldTick + info.AssaultCooldownTicks;
 			bot.QueueOrder(new Order("Stop", transport, false));
 			SetStance(bot, transport, UnitStance.HoldFire);
@@ -443,6 +867,11 @@ namespace OpenRA.Mods.Common.Traits
 		static bool IsUsable(Actor actor)
 		{
 			return actor != null && !actor.IsDead && actor.IsInWorld;
+		}
+
+		static bool IsCarrierIdle(Actor actor)
+		{
+			return actor.IsIdle || actor.CurrentActivity == null || actor.CurrentActivity is FlyIdle;
 		}
 
 		void Debug(string format, params object[] args)

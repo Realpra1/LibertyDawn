@@ -18,6 +18,10 @@ Do not place a new task in the executable queue until it states:
 - Predicted change from current behavior.
 - Why the task should be done.
 
+Record explicit balance authority. If the user did not expressly request a
+balance change, write that balance is frozen; never infer tuning permission from
+a desired gameplay or AI outcome.
+
 A bug report additionally requires:
 
 - What happened.

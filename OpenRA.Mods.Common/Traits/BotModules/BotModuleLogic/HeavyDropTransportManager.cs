@@ -10,7 +10,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using OpenRA.Mods.Common.Activities;
-using OpenRA.Mods.Common.Traits.BotModules.Squads;
 using OpenRA.Traits;
 
 namespace OpenRA.Mods.Common.Traits
@@ -30,9 +29,9 @@ namespace OpenRA.Mods.Common.Traits
 			public readonly CPos PickupDestination;
 			public CPos Destination;
 			public int LastOrderTick;
-			public bool EmergencyUnload;
 			public bool PickupOrdered;
 			public bool BoardingOrdered;
+			public TransportUnloadPlan UnloadPlan;
 
 			public Pair(Actor transport, Actor passenger, CPos pickupDestination, CPos destination, int tick)
 			{
@@ -51,14 +50,17 @@ namespace OpenRA.Mods.Common.Traits
 			public readonly float AaDanger;
 			public readonly int DefenderValue;
 			public readonly long Score;
+			public readonly string FirstThreatRejection;
 
-			public DropPlan(Actor target, CPos landingCenter, float aaDanger, int defenderValue, long score)
+			public DropPlan(Actor target, CPos landingCenter, float aaDanger, int defenderValue, long score,
+				string firstThreatRejection)
 			{
 				Target = target;
 				LandingCenter = landingCenter;
 				AaDanger = aaDanger;
 				DefenderValue = defenderValue;
 				Score = score;
+				FirstThreatRejection = firstThreatRejection;
 			}
 		}
 
@@ -74,6 +76,7 @@ namespace OpenRA.Mods.Common.Traits
 			public int TimeoutOriginTick;
 			public bool ReturningToAssembly;
 			public bool Aborted;
+			public bool SafeReturnFallback;
 
 			public Wave(int id, int tick, List<Pair> pairs, DropPlan plan)
 			{
@@ -89,27 +92,34 @@ namespace OpenRA.Mods.Common.Traits
 		readonly Player player;
 		readonly TransportManagerBotModuleInfo info;
 		readonly TransportMissionCoordinator coordinator;
+		readonly TransportUnloadPlanner unloadPlanner;
 		readonly Action<Actor, CPos, Order> issueRoutedAirMove;
 		readonly Action requestTransportHelicopter;
 		readonly Func<SquadManagerBotModule> squadManager;
 		readonly Func<Actor, bool> isReservedForOtherBehavior;
+		readonly Action<Actor, CPos> rememberSafeIdleStaging;
 		Wave wave;
 		bool enabled;
 		int nextWaveTick;
+		int lastBlockedDiagnosticTick = -1;
+		string lastBlockedDiagnostic;
 
 		public HeavyDropTransportManager(World world, Player player, TransportManagerBotModuleInfo info,
-			TransportMissionCoordinator coordinator, Action<Actor, CPos, Order> issueRoutedAirMove,
+			TransportMissionCoordinator coordinator, TransportUnloadPlanner unloadPlanner,
+			Action<Actor, CPos, Order> issueRoutedAirMove,
 			Action requestTransportHelicopter, Func<SquadManagerBotModule> squadManager,
-			Func<Actor, bool> isReservedForOtherBehavior)
+			Func<Actor, bool> isReservedForOtherBehavior, Action<Actor, CPos> rememberSafeIdleStaging)
 		{
 			this.world = world;
 			this.player = player;
 			this.info = info;
 			this.coordinator = coordinator;
+			this.unloadPlanner = unloadPlanner;
 			this.issueRoutedAirMove = issueRoutedAirMove;
 			this.requestTransportHelicopter = requestTransportHelicopter;
 			this.squadManager = squadManager;
 			this.isReservedForOtherBehavior = isReservedForOtherBehavior;
+			this.rememberSafeIdleStaging = rememberSafeIdleStaging;
 		}
 
 		public void Enable()
@@ -156,11 +166,14 @@ namespace OpenRA.Mods.Common.Traits
 			if (cargo == null || cargo.IsEmpty())
 				return;
 
-			pair.EmergencyUnload = true;
-			pair.LastOrderTick = world.WorldTick;
-			bot.QueueOrder(new Order("Unload", actor, false));
-			Debug("wave {0} carrier {1} damaged; emergency unloading at {2}",
-				wave.Id, actor, actor.Location);
+			if (NeedsRepair(actor) && !wave.ReturningToAssembly)
+			{
+				var loadedPairs = wave.Pairs.Where(p => IsPairUsable(p) && IsLoaded(p)).ToList();
+				ReturnWaveToAssembly(bot, loadedPairs, $"carrier {actor} seriously damaged");
+			}
+			else
+				Debug("wave {0} retained safe unload plans after incidental carrier damage: carrier={1} damage={2}",
+					wave.Id, actor, attack.Damage.Value);
 		}
 
 		void TryCreateWave(IBot bot)
@@ -175,7 +188,7 @@ namespace OpenRA.Mods.Common.Traits
 			if (transports.Count < info.HeavyDropMaximumPassengers)
 			{
 				requestTransportHelicopter();
-				Debug("preparing wave: passengers={0}/{1}, carriers={2}/{1}",
+				DebugBlocked("preparing wave: passengers={0}/{1}, carriers={2}/{1}",
 					passengers.Count, info.HeavyDropMaximumPassengers, transports.Count);
 				return;
 			}
@@ -184,10 +197,10 @@ namespace OpenRA.Mods.Common.Traits
 				passengers.Count, transports.Count, info.HeavyDropMaximumPassengers))
 				return;
 
-			var plan = FindDropPlan(transports[0].Location, passengers[0]);
+			var plan = FindDropPlan(transports[0], passengers[0]);
 			if (plan == null)
 			{
-				Debug("wave ready but no undefended drop site was found");
+				DebugBlocked("wave ready but no undefended drop site was found");
 				return;
 			}
 
@@ -196,7 +209,7 @@ namespace OpenRA.Mods.Common.Traits
 			var destinations = FindDistinctDestinations(plan.LandingCenter, passengers);
 			if (destinations.Count < info.HeavyDropMinimumPassengers)
 			{
-				Debug("rejected drop site {0}: only {1}/{2} distinct landing cells",
+				DebugBlocked("rejected drop site {0}: only {1}/{2} distinct landing cells",
 					plan.LandingCenter, destinations.Count, info.HeavyDropMinimumPassengers);
 				return;
 			}
@@ -204,7 +217,7 @@ namespace OpenRA.Mods.Common.Traits
 			var pickupDestinations = FindDistinctPickupDestinations(passengers, transports);
 			if (pickupDestinations.Count < passengers.Count)
 			{
-				Debug("rejected wave assembly: only {0}/{1} distinct Mammoth-passable pickup cells",
+				DebugBlocked("rejected wave assembly: only {0}/{1} distinct Mammoth-passable pickup cells",
 					pickupDestinations.Count, passengers.Count);
 				return;
 			}
@@ -220,6 +233,8 @@ namespace OpenRA.Mods.Common.Traits
 				.Select(i => new Pair(transports[i], passengers[i], pickupDestinations[i],
 					destinations[i], world.WorldTick)).ToList();
 			wave = new Wave(missionId, world.WorldTick, pairs, plan);
+			lastBlockedDiagnostic = null;
+			lastBlockedDiagnosticTick = -1;
 			nextWaveTick = world.WorldTick + info.HeavyDropCooldownTicks;
 			foreach (var pair in pairs)
 			{
@@ -229,9 +244,10 @@ namespace OpenRA.Mods.Common.Traits
 				pair.PickupOrdered = true;
 			}
 
-			Debug("created wave {0}: pairs={1}, target={2}#{3}, landing={4}, AA={5:0.00}, defenders={6}, score={7}",
+			Debug("created wave {0}: pairs={1}, target={2}#{3}, landing={4}, AA={5:0.00}, defenders={6}, " +
+				"score={7}, firstStrategicThreatRejection={8}",
 				missionId, pairs.Count, plan.Target.Info.Name, plan.Target.ActorID, plan.LandingCenter,
-				plan.AaDanger, plan.DefenderValue, plan.Score);
+				plan.AaDanger, plan.DefenderValue, plan.Score, plan.FirstThreatRejection ?? "none");
 			Debug("wave {0} routed all {1} carriers concurrently to distinct pickup cells", missionId, pairs.Count);
 		}
 
@@ -245,7 +261,9 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				DiscardUnloadedPairs(bot);
 				wave.Stage = WaveStage.Travelling;
-				IssueWaveTravel(bot, "assembled");
+				if (!IssueWaveTravel(bot, "assembled"))
+					ReturnWaveToAssembly(bot, wave.Pairs.Where(IsLoaded).ToList(),
+						"assembled wave has no complete safe drop plans");
 				return;
 			}
 
@@ -330,11 +348,15 @@ namespace OpenRA.Mods.Common.Traits
 			if (world.WorldTick - wave.TimeoutOriginTick >= info.HeavyDropMissionTimeoutTicks)
 			{
 				DebugTravelFailure("mission timeout");
-				BeginAbortUnload(bot, "mission timeout");
+				if (!wave.ReturningToAssembly)
+					ReturnWaveToAssembly(bot, wave.Pairs.Where(p => IsPairUsable(p) && IsLoaded(p)).ToList(),
+						"mission timeout");
+				else
+					BeginAbortUnload(bot, "safe-return timeout");
 				return;
 			}
 
-			var loadedPairs = wave.Pairs.Where(p => IsPairUsable(p) && IsLoaded(p) && !p.EmergencyUnload).ToList();
+			var loadedPairs = wave.Pairs.Where(p => IsPairUsable(p) && IsLoaded(p)).ToList();
 			if (loadedPairs.Count == 0)
 			{
 				wave.Stage = WaveStage.Unloading;
@@ -342,13 +364,29 @@ namespace OpenRA.Mods.Common.Traits
 				return;
 			}
 
-			if (!wave.ReturningToAssembly &&
-				world.WorldTick - wave.LastPlanTick >= info.HeavyDropReplanInterval)
+			if (world.WorldTick - wave.LastPlanTick >= info.HeavyDropReplanInterval)
 			{
 				wave.LastPlanTick = world.WorldTick;
-				if (!IsCurrentPlanSafe())
+				if (!RevalidateWavePlans(loadedPairs, out var rejection))
 				{
-					var replacement = FindDropPlan(loadedPairs[0].Transport.Location, loadedPairs[0].Passenger);
+					Debug("wave {0} invalidated unload-plan set: {1}", wave.Id, rejection);
+					if (TryPlanWave(loadedPairs, out rejection))
+					{
+						IssueWaveRoutes(bot, loadedPairs, "landing plans refreshed");
+						return;
+					}
+
+					if (wave.ReturningToAssembly)
+					{
+						foreach (var pair in loadedPairs)
+							bot.QueueOrder(new Order("Stop", pair.Transport, false));
+
+						Debug("wave {0} holding outside known danger: no safe assembly unload-plan set; reason={1}",
+							wave.Id, rejection);
+						return;
+					}
+
+					var replacement = FindDropPlan(loadedPairs[0].Transport, loadedPairs[0].Passenger);
 					if (replacement == null)
 					{
 						ReturnWaveToAssembly(bot, loadedPairs,
@@ -366,25 +404,45 @@ namespace OpenRA.Mods.Common.Traits
 					for (var i = 0; i < loadedPairs.Count; i++)
 						loadedPairs[i].Destination = destinations[i];
 
-					IssueWaveTravel(bot, "destination replanned");
+					if (!IssueWaveTravel(bot, "destination replanned"))
+						ReturnWaveToAssembly(bot, loadedPairs, "replacement lacks complete safe unload plans");
+
+					return;
 				}
+			}
+
+			var committing = loadedPairs.Any(pair => pair.UnloadPlan != null &&
+				(pair.Transport.Location - pair.UnloadPlan.CarrierCell).LengthSquared <=
+				info.HeavyDropUnloadRangeCells * info.HeavyDropUnloadRangeCells);
+			if (committing && !RevalidateWavePlans(loadedPairs, out var commitRejection))
+			{
+				if (TryPlanWave(loadedPairs, out commitRejection))
+					IssueWaveRoutes(bot, loadedPairs, "plans changed before descent");
+				else if (!wave.ReturningToAssembly)
+					ReturnWaveToAssembly(bot, loadedPairs, "no complete safe plan before descent");
+
+				return;
 			}
 
 			foreach (var pair in loadedPairs)
 			{
-				if ((pair.Transport.Location - pair.Destination).LengthSquared <=
+				if (pair.UnloadPlan != null &&
+					(pair.Transport.Location - pair.UnloadPlan.CarrierCell).LengthSquared <=
 					info.HeavyDropUnloadRangeCells * info.HeavyDropUnloadRangeCells)
 				{
 					pair.LastOrderTick = world.WorldTick;
-					bot.QueueOrder(new Order("Unload", pair.Transport, false));
-					Debug("wave {0} carrier {1} reached drop cell {2}; unloading passenger {3}",
-						wave.Id, pair.Transport, pair.Transport.Location, pair.Passenger);
+					bot.QueueOrder(TransportUnloadOrder.Create(world, pair.Transport, pair.UnloadPlan));
+					Debug("wave {0} carrier {1} committing exact unload: carrierCell={2}, exit={3}, " +
+						"passenger={4}, revision={5}, snapshot={6}, outcome={7}", wave.Id, pair.Transport,
+						pair.UnloadPlan.CarrierCell, pair.UnloadPlan.ExitCells[0], pair.Passenger,
+						pair.UnloadPlan.Revision, pair.UnloadPlan.SnapshotTick,
+						wave.ReturningToAssembly ? "safe-return" : "heavy-assault");
 					continue;
 				}
 
 				if (IsCarrierIdle(pair.Transport) && ReadyToRetry(pair))
 				{
-					IssueRoutedLanding(pair.Transport, pair.Destination);
+					IssuePairRoute(bot, pair);
 					pair.LastOrderTick = world.WorldTick;
 				}
 			}
@@ -416,9 +474,24 @@ namespace OpenRA.Mods.Common.Traits
 				return;
 			}
 
+			if (!RevalidateWavePlans(carrying, out var rejection))
+			{
+				if (!TryPlanWave(carrying, out rejection))
+				{
+					if (!wave.ReturningToAssembly)
+						ReturnWaveToAssembly(bot, carrying, "remaining unload plans invalidated");
+
+					return;
+				}
+
+				wave.Stage = WaveStage.Travelling;
+				IssueWaveRoutes(bot, carrying, "remaining unload plans refreshed");
+				return;
+			}
+
 			foreach (var pair in carrying.Where(ReadyToRetry))
 			{
-				bot.QueueOrder(new Order("Unload", pair.Transport, false));
+				bot.QueueOrder(TransportUnloadOrder.Create(world, pair.Transport, pair.UnloadPlan));
 				pair.LastOrderTick = world.WorldTick;
 			}
 		}
@@ -426,25 +499,164 @@ namespace OpenRA.Mods.Common.Traits
 		void ReturnWaveToAssembly(IBot bot, List<Pair> loadedPairs, string reason)
 		{
 			wave.ReturningToAssembly = true;
+			wave.Stage = WaveStage.Travelling;
 			wave.TimeoutOriginTick = world.WorldTick;
 			foreach (var pair in loadedPairs)
 				pair.Destination = pair.PickupDestination;
 
-			IssueWaveTravel(bot, $"{reason}; returning to safe assembly cells");
+			if (!IssueWaveTravel(bot, $"{reason}; returning to safe assembly cells") &&
+				!IssueWaveCurrentFallback(bot, loadedPairs, reason))
+			{
+				foreach (var pair in loadedPairs)
+					bot.QueueOrder(new Order("Stop", pair.Transport, false));
+
+				Debug("wave {0} holding outside known danger: no safe assembly plan", wave.Id);
+			}
 		}
 
-		void IssueWaveTravel(IBot bot, string reason)
+		bool IssueWaveCurrentFallback(IBot bot, List<Pair> pairs, string reason)
 		{
-			var travelling = 0;
-			foreach (var pair in wave.Pairs.Where(p => IsPairUsable(p) && IsLoaded(p)))
+			var unavailable = new HashSet<CPos>();
+			var replacements = new List<KeyValuePair<Pair, TransportUnloadPlan>>();
+			foreach (var pair in pairs.OrderBy(p => p.Transport.ActorID))
 			{
-				IssueRoutedLanding(pair.Transport, pair.Destination);
-				pair.LastOrderTick = world.WorldTick;
-				travelling++;
+				var revision = (pair.UnloadPlan?.Revision ?? 0) + 1;
+				var fallbackCenter = world.Map.Clamp(pair.PickupDestination +
+					(pair.PickupDestination - pair.Transport.Location).Sign() *
+					info.SafeReturnLandingSearchRadiusCells);
+				if (!unloadPlanner.TryPlanWithoutClaim(wave.Id, pair.Transport, new[] { pair.Passenger },
+					fallbackCenter, pair.PickupDestination, info.SafeReturnLandingSearchRadiusCells,
+					info.SafeReturnUsefulnessRadiusCells, revision, unavailable, out var plan, out _))
+					return false;
+
+				replacements.Add(new KeyValuePair<Pair, TransportUnloadPlan>(pair, plan));
+				unavailable.Add(plan.CarrierCell);
+				foreach (var exit in plan.ExitCells)
+					unavailable.Add(exit);
 			}
 
+			if (!unloadPlanner.TryClaimPlans(wave.Id, replacements.Select(r => r.Value), out _))
+				return false;
+
+			foreach (var replacement in replacements)
+				replacement.Key.UnloadPlan = replacement.Value;
+
+			IssueWaveRoutes(bot, pairs, reason + "; current-position safe fallback");
+			wave.SafeReturnFallback = true;
+			Debug("wave {0} terminal safe fallback routed {1} loaded carriers from current positions",
+				wave.Id, pairs.Count);
+			return true;
+		}
+
+		bool IssueWaveTravel(IBot bot, string reason)
+		{
+			var pairs = wave.Pairs.Where(p => IsPairUsable(p) && IsLoaded(p)).ToList();
+			if (!TryPlanWave(pairs, out var rejection))
+			{
+				Debug("wave {0} cannot travel: no complete unload-plan set; reason={1}", wave.Id, rejection);
+				return false;
+			}
+
+			IssueWaveRoutes(bot, pairs, reason);
+			wave.SafeReturnFallback = false;
+
 			Debug("wave {0} travelling with {1} carriers to {2}: {3}",
-				wave.Id, travelling, wave.LandingCenter, reason);
+				wave.Id, pairs.Count, wave.LandingCenter, reason);
+			return true;
+		}
+
+		bool TryPlanWave(List<Pair> pairs, out string rejection)
+		{
+			var unavailable = new HashSet<CPos>();
+			var replacements = new List<KeyValuePair<Pair, TransportUnloadPlan>>();
+			foreach (var pair in pairs.OrderBy(p => p.Transport.ActorID))
+			{
+				var revision = (pair.UnloadPlan?.Revision ?? 0) + 1;
+				var handoffObjective = wave.ReturningToAssembly || wave.Target == null ?
+					pair.Destination : wave.Target.Location;
+				if (!unloadPlanner.TryPlanWithoutClaim(wave.Id, pair.Transport, new[] { pair.Passenger },
+					pair.Destination, handoffObjective, info.HeavyDropLandingSearchRadiusCells,
+					info.HeavyDropLandingUsefulnessRadiusCells, revision, unavailable,
+					out var plan, out rejection))
+					return false;
+
+				replacements.Add(new KeyValuePair<Pair, TransportUnloadPlan>(pair, plan));
+				unavailable.Add(plan.CarrierCell);
+				foreach (var exit in plan.ExitCells)
+					unavailable.Add(exit);
+			}
+
+			if (!unloadPlanner.TryClaimPlans(wave.Id, replacements.Select(r => r.Value), out rejection))
+				return false;
+
+			foreach (var replacement in replacements)
+			{
+				replacement.Key.UnloadPlan = replacement.Value;
+				Debug("wave {0} selected unload plan: carrier={1}, passenger={2}, objective={3}, " +
+					"carrierCell={4}, exit={5}, revision={6}, snapshot={7}, candidates={8}, " +
+					"firstThreatRejection={9}", wave.Id, replacement.Key.Transport,
+					replacement.Key.Passenger, replacement.Key.Destination, replacement.Value.CarrierCell,
+					replacement.Value.ExitCells[0], replacement.Value.Revision, replacement.Value.SnapshotTick,
+					replacement.Value.CandidatesEvaluated,
+					replacement.Value.FirstThreatRejection ?? "none");
+			}
+
+			rejection = null;
+			return true;
+		}
+
+		bool RevalidateWavePlans(List<Pair> pairs, out string rejection)
+		{
+			var unavailable = new HashSet<CPos>();
+			var plans = new List<TransportUnloadPlan>();
+			foreach (var pair in pairs.OrderBy(p => p.Transport.ActorID))
+			{
+				if (!unloadPlanner.RevalidateWithoutClaim(wave.Id, pair.Transport, new[] { pair.Passenger },
+					pair.UnloadPlan, info.HeavyDropLandingUsefulnessRadiusCells, unavailable, out rejection))
+					return false;
+
+				plans.Add(pair.UnloadPlan);
+				unavailable.Add(pair.UnloadPlan.CarrierCell);
+				foreach (var exit in pair.UnloadPlan.ExitCells)
+					unavailable.Add(exit);
+			}
+
+			return unloadPlanner.TryClaimPlans(wave.Id, plans, out rejection);
+		}
+
+		void IssueWaveRoutes(IBot bot, List<Pair> pairs, string reason)
+		{
+			foreach (var pair in pairs.OrderBy(p => p.Transport.ActorID))
+			{
+				if (!IssuePairRoute(bot, pair))
+				{
+					bot.QueueOrder(new Order("Stop", pair.Transport, false));
+					Debug("wave {0} route failed without unsafe direct append: carrier={1}, carrierCell={2}",
+						wave.Id, pair.Transport, pair.UnloadPlan?.CarrierCell);
+				}
+
+				pair.LastOrderTick = world.WorldTick;
+			}
+
+			Debug("wave {0} issued {1} threat-aware plan routes: {2}", wave.Id, pairs.Count, reason);
+		}
+
+		bool IssuePairRoute(IBot bot, Pair pair)
+		{
+			var route = unloadPlanner.Route(pair.Transport, pair.UnloadPlan);
+			if (route == null || (route.Count == 0 && pair.Transport.Location != pair.UnloadPlan.CarrierCell))
+				return false;
+
+			var queued = false;
+			foreach (var waypoint in route)
+			{
+				bot.QueueOrder(new Order("Move", pair.Transport, Target.FromCell(world, waypoint), queued));
+				queued = true;
+			}
+
+			Debug("wave {0} routed carrier={1} to carrierCell={2}: waypoints={3}, snapshot={4}",
+				wave.Id, pair.Transport, pair.UnloadPlan.CarrierCell, route.Count, pair.UnloadPlan.SnapshotTick);
+			return true;
 		}
 
 		void IssueRoutedLanding(Actor transport, CPos destination)
@@ -456,25 +668,43 @@ namespace OpenRA.Mods.Common.Traits
 		void BeginAbortUnload(IBot bot, string reason)
 		{
 			wave.Aborted = true;
-			wave.Stage = WaveStage.Unloading;
-			foreach (var pair in wave.Pairs.Where(IsPairUsable))
+			wave.ReturningToAssembly = true;
+			wave.Stage = WaveStage.Travelling;
+			wave.TimeoutOriginTick = world.WorldTick;
+			var loadedPairs = wave.Pairs.Where(p => IsPairUsable(p) && IsLoaded(p)).ToList();
+			foreach (var pair in wave.Pairs.Where(p => IsPairUsable(p) && !IsLoaded(p)))
 			{
-				if (IsLoaded(pair))
-					bot.QueueOrder(new Order("Unload", pair.Transport, false));
-				else
-					bot.QueueOrder(new Order("Stop", pair.Passenger, false));
-
+				bot.QueueOrder(new Order("Stop", pair.Passenger, false));
+				bot.QueueOrder(new Order("Stop", pair.Transport, false));
 				pair.LastOrderTick = world.WorldTick;
 			}
 
-			Debug("wave {0} aborted: {1}", wave.Id, reason);
+			if (loadedPairs.Count == 0)
+			{
+				Debug("wave {0} aborted without loaded cargo: {1}", wave.Id, reason);
+				FinishWave(bot, "abort restored unloaded pairs");
+				return;
+			}
+
+			foreach (var pair in loadedPairs)
+				pair.Destination = pair.PickupDestination;
+
+			if (!IssueWaveTravel(bot, $"abort: {reason}; returning for planned safe unload"))
+			{
+				foreach (var pair in loadedPairs)
+					bot.QueueOrder(new Order("Stop", pair.Transport, false));
+
+				Debug("wave {0} aborted and holding loaded carriers: no safe assembly unload plans", wave.Id);
+			}
 		}
 
-		DropPlan FindDropPlan(CPos origin, Actor passenger)
+		DropPlan FindDropPlan(Actor carrier, Actor passenger)
 		{
 			var manager = squadManager();
 			if (manager == null)
 				return null;
+
+			var origin = carrier.Location;
 
 			var targets = world.Actors.Where(a => IsActorUsable(a) &&
 				player.RelationshipWith(a.Owner) == PlayerRelationship.Enemy &&
@@ -482,6 +712,7 @@ namespace OpenRA.Mods.Common.Traits
 				.OrderByDescending(EconomicValue).ThenBy(a => (a.Location - origin).LengthSquared)
 				.ThenBy(a => a.ActorID).Take(info.HeavyDropTargetCandidateLimit);
 			DropPlan best = null;
+			string firstThreatRejection = null;
 			foreach (var target in targets)
 			{
 				var away = (target.Location - origin).Sign();
@@ -490,27 +721,41 @@ namespace OpenRA.Mods.Common.Traits
 				{
 					var intended = world.Map.Clamp(target.Location + direction * info.HeavyDropLandingRadius);
 					var landing = MoveableCellNear(passenger, intended);
-					var aaDanger = AirStateBase.SafeIndependentAirThreatAt(manager, landing);
-					var defenderValue = DefenderValueAt(landing);
-					if (!HeavyDropPolicy.IsDropSiteSafe(aaDanger, info.HeavyDropMaximumAaDanger,
+					if (!unloadPlanner.TryPlanWithoutClaim(0, carrier, new[] { passenger }, landing,
+						target.Location, info.HeavyDropLandingSearchRadiusCells,
+						info.HeavyDropLandingUsefulnessRadiusCells, 1, Array.Empty<CPos>(),
+						out var exactPlan, out var rejection))
+					{
+						if (firstThreatRejection == null && rejection.Contains(" weapon "))
+							firstThreatRejection = rejection;
+
+						continue;
+					}
+
+					firstThreatRejection = firstThreatRejection ?? exactPlan.FirstThreatRejection;
+
+					var defenderValue = DefenderValueAt(exactPlan.CarrierCell);
+					if (!HeavyDropPolicy.IsDropSiteSafe(0, info.HeavyDropMaximumAaDanger,
 						defenderValue, info.HeavyDropMaximumDefenderValue))
 						continue;
 
-					var distance = Math.Abs(landing.X - origin.X) + Math.Abs(landing.Y - origin.Y);
+					var distance = Math.Abs(exactPlan.CarrierCell.X - origin.X) +
+						Math.Abs(exactPlan.CarrierCell.Y - origin.Y);
 					var score = HeavyDropPolicy.TargetScore(EconomicValue(target), defenderValue, distance,
 						CVec.Dot(direction, away));
 					if (best == null || score > best.Score ||
 						(score == best.Score && target.ActorID < best.Target.ActorID))
-						best = new DropPlan(target, landing, aaDanger, defenderValue, score);
+						best = new DropPlan(target, exactPlan.CarrierCell, 0, defenderValue, score,
+							firstThreatRejection);
 				}
 			}
 
-			return best;
+			return best == null ? null : new DropPlan(best.Target, best.LandingCenter, best.AaDanger,
+				best.DefenderValue, best.Score, firstThreatRejection);
 		}
 
 		List<CPos> FindDistinctDestinations(CPos center, List<Actor> passengers)
 		{
-			var manager = squadManager();
 			var candidates = world.Map.FindTilesInCircle(center, info.HeavyDropFormationRadius)
 				.OrderBy(c => (c - center).LengthSquared).ThenBy(c => c.X).ThenBy(c => c.Y).ToList();
 			var used = new HashSet<CPos>();
@@ -521,9 +766,7 @@ namespace OpenRA.Mods.Common.Traits
 				var destination = candidates.Cast<CPos?>().FirstOrDefault(c => c.HasValue &&
 					used.All(u => (u - c.Value).LengthSquared >=
 						info.HeavyDropFormationSpacing * info.HeavyDropFormationSpacing) &&
-					mobile != null && HasUnloadSpace(mobile, c.Value) &&
-					manager != null && AirStateBase.SafeIndependentAirThreatAt(manager, c.Value) <=
-					info.HeavyDropMaximumAaDanger);
+					mobile != null && HasUnloadSpace(mobile, c.Value));
 				if (!destination.HasValue)
 					continue;
 
@@ -589,14 +832,6 @@ namespace OpenRA.Mods.Common.Traits
 
 			return mobile.CanEnterCell(intended, check: BlockedByActor.Immovable) ? intended :
 				mobile.NearestMoveableCell(intended, 1, 6);
-		}
-
-		bool IsCurrentPlanSafe()
-		{
-			var manager = squadManager();
-			return manager != null && HeavyDropPolicy.IsDropSiteSafe(
-				AirStateBase.SafeIndependentAirThreatAt(manager, wave.LandingCenter), info.HeavyDropMaximumAaDanger,
-				DefenderValueAt(wave.LandingCenter), info.HeavyDropMaximumDefenderValue);
 		}
 
 		int DefenderValueAt(CPos cell)
@@ -721,6 +956,11 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			var completedWave = wave;
 			var passengers = completedWave.Pairs.Select(p => p.Passenger).ToList();
+			if (completedWave.SafeReturnFallback)
+				foreach (var pair in completedWave.Pairs.Where(p => IsTransportUsable(p.Transport) &&
+					p.UnloadPlan != null))
+					rememberSafeIdleStaging(pair.Transport, pair.UnloadPlan.CarrierCell);
+
 			coordinator.Release(completedWave.Id);
 
 			var manager = squadManager();
@@ -745,6 +985,22 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			if (info.DebugLogging)
 				Log.Write("debug", "AI heavy drop [{0}]: {1}", player.InternalName, string.Format(format, args));
+		}
+
+		void DebugBlocked(string format, params object[] args)
+		{
+			if (!info.DebugLogging)
+				return;
+
+			var message = string.Format(format, args);
+			var interval = info.ScanInterval * info.BlockedDiagnosticIntervalScans;
+			if (message == lastBlockedDiagnostic && lastBlockedDiagnosticTick >= 0 &&
+				world.WorldTick - lastBlockedDiagnosticTick < interval)
+				return;
+
+			lastBlockedDiagnostic = message;
+			lastBlockedDiagnosticTick = world.WorldTick;
+			Log.Write("debug", "AI heavy drop [{0}]: {1}", player.InternalName, message);
 		}
 	}
 }

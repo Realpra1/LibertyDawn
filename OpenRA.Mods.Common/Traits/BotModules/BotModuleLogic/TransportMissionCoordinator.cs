@@ -18,6 +18,9 @@ namespace OpenRA.Mods.Common.Traits
 		readonly int maximumMissions;
 		readonly Dictionary<uint, int> actorReservations = new Dictionary<uint, int>();
 		readonly Dictionary<int, HashSet<uint>> missionActors = new Dictionary<int, HashSet<uint>>();
+		readonly Dictionary<int, HashSet<uint>> parkedMissionActors = new Dictionary<int, HashSet<uint>>();
+		readonly Dictionary<CPos, int> cellClaims = new Dictionary<CPos, int>();
+		readonly Dictionary<int, HashSet<CPos>> missionCells = new Dictionary<int, HashSet<CPos>>();
 		int nextMissionId = 1;
 
 		public int MissionCount => missionActors.Count;
@@ -53,15 +56,78 @@ namespace OpenRA.Mods.Common.Traits
 
 		public bool IsReserved(uint actorId) { return actorReservations.ContainsKey(actorId); }
 
-		public void Release(int missionId)
+		/// <summary>
+		/// Atomically replaces a mission's exact carrier/exit claims. Existing claims remain intact when
+		/// any requested cell belongs to another mission.
+		/// </summary>
+		public bool TryClaimCells(int missionId, IEnumerable<CPos> cells, out int conflictingMissionId)
+		{
+			conflictingMissionId = 0;
+			if ((!missionActors.ContainsKey(missionId) && !parkedMissionActors.ContainsKey(missionId)) || cells == null)
+				return false;
+
+			var requested = new HashSet<CPos>(cells);
+			if (requested.Count == 0)
+				return false;
+
+			foreach (var cell in requested.OrderBy(c => c.X).ThenBy(c => c.Y).ThenBy(c => c.Layer))
+				if (cellClaims.TryGetValue(cell, out var owner) && owner != missionId)
+				{
+					conflictingMissionId = owner;
+					return false;
+				}
+
+			ReleaseCells(missionId);
+			missionCells.Add(missionId, requested);
+			foreach (var cell in requested)
+				cellClaims.Add(cell, missionId);
+
+			return true;
+		}
+
+		public int ClaimOwner(CPos cell)
+		{
+			return cellClaims.TryGetValue(cell, out var owner) ? owner : 0;
+		}
+
+		public void ReleaseCells(int missionId)
+		{
+			if (!missionCells.TryGetValue(missionId, out var cells))
+				return;
+
+			foreach (var cell in cells)
+				cellClaims.Remove(cell);
+
+			missionCells.Remove(missionId);
+		}
+
+		/// <summary>
+		/// Removes a terminal loaded mission from the active capacity and releases its obsolete landing
+		/// claims while deliberately retaining carrier/passenger ownership until cargo is safely resolved.
+		/// </summary>
+		public bool ParkLoadedMission(int missionId)
 		{
 			if (!missionActors.TryGetValue(missionId, out var actors))
+				return false;
+
+			ReleaseCells(missionId);
+			missionActors.Remove(missionId);
+			parkedMissionActors.Add(missionId, actors);
+			return true;
+		}
+
+		public void Release(int missionId)
+		{
+			ReleaseCells(missionId);
+			if (!missionActors.TryGetValue(missionId, out var actors) &&
+				!parkedMissionActors.TryGetValue(missionId, out actors))
 				return;
 
 			foreach (var id in actors)
 				actorReservations.Remove(id);
 
 			missionActors.Remove(missionId);
+			parkedMissionActors.Remove(missionId);
 		}
 	}
 }
