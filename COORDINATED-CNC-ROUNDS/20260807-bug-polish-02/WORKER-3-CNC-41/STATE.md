@@ -31,11 +31,11 @@ when the dependency section directs it.
 
 ## Integrated repair assignment
 
-- Phase: `isolated implementation`
-- Current release branch/head: `not assigned`
-- Integration notes: `not assigned`
-- Repair branch: `not assigned`
-- Repair PR base: `not assigned`
+- Phase: `integrated testing`
+- Current release branch/head: `agent/cnc-20260807-bug-polish-02-release` / `ffb841b48750cc54b1862fb93101d3dce3a87a3f`
+- Integration notes: `COORDINATED-CNC-ROUNDS/20260807-bug-polish-02/INTEGRATION.md`
+- Repair branch: `agent/round-20260807-cnc41-rc1-repair`
+- Repair PR base: `agent/cnc-20260807-bug-polish-02-release`
 - Integrated cycles used this RC: `0/3`
 - Integrated cycles used total: `0/12`
 
