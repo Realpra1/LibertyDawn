@@ -1,7 +1,7 @@
 # Coordinated CNC State
 
 - Round ID: `20260807-bug-polish-03`
-- Phase: `task selection; 4/5 claims recorded`
+- Phase: `five tasks claimed; Task Maker claim publication pending`
 - Common base branch: `agent/cnc-20260807-bug-polish-02-release`
 - Common base SHA: `468ee64f5a0f9a9e19e260e5c5943e6e878f4705`
 - Coordinator model: `gpt-5.6-sol` / `high` (trial mismatch explicitly accepted by user)
@@ -25,7 +25,7 @@
 | 2 | CNC-46 Defense clusters | | | `claimed` at `2026-08-07T15:06:39Z`; packet `COORDINATED-CNC-ROUNDS/20260807-bug-polish-03/TASK-PACKET-2.md` | reader `/root/round03_task_reader_2` complete | | | |
 | 3 | CNC-47 Repeatable performance baseline | | | `claimed` at `2026-08-07T15:08:04Z`; packet `COORDINATED-CNC-ROUNDS/20260807-bug-polish-03/TASK-PACKET-3.md` | reader `/root/round03_task_reader_3` complete | | | |
 | 4 | CNC-50 Late-game engineer stall recovery | | | `claimed` at `2026-08-07T15:09:42Z`; packet `COORDINATED-CNC-ROUNDS/20260807-bug-polish-03/TASK-PACKET-4.md` | reader `/root/round03_task_reader_4` complete | | | |
-| 5 | unassigned | | | | | | | |
+| 5 | CNC-52 Starting-Fact wall hole prevention/repair | | | `claimed` at `2026-08-07T15:11:17Z`; packet `COORDINATED-CNC-ROUNDS/20260807-bug-polish-03/TASK-PACKET-5.md` | reader `/root/round03_task_reader_5` complete | | | |
 
 ## Release rounds
 
