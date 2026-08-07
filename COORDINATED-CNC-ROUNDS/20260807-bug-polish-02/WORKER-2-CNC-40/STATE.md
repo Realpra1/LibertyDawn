@@ -12,7 +12,7 @@ when the dependency section directs it.
 - Task: `CNC-40 — Adaptive specialists`
 - Change category: `AI production evidence and adaptive-production policy`
 - Balance authority: `Frozen except for the exact requested completed specialist-outcome evidence and the minimum addition of Engineer (e6) to SkyNet's adaptive eligibility set so that evidence can affect production. Do not change actor costs/stats/prerequisites, authored production weights, confidence, decay, floor, ceiling, intervals, probabilities, or any other numeric policy.`
-- Status: `Handoff ready — First iteration - testing`
+- Status: `Handoff ready — RC1 integrated validation passed; First iteration - testing`
 - Common base branch/SHA: `agent/cnc-20260806-bug-polish-01-release` / `419bee2531d4802bf922c3597b42c6eeb75ab250`
 - Task branch: `agent/round-20260807-cnc40-adaptive-specialists`
 - Intended PR base: `agent/cnc-20260806-bug-polish-01-release`
@@ -24,7 +24,7 @@ when the dependency section directs it.
 - Task report: `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260807-bug-polish-02/workers/worker-2-cnc40/COORDINATED-CNC-ROUNDS/20260807-bug-polish-02/WORKER-2-CNC-40/REPORT.md`
 - Match-analysis directory: `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260807-bug-polish-02/analysis/worker-2-cnc40`
 - Liberty Dawn design reference: `.agents/references/LIBERTY-DAWN-DESIGN.md`
-- Full-engine game tests completed: `15` (the prior 12 plus one fresh save run and two reload stages in the final-review response; excluded two tick-0 map-bootstrap failures and one manifest-path parse failure without game evidence)
+- Full-engine game tests completed: `17` (the prior 15 plus fresh RC1 literal and aircraft-ground-husk combined probes; excluded two tick-0 map-bootstrap failures and one manifest-path parse failure without game evidence)
 - Terra cycle code reviews: `cycle 5 complete; its staged-save advisory was adopted and addressed by the final-review test-only response; reachable pre-outcome/post-credit reloads pass, while a captured-but-not-transformed save is impossible because frame-end transformation finishes before the save request boundary; no product change`
 - Sol-xhigh policy escalation: `used once after 10 game tests; policy-escalation/POLICY-REVIEW.md recommends First iteration - testing and blocks Complete - testing with medium-high confidence because cycle 4 demonstrates forbidden prolonged Engineer saturation; no further escalation allowed`
 - PR: `https://github.com/Realpra1/LibertyDawn/pull/87` (draft; required Linux and Windows checks green on reviewed head `ee5e3aa33b`)
@@ -813,6 +813,21 @@ ordering evidence: same-tick frame-end capture/`AfterTransform` completes before
 `TryAutomatedSave`, so no valid save can contain that transient interval. No code,
 config, or balance change was made; cycles used remains 5.
 
+RC1 integrated validation (test-only; no integrated product cycle): combined
+product `ffb841b48750cc54b1862fb93101d3dce3a87a3f` compiled in Release with zero
+warnings/errors, all 37 focused adaptive/capture tests passed, and CNC YAML passed.
+Fresh ordinary-AI seeds 40611/40612 at `rc1-integrated/run` both reached tick
+3500 under headless MAX with no outcome warning, fatal, or desync. The literal
+probe repeated exact direct capture `e6` 0->1/0->400, generic C4 `rmbo`
+0->1/0->400, and usable `htnk` restoration `e6` 1->2/400->2100. The combined
+aircraft probe exercised CNC-44's new `heli.groundhusk`: normal CaptureManager
+produced a usable `heli` and credited exactly `e6` 1->2/400->1400 only at the
+completed transformation. Ordinary Commando loss and conventional economy,
+infantry, and harvester production remained. The fresh factual Commenter found
+no integrity blocker; routine Policy Review was mostly sensible/medium and
+preserved the known saturation limitation. No repair or balance change is
+warranted; integrated counters remain 0.
+
 ## Handoff receipt
 
 - Proposed status: `First iteration - testing`
@@ -832,3 +847,17 @@ config, or balance change was made; cycles used remains 5.
 - Deferred work: `authorized adaptive-policy investigation for Engineer saturation; direct serialized-ledger save/load assertion if higher confidence is required; persist pending identity if transformation is ever deferred across ticks; remaining clean adversarial/transport/final-stress set; stable-workload performance repeat; CNC-90 exact-once preservation`
 - Known failures/risks: `prolonged Engineer saturation after one exceptional success; direct serialized save-state dump absent despite passing log/rollover continuity; in-game post-plant Commando owner-change not forced; full acceptance set incomplete`
 - Relevant artifact paths: `analysis/worker-2-cnc40/{base-probe,cycle-01,cycle-02,cycle-03,cycle-04,cycle-05,cycle-review-05,policy-escalation,final-pr-review,review-save-load}; task REPORT.md`
+
+## RC1 integrated handoff receipt
+
+- Proposed status: `First iteration - testing` (unchanged)
+- Validated release product: `agent/cnc-20260807-bug-polish-02-release` / `ffb841b48750cc54b1862fb93101d3dce3a87a3f`
+- Validation branch: `agent/round-20260807-cnc40-rc1-repair`
+- Product repair and PR: `none required; state/report receipt only`
+- Integrated cycles used: `0/3 this RC; 0/12 total`
+- Gates: `Release build passed with 0 warnings/errors; 37/37 focused AdaptiveWeightingTest/CaptureTargetingTest cases passed; CNC YAML passed`
+- Fresh games: `seed 40611 literal tank-husk probe and seed 40612 combined aircraft-ground-husk probe; both tick 3500, exact completed-outcome attribution, no warning/fatal/desync; 7000 valid ticks at 581.856 aggregate ticks/s`
+- Combined-overlap evidence: `CNC-44's new heli.groundhusk restores to heli and supplies exactly one 1000-value Engineer sample; merged UnitBuilder owned-request persistence does not disturb CNC-40 rollover or ordinary production; merged Brutalis economy modules run concurrently`
+- Factual/policy review: `rc1-integrated/commenter/NARRATIVE.md has no integrity blocker; rc1-integrated/policy/POLICY-REVIEW.md is mostly sensible/medium and explicitly retains the First-iteration saturation limitation`
+- Decision: `RC1 passes CNC-40 task-scoped combined validation; stop this worker unless a later release repair touches PlayerStatistics, capture/transform completion, demolition attribution, UnitBuilder adaptive selection, or CNC specialist rules`
+- Remaining limitation: `one exceptional Engineer success can still cause prolonged target-starved Engineer saturation; frozen numeric policy and incomplete clean adversarial set continue to block Complete - testing`

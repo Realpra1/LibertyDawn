@@ -74,11 +74,12 @@ No Red Alert, Dune 2000, or Tiberian Sun product work was performed.
 
 ## Full-engine evidence and old control
 
-Fifteen material full-engine games were counted: one base probe, one invalid
+Seventeen material full-engine games were counted: one base probe, one invalid
 changed harness run that still produced outcome evidence, four valid changed
 runs, four matched base controls, and a changed/control natural-conclusion pair
 invalid only because both ended before the configured duration, followed by one
-fresh save run and two full-engine reload stages in the final-review response.
+fresh save run and two full-engine reload stages in the final-review response,
+plus two fresh RC1 integrated-release probes.
 Two tick-0 map bootstrap failures and one manifest path parse failure had no game
 evidence and were excluded. All ordinary-AI games used SkyNet plus an active
 opponent with normal modules; matched controls used the exact base SHA
@@ -136,6 +137,20 @@ starts, factions, and options.
   warning, fatal, or desync. The initial save launcher was status-invalid only
   because its required regexes assumed prior unseeded action ticks; its game and
   save artifacts are valid and were judged from their actual events.
+- RC1 integrated validation, seeds 40611 and 40612: `rc1-integrated/run`. Both
+  ordinary SkyNet-versus-Brutalis games reached tick 3500 under headless MAX on
+  combined product head `ffb841b48750cc54b1862fb93101d3dce3a87a3f` with no
+  outcome warning, fatal, or desync. The fresh literal probe repeated direct
+  capture `e6` 0->1/0->400, generic exact-once C4 `rmbo` 0->1/0->400, and usable
+  `htnk` restoration `e6` 1->2/400->2100. A second combined probe replaced the
+  tank husk with CNC-44's new `heli.groundhusk`; normal CaptureManager selected
+  it, produced a usable `heli`, and credited exactly `e6` 1->2/400->1400 only at
+  completed transformation. The same Commando then retained ordinary loss
+  evidence after three exact demolitions. Merged Brutalis tiberium-field and
+  harvester modules ran concurrently, and SkyNet continued conventional economy,
+  infantry, and harvester spending after rollover. The two-game batch processed
+  7000 valid ticks at 581.856 ticks/s wall-clock aggregate. These are combined
+  correctness probes, not a new old-behavior differential.
 
 The cycle-3 and cycle-5 changed runs were respectively 8.36% and 9.03% slower
 than their controls, but the identical cycle-1 map was effectively equal and the
@@ -182,6 +197,16 @@ valid save cannot contain. The supplement instead saves immediately before the
 normal capture/transform completion and after all credits, covering the reachable
 pre-outcome and post-credit boundaries.
 
+RC1's fresh factual review at `rc1-integrated/commenter/NARRATIVE.md` found no
+evidence-integrity blocker and confirmed both requested event sequences while
+correctly limiting the batch to feature validation. The fresh policy review at
+`rc1-integrated/policy/POLICY-REVIEW.md` judged the behavior mostly sensible with
+medium confidence: exact completion attribution remains strategically coherent,
+but the short probes do not establish natural-match production value or remove
+the known target-starved Engineer saturation limitation. No repair or balance
+change was warranted; integrated code-change cycles remain `0/3` for RC1 and
+`0/12` total.
+
 ## Diagnostics
 
 Retained diagnostics are bounded per completed or inconsistent outcome. A normal
@@ -224,6 +249,8 @@ debug hook, generated log, replay, save, or build output is included in Git.
 - Policy escalation: `policy-escalation/POLICY-REVIEW.md`
 - Final PR review: `final-pr-review/PR-REVIEW.md`
 - Save/load response: `review-save-load/{commenter/NARRATIVE.md,policy/POLICY-REVIEW.md}`
+- RC1 integrated validation:
+  `rc1-integrated/{run,commenter/NARRATIVE.md,policy/POLICY-REVIEW.md}`
 
 ## Publication
 
@@ -236,3 +263,9 @@ debug hook, generated log, replay, save, or build output is included in Git.
 - Final Sol-high task-PR review: `ready with one fix`; the save/load finding was
   addressed by the documented test-only response, with the unreachable sub-tick
   save point rejected from engine-order evidence.
+- RC1 combined candidate: release product
+  `ffb841b48750cc54b1862fb93101d3dce3a87a3f`, validated from
+  `agent/round-20260807-cnc40-rc1-repair`. No product repair, repair PR, or
+  integrated code-change cycle is required; preserve `First iteration - testing`
+  and reactivate only if a later release repair touches CNC-40's accounting,
+  capture/transform, demolition, adaptive selection, or CNC specialist rules.
