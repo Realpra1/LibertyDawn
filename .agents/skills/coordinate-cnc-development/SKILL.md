@@ -79,13 +79,16 @@ Use a fresh context whenever practical:
 | Reviewer | Sol 5.6 high | One task PR, its worker state, evidence |
 | Integrator | Sol 5.6 high | Reviewed branch heads and integration state |
 
-Prefer native fresh agents while slots exist. Spawn every native delegated role
-with no inherited conversation history; for native Commenter and Policy Reviewer
-sessions this means an explicit no-history fork such as `fork_turns="none"`.
-Because the native four-agent limit includes the coordinator, use
-`scripts/launch_role.py` for additional independent Codex sessions. Do not share a
-mutable worktree. The launcher tells each session to read/work its role-instruction
-file and job file without asking the coordinator to preload that role. Its worker
+Prefer native fresh agents while slots exist for roles other than Commenter and
+Policy Reviewer. Spawn those native delegated roles with no inherited conversation
+history. Always launch `commenter`, `policy-reviewer`, `policy-speccer`, and
+`policy-escalation` through `scripts/launch_role.py`, even when a native slot is
+free. The caller selects only the role and strict job envelope; it must not
+reconstruct or override model, reasoning, sandbox, output, or session settings.
+Because the native four-agent limit includes the coordinator, use the same launcher
+for additional independent sessions of other roles. Do not share a mutable
+worktree. The launcher tells each session to read/work its role-instruction file
+and job file without asking the coordinator to preload that role. Its worker
 prompt points only at the worker state, which is the worker's complete contract.
 Put launcher event/process output under the ignored `.worktrees/` coordination
 area; keep only concise durable results in tracked state.
@@ -117,8 +120,11 @@ Policy Reviewer directory as `inputs/NARRATIVE.md`; do not use symlinks. Stage a
 short `inputs/TASK-CONTEXT.md` containing task identity, why, change category,
 in/out-of-scope behavior, and explicit balance authority. The
 launcher rejects analysis inputs outside these staged roots.
-Run the launcher with `--print-command` to validate the same envelope before a
-native no-history spawn; give that agent only the role-instruction and job paths.
+Run the launcher with `--validate-cli` for a no-agent smoke against the installed
+Codex parser. This retains every constructed option, substitutes parser help only
+for the free-form prompt, and proves a legacy approval option is rejected. Use
+`--background` or foreground execution for the real isolated role; there is no
+native analysis-role bypass.
 
 ## Start a round
 
@@ -175,7 +181,24 @@ an existing task require a new or revised spec before selection.
   It returns at most one advisory concern. Require the worker to record an
   evidence-based adoption or rejection; an adopted code change consumes the next
   normal cycle. Do not grant extra cycles or replace the final Sol-high PR review.
-- Run `scripts/with_resource_slots.py` around shared builds and game batches.
+- Run every large build or full test through the protected entry mode; callers
+  select their ownership role but cannot select a filename or capacity:
+
+  ```text
+  python3 scripts/with_resource_slots.py --lock-dir <absolute-round-lock-dir> \
+    --large-build-entry worker -- COMMAND...
+  ```
+
+  Reviewers use `--large-build-entry reviewer` and Integrators use
+  `--large-build-entry integrator`. This covers `make`, `make all`, `make test`,
+  `make check`, equivalent full `dotnet`/`msbuild` suites, packaging, and other
+  comparably expensive shared-engine checks. The helper owns the canonical
+  capacity-one lock and complete command-tree lifetime. After the foreground
+  command exits it allows short-lived assigned descendants a bounded grace period,
+  then terminates and reaps persistent build servers before releasing. Do not use
+  direct `flock` or generic `--resource large-build`.
+- Continue to use generic `scripts/with_resource_slots.py` reservations for game
+  batches; games retain independent capacity two.
 - A worker may reserve two game slots for a two-game comparison. Use the existing
   `launch-ai-parallel.py` inside the reservation.
 - Keep every game's support directory, logs, saves, replay, map artifact, port,

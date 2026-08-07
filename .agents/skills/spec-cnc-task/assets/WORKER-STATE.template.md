@@ -267,8 +267,10 @@ After every materially judged full-engine match or paired control batch:
    summaries, and metrics into the role output directory's `inputs/` subtree. In
    that directory, write a strict JSON Commenter job containing only their absolute
    `artifacts` paths, optional `design_reference`, and the absolute `output` path
-   ending in `NARRATIVE.md`. Launch a no-history fresh `commenter` role (Terra 5.6
-   medium). Do not stage source code, this worker state, the task sheet,
+   ending in `NARRATIVE.md`. Launch the fresh `commenter` through the coordinator
+   role launcher; the worker selects only the role and cannot reconstruct or
+   override its pinned Terra 5.6 medium configuration. Do not stage source code,
+   this worker state, the task sheet,
    implementation notes, or inline job-file commentary.
 3. Read its factual `NARRATIVE.md`. Verify cited artifacts/ticks and use it to
    understand exact control differences, causal win/loss sequence, and what the
@@ -282,8 +284,9 @@ After every materially judged full-engine match or paired control batch:
    preferences, the full spec, or desired review conclusions. Write a strict JSON
    job there with exactly the absolute `design_reference`, staged `task_context`,
    staged `narrative`, and `output` paths; output must end in `POLICY-REVIEW.md`.
-   Launch a no-history fresh
-   `policy-reviewer` role (Terra 5.6 medium). Questions embedded in the narrative
+   Launch `policy-reviewer` through the coordinator role launcher; the worker
+   selects only the role and cannot reconstruct or override its pinned Terra 5.6
+   medium configuration. Questions embedded in the narrative
    are the worker's questions to this playtester; the job contains no inline
    context.
 5. Read the `POLICY-REVIEW.md` before choosing the next code change. Treat advice
@@ -365,6 +368,12 @@ port, and display, and judge each run separately. Use concurrent slots for
 materially different scenarios. Return to serial tests if contention corrupts
 timing or evidence. A required full match may exceed 30 minutes while it continues
 making useful progress; stop it when evidence is sufficient or progress stalls.
+
+Route every large build, full `make test`/`make check`, equivalent full
+`dotnet`/`msbuild` suite, and packaging build through the same helper with
+`--large-build-entry worker` and the absolute lock directory above. This protected
+entry owns canonical capacity one; do not supply `--resource large-build`, a
+capacity, a lock filename, an alias, or direct `flock`.
 
 For expensive setup, optionally save shortly before the critical event and reload
 after a logic change. Record the save's commit, config, seed, and tick; reject an
