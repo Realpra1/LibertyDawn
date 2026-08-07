@@ -763,9 +763,17 @@ these ownership/failure boundaries.
   reserved stealth-harvester mission, and <=5% sustained performance comparison.
 - The unrelated global queue-manager `failCount += failCount` zero-backoff bug
   remains out of scope; field placement uses its own bounded retry/defer state.
-- Remove the unused `using OpenRA.Traits` reported by clean Linux `make check`.
-  This is a one-line CI correction, but making it after cycle 20 would violate the
-  task's explicit code-cycle cap.
+
+## Final-review response
+
+The coordinator authorized one final-review response limited to the task-scoped
+Linux IDE0005 failure. The response removed only the unused
+`using OpenRA.Traits` from `BaseBuilderTiberiumFieldManager.cs`; it changes no
+behavior, balance, configuration, or route-gating policy. After `make clean`, the
+locked repository `make check` passed with 0 warnings and 0 errors, including the
+explicit-interface checks. The proportionate filtered
+`TiberiumFieldPolicyTest` verification passed 16/16 on
+`TargetPlatform=unix-generic`. Replacement GitHub checks are pending push.
 
 ## Publication
 
@@ -774,7 +782,8 @@ these ownership/failure boundaries.
 - Proposed status: `First iteration - testing`
 - Product commit: `aa4e97972d8a0cb7f4780babcdffa4fa363c2299`
 - Draft PR: `https://github.com/Realpra1/LibertyDawn/pull/88`
-- GitHub checks: Windows (.NET 6.0) passed; Linux (.NET 6.0) failed clean
-  `make check` on IDE0005 for the unused manager `using`.
+- GitHub checks: the prior Windows (.NET 6.0) check passed and prior Linux
+  (.NET 6.0) check failed clean `make check` on IDE0005; the one-line correction
+  now passes the same clean check locally and replacement PR checks are pending.
 - Final Sol-high review: clear for this explicit handoff status only; route proof
   remains required before completion/release.

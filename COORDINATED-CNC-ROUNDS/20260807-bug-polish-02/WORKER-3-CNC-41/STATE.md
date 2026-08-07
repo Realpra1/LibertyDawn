@@ -27,7 +27,7 @@ when the dependency section directs it.
 - Full-engine game tests completed: `42`
 - Terra cycle code reviews: `cycle 5: advisory concern adopted; red-tree lifecycle configured but unimplemented; cycle 10: advisory concern adopted; completed red enclosure identity, 1500-tick missing-only maintenance, and save/load reconstruction are absent; cycle 15: advisory concern adopted; terminal red segment state is rejected after completed enclosure and before Resonator placement; cycle 20: advisory concern adopted for handoff; real ordinary and reserved-stealth harvester route proof is absent before red activation eligibility`
 - Sol-xhigh policy escalation: `unused (requires at least 10 game tests; one maximum)`
-- PR: `https://github.com/Realpra1/LibertyDawn/pull/88` (draft; Windows passed, Linux failed clean `make check` on one unused using)
+- PR: `https://github.com/Realpra1/LibertyDawn/pull/88` (draft; final-review CI-only response removes the single unused using; replacement checks pending)
 
 ## Integrated repair assignment
 
@@ -1089,3 +1089,17 @@ final Resonator coverage; do not infer policy success from a clean engine exit.
 - Deferred work: implement pre-activation ordinary/refinery/gate round-trip and reserved-stealth route gates; then complete active breach/maintenance/save-load, remote extension, topology, three-tree, Red Dawn, matched payoff, and natural-match validation.
 - Known failures/risks: red activation can become eligible from wall/open-gate presence without required real route proof; Linux CI is red for one unused using; fresh red construction never reached complete active coverage; active maintenance and active-enclosure reload are runtime-unproven; extension stopped after one step; serial infeasible-project starvation remains a hypothesis.
 - Relevant artifact paths: `analysis/worker-3-cnc41/cycle-18-game-20-red-recovery-save/`, `cycle-19-game-21-terminal-reload/`, `cycle-20-game-22-exact-perimeter-reload/`, and `cycle-review-20/CYCLE-REVIEW.md`
+
+## Final-review response receipt
+
+- Scope: authorized single CI-only response for PR #88. Removed the unused
+  `using OpenRA.Traits` reported as IDE0005 in
+  `BaseBuilderTiberiumFieldManager.cs`; no behavior, balance, configuration, or
+  route-gating code changed.
+- Clean Linux reproduction: `make clean`, then locked `make check`, passed with
+  0 warnings and 0 errors, including both explicit-interface validation steps.
+- Proportionate verification: filtered `TiberiumFieldPolicyTest` passed 16/16 on
+  `TargetPlatform=unix-generic`.
+- GitHub receipt: pending push and replacement PR checks.
+- The ordinary/stealth harvester gate-route blocker and every other deferred
+  acceptance gap remain unchanged and explicitly out of this response scope.
