@@ -150,6 +150,7 @@ namespace OpenRA.Mods.Common.Traits
 				var type = BuildingType.Building;
 				CPos? location = null;
 				string orderString = "PlaceBuilding";
+				var fieldPlacement = false;
 
 				// Check if Building is a plug for other Building
 				var actorInfo = world.Map.Rules.Actors[currentBuilding.Item];
@@ -164,6 +165,14 @@ namespace OpenRA.Mods.Common.Traits
 						orderString = "PlacePlug";
 						location = possibleBuilding.Actor.Location + possibleBuilding.Trait.Info.Offset;
 					}
+				}
+				else if (baseBuilder.TiberiumFieldManager != null &&
+					baseBuilder.TiberiumFieldManager.TryGetPlacement(
+						queue.Actor.ActorID, actorInfo.Name, out location, out var fieldLineBuild))
+				{
+					fieldPlacement = true;
+					if (fieldLineBuild)
+						orderString = "LineBuild";
 				}
 				else if (baseBuilder.WallPlanner != null && baseBuilder.WallPlanner.IsWallType(actorInfo.Name))
 				{
@@ -193,6 +202,9 @@ namespace OpenRA.Mods.Common.Traits
 
 				if (location == null)
 				{
+					if (fieldPlacement)
+						baseBuilder.TiberiumFieldManager.PlacementFailed("reserved site became illegal before placement");
+
 					AIUtils.BotDebug($"{player} has nowhere to place {DisplayName(currentBuilding.Item)}");
 					bot.QueueOrder(Order.CancelProduction(queue.Actor, currentBuilding.Item, 1));
 					failCount += failCount;
@@ -217,6 +229,8 @@ namespace OpenRA.Mods.Common.Traits
 						ExtraData = queue.Actor.ActorID,
 						SuppressVisualFeedback = true
 					});
+					if (fieldPlacement)
+						baseBuilder.TiberiumFieldManager.PlacementOrdered();
 
 					return true;
 				}
@@ -432,6 +446,16 @@ namespace OpenRA.Mods.Common.Traits
 				return power;
 			}
 
+			// Field development is discretionary and serialized globally. It is considered only
+			// after opening/refinery/power/repair owners, and it applies its own cash and route gate.
+			var fieldBuilding = baseBuilder.TiberiumFieldManager?.TryChooseBuilding(queue, buildableThings);
+			if (fieldBuilding != null)
+			{
+				AIUtils.BotDebug("{0} decided to build {1}: reserved Tiberium field project",
+					queue.Actor.Owner, DisplayName(fieldBuilding.Name));
+				return fieldBuilding;
+			}
+
 			// Preserve the original random production-building selector when cash is floating.
 			// Smart economy only decides refinery work; all other choices retain authored limits.
 			var availableFunds = Math.Max(0, playerResources.Cash + playerResources.Resources);
@@ -510,6 +534,11 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				var name = frac.Key;
 				if (limitedFractions.ContainsKey(name))
+					continue;
+
+				// An enabled field manager owns every Resonator request so a generic fraction cannot
+				// create an unassigned actor or duplicate a queue reservation.
+				if (baseBuilder.TiberiumFieldManager?.OwnsActorType(name) == true)
 					continue;
 
 				// While a smart AI has no live refinery, every refinery source shares the one

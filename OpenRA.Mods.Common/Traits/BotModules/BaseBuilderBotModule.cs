@@ -108,6 +108,66 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Write fleet-based air repair-capacity decisions to debug.log.")]
 		public readonly bool AirRepairCapacityDebugLogging = false;
 
+		[Desc("Enable bounded one-project-at-a-time development of configured Tiberium blossom trees.")]
+		public readonly bool EnableTiberiumFieldPolicy = false;
+
+		[Desc("Bot types that retain the same BaseBuilder configuration but disable Tiberium field projects for matched controls.")]
+		public readonly HashSet<string> TiberiumFieldExcludedBotTypes = new HashSet<string>();
+
+		[Desc("Actor types treated as durable Tiberium field identities.")]
+		public readonly HashSet<string> TiberiumFieldTreeTypes = new HashSet<string>();
+
+		[Desc("Configured tree types that require containment before Resonator activation.")]
+		public readonly HashSet<string> TiberiumFieldRedTreeTypes = new HashSet<string>();
+
+		[Desc("Ordered Resonator alternatives owned exclusively by the field policy while enabled.")]
+		public readonly string[] TiberiumFieldResonatorTypes = System.Array.Empty<string>();
+
+		[Desc("Ordered ordinary Power Plant alternatives used for remote field extension.")]
+		public readonly string[] TiberiumFieldPowerTypes = System.Array.Empty<string>();
+
+		[Desc("Ordered containment wall alternatives. Do not include mined chain-link walls.")]
+		public readonly string[] TiberiumFieldWallTypes = System.Array.Empty<string>();
+
+		[Desc("Owned stable building types whose accessible edge may anchor a field entrance.")]
+		public readonly string[] TiberiumFieldGateBuildingTypes = System.Array.Empty<string>();
+
+		[Desc("Cells between a red field's contained actors and its perimeter.")]
+		public readonly int TiberiumFieldPerimeterStandoff = 4;
+
+		[Desc("Target useful progress in cells for each necessary Power Plant extension.")]
+		public readonly int TiberiumFieldExtensionStep = 6;
+
+		[Desc("Ticks between bounded live-tree observations.")]
+		public readonly int TiberiumFieldScanInterval = 50;
+
+		[Desc("Ticks between repeated field deferral summaries while the reason is unchanged.")]
+		public readonly int TiberiumFieldProgressLogInterval = 750;
+
+		[Desc("Cells around a tree used to rank observed useful resource demand.")]
+		public readonly int TiberiumFieldDemandRadius = 6;
+
+		[Desc("Ticks between missing-only maintenance scans of active red enclosures.")]
+		public readonly int TiberiumFieldMaintenanceInterval = 1500;
+
+		[Desc("Spendable cash protected from a new discretionary field commitment.")]
+		public readonly int TiberiumFieldProtectedCash = 5000;
+
+		[Desc("Ticks to retain a field queue reservation before production accepts it.")]
+		public readonly int TiberiumFieldReservationTimeout = 750;
+
+		[Desc("Ticks to wait for a placed Resonator to become live and powered.")]
+		public readonly int TiberiumFieldPlacementTimeout = 3000;
+
+		[Desc("Consecutive failed field placements before entering a visible deferred state.")]
+		public readonly int TiberiumFieldMaximumRetries = 3;
+
+		[Desc("Ticks to defer a field project after bounded placement failures.")]
+		public readonly int TiberiumFieldRetryDelay = 1500;
+
+		[Desc("Write bounded field identity, reservation, placement, and coverage transitions to debug.log.")]
+		public readonly bool TiberiumFieldDebugLogging = false;
+
 		[Desc("Production queues AI uses for buildings.")]
 		public readonly HashSet<string> BuildingQueues = new HashSet<string> { "Building" };
 
@@ -341,6 +401,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		internal BaseBuilderWallPlanner WallPlanner { get; private set; }
 		internal BaseBuilderFirstTowerPlanner FirstTowerPlanner { get; private set; }
+		internal BaseBuilderTiberiumFieldManager TiberiumFieldManager { get; private set; }
 
 		readonly World world;
 		readonly Player player;
@@ -393,6 +454,8 @@ namespace OpenRA.Mods.Common.Traits
 			rallyPointManagers = self.Owner.PlayerActor.TraitsImplementing<IBotRallyPointManager>().ToArray();
 			WallPlanner = new BaseBuilderWallPlanner(this, player);
 			FirstTowerPlanner = new BaseBuilderFirstTowerPlanner(this, player);
+			TiberiumFieldManager = new BaseBuilderTiberiumFieldManager(this, player,
+				playerResources, playerPower, resourceLayer);
 			if (Info.EnableSmartEconomy)
 				smartEconomy = new BaseBuilderSmartEconomyManager(this, player, playerResources, unitProduction);
 		}
@@ -521,6 +584,7 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			UpdateOpening(bot);
 			smartEconomy?.Tick(bot);
+			TiberiumFieldManager?.Tick();
 			FirstTowerPlanner.Update();
 			SetRallyPointsForNewProductionBuildings(bot);
 
@@ -988,18 +1052,27 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		// Require at least one refinery, unless we can't build it.
-		public bool HasAdequateRefineryCount =>
-			!Info.RefineryTypes.Any() ||
-			AIUtils.CountBuildingByCommonName(Info.RefineryTypes, player) > 0 ||
-			AIUtils.CountBuildingByCommonName(Info.PowerTypes, player) == 0 ||
-			AIUtils.CountBuildingByCommonName(Info.ConstructionYardTypes, player) == 0;
+		public bool HasAdequateRefineryCount
+		{
+			get
+			{
+				// Smart-economy profiles must use the actual unloading refinery set so an
+				// authored Resonator alias cannot satisfy core recovery. Preserve the original
+				// common-name behavior for every profile that does not enable smart economy.
+				var refineryTypes = Info.EnableSmartEconomy ? SmartEconomyRefineryTypes : Info.RefineryTypes;
+				return !refineryTypes.Any() ||
+					AIUtils.CountBuildingByCommonName(refineryTypes, player) > 0 ||
+					AIUtils.CountBuildingByCommonName(Info.PowerTypes, player) == 0 ||
+					AIUtils.CountBuildingByCommonName(Info.ConstructionYardTypes, player) == 0;
+			}
+		}
 
 		List<MiniYamlNode> IGameSaveTraitData.IssueTraitData(Actor self)
 		{
 			if (IsTraitDisabled)
 				return null;
 
-			return new List<MiniYamlNode>()
+			var data = new List<MiniYamlNode>()
 			{
 				new MiniYamlNode("InitialBaseCenter", FieldSaver.FormatValue(initialBaseCenter)),
 				new MiniYamlNode("DefenseCenter", FieldSaver.FormatValue(defenseCenter)),
@@ -1039,6 +1112,11 @@ namespace OpenRA.Mods.Common.Traits
 				new MiniYamlNode("SmartEconomyCashPressureActive", FieldSaver.FormatValue(smartEconomy?.CashPressure.Active ?? false)),
 				new MiniYamlNode("FirstTowerPlacementComplete", FieldSaver.FormatValue(FirstTowerPlanner.Complete))
 			};
+			var fieldState = TiberiumFieldManager?.IssueTraitData();
+			if (fieldState != null)
+				data.Add(fieldState);
+
+			return data;
 		}
 
 		void IGameSaveTraitData.ResolveTraitData(Actor self, List<MiniYamlNode> data)
@@ -1163,6 +1241,8 @@ namespace OpenRA.Mods.Common.Traits
 			var firstTowerNode = data.FirstOrDefault(n => n.Key == "FirstTowerPlacementComplete");
 			if (firstTowerNode != null)
 				FirstTowerPlanner.Complete = FieldLoader.GetValue<bool>("FirstTowerPlacementComplete", firstTowerNode.Value.Value);
+
+			TiberiumFieldManager?.ResolveTraitData(data);
 		}
 	}
 }

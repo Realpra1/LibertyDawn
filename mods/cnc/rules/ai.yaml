@@ -872,6 +872,17 @@ Player:
     BaseBuilderBotModule@brutalis:
 		RequiresCondition: enable-brutalis-ai || enable-wavemaker-ai
 		EnableSmartEconomy: true
+		EnableTiberiumFieldPolicy: true
+		TiberiumFieldTreeTypes: split2, split3, splitblue, splitred
+		TiberiumFieldRedTreeTypes: splitred
+		TiberiumFieldResonatorTypes: resonator
+		TiberiumFieldPowerTypes: nuk2, nuke
+		TiberiumFieldWallTypes: brik, sbag
+		TiberiumFieldGateBuildingTypes: fix, nuk2, nuke, proc, silo, pyle, hand, weap, afld, fact
+		TiberiumFieldPerimeterStandoff: 4
+		TiberiumFieldExtensionStep: 6
+		TiberiumFieldMaintenanceInterval: 1500
+		TiberiumFieldDebugLogging: true
 		SmartEconomyRefineryTypes: proc
 		SmartEconomyMcvTypes: mcv
 		SmartEconomyDebugLogging: false
@@ -1579,6 +1590,17 @@ Player:
     BaseBuilderBotModule@ironreaper:
 		RequiresCondition: enable-ironreaper-ai
 		EnableSmartEconomy: true
+		EnableTiberiumFieldPolicy: true
+		TiberiumFieldTreeTypes: split2, split3, splitblue, splitred
+		TiberiumFieldRedTreeTypes: splitred
+		TiberiumFieldResonatorTypes: resonator
+		TiberiumFieldPowerTypes: nuk2, nuke
+		TiberiumFieldWallTypes: brik, sbag
+		TiberiumFieldGateBuildingTypes: fix, nuk2, nuke, proc, silo, pyle, hand, weap, afld, fact
+		TiberiumFieldPerimeterStandoff: 4
+		TiberiumFieldExtensionStep: 6
+		TiberiumFieldMaintenanceInterval: 1500
+		TiberiumFieldDebugLogging: true
 		SmartEconomyRefineryTypes: proc
 		SmartEconomyMcvTypes: mcv
 		SmartEconomyDebugLogging: false
