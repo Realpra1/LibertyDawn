@@ -60,6 +60,12 @@ do not escape the boundary to investigate it yourself.
    waiting indefinitely or blaming the current policy for a missing trigger.
 6. Recommend policy-level changes and next tests, not source files or code edits.
    Prefer a few prioritized, falsifiable recommendations over a long wish list.
+   Keep recommendations inside the change boundary stated by the narrative. For
+   a balance-only or other non-AI change, treat altered AI composition/outcomes as
+   emergent evidence: recommend balance-scoped tuning and discriminating games,
+   not new AI production, targeting, retreat, or squad policy. Record a suspected
+   AI-policy problem as separate follow-up work unless the supplied change itself
+   changed that policy.
 
 ## Output
 
