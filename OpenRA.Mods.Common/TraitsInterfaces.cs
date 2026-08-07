@@ -127,9 +127,25 @@ namespace OpenRA.Mods.Common.Traits
 		void Demolish(Actor self, Actor saboteur, int delay, BitSet<DamageType> damageTypes, DemolitionSafety safety);
 	}
 
+	public readonly struct AdaptiveKillEvidence
+	{
+		public readonly Player SpecialistPlayer;
+		public readonly string SpecialistType;
+		public readonly uint SpecialistId;
+		public readonly int EconomicValue;
+
+		public AdaptiveKillEvidence(Player specialistPlayer, string specialistType, uint specialistId, int economicValue)
+		{
+			SpecialistPlayer = specialistPlayer;
+			SpecialistType = specialistType;
+			SpecialistId = specialistId;
+			EconomicValue = economicValue;
+		}
+	}
+
 	public interface IAdaptiveKillValue
 	{
-		int? GetAdaptiveKillValue(Actor self, Actor attacker);
+		AdaptiveKillEvidence? GetAdaptiveKillValue(Actor self, Actor attacker);
 	}
 
 	// Type tag for crush class bits

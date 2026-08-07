@@ -33,6 +33,9 @@ namespace OpenRA.Mods.Common.Traits
 		class DemolishAction
 		{
 			public readonly Actor Saboteur;
+			public readonly Player SpecialistPlayer;
+			public readonly string SpecialistType;
+			public readonly uint SpecialistId;
 			public readonly int Token;
 			public int Delay;
 			public readonly BitSet<DamageType> DamageTypes;
@@ -42,6 +45,9 @@ namespace OpenRA.Mods.Common.Traits
 				DemolitionSafety safety)
 			{
 				Saboteur = saboteur;
+				SpecialistPlayer = saboteur.Owner;
+				SpecialistType = saboteur.Info.Name;
+				SpecialistId = saboteur.ActorID;
 				Delay = delay;
 				Token = token;
 				DamageTypes = damageTypes;
@@ -66,10 +72,13 @@ namespace OpenRA.Mods.Common.Traits
 			return !IsTraitDisabled;
 		}
 
-		int? IAdaptiveKillValue.GetAdaptiveKillValue(Actor self, Actor attacker)
+		AdaptiveKillEvidence? IAdaptiveKillValue.GetAdaptiveKillValue(Actor self, Actor attacker)
 		{
-			return resolvingAction?.Saboteur == attacker && self.Info.HasTraitInfo<BuildingInfo>() ?
-				self.GetSellValue() : (int?)null;
+			if (resolvingAction?.Saboteur != attacker || !self.Info.HasTraitInfo<BuildingInfo>())
+				return null;
+
+			return new AdaptiveKillEvidence(resolvingAction.SpecialistPlayer, resolvingAction.SpecialistType,
+				resolvingAction.SpecialistId, self.GetSellValue());
 		}
 
 		void IDemolishable.Demolish(Actor self, Actor saboteur, int delay, BitSet<DamageType> damageTypes,

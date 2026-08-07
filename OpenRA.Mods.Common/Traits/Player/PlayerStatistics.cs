@@ -429,19 +429,21 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				attackerStats.KillsCost += cost;
 
-				int? specialistValue = null;
+				AdaptiveKillEvidence? specialistEvidence = null;
 				foreach (var adaptiveKillValue in adaptiveKillValues)
 				{
-					specialistValue = adaptiveKillValue.GetAdaptiveKillValue(self, e.Attacker);
-					if (specialistValue.HasValue)
+					specialistEvidence = adaptiveKillValue.GetAdaptiveKillValue(self, e.Attacker);
+					if (specialistEvidence.HasValue)
 						break;
 				}
 
-				if (specialistValue.HasValue)
+				if (specialistEvidence.HasValue)
 				{
-					var delta = CompletedSpecialistOutcome.Record(e.Attacker.Owner, e.Attacker.Info.Name, specialistValue.Value);
-					CompletedSpecialistOutcome.WriteLog(self.World, "building-demolition", e.Attacker.Info.Name,
-						e.Attacker.ActorID, e.Attacker.Owner, self.Info.Name, self.ActorID, self.Owner.InternalName,
+					var evidence = specialistEvidence.Value;
+					var delta = CompletedSpecialistOutcome.Record(evidence.SpecialistPlayer, evidence.SpecialistType,
+						evidence.EconomicValue);
+					CompletedSpecialistOutcome.WriteLog(self.World, "building-demolition", evidence.SpecialistType,
+						evidence.SpecialistId, evidence.SpecialistPlayer, self.Info.Name, self.ActorID, self.Owner.InternalName,
 						"direct-sell-value", null, true, delta);
 				}
 				else
