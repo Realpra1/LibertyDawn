@@ -1,7 +1,7 @@
 # Coordinated CNC State
 
 - Round ID: `20260807-bug-polish-02`
-- Phase: `worker 1 claimed; task reader 2 pending`
+- Phase: `workers 1-2 claimed; task reader 3 pending`
 - Common base branch: `agent/cnc-20260806-bug-polish-01-release`
 - Common base SHA: `419bee2531d4802bf922c3597b42c6eeb75ab250`
 - Coordinator model: `gpt-5.6-sol` / `high` (trial mismatch explicitly accepted by user)
@@ -11,7 +11,7 @@
 - Lock directory: `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260807-bug-polish-02/locks`
 - Prior release: [product PR #84](https://github.com/Realpra1/LibertyDawn/pull/84)
   at RC4 task-status head `419bee2531d4`, intentionally unmerged; local gates
-  passed and final-head CI was still completing when this round began
+  and exact-head Linux/Windows CI passed
 - Release candidate: `none`
 - Release PR: `none`
 
@@ -20,7 +20,7 @@
 | Worker | Task | Branch | Worktree | State | Process/result | PR | Review | Integrated status |
 |---|---|---|---|---|---|---|---|---|
 | 1 | CNC-87 Repair coordinated external-role launching and large-build enforcement | | | claimed at `2026-08-07T04:57:21Z`; packet `COORDINATED-CNC-ROUNDS/20260807-bug-polish-02/TASK-PACKET-1.md` | `roles/task-reader-1/process.json` complete 0 | | | |
-| 2 | unassigned | | | | | | | |
+| 2 | CNC-40 Adaptive specialists | | | claimed at `2026-08-07T04:58:59Z`; packet `COORDINATED-CNC-ROUNDS/20260807-bug-polish-02/TASK-PACKET-2.md` | `roles/task-reader-2/process.json` complete 0 | | | |
 | 3 | unassigned | | | | | | | |
 | 4 | unassigned | | | | | | | |
 | 5 | unassigned | | | | | | | |
