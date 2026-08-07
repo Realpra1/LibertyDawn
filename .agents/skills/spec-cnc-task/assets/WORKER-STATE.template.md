@@ -157,6 +157,16 @@ game evidence while accumulating unit-only confidence. Keep available game slots
 working while other agents code or analyze because simulation is cheaper than
 missing human feedback.
 
+When a required situation is rare, construct it deliberately in a full-engine
+custom map while keeping ordinary AIs and every relevant normal module enabled.
+For example, pre-place a damaged or healthy capturable building and enough
+engineers to force the one-versus-two-engineer decision. Use the setup for direct
+causal proof, then seek natural-match evidence when the event is reasonably
+reachable. If natural occurrence depends on unfinished prerequisite behavior
+(such as an APC/transport delivery task), record that dependency and required
+future revalidation instead of wasting cycles waiting for an event the current
+build seldom creates or treating its absence as failure of this task.
+
 For every change to AI strategy, priorities, economy, production, targeting,
 recovery, or tactics, compare against old behavior repeatedly throughout the loop.
 Prefer a same-build feature-disabled control. If unavailable, run the recorded
