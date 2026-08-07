@@ -7,6 +7,7 @@
 - Exact combined RC2 code candidate: `b456fd89fac88d71dfadd65c47cfb7b409d44122`
 - Release target: `bleed`
 - Original release PR: https://github.com/Realpra1/LibertyDawn/pull/82
+- Successor draft release PR: https://github.com/Realpra1/LibertyDawn/pull/84
 
 ## Live release-PR state
 
@@ -17,7 +18,8 @@ Its merged head was the partial RC1 receipt commit
 `0057dd25868e1cc6f7a3ba406062caa05eca2406`. A merged PR cannot be updated in
 place. The stable branch was therefore synchronized with that exact target commit
 using a no-content merge before adding RC2, so a successor draft PR can contain
-only the cumulative work not already present in `bleed`.
+only the cumulative work not already present in `bleed`. Draft PR #84 now carries
+the same stable branch forward for the remaining RC/test rounds.
 
 ## Source verification
 
