@@ -1,7 +1,7 @@
 # Coordinated CNC State
 
 - Round ID: `20260807-bug-polish-02`
-- Phase: `all five task handoffs reviewed and CI-clean; launching integration RC1`
+- Phase: `Sol-high integrator active; constructing RC1 from five reviewed heads`
 - Common base branch: `agent/cnc-20260806-bug-polish-01-release`
 - Common base SHA: `419bee2531d4802bf922c3597b42c6eeb75ab250`
 - Coordinator model: `gpt-5.6-sol` / `high` (trial mismatch explicitly accepted by user)
@@ -16,6 +16,7 @@
   and exact-head Linux/Windows CI passed
 - Release candidate: `none`
 - Release PR: `none`
+- Integrator: `roles/integrator/process.json` supervisor PID `937153`
 
 ## Workers
 
