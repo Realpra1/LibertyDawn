@@ -258,6 +258,22 @@ namespace OpenRA.Mods.Common.Traits
 	}
 
 	[RequireExplicitImplementation]
+	public interface INotifyHarvesterUnload
+	{
+		void UnloadStarted(Actor self, Actor refinery);
+		void UnloadCompleted(Actor self, Actor refinery);
+		void UnloadAborted(Actor self, Actor refinery);
+	}
+
+	public interface IHarvesterFieldStation
+	{
+		bool HasPendingField { get; }
+		CPos PendingField { get; }
+		bool HasCommittedField { get; }
+		CPos CommittedField { get; }
+	}
+
+	[RequireExplicitImplementation]
 	public interface INotifyUnload
 	{
 		void Unloading(Actor self);
@@ -504,6 +520,11 @@ namespace OpenRA.Mods.Common.Traits
 		bool CanEnterTargetNow(Actor self, in Target target);
 	}
 
+	public interface IMobileCellValidator
+	{
+		bool IsValidCell(Actor self, CPos cell);
+	}
+
 	public interface IWrapMove
 	{
 		Activity WrapMove(Activity moveInner);
@@ -590,6 +611,14 @@ namespace OpenRA.Mods.Common.Traits
 		void RequestUnitProduction(IBot bot, string requestedActor);
 		void CancelRequestedUnitProduction(IBot bot, string requestedActor);
 		int RequestedProductionCount(IBot bot, string requestedActor);
+	}
+
+	[RequireExplicitImplementation]
+	public interface IBotRequestOwnedUnitProduction
+	{
+		void RequestUnitProduction(IBot bot, string requestOwner, string requestedActor);
+		void CancelRequestedUnitProduction(IBot bot, string requestOwner, string requestedActor);
+		int RequestedProductionCount(IBot bot, string requestOwner, string requestedActor);
 	}
 
 	[RequireExplicitImplementation]

@@ -183,10 +183,14 @@ namespace OpenRA.Mods.Common.Traits
 				}
 				else
 				{
-					if (baseBuilder.FirstTowerPlanner.AppliesTo(actorInfo.Name))
+					var economySamPlacement = baseBuilder.OwnsEconomyDefenseSam(queue, actorInfo.Name);
+					if (economySamPlacement)
+						location = baseBuilder.EconomyDefenseSamLocation(queue, currentBuilding.Item, actorInfo,
+							actorInfo.TraitInfo<BuildingInfo>(), true);
+					else if (baseBuilder.FirstTowerPlanner.AppliesTo(actorInfo.Name))
 						location = baseBuilder.FirstTowerPlanner.ChooseLocation(actorInfo, actorInfo.TraitInfo<BuildingInfo>());
 
-					if (location == null)
+					if (location == null && !economySamPlacement)
 					{
 						// Check if Building is a defense and if we should place it towards the enemy or not.
 						if (actorInfo.HasTraitInfo<AttackBaseInfo>() && world.LocalRandom.Next(100) < baseBuilder.Info.PlaceDefenseTowardsEnemyChance)
@@ -387,6 +391,17 @@ namespace OpenRA.Mods.Common.Traits
 				}
 
 				return null;
+			}
+
+			// Once the authored opening and power prerequisites are satisfied, an uncovered
+			// economy anchor may reserve one normal SAM build. Existing powered overlapping
+			// coverage and a single in-flight reservation suppress duplicate sites.
+			var economySam = baseBuilder.EconomyDefenseSamBuilding(queue, buildableThings);
+			if (economySam != null)
+			{
+				AIUtils.BotDebug("{0} decided to build {1}: uncovered economy air approach",
+					queue.Actor.Owner, DisplayName(economySam.Name));
+				return economySam;
 			}
 
 			// Next is to build up a strong economy

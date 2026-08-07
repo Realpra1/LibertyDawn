@@ -62,6 +62,33 @@ Player:
 	GrantConditionOnBotOwner@Easiest:
 		Condition: enable-Easiest-ai
 		Bots: Easiest
+	EconomyFieldDefenseBotModule:
+		RequiresCondition: enable-brutalis-ai || enable-ironreaper-ai
+		RequiredPrerequisites: upgrade.economy2
+		HarvesterTypes: harv, sharv
+		TankTypes: mtnk
+		InfantryTypes: e1
+		AntiAirTypes: msam
+		AvoidResourceTypes: Tiberium, BlueTiberium, RedTiberium
+		TanksPerHarvester: 1
+		InfantryPerHarvester: 2
+		AntiAirPerHarvester: 1
+		ScanInterval: 25
+		OrderInterval: 25
+		StationMinimumRadiusCells: 2
+		StationMaximumRadiusCells: 6
+		FormationToleranceCells: 1
+		EngagementLeashCells: 8
+		RefineryLaneLengthCells: 7
+		RefineryLaneHalfWidthCells: 1
+		MaximumRouteCells: 96
+		ResourceSafetyMarginCells: 2
+		ResourceModifierSafetyMarginCells: 1
+		RouteStallTicks: 250
+		RouteRetryTicks: 250
+		MaximumCandidatesPerRole: 48
+		MaximumOutstandingRequestsPerRole: 2
+		DebugLogging: false
 	EconomyArtilleryBotModule:
 		RequiresCondition: enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai
 		RequiredPrerequisites: upgrade.economy2
@@ -923,6 +950,20 @@ Player:
         MinBaseRadius: 6
         MaxBaseRadius: 49
         MaximumDefenseRadius: 49
+		EconomyDefenseBotTypes: brutalis
+		EconomyDefensePrerequisites: upgrade.economy2
+		EconomyDefenseSamTypes: sam
+		EconomyDefenseRefineryTypes: proc
+		EconomyDefenseResonatorTypes: resonator
+		EconomyDefenseSiloTypes: silo
+		EconomyDefenseMaximumSamSites: 4
+		EconomyDefenseSamMinimumRadius: 2
+		EconomyDefenseSamMaximumRadius: 8
+		EconomyDefenseSamCoverageMarginCells: 2
+		EconomyDefenseRefineryLaneLengthCells: 7
+		EconomyDefenseRefineryLaneHalfWidthCells: 1
+		EconomyDefenseUsedSiloThresholdPercent: 25
+		EconomyDefenseSamDebugLogging: false
         PlaceDefenseTowardsEnemyChance: 90
         PlaceAsDefenses: nuke, hand, pyle, weap, afld, proc
         PlaceAsDefenseChance: 33
@@ -1639,6 +1680,20 @@ Player:
         MinBaseRadius: 6
         MaxBaseRadius: 49
         MaximumDefenseRadius: 49
+		EconomyDefenseBotTypes: ironreaper
+		EconomyDefensePrerequisites: upgrade.economy2
+		EconomyDefenseSamTypes: sam
+		EconomyDefenseRefineryTypes: proc
+		EconomyDefenseResonatorTypes: resonator
+		EconomyDefenseSiloTypes: silo
+		EconomyDefenseMaximumSamSites: 4
+		EconomyDefenseSamMinimumRadius: 2
+		EconomyDefenseSamMaximumRadius: 8
+		EconomyDefenseSamCoverageMarginCells: 2
+		EconomyDefenseRefineryLaneLengthCells: 7
+		EconomyDefenseRefineryLaneHalfWidthCells: 1
+		EconomyDefenseUsedSiloThresholdPercent: 25
+		EconomyDefenseSamDebugLogging: false
         PlaceDefenseTowardsEnemyChance: 90
 		ConstructionYardTypes: fact
 		RefineryTypes: proc, resonator
