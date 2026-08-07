@@ -17,22 +17,22 @@ when the dependency section directs it.
 - Cycle budget: `20` isolated code-change cycles
 - Cycles used: `2`
 - Game/build lock directory: `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260806-bug-polish-01/locks`
-- Game capacity: `2`
+- Game capacity: `3` (RC2 trial retained)
 - Large-build capacity: `1`
 - Task report: `/root/github/LibertyDawn/COORDINATED-CNC-ROUNDS/20260806-bug-polish-01/WORKER-4-CNC-43A/REPORT.md`
 - Match-analysis directory: `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260806-bug-polish-01/analysis/worker-4-cnc-43a`
 - Liberty Dawn design reference: `.agents/references/LIBERTY-DAWN-DESIGN.md`
-- Full-engine game tests completed: `40` (including labeled diagnostic/invalid runs that advanced far enough to expose evidence; four tick-0 packaging failures excluded)
+- Full-engine game tests completed: `45` (including labeled diagnostic/invalid runs that advanced far enough to expose evidence; the RC2 GNU-time wrapper failure and four earlier tick-0 packaging failures excluded)
 - Sol-xhigh policy escalation: `unused (requires at least 10 game tests; one maximum)`
 - PR: `#79 https://github.com/Realpra1/LibertyDawn/pull/79`
 
 ## Integrated repair assignment
 
-- Phase: `isolated implementation`
-- Current release branch/head: `not assigned`
-- Integration notes: `not assigned`
-- Repair branch: `not assigned`
-- Repair PR base: `not assigned`
+- Phase: `integrated RC2 validation complete`
+- Current release branch/head: `agent/cnc-20260806-bug-polish-01-release` / `fd15540ffc98c70f085688fe0b38a4a6341fc6ed`
+- Integration notes: `code candidate b456fd89fac88d71dfadd65c47cfb7b409d44122; draft PR #84`
+- Repair branch: `agent/round-20260806-cnc43a-rc2-repair`
+- Repair PR base: `agent/cnc-20260806-bug-polish-01-release` at `fd15540ffc98c70f085688fe0b38a4a6341fc6ed`
 - Integrated cycles used this RC: `0/3`
 - Integrated cycles used total: `0/12`
 
@@ -861,3 +861,97 @@ Review response (no product/code cycle): the response added bounded analysis-map
 - Deferred work: multi-seed/replay-derived attack, route, and withdrawal policy study; AI production/target retuning remains explicitly out of scope, while terminal winner/economy/force capture is now complete
 - Known failures/risks: three geographically separated FTNK remained unengaged at the Mammoth hold bound, but all six Mammoths survived with 536480 changed aggregate HP after killing 14/17; the earlier concentrated Mammoth harness was invalidated because death-chain geometry reversed both changed and control
 - Relevant artifact paths: `analysis/worker-4-cnc-43a/{final-resolved-cycle2,final-literal-v1,true-tanks-v1,natural-v1,natural-terminal-v2,save-load-v1,defense-v1,mtnk-isolated}` and task report
+
+## Integrated RC2 assignment
+
+- Test the exact cumulative candidate fd15540ffc98c70f085688fe0b38a4a6341fc6ed
+  (code candidate b456fd89fac88d71dfadd65c47cfb7b409d44122, draft PR #84)
+  from repair branch agent/round-20260806-cnc43a-rc2-repair.
+- This is the combined release-testing phase. Preserve the original task contract
+  and judge whether that task still works when all five reviewed changes coexist.
+- Use full-engine headless MAX simulations from the first behavioral test. Make
+  every test adversarial, use materially different scenarios, and compare against
+  old/control behavior whenever that is informative. Isolate every support dir,
+  log, replay, port, display, and map artifact.
+- The shared game resource has a trial capacity of three. Use
+  with_resource_slots.py with resource game, capacity 3, and the common round lock
+  directory. Record elapsed time, peak RSS, completion reliability, and whether
+  three-way concurrency should be retained or reduced to two.
+- Run at most three integrated code-change cycles. A cycle boundary is a product
+  code change; one cycle may include up to two games when needed. If relevant
+  combined evidence passes, stop without inventing a change. If a failure requires
+  repair, keep it strictly within this task, commit and push this repair branch,
+  rerun affected evidence, and record the exact repair head for the integrator.
+- The original task's balance authority is unchanged. Do not alter balance outside
+  an exact authorization already present in this state, and never tune values to
+  manufacture a better result.
+- Continue using the existing Commenter and Policy Reviewer workflow for materially
+  judged AI matches. Finish by updating this state/report with the exact candidate,
+  scenarios, controls, artifacts, results, cycle count, resource measurements, and
+  one of: combined pass/no repair, or reviewed repair head ready to merge.
+
+## Integrated RC2 handoff receipt
+
+- Result: `combined pass / no repair`. Exact candidate
+  `fd15540ffc98c70f085688fe0b38a4a6341fc6ed` (code candidate
+  `b456fd89fac88d71dfadd65c47cfb7b409d44122`) was tested from assignment head
+  `a207f21d44e94d628fe5dc31c76a96f7b27962bf`; the assignment commit differs
+  from the candidate only in this worker state.
+- Integrated code-change cycles: `0/3` this RC and `0/12` total. No product,
+  balance, AI, map, or diagnostic repair was made.
+- Static/build result: `make test` passed Release with 0 warnings and 0 errors,
+  CNC MiniYAML/default-sequence/all-map validation passed, and `git diff --check`
+  passed. Candidate resolved FTNK, BigFlamer, `^FlametankExplode`, Flamethrower,
+  Chemspray, BigChem, and Napalm outputs were byte-identical to the saved final
+  isolated outputs. Their SHA-256 values were respectively
+  `839e903bd90c2d30522384e82f70fdc1417e2b38c154f3d7b09857fcb42c6fbc`,
+  `5f7ebb0a0ef5f4ba29da74005c9ded30a606a52548848af6113235b17cc0b910`,
+  `fe8b8a696800d9b4c67c063676d6275e0e47bb5bdb7cb61036d7cc93cabe3c95`,
+  `9fbc068b731a9037d19edd438b1677ddcd82d4de81231502d91cc1e9d1297965`,
+  `7c3813da6402070d0e3058e44f3e83d7436a7d86ee0682b7082977058b41ef69`,
+  `16dde188f82de50d3960ea1128b9b2b86472e256b80e80cc60d84848bfa4b706`,
+  and `7caa5605bcf62168c36050059df13cf199596bc152c0426cbd4e4ac2854b3274`.
+- Three-way full-engine batch: literal seed 43001, isolated Medium Tank seed
+  43013, and defense/range/air seed 43021 all passed under three reserved game
+  slots. Literal evidence again showed fresh FTNK 36,000 HP, Heavy 5,544 over
+  14 hits, exact five-class totals 25,200/30,240/30,240/17,640/5,040, and
+  death collision 1,991/9. Three Medium Tanks beat four equal-credit FTNK with
+  two survivors and 64,654 aggregate HP. The fixed defense left the objective
+  untouched at 110,000 HP with zero hits while two FTNK survived.
+- Concurrency result: 3/3 games completed cleanly in 10.176 seconds; batch
+  throughput was 392.478 valid ticks/s. The 0.1-second `/proc` sampler observed
+  1,871,232 KiB peak aggregate process-tree RSS, 891,476 KiB peak member RSS,
+  and 13 processes. Retain capacity three: the trial had clean isolation,
+  reliable completion, and no timing corruption. The unavailable GNU `time`
+  wrapper failed before launching a game and is excluded from the game count.
+- Natural matched pair: on terminal-instrumented Empire Earth4 map SHA-256
+  `a4af116d7c1ce9d7f5de07b13ebd4251a7cb0723bfa59a5cb8d4f422e66a33bb`,
+  seed 43033, both candidate and pinned control
+  `09ccdac3c1ecb5134a4751f2bcbd8a7970dfe6bf` reached natural game over with
+  SkyNet defeating Brutalis. Candidate terminal defeat was tick 24,828 versus
+  control 25,442. Candidate observed 24 FTNK creations at 36,000 HP, 18 first
+  damage events, nine kills, and 14 terminal FTNK; control observed 47 at
+  30,000 HP, 35 first damage events, 15 kills, and 34 terminal FTNK. Heavy Tanks
+  and MLRS killed FTNK in both runs. Adaptive composition and different terminal
+  times prevent causal attribution of the 614-tick difference.
+- Natural resource result: candidate completed in 130.299 seconds at 191.958
+  valid ticks/s with 1,619,768 KiB peak tree RSS; control completed in 144.499
+  seconds at 173.195 valid ticks/s with 1,583,324 KiB peak tree RSS. The board
+  trajectories diverged, so these figures show reliable execution and no
+  obvious regression, not a balance-caused performance improvement.
+- Role feedback: `analysis/worker-4-cnc-43a/rc2-concurrency-v1/` reconstructed
+  the focused facts and correctly limited policy claims without a fresh control.
+  That recommendation inspired the matched natural pair at
+  `analysis/worker-4-cnc-43a/rc2-natural-pair-v1/`. Its Commenter called the
+  pair usable with a terminal-tick/summary caveat; its Policy Reviewer returned
+  `insufficient evidence; high confidence` for attributing the earlier win to
+  FTNK durability. That causal limit is accepted. Its requests for repeated
+  Heavy Tank/MLRS counter checks are already covered by the original multi-seed
+  counter suite and the clean RC2 Medium Tank and defense reruns; AI retuning
+  remains forbidden and no task-scoped repair is indicated.
+- Scope/dependency result: the named CNC-43 commit `4f36851179` was rechecked.
+  Its MCV/FACT/world locomotor changes remain disjoint from FTNK and BigFlamer;
+  the cumulative candidate preserves both without semantic overlap.
+- Ignored artifacts: `analysis/worker-4-cnc-43a/{rc2-concurrency-v1,rc2-natural-v1,rc2-natural-control-v1,rc2-natural-pair-v1}`.
+  The bounded process-tree sampler is retained only as ignored analysis tooling;
+  no product diagnostics or test-map references were added.

@@ -2,7 +2,7 @@
 
 ## Status
 
-Complete - testing after 2 of 20 isolated code cycles and 40 completion-worthy full-engine games. Four tick-0 custom-map/save staging failures are documented in ignored evidence but excluded from the game count because they never exercised gameplay.
+Complete - testing after 2 of 20 isolated code cycles, 0 integrated RC2 code cycles, and 45 completion-worthy full-engine games. The RC2 GNU-time wrapper failure and four earlier tick-0 custom-map/save staging failures are documented in ignored evidence but excluded because they never exercised gameplay.
 
 Task branch: `agent/round-20260806-cnc43a-flame-tank-balance`
 
@@ -140,3 +140,53 @@ CNC-43 PR #78 (`agent/round-20260806-cnc43-mcv-crush-flavor`, product commit `4f
 ## Publication
 
 Individual PR: [#79](https://github.com/Realpra1/LibertyDawn/pull/79), against `agent/cnc38-early-viki-infantry-rush`. At tested head `bcff2af985a3fbc205a0d8b4e03c9cc4ee0dc03d`, GitHub reported `MERGEABLE/CLEAN`. The assigned base branch is unprotected and GitHub reported no required checks, no check rollup, and no workflow runs after polling; final local `make test` is green. This receipt update is documentation-only. Do not merge this task PR directly.
+
+## Integrated RC2 combined validation
+
+Result: **combined pass / no repair** for exact cumulative candidate
+`fd15540ffc98c70f085688fe0b38a4a6341fc6ed` (code candidate
+`b456fd89fac88d71dfadd65c47cfb7b409d44122`, draft PR #84), tested from
+`agent/round-20260806-cnc43a-rc2-repair` assignment head
+`a207f21d44e94d628fe5dc31c76a96f7b27962bf`. No product code/config, AI,
+balance, map, or diagnostic change was needed; integrated cycle use is 0/3 for
+RC2 and 0/12 total.
+
+- `make test` passed Release with 0 warnings/0 errors and all CNC YAML,
+  sequence, and map checks. `git diff --check` passed. Resolved FTNK,
+  BigFlamer, death explosion, Flamethrower, Chemspray, BigChem, and Napalm were
+  byte-identical to the saved final isolated outputs.
+- A three-job candidate batch ran literal seed 43001, equal-credit Medium Tank
+  seed 43013, and fixed defense/range/air seed 43021 concurrently. All 3/3
+  passed. Literal values remained 36,000 HP, Heavy burst 5,544/14 hits, exact
+  non-Heavy totals 25,200/30,240/30,240/17,640/5,040, and unchanged death
+  collision 1,991/9. Three Medium Tanks beat four FTNK with two survivors and
+  64,654 HP. Fixed defense kept the 110,000-HP objective untouched with zero
+  hits while two FTNK survived.
+- Three-way execution completed in 10.176 seconds at 392.478 valid ticks/s,
+  with 1,871,232 KiB peak process-tree RSS, 891,476 KiB peak member RSS, and
+  13 processes. The three-slot capacity should be retained: isolation and
+  completion were clean with no timing corruption.
+- A fresh matched natural Empire Earth4 pair used map SHA-256
+  `a4af116d7c1ce9d7f5de07b13ebd4251a7cb0723bfa59a5cb8d4f422e66a33bb`,
+  seed 43033, identical slots/bots/factions/cash, and pinned control
+  `09ccdac3c1ecb5134a4751f2bcbd8a7970dfe6bf`. SkyNet won both: candidate
+  terminal defeat tick 24,828, control 25,442. Candidate observed 24 FTNK at
+  36,000 HP (18 first-damaged, nine killed, 14 terminal); control observed 47
+  at 30,000 HP (35 first-damaged, 15 killed, 34 terminal). Heavy Tanks and MLRS
+  killed FTNK in both games. Adaptive trajectories and different terminal
+  inventories make the 614-tick difference non-causal evidence.
+- Candidate/control natural runs took 130.299/144.499 seconds and peaked at
+  1,619,768/1,583,324 KiB process-tree RSS. These establish reliable execution
+  and no obvious slowdown, not a performance claim from divergent combat.
+- Fresh role outputs are under
+  `analysis/worker-4-cnc-43a/{rc2-concurrency-v1,rc2-natural-v1,rc2-natural-pair-v1}`.
+  The paired Commenter found usable matched evidence. The paired Policy Reviewer
+  judged causal strategic attribution `insufficient evidence; high confidence`;
+  this limit is accepted. Its requested focused Heavy Tank/MLRS checks are
+  covered by the original multi-seed suite plus the clean RC2 Medium Tank and
+  defense reruns. AI production/target/retreat changes remain out of scope.
+- CNC-43 commit `4f36851179` was rechecked before handoff; its MCV/FACT/world
+  locomotor edits are disjoint from FTNK/BigFlamer and coexist cleanly.
+- Raw logs, manifests, maps, reviewer inputs/outputs, and the bounded `/proc`
+  sampler remain ignored under
+  `analysis/worker-4-cnc-43a/{rc2-concurrency-v1,rc2-natural-v1,rc2-natural-control-v1,rc2-natural-pair-v1}`.
