@@ -85,6 +85,18 @@ do not escape the boundary to investigate it yourself.
    rating, and selection frequency as primary evidence; treat whole-match result
    and global composition as secondary regression signals unless the task says
    otherwise. Do not turn one noisy match into new AI-policy requirements.
+10. Consider simulation CPU cost and policy complexity. Prefer a cheap robust rule
+    of thumb when it captures most of the benefit of a global optimizer; require a
+    complex scheduler/reservation system to beat that simpler control in both
+    game value and measured MAX-simulation cost.
+
+For harvesting questions, useful hypotheses include reusing the threat map and
+fleeing active attackers before adding global route optimization. Economy can
+sustain defended fields with Resonators; Recon can make harvesting safer through
+map control; Covert can greedily exploit remote fields with stealth harvesters.
+On Archipelago, sleeping some harvesters or limiting active harvesters relative to
+reachable available Tiberium may preserve field growth. Treat these as faction-
+and-map-specific alternatives to test, not universal requirements.
 
 ## Output
 
