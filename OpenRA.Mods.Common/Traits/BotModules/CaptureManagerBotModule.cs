@@ -216,6 +216,12 @@ namespace OpenRA.Mods.Common.Traits
 
 		void IBotTick.BotTick(IBot bot)
 		{
+			// Capture and demolition consume their specialist before the next reassessment can run.
+			// Retire only those unavailable actors promptly so a pair's sabotage is observed before
+			// its survivor changes ownership, while keeping planning and world scans on their cadence.
+			RetireUnavailableAssignments(bot, activeCapturers, "capture", SpecialistAssignmentPurpose.Capture);
+			RetireUnavailableAssignments(bot, activeDemolitionUnits, "demolition", SpecialistAssignmentPurpose.Demolition);
+
 			var scanCapture = --minCaptureDelayTicks <= 0;
 			var scanDemolition = --minDemolitionDelayTicks <= 0;
 			if (scanCapture || scanDemolition)
@@ -834,30 +840,54 @@ namespace OpenRA.Mods.Common.Traits
 			SpecialistAssignmentPurpose purpose)
 		{
 			foreach (var pair in assignments.Where(pair => ShouldRetireAssignment(pair.Key, pair.Value, purpose)).ToArray())
-			{
-				var target = pair.Value.Target;
-				var targetRemoved = target.IsDead || !target.IsInWorld;
-				var targetHealth = targetRemoved ? 0 : target.TraitOrDefault<IHealth>()?.HP ?? 0;
-				var relationshipInvalid = !targetRemoved && !HasValidRelationship(target, purpose);
-				var nonProgressing = world.WorldTick - pair.Value.LastProgressTick > StalledAssignmentTicks(purpose);
-				var result = targetRemoved ? "target-removed" :
-					target.Owner == player ? "captured" :
-					targetHealth < pair.Value.TargetHealth ? "sabotaged" :
-					pair.Key.IsDead || !pair.Key.IsInWorld ? "specialist-lost" :
-					relationshipInvalid ? "relationship-invalid" :
-					nonProgressing ? "non-progressing" : "specialist-idle";
-				Debug("{0} {1}#{2} released from {3}#{4}: result={5}", action, pair.Key.Info.Name,
-					pair.Key.ActorID, target.Info.Name, target.ActorID, result);
-				if (result == "non-progressing")
-				{
-					deferredTargets[pair.Key] = new DeferredTarget(target,
-						world.WorldTick + StalledAssignmentTicks(purpose));
-					bot.QueueOrder(new Order("Stop", pair.Key, false));
-				}
+				RetireAssignment(bot, assignments, pair, action, purpose);
+		}
 
-				assignments.Remove(pair.Key);
-				targetReservations.Release(pair.Key.ActorID);
+		void RetireUnavailableAssignments(IBot bot, Dictionary<Actor, SpecialistAssignment> assignments, string action,
+			SpecialistAssignmentPurpose purpose)
+		{
+			while (true)
+			{
+				var unavailable = default(KeyValuePair<Actor, SpecialistAssignment>);
+				foreach (var pair in assignments)
+					if (unitCannotBeOrdered(pair.Key))
+					{
+						unavailable = pair;
+						break;
+					}
+
+				if (unavailable.Key == null)
+					return;
+
+				RetireAssignment(bot, assignments, unavailable, action, purpose);
 			}
+		}
+
+		void RetireAssignment(IBot bot, Dictionary<Actor, SpecialistAssignment> assignments,
+			KeyValuePair<Actor, SpecialistAssignment> pair, string action, SpecialistAssignmentPurpose purpose)
+		{
+			var target = pair.Value.Target;
+			var targetRemoved = target.IsDead || !target.IsInWorld;
+			var targetHealth = targetRemoved ? 0 : target.TraitOrDefault<IHealth>()?.HP ?? 0;
+			var relationshipInvalid = !targetRemoved && !HasValidRelationship(target, purpose);
+			var nonProgressing = world.WorldTick - pair.Value.LastProgressTick > StalledAssignmentTicks(purpose);
+			var result = targetRemoved ? "target-removed" :
+				target.Owner == player ? "captured" :
+				targetHealth < pair.Value.TargetHealth ? "sabotaged" :
+				pair.Key.IsDead || !pair.Key.IsInWorld ? "specialist-lost" :
+				relationshipInvalid ? "relationship-invalid" :
+				nonProgressing ? "non-progressing" : "specialist-idle";
+			Debug("{0} {1}#{2} released from {3}#{4}: result={5}", action, pair.Key.Info.Name,
+				pair.Key.ActorID, target.Info.Name, target.ActorID, result);
+			if (result == "non-progressing")
+			{
+				deferredTargets[pair.Key] = new DeferredTarget(target,
+					world.WorldTick + StalledAssignmentTicks(purpose));
+				bot.QueueOrder(new Order("Stop", pair.Key, false));
+			}
+
+			assignments.Remove(pair.Key);
+			targetReservations.Release(pair.Key.ActorID);
 		}
 
 		bool ShouldRetireAssignment(Actor specialist, SpecialistAssignment assignment,
