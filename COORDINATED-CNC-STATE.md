@@ -44,8 +44,10 @@ behavior, and sensible restored AI state; do not require a loaded game to reprod
 an uninterrupted game's exact actor decisions or ticks unless a task-specific
 persisted invariant expressly needs it.
 
-Continuation directive: complete, integrate, and test this five-task round, then
-use its cumulative release head as the base for another round without pausing.
+Terminal directive (supersedes the earlier continuation directive): complete,
+review, integrate, and adversarially test this five-task round; open its final
+cumulative product release PR into `bleed`; then pause before selecting or
+starting another task batch.
 
 Recovery note (2026-08-07 16:38 UTC): the shared `policy-scratchpad` lock left by
 completed speccer PID `1006013` was verified dead with no active policy-role
@@ -71,3 +73,12 @@ as a separate high-priority coordination-infrastructure recovery task at commit
 `9bf0ec9050`, immediately before pinned final `CNC-26C`. It covers dead-worker
 detection, truthful process status, safe exact-assignment relaunch, preserved
 worktree changes, partial-test handling, and avoiding duplicate cycle counts.
+
+Model audit (2026-08-07 18:20 UTC): active-round external envelopes match the
+role table. Commenters and ordinary Policy Reviewers use Terra medium;
+spec-policy consultation uses Sol high; workers use Sol high. Task Readers and
+Task Makers were fresh Terra-medium native roles; Speccers were Sol xhigh. No
+cycle reviewer has launched yet; it must use Terra medium. Final PR Reviewers
+and the Integrator remain Sol high by design. The Sol-high coordinator itself is
+the already-recorded user-accepted trial mismatch. Dead pre-interruption worker
+envelopes are historical records, not additional running Sol sessions.
