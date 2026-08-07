@@ -1,7 +1,7 @@
 # Coordinated CNC State
 
 - Round ID: `20260807-bug-polish-02`
-- Phase: `RC1 draft PR CI-clean; five Sol-high combined workers active`
+- Phase: `RC1 draft PR CI-clean; two Sol-high combined repair workers active`
 - Common base branch: `agent/cnc-20260806-bug-polish-01-release`
 - Common base SHA: `419bee2531d4802bf922c3597b42c6eeb75ab250`
 - Coordinator model: `gpt-5.6-sol` / `high` (trial mismatch explicitly accepted by user)
@@ -28,13 +28,13 @@
 | 2 | CNC-40 Adaptive specialists | `agent/round-20260807-cnc40-adaptive-specialists` | `.worktrees/coordinated-cnc/20260807-bug-polish-02/workers/worker-2-cnc40` | `First iteration - testing`; final head `40ed5926864c`; clean and pushed | `roles/worker-2/process.json` complete 0 | [#87](https://github.com/Realpra1/LibertyDawn/pull/87) | final review response recorded; Linux/Windows CI passed | RC1 pass with no repair; build, 37/37 focused tests, YAML, and two ordinary-AI games passed; receipt `bd7e2812e902`; integrated cycles 0/3 |
 | 3 | CNC-41 Economy Tiberium fields | `agent/round-20260807-cnc41-economy-tiberium-fields` | `.worktrees/coordinated-cnc/20260807-bug-polish-02/workers/worker-3-cnc41` | `First iteration - testing`; final head `418786381f64`; only unused import removed in review response; route-proof blocker retained; clean local `make check` and 16/16 focused tests | `roles/worker-3-cont-1/process.json` complete 0; native review response complete; cycle-5/10/15/20 Terra reviews complete | [#88](https://github.com/Realpra1/LibertyDawn/pull/88) | final Sol-high clear for testing handoff; final Linux/Windows CI passed | RC1 role `roles/rc1-worker-3-cnc41/process.json` running PID 942927 on `agent/round-20260807-cnc41-rc1-repair` |
 | 4 | CNC-42 Economy field defense | `agent/round-20260807-cnc42-economy-field-defense` | `.worktrees/coordinated-cnc/20260807-bug-polish-02/workers/worker-4-cnc42` | `First iteration - testing`; final head `260d10e9654c`; 20/20 cycles; 66 engine games; 34/34 focused tests; pre-placement save/load ownership and clean-three/final-regression evidence remain explicit integrated-repair work | `roles/worker-4/process.json` complete 0; cycle-5/10/15/20 Terra reviews complete | [#89](https://github.com/Realpra1/LibertyDawn/pull/89) | final Sol-high blocker addressed; final Linux/Windows CI passed | RC1 role `roles/rc1-worker-4-cnc42/process.json` running PID 942963 on `agent/round-20260807-cnc42-rc1-repair`; prioritize save/load plus CNC-41 G4/G5/G7 |
-| 5 | CNC-44 Aircraft husks | `agent/round-20260807-cnc44-aircraft-husks` | `.worktrees/coordinated-cnc/20260807-bug-polish-02/workers/worker-5-cnc44` | `First iteration - testing`; final head `df9cd6e12fd5`; clean and pushed; CNC62 dependency remains | `roles/worker-5/process.json` complete 0 | [#85](https://github.com/Realpra1/LibertyDawn/pull/85) | Sol-high `ready`; no fix | RC1 role `roles/rc1-worker-5-cnc44/process.json` running PID 943099 on `agent/round-20260807-cnc44-rc1-repair` |
+| 5 | CNC-44 Aircraft husks | `agent/round-20260807-cnc44-aircraft-husks` | `.worktrees/coordinated-cnc/20260807-bug-polish-02/workers/worker-5-cnc44` | `First iteration - testing`; final head `df9cd6e12fd5`; clean and pushed; CNC62 dependency remains | `roles/worker-5/process.json` complete 0 | [#85](https://github.com/Realpra1/LibertyDawn/pull/85) | Sol-high `ready`; no fix | RC1 pass with no product repair; corrected full-engine occupancy, contention, transform, and forbidden-terrain evidence passed; receipt `1ead96e949`, validation [#91](https://github.com/Realpra1/LibertyDawn/pull/91) CI green; CNC-62 remains absent; integrated cycles 0/3 |
 
 ## Release rounds
 
 | RC | Head | Included heads | Repair heads | Build/checks | Integrated tests | Result |
 |---|---|---|---|---|---|---|
-| RC1 | product `394ae5eeadff`; receipt `ffb841b48750` | CNC-87 `5170183fb882`; CNC-40 `40ed5926864c`; CNC-41 `418786381f64`; CNC-42 `260d10e9654c`; CNC-44 `df9cd6e12fd5` | receipts CNC-87 `4c75f395`, CNC-40 `bd7e2812`; other assignment heads `a6d55734`, `ff173b7d`, `920eaa2e` | conflict-free merge; Debug/Release, interface/Lua, CNC YAML/maps, 512 tests, and release PR Linux/Windows CI passed | CNC-87 and CNC-40 passed; workers 3–5 active | testing |
+| RC1 | product `394ae5eeadff`; receipt `ffb841b48750` | CNC-87 `5170183fb882`; CNC-40 `40ed5926864c`; CNC-41 `418786381f64`; CNC-42 `260d10e9654c`; CNC-44 `df9cd6e12fd5` | receipts CNC-87 `4c75f395`, CNC-40 `bd7e2812`, CNC-44 `1ead96e9`; other assignment heads `a6d55734`, `ff173b7d` | conflict-free merge; Debug/Release, interface/Lua, CNC YAML/maps, 512 tests, and release PR Linux/Windows CI passed | CNC-87, CNC-40, and CNC-44 passed; CNC-41 and CNC-42 repairs active | testing |
 
 ## Resume note
 
