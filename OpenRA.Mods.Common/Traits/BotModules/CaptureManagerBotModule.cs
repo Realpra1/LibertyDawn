@@ -339,8 +339,10 @@ namespace OpenRA.Mods.Common.Traits
 				{
 					foreach (var surplus in assignments.Skip(1))
 					{
+						bot.QueueOrder(new Order("Stop", surplus.Key, false));
 						activeCapturers.Remove(surplus.Key);
-						Debug("capture pair surplus released {0}#{1}: target={2}#{3}, health={4}/{5}, solo-eligible=true",
+						Debug("capture pair surplus stopped and released {0}#{1}: target={2}#{3}, " +
+							"health={4}/{5}, solo-eligible=true",
 							surplus.Key.Info.Name, surplus.Key.ActorID, candidates[targetIndex].Actor.Info.Name,
 							candidates[targetIndex].Actor.ActorID, candidates[targetIndex].HitPoints,
 							candidates[targetIndex].MaxHitPoints);
