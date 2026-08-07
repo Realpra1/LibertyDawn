@@ -4,7 +4,9 @@
 - Phase: `five Sol-high isolated workers resumed after process-tree interruption`
 - Common base branch: `agent/cnc-20260807-bug-polish-02-release`
 - Common base SHA: `468ee64f5a0f9a9e19e260e5c5943e6e878f4705`
-- Coordinator model: `gpt-5.6-sol` / `high` (trial mismatch explicitly accepted by user)
+- Coordinator model: `gpt-5.6-terra` / `medium` (user identifies this current
+  coordinator session as Luna medium); delegated worker tiers remain pinned
+  independently
 - Game slots: `2` for ordinary/full MAX simulations; `3` only for short,
   tightly bounded custom fixtures
 - Large-build slots: `1`
@@ -44,10 +46,10 @@ behavior, and sensible restored AI state; do not require a loaded game to reprod
 an uninterrupted game's exact actor decisions or ticks unless a task-specific
 persisted invariant expressly needs it.
 
-Terminal directive (supersedes the earlier continuation directive): complete,
-review, integrate, and adversarially test this five-task round; open its final
-cumulative product release PR into `bleed`; then pause before selecting or
-starting another task batch.
+Terminal directive (supersedes the earlier pause directive): complete, review,
+integrate, and adversarially test this five-task round; open its final
+cumulative product release PR into `bleed`; then continue with another fresh
+five-task coordinator cycle instead of pausing.
 
 Recovery note (2026-08-07 16:38 UTC): the shared `policy-scratchpad` lock left by
 completed speccer PID `1006013` was verified dead with no active policy-role
@@ -79,8 +81,8 @@ role table. Commenters and ordinary Policy Reviewers use Terra medium;
 spec-policy consultation uses Sol high; workers use Sol high. Task Readers and
 Task Makers were fresh Terra-medium native roles; Speccers were Sol xhigh. No
 cycle reviewer has launched yet; it must use Terra medium. Final PR Reviewers
-and the Integrator remain Sol high by design. The Sol-high coordinator itself is
-the already-recorded user-accepted trial mismatch. Dead pre-interruption worker
+and the Integrator remain Sol high by design. The coordinator is now the
+user-selected Luna-medium/Terra-medium session. Dead pre-interruption worker
 envelopes are historical records, not additional running Sol sessions.
 
 Task routing note (2026-08-07): a fresh Terra-medium Task Maker recorded two
