@@ -21,6 +21,7 @@ ROLES = {
     "policy-reviewer": ("gpt-5.6-terra", "medium", "review-cnc-policy/SKILL.md"),
     "policy-speccer": ("gpt-5.6-sol", "high", "review-cnc-policy/SKILL.md"),
     "policy-escalation": ("gpt-5.6-sol", "xhigh", "review-cnc-policy/SKILL.md"),
+    "cycle-reviewer": ("gpt-5.6-terra", "medium", "review-cnc-pr/SKILL.md"),
     "reviewer": ("gpt-5.6-sol", "high", "review-cnc-pr/SKILL.md"),
     "integrator": ("gpt-5.6-sol", "high", "integrate-cnc-release/SKILL.md"),
 }
@@ -92,9 +93,17 @@ def validate_analysis_job(args: argparse.Namespace) -> None:
                 )
         return
 
-    if set(job) != {"design_reference", "narrative", "output"}:
+    if set(job) != {"design_reference", "task_context", "narrative", "output"}:
         raise SystemExit(
-            "Policy Reviewer job must contain only design_reference, narrative, and output"
+            "Policy Reviewer job must contain only design_reference, task_context, "
+            "narrative, and output"
+        )
+    task_context = _resolved_path(job["task_context"], "task_context")
+    expected_task_context = output_dir / "inputs" / "TASK-CONTEXT.md"
+    if not task_context.is_file() or task_context != expected_task_context:
+        raise SystemExit(
+            "Policy Reviewer task context must be the staged input "
+            f"{expected_task_context}"
         )
     narrative = _resolved_path(job["narrative"], "narrative")
     expected_narrative = output_dir / "inputs" / "NARRATIVE.md"

@@ -16,7 +16,10 @@ contract, not a summary.
 ## Specification method
 
 1. Preserve the literal user requirements and explain why the task exists and the
-   predicted observable change.
+   predicted observable change. Classify the change and fill the worker state's
+   balance authority. Balance is frozen by default: authorize only the exact
+   balance surface expressly requested by the user/task; never infer permission
+   to tune values so behavioral evidence looks better.
 2. Inspect current implementation, configuration ownership, history, tests,
    current control behavior, and relevant open PR commits. Never spec from task
    prose alone when repository inspection can settle a fact.
@@ -89,14 +92,24 @@ contract, not a summary.
     policy narrative containing current/control behavior, proposed rule of thumb,
     expected situations and counters, predicted benefit/tradeoffs, forbidden
     blunders, and focused questions. Copy it (not symlink it) to the review role's
-    `inputs/NARRATIVE.md`, then put a strict JSON job beside the output with exactly
-    the absolute `design_reference`, staged `narrative`, and `output` paths. Launch
+    `inputs/NARRATIVE.md`. Write a separate short `inputs/TASK-CONTEXT.md` with
+    task ID/title, expected change, why, change category, in/out-of-scope behavior,
+    and exact balance authority; exclude source, full spec, and preferred verdict.
+    Put a strict JSON job beside the output with exactly the absolute
+    `design_reference`, staged `task_context`, staged `narrative`, and `output`
+    paths. Launch
     `policy-speccer` through the coordinator role launcher so a no-history fresh Sol
     5.6 high Policy Reviewer reads only that narrative and
     `.agents/references/LIBERTY-DAWN-DESIGN.md`. Record its verdict, review path,
     useful recommendations, rejected recommendations with reasons, and the
     adversarial tests it inspired in the worker state. Skip only when policy is
     genuinely irrelevant, recording why.
+19. Require fresh Terra-medium code reviews after product-change cycles 5, 10,
+    15, and 20 that occur. Each checkpoint reviews only this worker's state,
+    cumulative scoped diff, and evidence so far and returns at most one advisory
+    concern. Require the worker to record adoption or evidence-based rejection;
+    an adopted correction consumes the next ordinary cycle. These checkpoints do
+    not replace the final Sol-high PR review or increase the 20-cycle budget.
 
 Keep the coordinator state concise; all task detail belongs in this worker state.
 Return only the task ID, worker-state path, base SHA, and material cross-worker
