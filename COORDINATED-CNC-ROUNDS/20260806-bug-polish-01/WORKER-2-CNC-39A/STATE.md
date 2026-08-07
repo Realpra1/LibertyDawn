@@ -10,7 +10,7 @@ when the dependency section directs it.
 
 - Worker: `worker-2-cnc-39a`
 - Task: `CNC-39A — Engineer/commando target coordination`
-- Status: `First iteration - testing`
+- Status: `First iteration - testing; RC2 combined pass/no repair`
 - Common base branch/SHA: `agent/cnc38-early-viki-infantry-rush` / `09ccdac3c1ecb5134a4751f2bcbd8a7970dfe6bf`
 - Task branch: `agent/round-20260806-cnc39a-engineer-commando`
 - Intended PR base: `agent/cnc38-early-viki-infantry-rush`
@@ -19,22 +19,22 @@ when the dependency section directs it.
 - Cycle budget: `20` isolated code-change cycles
 - Cycles used: `11`
 - Game/build lock directory: `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260806-bug-polish-01/locks`
-- Game capacity: `2`
+- Game capacity: `3 during RC2 trial; recommend restore to 2`
 - Large-build capacity: `1`
 - Task report: `/root/github/LibertyDawn/COORDINATED-CNC-ROUNDS/20260806-bug-polish-01/WORKER-2-CNC-39A/REPORT.md`
 - Match-analysis directory: `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260806-bug-polish-01/analysis/worker-2-cnc-39a`
 - Liberty Dawn design reference: `.agents/references/LIBERTY-DAWN-DESIGN.md`
-- Full-engine game tests completed: `65`
+- Full-engine game tests completed: `69`
 - Sol-xhigh policy escalation: `unused (requires at least 10 game tests; one maximum)`
 - PR: `#80` — https://github.com/Realpra1/LibertyDawn/pull/80
 
 ## Integrated repair assignment
 
-- Phase: `isolated implementation`
-- Current release branch/head: `not assigned`
-- Integration notes: `not assigned`
-- Repair branch: `not assigned`
-- Repair PR base: `not assigned`
+- Phase: `RC2 combined testing complete; no repair required`
+- Current release branch/head: `agent/cnc-20260806-bug-polish-01-release` / `fd15540ffc98c70f085688fe0b38a4a6341fc6ed`
+- Integration notes: `assigned directly in this state; no separate note path assigned`
+- Repair branch: `agent/round-20260806-cnc39a-rc2-repair`
+- Repair PR base: `agent/cnc-20260806-bug-polish-01-release` at `fd15540ffc98c70f085688fe0b38a4a6341fc6ed`
 - Integrated cycles used this RC: `0/3`
 - Integrated cycles used total: `0/12`
 
@@ -794,6 +794,7 @@ silently exceed the budget.
 - Proposed status: `First iteration - testing`
 - Final branch/head: `agent/round-20260806-cnc39a-engineer-commando` / review-response product commit `f3fbbb4da48a66739bfc7195a3f3b4f91e5e3d16` (final receipt commit follows)
 - PR and checks: draft PR `#80`, https://github.com/Realpra1/LibertyDawn/pull/80; local required checks passed; review-response GitHub checks awaited after publication
+- Integrated RC2 receipt: candidate `fd15540ffc98c70f085688fe0b38a4a6341fc6ed`, draft release PR `#84`; combined pass/no repair; metadata handoff commit follows on `agent/round-20260806-cnc39a-rc2-repair`
 - Cycles used: `11/20`
 - Acceptance evidence: simultaneous pair `cycle-3/changed-run`; travel cancellation `cycle-9/changed-run`; post-plant disarm `cycle-5/changed-run-8`; combined core regression `cycle-11/fresh-combined-3/combined-final`; assignment persistence `cycle-11/save-runs-6/` and `cycle-11/load-runs-2/`
 - Adversarial evidence: natural repeated ladder `cycle-10/ladder-clean-run`; scripted-friendly compatibility `script-changed-run`/`script-control-run`; capture-incumbent and demolition-incumbent travel persistence; blocked recovery `cycle-7/changed-run-2`
@@ -834,3 +835,63 @@ silently exceed the budget.
   judged AI matches. Finish by updating this state/report with the exact candidate,
   scenarios, controls, artifacts, results, cycle count, resource measurements, and
   one of: combined pass/no repair, or reviewed repair head ready to merge.
+
+## Integrated RC2 result
+
+- Result: `combined pass/no repair` on assigned candidate
+  `fd15540ffc98c70f085688fe0b38a4a6341fc6ed` (product candidate
+  `b456fd89fac88d71dfadd65c47cfb7b409d44122`). Tested worktree head
+  `c3c714dbf092d7dd4470ef3e5e4da9d03664812a` differed only by this worker's
+  RC2 assignment-state commit, confirmed by `git diff --name-only`.
+- Integrated product-code cycles: `0/3 this RC`, `0/12 total`. No product, rules,
+  balance, or fixture-map change was required.
+- Full-engine games: four additional starts, bringing the task total to `69`.
+  The capacity-3 batch ran the combined literal regression, post-plant disarm
+  race, and repeated ownership ladder concurrently. All three game processes
+  exited cleanly; combined and post-plant passed their existing oracles. The
+  ladder completed both safe cancellations and hostile demolition but missed a
+  later fixture marker after an earlier natural conclusion, so it was labeled an
+  invalid harness result rather than a product failure. A corrected serial rerun
+  passed to tick 2501 and natural game over.
+- Combined literal result: exact pair `e6#155+e6#156` captured `weap#158` at tick
+  102 while `rmbo#157` destroyed alternate `nuke#159` at 539; the allied capture
+  of `fact#161` canceled its autonomous C4 at 793; hostile follow-up `nuke#162`
+  was destroyed at 1826; final owners/survival were correct through tick 2400.
+- Post-plant result: autonomous C4 planted on `weap#157` at tick 81, allied
+  capture completed at 135, the charge disarmed at 136, and the friendly building
+  survived unchanged through tick 1400 with no final harmful action.
+- Corrected ladder result: captures at ticks 96 and 342 canceled C4 at 97 and
+  343; continuously hostile `nuke#160` was planted at 1617 and destroyed at 1663;
+  tick-2501 final state preserved both allied structures and left the Commando
+  idle. Harness passed at `249.657` valid world ticks/sec.
+- Resource trial: the three-way batch spent about 58 seconds waiting for all
+  locks, then ran for 12.034 seconds. Process completion reliability was `3/3`,
+  while the stale initial oracle was `2/3`. The first sampler did not follow child
+  sessions, so its reported peak is invalid; a live two-second snapshot recorded
+  `1,017,884 KiB` across the three game/Xvfb process pairs. The corrected serial
+  sampler measured `677,544 KiB` peak process-tree RSS and 10.151 seconds elapsed.
+  A clean three-slot retry then starved for more than eleven minutes behind
+  continuous one-/two-slot work. Recommend restoring capacity `2`: three-way
+  execution itself was stable, but exclusive scheduling and memory pressure make
+  it a worse shared-round default.
+- Checks: Release build passed with 0 warnings/errors; focused
+  `CaptureTargetingTest` `15/15`; full unit suite `454/454`; `make check`,
+  `make check-scripts`, `make test`, and `git diff --check` passed.
+- Reviews: initial factual/policy outputs are `rc2/commenter/NARRATIVE.md` and
+  `rc2/policy-review/POLICY-REVIEW.md`; corrected-ladder outputs are
+  `rc2/commenter-ladder-corrected/NARRATIVE.md` and
+  `rc2/policy-ladder-corrected/POLICY-REVIEW.md`. Both policy reviews returned
+  `mostly sensible` at medium confidence and recommended no product repair for
+  the invalid harness result. The long hostile-target travel remains an
+  instrumentation/deferred-evidence concern, not evidence for policy change.
+- Controls: no new RC2 old-code control was needed to diagnose coexistence. The
+  preserved pinned control evidence remains decisive: base `09ccdac3c1` collided
+  capture/demolition and destroyed a newly friendly planted-charge target, while
+  the cumulative candidate split useful objectives and canceled/disarmed safely.
+- Artifact root: `analysis/worker-2-cnc-39a/rc2/`; decisive runs are
+  `three-way-run/rc2-combined`, `three-way-run/rc2-postplant`, and
+  `ladder-rerun/rc2-ownership-ladder-corrected`.
+- Remaining completion gaps are unchanged: no exercised ordinary transport
+  takeover, no defended natural-production match, and no direct UI force-target
+  test. They preserve the original `First iteration - testing` status but do not
+  block this RC2 combined pass/no-repair handoff.
