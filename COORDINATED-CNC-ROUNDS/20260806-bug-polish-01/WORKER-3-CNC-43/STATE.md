@@ -728,3 +728,31 @@ silently exceed the budget.
 - Deferred work: Optional generic headless winner/per-player telemetry; no CNC-43 product work deferred.
 - Known failures/risks: No known task defect. The long-pressure logs identify McvManager ownership and zero scripted/combat/crush counters but do not expose every engine order packet; exact per-item queue blocking is also unknown. Ordinary AI outcomes and wall-clock measurements diverge between repetitions. Terrain equality uses exact resolved-rule comparison rather than per-terrain timed gameplay.
 - Relevant artifact paths: `analysis/worker-3-cnc-43/{resolved,games,commenters,maps,manifests}` and this worker's `REPORT.md`.
+
+## Integrated RC2 assignment
+
+- Test the exact cumulative candidate fd15540ffc98c70f085688fe0b38a4a6341fc6ed
+  (code candidate b456fd89fac88d71dfadd65c47cfb7b409d44122, draft PR #84)
+  from repair branch agent/round-20260806-cnc43-rc2-repair.
+- This is the combined release-testing phase. Preserve the original task contract
+  and judge whether that task still works when all five reviewed changes coexist.
+- Use full-engine headless MAX simulations from the first behavioral test. Make
+  every test adversarial, use materially different scenarios, and compare against
+  old/control behavior whenever that is informative. Isolate every support dir,
+  log, replay, port, display, and map artifact.
+- The shared game resource has a trial capacity of three. Use
+  with_resource_slots.py with resource game, capacity 3, and the common round lock
+  directory. Record elapsed time, peak RSS, completion reliability, and whether
+  three-way concurrency should be retained or reduced to two.
+- Run at most three integrated code-change cycles. A cycle boundary is a product
+  code change; one cycle may include up to two games when needed. If relevant
+  combined evidence passes, stop without inventing a change. If a failure requires
+  repair, keep it strictly within this task, commit and push this repair branch,
+  rerun affected evidence, and record the exact repair head for the integrator.
+- The original task's balance authority is unchanged. Do not alter balance outside
+  an exact authorization already present in this state, and never tune values to
+  manufacture a better result.
+- Continue using the existing Commenter and Policy Reviewer workflow for materially
+  judged AI matches. Finish by updating this state/report with the exact candidate,
+  scenarios, controls, artifacts, results, cycle count, resource measurements, and
+  one of: combined pass/no repair, or reviewed repair head ready to merge.
