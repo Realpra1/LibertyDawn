@@ -1,7 +1,7 @@
 # Coordinated CNC State
 
 - Round ID: `20260807-bug-polish-02`
-- Phase: `five tasks claimed; Task Maker in-progress update pending`
+- Phase: `five tasks in progress; speccer 1 active`
 - Common base branch: `agent/cnc-20260806-bug-polish-01-release`
 - Common base SHA: `419bee2531d4802bf922c3597b42c6eeb75ab250`
 - Coordinator model: `gpt-5.6-sol` / `high` (trial mismatch explicitly accepted by user)
@@ -19,7 +19,7 @@
 
 | Worker | Task | Branch | Worktree | State | Process/result | PR | Review | Integrated status |
 |---|---|---|---|---|---|---|---|---|
-| 1 | CNC-87 Repair coordinated external-role launching and large-build enforcement | | | claimed at `2026-08-07T04:57:21Z`; packet `COORDINATED-CNC-ROUNDS/20260807-bug-polish-02/TASK-PACKET-1.md` | `roles/task-reader-1/process.json` complete 0 | | | |
+| 1 | CNC-87 Repair coordinated external-role launching and large-build enforcement | `agent/round-20260807-cnc87-role-launch-lock` | `.worktrees/coordinated-cnc/20260807-bug-polish-02/workers/worker-1-cnc87` | claimed; speccing active; packet `COORDINATED-CNC-ROUNDS/20260807-bug-polish-02/TASK-PACKET-1.md` | `roles/speccer-1/process.json` running | | | |
 | 2 | CNC-40 Adaptive specialists | | | claimed at `2026-08-07T04:58:59Z`; packet `COORDINATED-CNC-ROUNDS/20260807-bug-polish-02/TASK-PACKET-2.md` | `roles/task-reader-2/process.json` complete 0 | | | |
 | 3 | CNC-41 Economy Tiberium fields | | | claimed at `2026-08-07T05:00:41Z`; packet `COORDINATED-CNC-ROUNDS/20260807-bug-polish-02/TASK-PACKET-3.md` | `roles/task-reader-3/process.json` complete 0 | | | |
 | 4 | CNC-42 Economy field defense | | | claimed at `2026-08-07T05:02:24Z`; packet `COORDINATED-CNC-ROUNDS/20260807-bug-polish-02/TASK-PACKET-4.md` | `roles/task-reader-4/process.json` complete 0 | | | |
