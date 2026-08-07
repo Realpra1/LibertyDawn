@@ -251,16 +251,6 @@ namespace OpenRA.Mods.Common.Traits
 
 	static class CompletedSpecialistOutcome
 	{
-		public static AdaptiveOutcomeDelta Record(Player player, string specialistType, int economicValue)
-		{
-			var stats = player.PlayerActor.Trait<PlayerStatistics>().AdaptiveStats[specialistType];
-			var creditedValue = Math.Max(0, economicValue);
-			var beforeCount = stats.KillsCount;
-			var beforeValue = stats.KillsValue;
-			stats.RecordCompletedOutcome(creditedValue);
-			return new AdaptiveOutcomeDelta(creditedValue, beforeCount, stats.KillsCount, beforeValue, stats.KillsValue);
-		}
-
 		public static bool TryRecord(World world, string kind, Player player, string specialistType,
 			int economicValue, out AdaptiveOutcomeDelta delta)
 		{
@@ -440,11 +430,11 @@ namespace OpenRA.Mods.Common.Traits
 				if (specialistEvidence.HasValue)
 				{
 					var evidence = specialistEvidence.Value;
-					var delta = CompletedSpecialistOutcome.Record(evidence.SpecialistPlayer, evidence.SpecialistType,
-						evidence.EconomicValue);
-					CompletedSpecialistOutcome.WriteLog(self.World, "building-demolition", evidence.SpecialistType,
-						evidence.SpecialistId, evidence.SpecialistPlayer, self.Info.Name, self.ActorID, self.Owner.InternalName,
-						"direct-sell-value", null, true, delta);
+					if (CompletedSpecialistOutcome.TryRecord(self.World, "building-demolition", evidence.SpecialistPlayer,
+						evidence.SpecialistType, evidence.EconomicValue, out var delta))
+						CompletedSpecialistOutcome.WriteLog(self.World, "building-demolition", evidence.SpecialistType,
+							evidence.SpecialistId, evidence.SpecialistPlayer, self.Info.Name, self.ActorID, self.Owner.InternalName,
+							"direct-sell-value", null, true, delta);
 				}
 				else
 				{
