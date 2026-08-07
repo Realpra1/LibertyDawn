@@ -6,7 +6,9 @@ Proposed handoff: **First iteration - testing** on
 `agent/round-20260807-cnc41-economy-tiberium-fields`. The 20-cycle budget is
 exhausted. The safest useful implementation and its passing local gates are
 published with a release-blocking route-proof concern and incomplete literal
-acceptance explicitly retained.
+acceptance explicitly retained. GitHub Windows CI passes; Linux CI is red on one
+unused-using style error that cannot be corrected without exceeding the cycle
+budget.
 
 ## Baseline
 
@@ -469,7 +471,10 @@ unexercised.
 - Final local gates: strict Debug CNC module build passed with 0 warnings and 0
   errors; the complete OpenRA test assembly passed 471/471; exhaustive
   `./utility.sh cnc --check-yaml` passed all CNC sequences and maps; and
-  `git diff --check` passed.
+  `git diff --check` passed. GitHub's clean Linux `make check` later found an
+  IDE0005 error for unused `using OpenRA.Traits` at manager line 15; Windows CI
+  passed. The difference is recorded rather than treating the incremental local
+  build as authoritative.
 
 ## Control and comparative result
 
@@ -718,6 +723,11 @@ observed in the recorded current-code runs.
   through the planned gate or a reserved stealth-harvester path. Resolving and
   validating this needs cycle 21, so the required disposition is handoff as
   `First iteration - testing`.
+- Final Sol-high task-PR review:
+  `analysis/worker-3-cnc41/final-pr-review/FINAL-PR-REVIEW.md`; CLEAR for the
+  explicit `First iteration - testing` handoff only, not complete or release-
+  ready. It agrees that real ordinary and reserved-stealth gate-route proof is
+  the highest-impact correctness correction before release.
 
 ## Diagnostics
 
@@ -753,10 +763,18 @@ these ownership/failure boundaries.
   reserved stealth-harvester mission, and <=5% sustained performance comparison.
 - The unrelated global queue-manager `failCount += failCount` zero-backoff bug
   remains out of scope; field placement uses its own bounded retry/defer state.
+- Remove the unused `using OpenRA.Traits` reported by clean Linux `make check`.
+  This is a one-line CI correction, but making it after cycle 20 would violate the
+  task's explicit code-cycle cap.
 
 ## Publication
 
 - Branch: `agent/round-20260807-cnc41-economy-tiberium-fields`
 - Intended base: `agent/cnc-20260806-bug-polish-01-release`
 - Proposed status: `First iteration - testing`
-- PR/checks/final Sol-high review: pending publication
+- Product commit: `aa4e97972d8a0cb7f4780babcdffa4fa363c2299`
+- Draft PR: `https://github.com/Realpra1/LibertyDawn/pull/88`
+- GitHub checks: Windows (.NET 6.0) passed; Linux (.NET 6.0) failed clean
+  `make check` on IDE0005 for the unused manager `using`.
+- Final Sol-high review: clear for this explicit handoff status only; route proof
+  remains required before completion/release.
