@@ -548,7 +548,7 @@ Player:
 		MaximumCaptureTargetOptions: 15
 		CaptureDistanceBias: 10
 		CaptureRetargetImprovement: 25
-		SoloBuildingCaptureHealth: 50
+		SoloBuildingCaptureHealth: 80
 		CheckCaptureTargetsForVisibility: false
 		CapturableRelationships: Enemy, Neutral
 		DebugLogging: false
