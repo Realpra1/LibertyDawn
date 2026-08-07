@@ -14,7 +14,10 @@ state, coordinator state, or the PR; write only the requested review file.
 2. Verify observable requirements and forbidden behavior before style. Look for
    hidden queue/order contention, save/load or replay-state omissions, nondeterminism,
    unbounded per-tick work, excess allocations/scans/logging, duplicated policy,
-   brittle test-only behavior, and unrelated changes.
+   brittle test-only behavior, and unrelated changes. Treat balance as frozen
+   unless the worker contract expressly authorizes the exact surface; block cost,
+   HP, damage, armor, speed, timing, power, prerequisite, probability, resource,
+   or similar tuning used to make unrelated acceptance evidence pass.
 3. Enforce separation of concerns and cohesion. Flag mixed responsibilities,
    oversized or deeply nested classes/functions, unclear ownership, duplicated
    policy, misleading names, hidden mutable state, and abstractions that make the
@@ -57,8 +60,8 @@ state, coordinator state, or the PR; write only the requested review file.
    fresh Terra Policy Review before the next worker decision. For AI-policy specs,
    require the recorded Sol-high spec consultation. Permit at most one Sol-xhigh
    policy escalation, only after the recorded tenth game test. Flag leaked source,
-   logs, task/spec context, or outcome-driven rewriting across the Policy Reviewer's
-   design-document-plus-narrative boundary.
+   logs, full task/spec context, or outcome-driven rewriting across the Policy
+   Reviewer's design-document-plus-short-task-context-plus-narrative boundary.
 12. Treat Commenter and Policy Reviewer output as interpretation, not completion
    evidence. Confirm the worker checked cited facts, documented adopted/rejected
    advice, and validated recommendations through later adversarial full-AI games.

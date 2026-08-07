@@ -1,6 +1,6 @@
 ---
 name: review-cnc-policy
-description: Judge whether a Liberty Dawn AI policy or observed match behavior makes strategic sense using only the shared Liberty Dawn design reference and a factual match or proposed-policy narrative. Use for Terra-medium post-match playtester feedback, Sol-high consultation during CNC task specification, or one Sol-xhigh escalation after a worker has at least ten persistent-problem game tests.
+description: Judge whether a Liberty Dawn AI policy or observed match behavior makes strategic sense using only the shared Liberty Dawn design reference, a short task/scope description, and a factual match or proposed-policy narrative. Use for Terra-medium post-match playtester feedback, Sol-high consultation during CNC task specification, or one Sol-xhigh escalation after a worker has at least ten persistent-problem game tests.
 ---
 
 # Review CNC Policy
@@ -22,11 +22,13 @@ them with adversarial full-AI games; this role cannot certify completion.
 ## Strict context isolation
 
 Aside from these role instructions and a validated JSON job containing only the
-three paths `design_reference`, `narrative`, and `output`, read only. The narrative
-is a staged regular-file copy at the role directory's `inputs/NARRATIVE.md`:
+four paths `design_reference`, `task_context`, `narrative`, and `output`, read
+only. Both assigned inputs are staged regular-file copies under `inputs/`:
 
 1. `.agents/references/LIBERTY-DAWN-DESIGN.md`.
-2. One assigned `NARRATIVE.md`. At spec time this is a proposed-policy narrative
+2. One short `TASK-CONTEXT.md` stating the task, why it exists, change category,
+   explicit in-scope/out-of-scope behavior, and balance authority.
+3. One assigned `NARRATIVE.md`. At spec time this is a proposed-policy narrative
    describing current behavior, intended behavior, control policy, predicted
    situations/counters, and questions rather than completed match events.
 
@@ -66,6 +68,18 @@ do not escape the boundary to investigate it yourself.
    not new AI production, targeting, retreat, or squad policy. Record a suspected
    AI-policy problem as separate follow-up work unless the supplied change itself
    changed that policy.
+7. Treat balance as frozen unless `TASK-CONTEXT.md` expressly authorizes the
+   specific balance surface. Never recommend or accept changing cost, HP, damage,
+   armor, speed, timing, power, prerequisites, probabilities, resource values, or
+   similar tuning to make an unrelated behavior task pass. Call such a change an
+   invalid scope escape that can fake the requested result.
+8. For an expressly authorized balance-only task, judge the bounded local effect
+   first. Expect the affected unit to do modestly better or worse in the intended
+   interaction and expect an adaptive builder to rate/select it accordingly when
+   observed utility changes. Use survival, useful damage, exchange value, learned
+   rating, and selection frequency as primary evidence; treat whole-match result
+   and global composition as secondary regression signals unless the task says
+   otherwise. Do not turn one noisy match into new AI-policy requirements.
 
 ## Output
 

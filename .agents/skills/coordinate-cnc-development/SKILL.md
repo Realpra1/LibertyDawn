@@ -24,6 +24,9 @@ new sessions.
 - Keep task-sheet writes single-owner: only a Task Maker session may edit it.
 - Keep coordinator-state writes single-owner: only the coordinator may edit it.
 - Let workers update only their own state/report and code branch.
+- Treat balance as frozen throughout specification, implementation, review, and
+  integration unless the selected task expressly authorizes the exact balance
+  surface. Never permit tuning values to manufacture behavioral improvement.
 - Preserve unrelated local work. Fetch before trusting remote branch state; never
   discard or rewrite an unknown change to manufacture a clean checkpoint.
 
@@ -69,8 +72,8 @@ Use a fresh context whenever practical:
 | Speccer | Sol 5.6 xhigh | One task packet, repository, worker-state output path |
 | Worker | Sol 5.6 high | One worker `STATE.md` only |
 | Commenter | Terra 5.6 medium | Assigned match/control logs and optional design doc |
-| Policy Reviewer | Terra 5.6 medium | Design doc plus one match narrative |
-| Spec Policy Reviewer | Sol 5.6 high | Design doc plus proposed-policy narrative |
+| Policy Reviewer | Terra 5.6 medium | Design doc, short task context, match narrative |
+| Spec Policy Reviewer | Sol 5.6 high | Design doc, short task context, proposed-policy narrative |
 | Escalated Policy Reviewer | Sol 5.6 xhigh | Once after at least ten persistent-problem game tests |
 | Reviewer | Sol 5.6 high | One task PR, its worker state, evidence |
 | Integrator | Sol 5.6 high | Reviewed branch heads and integration state |
@@ -104,12 +107,14 @@ blocker or receive a user override.
 Commenter and Policy Reviewer launcher jobs must be strict JSON path envelopes
 stored directly in their output directory. Commenter keys are `artifacts`, optional
 `design_reference`, and `output`; its output is `NARRATIVE.md`. Policy-role keys
-are exactly `design_reference`, `narrative`, and `output`; its output is
+are exactly `design_reference`, `task_context`, `narrative`, and `output`; its output is
 `POLICY-REVIEW.md`. The launcher rejects extra inline context, a different design
 document, missing inputs, relative paths, or outputs outside the role directory.
 Before launch, copy only authorized Commenter game evidence into that role
 directory's `inputs/` subtree. Copy the one proposed or factual narrative to the
-Policy Reviewer directory as `inputs/NARRATIVE.md`; do not use symlinks. The
+Policy Reviewer directory as `inputs/NARRATIVE.md`; do not use symlinks. Stage a
+short `inputs/TASK-CONTEXT.md` containing task identity, why, change category,
+in/out-of-scope behavior, and explicit balance authority. The
 launcher rejects analysis inputs outside these staged roots.
 Run the launcher with `--print-command` to validate the same envelope before a
 native no-history spawn; give that agent only the role-instruction and job paths.

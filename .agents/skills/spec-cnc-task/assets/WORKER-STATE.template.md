@@ -10,6 +10,8 @@ when the dependency section directs it.
 
 - Worker: `{{WORKER_ID}}`
 - Task: `{{TASK_ID}} — {{TITLE}}`
+- Change category: `{{CHANGE_CATEGORY}}`
+- Balance authority: `{{EXPLICIT_BALANCE_AUTHORITY_OR_FROZEN}}`
 - Status: `Specified`
 - Common base branch/SHA: `{{BASE_BRANCH}}` / `{{BASE_SHA}}`
 - Task branch: `{{TASK_BRANCH}}`
@@ -119,6 +121,15 @@ before publication. Do not read its worker spec.
 - Put tunable policy in the owning rules/config/save/map layer and algorithmic
   invariants in code. Do not duplicate policy across AI personalities or hide a
   rules/config concern in test-only code.
+- Treat balance as frozen unless `Balance authority` above expressly permits the
+  specific surface. Never change cost, HP, damage, armor, speed, timing, power,
+  prerequisites, probabilities, resource values, or comparable tuning to make a
+  behavior test pass. Unauthorized balance changes invalidate the result because
+  they can fake improvement. Record a needed balance change as deferred work.
+- For an expressly authorized balance-only task, test its bounded local effect
+  first: affected-unit survival, useful damage, exchange value, adaptive rating,
+  and selection frequency as relevant. Treat whole-match outcome/composition as
+  secondary regression evidence unless the task explicitly makes it primary.
 - Add proportionate unit/interface/static tests. Add useful bounded debug logging
   and handled warnings/errors at the owning boundary: make failures actionable,
   never silently swallow exceptions or substitute success, avoid per-tick spam,
@@ -246,9 +257,14 @@ After every materially judged full-engine match or paired control batch:
    losing AI did well. Correct the input/evidence rather than editing the narrative
    into a preferred story.
 4. For AI-policy work, copy that narrative (do not symlink) to the Policy Reviewer
-   output directory as `inputs/NARRATIVE.md`. Write a strict JSON job there with
-   exactly the absolute `design_reference`, staged `narrative`, and `output` paths;
-   output must end in `POLICY-REVIEW.md`. Launch a no-history fresh
+   output directory as `inputs/NARRATIVE.md`. Also write
+   `inputs/TASK-CONTEXT.md`: a short factual description containing task ID/title,
+   expected change, why, change category, explicit in-scope/out-of-scope behavior,
+   and the exact `Balance authority` above. Do not include source, implementation
+   preferences, the full spec, or desired review conclusions. Write a strict JSON
+   job there with exactly the absolute `design_reference`, staged `task_context`,
+   staged `narrative`, and `output` paths; output must end in `POLICY-REVIEW.md`.
+   Launch a no-history fresh
    `policy-reviewer` role (Terra 5.6 medium). Questions embedded in the narrative
    are the worker's questions to this playtester; the job contains no inline
    context.
