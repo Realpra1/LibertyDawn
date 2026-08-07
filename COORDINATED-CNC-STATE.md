@@ -1,7 +1,7 @@
 # Coordinated CNC State
 
 - Round ID: `20260807-bug-polish-03`
-- Phase: `five tasks claimed; Task Maker claim publication pending`
+- Phase: `five tasks claimed/in progress; speccing pending`
 - Common base branch: `agent/cnc-20260807-bug-polish-02-release`
 - Common base SHA: `468ee64f5a0f9a9e19e260e5c5943e6e878f4705`
 - Coordinator model: `gpt-5.6-sol` / `high` (trial mismatch explicitly accepted by user)
