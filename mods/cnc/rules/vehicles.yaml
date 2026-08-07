@@ -363,7 +363,7 @@ FTNK:
 		TurnSpeed: 28
 		Speed: 92
 	Health:
-		HP: 30000
+		HP: 36000
 	Repairable:
 		HpPerStep: 2046
 	Armor:
