@@ -120,3 +120,9 @@ JSON/PID text is diagnostic only, and file persistence after process exit does
 not hold a slot. CNC-94 was corrected by Task Maker commit `599a222fdf` to cover
 misleading metadata and inconsistent round/shared lock namespaces, with tests
 based on actual flock ownership and safe process death rather than JSON cleanup.
+
+Task routing note: fresh Task Maker commit `fc16244bd1` corrected `CNC-85` as
+pending. The task now distinguishes eligible husk restoration into a live unit
+from impossible cross-tech production capture, and limits its stealth-tank
+requirement to air-squad hunt/target priority `3000`; build priority and balance
+are explicitly out of scope. Active Round 03 selection was unchanged.
