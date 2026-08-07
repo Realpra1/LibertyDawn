@@ -12,7 +12,7 @@ when the dependency section directs it.
 - Task: `CNC-52 — Starting-Fact wall hole prevention/repair`
 - Change category: `AI base-construction policy/behavior bug fix with persisted bounded state`
 - Balance authority: `Frozen. Do not change costs, HP, armor, damage, speed, build time, power, prerequisites, probabilities, resource values, wall caps, or other balance/tuning values.`
-- Status: `Implementation and evidence loop`
+- Status: `First iteration - testing handoff (required final Sol-high review unavailable)`
 - Common base branch/SHA: `agent/cnc-20260807-bug-polish-02-release` / `468ee64f5a0f9a9e19e260e5c5943e6e878f4705`
 - Task branch: `agent/round-20260807-cnc52-first-fact-wall-holes`
 - Intended PR base: `agent/cnc-20260807-bug-polish-03-release`
@@ -30,7 +30,7 @@ when the dependency section directs it.
 - Full-engine game tests completed: `33` (`control-game-03`, `control-game-04`, `changed-game-01`, exact-base `control-game-05`, changed `changed-game-02`, cycle-2 fresh-save `changed-game-03`, valid reload `changed-game-05`, cycle-3 diagnostic `changed-game-06`, cycle-4 queue-owner `changed-game-07`, strict cycle-4 pass `changed-game-08`, cycle-5 pending-owner fresh `changed-game-09`, exact reload `changed-game-10`, cycle-6 cadence reload `changed-game-11`, cycle-7 telemetry reload `changed-game-12`, cycle-8 controlled-map fresh `changed-game-14`, cycle-9 deterministic fresh/reload `changed-game-15`/`16`, cycle-10 exact-cutoff reload `changed-game-17`, cycle-11 post-review reload `changed-game-18`, cycle-12 fixed-geometry contention `changed-game-19`, cycle-13 original-Fact-loss fresh/reload `changed-game-20`/`21`, cycle-14 low-cash final-stress diagnostic `changed-game-22`, cycle-15 raid-path diagnostic `changed-game-23`, cycle-16 final changed/exact-base pair `changed-game-24`/`control-game-06`, cycle-17 simultaneous diagnostic pair `changed-game-25`/`control-game-07`, cycle-18 stock-default simultaneous pair `changed-game-26`/`control-game-08`, cycle-19 stock-default serial pair `control-game-09`/`changed-game-27`, and cycle-20 connected-map natural-conclusion `changed-game-28`; cycle-13 fresh and cycles 14/15/17 are counted as materially judged setup/stress failures and tick-0 harness failures are excluded)
 - Terra cycle code reviews: `cycle-05 concern adopted: bound inactive defense-queue polling to enclosure cadence; cycle-10 concern adopted for cycle 11: when generic placement is randomly ordered, deterministically search the full annulus for a legal unreserved alternative before overriding, without consuming additional RNG`
 - Sol-xhigh policy escalation: `unused (requires at least 10 game tests; one maximum)`
-- PR: `none`
+- PR: `https://github.com/Realpra1/LibertyDawn/pull/96` (opened against exact common base because the intended round-03 release branch was not yet published; same-round precedent)
 
 ## Integrated repair assignment
 
@@ -692,19 +692,19 @@ silently exceed the budget.
 
 ## Handoff receipt
 
-- Proposed status:
-- Final branch/head:
-- PR and checks:
-- Cycles used:
-- Acceptance evidence:
-- Adversarial evidence:
-- Old-behavior control and comparative result:
-- Match narratives and routine policy-review conclusions:
-- Terra cycle code reviews and dispositions:
-- Sol-xhigh policy escalation (unused, or test count/path/conclusion):
-- Final regression:
-- Error/warning and diagnostic-cleanup result:
-- Performance/determinism result:
-- Deferred work:
-- Known failures/risks:
-- Relevant artifact paths:
+- Proposed status: `First iteration - testing`. All implementation/evidence/PR/check gates pass, but the mandatory final Sol-high reviewer could not run because its service usage limit was reached before it read any file.
+- Final branch/head: `agent/round-20260807-cnc52-first-fact-wall-holes` / `5f5e4bf96e05783d23ad5d1f19ed016e33b8c800` before the receipt-only commit.
+- PR and checks: `https://github.com/Realpra1/LibertyDawn/pull/96`; Linux CI passed in 2m24s and Windows CI passed in 3m31s on product head `5f5e4bf96e`.
+- Cycles used: `20` recorded evidence cycles; product behavior last changed in cycle 11.
+- Acceptance evidence: Final literal current `changed-game-24-final-literal` passed repair, late clear, three-cell real two-way access, later-Fact negative control, exact cutoff, and post-cutoff negative control through tick 10000. Graphical `replay-game-02-final-literal` reproduced the final snapshot through tick 9999 with no fatal/desync/divergence.
+- Adversarial evidence: Three clean post-fix full-engine scenarios: cycle 11 dynamic occupied hole/interior repair/save-load/traffic; cycle 12 permanent geometry plus first-tower/SAM/Tiberium-field/construction contention; cycle 13 persisted identity, later Fact, original-Fact loss, pre/post-cutoff damage.
+- Old-behavior control and comparative result: Exact `468ee64f5a0f9a9e19e260e5c5943e6e878f4705` `control-game-06-final-literal` logged all eight retries, abandoned the first Fact, left exercised cells empty, then targeted the later Fact. Current repaired/filled both exercised cells and never targeted the later Fact.
+- Match narratives and routine policy-review conclusions: Fresh Terra commenter/policy artifacts exist for every materially judged batch under `analysis/worker-5-cnc52/cycle-*-commenter|policy`. Reviews generally endorsed stable identity, access, independent repair, normal critical arbitration, and exact cutoff; performance/natural-only reviews correctly withheld causal acceptance that is instead supplied by cycles 11–16. No valid post-spec scratchpad replacement was emitted.
+- Terra cycle code reviews and dispositions: Cycle 5 bounded queue polling concern adopted; cycle 10 randomized-placement ninth-candidate concern adopted via deterministic same-annulus fallback without extra RNG; no later product-change checkpoint occurred.
+- Sol-xhigh policy escalation (unused, or test count/path/conclusion): unused.
+- Final regression: Exact current/control literal pair passed; connected Twin Lakes `changed-game-28-natural-twin-lakes` naturally ended after tick 45000 with enclosure complete by 6117 and reservations released exactly 7500; focused 32/32, broad 533/533, `make check`, and `make test` passed.
+- Error/warning and diagnostic-cleanup result: No task warning/error/fatal/desync. Only unrelated baseline CA1825 at `AircraftHuskSpawnEligibilityTest.cs:23`. Diagnostics are bounded, actionable, opt-in, and default false; raw artifacts remain ignored/untracked.
+- Performance/determinism result: Production-default tick-time +4.1% versus control, inside threshold; serial exclusive repeat reversed total throughput (current 434.247 versus control 369.900 ticks/s), disproving repeatable slowdown. Stable ordered plan, bit-encoded save cells, exact queue/tick ownership, same-UID reload, and replay were proven.
+- Deferred work: Separately scope the observed resource-extension placement stall and unavailable late harvester requests; do not fold them into CNC-52. Low-cash wall deferral behind unfinished critical defenses is intentional under frozen priority/balance.
+- Known failures/risks: Mandatory final Sol-high review invocation failed before reading any file because the role account reported its usage limit exhausted until 2026-08-12 17:03; no review verdict or correction exists, so completion cannot be proposed. Natural artifact omitted explicit winner/player statistics, secondary for this local fix. Intended round-03 release PR base was unavailable at publication; PR 96 uses the exact common base and may need integrator retargeting.
+- Relevant artifact paths: `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260807-bug-polish-03/analysis/worker-5-cnc52/{changed-game-18-cycle11-post-review-reload,changed-game-19-cycle12-fixed-geometry-contention,changed-game-21-cycle13-loss-reload,changed-game-24-final-literal,control-game-06-final-literal,replay-game-02-final-literal,changed-game-28-natural-twin-lakes,final-pr-review}`; failed reviewer event is `final-pr-review/events.jsonl`; report `/root/github/LibertyDawn/COORDINATED-CNC-ROUNDS/20260807-bug-polish-03/WORKER-5-CNC-52/REPORT.md`.
