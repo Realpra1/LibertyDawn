@@ -773,7 +773,9 @@ behavior, balance, configuration, or route-gating policy. After `make clean`, th
 locked repository `make check` passed with 0 warnings and 0 errors, including the
 explicit-interface checks. The proportionate filtered
 `TiberiumFieldPolicyTest` verification passed 16/16 on
-`TargetPlatform=unix-generic`. Replacement GitHub checks are pending push.
+`TargetPlatform=unix-generic`. GitHub Actions run `31170984595` for CI-fix
+commit `237da1af47` then passed Linux (.NET 6.0) in 1m57s and Windows (.NET 6.0)
+in 3m45s.
 
 ## Publication
 
@@ -782,8 +784,8 @@ explicit-interface checks. The proportionate filtered
 - Proposed status: `First iteration - testing`
 - Product commit: `aa4e97972d8a0cb7f4780babcdffa4fa363c2299`
 - Draft PR: `https://github.com/Realpra1/LibertyDawn/pull/88`
-- GitHub checks: the prior Windows (.NET 6.0) check passed and prior Linux
-  (.NET 6.0) check failed clean `make check` on IDE0005; the one-line correction
-  now passes the same clean check locally and replacement PR checks are pending.
+- GitHub checks: final-review response commit `237da1af47`, Actions run
+  `31170984595`; Linux (.NET 6.0) passed in 1m57s and Windows (.NET 6.0) passed
+  in 3m45s.
 - Final Sol-high review: clear for this explicit handoff status only; route proof
   remains required before completion/release.

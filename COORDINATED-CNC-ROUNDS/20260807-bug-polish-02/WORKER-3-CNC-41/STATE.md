@@ -27,7 +27,7 @@ when the dependency section directs it.
 - Full-engine game tests completed: `42`
 - Terra cycle code reviews: `cycle 5: advisory concern adopted; red-tree lifecycle configured but unimplemented; cycle 10: advisory concern adopted; completed red enclosure identity, 1500-tick missing-only maintenance, and save/load reconstruction are absent; cycle 15: advisory concern adopted; terminal red segment state is rejected after completed enclosure and before Resonator placement; cycle 20: advisory concern adopted for handoff; real ordinary and reserved-stealth harvester route proof is absent before red activation eligibility`
 - Sol-xhigh policy escalation: `unused (requires at least 10 game tests; one maximum)`
-- PR: `https://github.com/Realpra1/LibertyDawn/pull/88` (draft; final-review CI-only response removes the single unused using; replacement checks pending)
+- PR: `https://github.com/Realpra1/LibertyDawn/pull/88` (draft; final-review CI-only response commit `237da1af47` passed Linux and Windows)
 
 ## Integrated repair assignment
 
@@ -1074,8 +1074,8 @@ final Resonator coverage; do not infer policy success from a clean engine exit.
 ## Handoff receipt
 
 - Proposed status: `First iteration - testing`
-- Final branch/head: `agent/round-20260807-cnc41-economy-tiberium-fields` / product head `aa4e97972d8a0cb7f4780babcdffa4fa363c2299`; handoff metadata successor follows
-- PR and checks: draft PR `https://github.com/Realpra1/LibertyDawn/pull/88`; Windows (.NET 6.0) passed in 3m39s; Linux (.NET 6.0) failed `make check` with IDE0005 at `BaseBuilderTiberiumFieldManager.cs:15` for unused `using OpenRA.Traits`. The one-line source correction would require forbidden cycle 21, so checks are explicitly not green.
+- Final branch/head: `agent/round-20260807-cnc41-economy-tiberium-fields` / CI-fix head `237da1af47`; review-receipt metadata successor follows
+- PR and checks: draft PR `https://github.com/Realpra1/LibertyDawn/pull/88`; final-review response Actions run `31170984595` passed Linux (.NET 6.0) in 1m57s and Windows (.NET 6.0) in 3m45s.
 - Cycles used: `20/20`; `42` materially judged full-engine games
 - Acceptance evidence: non-red one-to-one powered placement and observed ordinary cargo/unload passed in cycle 4/5; exact red geometry, pre-existing enclosure reconstruction, and terminal project save/reload passed in cycles 18-20. Literal three-tree acceptance did not pass.
 - Adversarial evidence: bounded resource obstruction, illegal-cell retarget, 1500-tick no-progress defer/resume, one necessary live Power Plant extension, mid-project reload, exact saved spatial/geometry validation, and terminal reload were exercised. Three clean post-fix adversarial scenarios were not completed.
@@ -1084,10 +1084,10 @@ final Resonator coverage; do not infer policy success from a clean engine exit.
 - Terra cycle code reviews and dispositions: cycles 5, 10, and 15 concerns were adopted in later cycles. Cycle 20 REQUEST_CHANGES is adopted for handoff: activation eligibility lacks actual ordinary and reserved-stealth harvester route proof. Final Sol-high task-PR review at `analysis/worker-3-cnc41/final-pr-review/FINAL-PR-REVIEW.md` is CLEAR only for `First iteration - testing`, not completion/release.
 - Sol-xhigh policy escalation (unused, or test count/path/conclusion): unused
 - Final regression: not passed; no literal stressed fresh regression, packaged Red Dawn changed-AI regression, or natural full match
-- Error/warning and diagnostic-cleanup result: local incremental strict CNC build reported 0 warnings/errors; full tests 471/471, exhaustive CNC YAML, and diff check pass. GitHub Windows passed, but Linux clean `make check` found IDE0005 for unused `using OpenRA.Traits`; no out-of-budget correction was made. Initial 140-line scan and temporary constructor diagnostic were removed; bounded/rate-limited ownership transitions remain.
+- Error/warning and diagnostic-cleanup result: final-review `make clean` plus locked `make check` reported 0 warnings/errors, filtered policy tests passed 16/16, and both GitHub platform checks passed after removing only the unused `using OpenRA.Traits`. Initial 140-line scan and temporary constructor diagnostic were removed; bounded/rate-limited ownership transitions remain.
 - Performance/determinism result: deterministic sorting and bounded scan/search/state; cycle-20 reload 187.293 valid ticks/s without desync. No matched <=5% sustained performance proof.
 - Deferred work: implement pre-activation ordinary/refinery/gate round-trip and reserved-stealth route gates; then complete active breach/maintenance/save-load, remote extension, topology, three-tree, Red Dawn, matched payoff, and natural-match validation.
-- Known failures/risks: red activation can become eligible from wall/open-gate presence without required real route proof; Linux CI is red for one unused using; fresh red construction never reached complete active coverage; active maintenance and active-enclosure reload are runtime-unproven; extension stopped after one step; serial infeasible-project starvation remains a hypothesis.
+- Known failures/risks: red activation can become eligible from wall/open-gate presence without required real route proof; fresh red construction never reached complete active coverage; active maintenance and active-enclosure reload are runtime-unproven; extension stopped after one step; serial infeasible-project starvation remains a hypothesis.
 - Relevant artifact paths: `analysis/worker-3-cnc41/cycle-18-game-20-red-recovery-save/`, `cycle-19-game-21-terminal-reload/`, `cycle-20-game-22-exact-perimeter-reload/`, and `cycle-review-20/CYCLE-REVIEW.md`
 
 ## Final-review response receipt
@@ -1100,6 +1100,7 @@ final Resonator coverage; do not infer policy success from a clean engine exit.
   0 warnings and 0 errors, including both explicit-interface validation steps.
 - Proportionate verification: filtered `TiberiumFieldPolicyTest` passed 16/16 on
   `TargetPlatform=unix-generic`.
-- GitHub receipt: pending push and replacement PR checks.
+- GitHub receipt: CI-fix commit `237da1af47`, Actions run `31170984595`;
+  Linux (.NET 6.0) passed in 1m57s and Windows (.NET 6.0) passed in 3m45s.
 - The ordinary/stealth harvester gate-route blocker and every other deferred
   acceptance gap remain unchanged and explicitly out of this response scope.
