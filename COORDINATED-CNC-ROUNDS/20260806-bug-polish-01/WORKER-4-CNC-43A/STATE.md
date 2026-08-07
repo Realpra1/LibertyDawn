@@ -861,3 +861,31 @@ Review response (no product/code cycle): the response added bounded analysis-map
 - Deferred work: multi-seed/replay-derived attack, route, and withdrawal policy study; AI production/target retuning remains explicitly out of scope, while terminal winner/economy/force capture is now complete
 - Known failures/risks: three geographically separated FTNK remained unengaged at the Mammoth hold bound, but all six Mammoths survived with 536480 changed aggregate HP after killing 14/17; the earlier concentrated Mammoth harness was invalidated because death-chain geometry reversed both changed and control
 - Relevant artifact paths: `analysis/worker-4-cnc-43a/{final-resolved-cycle2,final-literal-v1,true-tanks-v1,natural-v1,natural-terminal-v2,save-load-v1,defense-v1,mtnk-isolated}` and task report
+
+## Integrated RC2 assignment
+
+- Test the exact cumulative candidate fd15540ffc98c70f085688fe0b38a4a6341fc6ed
+  (code candidate b456fd89fac88d71dfadd65c47cfb7b409d44122, draft PR #84)
+  from repair branch agent/round-20260806-cnc43a-rc2-repair.
+- This is the combined release-testing phase. Preserve the original task contract
+  and judge whether that task still works when all five reviewed changes coexist.
+- Use full-engine headless MAX simulations from the first behavioral test. Make
+  every test adversarial, use materially different scenarios, and compare against
+  old/control behavior whenever that is informative. Isolate every support dir,
+  log, replay, port, display, and map artifact.
+- The shared game resource has a trial capacity of three. Use
+  with_resource_slots.py with resource game, capacity 3, and the common round lock
+  directory. Record elapsed time, peak RSS, completion reliability, and whether
+  three-way concurrency should be retained or reduced to two.
+- Run at most three integrated code-change cycles. A cycle boundary is a product
+  code change; one cycle may include up to two games when needed. If relevant
+  combined evidence passes, stop without inventing a change. If a failure requires
+  repair, keep it strictly within this task, commit and push this repair branch,
+  rerun affected evidence, and record the exact repair head for the integrator.
+- The original task's balance authority is unchanged. Do not alter balance outside
+  an exact authorization already present in this state, and never tune values to
+  manufacture a better result.
+- Continue using the existing Commenter and Policy Reviewer workflow for materially
+  judged AI matches. Finish by updating this state/report with the exact candidate,
+  scenarios, controls, artifacts, results, cycle count, resource measurements, and
+  one of: combined pass/no repair, or reviewed repair head ready to merge.
