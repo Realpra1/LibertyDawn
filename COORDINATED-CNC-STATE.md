@@ -5,7 +5,9 @@
 - Common base branch: `agent/cnc38-early-viki-infantry-rush`
 - Common base SHA: `09ccdac3c1ecb5134a4751f2bcbd8a7970dfe6bf`
 - Coordinator model: `gpt-5.6-sol` / `high` (trial mismatch explicitly accepted by user)
-- Game slots: `2`
+- Game slots: `2` proven; trial `3` concurrent isolated MAX games during combined
+  testing and retain three only if throughput, RSS, and evidence reliability stay
+  healthy
 - Large-build slots: `1`
 - Lock directory: `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260806-bug-polish-01/locks`
 - Release candidate: `RC1 preview` at `0057dd25868e1cc6f7a3ba406062caa05eca2406`
@@ -32,3 +34,8 @@
 Record only routing, process identity, branch heads, phase, blockers, and concise
 results here. Keep task specifications and detailed evidence in worker state and
 reports.
+
+After all five task heads complete review, integration, adversarial combined
+testing, repair, and release review, use the tested cumulative release head as the
+common base for the next coordinated five-task round. Do not stop after this
+round unless the user pauses the pipeline or a real blocker prevents progress.
