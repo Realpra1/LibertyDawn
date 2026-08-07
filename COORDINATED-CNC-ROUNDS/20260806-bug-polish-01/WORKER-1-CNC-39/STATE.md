@@ -845,7 +845,7 @@ silently exceed the budget.
 
 - Proposed status: `Reviewed RC2 repair head ready to merge`
 - Final branch/head: `agent/round-20260806-cnc39-rc2-repair`; exact product
-  repair `bc3ab411f81e8d4928769fc2cd3c80b44bf1f65e`
+  repair `bc3ab411f8235cfbec1a31ed7187f6e7971897a9`
 - PR and checks: original draft PR #83 and cumulative draft PR #84; local final
   focused/full/build/CNC-content gates green; repair branch is the integrator handoff
 - Cycles used: `8/20 isolated; 2/3 integrated RC2; 2/12 integrated total`
@@ -1033,6 +1033,6 @@ silently exceed the budget.
   and `git diff --check`; zero build warnings/errors. Prompt maintenance performs
   no world/path scan and no per-tick temporary collection allocation; it scans
   only the bounded active capture/demolition assignment dictionaries.
-- Exact product repair commit: `bc3ab411f81e8d4928769fc2cd3c80b44bf1f65e`
+- Exact product repair commit: `bc3ab411f8235cfbec1a31ed7187f6e7971897a9`
   (`Retire completed specialist assignments promptly`). Ready for the integrator
   to merge/cherry-pick onto the cumulative release branch.
