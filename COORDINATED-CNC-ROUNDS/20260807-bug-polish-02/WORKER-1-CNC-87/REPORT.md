@@ -84,6 +84,15 @@ Commenter paths pass.
   Guarded `make check` passed the Debug warning-as-error build and both interface
   checks, reaping PIDs 767800/767801/767805 before release. Both builds reported
   zero warnings and zero errors.
+- Final Sol-high review on head `69f0e1aa2b` returned `ready with one fix`: its
+  independent repetitions proved the test's `select()` plus `TextIOWrapper`
+  reader could miss an already buffered `queued` line and leak exact probes on an
+  assertion path. The finding was adopted in the one allowed review-response
+  cycle. Event reads now drain raw descriptor bytes and all spawned probes are
+  teardown-tracked for exact termination, bounded wait/escalation, and pipe
+  closure. Five isolated resource-suite repetitions passed in 3.549–3.721 s with
+  `ResourceWarning` as error; the full 20-test portfolio then passed in 5.651 s.
+  This was test-harness-only and did not alter production/game behavior.
 
 ## Performance and determinism
 
@@ -98,6 +107,7 @@ ticks/s) without startup, fatal, desync, or termination regression.
 
 - Draft PR #86 targets the recorded common base:
   `https://github.com/Realpra1/LibertyDawn/pull/86`. Complete the final independent
-  Sol-high review, required Linux/Windows GitHub checks, and publication receipt.
+  reviewer verification, required Linux/Windows GitHub checks, and publication
+  receipt.
 - Evaluate portability explicitly: complete process-tree enforcement uses Linux
   `prctl` and `/proc`, matching the coordinated Linux host contract.

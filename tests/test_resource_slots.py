@@ -25,9 +25,25 @@ class ResourceSlotsTest(unittest.TestCase):
         self.root = Path(self.temporary.name)
         self.lock_dir = self.root / "locks"
         self.sequence = 0
+        self.processes = []
+        self.stderr_buffers = {}
+        self.stderr_lines = {}
 
     def tearDown(self):
+        for process in reversed(self.processes):
+            if process.poll() is None:
+                process.terminate()
+            try:
+                process.communicate(timeout=3)
+            except subprocess.TimeoutExpired:
+                if process.poll() is None:
+                    process.kill()
+                process.communicate(timeout=3)
         self.temporary.cleanup()
+
+    def track(self, process):
+        self.processes.append(process)
+        return process
 
     def large_build(self, entry_role, command, timeout=3):
         return [
@@ -104,21 +120,28 @@ class ResourceSlotsTest(unittest.TestCase):
 
     def wait_event(self, process, event, timeout=3):
         deadline = time.monotonic() + timeout
-        lines = []
+        descriptor = process.stderr.fileno()
+        buffer = self.stderr_buffers.setdefault(process.pid, bytearray())
+        lines = self.stderr_lines.setdefault(process.pid, [])
         while time.monotonic() < deadline:
-            ready, _, _ = select.select([process.stderr], [], [], .1)
+            while b"\n" in buffer:
+                raw_line, _, remainder = buffer.partition(b"\n")
+                buffer[:] = remainder
+                line = raw_line.decode("utf-8", errors="replace") + "\n"
+                lines.append(line)
+                try:
+                    value = json.loads(line.removeprefix("resource-slot "))
+                except json.JSONDecodeError:
+                    continue
+                if value.get("event") == event:
+                    return value, list(lines)
+            ready, _, _ = select.select([descriptor], [], [], .1)
             if not ready:
                 continue
-            line = process.stderr.readline()
-            if not line:
+            chunk = os.read(descriptor, 65536)
+            if not chunk:
                 break
-            lines.append(line)
-            try:
-                value = json.loads(line.removeprefix("resource-slot "))
-            except json.JSONDecodeError:
-                continue
-            if value.get("event") == event:
-                return value, lines
+            buffer.extend(chunk)
         self.fail(f"timed out waiting for event {event!r}; lines={lines!r}")
 
     def assert_cross_path_serializes(self, first_role, second_role):
@@ -128,7 +151,7 @@ class ResourceSlotsTest(unittest.TestCase):
         first_exit = self.root / f"{prefix}-{first_role}-exit"
         release = self.root / f"{prefix}-{first_role}-release"
         second_enter = self.root / f"{prefix}-{second_role}-enter"
-        first = subprocess.Popen(
+        first = self.track(subprocess.Popen(
             self.large_build(
                 first_role,
                 self.marker_command(first_enter, release, first_exit),
@@ -136,9 +159,9 @@ class ResourceSlotsTest(unittest.TestCase):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-        )
+        ))
         self.wait_path(first_enter)
-        second = subprocess.Popen(
+        second = self.track(subprocess.Popen(
             self.large_build(
                 second_role,
                 self.marker_command(second_enter),
@@ -146,7 +169,7 @@ class ResourceSlotsTest(unittest.TestCase):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-        )
+        ))
         queued, _ = self.wait_event(second, "queued")
         self.assertEqual(queued["entry_role"], second_role)
         self.assertFalse(second_enter.exists())
@@ -239,7 +262,7 @@ class ResourceSlotsTest(unittest.TestCase):
     def test_abrupt_wrapper_death_does_not_release_live_command_tree(self):
         first_enter = self.root / "abandoned-enter"
         first_exit = self.root / "abandoned-exit"
-        first = subprocess.Popen(
+        first = self.track(subprocess.Popen(
             self.large_build(
                 "worker",
                 self.marker_command(
@@ -248,17 +271,17 @@ class ResourceSlotsTest(unittest.TestCase):
             ),
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
-        )
+        ))
         self.wait_path(first_enter)
         os.kill(first.pid, signal.SIGKILL)
         first.wait(timeout=1)
         second_enter = self.root / "after-abandon-enter"
-        second = subprocess.Popen(
+        second = self.track(subprocess.Popen(
             self.large_build("integrator", self.marker_command(second_enter)),
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-        )
+        ))
         self.wait_event(second, "queued")
         self.assertFalse(second_enter.exists())
         self.wait_path(first_exit)
@@ -277,12 +300,12 @@ class ResourceSlotsTest(unittest.TestCase):
             + repr(str(entered))
             + ").write_text(str(time.monotonic())); time.sleep(60)",
         ]
-        holder = subprocess.Popen(
+        holder = self.track(subprocess.Popen(
             self.large_build("integrator", command),
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-        )
+        ))
         self.wait_path(entered)
         holder.terminate()
         output = holder.communicate(timeout=5)
@@ -301,12 +324,12 @@ class ResourceSlotsTest(unittest.TestCase):
     def test_timeout_and_invalid_policy_do_not_claim_success(self):
         entered = self.root / "timeout-holder-enter"
         release = self.root / "timeout-holder-release"
-        holder = subprocess.Popen(
+        holder = self.track(subprocess.Popen(
             self.large_build("worker", self.marker_command(entered, release)),
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-        )
+        ))
         self.wait_path(entered)
         timed_out = subprocess.run(
             self.large_build(
@@ -391,26 +414,26 @@ class ResourceSlotsTest(unittest.TestCase):
     def test_game_slots_remain_independent_and_capacity_two(self):
         build_enter = self.root / "build-enter"
         build_release = self.root / "build-release"
-        build = subprocess.Popen(
+        build = self.track(subprocess.Popen(
             self.large_build(
                 "worker", self.marker_command(build_enter, build_release)
             ),
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-        )
+        ))
         self.wait_path(build_enter)
         games = []
         releases = []
         for index in range(2):
             entered = self.root / f"game-{index}-enter"
             release = self.root / f"game-{index}-release"
-            process = subprocess.Popen(
+            process = self.track(subprocess.Popen(
                 self.generic("game", 2, self.marker_command(entered, release)),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
-            )
+            ))
             self.wait_path(entered)
             games.append(process)
             releases.append(release)
@@ -426,12 +449,12 @@ class ResourceSlotsTest(unittest.TestCase):
             },
         )
         third_enter = self.root / "game-2-enter"
-        third = subprocess.Popen(
+        third = self.track(subprocess.Popen(
             self.generic("game", 2, self.marker_command(third_enter)),
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-        )
+        ))
         self.wait_event(third, "queued")
         self.assertFalse(third_enter.exists())
         releases[0].write_text("release\n", encoding="utf-8")
