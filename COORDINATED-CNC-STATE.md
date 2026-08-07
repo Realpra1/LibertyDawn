@@ -126,3 +126,9 @@ pending. The task now distinguishes eligible husk restoration into a live unit
 from impossible cross-tech production capture, and limits its stealth-tank
 requirement to air-squad hunt/target priority `3000`; build priority and balance
 are explicitly out of scope. Active Round 03 selection was unchanged.
+
+Task routing note: fresh Task Maker commit `9a9f4b1f43` split `CNC-86A` from
+`CNC-86`. `CNC-86A` is pending and owns the blue-tiberium-loaded harvester
+shot-burst behavior; `CNC-86` remains pending with only its lobby-option and
+detonation contract. No active Round 03 task was changed, and no completed
+merged task was eligible for history migration.

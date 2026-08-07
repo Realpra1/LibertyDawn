@@ -59,6 +59,10 @@ Store detailed per-match narratives and policy reviews under the ignored round
 analysis area, for example `.worktrees/coordinated-cnc/<round>/analysis/<worker>/`;
 commit concise conclusions and paths in worker state/report rather than flooding
 Git with every generated analysis.
+Keep `AUTONOMOUS-CNC-TASK-HISTORY.md` as passive append-only release history.
+No coordinator, reader, speccer, worker, reviewer, integrator, or other agent
+reads or searches that file; only the Task Maker may append a release-handoff
+line without reading prior history.
 
 Commit local state during normal task/release pushes. A task branch contains only
 its own worker state. After task and release PRs are merged or closed, remove
