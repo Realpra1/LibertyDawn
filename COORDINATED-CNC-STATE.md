@@ -23,7 +23,7 @@
 |---|---|---|---|---|---|---|---|---|
 | 1 | CNC-45 Economy troop production/use | | | spec ready at `COORDINATED-CNC-ROUNDS/20260807-bug-polish-03/WORKER-1-CNC-45/STATE.md`; no prerequisite; preserve CNC-43/CNC-36 ownership surfaces | reader and xhigh speccer complete; Sol-high spec policy consultation complete | | | |
 | 2 | CNC-46 Defense clusters | | | spec ready at `COORDINATED-CNC-ROUNDS/20260807-bug-polish-03/WORKER-2-CNC-46/STATE.md`; preserve CNC-52 enclosure ownership and keep CNC-91 sparse towers subordinate | reader and xhigh speccer complete; Sol-high spec policy consultation complete | | | |
-| 3 | CNC-47 Repeatable performance baseline | | | `claimed` at `2026-08-07T15:08:04Z`; packet `COORDINATED-CNC-ROUNDS/20260807-bug-polish-03/TASK-PACKET-3.md` | reader `/root/round03_task_reader_3` complete | | | |
+| 3 | CNC-47 Repeatable performance baseline | | | spec ready at `COORDINATED-CNC-ROUNDS/20260807-bug-polish-03/WORKER-3-CNC-47/STATE.md`; pure measurement/tooling, policy consultation correctly skipped; outputs feed CNC-48/CNC-49 | reader and xhigh speccer complete | | | |
 | 4 | CNC-50 Late-game engineer stall recovery | | | `claimed` at `2026-08-07T15:09:42Z`; packet `COORDINATED-CNC-ROUNDS/20260807-bug-polish-03/TASK-PACKET-4.md` | reader `/root/round03_task_reader_4` complete | | | |
 | 5 | CNC-52 Starting-Fact wall hole prevention/repair | | | `claimed` at `2026-08-07T15:11:17Z`; packet `COORDINATED-CNC-ROUNDS/20260807-bug-polish-03/TASK-PACKET-5.md` | reader `/root/round03_task_reader_5` complete | | | |
 
