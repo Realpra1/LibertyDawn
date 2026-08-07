@@ -50,13 +50,56 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
-		public void HealthyBuildingsRequirePairAndRetargetingUsesMargin()
+		public void BuildingPairRequirementUsesExactHealthRatio()
 		{
-			Assert.That(CaptureTargeting.RequiresEngineerPair(true, 51, 50), Is.True);
-			Assert.That(CaptureTargeting.RequiresEngineerPair(true, 50, 50), Is.False);
-			Assert.That(CaptureTargeting.RequiresEngineerPair(false, 100, 50), Is.False);
+			Assert.That(CaptureTargeting.RequiresEngineerPair(true, 79, 100, 80), Is.False);
+			Assert.That(CaptureTargeting.RequiresEngineerPair(true, 80, 100, 80), Is.False);
+			Assert.That(CaptureTargeting.RequiresEngineerPair(true, 80001, 100000, 80), Is.True);
+			Assert.That(CaptureTargeting.RequiresEngineerPair(true, 81, 100, 80), Is.True);
+			Assert.That(CaptureTargeting.RequiresEngineerPair(true, 1, 0, 80), Is.True);
+			Assert.That(CaptureTargeting.RequiresEngineerPair(true, 1, -1, 80), Is.True);
+			Assert.That(CaptureTargeting.RequiresEngineerPair(false, int.MaxValue, 1, 80), Is.False);
+			Assert.That(CaptureTargeting.RequiresEngineerPair(true, int.MaxValue, int.MaxValue, 80), Is.True);
+		}
+
+		[Test]
+		public void RetargetingUsesStrictImprovementMargin()
+		{
 			Assert.That(CaptureTargeting.ShouldRetarget(100, 124, 25), Is.False);
+			Assert.That(CaptureTargeting.ShouldRetarget(100, 125, 25), Is.False);
 			Assert.That(CaptureTargeting.ShouldRetarget(100, 126, 25), Is.True);
+		}
+
+		[Test]
+		public void PairUsesWorseMemberAndComparesDistinctSoloTargets()
+		{
+			Assert.That(CaptureTargeting.PairScore(900, 300), Is.EqualTo(300));
+			Assert.That(CaptureTargeting.PairScore(900, -1), Is.EqualTo(-1));
+
+			var firstScores = new double[] { 80, 60, -1 };
+			var secondScores = new double[] { 70, 100, -1 };
+			var allocation = CaptureTargeting.BestDistinctTargetAllocation(
+				firstScores, secondScores, new HashSet<int>());
+			Assert.That(allocation.FirstTarget, Is.EqualTo(0));
+			Assert.That(allocation.SecondTarget, Is.EqualTo(1));
+			Assert.That(allocation.Score, Is.EqualTo(180));
+
+			allocation = CaptureTargeting.BestDistinctTargetAllocation(
+				firstScores, secondScores, new HashSet<int> { 1 });
+			Assert.That(allocation.FirstTarget, Is.EqualTo(0));
+			Assert.That(allocation.SecondTarget, Is.EqualTo(-1));
+			Assert.That(allocation.Score, Is.EqualTo(80));
+		}
+
+		[Test]
+		public void DistinctSoloAllocationBreaksEqualTiesDeterministically()
+		{
+			var scores = new double[] { 100, 100 };
+			var allocation = CaptureTargeting.BestDistinctTargetAllocation(
+				scores, scores, new HashSet<int>());
+			Assert.That(allocation.FirstTarget, Is.EqualTo(0));
+			Assert.That(allocation.SecondTarget, Is.EqualTo(1));
+			Assert.That(allocation.Score, Is.EqualTo(200));
 		}
 	}
 }
