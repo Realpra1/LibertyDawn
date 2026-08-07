@@ -82,3 +82,12 @@ cycle reviewer has launched yet; it must use Terra medium. Final PR Reviewers
 and the Integrator remain Sol high by design. The Sol-high coordinator itself is
 the already-recorded user-accepted trial mismatch. Dead pre-interruption worker
 envelopes are historical records, not additional running Sol sessions.
+
+Task routing note (2026-08-07): a fresh Terra-medium Task Maker recorded two
+separate pending user bug reports at task-sheet commit `281bc8d23c`: `CNC-96`
+for periodic freezes on very old hardware (linked to CNC-47 history), and
+`CNC-97` for suspected failure to recognize new aircraft husks as Engineer-
+restorable targets (linked to CNC-44 history). Neither was deduplicated. CNC-96
+can be sharpened later with CPU/GPU/RAM/OS, map/match conditions, freeze
+frequency, and freeze duration; absence of those details does not alter the
+active Round 03 batch.
