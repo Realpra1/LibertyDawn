@@ -139,3 +139,10 @@ controls spontaneous instability; `tiberium explosions` is positive when
 selected and controls loose tiberium reacting to shots. Killed or deliberately
 detonated tiberium-loaded harvesters always explode regardless of either option.
 Active Round 03 selection was unchanged.
+
+Task routing note: fresh Task Maker commit `01774bfba5` amended pending `CNC-86`
+with the confirmed red-loaded-Harvester shot-kill regression. A killed or
+deliberately detonated red Harvester must explode regardless of lobby options;
+only spontaneous instability and loose-tiberium shot reactions are suppressible.
+The required fixture compares shot-kill, deliberate detonation, and spontaneous
+events with options on and off. CNC-86A and Round 03 were untouched.
