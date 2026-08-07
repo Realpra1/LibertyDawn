@@ -36,6 +36,7 @@ when the dependency section directs it.
 - Integration notes: `COORDINATED-CNC-ROUNDS/20260807-bug-polish-02/INTEGRATION.md`
 - Repair branch: `agent/round-20260807-cnc41-rc1-repair`
 - Repair PR base: `agent/cnc-20260807-bug-polish-02-release`
+- Repair PR: `https://github.com/Realpra1/LibertyDawn/pull/93` (draft)
 - Integrated cycles used this RC: `3/3`
 - Integrated cycles used total: `3/12`
 
@@ -1089,7 +1090,7 @@ final Resonator coverage; do not infer policy success from a clean engine exit.
 - Repaired safety outcome: exact containment no longer makes a red Resonator activation-eligible; activation requires a live ordinary refinery/gate/enclosed-harvest/gate/unload sequence and, when relevant, a read-only-observed reserved RedTiberiumBomb gate crossing
 - Unmet acceptance: the exact east test entrance has no actual ordinary-locomotor outbound path; no ordinary or reserved-stealth live proof, red activation, or active maintenance result exists
 - Final reviewer disposition: factual Commenter confirms missing route/round-trip evidence; Policy Reviewer rejects feature acceptance while affirming fail-closed activation and frozen scope/balance
-- Publication: repair commit/PR/check receipts pending below
+- Publication: product/state commit `727af8d4c8`; draft repair PR `https://github.com/Realpra1/LibertyDawn/pull/93` against the recorded release branch; receipt-metadata successor and required Linux/Windows checks follow
 
 ## Handoff receipt
 
