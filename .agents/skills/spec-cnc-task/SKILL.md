@@ -104,6 +104,12 @@ contract, not a summary.
     useful recommendations, rejected recommendations with reasons, and the
     adversarial tests it inspired in the worker state. Skip only when policy is
     genuinely irrelevant, recording why.
+19. Require fresh Terra-medium code reviews after product-change cycles 5, 10,
+    15, and 20 that occur. Each checkpoint reviews only this worker's state,
+    cumulative scoped diff, and evidence so far and returns at most one advisory
+    concern. Require the worker to record adoption or evidence-based rejection;
+    an adopted correction consumes the next ordinary cycle. These checkpoints do
+    not replace the final Sol-high PR review or increase the 20-cycle budget.
 
 Keep the coordinator state concise; all task detail belongs in this worker state.
 Return only the task ID, worker-state path, base SHA, and material cross-worker

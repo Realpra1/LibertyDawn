@@ -75,6 +75,7 @@ Use a fresh context whenever practical:
 | Policy Reviewer | Terra 5.6 medium | Design doc, short task context, match narrative |
 | Spec Policy Reviewer | Sol 5.6 high | Design doc, short task context, proposed-policy narrative |
 | Escalated Policy Reviewer | Sol 5.6 xhigh | Once after at least ten persistent-problem game tests |
+| Cycle Reviewer | Terra 5.6 medium | One worker state, cumulative scoped diff, and evidence through cycle 5/10/15/20 |
 | Reviewer | Sol 5.6 high | One task PR, its worker state, evidence |
 | Integrator | Sol 5.6 high | Reviewed branch heads and integration state |
 
@@ -167,6 +168,13 @@ an existing task require a new or revised spec before selection.
   Commenter. For AI-policy work, pass its narrative to a fresh Terra-medium Policy
   Reviewer before the worker chooses the next change. These model sessions do not
   consume local game slots and can analyze while another simulation runs.
+- After each isolated product-change cycle 5, 10, 15, and 20 that occurs, launch
+  a fresh Terra-medium `cycle-reviewer` before the next product change or
+  publication. Give it only that worker's state, cumulative diff from the common
+  base, relevant evidence through the checkpoint, and a task-local output path.
+  It returns at most one advisory concern. Require the worker to record an
+  evidence-based adoption or rejection; an adopted code change consumes the next
+  normal cycle. Do not grant extra cycles or replace the final Sol-high PR review.
 - Run `scripts/with_resource_slots.py` around shared builds and game batches.
 - A worker may reserve two game slots for a two-game comparison. Use the existing
   `launch-ai-parallel.py` inside the reservation.
@@ -180,27 +188,31 @@ an existing task require a new or revised spec before selection.
 
 1. Each worker opens one task PR from its isolated branch and proposes `Complete -
    testing` or `First iteration - testing` in its state.
-2. Launch one fresh Reviewer per PR after the worker finishes. Give the reviewer
+2. Confirm every due cycle-5/10/15/20 Terra review and worker disposition is
+   recorded. Missing an advisory checkpoint does not authorize a retroactive
+   code change outside the cycle budget; complete it before publication when
+   possible or record the gap for the final reviewer.
+3. Launch one fresh Reviewer per PR after the worker finishes. Give the reviewer
    only that PR, state/spec, and evidence. Return its single highest-impact
    compatible correction to the worker for at most one review-response code/test
    cycle. Record disagreements; review never replaces CI or runtime evidence.
-3. After reviews and required task-PR checks, launch the Integrator. It creates one
+4. After reviews and required task-PR checks, launch the Integrator. It creates one
    stable `agent/cnc-<round>-release` branch from the common base and locally
    merges the reviewed feature heads with merge commits. Its initial head is RC1.
    Do not invoke GitHub's merge action on the individual PRs.
-4. Open one draft release PR from that stable branch to `bleed`. Keep source PRs
+5. Open one draft release PR from that stable branch to `bleed`. Keep source PRs
    open and visible.
-5. Ask the five workers to test the combined candidate for up to three
+6. Ask the five workers to test the combined candidate for up to three
    code-change cycles each. Stop workers whose relevant combined tests pass.
-6. Put required release fixes on individual repair branches based on the current
+7. Put required release fixes on individual repair branches based on the current
    release head. Merge reviewed repair heads back into the same stable release
    branch; each new tested head becomes RC2, RC3, or RC4 and automatically updates
    the existing release PR. Repeat at most four candidate rounds, providing at
    most twelve merged-branch cycles per task and 32 total cycles per task including
    its 20 isolated cycles.
-7. Reactivate a stopped worker when a later repair touches its subsystem or
+8. Reactivate a stopped worker when a later repair touches its subsystem or
    invalidates its evidence.
-8. When the final candidate passes, have the Task Maker finalize task-sheet
+9. When the final candidate passes, have the Task Maker finalize task-sheet
    statuses and promote the draft release PR to the product release PR. The user
    decides whether to merge it.
 

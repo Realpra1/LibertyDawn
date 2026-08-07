@@ -25,6 +25,7 @@ when the dependency section directs it.
 - Match-analysis directory: `{{ABSOLUTE_ANALYSIS_DIRECTORY}}`
 - Liberty Dawn design reference: `.agents/references/LIBERTY-DAWN-DESIGN.md`
 - Full-engine game tests completed: `0`
+- Terra cycle code reviews: `none yet; required after cycles 5/10/15/20 that occur`
 - Sol-xhigh policy escalation: `unused (requires at least 10 game tests; one maximum)`
 - PR: `none`
 
@@ -239,6 +240,23 @@ For each cycle:
 6. Remove or reduce obsolete/noisy diagnostics after they answer the question.
 7. Update the cycle journal before making another code change.
 
+## Interim code-review loop
+
+After product-change cycles 5, 10, 15, and 20 that occur, and before the next
+product change or publication, launch a fresh Terra 5.6 medium
+`cycle-reviewer`. Give it a job declaring `cycle` mode and only this state path,
+the recorded base SHA, current branch/head and cumulative scoped diff, relevant
+evidence through that cycle, and a task-local output path such as
+`{{ABSOLUTE_ANALYSIS_DIRECTORY}}/cycle-review-05/CYCLE-REVIEW.md`.
+
+The reviewer writes only its review artifact and returns at most one
+`advisory_concern`. Read it, verify its evidence, and record whether it is adopted
+or rejected and why. An adopted product change begins the next ordinary cycle;
+the review grants no extra cycles. At cycle 20, either reject the concern with
+evidence or hand off `First iteration - testing` if resolving it would require
+cycle 21. A clear review does not replace adversarial games, Commenter/Policy
+Review, CI, or the final Sol-high task-PR review and one-response gate.
+
 ## Match narrative and policy-feedback loop
 
 After every materially judged full-engine match or paired control batch:
@@ -388,7 +406,7 @@ silently exceed the budget.
 
 ## Cycle journal
 
-| Cycle | Commit/change | Failure hypothesis and perturbation | Checks/games | Narrative/policy review | Failure/pass evidence | Decision/next harder test |
+| Cycle | Commit/change | Failure hypothesis and perturbation | Checks/games | Narrative/policy/cycle-code review | Failure/pass evidence | Decision/next harder test |
 |---|---|---|---|---|---|---|
 
 ## Handoff receipt
@@ -401,6 +419,7 @@ silently exceed the budget.
 - Adversarial evidence:
 - Old-behavior control and comparative result:
 - Match narratives and routine policy-review conclusions:
+- Terra cycle code reviews and dispositions:
 - Sol-xhigh policy escalation (unused, or test count/path/conclusion):
 - Final regression:
 - Error/warning and diagnostic-cleanup result:
