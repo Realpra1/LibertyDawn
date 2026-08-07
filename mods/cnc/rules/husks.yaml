@@ -1,3 +1,30 @@
+TRAN.GroundHusk:
+	Inherits: ^AircraftGroundHusk
+	Tooltip:
+		Name: Chinook Transport (Destroyed)
+	TransformOnCapture:
+		IntoActor: tran
+	RenderSprites:
+		Image: tran
+
+HELI.GroundHusk:
+	Inherits: ^AircraftGroundHusk
+	Tooltip:
+		Name: Apache Longbow (Destroyed)
+	TransformOnCapture:
+		IntoActor: heli
+	RenderSprites:
+		Image: heli
+
+ORCA.GroundHusk:
+	Inherits: ^AircraftGroundHusk
+	Tooltip:
+		Name: Orca (Destroyed)
+	TransformOnCapture:
+		IntoActor: orca
+	RenderSprites:
+		Image: orca
+
 MCV.Husk:
 	Inherits: ^Husk
 	Tooltip:
