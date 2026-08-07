@@ -6,8 +6,8 @@
 implemented and passes its focused correctness regression, broad tests, and CNC
 rules validation. It is not proposed as `Complete - testing`: a high-value
 Engineer success produced prolonged target-starved Engineer saturation under the
-unchanged adaptive bounds, and the required staged save/load and complete clean
-adversarial set remain unproven. Numeric policy is frozen for CNC-40, so the
+unchanged adaptive bounds, and the complete clean adversarial set remains
+unfinished. Numeric policy is frozen for CNC-40, so the
 observed production-policy issue needs separately authorized follow-up.
 
 ## Behavior and design
@@ -68,20 +68,22 @@ the recorded base, so no capture/demolition/statistics/config rebase was needed.
 - Focused tests cover one sample/value mutation, non-negative clamping, and
   direct-versus-replacement economic value selection. Completion callback order,
   attribution, cancellation, and exact-once behavior are additionally exercised
-  by full-engine games, but not yet by staged save/load automation.
+  by full-engine games, including the final-review staged save/load supplement.
 
 No Red Alert, Dune 2000, or Tiberian Sun product work was performed.
 
 ## Full-engine evidence and old control
 
-Twelve material full-engine games were counted: one base probe, one invalid
+Fifteen material full-engine games were counted: one base probe, one invalid
 changed harness run that still produced outcome evidence, four valid changed
 runs, four matched base controls, and a changed/control natural-conclusion pair
-invalid only because both ended before the configured duration. Two tick-0 map
-bootstrap failures had no game evidence and were excluded. All ordinary-AI games
-used SkyNet plus an active opponent with normal modules; matched controls used
-the exact base SHA `419bee2531d4802bf922c3597b42c6eeb75ab250` and matching
-map bytes, seeds, starts, factions, and options.
+invalid only because both ended before the configured duration, followed by one
+fresh save run and two full-engine reload stages in the final-review response.
+Two tick-0 map bootstrap failures and one manifest path parse failure had no game
+evidence and were excluded. All ordinary-AI games used SkyNet plus an active
+opponent with normal modules; matched controls used the exact base SHA
+`419bee2531d4802bf922c3597b42c6eeb75ab250` and matching map bytes, seeds,
+starts, factions, and options.
 
 - Base probe: `base-probe/run`. Existing C4 gave exactly one generic `rmbo`
   sample, but used valued cost 1500 rather than the building's custom sell value
@@ -121,6 +123,19 @@ map bytes, seeds, starts, factions, and options.
   Commando loss remained. Control completed the same visible paths without
   Engineer evidence. Neither run emitted a warning, fatal, or desync. Throughput
   was 317.670 versus 349.209 ticks/s.
+- Final-review save/load response, seed 40601: `review-save-load`. A fresh run
+  saved at tick 600 after direct capture and the first C4 but before the husk
+  outcome (save SHA-256 prefix `9e9d861f`). Reloading that save preserved the
+  prior ledgers: restoration at tick 687 advanced `e6` exactly 1->2/400->2100,
+  and the later C4 at tick 719 advanced `rmbo` exactly 1->2/400->4400. A second
+  save at tick 750 (SHA-256 prefix `13eb1e4c`) contained all four outcomes.
+  Reloading it through tick 3050 emitted no new specialist outcome after the
+  tick-751 load boundary and rolled Engineer as built 2/killed 2/lost 0, score
+  1050.50, weight 1687.2. Removed-target and specialist-loss attempts still gave
+  no completed-outcome credit. All stages exited normally without outcome
+  warning, fatal, or desync. The initial save launcher was status-invalid only
+  because its required regexes assumed prior unseeded action ticks; its game and
+  save artifacts are valid and were judged from their actual events.
 
 The cycle-3 and cycle-5 changed runs were respectively 8.36% and 9.03% slower
 than their controls, but the identical cycle-1 map was effectively equal and the
@@ -147,8 +162,25 @@ remove the prior saturation risk.
 The mandatory Terra cycle-5 cumulative review is at
 `cycle-review-05/CYCLE-REVIEW.md`. It found the implementation coherent and one
 advisory concern: staged save/load exact-once behavior is unproven while husk
-restoration attribution is pending and after credit. The concern is adopted as a
-handoff risk; no product change is justified without that missing test evidence.
+restoration attribution is pending and after credit.
+
+The final Sol-high review at `final-pr-review/PR-REVIEW.md` returned **ready with
+one fix**: add staged full-engine save/load exact-once evidence. The one permitted
+review-response loop adopted the finding without a product change and ran the
+three-stage supplement above. Its fresh Commenter found no evidence-integrity
+blocker and its Policy Review judged the supplement mostly sensible with medium
+confidence. The direct ledger is supported by completion deltas and the preserved
+rollover rather than a serialized-state dump.
+
+The requested captured-but-not-transformed save point is rejected as an
+unreachable game-save boundary, not left silently untested: `World.Tick` drains
+all frame-end actions before `Game.TryAutomatedSave` requests a save. In the
+full-engine run, capture release and `AfterTransform` outcome both occur at tick
+687, with no save request boundary between them. Persisting same-tick transient
+fields or inserting a test-only pause would add state for a world state that a
+valid save cannot contain. The supplement instead saves immediately before the
+normal capture/transform completion and after all credits, covering the reachable
+pre-outcome and post-credit boundaries.
 
 ## Diagnostics
 
@@ -165,10 +197,11 @@ debug hook, generated log, replay, save, or build output is included in Git.
   investigate target-starved Engineer saturation after an exceptional success.
   CNC-40 must not tune confidence, decay, weights, floor/ceiling, intervals, or
   other numeric policy.
-- Add a staged save/load test after husk capture but before replacement creation,
-  and after each completed C4/capture/restoration credit, verifying preserved
-  state and no lost/double sample. This is required before promotion to
-  `Complete - testing`.
+- A direct serialized-ledger diagnostic/assertion would raise the save/load
+  supplement from log-level medium confidence. No valid captured-but-not-
+  transformed save boundary exists in the current same-tick frame-end path; if a
+  future change defers transformation across ticks, it must persist and test the
+  pending specialist identity then.
 - Complete the clean cancellation/ownership race, paired/shared-target transport
   contention, failed-transform, blocked/island transport, repeated-failure, and
   strongest final-stress differential set. The current first-iteration handoff
@@ -189,10 +222,17 @@ debug hook, generated log, replay, save, or build output is included in Git.
 - Cycle-5 policy review: `cycle-05/policy/POLICY-REVIEW.md`
 - Cycle-5 code review: `cycle-review-05/CYCLE-REVIEW.md`
 - Policy escalation: `policy-escalation/POLICY-REVIEW.md`
+- Final PR review: `final-pr-review/PR-REVIEW.md`
+- Save/load response: `review-save-load/{commenter/NARRATIVE.md,policy/POLICY-REVIEW.md}`
 
 ## Publication
 
 - Task branch: `agent/round-20260807-cnc40-adaptive-specialists`
 - Intended base: `agent/cnc-20260806-bug-polish-01-release`
-- Pull request and required checks: pending publication.
-- Final Sol-high task-PR review: pending publication/checks.
+- Draft pull request: `https://github.com/Realpra1/LibertyDawn/pull/87` against
+  `agent/cnc-20260806-bug-polish-01-release`.
+- Required checks on reviewed product/report head `ee5e3aa33b`: Linux passed in
+  2m10s; Windows passed in 3m16s.
+- Final Sol-high task-PR review: `ready with one fix`; the save/load finding was
+  addressed by the documented test-only response, with the unreachable sub-tick
+  save point rejected from engine-order evidence.
