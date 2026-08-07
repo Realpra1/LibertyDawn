@@ -6,6 +6,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -26,21 +27,31 @@ logs = support / "Logs"
 logs.mkdir(parents=True, exist_ok=True)
 source = pathlib.Path(arguments["Launch.Map"]).read_text(encoding="utf-8")
 exit_tick = int(arguments.get("Launch.ExitAtTick", "5000"))
+commands = arguments.get("Launch.LobbyCommands", "option gamespeed max")
+speed = next(part.rsplit(" ", 1)[-1] for part in commands.split(";") if part.startswith("option gamespeed "))
+speeds = {
+    "default": ("Normal", 40, False, "paced"),
+    "fastest": ("Fastest", 20, False, "paced"),
+    "max": ("MAX", 20, True, "MAX"),
+}
+speed_name, timestep, maximum, label = speeds[speed]
 time.sleep(0.15)
 debug = logs / "debug.log"
 if source == "fail":
     debug.write_text("Fatal error from fake launcher\n", encoding="utf-8")
     raise SystemExit(7)
 debug.write_text(
-    "Headless MAX automation enabled\n"
-    "Headless MAX automation started map 'Fake Map' with bots: Fake: bot=viki.\n"
-    "MAX game speed enabled at world tick 0.\n"
+    "Headless automation enabled\n"
+    f"Headless {label} automation started map 'Fake Map' with bots: Fake: bot=viki.\n"
+    f"Headless automation accepted gamespeed key={speed}, name={speed_name}, timestep={timestep}, maximum={maximum}.\n"
     f"MAX progress: world={exit_tick}, local={exit_tick}, net={exit_tick}, queued-orders=0.\n"
-    f"Headless MAX automation reached configured exit at world tick {exit_tick}; exiting.\n"
+    f"Headless {label} automation reached configured exit at world tick {exit_tick}; exiting.\n"
     "Loaded ordinary bot VIKI on isolated map\n",
     encoding="utf-8",
 )
-(logs / "fake-tick_time.csv").write_text("tick,time [ms]\n", encoding="utf-8")
+(logs / f"{arguments['Launch.Benchmark']}tick_time.csv").write_text(
+    f"tick,time [ms]\n{exit_tick},1\n", encoding="utf-8"
+)
 if "Launch.SaveGameAtTick" in arguments:
     saves = support / "Saves" / "cnc" / "test"
     saves.mkdir(parents=True)
@@ -71,7 +82,7 @@ class ParallelLauncherTest(unittest.TestCase):
         path.write_text(contents, encoding="utf-8")
         return path
 
-    def test_rejects_duplicate_names_and_non_max_map(self):
+    def test_rejects_duplicate_names_and_unsupported_map_speed(self):
         game_map = self.map("map.oramap")
         duplicate = self.write_manifest([
             {"name": "same", "map": str(game_map), "lobby_commands": "option gamespeed max"},
@@ -80,11 +91,11 @@ class ParallelLauncherTest(unittest.TestCase):
         with self.assertRaisesRegex(parallel.ConfigurationError, "duplicated"):
             parallel.load_manifest(duplicate, 10)
 
-        non_max = self.write_manifest([
-            {"name": "test", "map": str(game_map), "lobby_commands": "option gamespeed fastest"}
+        unsupported = self.write_manifest([
+            {"name": "test", "map": str(game_map), "lobby_commands": "option gamespeed fast"}
         ])
-        with self.assertRaisesRegex(parallel.ConfigurationError, "gamespeed max"):
-            parallel.load_manifest(non_max, 10)
+        with self.assertRaisesRegex(parallel.ConfigurationError, "exactly one"):
+            parallel.load_manifest(unsupported, 10)
 
     def test_failed_child_does_not_hide_or_stop_healthy_sibling(self):
         passing_map = self.map("passing.oramap")
@@ -175,6 +186,157 @@ class ParallelLauncherTest(unittest.TestCase):
             self.assertEqual(summary["passed"], 3)
             durations.append(summary["duration_seconds"])
         self.assertLess(durations[1], durations[0])
+
+    def measurement_run(self, ticks, under_floor=False):
+        game_map = self.map(f"measurement-{len(list(self.root.glob('measurement-*')))}.oramap")
+        manifest = self.write_manifest([{
+            "name": "measured",
+            "map": str(game_map),
+            "lobby_commands": "option gamespeed default",
+            "exit_at_tick": 3000,
+            "measurement": {
+                "warmup_tick": 500,
+                "measurement_ticks": 2500,
+                "sample_interval": 100,
+                "minimum_bots": 5,
+                "minimum_live_mobile": 300,
+                "expected_short_game": False,
+                "expected_starting_cash": 20000,
+                "expected_players": [
+                    {
+                        "player": f"Multi{player}",
+                        "bot_type": "skynet" if player < 2 else "brutalis",
+                        "faction": "gdi" if player % 2 == 0 else "nod",
+                        "team": 1 if player < 3 else 2,
+                        "spawn": player + 1,
+                    }
+                    for player in range(5)
+                ],
+            },
+        }])
+        _, specs = parallel.load_manifest(manifest, 10)
+        support = self.root / f"measurement-support-{len(list(self.root.glob('measurement-support-*')))}"
+        logs = support / "Logs"
+        logs.mkdir(parents=True)
+        header = (
+            "world_tick,local_tick,elapsed_ms,warmup_elapsed_ms,total_live_actors,total_effects,"
+            "player,bot_type,faction,team,spawn,live_mobile,queued,moving,busy,orders,cash,"
+            "resources,earned,spent,units_killed,units_dead"
+        )
+        rows = [header]
+        for tick in ticks:
+            for player in range(5):
+                live = 299 if under_floor and tick == 600 and player == 4 else 300 + player
+                rows.append(",".join(str(value) for value in (
+                    tick, tick, (tick - 500) * 40, 12345.5, 1700, 1,
+                    f"Multi{player}", "skynet" if player < 2 else "brutalis",
+                    "gdi" if player % 2 == 0 else "nod", 1 if player < 3 else 2,
+                    player + 1, live, 1, 0 if tick == 500 else 1, 1,
+                    tick // 100, 10000, 0, tick, tick, 1 if tick > 500 else 0, 0,
+                )))
+        (logs / "performance-baseline.csv").write_text("\n".join(rows) + "\n", encoding="utf-8")
+        return SimpleNamespace(spec=specs[0], support_dir=support)
+
+    def test_measurement_requires_exact_window_and_each_bot_floor(self):
+        ticks = list(range(500, 3001, 100))
+        run = self.measurement_run(ticks)
+        summary, reasons = parallel.analyze_measurement(run)
+
+        self.assertEqual(reasons, [])
+        self.assertTrue(summary["complete_window"])
+        self.assertEqual(summary["start_world_tick"], 500)
+        self.assertEqual(summary["end_world_tick"], 3000)
+        self.assertEqual(summary["warmup_wall_milliseconds"], 12345.5)
+        self.assertEqual(summary["real_game_time_ratio"], 1)
+        self.assertEqual(summary["players"]["Multi0"]["live_mobile_min"], 300)
+
+        under_floor = self.measurement_run(ticks, under_floor=True)
+        _, reasons = parallel.analyze_measurement(under_floor)
+        self.assertIn("Multi4 live-mobile count 299 below 300 at tick 600", reasons)
+
+    def test_incomplete_measurement_reports_observed_not_configured_end(self):
+        run = self.measurement_run([500, 600, 700])
+        summary, reasons = parallel.analyze_measurement(run)
+
+        self.assertIn("measurement samples do not cover the exact configured tick window", reasons)
+        self.assertFalse(summary["complete_window"])
+        self.assertEqual(summary["end_world_tick"], 700)
+        self.assertEqual(summary["configured_end_world_tick"], 3000)
+        self.assertIsNone(summary["real_game_time_ratio"])
+
+    def test_benchmark_summary_uses_true_median_and_rejects_absent_streams(self):
+        run = self.measurement_run([500, 600, 700])
+        benchmark_files = []
+        for stream in ("tick_time", "tick_actors", "bot_tick"):
+            relative = f"Logs/measured-{stream}.csv"
+            (run.support_dir / relative).write_text(
+                "tick,time [ms]\n500,1\n600,2\n700,10\n800,20\n", encoding="utf-8"
+            )
+            benchmark_files.append(relative)
+
+        summary, reasons = parallel.summarize_benchmarks(run, benchmark_files, 500, 800)
+        self.assertEqual(reasons, [])
+        self.assertEqual(summary["tick_time"]["median_ms"], 6)
+        self.assertEqual(summary["tick_time"]["p95_ms"], 20)
+
+        _, reasons = parallel.summarize_benchmarks(run, benchmark_files[:1], 500, 800)
+        self.assertIn("required benchmark stream tick_actors missing", reasons)
+        self.assertIn("required benchmark stream bot_tick missing", reasons)
+
+    def test_measurement_csv_does_not_satisfy_engine_benchmark_gate(self):
+        run = self.measurement_run([500, 600])
+        self.assertEqual(parallel.engine_benchmark_files(run), [])
+
+        benchmark = run.support_dir / "Logs" / "measured-tick_time.csv"
+        benchmark.write_text("tick,time [ms]\n500,1\n", encoding="utf-8")
+        self.assertEqual(parallel.engine_benchmark_files(run), ["Logs/measured-tick_time.csv"])
+
+    def test_profile_summary_is_bounded_and_ranked_by_cumulative_time(self):
+        run = self.measurement_run([500, 600])
+        run.spec.profile = {
+            "kind": "simulation_perf_log",
+            "long_tick_threshold_ms": 100,
+            "max_bytes": 1024,
+            "top": 2,
+        }
+        (run.support_dir / "Logs" / "perf.log").write_text(
+            "  125 ms [700] Trait tick: Foo\n"
+            "  200 ms [701] Trait tick: Foo\n"
+            "  300 ms [702] Activity tick: Bar\n",
+            encoding="utf-8",
+        )
+
+        summary, reasons = parallel.summarize_profile(run)
+
+        self.assertEqual(reasons, [])
+        self.assertEqual(summary["event_count"], 3)
+        self.assertEqual(summary["max_bytes"], 1024)
+        self.assertEqual(summary["hotspots"][0]["label"], "Trait tick: Foo")
+        self.assertEqual(summary["hotspots"][0]["total_ms"], 325)
+        self.assertEqual(summary["hotspots"][1]["label"], "Activity tick: Bar")
+
+    def test_effective_lobby_identity_is_recorded_and_must_match_request(self):
+        run = self.measurement_run([500, 600])
+        players = ";".join(
+            f"Multi{player}|{'skynet' if player < 2 else 'brutalis'}|"
+            f"{'gdi' if player % 2 == 0 else 'nod'}|{1 if player < 3 else 2}|{player + 1}"
+            for player in range(5)
+        )
+        text = (
+            "Performance baseline accepted lobby identity: "
+            f"shortgame=False, startingcash=20000, bots={players}."
+        )
+        effective, reasons = parallel.analyze_effective_lobby(run, text)
+
+        self.assertEqual(reasons, [])
+        self.assertFalse(effective["short_game"])
+        self.assertEqual(effective["starting_cash"], 20000)
+        self.assertEqual(len(effective["players"]), 5)
+
+        _, mismatch_reasons = parallel.analyze_effective_lobby(
+            run, text.replace("shortgame=False", "shortgame=True")
+        )
+        self.assertRegex(mismatch_reasons[0], "does not match requested")
 
 
 if __name__ == "__main__":

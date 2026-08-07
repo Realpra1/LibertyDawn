@@ -218,14 +218,21 @@ namespace OpenRA
 			OrderManager.StartGame();
 			if (IsHeadlessAutomation)
 			{
+				var gameSpeeds = ModData.Manifest.Get<GameSpeeds>();
+				var speedKey = gameSpeeds.Speeds.First(kv => ReferenceEquals(kv.Value, OrderManager.World.GameSpeed)).Key;
+				var automationLabel = OrderManager.World.GameSpeed.RunAtMaximumSpeed ?
+					"Headless MAX automation" : "Headless paced automation";
 				var bots = OrderManager.LobbyInfo.Clients
 					.Where(client => client.IsBot)
 					.OrderBy(client => client.Index)
 					.Select(client => string.Format(CultureInfo.InvariantCulture,
 						"{0}: bot={1}, faction={2}, team={3}, spawn={4}", client.Name, client.Bot,
 						client.Faction, client.Team, client.SpawnPoint));
-				Log.Write("debug", "Headless MAX automation started map '{0}' with bots: {1}.",
-					map.Title, string.Join("; ", bots));
+				Log.Write("debug", "{0} started map '{1}' with bots: {2}.",
+					automationLabel, map.Title, string.Join("; ", bots));
+				Log.Write("debug", "Headless automation accepted gamespeed key={0}, name={1}, timestep={2}, maximum={3}.",
+					speedKey, OrderManager.World.GameSpeed.Name, OrderManager.World.Timestep,
+					OrderManager.World.GameSpeed.RunAtMaximumSpeed);
 			}
 
 			worldRenderer.RefreshPalette();
@@ -1056,7 +1063,7 @@ namespace OpenRA
 				throw new InvalidOperationException("Headless automation was not requested during engine startup.");
 
 			IsHeadlessAutomation = true;
-			Log.Write("debug", "Headless MAX automation enabled: game rendering suppressed; input events remain bounded.");
+			Log.Write("debug", "Headless automation enabled: game rendering suppressed; input events remain bounded.");
 		}
 
 		public static void ConfigureAutomatedSave(int worldTick, string filename)
@@ -1076,8 +1083,8 @@ namespace OpenRA
 				return;
 
 			automatedExitTick = -1;
-			Log.Write("debug", "Headless MAX automation reached configured exit at world tick {0}; exiting.",
-				world.WorldTick);
+			Log.Write("debug", "Headless {0} automation reached configured exit at world tick {1}; exiting.",
+				world.GameSpeed.RunAtMaximumSpeed ? "MAX" : "paced", world.WorldTick);
 			FinishBenchmark();
 		}
 
@@ -1155,7 +1162,8 @@ namespace OpenRA
 			automatedExitRequested = true;
 			benchmark?.Write();
 			if (IsHeadlessAutomation)
-				Log.Write("debug", "Headless MAX automation reached natural game over; exiting.");
+				Log.Write("debug", "Headless {0} automation reached natural game over; exiting.",
+					OrderManager.World.GameSpeed.RunAtMaximumSpeed ? "MAX" : "paced");
 
 			Exit();
 		}

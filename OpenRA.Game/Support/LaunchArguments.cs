@@ -30,7 +30,7 @@ namespace OpenRA
 		[Desc("Dump performance data into cpu.csv and render.csv in the logs folder with the given prefix.")]
 		public string Benchmark;
 
-		[Desc("Run an automated local MAX game without showing or rendering the game window.")]
+		[Desc("Run an automated local game at Normal, Fastest, or MAX speed without showing or rendering the game window.")]
 		public bool Headless;
 
 		[Desc("Automatically start playing the given map.")]
@@ -131,8 +131,10 @@ namespace OpenRA
 				return "Launch.Headless requires Launch.Map or Launch.GameSave.";
 
 			if (!string.IsNullOrEmpty(Map) && !GetLobbyCommands().Any(c =>
+				c.Equals("option gamespeed default", StringComparison.OrdinalIgnoreCase) ||
+				c.Equals("option gamespeed fastest", StringComparison.OrdinalIgnoreCase) ||
 				c.Equals("option gamespeed max", StringComparison.OrdinalIgnoreCase)))
-				return "Launch.Headless map games require 'option gamespeed max' in Launch.LobbyCommands.";
+				return "Launch.Headless map games require Normal ('default'), Fastest, or MAX gamespeed in Launch.LobbyCommands.";
 
 			return null;
 		}

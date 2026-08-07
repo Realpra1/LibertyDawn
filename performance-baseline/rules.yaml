@@ -1,0 +1,11 @@
+World:
+	PerformanceBaseline:
+		WarmupTick: 500
+		MeasurementTicks: 2500
+		SampleInterval: 100
+		MinimumBots: 6
+		MinimumMobileActors: 300
+		SetupActorsPerBot: 550
+		SetupInnerRadius: 4
+		SetupOuterRadius: 28
+		SetupAircraftInterval: 25

@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "identity": "cnc47-empire-earth-six-ai-550-v16",
+  "base_map": "../mods/cnc/maps/Empire-Earth.oramap",
+  "rules": "rules.yaml",
+  "seed": 24700,
+  "warmup_tick": 500,
+  "measurement_ticks": 2500,
+  "sample_interval": 100,
+  "minimum_bots": 6,
+  "minimum_live_mobile": 300,
+  "setup_actors_per_bot": 550,
+  "short_game": false,
+  "starting_cash": 20000,
+  "profile": {
+    "kind": "simulation_perf_log",
+    "long_tick_threshold_ms": 100,
+    "max_bytes": 16777216,
+    "top": 20
+  },
+  "players": [
+    {"slot": "Multi0", "bot_type": "skynet", "faction": "gdi", "team": 1, "spawn": 1},
+    {"slot": "Multi1", "bot_type": "skynet", "faction": "nod", "team": 1, "spawn": 3},
+    {"slot": "Multi2", "bot_type": "brutalis", "faction": "gdi", "team": 1, "spawn": 5},
+    {"slot": "Multi3", "bot_type": "brutalis", "faction": "nod", "team": 2, "spawn": 34},
+    {"slot": "Multi4", "bot_type": "brutalis", "faction": "gdi", "team": 2, "spawn": 35},
+    {"slot": "Multi5", "bot_type": "skynet", "faction": "nod", "team": 2, "spawn": 24}
+  ]
+}

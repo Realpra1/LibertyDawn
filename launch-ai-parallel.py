@@ -1,18 +1,22 @@
 #!/usr/bin/env python3
-"""Run one to three isolated Linux headless MAX games from a JSON manifest."""
+"""Run isolated Linux headless CNC games from a validated JSON manifest."""
 
 from __future__ import annotations
 
 import argparse
+import csv
 import json
+import math
 import os
 import re
 import shutil
 import signal
+import statistics
 import subprocess
 import sys
 import time
 import uuid
+from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -23,11 +27,22 @@ MAX_TICK_PATTERNS = (
     re.compile(r"MAX progress: world=(\d+)"),
     re.compile(r"world tick (\d+)", re.IGNORECASE),
 )
-HEADLESS_MARKER = "Headless MAX automation enabled"
-MAX_MARKER = "MAX game speed enabled"
-STARTED_MARKER = "Headless MAX automation started map"
-NATURAL_MARKER = "Headless MAX automation reached natural game over"
-BOUNDED_MARKER = "Headless MAX automation reached configured exit"
+HEADLESS_MARKER = "Headless automation enabled"
+STARTED_PATTERN = re.compile(r"Headless (?:MAX|paced) automation started map")
+NATURAL_PATTERN = re.compile(r"Headless (?:MAX|paced) automation reached natural game over")
+BOUNDED_PATTERN = re.compile(r"Headless (?:MAX|paced) automation reached configured exit")
+ACCEPTED_SPEED_PATTERN = re.compile(
+    r"Headless automation accepted gamespeed key=(\w+), name=([^,]+), timestep=(\d+), maximum=(True|False)\."
+)
+ACCEPTED_LOBBY_PATTERN = re.compile(
+    r"Performance baseline accepted lobby identity: shortgame=(True|False), "
+    r"startingcash=([^,]+), bots=(.*)\."
+)
+SPEEDS = {
+    "default": {"name": "Normal", "timestep": 40, "maximum": False},
+    "fastest": {"name": "Fastest", "timestep": 20, "maximum": False},
+    "max": {"name": "MAX", "timestep": 20, "maximum": True},
+}
 FATAL_PATTERN = re.compile(
     r"unhandled exception|fatal error|desync detected|exception of type", re.IGNORECASE
 )
@@ -53,6 +68,7 @@ class RunSpec:
     source_kind: str
     seed: int | None
     lobby_commands: str | None
+    speed_key: str | None
     exit_at_tick: int | None
     minimum_world_tick: int
     timeout_seconds: float
@@ -62,6 +78,8 @@ class RunSpec:
     forbidden_log_patterns: list[str]
     expected_artifacts: list[str]
     extra_args: list[str]
+    measurement: dict[str, Any] | None
+    profile: dict[str, Any] | None
 
 
 @dataclass
@@ -173,11 +191,17 @@ def load_manifest(path: Path, default_timeout: float) -> tuple[dict[str, Any], l
             raise ConfigurationError(f"Run '{name}' input does not exist: {source_path}")
 
         lobby_commands = config.get("lobby_commands")
+        speed_key = None
         if source_kind == "map":
-            if not isinstance(lobby_commands, str) or not re.search(
-                r"(?:^|;)\s*option gamespeed max\s*(?:;|$)", lobby_commands, re.IGNORECASE
-            ):
-                raise ConfigurationError(f"Run '{name}' map lobby_commands must select gamespeed max.")
+            speed_matches = re.findall(
+                r"(?:^|;)\s*option gamespeed (default|fastest|max)\s*(?=;|$)",
+                lobby_commands if isinstance(lobby_commands, str) else "", re.IGNORECASE,
+            )
+            if len(speed_matches) != 1:
+                raise ConfigurationError(
+                    f"Run '{name}' map lobby_commands must select exactly one of gamespeed default, fastest, or max."
+                )
+            speed_key = speed_matches[0].lower()
             if "\n" in lobby_commands or "\r" in lobby_commands:
                 raise ConfigurationError(f"Run '{name}' lobby_commands must not contain newlines.")
         elif lobby_commands is not None:
@@ -223,12 +247,94 @@ def load_manifest(path: Path, default_timeout: float) -> tuple[dict[str, Any], l
             if argument.startswith(ISOLATED_ARGUMENTS):
                 raise ConfigurationError(f"Run '{name}' cannot override isolated argument '{argument}'.")
 
+        measurement = config.get("measurement")
+        if measurement is not None:
+            if source_kind != "map" or speed_key not in ("default", "fastest"):
+                raise ConfigurationError(f"Run '{name}' measurement requires a Normal or Fastest map run.")
+            if not isinstance(measurement, dict):
+                raise ConfigurationError(f"Run '{name}' measurement must be an object.")
+            required_measurement = {
+                "warmup_tick": 0,
+                "measurement_ticks": 2500,
+                "sample_interval": 1,
+                "minimum_bots": 5,
+                "minimum_live_mobile": 300,
+            }
+            for key, minimum in required_measurement.items():
+                value = measurement.get(key)
+                if not isinstance(value, int) or value < minimum:
+                    raise ConfigurationError(
+                        f"Run '{name}' measurement.{key} must be an integer of at least {minimum}."
+                    )
+            expected_short_game = measurement.get("expected_short_game")
+            if not isinstance(expected_short_game, bool):
+                raise ConfigurationError(
+                    f"Run '{name}' measurement.expected_short_game must be a boolean."
+                )
+            expected_starting_cash = measurement.get("expected_starting_cash")
+            if not isinstance(expected_starting_cash, int) or expected_starting_cash < 0:
+                raise ConfigurationError(
+                    f"Run '{name}' measurement.expected_starting_cash must be a non-negative integer."
+                )
+            expected_players = measurement.get("expected_players")
+            if not isinstance(expected_players, list) or len(expected_players) < measurement["minimum_bots"]:
+                raise ConfigurationError(
+                    f"Run '{name}' measurement.expected_players must contain every required bot."
+                )
+            player_names = set()
+            for player in expected_players:
+                if not isinstance(player, dict) or set(player) != {
+                    "player", "bot_type", "faction", "team", "spawn"
+                }:
+                    raise ConfigurationError(
+                        f"Run '{name}' measurement.expected_players entries have an invalid schema."
+                    )
+                if not all(isinstance(player[key], str) and player[key] for key in (
+                    "player", "bot_type", "faction"
+                )) or not all(isinstance(player[key], int) and player[key] > 0 for key in ("team", "spawn")):
+                    raise ConfigurationError(
+                        f"Run '{name}' measurement.expected_players entries contain invalid values."
+                    )
+                if player["player"] in player_names:
+                    raise ConfigurationError(
+                        f"Run '{name}' measurement.expected_players contains duplicate players."
+                    )
+                player_names.add(player["player"])
+            if measurement["measurement_ticks"] % measurement["sample_interval"]:
+                raise ConfigurationError(
+                    f"Run '{name}' measurement_ticks must be divisible by sample_interval."
+                )
+            expected_exit = measurement["warmup_tick"] + measurement["measurement_ticks"]
+            if exit_at_tick is None or exit_at_tick < expected_exit:
+                raise ConfigurationError(
+                    f"Run '{name}' exit_at_tick must reach the measurement end tick {expected_exit}."
+                )
+
+        profile = config.get("profile")
+        if profile is not None:
+            if not isinstance(profile, dict) or set(profile) != {
+                "kind", "long_tick_threshold_ms", "max_bytes", "top"
+            }:
+                raise ConfigurationError(f"Run '{name}' profile has an invalid schema.")
+            if profile["kind"] != "simulation_perf_log":
+                raise ConfigurationError(f"Run '{name}' profile.kind is unsupported.")
+            if not isinstance(profile["long_tick_threshold_ms"], (int, float)) or \
+                    profile["long_tick_threshold_ms"] <= 0:
+                raise ConfigurationError(
+                    f"Run '{name}' profile.long_tick_threshold_ms must be positive."
+                )
+            if not isinstance(profile["max_bytes"], int) or profile["max_bytes"] < 1024:
+                raise ConfigurationError(f"Run '{name}' profile.max_bytes must be at least 1024.")
+            if not isinstance(profile["top"], int) or not 1 <= profile["top"] <= 100:
+                raise ConfigurationError(f"Run '{name}' profile.top must be between 1 and 100.")
+
         specs.append(RunSpec(
             name=name,
             source_path=source_path,
             source_kind=source_kind,
             seed=config.get("seed"),
             lobby_commands=lobby_commands,
+            speed_key=speed_key,
             exit_at_tick=exit_at_tick,
             minimum_world_tick=minimum_world_tick,
             timeout_seconds=float(timeout_seconds),
@@ -238,6 +344,8 @@ def load_manifest(path: Path, default_timeout: float) -> tuple[dict[str, Any], l
             forbidden_log_patterns=forbidden_log_patterns,
             expected_artifacts=expected_artifacts,
             extra_args=extra_args,
+            measurement=measurement,
+            profile=profile,
         ))
 
         if specs[-1].seed is not None and not isinstance(specs[-1].seed, int):
@@ -295,6 +403,11 @@ def prepare_run(
         "Launch.Headless=true",
         f"Launch.Benchmark={spec.name}-",
     ))
+    if spec.profile:
+        command.extend((
+            "Debug.EnableSimulationPerfLogging=true",
+            f"Debug.LongTickThresholdMs={spec.profile['long_tick_threshold_ms']}",
+        ))
     if spec.source_kind == "map":
         command.append(f"Launch.Map={runtime_input}")
         command.append(f"Launch.LobbyCommands={spec.lobby_commands}")
@@ -353,6 +466,290 @@ def relative_files(root: Path, pattern: str) -> list[str]:
     return [str(path.relative_to(root)) for path in sorted(root.glob(pattern)) if path.is_file()]
 
 
+def engine_benchmark_files(run: ActiveRun) -> list[str]:
+    prefix = run.spec.name + "-"
+    return [
+        relative for relative in relative_files(run.support_dir, "Logs/*.csv")
+        if Path(relative).name.startswith(prefix)
+    ]
+
+
+def summarize_profile(run: ActiveRun) -> tuple[dict[str, Any] | None, list[str]]:
+    if run.spec.profile is None:
+        return None, []
+
+    path = run.support_dir / "Logs" / "perf.log"
+    if not path.is_file():
+        return None, ["profile output missing"]
+
+    size = path.stat().st_size
+    reasons = []
+    if size > run.spec.profile["max_bytes"]:
+        reasons.append(
+            f"profile output {size} bytes exceeds {run.spec.profile['max_bytes']} byte bound"
+        )
+
+    pattern = re.compile(r"^\s*([0-9]+(?:\.[0-9]+)?) ms \[(\d+)\] ([^:]+): (.+)$")
+    aggregate: dict[str, dict[str, float | int]] = {}
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        match = pattern.match(line)
+        if not match:
+            continue
+        elapsed = float(match.group(1))
+        label = f"{match.group(3)}: {match.group(4)}"
+        item = aggregate.setdefault(label, {"count": 0, "total_ms": 0.0, "max_ms": 0.0})
+        item["count"] += 1
+        item["total_ms"] += elapsed
+        item["max_ms"] = max(item["max_ms"], elapsed)
+
+    if not aggregate:
+        reasons.append("profile contains no simulation threshold events")
+    ranked = sorted(
+        ({"label": label, **values} for label, values in aggregate.items()),
+        key=lambda item: (-item["total_ms"], -item["max_ms"], item["label"]),
+    )[:run.spec.profile["top"]]
+    return {
+        "kind": run.spec.profile["kind"],
+        "path": str(path.relative_to(run.support_dir)),
+        "size_bytes": size,
+        "max_bytes": run.spec.profile["max_bytes"],
+        "long_tick_threshold_ms": run.spec.profile["long_tick_threshold_ms"],
+        "event_count": sum(item["count"] for item in aggregate.values()),
+        "hotspots": ranked,
+    }, reasons
+
+
+def percentile(values: list[float], fraction: float) -> float:
+    if not values:
+        raise ValueError("percentile requires at least one value")
+    ordered = sorted(values)
+    return ordered[max(0, math.ceil(len(ordered) * fraction) - 1)]
+
+
+def summarize_benchmarks(
+    run: ActiveRun, benchmark_files: list[str], local_start: int | None, local_end: int | None
+) -> tuple[dict[str, Any], list[str]]:
+    summaries: dict[str, Any] = {}
+    reasons: list[str] = []
+    prefix = run.spec.name + "-"
+    for relative in benchmark_files:
+        path = run.support_dir / relative
+        if path.name == "performance-baseline.csv" or not path.name.startswith(prefix):
+            continue
+        stream = path.stem[len(prefix):]
+        values = []
+        try:
+            with path.open(newline="", encoding="utf-8") as source:
+                reader = csv.DictReader(source)
+                if reader.fieldnames != ["tick", "time [ms]"]:
+                    raise ValueError(f"unexpected header {reader.fieldnames}")
+                for row in reader:
+                    tick = int(row["tick"])
+                    value = float(row["time [ms]"])
+                    if not math.isfinite(value) or value < 0:
+                        raise ValueError("non-finite or negative timing sample")
+                    if local_start is None or local_start <= tick <= local_end:
+                        values.append(value)
+        except (OSError, ValueError, TypeError) as ex:
+            reasons.append(f"benchmark stream {stream} is corrupt: {ex}")
+            continue
+
+        if not values:
+            reasons.append(f"benchmark stream {stream} has no measured-window samples")
+            continue
+        summaries[stream] = {
+            "samples": len(values),
+            "median_ms": round(statistics.median(values), 6),
+            "p95_ms": round(percentile(values, 0.95), 6),
+            "p99_ms": round(percentile(values, 0.99), 6),
+            "max_ms": round(max(values), 6),
+        }
+
+    if run.spec.measurement:
+        for required in ("tick_time", "tick_actors", "bot_tick"):
+            if required not in summaries:
+                reasons.append(f"required benchmark stream {required} missing")
+    return summaries, reasons
+
+
+def analyze_effective_lobby(run: ActiveRun, text: str) -> tuple[dict[str, Any] | None, list[str]]:
+    if run.spec.measurement is None:
+        return None, []
+
+    matches = list(ACCEPTED_LOBBY_PATTERN.finditer(text))
+    if len(matches) != 1:
+        return None, [
+            "accepted performance-lobby identity marker missing"
+            if not matches else "accepted performance-lobby identity marker is ambiguous"
+        ]
+
+    match = matches[0]
+    reasons = []
+    try:
+        starting_cash = int(match.group(2))
+        players = []
+        for encoded in match.group(3).split(";"):
+            player, bot_type, faction, team, spawn = encoded.split("|")
+            players.append({
+                "player": player,
+                "bot_type": bot_type,
+                "faction": faction,
+                "team": int(team),
+                "spawn": int(spawn),
+            })
+    except (TypeError, ValueError) as ex:
+        return None, [f"accepted performance-lobby identity marker is corrupt: {ex}"]
+
+    effective = {
+        "short_game": match.group(1) == "True",
+        "starting_cash": starting_cash,
+        "players": sorted(players, key=lambda item: item["player"]),
+    }
+    expected = {
+        "short_game": run.spec.measurement["expected_short_game"],
+        "starting_cash": run.spec.measurement["expected_starting_cash"],
+        "players": sorted(run.spec.measurement["expected_players"], key=lambda item: item["player"]),
+    }
+    if effective != expected:
+        reasons.append(f"effective lobby identity {effective} does not match requested {expected}")
+    return effective, reasons
+
+
+def analyze_measurement(run: ActiveRun) -> tuple[dict[str, Any] | None, list[str]]:
+    if run.spec.measurement is None:
+        return None, []
+
+    config = run.spec.measurement
+    path = run.support_dir / "Logs" / "performance-baseline.csv"
+    reasons = []
+    try:
+        with path.open(newline="", encoding="utf-8") as source:
+            rows = list(csv.DictReader(source))
+    except OSError as ex:
+        return None, [f"performance baseline evidence missing: {ex}"]
+
+    required_columns = {
+        "world_tick", "local_tick", "elapsed_ms", "warmup_elapsed_ms",
+        "total_live_actors", "total_effects",
+        "player", "bot_type", "faction", "team", "spawn", "live_mobile", "queued",
+        "moving", "busy", "orders", "cash", "resources", "earned", "spent",
+        "units_killed", "units_dead",
+    }
+    if not rows or not required_columns.issubset(rows[0]):
+        return None, ["performance baseline evidence is empty or has an invalid schema"]
+
+    numeric_columns = required_columns - {"player", "bot_type", "faction"}
+    float_columns = {"elapsed_ms", "warmup_elapsed_ms"}
+    try:
+        parsed = [
+            {
+                **row,
+                **{key: float(row[key]) if key in float_columns else int(row[key]) for key in numeric_columns},
+            }
+            for row in rows
+        ]
+    except (ValueError, TypeError, KeyError) as ex:
+        return None, [f"performance baseline evidence is corrupt: {ex}"]
+
+    expected_ticks = list(range(
+        config["warmup_tick"],
+        config["warmup_tick"] + config["measurement_ticks"] + 1,
+        config["sample_interval"],
+    ))
+    by_tick: dict[int, list[dict[str, Any]]] = defaultdict(list)
+    for row in parsed:
+        by_tick[row["world_tick"]].append(row)
+    if sorted(by_tick) != expected_ticks:
+        reasons.append("measurement samples do not cover the exact configured tick window")
+
+    players = sorted({row["player"] for row in parsed})
+    if len(players) < config["minimum_bots"]:
+        reasons.append(f"measurement contains {len(players)} bots; {config['minimum_bots']} required")
+    for tick, samples in by_tick.items():
+        if sorted(row["player"] for row in samples) != players:
+            reasons.append(f"measurement tick {tick} has an incomplete or duplicate bot roster")
+        for row in samples:
+            if row["live_mobile"] < config["minimum_live_mobile"]:
+                reasons.append(
+                    f"{row['player']} live-mobile count {row['live_mobile']} below "
+                    f"{config['minimum_live_mobile']} at tick {tick}"
+                )
+
+    observed_ticks = sorted(by_tick)
+    first_tick = observed_ticks[0]
+    last_tick = observed_ticks[-1]
+    first_rows = by_tick.get(first_tick, [])
+    last_rows = by_tick.get(last_tick, [])
+    first_elapsed = min((row["elapsed_ms"] for row in first_rows), default=0)
+    measured_wall_ms = max((row["elapsed_ms"] for row in last_rows), default=0) - first_elapsed
+    observed_ticks_count = last_tick - first_tick
+    simulated_ms = observed_ticks_count * SPEEDS[run.spec.speed_key]["timestep"]
+    complete_window = observed_ticks == expected_ticks
+    if complete_window and measured_wall_ms <= 0:
+        reasons.append("measured wall interval is not positive")
+
+    per_player = {}
+    for player in players:
+        samples = sorted((row for row in parsed if row["player"] == player), key=lambda row: row["world_tick"])
+        live = [row["live_mobile"] for row in samples]
+        per_player[player] = {
+            "bot_type": samples[0]["bot_type"],
+            "faction": samples[0]["faction"],
+            "team": samples[0]["team"],
+            "spawn": samples[0]["spawn"],
+            "live_mobile_min": min(live),
+            "live_mobile_median": statistics.median(live),
+            "live_mobile_max": max(live),
+            "queued_max": max(row["queued"] for row in samples),
+            "moving_samples_total": sum(row["moving"] for row in samples[1:]),
+            "busy_samples_total": sum(row["busy"] for row in samples),
+            "order_delta": samples[-1]["orders"] - samples[0]["orders"],
+            "earned_delta": samples[-1]["earned"] - samples[0]["earned"],
+            "spent_delta": samples[-1]["spent"] - samples[0]["spent"],
+            "kills_delta": samples[-1]["units_killed"] - samples[0]["units_killed"],
+            "deaths_delta": samples[-1]["units_dead"] - samples[0]["units_dead"],
+        }
+        if per_player[player]["moving_samples_total"] <= 0:
+            reasons.append(f"{player} has no observable mobile movement during the measured window")
+
+    if per_player and not any(
+        item["earned_delta"] > 0 or item["spent_delta"] > 0 or item["queued_max"] > 0
+        for item in per_player.values()
+    ):
+        reasons.append("no observable production/economy activity during the measured window")
+    if per_player and not any(
+        item["kills_delta"] > 0 or item["deaths_delta"] > 0 for item in per_player.values()
+    ) and max((row["total_effects"] for row in parsed), default=0) == 0:
+        reasons.append("no observable combat/effect activity during the measured window")
+
+    local_start = min((row["local_tick"] for row in first_rows), default=0)
+    local_end = max((row["local_tick"] for row in last_rows), default=0)
+    summary = {
+        "start_world_tick": first_tick,
+        "end_world_tick": last_tick,
+        "configured_start_world_tick": expected_ticks[0],
+        "configured_end_world_tick": expected_ticks[-1],
+        "complete_window": complete_window,
+        "start_local_tick": local_start,
+        "end_local_tick": local_end,
+        "sample_interval": config["sample_interval"],
+        "sample_count": len(observed_ticks),
+        "configured_sample_count": len(expected_ticks),
+        "warmup_wall_milliseconds": round(max((row["warmup_elapsed_ms"] for row in first_rows), default=0), 3),
+        "measured_wall_milliseconds": round(measured_wall_ms, 3),
+        "simulated_milliseconds": simulated_ms,
+        "real_game_time_ratio": round(measured_wall_ms / simulated_ms, 6)
+        if complete_window and measured_wall_ms > 0 and simulated_ms > 0 else None,
+        "measured_ticks_per_second": round(observed_ticks_count * 1000 / measured_wall_ms, 6)
+        if complete_window and measured_wall_ms > 0 else None,
+        "total_live_actors_min": min((row["total_live_actors"] for row in parsed), default=0),
+        "total_live_actors_max": max((row["total_live_actors"] for row in parsed), default=0),
+        "total_effects_max": max((row["total_effects"] for row in parsed), default=0),
+        "players": per_player,
+    }
+    return summary, reasons
+
+
 def finalize_run(run: ActiveRun) -> dict[str, Any]:
     run.console_file.close()
     text, log_paths = read_evidence(run)
@@ -367,7 +764,7 @@ def finalize_run(run: ActiveRun) -> dict[str, Any]:
         for pattern in run.spec.forbidden_log_patterns
     }
     artifacts = {pattern: relative_files(run.support_dir, pattern) for pattern in run.spec.expected_artifacts}
-    benchmark_files = relative_files(run.support_dir, "Logs/*.csv")
+    benchmark_files = engine_benchmark_files(run)
     replay_files = relative_files(run.support_dir, "Replays/**/*")
     save_files = relative_files(run.support_dir, "Saves/**/*")
     crash_files = relative_files(run.support_dir, "Logs/*crash*.log")
@@ -382,12 +779,10 @@ def finalize_run(run: ActiveRun) -> dict[str, Any]:
         reasons.append(f"exit code {exit_code}")
     if HEADLESS_MARKER not in text:
         reasons.append("headless activation marker missing")
-    if MAX_MARKER not in text:
-        reasons.append("MAX activation marker missing")
-    if STARTED_MARKER not in text:
+    if not STARTED_PATTERN.search(text):
         reasons.append("actual map/bot start marker missing")
-    exit_marker = BOUNDED_MARKER if run.spec.exit_at_tick is not None else NATURAL_MARKER
-    if exit_marker not in text:
+    exit_pattern = BOUNDED_PATTERN if run.spec.exit_at_tick is not None else NATURAL_PATTERN
+    if not exit_pattern.search(text):
         reasons.append(
             "configured exit marker missing"
             if run.spec.exit_at_tick is not None else "natural game-over marker missing"
@@ -405,6 +800,39 @@ def finalize_run(run: ActiveRun) -> dict[str, Any]:
     if crash_files or FATAL_PATTERN.search(text):
         reasons.append("fatal/crash/desync signal present")
 
+    accepted_match = ACCEPTED_SPEED_PATTERN.search(text)
+    accepted_speed = None
+    if not accepted_match:
+        reasons.append("accepted speed/timestep marker missing")
+    else:
+        accepted_speed = {
+            "key": accepted_match.group(1),
+            "name": accepted_match.group(2),
+            "timestep": int(accepted_match.group(3)),
+            "maximum": accepted_match.group(4) == "True",
+        }
+        if run.spec.speed_key is not None:
+            expected = SPEEDS[run.spec.speed_key]
+            if accepted_speed != {"key": run.spec.speed_key, **expected}:
+                reasons.append(f"accepted speed {accepted_speed} does not match requested {run.spec.speed_key}")
+
+    effective_lobby, lobby_reasons = analyze_effective_lobby(run, text)
+    reasons.extend(lobby_reasons)
+    measurement_summary, measurement_reasons = analyze_measurement(run)
+    reasons.extend(measurement_reasons)
+    if measurement_summary:
+        tick = max(tick, measurement_summary["end_world_tick"])
+    benchmark_summary, benchmark_reasons = summarize_benchmarks(
+        run, benchmark_files,
+        measurement_summary["start_local_tick"] if measurement_summary else None,
+        measurement_summary["end_local_tick"] if measurement_summary else None,
+    )
+    reasons.extend(benchmark_reasons)
+    profile_summary, profile_reasons = summarize_profile(run)
+    reasons.extend(profile_reasons)
+    if run.spec.measurement and not replay_files:
+        reasons.append("replay output missing")
+
     result = {
         "name": run.spec.name,
         "status": "passed" if not reasons else "failed",
@@ -412,6 +840,9 @@ def finalize_run(run: ActiveRun) -> dict[str, Any]:
         "exit_code": exit_code,
         "duration_seconds": round(duration, 3),
         "maximum_world_tick": tick,
+        "requested_speed_key": run.spec.speed_key,
+        "accepted_speed": accepted_speed,
+        "effective_lobby": effective_lobby,
         "started_utc": run.started_utc,
         "finished_utc": datetime.now(timezone.utc).isoformat(),
         "display_start": run.display_start,
@@ -420,6 +851,9 @@ def finalize_run(run: ActiveRun) -> dict[str, Any]:
         "support_directory": str(run.support_dir),
         "logs": [str(path.relative_to(run.run_dir)) for path in log_paths if path.exists()],
         "benchmarks": benchmark_files,
+        "benchmark_summary": benchmark_summary,
+        "profile_summary": profile_summary,
+        "measurement_summary": measurement_summary,
         "replays": replay_files,
         "saves": save_files,
         "required_log_patterns": required,
