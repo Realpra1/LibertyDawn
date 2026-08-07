@@ -226,10 +226,18 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			if (order.OrderString == "Unload")
 			{
-				if (!order.Queued && !CanUnload())
+				var hasExactPlan = order.Target.Type == TargetType.Terrain && order.ExtraData == 1;
+				Dictionary<uint, CPos> exactExits = null;
+				if (hasExactPlan && !TransportLandingPolicy.TryDecodeExactExits(order.TargetString, out exactExits))
 					return;
 
-				self.QueueActivity(order.Queued, new UnloadCargo(self, Info.LoadRange));
+				if (!order.Queued && (hasExactPlan ? IsEmpty() : !CanUnload()))
+					return;
+
+				if (hasExactPlan)
+					self.QueueActivity(order.Queued, new UnloadCargo(self, order.Target, WDist.Zero, exactExits));
+				else
+					self.QueueActivity(order.Queued, new UnloadCargo(self, Info.LoadRange));
 			}
 		}
 

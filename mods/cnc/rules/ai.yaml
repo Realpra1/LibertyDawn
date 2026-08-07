@@ -174,9 +174,20 @@ Player:
 		MaximumActiveMissions: 4
 		TransportHelicopterLimit: 10
 		PersistentBlockedScans: 3
+		BlockedDiagnosticIntervalScans: 8
 		MaximumCandidatesPerScan: 32
 		MoveIntentMaximumAge: 1500
 		MissionTimeoutTicks: 3000
+		LandingSearchRadiusCells: 8
+		LandingUsefulnessRadiusCells: 16
+		LandingMaximumCandidates: 128
+		LandingReplanInterval: 75
+		LandingHoldTicks: 300
+		SafeReturnLandingSearchRadiusCells: 8
+		SafeReturnUsefulnessRadiusCells: 64
+		LandingThreatRangeBufferCells: 1
+		LandingCoarseCellSize: 4
+		LandingRouteThreatPenalty: 100
 		RepairHealthPercent: 50
 		AssaultSelectionPercent: 50
 		MinimumAssaultPassengers: 3
@@ -184,6 +195,8 @@ Player:
 		AssaultGatherTimeoutTicks: 750
 		AssaultCooldownTicks: 7500
 		AssaultOrderRetryTicks: 75
+		AssaultLandingSearchRadiusCells: 8
+		AssaultLandingUsefulnessRadiusCells: 16
 		HeavyDropMinimumGameTicks: 0
 		HeavyDropMinimumPassengers: 8
 		HeavyDropMaximumPassengers: 10
@@ -197,6 +210,8 @@ Player:
 		HeavyDropLandingRadius: 8
 		HeavyDropFormationRadius: 8
 		HeavyDropFormationSpacing: 3
+		HeavyDropLandingSearchRadiusCells: 3
+		HeavyDropLandingUsefulnessRadiusCells: 16
 		HeavyDropUnloadRangeCells: 1
 		HeavyDropDefenseRadius: 7
 		HeavyDropMaximumDefenderValue: 3400
