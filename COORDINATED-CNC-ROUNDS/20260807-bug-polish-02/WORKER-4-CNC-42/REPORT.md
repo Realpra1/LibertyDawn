@@ -2,14 +2,13 @@
 
 ## Current status
 
-Publication-ready isolated first iteration on
-`agent/round-20260807-cnc42-economy-field-defense` from common base
-`419bee2531d4802bf922c3597b42c6eeb75ab250`. Proposed handoff is
-`First iteration - testing`: the implementation, focused gates, repeated matched
-comparisons, save/load defect repair, and debug-disabled publication regression
-pass. The one allowed final-review response also repairs ordinary SAM construction
-ownership. The exact post-response clean-three plus strongest final-regression bar
-remains for reviewed combined testing.
+Integrated RC1 is complete on `agent/round-20260807-cnc42-rc1-repair` from release
+head `ffb841b48750cc54b1862fb93101d3dce3a87a3f`. Proposed handoff is
+`Complete - testing`: tested product head
+`b6e7eecf15a6993a2349b1595ffb2c350582d976` persists exact economy-SAM build
+ownership across a mid-build save/load, and the reset clean-three, combined
+CNC-41 G4/G7, corrected matched stressed-final differential, focused, and
+repository-wide gates pass.
 
 ## Dependency inspection
 
@@ -968,3 +967,91 @@ allowed final-review response are consumed. Do not infer completion from the
 green build. The adopted mid-build save/load ownership blocker, reset clean-three,
 stressed final regression, stronger cycle-20 causal control, and combined CNC-41
 validation remain required before promotion.
+
+## Integrated RC1 repair and evidence
+
+The isolated blocker was exact economy-SAM build ownership living only in a
+runtime `ProductionQueue` reference. Product commit
+`b6e7eecf15a6993a2349b1595ffb2c350582d976` persists the queue actor ID, queue
+type, actor type, and reservation tick. Load reconstructs ownership only against
+the original owned/live queue when that exact build is still queued, and safely
+discards stale or incompatible records. Legacy saves remain valid. The focused
+suite now passes 35/35, `make check && make test` passes cleanly, and the full
+test assembly passes 513/513.
+
+Six counted integrated games raise the task total from 66 to 72. G5 discovery
+located the reservation window. G5 then saved at tick 300 before the first SAM
+placement; uninterrupted and loaded play both chose economy cell `41,17`, while
+the load explicitly restored queue `328/Defence.GDI`. Combined CNC-41 G4 reached
+tick 6000 with both original harvesters/processors alive and all eight raiders
+dead. Combined G7 reached tick 6500 with both harvesters/processors alive, all six
+raiders dead, no path spam, and the unreachable MSAM correctly withheld. Source
+confirms that `unreachable-domain` is rejected before assignment/reservation, so
+the G7 policy review's possible ineffective-ownership condition is resolved.
+
+The stressed final reached tick 9000. Literal left/right screens were ready
+before the delayed raids; defender totals recovered after the scripted casualty;
+both original harvesters and pristine refineries survived; both measured
+harvesters completed later unloads after contact; seven of eight raiders died;
+and three SAM sites were live at the final sample. No forbidden occupancy,
+preferred-placement miss, refinery traffic failure, runtime/Lua error, or desync
+occurred. The launcher summary's three misses were evidence-expression errors,
+not game failures: two patterns expected `tick=` where the raw engine text says
+`at tick`, and one sampled local recovery before the later literal-screen line.
+The factual narrative preserves the exact discrepancy. Routine policy's
+conditional evidence request is satisfied by those raw later screen and unload
+lines; rerunning the unchanged successful game would violate the no-repeated-
+happy-path rule.
+
+This uses one integrated product cycle (`1/3` this RC, `1/12` total). Draft PR
+#92 targets the exact integrated release branch. CI run `31185660304` passed
+Linux .NET 6.0 in 2m14s and Windows .NET 6.0 in 4m29s on the tested product head.
+Task debug is disabled and raw saves, maps, logs, replays, and benchmarks remain
+ignored. The integrated handoff status is `Complete - testing`.
+
+## Integrated RC1 final-review response
+
+The final repair reviewer found one remaining evidence defect, not a product
+defect: the stressed final lacked its required matched old-behavior control and
+three assertions tested a fixed early recovery sample or the wrong unload log
+syntax. I corrected the ignored harness to track actual casualty application and
+replacement, require both literal screens before fixed raids, accept the engine's
+`at tick N: unload completed` syntax, and run identical changed/control scenario
+timing. No code, rules, balance, or integrated-cycle count changed.
+
+Both same-build arms used product head
+`b6e7eecf15a6993a2349b1595ffb2c350582d976`, identical assemblies, seed
+424307, GDI Brutalis versus Nod Skynet, starts/options/initial actors, the
+storage-full cancellation, casualty, power recovery, and raids at ticks
+6201/6301. The control's only map-rule difference disabled CNC-42 mobile and
+Brutalis economy-SAM activation by restricting both to Iron Reaper. Both jobs
+passed through tick 9000 with exit 0.
+
+Changed applied the casualty at tick 4502, recovered its infantry total by 5001,
+and formed both separated 1/2/1-or-better screens at tick 5926 before contact.
+Measured harvesters 342 and 341 unloaded after contact at ticks 6238 and 6889;
+all eight raiders were dead by 7323; both measured harvesters and refineries were
+pristine at ticks 7701 and 8501; and three SAM sites were live. It emitted no
+resource-safety, refinery-traffic, pending-SAM, runtime, Lua, desync, or fatal
+signal. Old behavior timed out without screens at tick 6151, had only seven kills
+at 7701, and left its measured left harvester at 4,100/35,000 plus its left
+refinery at 47,098/100,000. It recovered and killed the last raider at 8256, and
+both harvesters later unloaded, making the comparative credit precise: 933 ticks
+faster raid clearance and prevention of 30,900 harvester damage plus 52,902
+transient refinery damage, not an artificial control collapse. Changed wall time
+was 29.080 seconds versus 28.069, about 3.6% slower and within the 10% limit.
+
+The fresh factual Commenter accepts the pair as valid and the local readiness and
+damage-prevention difference as decisive. Fresh routine Policy Review returns
+`mostly sensible`, medium confidence, and recommends retaining the unload-gated
+mixed screen and economy-SAM policy. Its air-only/ground-only proportionality and
+unchanged-unsafe-route retry suggestions are bounded next-round hypotheses; the
+pair exposes no task defect requiring another product cycle. The staged persistent
+scratchpad was not rewritten by the current policy role, so the missing
+replacement was rejected and the canonical scratchpad retained unchanged.
+
+This adds two counted games for a total of 74. The sole repair-review correction
+passes, `Complete - testing` remains supported, and the tested product head remains
+`b6e7eecf15a6993a2349b1595ffb2c350582d976`. Evidence is under
+`analysis/worker-4-cnc42/rc1-review-response/`, including the paired manifest/run,
+fresh `commenter/NARRATIVE.md`, and fresh `policy/POLICY-REVIEW.md`.

@@ -12,7 +12,7 @@ when the dependency section directs it.
 - Task: `CNC-42 — Economy field defense`
 - Change category: `AI strategy, production/reservation, persisted stationing/routing, and economy-defense placement policy`
 - Balance authority: `Frozen except for the exact requested AI-policy surface: approximately one existing Medium Tank (mtnk), two Minigunners/riflemen (e1), and one Mobile SAM (msam) of field-defense demand per harvester/working-field context in mid/late Economy play; commit the saved station only after completed unloading; keep infantry out of every Tiberium type and all guards out of refinery traffic; and use normal SAM Site (sam) construction to defend economy structures. This permits bounded AI requests, reservations, assignment, safe routing/stationing, pursuit/re-form/release rules, and economy-oriented SAM demand/placement needed to realize that behavior. It does not permit changes to unit/weapon/structure stats, cost, HP, damage, armor, speed, range, ammunition, build time, power, prerequisites, Tiberium values/spread/damage, probabilities, resource values, general army composition, unrelated unit/building weights or fractions, or any other balance surface.`
-- Status: `First iteration - testing`
+- Status: `Complete - testing`
 - Common base branch/SHA: `agent/cnc-20260806-bug-polish-01-release` / `419bee2531d4802bf922c3597b42c6eeb75ab250`
 - Task branch: `agent/round-20260807-cnc42-economy-field-defense`
 - Intended PR base: `agent/cnc-20260806-bug-polish-01-release`
@@ -24,20 +24,20 @@ when the dependency section directs it.
 - Task report: `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260807-bug-polish-02/workers/worker-4-cnc42/COORDINATED-CNC-ROUNDS/20260807-bug-polish-02/WORKER-4-CNC-42/REPORT.md`
 - Match-analysis directory: `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260807-bug-polish-02/analysis/worker-4-cnc42`
 - Liberty Dawn design reference: `.agents/references/LIBERTY-DAWN-DESIGN.md`
-- Full-engine game tests completed: `66` (the prior 64 through cycle 19; cycle 20 adds one invalid tick-3401 covered-anchor setup whose unsupported Lua `ActorID` observer crashed after the second SAM was already visible, plus one corrected fresh covered-anchor/general-defense run through tick 5200; that corrected run began with one powered SAM covering the active refinery/resonator/used-silo anchors, retained ordinary authored fractions and all normal modules, then visibly grew to four live general-defense SAMs while all anchors survived and no economy reservation/runtime/desync signal occurred; its launcher label failed only two overstrict regexes requiring an unavailable BotDebug sentence and exactly two rather than four sites; tick-0 content-root/configuration attempts, the earlier desyncing current-load attempt, and reused controls remain excluded)
+- Full-engine game tests completed: `74` (66 isolated plus eight integrated RC1 games: G5 discovery, G5 mid-build save, G5 exact load, combined G4, combined G7, the initial stressed final, and the final-review-response changed/control pair; the tick-0 missing-map load attempt is excluded)
 - Terra cycle code reviews: `cycle 5 advisory adopted: validated hazard-free paths were reduced to four-cell waypoints whose ordinary Move activities could re-path through forbidden cells; cycle 6 preserved every safe segment (`analysis/worker-4-cnc42/cycle-review-05/CYCLE-REVIEW.md`). Cycle 10 advisory adopted: the judged e1 occupancy proves owned safety must veto every ordinary movement source, not only exact routes/nudges, and needs a forced like-for-like regression (`analysis/worker-4-cnc42/cycle-review-10/CYCLE-REVIEW.md`). Cycle 15 advisory rejected after source verification: the synchronized SetMoveAlongPathSafety order is recorded in the save order stream and deterministically reconstructs both strictMovementSafety and strictAvoidCells during replay before IGameSaveTraitData resolution; SyncAttribute controls hash reporting rather than save serialization, and the cycle-15 load reproduced the live pre-boundary trace exactly (`analysis/worker-4-cnc42/cycle-review-15/CYCLE-REVIEW.md`). Cycle 16 nevertheless retained a post-load pre-scan forbidden-cell assertion. Cycle 20 advisory adopted as deferred: exact economy-SAM queue/type ownership is runtime-only and is lost when loading between reservation and placement, so that one build can fall back to ordinary placement (`analysis/worker-4-cnc42/cycle-review-20/CYCLE-REVIEW.md`); resolving and proving it requires forbidden cycle 21, therefore hand off First iteration.`
 - Sol-xhigh policy escalation: `unused (requires at least 10 game tests; one maximum)`
 - PR: `#89 https://github.com/Realpra1/LibertyDawn/pull/89 (draft and mergeable; base agent/cnc-20260806-bug-polish-01-release; tested product head 84dbf5013d8b6b3c696e8d6f80f24c7be00f1a23)`
 
 ## Integrated repair assignment
 
-- Phase: `isolated implementation`
-- Current release branch/head: `not assigned`
-- Integration notes: `not assigned`
-- Repair branch: `not assigned`
-- Repair PR base: `not assigned`
-- Integrated cycles used this RC: `0/3`
-- Integrated cycles used total: `0/12`
+- Phase: `integrated testing`
+- Current release branch/head: `agent/cnc-20260807-bug-polish-02-release` / `ffb841b48750cc54b1862fb93101d3dce3a87a3f`
+- Integration notes: `COORDINATED-CNC-ROUNDS/20260807-bug-polish-02/INTEGRATION.md`
+- Repair branch: `agent/round-20260807-cnc42-rc1-repair`
+- Repair PR base: `agent/cnc-20260807-bug-polish-02-release`
+- Integrated cycles used this RC: `1/3`
+- Integrated cycles used total: `1/12`
 
 Before relaunching this worker for combined testing or repair, the integrator must
 replace these fields with the exact release head, note path, branch, and counters.
@@ -1316,3 +1316,108 @@ handoff blocker.
   and `analysis/worker-4-cnc42/g5-cycle20-policy/POLICY-REVIEW.md`; cycle-20 code
   review `analysis/worker-4-cnc42/cycle-review-20/CYCLE-REVIEW.md`; publication
   run `analysis/worker-4-cnc42/games/g7-archipelago/focused-cycle19-run2`.
+
+## Integrated RC1 handoff receipt
+
+- Proposed status: `Complete - testing`. One integrated repair cycle closes the
+  adopted mid-build save/load blocker and passes the reset clean-three, combined
+  CNC-41 validation, stressed final, repository gates, and publication checks.
+- Tested product head: `b6e7eecf15a6993a2349b1595ffb2c350582d976` on
+  `agent/round-20260807-cnc42-rc1-repair`, based on exact integrated release head
+  `ffb841b48750cc54b1862fb93101d3dce3a87a3f`.
+- Repair: save the economy-SAM reservation's queue actor ID, exact queue type,
+  actor type, and reservation tick. Load resolves the original owned/live queue
+  and restores ownership only when its matching build remains queued; missing,
+  stale, dead, captured, disabled, and mismatched records fail closed. Legacy
+  saves safely omit the new state.
+- Focused and build gates: economy policy tests passed `35/35`; `make check &&
+  make test` passed Debug/Release compilation, interface checks, and CNC
+  MiniYAML with zero warnings/errors; full `OpenRA.Test` passed `513/513`.
+- G5 persistence: uninterrupted play saved at tick 300 after reservation and
+  before placement. The exact load restored queue `328/Defence.GDI`, retained
+  actor type `sam`, and selected the same economy anchor/cell `332 / 41,17` at
+  the same tick as uninterrupted play. The invalid tick-0 missing-map attempt is
+  excluded.
+- Reset clean-three and combination: the exact G5 load, combined CNC-41 G4 toxic
+  geometry, and combined CNC-41 G7 topology/save scenarios passed. G4 retained
+  both original harvesters and processors after all eight raiders; G7 retained
+  both harvesters and processors after all six raiders without path spam,
+  resource/traffic violations, runtime error, or desync.
+- G7 policy-review disposition: the reviewer condition asked whether the fixed
+  unreachable MSAM at `91,96` was ineffectively reserved. Source inspection
+  confirms `unreachable-domain` rejection occurs in `ClaimRejectionReason`
+  before `Fill` calls `assignment.Add` or `reserved.Add`; the actor was correctly
+  withheld and never owned by the economy-defense module. No repair is needed.
+- Stressed final: reached tick 9000 with both original harvesters and pristine
+  refineries, literal local screens before contact, defender recovery, three SAM
+  sites, later post-contact unload completions by both measured harvesters, and
+  seven of eight raiders destroyed. No safety, traffic, runtime, Lua, or desync
+  failure occurred. Its launcher label is rejected as an assertion-harness false
+  negative: two unload expressions required `tick=` although the engine logged
+  `at tick`, and the recovery expression sampled before the later literal screens.
+  The factual narrative records the raw outcomes; the routine policy review's
+  evidence condition is resolved by those same post-contact unload and literal-
+  screen lines rather than an unchanged rerun.
+- Evidence count and budgets: six new counted games bring the total to `72`;
+  integrated cycles are `1/3` this RC and `1/12` total. No further product cycle
+  was needed. Task-owned debug remains disabled and no raw game artifact is
+  tracked.
+- Publication: draft PR #92,
+  https://github.com/Realpra1/LibertyDawn/pull/92, targets
+  `agent/cnc-20260807-bug-polish-02-release`. CI run `31185660304` passed Linux
+  .NET 6.0 in 2m14s and Windows .NET 6.0 in 4m29s on the tested product head.
+  The final receipt-only commit follows that head and changes no product code.
+- Integrated artifacts:
+  `analysis/worker-4-cnc42/integrated-rc1/{g5-discovery-run,g5-save-run,g5-load-run2,g4-g7-combined-run,final-stress-run}`
+  and factual/policy narratives under
+  `analysis/worker-4-cnc42/integrated-rc1/reviews/`.
+
+## Integrated RC1 final-review response receipt
+
+- Review disposition: adopt the sole high-priority finding in
+  `analysis/worker-4-cnc42/rc1-repair-review/REVIEW.md`. The initial stressed
+  final lacked its required matched old-behavior differential, and its fixed-tick
+  recovery plus unload expressions asserted the wrong semantic window and log
+  syntax. This was an evidence-harness defect; no product or balance change was
+  made, and integrated cycle counters remain `1/3` this RC and `1/12` total.
+- Corrected pair: both arms used product head
+  `b6e7eecf15a6993a2349b1595ffb2c350582d976`, identical assemblies, seed
+  `424307`, GDI Brutalis versus Nod Skynet, starts, lobby options, actors,
+  storage-full cancellation, casualty, power recovery, and fixed raid ticks.
+  The approved same-build old-behavior map differed only by restricting the
+  CNC-42 mobile module and Brutalis economy-SAM identity to Iron Reaper. Map
+  SHA-256 values are changed `28a6dc6a...0b77` and control
+  `d1090d91...d59b`; the map-rule-only difference is recorded in the manifest.
+- Changed result: the casualty applied at tick 4502 and infantry total recovered
+  at 5001. Both separated fields visibly reached at least 1/2/1 by tick 5926,
+  before identical raids at 6201/6301. Measured harvesters 342 and 341 completed
+  post-contact unloads at ticks 6238 and 6889, all eight raiders were dead by
+  7323, and both measured harvesters/refineries remained pristine at ticks 7701
+  and 8501. Three SAM sites were live. No resource-safety, refinery-traffic,
+  pending-SAM, runtime, Lua, desync, or fatal signal occurred.
+- Control result and decisive comparison: the old behavior timed out at tick
+  6151 with no left screen and only one right rifleman. It had killed 7/8 at tick
+  7701 while the left harvester was reduced to `4,100/35,000` and the left
+  refinery to `47,098/100,000`; it killed the last raider at 8256. Both measured
+  harvesters still completed later unloads and survived, so the decisive benefit
+  is local readiness, 933-tick faster clearance, and prevention of 30,900
+  harvester damage plus 52,902 transient refinery damage rather than a fabricated
+  control collapse.
+- Performance: the changed arm completed 9,000 ticks in 29.080 seconds versus
+  28.069 seconds for control, about 3.6% slower and within the 10% limit. Both
+  launcher summaries passed with exit 0, replay/benchmarks, and all semantic
+  expressions satisfied.
+- Fresh independent review: factual Commenter accepts the pair as valid and the
+  readiness/damage-prevention advantage as decisive. Routine Policy Review
+  returns `mostly sensible`, medium confidence: retain the unload-gated mixed
+  defense and economy-SAM policy; its air-only/ground-only proportionality and
+  unchanged-unsafe-route retry recommendations are next-round hypotheses, not a
+  defect exposed by this pair. The current policy role emitted no replacement
+  persistent scratchpad despite receiving its staged copy, so the missing
+  replacement was rejected and the canonical scratchpad retained unchanged.
+- Final disposition: the one required repair-review response passes and closes
+  the remaining stressed-final differential gate. Proposed status remains
+  `Complete - testing`; tested product head remains `b6e7eecf15...`, followed
+  only by receipt commits. Counted full-engine evidence is now `74`.
+- Artifacts:
+  `analysis/worker-4-cnc42/rc1-review-response/{paired-manifest.json,paired-run,commenter/NARRATIVE.md,policy/POLICY-REVIEW.md}`.
