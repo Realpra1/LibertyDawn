@@ -824,7 +824,10 @@ namespace OpenRA.Mods.Common.Traits
 				notifyCrushed.Trait.WarnCrush(notifyCrushed.Actor, self, Info.LocomotorInfo.Crushes);
 		}
 
-		public Activity MoveTo(Func<BlockedByActor, (bool AlreadyAtDestination, List<CPos> Path)> pathFunc) { return new Move(self, pathFunc); }
+		public Activity MoveTo(Func<BlockedByActor, (bool AlreadyAtDestination, List<CPos> Path)> pathFunc, Actor ignoreActor = null)
+		{
+			return new Move(self, pathFunc, ignoreActor: ignoreActor);
+		}
 
 		Activity LocalMove(Actor self, WPos fromPos, WPos toPos, CPos cell)
 		{

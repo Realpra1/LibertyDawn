@@ -99,12 +99,14 @@ namespace OpenRA.Mods.Common.Activities
 			this.targetLineColor = targetLineColor;
 		}
 
-		public Move(Actor self, Func<BlockedByActor, (bool AlreadyAtDestination, List<CPos> Path)> getPath, Color? targetLineColor = null)
+		public Move(Actor self, Func<BlockedByActor, (bool AlreadyAtDestination, List<CPos> Path)> getPath,
+			Color? targetLineColor = null, Actor ignoreActor = null)
 		{
 			// PERF: Because we can be sure that OccupiesSpace is Mobile here, we can save some performance by avoiding querying for the trait.
 			mobile = (Mobile)self.OccupiesSpace;
 
 			this.getPath = getPath;
+			this.ignoreActor = ignoreActor;
 
 			destination = null;
 			nearEnough = WDist.Zero;

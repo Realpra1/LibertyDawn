@@ -312,10 +312,11 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		internal List<Actor> GroundFormationUnits(bool bootstrapIfEmpty = false)
 		{
 			var formation = Units.Where(a => !GroundReinforcements.Contains(a.ActorID) &&
-				!SquadManager.IsUnitProtectingBase(a)).ToList();
+				!SquadManager.IsUnitProtectingBase(a) && !SquadManager.IsUnitTemporarilyControlled(a)).ToList();
 			if (formation.Count == 0 && bootstrapIfEmpty)
 			{
-				var replacement = Units.Where(a => !SquadManager.IsUnitProtectingBase(a))
+				var replacement = Units.Where(a => !SquadManager.IsUnitProtectingBase(a) &&
+					!SquadManager.IsUnitTemporarilyControlled(a))
 					.OrderBy(a => hasGroundFormationCenter ?
 					(a.CenterPosition - groundLastFormationCenter).LengthSquared : (long)a.ActorID)
 					.ThenBy(a => a.ActorID).FirstOrDefault();
