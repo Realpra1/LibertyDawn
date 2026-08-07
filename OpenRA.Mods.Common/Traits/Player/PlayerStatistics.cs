@@ -363,6 +363,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly UpdatesPlayerStatisticsInfo info;
 		readonly string actorName;
 		readonly int cost = 0;
+		IAdaptiveKillValue[] adaptiveKillValues;
 
 		PlayerStatistics playerStats;
 		bool includedInArmyValue = false;
@@ -428,8 +429,14 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				attackerStats.KillsCost += cost;
 
-				var specialistValue = self.TraitsImplementing<IAdaptiveKillValue>()
-					.Select(t => t.GetAdaptiveKillValue(self, e.Attacker)).FirstOrDefault(value => value.HasValue);
+				int? specialistValue = null;
+				foreach (var adaptiveKillValue in adaptiveKillValues)
+				{
+					specialistValue = adaptiveKillValue.GetAdaptiveKillValue(self, e.Attacker);
+					if (specialistValue.HasValue)
+						break;
+				}
+
 				if (specialistValue.HasValue)
 				{
 					var delta = CompletedSpecialistOutcome.Record(e.Attacker.Owner, e.Attacker.Info.Name, specialistValue.Value);
@@ -449,6 +456,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		void INotifyCreated.Created(Actor self)
 		{
+			adaptiveKillValues = self.TraitsImplementing<IAdaptiveKillValue>().ToArray();
 			includedInArmyValue = info.AddToArmyValue;
 			if (includedInArmyValue)
 			{
