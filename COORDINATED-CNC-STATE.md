@@ -1,7 +1,7 @@
 # Coordinated CNC State
 
 - Round ID: `20260807-bug-polish-02`
-- Phase: `five isolated Sol-high workers active`
+- Phase: `three task handoffs complete; two isolated Sol-high workers active`
 - Common base branch: `agent/cnc-20260806-bug-polish-01-release`
 - Common base SHA: `419bee2531d4802bf922c3597b42c6eeb75ab250`
 - Coordinator model: `gpt-5.6-sol` / `high` (trial mismatch explicitly accepted by user)
@@ -19,11 +19,11 @@
 
 | Worker | Task | Branch | Worktree | State | Process/result | PR | Review | Integrated status |
 |---|---|---|---|---|---|---|---|---|
-| 1 | CNC-87 Repair coordinated external-role launching and large-build enforcement | `agent/round-20260807-cnc87-role-launch-lock` | `.worktrees/coordinated-cnc/20260807-bug-polish-02/workers/worker-1-cnc87` | spec complete at `WORKER-1-CNC-87/STATE.md`; launcher/lock overlap warning recorded | `roles/worker-1/process.json` running PID 717796; speccer complete 0 | | | |
-| 2 | CNC-40 Adaptive specialists | `agent/round-20260807-cnc40-adaptive-specialists` | `.worktrees/coordinated-cnc/20260807-bug-polish-02/workers/worker-2-cnc40` | spec complete at `WORKER-2-CNC-40/STATE.md`; capture/C4 overlap warning recorded | `roles/worker-2/process.json` running PID 717831; speccer complete 0 | | | |
+| 1 | CNC-87 Repair coordinated external-role launching and large-build enforcement | `agent/round-20260807-cnc87-role-launch-lock` | `.worktrees/coordinated-cnc/20260807-bug-polish-02/workers/worker-1-cnc87` | `Complete - testing`; final head `5170183fb882`; clean and pushed | `roles/worker-1/process.json` complete 0 | [#86](https://github.com/Realpra1/LibertyDawn/pull/86) | Sol-high `ready`; no fix | awaiting integration |
+| 2 | CNC-40 Adaptive specialists | `agent/round-20260807-cnc40-adaptive-specialists` | `.worktrees/coordinated-cnc/20260807-bug-polish-02/workers/worker-2-cnc40` | `First iteration - testing`; final head `40ed5926864c`; clean and pushed | `roles/worker-2/process.json` complete 0 | [#87](https://github.com/Realpra1/LibertyDawn/pull/87) | final review response recorded; Linux/Windows CI passed | awaiting integration |
 | 3 | CNC-41 Economy Tiberium fields | `agent/round-20260807-cnc41-economy-tiberium-fields` | `.worktrees/coordinated-cnc/20260807-bug-polish-02/workers/worker-3-cnc41` | spec complete at `WORKER-3-CNC-41/STATE.md`; CNC42 dependency warning recorded | `roles/worker-3/process.json` running PID 717899; speccer complete 0 | | | |
 | 4 | CNC-42 Economy field defense | `agent/round-20260807-cnc42-economy-field-defense` | `.worktrees/coordinated-cnc/20260807-bug-polish-02/workers/worker-4-cnc42` | spec complete at `WORKER-4-CNC-42/STATE.md`; CNC41 overlap warning recorded | `roles/worker-4/process.json` running PID 717984; speccer complete 0 | | | |
-| 5 | CNC-44 Aircraft husks | `agent/round-20260807-cnc44-aircraft-husks` | `.worktrees/coordinated-cnc/20260807-bug-polish-02/workers/worker-5-cnc44` | spec complete at `WORKER-5-CNC-44/STATE.md`; CNC62 publication-blocking crash-damage dependency recorded | `roles/worker-5/process.json` running PID 718301; speccer complete 0 | | | |
+| 5 | CNC-44 Aircraft husks | `agent/round-20260807-cnc44-aircraft-husks` | `.worktrees/coordinated-cnc/20260807-bug-polish-02/workers/worker-5-cnc44` | `First iteration - testing`; final head `df9cd6e12fd5`; clean and pushed; CNC62 dependency remains | `roles/worker-5/process.json` complete 0 | [#85](https://github.com/Realpra1/LibertyDawn/pull/85) | Sol-high `ready`; no fix | awaiting integration |
 
 ## Release rounds
 
