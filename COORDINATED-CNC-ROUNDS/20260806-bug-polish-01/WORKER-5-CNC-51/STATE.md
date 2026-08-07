@@ -50,7 +50,7 @@ when the dependency section directs it.
   replan, carrier recovery, and ordinary reuse; run 49 clean fresh-process final
   literal three-rescue regression; run 50 clean post-fix Release natural match.
 - Sol-xhigh policy escalation: `unused (requires at least 10 game tests; one maximum)`
-- PR: `none`
+- PR: `https://github.com/Realpra1/LibertyDawn/pull/81`
 
 ## Integrated repair assignment
 
