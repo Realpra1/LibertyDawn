@@ -1,7 +1,7 @@
 # Coordinated CNC State
 
 - Round ID: `20260806-bug-polish-01`
-- Phase: `RC3 integrated and locally green; final combined release review and CI active`
+- Phase: `RC3 final review ready-with-one-fix; CNC51 bounded recovery response starting`
 - Common base branch: `agent/cnc38-early-viki-infantry-rush`
 - Common base SHA: `09ccdac3c1ecb5134a4751f2bcbd8a7970dfe6bf`
 - Coordinator model: `gpt-5.6-sol` / `high` (trial mismatch explicitly accepted by user)
@@ -23,7 +23,7 @@
 | 2 | CNC-39A Engineer/commando target coordination | `agent/round-20260806-cnc39a-rc2-repair` | `.worktrees/coordinated-cnc/20260806-bug-polish-01/integration/combined-worker-2-cnc39a` | `First iteration - testing; combined pass/no repair` (`WORKER-2-CNC-39A/STATE.md`) | `roles/combined-worker-2-rc2/process.json` complete 0 | [#80](https://github.com/Realpra1/LibertyDawn/pull/80) at `937ef02048` | `blocked`; one required save/load response completed with exact-head CI and reload evidence (`REVIEW-2.md`) | `RC2 passed: 4 games, focused 15/15, full 454/454; prior evidence gaps remain; documentation head 4c140dc37a` |
 | 3 | CNC-43 MCV crush flavor | `agent/round-20260806-cnc43-rc2-repair` | `.worktrees/coordinated-cnc/20260806-bug-polish-01/integration/combined-worker-3-cnc43` | `combined pass/no repair` (`WORKER-3-CNC-43/STATE.md`) | `roles/combined-worker-3-rc2/process.json` complete 0 | [#78](https://github.com/Realpra1/LibertyDawn/pull/78) at `b229612791` | `ready with one fix`; one permitted evidence response complete (`REVIEW-3.md`) | `RC2 passed: 6 games, wall-intact recovery and natural conclusion; documentation head 10931c9f20` |
 | 4 | CNC-43A Flame Tank balance | `agent/round-20260806-cnc43a-rc2-repair` | `.worktrees/coordinated-cnc/20260806-bug-polish-01/integration/combined-worker-4-cnc43a` | `combined pass/no repair` (`WORKER-4-CNC-43A/STATE.md`) | `roles/combined-worker-4-rc2/process.json` complete 0 | [#79](https://github.com/Realpra1/LibertyDawn/pull/79) at `ade3f9d325` | `ready with one fix`; one permitted evidence response complete (`REVIEW-4.md`) | `RC2 passed: adversarial fixture matrix plus matched natural control; documentation head 8947aa71f7` |
-| 5 | CNC-51 Transport-helicopter unload recovery and threat-safe landing | `agent/round-20260806-cnc51-rc2-repair` | `.worktrees/coordinated-cnc/20260806-bug-polish-01/integration/combined-worker-5-cnc51` | `combined pass/no repair` (`WORKER-5-CNC-51/STATE.md`) | `roles/combined-worker-5-rc2/process.json` complete 0 | [#81](https://github.com/Realpra1/LibertyDawn/pull/81) at `72dad573af` (product `cb6a05d5a3`) | `ready with one fix`; moving-aircraft closing envelope response complete, exact-head CI passed | `RC2 passed: 6 games, focused 97/97, full 454/454; documentation head b007a26c2b` |
+| 5 | CNC-51 Transport-helicopter unload recovery and threat-safe landing | `agent/round-20260806-cnc51-rc3-final-repair` | `.worktrees/coordinated-cnc/20260806-bug-polish-01/integration/final-worker-5-cnc51` | `final review response starting` (`WORKER-5-CNC-51/STATE.md`) | pending launch | [#81](https://github.com/Realpra1/LibertyDawn/pull/81) at `72dad573af` (product `cb6a05d5a3`) | `ready with one fix`; moving-aircraft closing envelope response complete, exact-head CI passed | `RC2 combined pass; RC3 final review found renewable loaded-rescue deadline/reservation defect requiring one bounded repair cycle` |
 
 ## Release rounds
 
