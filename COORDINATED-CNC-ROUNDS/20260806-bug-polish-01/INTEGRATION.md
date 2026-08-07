@@ -1,10 +1,12 @@
-# Integration: coordinated bug/polish RC2 candidate
+# Integration: coordinated bug/polish RC3 candidate
 
 - Round: `20260806-bug-polish-01`
-- Status: complete five-task cumulative RC2 code candidate; combined worker adversarial testing and final release review remain pending
+- Status: RC3 combined handoffs and strict gates complete; final cumulative release-PR review remains pending
 - Recorded common product base: `09ccdac3c1ecb5134a4751f2bcbd8a7970dfe6bf`
 - Stable branch: `agent/cnc-20260806-bug-polish-01-release`
 - Exact combined RC2 code candidate: `b456fd89fac88d71dfadd65c47cfb7b409d44122`
+- Exact combined RC3 code candidate: `de855c42d39fc947c7d00b32b38c69e448ade6c4`
+- RC3 combined worker-receipt head before this integration record: `3e345413cf16dad746e88b7b1186b5b1e94c2312`
 - Release target: `bleed`
 - Original release PR: https://github.com/Realpra1/LibertyDawn/pull/82
 - Successor draft release PR: https://github.com/Realpra1/LibertyDawn/pull/84
@@ -62,6 +64,24 @@ RC2 continued with merge commits in this order:
    `b7df46abbf5e6d85a09b1701f6dd0116d14c0615`.
 8. CNC-39 `0e9efa901ae35283d435b217b5498d402b3f9fa9` -> exact RC2
    code candidate `b456fd89fac88d71dfadd65c47cfb7b409d44122`.
+
+RC3 continued from exact RC2 head
+`fd15540ffc98c70f085688fe0b38a4a6341fc6ed` with conflict-free merge commits in
+the supplied order:
+
+9. CNC-39 reviewed repair/receipt
+   `8040ba74e963cb27945cb75af28df3baa9cfb578` -> exact RC3 code candidate
+   `de855c42d39fc947c7d00b32b38c69e448ade6c4`. Its exact product repair is
+   `bc3ab411f8235cfbec1a31ed7187f6e7971897a9`.
+10. CNC-39A combined receipt
+    `4c140dc37ae858c0eee03eb46ed2dd06d5cda581` -> `589f55f1d76c2cd9bf826a31c7643d9e541fbccf`.
+11. CNC-43 combined receipt
+    `10931c9f200ffe0e74b25d7856a9d05815d236f1` -> `95703a9185cfc4d148fe38c573b74ae4ac812b71`.
+12. CNC-43A combined receipt
+    `8947aa71f7761d0e632ce2e2e045d227b1ce7796` -> `dd6fc1625fac9682e6c1b1d3f20725bfcb69c380`.
+13. CNC-51 combined receipt
+    `b007a26c2b9343ee17bdb94de94e5908aa8ebcdb` -> combined receipt head
+    `3e345413cf16dad746e88b7b1186b5b1e94c2312`.
 
 ## CNC-39 / CNC-39A conflict and semantic resolution
 
@@ -155,3 +175,82 @@ No source task is excluded from RC2. The principal orchestration risk is that th
 recorded persistent PR #82 was merged before this cumulative candidate; the
 successor draft release PR must remain open for the remaining RC/test rounds and
 must not be merged into `bleed` by the integrator.
+
+## RC3 combined handoffs
+
+All five exact handoff heads descend from RC2
+`fd15540ffc98c70f085688fe0b38a4a6341fc6ed`. CNC-39A, CNC-43, CNC-43A, and CNC-51
+change only their own durable combined-testing state/report receipts. They record
+`combined pass/no repair` and introduce no product, balance, fixture, skill, task,
+or unrelated metadata change. CNC-39 changes only its own state receipt and
+`CaptureManagerBotModule.cs`.
+
+The CNC-39 product tree at handoff `8040ba74e963cb27945cb75af28df3baa9cfb578`
+is byte-identical outside its state receipt to reviewed repair
+`bc3ab411f8235cfbec1a31ed7187f6e7971897a9`. Final repair review
+`/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260806-bug-polish-01/reviews/worker-1-rc2/REVIEW.md`
+returned `ready with one fix`: obtain one fresh
+strict literal lone-Engineer pass on the exact allocation-free repair tree. The
+handoff records that pass at fresh seed `39207`: the intended 79-percent target
+was the first and only assignment, ownership changed at tick 525, prompt
+`captured` retirement occurred at tick 526, final ownership and zero-Engineer
+assertions held, both pressure/repair gates fired, all forbidden patterns were
+absent, and headless MAX exited cleanly at tick 1250. Fresh factual and policy
+receipts accepted this as focused evidence; no further product change was made.
+
+## RC3 scope and invariant audit
+
+- The RC2-to-RC3 product delta is exactly the reviewed CNC-39 repair in
+  `CaptureManagerBotModule.cs`; the cumulative product tree is otherwise identical
+  to RC2. There is no RC3 rules, weapon, balance, map, fixture, task, or skill
+  delta.
+- The base-to-RC3 product diff remains confined to the five recorded task areas.
+  The combat-balance/config freeze is preserved: the only combat-balance delta
+  remains CNC-43A's authorized FTNK HP `30000 -> 36000` and seven
+  BigFlamer-local Heavy modifiers `20 -> 22`; the recorded CNC-39 threshold,
+  CNC-43 MCV locomotor/crush rules, and CNC-51 transport configuration are
+  unchanged from RC2.
+- Capture and transport diagnostics remain gated by `DebugLogging`; no
+  unconditional product diagnostic was introduced. Decision-sensitive actor,
+  target, reservation, restoration, passenger, cell, and route ordering remains
+  deterministic, with no new simulation RNG.
+- CNC-39A remains the sole save/restore and shared capture/demolition reservation
+  authority. The repair only retires consumed/unavailable specialists and releases
+  their existing claims; it adds no competing schema or policy.
+- Prompt retirement runs each bot tick but scans only the bounded active capture
+  and demolition assignment dictionaries. Its mutation loop creates no temporary
+  collection or `ToArray` allocation; planning, world/path scans, and full
+  retirement stay on their existing bounded cadence.
+
+## RC3 gates
+
+Every build-dependent command ran on combined receipt head
+`3e345413cf16dad746e88b7b1186b5b1e94c2312` under the canonical capacity-one
+`large-build` lock.
+
+- Focused `CaptureTargetingTest` command passed 15/15, with 0 failed and 0 skipped.
+- `make check` passed; Debug build succeeded with 0 warnings and 0 errors, and both
+  explicit-interface checks completed cleanly.
+- Full Debug `OpenRA.Test` passed 454/454, with 0 failed and 0 skipped.
+- `make check-scripts` passed Lua syntax validation.
+- `make test` passed; Release build succeeded with 0 warnings and 0 errors, then
+  CNC MiniYAML, all five default sequence sets, and every CNC map passed.
+- `git diff --check
+  09ccdac3c1ecb5134a4751f2bcbd8a7970dfe6bf..3e345413cf16dad746e88b7b1186b5b1e94c2312`
+  passed. `git diff --check` for the working tree also passed, and the worktree was
+  clean after all gates.
+
+## Game-resource conclusion
+
+Set the ordinary/full-engine shared default to two games. CNC-43's representative
+three-way batch completed only 1/3 at 6,447,160 KiB sampled peak aggregate RSS on
+this host, while its two-way rerun completed 2/2 with about 2.24 GiB less peak RSS.
+CNC-39 and CNC-39A also measured worse contention or lock starvation at three-way
+capacity. Three-way batches were reliable for CNC-43A and CNC-51's short bounded
+fixtures, so three slots may be reserved only for explicitly short, bounded,
+isolated fixtures whose combined memory and completion bounds are known. Normal,
+long-pressure, natural-conclusion, and other full games use at most two slots.
+
+RC3 excludes no task. Draft PR #84 remains the sole successor release PR and must
+remain open until the final cumulative release review is complete; the integrator
+must not merge it into `bleed`.
