@@ -5,9 +5,10 @@
 - Common base branch: `agent/cnc38-early-viki-infantry-rush`
 - Common base SHA: `09ccdac3c1ecb5134a4751f2bcbd8a7970dfe6bf`
 - Coordinator model: `gpt-5.6-sol` / `high` (trial mismatch explicitly accepted by user)
-- Game slots: `2` proven; trial `3` concurrent isolated MAX games during combined
-  testing and retain three only if throughput, RSS, and evidence reliability stay
-  healthy
+- Game slots: `2` for ordinary/full MAX simulations. The three-slot trial showed
+  that short, tightly bounded custom fixtures can run three safely, but three
+  benchmarked ordinary/full games reached about 5.5 GB RSS within 28 seconds and
+  were stopped before OOM; do not use three for normal full-game acceptance.
 - Large-build slots: `1`
 - Lock directory: `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260806-bug-polish-01/locks`
 - Release candidate: `RC2` at `fd15540ffc98c70f085688fe0b38a4a6341fc6ed`
