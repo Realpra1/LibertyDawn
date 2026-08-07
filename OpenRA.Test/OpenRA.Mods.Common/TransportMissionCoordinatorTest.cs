@@ -64,5 +64,39 @@ namespace OpenRA.Test
 			coordinator.Release(first);
 			Assert.That(coordinator.ClaimOwner(new CPos(6, 7)), Is.Zero);
 		}
+
+		[Test]
+		public void LoadedRecoveryDeadlineIsNonRenewableAndTerminalOwnershipIsParked()
+		{
+			var recovery = new TransportRescueRecoveryLifecycle();
+			var coordinator = new TransportMissionCoordinator(1);
+			var mission = coordinator.TryReserve(new uint[] { 10, 20 });
+			var staleCells = new[] { new CPos(4, 4), new CPos(4, 5) };
+
+			Assert.That(recovery.TryBeginReturn(1000, 3000), Is.True);
+			Assert.That(recovery.DeadlineTick, Is.EqualTo(4000));
+			Assert.That(recovery.TryBeginReturn(2500, 3000), Is.False);
+			Assert.That(recovery.DeadlineTick, Is.EqualTo(4000));
+			Assert.That(coordinator.TryClaimCells(mission, staleCells, out _), Is.True);
+			Assert.That(recovery.TryEnterTerminal(3999), Is.False);
+			Assert.That(recovery.TryEnterTerminal(4000), Is.True);
+			Assert.That(recovery.TryEnterTerminal(7000), Is.False);
+
+			Assert.That(coordinator.ParkLoadedMission(mission), Is.True);
+			Assert.That(coordinator.ParkLoadedMission(mission), Is.False);
+			Assert.That(coordinator.MissionCount, Is.Zero);
+			Assert.That(coordinator.ClaimOwner(staleCells[0]), Is.Zero);
+			Assert.That(coordinator.IsReserved(10), Is.True);
+			Assert.That(coordinator.IsReserved(20), Is.True);
+			Assert.That(coordinator.TryReserve(new uint[] { 10, 30 }), Is.Zero);
+
+			// A safe site that opens later may be claimed deterministically by the parked owner.
+			var openedCells = new[] { new CPos(8, 8), new CPos(8, 9) };
+			Assert.That(coordinator.TryClaimCells(mission, openedCells, out _), Is.True);
+			coordinator.Release(mission);
+			Assert.That(coordinator.ClaimOwner(openedCells[0]), Is.Zero);
+			Assert.That(coordinator.IsReserved(10), Is.False);
+			Assert.That(coordinator.IsReserved(20), Is.False);
+		}
 	}
 }
