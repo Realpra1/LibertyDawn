@@ -1,7 +1,7 @@
 # Coordinated CNC State
 
 - Round ID: `20260807-bug-polish-03`
-- Phase: `five isolated assignments ready; worker launch pending`
+- Phase: `five Sol-high isolated workers active`
 - Common base branch: `agent/cnc-20260807-bug-polish-02-release`
 - Common base SHA: `468ee64f5a0f9a9e19e260e5c5943e6e878f4705`
 - Coordinator model: `gpt-5.6-sol` / `high` (trial mismatch explicitly accepted by user)
@@ -21,11 +21,11 @@
 
 | Worker | Task | Branch | Worktree | State | Process/result | PR | Review | Integrated status |
 |---|---|---|---|---|---|---|---|---|
-| 1 | CNC-45 Economy troop production/use | `agent/round-20260807-cnc45-economy-troop-use` | `.worktrees/coordinated-cnc/20260807-bug-polish-03/workers/worker-1-cnc45` | assignment `92edf1f42a`; no prerequisite; preserve CNC-43/CNC-36 ownership surfaces | reader, xhigh speccer, and Sol-high spec policy complete | | | |
-| 2 | CNC-46 Defense clusters | `agent/round-20260807-cnc46-defense-clusters` | `.worktrees/coordinated-cnc/20260807-bug-polish-03/workers/worker-2-cnc46` | assignment `1cea87332d`; preserve CNC-52 enclosure ownership and keep CNC-91 sparse towers subordinate | reader, xhigh speccer, and Sol-high spec policy complete | | | |
-| 3 | CNC-47 Repeatable performance baseline | `agent/round-20260807-cnc47-performance-baseline` | `.worktrees/coordinated-cnc/20260807-bug-polish-03/workers/worker-3-cnc47` | assignment `8614808bc8`; pure measurement/tooling; outputs feed CNC-48/CNC-49 | reader and xhigh speccer complete; policy correctly skipped | | | |
-| 4 | CNC-50 Late-game engineer stall recovery | `agent/round-20260807-cnc50-engineer-stall-recovery` | `.worktrees/coordinated-cnc/20260807-bug-polish-03/workers/worker-4-cnc50` | assignment `49c24d7d29`; preserve CNC-39/CNC-39A; CNC-59 out of scope; named manual evidence absent but non-blocking | reader, xhigh speccer, and Sol-high spec policy complete | | | |
-| 5 | CNC-52 Starting-Fact wall hole prevention/repair | `agent/round-20260807-cnc52-first-fact-wall-holes` | `.worktrees/coordinated-cnc/20260807-bug-polish-03/workers/worker-5-cnc52` | assignment `d32362502b`; first-Fact maintenance before tick 7,500; CNC-46 owns general wall self-blocking/selling | reader, xhigh speccer, and Sol-high spec policy complete | | | |
+| 1 | CNC-45 Economy troop production/use | `agent/round-20260807-cnc45-economy-troop-use` | `.worktrees/coordinated-cnc/20260807-bug-polish-03/workers/worker-1-cnc45` | assignment `92edf1f42a`; no prerequisite; preserve CNC-43/CNC-36 ownership surfaces | `roles/worker-1/process.json` running PID `1008372` | | | |
+| 2 | CNC-46 Defense clusters | `agent/round-20260807-cnc46-defense-clusters` | `.worktrees/coordinated-cnc/20260807-bug-polish-03/workers/worker-2-cnc46` | assignment `1cea87332d`; preserve CNC-52 enclosure ownership and keep CNC-91 sparse towers subordinate | `roles/worker-2/process.json` running PID `1008405` | | | |
+| 3 | CNC-47 Repeatable performance baseline | `agent/round-20260807-cnc47-performance-baseline` | `.worktrees/coordinated-cnc/20260807-bug-polish-03/workers/worker-3-cnc47` | assignment `8614808bc8`; pure measurement/tooling; outputs feed CNC-48/CNC-49 | `roles/worker-3/process.json` running PID `1008474` | | | |
+| 4 | CNC-50 Late-game engineer stall recovery | `agent/round-20260807-cnc50-engineer-stall-recovery` | `.worktrees/coordinated-cnc/20260807-bug-polish-03/workers/worker-4-cnc50` | assignment `49c24d7d29`; preserve CNC-39/CNC-39A; CNC-59 out of scope; named manual evidence absent but non-blocking | `roles/worker-4/process.json` running PID `1008543` | | | |
+| 5 | CNC-52 Starting-Fact wall hole prevention/repair | `agent/round-20260807-cnc52-first-fact-wall-holes` | `.worktrees/coordinated-cnc/20260807-bug-polish-03/workers/worker-5-cnc52` | assignment `d32362502b`; first-Fact maintenance before tick 7,500; CNC-46 owns general wall self-blocking/selling | `roles/worker-5/process.json` running PID `1008715` | | | |
 
 ## Release rounds
 
