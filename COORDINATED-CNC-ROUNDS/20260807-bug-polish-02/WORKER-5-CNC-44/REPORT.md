@@ -2,7 +2,7 @@
 
 ## Status
 
-In progress. Cycle 1 is implemented; its matched empty-cell control/changed pair passes and a harder type/capture batch establishes the scoped behavior below. CNC-62 remains unavailable and publication-blocking, so this cannot be handed off as complete.
+`First iteration - testing`. Cycle 1 is implemented; its matched empty-cell control/changed pair passes and a harder type/capture batch establishes the scoped behavior below. CNC-62 remains unavailable and publication-blocking, so this is not a complete handoff.
 
 ## Behavior and design
 
@@ -38,6 +38,15 @@ Seed 44002 used ordinary SkyNet GDI and Brutalis Nod AIs at headless MAX. The fi
 ## Dependency and remaining work
 
 CNC-62 has no local branch, remote branch, or GitHub PR as of both the pre-implementation and pre-publication checks on 2026-08-07. Exact-cell crash damage and combined damage-before-eligibility evidence are therefore not yet available. CNC-40 has a remote branch but no PR, so the contract did not authorize treating it as a publication dependency. Capture-time HELI/ORCA facing, the full occupant matrix, same-frame contention, complete terrain/boundary matrix, save/load, adversarial capture invalidation, stress/natural endurance, final regression, and combined CNC-62 reruns remain. The scoped result must be published as `First iteration - testing`.
+
+## Publication and review
+
+- Product commit: `396c8106d9cec1c84ed0c2e44cd34ce0d0ef4772` on `agent/round-20260807-cnc44-aircraft-husks`.
+- PR: `#85`, https://github.com/Realpra1/LibertyDawn/pull/85, targeting `agent/cnc-20260806-bug-polish-01-release`; it remains open and unmerged.
+- GitHub checks: Linux and Windows .NET 6.0 passed at the product head. The final handoff-metadata-only successor is rechecked before return.
+- Independent Sol-high final review: `analysis/worker-5-cnc44/final-review/REVIEW.md`; verdict `ready`, required fix `none`. The reviewer found no scoped correctness, regression, determinism, performance, scope, or diagnostic defect, while retaining the same CNC-62 and acceptance blockers.
+
+The implementation is event-driven and bounded by actors influencing one exact cell. Ordered blocker diagnostics and all-actor evaluation make the decision deterministic; creation at the actual frame-end boundary makes an earlier same-frame created husk visible to a later attempt. Short matched evidence does not establish a stress/endurance performance conclusion, which remains open with the final portfolio.
 
 ## Deferred work
 
