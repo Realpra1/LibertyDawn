@@ -28,7 +28,7 @@ namespace OpenRA.Mods.Common.Traits
 		public override object Create(ActorInitializer init) { return new Demolishable(this); }
 	}
 
-	public class Demolishable : ConditionalTrait<DemolishableInfo>, IDemolishable, ITick
+	public class Demolishable : ConditionalTrait<DemolishableInfo>, IDemolishable, IAdaptiveKillValue, ITick
 	{
 		class DemolishAction
 		{
@@ -51,6 +51,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		readonly List<DemolishAction> actions = new List<DemolishAction>();
 		readonly List<DemolishAction> removeActions = new List<DemolishAction>();
+		DemolishAction resolvingAction;
 
 		public Demolishable(DemolishableInfo info)
 			: base(info) { }
@@ -63,6 +64,12 @@ namespace OpenRA.Mods.Common.Traits
 		bool IDemolishable.IsValidTarget(Actor self, Actor saboteur)
 		{
 			return !IsTraitDisabled;
+		}
+
+		int? IAdaptiveKillValue.GetAdaptiveKillValue(Actor self, Actor attacker)
+		{
+			return resolvingAction?.Saboteur == attacker && self.Info.HasTraitInfo<BuildingInfo>() ?
+				self.GetSellValue() : (int?)null;
 		}
 
 		void IDemolishable.Demolish(Actor self, Actor saboteur, int delay, BitSet<DamageType> damageTypes,
@@ -107,7 +114,15 @@ namespace OpenRA.Mods.Common.Traits
 								"relationship={4}", self.World.WorldTick, self.Info.Name, self.ActorID,
 								self.Owner.InternalName, a.Saboteur.Owner.RelationshipWith(self.Owner));
 
-						self.Kill(a.Saboteur, a.DamageTypes);
+						resolvingAction = a;
+						try
+						{
+							self.Kill(a.Saboteur, a.DamageTypes);
+						}
+						finally
+						{
+							resolvingAction = null;
+						}
 					}
 					else if (a.Token != Actor.InvalidConditionToken)
 					{

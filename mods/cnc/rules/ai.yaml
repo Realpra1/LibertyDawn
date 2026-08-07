@@ -1499,7 +1499,7 @@ Player:
 		WeightedUnitSelection: true
 		AdaptiveProductionDebugLogging: false
 		AdaptiveProductionLogInterval: 250
-		AdaptiveTypes: e1, e2, e3, e4, e5, rmbo, ltnk, ftnk, ctnk, arty, mtnk, mlrs, stnk, apc, bggy, bike, jeep, htnk, heli, orca
+		AdaptiveTypes: e1, e2, e3, e4, e5, e6, rmbo, ltnk, ftnk, ctnk, arty, mtnk, mlrs, stnk, apc, bggy, bike, jeep, htnk, heli, orca
 		EconomyTypes: harv
 		UnitsToBuild:
 			e1: 65

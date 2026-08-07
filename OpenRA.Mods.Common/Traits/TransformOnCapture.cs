@@ -32,10 +32,17 @@ namespace OpenRA.Mods.Common.Traits
 		public override object Create(ActorInitializer init) { return new TransformOnCapture(init, this); }
 	}
 
-	public class TransformOnCapture : INotifyCapture
+	public class TransformOnCapture : INotifyCapture, INotifyTransform
 	{
 		readonly TransformOnCaptureInfo info;
 		readonly string faction;
+		Player pendingSpecialistPlayer;
+		string pendingSpecialistType;
+		uint pendingSpecialistId;
+		string pendingTargetType;
+		uint pendingTargetId;
+		string pendingTargetOldOwner;
+		int pendingDirectValue;
 
 		public TransformOnCapture(ActorInitializer init, TransformOnCaptureInfo info)
 		{
@@ -43,16 +50,60 @@ namespace OpenRA.Mods.Common.Traits
 			faction = init.GetValue<FactionInit, string>(init.Self.Owner.Faction.InternalName);
 		}
 
+		public bool HandlesCaptureTypes(BitSet<CaptureType> captureTypes)
+		{
+			return info.CaptureTypes.IsEmpty || info.CaptureTypes.Overlaps(captureTypes);
+		}
+
 		void INotifyCapture.OnCapture(Actor self, Actor captor, Player oldOwner, Player newOwner, BitSet<CaptureType> captureTypes)
 		{
-			if (!info.CaptureTypes.IsEmpty && !info.CaptureTypes.Overlaps(captureTypes))
+			if (!HandlesCaptureTypes(captureTypes))
 				return;
+
+			pendingSpecialistPlayer = captor.Owner;
+			pendingSpecialistType = captor.Info.Name;
+			pendingSpecialistId = captor.ActorID;
+			pendingTargetType = self.Info.Name;
+			pendingTargetId = self.ActorID;
+			pendingTargetOldOwner = oldOwner.InternalName;
+			pendingDirectValue = self.GetSellValue();
 
 			var facing = self.TraitOrDefault<IFacing>();
 			var transform = new Transform(info.IntoActor) { ForceHealthPercentage = info.ForceHealthPercentage, Faction = faction };
 			if (facing != null) transform.Facing = facing.Facing;
 			transform.SkipMakeAnims = info.SkipMakeAnims;
 			self.QueueActivity(false, transform);
+		}
+
+		void INotifyTransform.BeforeTransform(Actor self) { }
+
+		void INotifyTransform.OnTransform(Actor self) { }
+
+		void INotifyTransform.AfterTransform(Actor toActor)
+		{
+			if (pendingSpecialistPlayer == null)
+				return;
+
+			var specialistPlayer = pendingSpecialistPlayer;
+			pendingSpecialistPlayer = null;
+			if (toActor.Info.Name != info.IntoActor || toActor.Owner != specialistPlayer ||
+				toActor.IsDead || !toActor.IsInWorld)
+			{
+				if (Game.Settings.Debug.BotDebug)
+					Log.Write("debug", "Adaptive specialist outcome warning at tick {0}: " +
+						"kind=husk-restoration, target={1}#{2}, expected-replacement={3}, actual-replacement={4}#{5}, " +
+						"expected-player={6}, actual-player={7}", toActor.World.WorldTick, pendingTargetType,
+						pendingTargetId, info.IntoActor, toActor.Info.Name, toActor.ActorID,
+						specialistPlayer.InternalName, toActor.Owner.InternalName);
+
+				return;
+			}
+
+			var economicValue = SpecialistAdaptiveEvidence.EconomicValue(true, pendingDirectValue, toActor.GetSellValue());
+			var delta = CompletedSpecialistOutcome.Record(specialistPlayer, pendingSpecialistType, economicValue);
+			CompletedSpecialistOutcome.WriteLog(toActor.World, "husk-restoration", pendingSpecialistType,
+				pendingSpecialistId, specialistPlayer, pendingTargetType, pendingTargetId, pendingTargetOldOwner,
+				"replacement-sell-value", toActor.Info.Name, false, delta);
 		}
 	}
 }

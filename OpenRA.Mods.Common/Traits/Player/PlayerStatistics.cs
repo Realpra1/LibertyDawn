@@ -213,6 +213,69 @@ namespace OpenRA.Mods.Common.Traits
 		// Exponentially-decayed kills/losses value ratio, blended once per rollover window. Starts at 1
 		// ("break-even") so an untested type neither boosts nor suppresses its own authored weight.
 		public double DecayedScore = 1;
+
+		public void RecordCompletedOutcome(int economicValue)
+		{
+			var creditedValue = Math.Max(0, economicValue);
+			KillsCount++;
+			KillsValue += creditedValue;
+			MinuteKillsValue += creditedValue;
+		}
+	}
+
+	public static class SpecialistAdaptiveEvidence
+	{
+		public static int EconomicValue(bool transformed, int directValue, int replacementValue)
+		{
+			return Math.Max(0, transformed ? replacementValue : directValue);
+		}
+	}
+
+	readonly struct AdaptiveOutcomeDelta
+	{
+		public readonly int CreditedValue;
+		public readonly int BeforeCount;
+		public readonly int AfterCount;
+		public readonly int BeforeValue;
+		public readonly int AfterValue;
+
+		public AdaptiveOutcomeDelta(int creditedValue, int beforeCount, int afterCount, int beforeValue, int afterValue)
+		{
+			CreditedValue = creditedValue;
+			BeforeCount = beforeCount;
+			AfterCount = afterCount;
+			BeforeValue = beforeValue;
+			AfterValue = afterValue;
+		}
+	}
+
+	static class CompletedSpecialistOutcome
+	{
+		public static AdaptiveOutcomeDelta Record(Player player, string specialistType, int economicValue)
+		{
+			var stats = player.PlayerActor.Trait<PlayerStatistics>().AdaptiveStats[specialistType];
+			var creditedValue = Math.Max(0, economicValue);
+			var beforeCount = stats.KillsCount;
+			var beforeValue = stats.KillsValue;
+			stats.RecordCompletedOutcome(creditedValue);
+			return new AdaptiveOutcomeDelta(creditedValue, beforeCount, stats.KillsCount, beforeValue, stats.KillsValue);
+		}
+
+		public static void WriteLog(World world, string kind, string specialistType, uint specialistId,
+			Player specialistPlayer, string targetType, uint targetId, string targetOldOwner,
+			string valueSource, string replacementType, bool genericAccounting, AdaptiveOutcomeDelta delta)
+		{
+			if (!Game.Settings.Debug.BotDebug)
+				return;
+
+			Log.Write("debug", "Adaptive specialist outcome at tick {0}: kind={1}, specialist={2}#{3}, " +
+				"player={4}, target={5}#{6}, target-old-owner={7}, replacement={8}, value-source={9}, " +
+				"credited-sample=1, credited-value={10}, ledger-count={11}->{12}, ledger-value={13}->{14}, generic={15}",
+				world.WorldTick, kind, specialistType, specialistId, specialistPlayer.InternalName,
+				targetType, targetId, targetOldOwner, replacementType ?? "none", valueSource,
+				delta.CreditedValue, delta.BeforeCount, delta.AfterCount, delta.BeforeValue, delta.AfterValue,
+				genericAccounting);
+		}
 	}
 
 	public class ArmyUnit
@@ -341,10 +404,14 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				attackerStats.KillsCost += cost;
 
-				var killStats = attackerStats.AdaptiveStats[e.Attacker.Info.Name];
-				killStats.KillsCount++;
-				killStats.KillsValue += cost;
-				killStats.MinuteKillsValue += cost;
+				var specialistValue = self.TraitsImplementing<IAdaptiveKillValue>()
+					.Select(t => t.GetAdaptiveKillValue(self, e.Attacker)).FirstOrDefault(value => value.HasValue);
+				var economicValue = specialistValue ?? cost;
+				var delta = CompletedSpecialistOutcome.Record(e.Attacker.Owner, e.Attacker.Info.Name, economicValue);
+				if (specialistValue.HasValue)
+					CompletedSpecialistOutcome.WriteLog(self.World, "building-demolition", e.Attacker.Info.Name,
+						e.Attacker.ActorID, e.Attacker.Owner, self.Info.Name, self.ActorID, self.Owner.InternalName,
+						"direct-sell-value", null, true, delta);
 			}
 		}
 

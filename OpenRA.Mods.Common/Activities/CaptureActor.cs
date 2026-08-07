@@ -9,6 +9,7 @@
  */
 #endregion
 
+using System.Linq;
 using OpenRA.Mods.Common.Traits;
 using OpenRA.Primitives;
 using OpenRA.Traits;
@@ -94,6 +95,9 @@ namespace OpenRA.Mods.Common.Activities
 		void DoCapture(Actor self, Captures captures)
 		{
 			var oldOwner = enterActor.Owner;
+			var specialistType = self.Info.Name;
+			var specialistId = self.ActorID;
+			var specialistPlayer = self.Owner;
 			self.World.AddFrameEndTask(w =>
 			{
 				// The target died or was already captured during this tick
@@ -120,9 +124,21 @@ namespace OpenRA.Mods.Common.Activities
 
 				// Do the capture
 				enterActor.ChangeOwnerSync(self.Owner);
+				var deferredAdaptiveOutcome = enterActor.TraitsImplementing<TransformOnCapture>()
+					.Any(t => t.HandlesCaptureTypes(captures.Info.CaptureTypes));
 
 				foreach (var t in enterActor.TraitsImplementing<INotifyCapture>())
 					t.OnCapture(enterActor, self, oldOwner, self.Owner, captures.Info.CaptureTypes);
+
+				if (!deferredAdaptiveOutcome && enterActor.Owner == specialistPlayer && !enterActor.IsDead &&
+					!enterActor.WillDispose && enterActor.IsInWorld && enterActor.Info.HasTraitInfo<BuildingInfo>())
+				{
+					var economicValue = SpecialistAdaptiveEvidence.EconomicValue(false, enterActor.GetSellValue(), 0);
+					var delta = CompletedSpecialistOutcome.Record(specialistPlayer, specialistType, economicValue);
+					CompletedSpecialistOutcome.WriteLog(w, "building-capture", specialistType, specialistId,
+						specialistPlayer, enterActor.Info.Name, enterActor.ActorID, oldOwner.InternalName,
+						"direct-sell-value", null, false, delta);
+				}
 
 				if (self.Owner.RelationshipWith(oldOwner).HasRelationship(captures.Info.PlayerExperienceRelationships))
 					self.Owner.PlayerActor.TraitOrDefault<PlayerExperience>()?.GiveExperience(captures.Info.PlayerExperience);

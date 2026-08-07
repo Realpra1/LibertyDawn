@@ -19,6 +19,30 @@ namespace OpenRA.Test
 	public class AdaptiveWeightingTest
 	{
 		[Test]
+		public void CompletedSpecialistOutcomeAddsOneSampleAndClampsValue()
+		{
+			var stats = new AdaptiveTypeStats();
+			stats.RecordCompletedOutcome(400);
+
+			Assert.That(stats.KillsCount, Is.EqualTo(1));
+			Assert.That(stats.KillsValue, Is.EqualTo(400));
+			Assert.That(stats.MinuteKillsValue, Is.EqualTo(400));
+
+			stats.RecordCompletedOutcome(-100);
+			Assert.That(stats.KillsCount, Is.EqualTo(2));
+			Assert.That(stats.KillsValue, Is.EqualTo(400));
+			Assert.That(stats.MinuteKillsValue, Is.EqualTo(400));
+		}
+
+		[Test]
+		public void SpecialistOutcomeUsesDirectOrReplacementValueWithoutAddingThem()
+		{
+			Assert.That(SpecialistAdaptiveEvidence.EconomicValue(false, 400, 1500), Is.EqualTo(400));
+			Assert.That(SpecialistAdaptiveEvidence.EconomicValue(true, 400, 1500), Is.EqualTo(1500));
+			Assert.That(SpecialistAdaptiveEvidence.EconomicValue(true, 0, -1), Is.Zero);
+		}
+
+		[Test]
 		public void AffordableOffersPreferHighestScoresAcrossQueues()
 		{
 			var selected = AdaptiveWeighting.SelectAffordableOffers(

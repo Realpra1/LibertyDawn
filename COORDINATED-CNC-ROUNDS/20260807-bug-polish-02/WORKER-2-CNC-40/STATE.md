@@ -12,19 +12,19 @@ when the dependency section directs it.
 - Task: `CNC-40 — Adaptive specialists`
 - Change category: `AI production evidence and adaptive-production policy`
 - Balance authority: `Frozen except for the exact requested completed specialist-outcome evidence and the minimum addition of Engineer (e6) to SkyNet's adaptive eligibility set so that evidence can affect production. Do not change actor costs/stats/prerequisites, authored production weights, confidence, decay, floor, ceiling, intervals, probabilities, or any other numeric policy.`
-- Status: `Specified`
+- Status: `Implementation and testing`
 - Common base branch/SHA: `agent/cnc-20260806-bug-polish-01-release` / `419bee2531d4802bf922c3597b42c6eeb75ab250`
 - Task branch: `agent/round-20260807-cnc40-adaptive-specialists`
 - Intended PR base: `agent/cnc-20260806-bug-polish-01-release`
 - Cycle budget: `20` isolated code-change cycles
-- Cycles used: `0`
+- Cycles used: `1`
 - Game/build lock directory: `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260807-bug-polish-02/locks`
 - Game capacity: `2`
 - Large-build capacity: `1`
 - Task report: `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260807-bug-polish-02/workers/worker-2-cnc40/COORDINATED-CNC-ROUNDS/20260807-bug-polish-02/WORKER-2-CNC-40/REPORT.md`
 - Match-analysis directory: `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260807-bug-polish-02/analysis/worker-2-cnc40`
 - Liberty Dawn design reference: `.agents/references/LIBERTY-DAWN-DESIGN.md`
-- Full-engine game tests completed: `0`
+- Full-engine game tests completed: `4` (one base probe, one invalid changed harness run with material outcome evidence, one valid changed run, one matched base control)
 - Terra cycle code reviews: `none yet; required after cycles 5/10/15/20 that occur`
 - Sol-xhigh policy escalation: `unused (requires at least 10 game tests; one maximum)`
 - PR: `none`
@@ -793,6 +793,7 @@ silently exceed the budget.
 
 | Cycle | Commit/change | Failure hypothesis and perturbation | Checks/games | Narrative/policy/cycle-code review | Failure/pass evidence | Decision/next harder test |
 |---|---|---|---|---|---|---|
+| 1 | Exact completed-outcome ledger boundary for direct capture, replacement completion, and generic C4 value; add `e6` to SkyNet adaptive eligibility. | C4 could double-credit or use the wrong custom value; capture could fire before transfer; husk could credit its shell or configured actor before creation. Perturbation: custom-sell-value refineries, sequential scripted introduction of a second ordinary-AI Engineer/husk, continued play through rollover, exact base control. | Release build 0 warnings/errors; 37 targeted `AdaptiveWeightingTest`/`CaptureTargetingTest` cases pass; CNC YAML, explicit-interface, conditional-interface, and diff checks pass. Base probe: `base-probe/run`. Invalid changed harness outcome run: `cycle-01/changed-run`. Valid matched seed 40601 pair: `cycle-01/paired/{changed,control}`; identical map SHA-256 `48955c11...`, replay seed 40601/map UID `0e22f0...`; throughput 290.994 changed vs 291.058 control ticks/s. | Base factual/policy: `base-probe/commenter/NARRATIVE.md`, `base-probe/policy/POLICY-REVIEW.md`. Pair factual/policy: `cycle-01/commenter/NARRATIVE.md`, `cycle-01/policy/POLICY-REVIEW.md`; policy verdict mixed/medium because exact accounting is sensible but downstream composition is unproven and raw `e6` weight reached 1687.2. No cycle-code review due before cycle 5. | Base C4 produced exactly one sample but used `Valued.Cost` 1500 for a direct-value-400 refinery. Changed valid pair recorded direct capture `e6` 0->1/0->400, restored `htnk` only after creation `e6` 1->2/400->2100, and C4 `rmbo` exactly once via generic accounting 0->1/0->400. Control completed the same visible captures but had no `e6` adaptive entry. Later genuine Commando loss remained. Startup action timing differed because existing `CaptureManagerBotModule` initializes with unseeded `World.LocalRandom`; no desync and replay/map seeds matched. | Keep accounting design. Do not tune frozen numeric policy. Cycle 2 must preserve the ordinary generic-kill path byte-for-behavior where no specialist value applies, handle missing statistics ownership as a bounded warning, then test one-success followed by defended/cash-contended post-rollover production to falsify specialist saturation. |
 
 ## Handoff receipt
 
