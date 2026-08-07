@@ -123,13 +123,19 @@ namespace OpenRA.Mods.Common.Traits
 			// Minimum should not be negative as delays in HackyAI could be zero.
 			var randomFactor = world.LocalRandom.Next(0, baseBuilder.Info.StructureProductionRandomBonusDelay);
 
-			waitTicks = active ? baseBuilder.Info.StructureProductionActiveDelay + randomFactor
+			var nextWaitTicks = active ? baseBuilder.Info.StructureProductionActiveDelay + randomFactor
 				: baseBuilder.Info.StructureProductionInactiveDelay + randomFactor;
+			if (IsDefenseQueue && baseBuilder.WallPlanner != null)
+				nextWaitTicks = baseBuilder.WallPlanner.LimitConstructionYardEnclosurePollDelay(nextWaitTicks);
+			waitTicks = nextWaitTicks;
 		}
 
 		bool TickQueue(IBot bot, ProductionQueue queue)
 		{
 			var currentBuilding = queue.AllQueued().FirstOrDefault();
+			if (IsDefenseQueue)
+				baseBuilder.WallPlanner?.LogConstructionYardEnclosureQueueState(queue, currentBuilding,
+					playerResources.Cash, playerResources.Resources);
 
 			// Waiting to build something
 			if (currentBuilding == null && failCount < baseBuilder.Info.MaximumFailedPlacementAttempts)
@@ -179,7 +185,7 @@ namespace OpenRA.Mods.Common.Traits
 					// Walls are laid out in lines by the wall planner rather than dropped on some
 					// free cell in the base like an ordinary building.
 					orderString = "LineBuild";
-					location = baseBuilder.WallPlanner.TakeWallCell(actorInfo.Name);
+					location = baseBuilder.WallPlanner.TakeWallCell(queue, actorInfo.Name);
 				}
 				else
 				{
@@ -326,7 +332,7 @@ namespace OpenRA.Mods.Common.Traits
 				return null;
 			}
 
-			var enclosureWall = baseBuilder.WallPlanner?.ConstructionYardEnclosureWall(buildableThings, playerBuildings);
+			var enclosureWall = baseBuilder.WallPlanner?.ConstructionYardEnclosureWall(queue, buildableThings, playerBuildings);
 			if (enclosureWall != null)
 			{
 				AIUtils.BotDebug("{0} decided to build {1}: construction-yard enclosure",
@@ -572,7 +578,7 @@ namespace OpenRA.Mods.Common.Traits
 				// Walls are only worth queueing if the planner has a line ready for them, and only
 				// until we hit the segment cap. Everything about where they go is decided there.
 				if (baseBuilder.WallPlanner != null && baseBuilder.WallPlanner.IsWallType(name)
-					&& !baseBuilder.WallPlanner.WantsToBuildWall(name, playerBuildings))
+					&& !baseBuilder.WallPlanner.WantsToBuildWall(queue, name, playerBuildings))
 					continue;
 
 				// Do we want to build this structure? Adaptive defense types get their authored ceiling
@@ -654,14 +660,19 @@ namespace OpenRA.Mods.Common.Traits
 			// Find the buildable cell that is closest to pos and centered around center
 			Func<CPos, CPos, int, int, CPos?> findPos = (center, target, minRange, maxRange) =>
 			{
-				var cells = world.Map.FindTilesInAnnulus(center, minRange, maxRange);
+				var candidateCells = world.Map.FindTilesInAnnulus(center, minRange, maxRange);
+				const int ComparableCandidateLimit = 8;
+				var randomlyOrdered = center == target;
 
 				// Sort by distance to target if we have one
-				if (center != target)
-					cells = cells.OrderBy(c => (c - target).LengthSquared);
+				IEnumerable<CPos> cells;
+				if (!randomlyOrdered)
+					cells = candidateCells.OrderBy(c => (c - target).LengthSquared);
 				else
-					cells = cells.Shuffle(world.LocalRandom);
+					cells = candidateCells.Shuffle(world.LocalRandom);
 
+				CPos? reservedFallback = null;
+				var legalCandidates = 0;
 				foreach (var cell in cells)
 				{
 					if (!world.CanPlaceBuilding(cell, actorInfo, bi, null))
@@ -670,10 +681,41 @@ namespace OpenRA.Mods.Common.Traits
 					if (distanceToBaseIsImportant && !bi.IsCloseEnoughToBase(world, player, actorInfo, cell))
 						continue;
 
-					return cell;
+					legalCandidates++;
+					if (!baseBuilder.WallPlanner.OverlapsConstructionYardEnclosure(cell, bi))
+					{
+						if (reservedFallback != null)
+							baseBuilder.WallPlanner.LogReservationDecision(actorType,
+								reservedFallback.Value, cell, false);
+
+						return cell;
+					}
+
+					if (reservedFallback == null)
+						reservedFallback = cell;
+					if (legalCandidates >= ComparableCandidateLimit)
+						break;
 				}
 
-				return null;
+				if (reservedFallback != null && randomlyOrdered)
+				{
+					var alternative = ConstructionYardEnclosurePolicy.FirstLegalUnreservedCell(candidateCells,
+						cell => world.CanPlaceBuilding(cell, actorInfo, bi, null) &&
+							(!distanceToBaseIsImportant || bi.IsCloseEnoughToBase(world, player, actorInfo, cell)),
+						cell => baseBuilder.WallPlanner.OverlapsConstructionYardEnclosure(cell, bi));
+					if (alternative != null)
+					{
+						baseBuilder.WallPlanner.LogReservationDecision(actorType,
+							reservedFallback.Value, alternative.Value, false);
+						return alternative;
+					}
+				}
+
+				if (reservedFallback != null)
+					baseBuilder.WallPlanner.LogReservationDecision(actorType,
+						reservedFallback.Value, reservedFallback.Value, true);
+
+				return reservedFallback;
 			};
 
 			var baseCenter = baseBuilder.GetRandomBaseCenter();
