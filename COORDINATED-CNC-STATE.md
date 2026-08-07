@@ -1,30 +1,31 @@
 # Coordinated CNC State
 
 - Round ID: `20260806-bug-polish-01`
-- Phase: `isolated implementation and testing`
+- Phase: `partial RC1 preview published; isolated implementation continues`
 - Common base branch: `agent/cnc38-early-viki-infantry-rush`
 - Common base SHA: `09ccdac3c1ecb5134a4751f2bcbd8a7970dfe6bf`
 - Coordinator model: `gpt-5.6-sol` / `high` (trial mismatch explicitly accepted by user)
 - Game slots: `2`
 - Large-build slots: `1`
 - Lock directory: `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260806-bug-polish-01/locks`
-- Release candidate: `none`
-- Release PR: `none`
+- Release candidate: `RC1 preview` at `0057dd25868e1cc6f7a3ba406062caa05eca2406`
+- Release PR: [draft #82](https://github.com/Realpra1/LibertyDawn/pull/82)
 
 ## Workers
 
 | Worker | Task | Branch | Worktree | State | Process/result | PR | Review | Integrated status |
 |---|---|---|---|---|---|---|---|---|
 | 1 | CNC-39 Engineer correction | `agent/round-20260806-cnc39-engineer-correction` | `.worktrees/coordinated-cnc/20260806-bug-polish-01/workers/worker-1-cnc-39` | `running` (`WORKER-1-CNC-39/STATE.md`) | `roles/worker-1/process.json` | | | |
-| 2 | CNC-39A Engineer/commando target coordination | `agent/round-20260806-cnc39a-engineer-commando` | `.worktrees/coordinated-cnc/20260806-bug-polish-01/workers/worker-2-cnc-39a` | `reviewed` (`WORKER-2-CNC-39A/STATE.md`) | `roles/worker-2-review-response/process.json` | [#80](https://github.com/Realpra1/LibertyDawn/pull/80) at `937ef02048` | `blocked`; one required save/load response completed with exact-head CI and reload evidence (`REVIEW-2.md`) | `ready for integration` |
-| 3 | CNC-43 MCV crush flavor | `agent/round-20260806-cnc43-mcv-crush-flavor` | `.worktrees/coordinated-cnc/20260806-bug-polish-01/workers/worker-3-cnc-43` | `reviewed` (`WORKER-3-CNC-43/STATE.md`) | `roles/worker-3-review-response/process.json` | [#78](https://github.com/Realpra1/LibertyDawn/pull/78) at `b229612791` | `ready with one fix`; one permitted evidence response complete (`REVIEW-3.md`) | `ready for integration` |
-| 4 | CNC-43A Flame Tank balance | `agent/round-20260806-cnc43a-flame-tank-balance` | `.worktrees/coordinated-cnc/20260806-bug-polish-01/workers/worker-4-cnc-43a` | `reviewed` (`WORKER-4-CNC-43A/STATE.md`) | `roles/worker-4-review-response/process.json` | [#79](https://github.com/Realpra1/LibertyDawn/pull/79) at `ade3f9d325` | `ready with one fix`; one permitted evidence response complete (`REVIEW-4.md`) | `ready for integration` |
+| 2 | CNC-39A Engineer/commando target coordination | `agent/round-20260806-cnc39a-engineer-commando` | `.worktrees/coordinated-cnc/20260806-bug-polish-01/workers/worker-2-cnc-39a` | `reviewed` (`WORKER-2-CNC-39A/STATE.md`) | `roles/worker-2-review-response/process.json` | [#80](https://github.com/Realpra1/LibertyDawn/pull/80) at `937ef02048` | `blocked`; one required save/load response completed with exact-head CI and reload evidence (`REVIEW-2.md`) | `included in RC1 preview; combined testing pending` |
+| 3 | CNC-43 MCV crush flavor | `agent/round-20260806-cnc43-mcv-crush-flavor` | `.worktrees/coordinated-cnc/20260806-bug-polish-01/workers/worker-3-cnc-43` | `reviewed` (`WORKER-3-CNC-43/STATE.md`) | `roles/worker-3-review-response/process.json` | [#78](https://github.com/Realpra1/LibertyDawn/pull/78) at `b229612791` | `ready with one fix`; one permitted evidence response complete (`REVIEW-3.md`) | `included in RC1 preview; combined testing pending` |
+| 4 | CNC-43A Flame Tank balance | `agent/round-20260806-cnc43a-flame-tank-balance` | `.worktrees/coordinated-cnc/20260806-bug-polish-01/workers/worker-4-cnc-43a` | `reviewed` (`WORKER-4-CNC-43A/STATE.md`) | `roles/worker-4-review-response/process.json` | [#79](https://github.com/Realpra1/LibertyDawn/pull/79) at `ade3f9d325` | `ready with one fix`; one permitted evidence response complete (`REVIEW-4.md`) | `included in RC1 preview; combined testing pending` |
 | 5 | CNC-51 Transport-helicopter unload recovery and threat-safe landing | `agent/round-20260806-cnc51-transport-unload` | `.worktrees/coordinated-cnc/20260806-bug-polish-01/workers/worker-5-cnc-51` | `running` (`WORKER-5-CNC-51/STATE.md`) | `roles/worker-5/process.json` | | | |
 
 ## Release rounds
 
 | RC | Head | Included heads | Repair heads | Build/checks | Integrated tests | Result |
 |---|---|---|---|---|---|---|
+| RC1 preview | `0057dd25868e` | CNC-39A `937ef02048`; CNC-43 `b229612791`; CNC-43A `ade3f9d325` | none | Debug/Release build, 445/445 unit, static/interface, Lua, MiniYAML/maps, diff check passed | pending full five-task candidate | draft [#82](https://github.com/Realpra1/LibertyDawn/pull/82); CNC-39/CNC-51 excluded |
 
 ## Resume note
 
