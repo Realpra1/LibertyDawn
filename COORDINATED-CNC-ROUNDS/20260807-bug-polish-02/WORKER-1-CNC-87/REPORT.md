@@ -116,3 +116,45 @@ ticks/s) without startup, fatal, desync, or termination regression.
   and require the protected entry paths before claiming round-wide capacity one.
 - Evaluate portability explicitly: complete process-tree enforcement uses Linux
   `prctl` and `/proc`, matching the coordinated Linux host contract.
+
+## RC1 integrated validation
+
+The exact recorded combined release head
+`ffb841b48750cc54b1862fb93101d3dce3a87a3f` passed CNC-87 validation without a
+product repair. The repair branch therefore records zero integrated code-change
+cycles (`0/3` for RC1 and `0/12` total).
+
+- The 16-test protected launcher/resource suite passed in 4.118 seconds with
+  `ResourceWarning` promoted to an error. The installed CLI parser, strict
+  analysis envelopes, exact role pinning, foreground/background metadata, both
+  Worker/Integrator orders, stale/failure/cancellation recovery, mixed-namespace
+  rejection, complete process-tree ownership, and independent capacity-two game
+  slots all remained green.
+- The four `launch-ai-parallel` tests plus the strongest repeated launcher and
+  resource cases passed in 2.906 seconds. Across the two invocations, all 20
+  unique Python portfolio tests passed on RC1.
+- A real `make test` entered through `--large-build-entry worker`. It requested
+  at monotonic 261562.949, queued behind another live round participant, acquired
+  the canonical `large-build-1.lock` at 261594.853, and completed the Release
+  build plus CNC MiniYAML/sequence/map validation with zero warnings/errors. The
+  foreground exited at 261624.631; assigned descendants 948488, 948489, 948492,
+  and 948560 were resolved before release at 261625.744.
+- A real `make check` entered through `--large-build-entry integrator`. It queued
+  at 261635.489, acquired the same canonical identity at 261649.243, and passed
+  the Debug build and both interface checks with zero warnings/errors. The
+  foreground exited at 261673.593; assigned descendants 949208, 949209, 949213,
+  and 949409 were resolved before release at 261674.755.
+- Static comparison confirmed that the four reviewed CNC-87 implementation/test
+  files are byte-for-byte unchanged between reviewed source head
+  `5170183fb882ccf68d1970052269e11c4d739ead` and RC1. Relevant Worker, Reviewer,
+  and Integrator guidance contains no executable direct-flock or legacy-lock
+  route. The shared directory contained `large-build-1.lock` and no
+  `large-build.lock`. Pre-publication open-PR inventory found only CNC-87 PR #86
+  and combined release PR #90 touching the protected orchestration paths; their
+  heads match the recorded reviewed and release SHAs.
+
+The two live queue intervals are additional integrated-host evidence that active
+round participants use one capacity-one namespace. No new game or Commenter was
+needed: the combined head did not change CNC-87 product files, all original game
+and Commenter evidence remains applicable, and the integrated validation made no
+gameplay or orchestration repair.

@@ -867,7 +867,26 @@ silently exceed the budget.
 ## Handoff receipt
 
 - Proposed status: `Complete - testing`
-- Final branch/head: `agent/round-20260807-cnc87-role-launch-lock`; reviewed implementation/review-response head `531c5e58acd3d1f63c460ab25f80bc1180de8376` plus this final receipt commit.
+- RC1 integrated result: exact combined release head
+  `ffb841b48750cc54b1862fb93101d3dce3a87a3f` passed without a product repair;
+  repair branch `agent/round-20260807-cnc87-rc1-repair` contains only assignment
+  and validation receipts, with integrated cycles still `0/3` this RC and
+  `0/12` total.
+- RC1 integrated checks: protected launcher/resource suite 16/16 in 4.118 s;
+  all 20 unique Python portfolio tests passed across the focused invocations;
+  guarded Worker `make test` and Integrator `make check` passed with zero build
+  warnings/errors. Both real entry paths visibly queued behind other live round
+  holders, acquired only canonical `large-build-1.lock`, resolved four assigned
+  MSBuild descendants, and released only after tree resolution. No legacy
+  `large-build.lock` existed.
+- RC1 compatibility: reviewed CNC-87 implementation/test files are unchanged
+  from source head `5170183fb882ccf68d1970052269e11c4d739ead` to RC1. No combined
+  repair touched role-launch, locking, gameplay, AI, rules, maps, or balance, so
+  the four original full-engine games and enforced Commenter receipts remain the
+  applicable behavioral evidence.
+- Isolated final branch/head: `agent/round-20260807-cnc87-role-launch-lock`;
+  reviewed implementation/review-response head
+  `531c5e58acd3d1f63c460ab25f80bc1180de8376` plus its final receipt commit.
 - PR and checks: `#86 — https://github.com/Realpra1/LibertyDawn/pull/86`; draft against `agent/cnc-20260806-bug-polish-01-release`; Linux and Windows .NET 6 checks passed on the reviewed response head. Final receipt-only head will be rechecked before handoff.
 - Cycles used: `4/20` (three product cycles plus the one allowed test-only final-review response cycle).
 - Acceptance evidence: Installed `codex-cli 0.146.0` accepted every constructed role command with production parser exit 0, rejected legacy `-a never` with exit 2, and emitted zero agent events. Exact four analysis mappings, strict envelopes, protected argv/session/sandbox/output/supervision fields, both large-build entry orders, process-tree ordering, stale/failure recovery, mixed guard, and independent game capacity all pass.
