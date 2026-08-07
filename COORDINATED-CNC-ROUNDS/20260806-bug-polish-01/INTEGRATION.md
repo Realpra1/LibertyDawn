@@ -1,7 +1,7 @@
 # Integration: coordinated bug/polish RC4 candidate
 
 - Round: `20260806-bug-polish-01`
-- Status: RC4 final-review repair merged and independently verified; draft release PR ready for user review after push/CI
+- Status: RC4 final-review repair merged and independently verified; product release PR #84 promoted for user review with CI pending
 - Recorded common product base: `09ccdac3c1ecb5134a4751f2bcbd8a7970dfe6bf`
 - Stable branch: `agent/cnc-20260806-bug-polish-01-release`
 - Exact combined RC2 code candidate: `b456fd89fac88d71dfadd65c47cfb7b409d44122`
@@ -386,5 +386,6 @@ Every build-dependent command ran on exact RC4 code candidate
   09ccdac3c1ecb5134a4751f2bcbd8a7970dfe6bf..a7d29d08d83deebb7867076a141675326553dc3f`:
   passed. Working-tree `git diff --check` also passed before this record update.
 
-RC4 excludes no task. Draft PR #84 remains the sole successor product release PR
-to `bleed`; the integrator leaves it open for the user and does not merge it.
+RC4 excludes no task. PR #84 is promoted from draft to the sole open product
+release PR to `bleed`; CI is allowed to complete asynchronously, and the integrator
+leaves the PR unmerged for the user.
