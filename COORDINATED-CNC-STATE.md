@@ -1,7 +1,7 @@
 # Coordinated CNC State
 
 - Round ID: `20260807-bug-polish-03`
-- Phase: `five tasks claimed/in progress; speccing pending`
+- Phase: `five specs complete; isolated branch/worktree creation pending`
 - Common base branch: `agent/cnc-20260807-bug-polish-02-release`
 - Common base SHA: `468ee64f5a0f9a9e19e260e5c5943e6e878f4705`
 - Coordinator model: `gpt-5.6-sol` / `high` (trial mismatch explicitly accepted by user)
@@ -25,7 +25,7 @@
 | 2 | CNC-46 Defense clusters | | | spec ready at `COORDINATED-CNC-ROUNDS/20260807-bug-polish-03/WORKER-2-CNC-46/STATE.md`; preserve CNC-52 enclosure ownership and keep CNC-91 sparse towers subordinate | reader and xhigh speccer complete; Sol-high spec policy consultation complete | | | |
 | 3 | CNC-47 Repeatable performance baseline | | | spec ready at `COORDINATED-CNC-ROUNDS/20260807-bug-polish-03/WORKER-3-CNC-47/STATE.md`; pure measurement/tooling, policy consultation correctly skipped; outputs feed CNC-48/CNC-49 | reader and xhigh speccer complete | | | |
 | 4 | CNC-50 Late-game engineer stall recovery | | | spec ready at `COORDINATED-CNC-ROUNDS/20260807-bug-polish-03/WORKER-4-CNC-50/STATE.md`; preserve CNC-39/CNC-39A; CNC-59 out of scope; named manual evidence absent but non-blocking | reader and xhigh speccer complete; Sol-high spec policy consultation complete | | | |
-| 5 | CNC-52 Starting-Fact wall hole prevention/repair | | | `claimed` at `2026-08-07T15:11:17Z`; packet `COORDINATED-CNC-ROUNDS/20260807-bug-polish-03/TASK-PACKET-5.md` | reader `/root/round03_task_reader_5` complete | | | |
+| 5 | CNC-52 Starting-Fact wall hole prevention/repair | | | spec ready at `COORDINATED-CNC-ROUNDS/20260807-bug-polish-03/WORKER-5-CNC-52/STATE.md`; limited to first-Fact enclosure maintenance before tick 7,500; CNC-46 owns general wall self-blocking/selling | reader and xhigh speccer complete; Sol-high spec policy consultation complete | | | |
 
 ## Release rounds
 
