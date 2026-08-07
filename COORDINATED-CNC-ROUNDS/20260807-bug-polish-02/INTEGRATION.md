@@ -141,3 +141,54 @@ make check && make check-scripts && make test && dotnet test OpenRA.Test/OpenRA.
 
 RC1 remains draft pending the routed combined full-engine/adversarial validation,
 matched controls where required, and any task-scoped repair candidates.
+
+## RC2 integration receipt
+
+- Stable release branch: `agent/cnc-20260807-bug-polish-02-release`
+- Prior release receipt head: `ffb841b48750cc54b1862fb93101d3dce3a87a3f`
+- RC2 product head: `83de3e880dac4ad680d73256f25d2974010587c5`
+- Draft release PR to `bleed`: https://github.com/Realpra1/LibertyDawn/pull/90
+- Included repair: Worker 4 / CNC-42 / PR #92 / reviewed head
+  `aa3e1835f1d9d988af211cd2a5bd06b7ab9337c3`.
+- The CNC-42 repair PR remained open and was not merged through GitHub.
+
+### Repair verification and merge
+
+- PR #92's exact remote head matched the supplied reviewed SHA and descended
+  from the prior release receipt head.
+- PR #92's required Linux and Windows checks were successful at that exact head.
+- The repair was merged locally with merge commit
+  `83de3e880dac4ad680d73256f25d2974010587c5`; its parents are exactly the prior
+  release receipt head and the reviewed repair head.
+- Merge conflicts and manual resolutions: none. Git's `ort` strategy applied the
+  task-local save/load ownership repair cleanly.
+- Balance compatibility edits by the integrator: none.
+- `git diff --check ffb841b48750cc54b1862fb93101d3dce3a87a3f..83de3e880dac4ad680d73256f25d2974010587c5`
+  passed. Aggregate inspection found only the reviewed CNC-42 repair history and
+  no merge-marker or whitespace damage.
+- No CNC-41 repair head was included in RC2; it remains excluded pending its own
+  reviewed integration instruction.
+
+### Combined RC2 gates
+
+The following CI-equivalent sequence ran successfully while holding the
+canonical protected `integrator` large-build reservation in
+`/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260807-bug-polish-02/locks`:
+
+```sh
+make check && make check-scripts && make test && dotnet test OpenRA.Test/OpenRA.Test.csproj
+```
+
+- Debug compile and explicit/conditional interface checks: passed, zero build
+  warnings and zero errors.
+- Script/Lua checks: passed.
+- Release compile and CNC MiniYAML/default-sequence/map validation: passed, zero
+  build warnings and zero errors.
+- C# unit suite: passed, 513 passed / 0 failed / 0 skipped, including the new
+  CNC-42 save/load ownership regression. Compilation retained the one
+  non-blocking CA1825 warning in the reviewed CNC-44
+  `AircraftHuskSpawnEligibilityTest.cs`; no new warning was introduced.
+
+RC2 remains draft pending the coordinator's remaining task-scoped repair and
+combined validation routing. In particular, no CNC-41 repair is part of this
+candidate.
