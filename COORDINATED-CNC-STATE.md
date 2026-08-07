@@ -43,3 +43,7 @@ User acceptance clarification for review/integration: require correct save/load,
 replay/no-desync behavior, and sensible restored AI state; do not require a loaded
 game to reproduce an uninterrupted game's exact actor decisions or ticks unless a
 task-specific persisted invariant expressly needs it.
+
+Continuation directive: after this five-task round is reviewed, integrated, and
+tested, use its cumulative release head as the base for the next five-task round
+and continue coordinated development rather than pausing.
