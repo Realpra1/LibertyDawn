@@ -2,14 +2,12 @@
 
 ## Current status
 
-Publication-ready isolated first iteration on
-`agent/round-20260807-cnc42-economy-field-defense` from common base
-`419bee2531d4802bf922c3597b42c6eeb75ab250`. Proposed handoff is
-`First iteration - testing`: the implementation, focused gates, repeated matched
-comparisons, save/load defect repair, and debug-disabled publication regression
-pass. The one allowed final-review response also repairs ordinary SAM construction
-ownership. The exact post-response clean-three plus strongest final-regression bar
-remains for reviewed combined testing.
+Integrated RC1 is complete on `agent/round-20260807-cnc42-rc1-repair` from release
+head `ffb841b48750cc54b1862fb93101d3dce3a87a3f`. Proposed handoff is
+`Complete - testing`: tested product head
+`b6e7eecf15a6993a2349b1595ffb2c350582d976` persists exact economy-SAM build
+ownership across a mid-build save/load, and the reset clean-three, combined
+CNC-41 G4/G7, stressed final, focused, and repository-wide gates pass.
 
 ## Dependency inspection
 
@@ -968,3 +966,44 @@ allowed final-review response are consumed. Do not infer completion from the
 green build. The adopted mid-build save/load ownership blocker, reset clean-three,
 stressed final regression, stronger cycle-20 causal control, and combined CNC-41
 validation remain required before promotion.
+
+## Integrated RC1 repair and evidence
+
+The isolated blocker was exact economy-SAM build ownership living only in a
+runtime `ProductionQueue` reference. Product commit
+`b6e7eecf15a6993a2349b1595ffb2c350582d976` persists the queue actor ID, queue
+type, actor type, and reservation tick. Load reconstructs ownership only against
+the original owned/live queue when that exact build is still queued, and safely
+discards stale or incompatible records. Legacy saves remain valid. The focused
+suite now passes 35/35, `make check && make test` passes cleanly, and the full
+test assembly passes 513/513.
+
+Six counted integrated games raise the task total from 66 to 72. G5 discovery
+located the reservation window. G5 then saved at tick 300 before the first SAM
+placement; uninterrupted and loaded play both chose economy cell `41,17`, while
+the load explicitly restored queue `328/Defence.GDI`. Combined CNC-41 G4 reached
+tick 6000 with both original harvesters/processors alive and all eight raiders
+dead. Combined G7 reached tick 6500 with both harvesters/processors alive, all six
+raiders dead, no path spam, and the unreachable MSAM correctly withheld. Source
+confirms that `unreachable-domain` is rejected before assignment/reservation, so
+the G7 policy review's possible ineffective-ownership condition is resolved.
+
+The stressed final reached tick 9000. Literal left/right screens were ready
+before the delayed raids; defender totals recovered after the scripted casualty;
+both original harvesters and pristine refineries survived; both measured
+harvesters completed later unloads after contact; seven of eight raiders died;
+and three SAM sites were live at the final sample. No forbidden occupancy,
+preferred-placement miss, refinery traffic failure, runtime/Lua error, or desync
+occurred. The launcher summary's three misses were evidence-expression errors,
+not game failures: two patterns expected `tick=` where the raw engine text says
+`at tick`, and one sampled local recovery before the later literal-screen line.
+The factual narrative preserves the exact discrepancy. Routine policy's
+conditional evidence request is satisfied by those raw later screen and unload
+lines; rerunning the unchanged successful game would violate the no-repeated-
+happy-path rule.
+
+This uses one integrated product cycle (`1/3` this RC, `1/12` total). Draft PR
+#92 targets the exact integrated release branch. CI run `31185660304` passed
+Linux .NET 6.0 in 2m14s and Windows .NET 6.0 in 4m29s on the tested product head.
+Task debug is disabled and raw saves, maps, logs, replays, and benchmarks remain
+ignored. The integrated handoff status is `Complete - testing`.
