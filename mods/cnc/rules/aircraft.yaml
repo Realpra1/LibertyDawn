@@ -284,6 +284,9 @@ A10:
 
 TRAN.Husk:
 	Inherits: ^HelicopterHusk
+	SpawnActorOnDeath:
+		Actor: TRAN.GroundHusk
+		RequiresValidHuskCell: True
 	Tooltip:
 		Name: Chinook Transport
 	Aircraft:
@@ -303,6 +306,9 @@ TRAN.Husk:
 
 HELI.Husk:
 	Inherits: ^HelicopterHusk
+	SpawnActorOnDeath:
+		Actor: HELI.GroundHusk
+		RequiresValidHuskCell: True
 	Tooltip:
 		Name: Apache Longbow
 	Aircraft:
@@ -319,6 +325,9 @@ HELI.Husk:
 
 ORCA.Husk:
 	Inherits: ^HelicopterHusk
+	SpawnActorOnDeath:
+		Actor: ORCA.GroundHusk
+		RequiresValidHuskCell: True
 	Tooltip:
 		Name: Orca
 	Aircraft:
