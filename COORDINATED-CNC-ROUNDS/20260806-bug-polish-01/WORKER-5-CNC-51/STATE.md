@@ -10,19 +10,19 @@ when the dependency section directs it.
 
 - Worker: `worker-5-cnc-51`
 - Task: `CNC-51 — Transport-helicopter unload recovery and threat-safe landing`
-- Status: `Specified`
+- Status: `Complete - testing`
 - Common base branch/SHA: `agent/cnc38-early-viki-infantry-rush` / `09ccdac3c1ecb5134a4751f2bcbd8a7970dfe6bf`
 - Task branch: `agent/round-20260806-cnc51-transport-unload`
 - Intended PR base: `agent/cnc38-early-viki-infantry-rush`
 - Cycle budget: `20` isolated code-change cycles
-- Cycles used: `13`
+- Cycles used: `14`
 - Game/build lock directory: `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260806-bug-polish-01/locks`
 - Game capacity: `2`
 - Large-build capacity: `1`
 - Task report: `/root/github/LibertyDawn/COORDINATED-CNC-ROUNDS/20260806-bug-polish-01/WORKER-5-CNC-51/REPORT.md`
 - Match-analysis directory: `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260806-bug-polish-01/analysis/worker-5-cnc-51`
 - Liberty Dawn design reference: `.agents/references/LIBERTY-DAWN-DESIGN.md`
-- Full-engine game tests completed: `49`
+- Full-engine game tests completed: `51`
 - Game-run summary: runs 02-06 invalid fixture; run 07 discovery; run 08 blocker
   correction; run 09 negative control; run 10 accepted pinned-base failure
   reproduction; run 11 cycle-1 changed smoke pass; runs 12-13 invalid stationary-
@@ -48,7 +48,11 @@ when the dependency section directs it.
   run 46 clean covered-assembly fallback recovery and idle survival; run 47 clean
   post-fix Archipelago mixed-vehicle regression; run 48 clean post-fix live-threat
   replan, carrier recovery, and ordinary reuse; run 49 clean fresh-process final
-  literal three-rescue regression; run 50 clean post-fix Release natural match.
+  literal three-rescue regression; run 50 clean post-fix Release natural match;
+  run 51 clean aircraft-closing-envelope review regression; run 52 strict literal
+  harness invalid because mission 3 selected a different real squad objective and
+  completed after the tick-2000 assertion, although all three useful physical
+  handoffs released safely by tick 3500.
 - Sol-xhigh policy escalation: `unused (requires at least 10 game tests; one maximum)`
 - PR: `https://github.com/Realpra1/LibertyDawn/pull/81`
 
@@ -1418,6 +1422,42 @@ There was no crash, desync, unchanged hold spam, or dishonest transport success.
 Evidence:
 `AUTONOMOUS-CNC-LOGS/cnc51-control/changed-cycle-13-run-50-natural-release/`.
 
+Review-response run 51 is predeclared on the connected occupied-cell fixture with
+one enabled enemy Apache at `47,30`. Its `HeliAGGun` has range 4096 and the
+configured buffer is 1024; speed 160 over the 75-tick revalidation interval makes
+the corrected effective envelope 17120. The first fallback is 15 cells away,
+outside static range-plus-buffer but inside that closing envelope. Failure is a
+static-only acceptance, missing exact aircraft/weapon/range rejection, unsafe
+carrier or exit, retained cargo, withdrawal, timeout, fatal, or desync. Pass
+requires an alternate exact plan, physical useful handoff, and release under
+ordinary Cabal/SkyNet modules.
+
+Run 51 passed to tick 4200 in 22.046 seconds (190.468 valid ticks/s), seed
+`510062`, fixture SHA
+`ae6cc567ccc07c321b02e6ef79d99c9eb82e7f53e729620bd1d68602bb33889a`.
+The snapshot named `heli 559`/`HeliAGGun` at effective range 17120, rejected the
+first fallback, then replaced two later cells as the aircraft moved. Mission 1
+committed carrier `29,30`/exit `29,29`, physically handed off the Medium Tank
+usefully, and released. There was no withdrawal, timeout, fatal, or desync.
+Evidence:
+`AUTONOMOUS-CNC-LOGS/cnc51-control/changed-cycle-14-run-51-aircraft-threat-final/`,
+`analysis/worker-5-cnc-51/cycle-14-aircraft-comment/NARRATIVE.md`, and
+`analysis/worker-5-cnc-51/cycle-14-aircraft-policy/POLICY-REVIEW.md`.
+
+Supplementary exact-head run 52 repeated the literal fixture. It reached tick
+5200 cleanly and all original three missions physically completed useful handoffs
+and released by tick 3500, including mission 2's live Mammoth revision. It is
+invalid as a replacement literal acceptance artifact: mission 3's real squad
+objective was `51,8` rather than the fixture-declared edge `4,80`, and its unload
+finished after the fixture's tick-2000 assertion. No timeout or safe-recovery
+outcome occurred. The mismatch is retained as an evidence-integrity limitation;
+run 49 remains the clean literal acceptance artifact. The Policy Reviewer's
+fixed-cutoff admission proposal is not adopted because production missions own
+real mission deadlines, not a test exit horizon. Evidence:
+`AUTONOMOUS-CNC-LOGS/cnc51-control/changed-cycle-14-run-52-final-literal/`,
+`analysis/worker-5-cnc-51/cycle-14-literal-comment/NARRATIVE.md`, and
+`analysis/worker-5-cnc-51/cycle-14-literal-policy/POLICY-REVIEW.md`.
+
 | Cycle | Commit/change | Failure hypothesis and perturbation | Checks/games | Narrative/policy review | Failure/pass evidence | Decision/next harder test |
 |---|---|---|---|---|---|---|
 | 1 | Shared live threat snapshot, deterministic exact carrier/exit plan, atomic cell claims, targeted exact unload, rescue integration | Old targetless unload selects the occupied current cell; the changed bot must choose a distinct landable/useful exit plan and unload before timeout in the identical fixture. | Release build 0 warnings/errors; 11 focused transport/route tests pass; `make check check-scripts` pass; run 11 passed at tick 4200 with replay/benchmark. Changed throughput 299.652 versus control 322.7 ticks/s (about -7.1%, below 10% threshold). | `cycle-01-pair-comment/NARRATIVE.md`; `cycle-01-pair-policy/POLICY-REVIEW.md`: mostly sensible/medium, materially better in this scenario. Adopt explicit useful-region success and threat/exit hardening; reviewer hash uncertainty is resolved by worker SHA evidence, not by editing the isolated narrative. | Identical seed `510051` and map SHA `72931e7603be21ce21c09a3a7bcece5836e1cf6f0ffcc31214af4f96a6526854`: changed selected carrier `32,30`, exit `33,29`, physically exited and released before tick 1000 with both blockers fixed; control retained cargo through tick 3500 and timed out. Evidence: `AUTONOMOUS-CNC-LOGS/cnc51-control/changed-cycle-01-run-11/`. | Harden multi-passenger exact exits and all-armor threat capture, then test a direct-side live threat before manager adoption. |
@@ -1433,21 +1473,68 @@ Evidence:
 | 11 | No product change; correct passenger-bound fixture callbacks and stage moving Mammoths after mission 2's initial plan. | All three real squads must trigger independently; a late Mammoth must invalidate an in-flight plan without permitting stale unload, while map-edge/blocker contention remains live. | Run 34 passed at tick 5200, 185.323 ticks/s, after runs 29-33 established fixture timing/objective/retirement bounds. | `cycle-11-literal-comment/NARRATIVE.md`; `cycle-11-literal-policy/POLICY-REVIEW.md`: insufficient match-level evidence/high confidence, but the wait/replan/complete sequence is locally survival-first and no transport blunder is proven. Retain it; test persistent threat bounds and paired strategic outcome before broader claims. | Seed `510057`, SHA `34f96775...`: 3/3 useful physical handoffs; mission 2 routed revisions 2/3 for `120mmDual`/`MammothMissiles`, held under continuing coverage, then reacquired its useful exact region after both threats died. All passengers/carriers alive with zero cargo at tick 2000. Evidence: `changed-cycle-11-run-34/`. | Exercise Archipelago connected-island vehicle unload and an ordinary natural match; capture winner/economy/end-state telemetry and retain the already-proven bounded persistent-threat recovery rather than changing policy from this narrow review. |
 | 12 | Rate-limit unchanged heavy-drop pre-wave blockage diagnostics using the shared configured scan bound; relocate the Archipelago fixture to guaranteed spawn land areas and a unique undefended edge-island target. | A geometrically plausible island setup can fail before boarding, and an unchanged failure can spam every 75 ticks; mixed Mammoth/Medium-Tank pairs still need distinct pickup/exit cells and connected target-island handoff. | Release build 0 warnings/errors; 35 focused tests pass. Runs 35-36 invalid with only 1/4 pickup cells; run 36 proved eight-scan diagnostic limiting. Run 37 passed at tick 7000, 279.672 ticks/s. Natural runs 39/41 physically completed ordinary rescues; run 41 reached natural outcome at 550.807 ticks/s versus pinned control 516.642. Final literal run 42 passed 3/3 at tick 5200, 305.456 ticks/s. | Archipelago: `cycle-12-archipelago-comment/NARRATIVE.md` and `cycle-12-archipelago-policy/POLICY-REVIEW.md`, mostly sensible/medium. Natural pair: `cycle-12-natural-pair-comment/NARRATIVE.md` and `cycle-12-natural-pair-policy/POLICY-REVIEW.md`, mixed/medium; it judges the two SAM-avoiding physical recoveries locally effective but correctly withholds match-level causality because opening rolls diverged. Final literal: `cycle-12-final-literal-comment/NARRATIVE.md` and `cycle-12-final-literal-policy/POLICY-REVIEW.md`, mostly sensible/medium, with no demonstrated transport-policy blunder. Production retry/APC advice is unrelated scope. A fixed-horizon admission rule is rejected because the fixed exit belongs to the test harness, mission 5 had no cargo before cutoff, and ordinary missions already have tested timeout/recovery bounds. | Run 37 loaded/exited/adopted 4/4 and killed the connected target. Release run 41 safely terminated two SAM-covered emergent rescues, retained the control's SkyNet win, and exceeded control throughput by 6.6%. Run 42 completed 3/3 useful handoffs after live replans. Evidence: `changed-cycle-12-run-37-archipelago/`, `pinned-control-run-40-natural-observed/`, `changed-cycle-12-run-41-natural-release/`, `changed-cycle-12-run-42-final-literal/`. | Release/full verification and publication; do not expand into fixture-horizon, production-request, or APC-composition policy. |
 | 13 | Empty assault-carrier recovery gains bounded far-side safe fallback, a hard reservation deadline, and released-fallback idle staging; heavy safe return re-enters timeout-governed travel and attempts an atomic far-side plan set when assembly cells disappear. | A permanently covered assembly could reserve an empty carrier forever; releasing at the handoff cell or immediately restaging into the covered base could kill it. Heavy return invoked from unloading could also remain outside timeout-governed travel. | Release build 0 warnings/errors; 35/35 focused and 442/442 full tests pass; `make check check-scripts` passes. Runs 43-45 exposed fallback/disposition and fixture-reuse confounders. Post-fix runs 46-48 passed covered recovery, Archipelago mixed vehicles, and late-threat recovery/reuse; final literal run 49 passed; Release natural run 50 passed. | `cycle-13-final-batch-comment/NARRATIVE.md`; `cycle-13-final-batch-policy/POLICY-REVIEW.md`: mixed/medium. It endorses safe replan/recovery as sound survival-first policy but does not infer match-level improvement. Harvester/MCV production recovery and undersized ground-APC assault advice are deferred as separate ownership/scope. | Run 46 held under MSAM coverage, routed six waypoints to `20,38`, released, and remained alive/cargo-zero at tick 2000. Run 47 exited/adopted 4/4 mixed vehicles and killed the target. Run 48 replanned 3/3 then recovered/reused the carrier. Run 49 completed 3/3 useful rescues with live Mammoth revisions and edge exit `1,80`. Run 50 naturally completed a useful rescue, retained the SkyNet win, and ran at 561.949 ticks/s (+8.8% versus pinned control). | Publish scoped branch/PR, wait Linux/Windows checks, obtain isolated code review, and respond at most once to material findings. |
+| 14 | Review response commit `cb6a05d5a3`: include enabled `Aircraft.MovementSpeed` alongside ground-mobile speed in the one-replan closing margin; add overflow-bounded pure envelope logic and a carrier/exit boundary regression. | The isolated reviewer found that a live enemy aircraft just outside static weapon-plus-buffer range could close before the next snapshot while receiving zero movement margin. | 82/82 focused transport/air-threat/route tests, 443/443 full Release tests, `make check check-scripts`, `make test`, and Release builds all pass with 0 warnings/errors. Run 51 cleanly exercises the aircraft branch. Run 52 is a strict harness invalid with three eventual safe handoffs. Linux and Windows CI pass on exact product head. | PR review `pr-81-review/PR-REVIEW.md`: `ready with one fix`; applied exactly. Run 51 comment/policy: mostly sensible/medium. Run 52 comment/policy: strict assertion invalid and mixed/medium. Another aircraft old-control pair and fixture-cutoff admission are rejected as unnecessary/broader scope because the task already retains pinned/matched controls and production mission deadlines are not test horizons. | Run 51 proved `HeliAGGun` static 5120 versus corrected dynamic 17120, named the aircraft rejection, replanned twice, physically unloaded usefully, and released. Run 52 preserved safe bounded behavior but missed the artificial tick-2000 pattern after mission 3 selected a different objective; it is not promoted over clean run 49. | Handoff `Complete - testing`: publish report/state only, retain run-52 fixture limitation and no additional product cycle. |
 
 ## Handoff receipt
 
-- Proposed status:
-- Final branch/head:
-- PR and checks:
-- Cycles used:
-- Acceptance evidence:
-- Adversarial evidence:
-- Old-behavior control and comparative result:
-- Match narratives and routine policy-review conclusions:
-- Sol-xhigh policy escalation (unused, or test count/path/conclusion):
-- Final regression:
-- Error/warning and diagnostic-cleanup result:
-- Performance/determinism result:
-- Deferred work:
-- Known failures/risks:
-- Relevant artifact paths:
+- Proposed status: `Complete - testing`
+- Final branch/head: `agent/round-20260806-cnc51-transport-unload` / reviewed
+  product head `cb6a05d5a302b2f1db2f32d2f72f684005a18611`; the handoff-state
+  commit is documentation-only.
+- PR and checks: `https://github.com/Realpra1/LibertyDawn/pull/81`, mergeable to
+  `agent/cnc38-early-viki-infantry-rush`; Linux (.NET 6.0) passed in 2m06s and
+  Windows (.NET 6.0) passed in 3m35s on exact product head `cb6a05d5a3`.
+- Cycles used: `14/20`, including the single permitted review-response cycle.
+- Acceptance evidence: clean run 49 completed the literal three-rescue scenario
+  3/3 with dense contention, edge exit `1,80`, live Mammoth replans, useful
+  physical handoffs, and exact claim release; run 11 decisively fixed the pinned
+  occupied-cell failure.
+- Adversarial evidence: post-recovery-fix runs 46-48 cover no-safe assembly/far-
+  side recovery, Archipelago mixed-vehicle connectivity/adoption, and live-threat
+  replan plus carrier reuse. Review-response run 51 adds the enabled enemy-aircraft
+  ground-weapon closing envelope.
+- Old-behavior control and comparative result: exact pinned SHA `09ccdac3...`
+  retained cargo through tick 3500 and timed out where changed run 11 completed
+  before tick 1000; changed was -7.1%, inside the performance bound. Exact-base
+  natural run 40 and changed Release run 50 both produced a SkyNet win; changed
+  ran at 561.949 versus 516.642 ticks/s (+8.8%).
+- Match narratives and routine policy-review conclusions: cycle 13 `mixed` /
+  `medium`, cycle-14 aircraft `mostly sensible` / `medium`, and cycle-14 literal
+  `mixed` / `medium`. Reviews endorse survival-first threat replan/recovery but do
+  not infer match-level win causality. Fixed-horizon admission, unavailable-
+  harvester recovery, and ground-APC package policy are rejected/deferred to their
+  owning scopes.
+- Sol-xhigh policy escalation (unused, or test count/path/conclusion): unused.
+- Final regression: clean fresh run 49 remains literal acceptance. Supplementary
+  exact-head run 52 is explicitly invalid as a replacement artifact because the
+  real squad selected objective `51,8` instead of fixture edge `4,80` and mission
+  3 completed after tick 2000; all three still handed off usefully and released by
+  tick 3500 with no timeout/safe recovery. The reviewer-required affected-path
+  regression is clean run 51.
+- Error/warning and diagnostic-cleanup result: 82/82 focused and 443/443 full
+  Release tests pass; `make check`, `make check-scripts`, `make test`, and Release
+  compilation pass with zero warnings/errors. Debug diagnostics remain gated and
+  unchanged failures are rate-limited; no temporary per-tick product tracing is
+  committed.
+- Performance/determinism result: stable actor/passenger/cell ordering, atomic
+  claims, bounded 75-tick snapshot reuse and 128 candidates. Matched performance
+  is within bound; run 51 reached 190.468 ticks/s.
+- Deferred work: save/load persistence; adaptive unavailable harvester/MCV
+  production recovery; ground-APC assault composition; richer replay economy/
+  casualty causality; deterministic literal-fixture objective binding.
+- Known failures/risks: low-frequency heavy multi-carrier far-side terminal
+  fallback lacks a dedicated physical branch game but is atomic/bounded and the
+  normal Archipelago path passes. Run 52 documents literal fixture objective/
+  cutoff instability; do not convert the artificial test horizon into production
+  admission policy. No known unsafe aircraft-margin, cargo-retention, claim-leak,
+  compilation, or CI failure remains.
+- Relevant artifact paths: task report
+  `/root/github/LibertyDawn/COORDINATED-CNC-ROUNDS/20260806-bug-polish-01/WORKER-5-CNC-51/REPORT.md`;
+  isolated PR review `analysis/worker-5-cnc-51/pr-81-review/PR-REVIEW.md`;
+  run roots `changed-cycle-13-run-46-carrier-fallback`,
+  `changed-cycle-13-run-47-archipelago`, `changed-cycle-13-run-48-late-threat`,
+  `changed-cycle-13-run-49-final-literal`,
+  `changed-cycle-13-run-50-natural-release`,
+  `changed-cycle-14-run-51-aircraft-threat-final`, and
+  `changed-cycle-14-run-52-final-literal` under
+  `AUTONOMOUS-CNC-LOGS/cnc51-control/`.
