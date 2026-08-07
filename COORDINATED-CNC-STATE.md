@@ -51,3 +51,9 @@ Recovery note (2026-08-07 16:38 UTC): the shared `policy-scratchpad` lock left b
 completed speccer PID `1006013` was verified dead with no active policy-role
 process, then moved into the ignored shared-lock `stale/` quarantine. No
 canonical scratchpad content was changed; policy consultations may proceed.
+
+Task routing note (2026-08-07 16:42 UTC): a fresh Task Maker recorded `CNC-94`
+as a high-priority coordination-infrastructure bug/polish task after dead
+game/build locks were also observed. It covers automatic, safe stale-lock
+reclamation without weakening live-owner exclusivity; task-sheet commit
+`c6d133cc32` placed it immediately before pinned final `CNC-26C`.
