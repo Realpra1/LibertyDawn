@@ -88,6 +88,55 @@ def cnc_mod_version(root: Path) -> str | None:
     return match.group(1) if match else None
 
 
+def checkout_identity(root: Path) -> dict[str, object]:
+    revision = revision_identity(root)
+    if not revision["commit"] or revision["dirty"] is None:
+        raise ValueError(f"cannot establish Git revision identity for checkout: {root}")
+    mod_version = cnc_mod_version(root)
+    if mod_version is None:
+        raise ValueError(f"cannot establish CNC mod version for checkout: {root}")
+    return {
+        "root": str(root),
+        "revision": revision,
+        "cnc_mod_version": mod_version,
+    }
+
+
+def measured_checkout_identity(launcher: Path) -> dict[str, object]:
+    checkout_text = command_output(
+        ["git", "rev-parse", "--show-toplevel"], launcher.parent
+    )
+    if not checkout_text:
+        raise ValueError(f"launcher is not owned by a Git checkout: {launcher}")
+    checkout = Path(checkout_text).resolve()
+    expected_launcher = checkout / "launch-game.sh"
+    if launcher != expected_launcher:
+        raise ValueError(
+            "alternate launcher must be the owning checkout's launch-game.sh: "
+            f"{launcher}"
+        )
+    engine_assembly = checkout / "bin" / "OpenRA.dll"
+    if not launcher.is_file() or not engine_assembly.is_file():
+        raise ValueError(
+            f"measured checkout is missing launch-game.sh or bin/OpenRA.dll: {checkout}"
+        )
+    identity = checkout_identity(checkout)
+    identity.update({
+        "launcher_relative_path": str(launcher.relative_to(checkout)),
+        "launcher_sha256": sha256(launcher),
+        "engine_assembly_relative_path": str(engine_assembly.relative_to(checkout)),
+        "engine_assembly_sha256": sha256(engine_assembly),
+    })
+    return identity
+
+
+def provenance_identity(workload_root: Path, launcher: Path) -> dict[str, object]:
+    return {
+        "workload_source": checkout_identity(workload_root),
+        "measured_checkout": measured_checkout_identity(launcher),
+    }
+
+
 def artifact_inventory(output: Path, run_names: list[str]) -> list[dict[str, object]]:
     inventory = []
     for run_name in run_names:
@@ -174,8 +223,12 @@ def main() -> int:
     source_map = (base / config["base_map"]).resolve()
     rules = (base / config["rules"]).resolve()
     launcher = (args.launcher or (root / "launch-game.sh")).resolve()
+    try:
+        provenance = provenance_identity(root, launcher)
+    except ValueError as error:
+        print(str(error), file=sys.stderr)
+        return 2
     started_utc = datetime.now(timezone.utc).isoformat()
-    revision = revision_identity(root)
     dotnet_runtime = command_output(["dotnet", "--version"], root)
     host = host_identity()
 
@@ -263,9 +316,11 @@ def main() -> int:
         "task_identity": args.task_identity,
         "result_kind": "profiled diagnostic" if args.profile_only else "golden paced timing",
         "workload_identity": config["identity"],
-        "revision": revision,
-        "cnc_mod_version": cnc_mod_version(root),
-        "build_configuration": args.build_configuration,
+        "revision": provenance["measured_checkout"]["revision"],
+        "cnc_mod_version": provenance["measured_checkout"]["cnc_mod_version"],
+        "measured_checkout": provenance["measured_checkout"],
+        "workload_source": provenance["workload_source"],
+        "requested_build_configuration": args.build_configuration,
         "automation_mode": "local headless paced; rendering suppressed",
         "dotnet_runtime": dotnet_runtime,
         "workload_config_sha256": sha256(config_path),
@@ -273,7 +328,7 @@ def main() -> int:
         "base_map_sha256": sha256(source_map),
         "rules_sha256": sha256(rules),
         "generated_map_sha256": sha256(output / "workload.oramap"),
-        "launcher_sha256": sha256(launcher),
+        "launcher_sha256": provenance["measured_checkout"]["launcher_sha256"],
         "requested_jobs": 1,
         "requested_game_slots": 2,
         "requested_affinity": host["process_affinity"],
