@@ -11,9 +11,9 @@
 - Lock directory: `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260807-bug-polish-03/locks`
 - Persistent policy scratchpad: `/root/github/LibertyDawn/.agents/references/LIBERTY-DAWN-POLICY-SCRATCHPAD.md`
 - Cross-round policy lock directory: `/root/github/LibertyDawn/.worktrees/coordinated-cnc/shared-locks`
-- Prior release: [ready product PR #90](https://github.com/Realpra1/LibertyDawn/pull/90)
-  at final task-status head `468ee64f5a0f`; mergeable with 2× Linux/2× Windows
-  CI passed; intentionally unmerged for user decision
+- Prior release: [product PR #90](https://github.com/Realpra1/LibertyDawn/pull/90)
+  at final task-status head `468ee64f5a0f`; merged by the user into `bleed` at
+  2026-08-07 18:20:52 UTC after 2× Linux/2× Windows CI passed
 - Release candidate: `none`
 - Release PR: `none`
 
