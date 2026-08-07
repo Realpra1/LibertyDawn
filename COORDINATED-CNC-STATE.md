@@ -111,3 +111,10 @@ planning. Avoid one expensive independent planner per Harvester; prefer shared
 local Tiberium-field guard groups, bounded low-frequency enemy checks, and
 ordinary move/guard/attack orders. This does not presume Economy squads are the
 freeze cause, and requires behavioral control comparison before adoption.
+
+Lock-scope correction (2026-08-07): inspection of the actual
+`with_resource_slots.py` helper showed that slot files use kernel `fcntl.flock`;
+JSON/PID text is diagnostic only, and file persistence after process exit does
+not hold a slot. CNC-94 was corrected by Task Maker commit `599a222fdf` to cover
+misleading metadata and inconsistent round/shared lock namespaces, with tests
+based on actual flock ownership and safe process death rather than JSON cleanup.
