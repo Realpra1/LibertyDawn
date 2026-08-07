@@ -1,7 +1,7 @@
 # Coordinated CNC State
 
 - Round ID: `20260807-bug-polish-02`
-- Phase: `Sol-high integrator active; constructing RC1 from five reviewed heads`
+- Phase: `RC1 assembled and draft PR open; publishing durable receipt before combined worker tests`
 - Common base branch: `agent/cnc-20260806-bug-polish-01-release`
 - Common base SHA: `419bee2531d4802bf922c3597b42c6eeb75ab250`
 - Coordinator model: `gpt-5.6-sol` / `high` (trial mismatch explicitly accepted by user)
@@ -14,9 +14,10 @@
 - Prior release: [product PR #84](https://github.com/Realpra1/LibertyDawn/pull/84)
   at RC4 task-status head `419bee2531d4`, intentionally unmerged; local gates
   and exact-head Linux/Windows CI passed
-- Release candidate: `none`
-- Release PR: `none`
-- Integrator: `roles/integrator/process.json` supervisor PID `937153`
+- Release candidate: RC1 product head `394ae5eeadfffbf58a9db7c1fac91960f5158cb6`
+- Release PR: [draft #90](https://github.com/Realpra1/LibertyDawn/pull/90)
+- Integrator: `roles/integrator/process.json` complete 0; receipt follow-up
+  `roles/integrator-receipt/process.json` supervisor PID `939602`
 
 ## Workers
 
@@ -32,6 +33,7 @@
 
 | RC | Head | Included heads | Repair heads | Build/checks | Integrated tests | Result |
 |---|---|---|---|---|---|---|
+| RC1 | product `394ae5eeadff` | CNC-87 `5170183fb882`; CNC-40 `40ed5926864c`; CNC-41 `418786381f64`; CNC-42 `260d10e9654c`; CNC-44 `df9cd6e12fd5` | none | conflict-free merge; Debug/Release, interface/Lua, CNC YAML/maps, and 512 tests passed; PR CI running | pending | reactivate workers 2–5 after receipt publication |
 
 ## Resume note
 
