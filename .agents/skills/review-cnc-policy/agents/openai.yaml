@@ -1,0 +1,6 @@
+interface:
+  display_name: "Review CNC Policy"
+  short_description: "Judge CNC AI policy from match narratives"
+  default_prompt: "Use $review-cnc-policy to judge whether this AI policy makes strategic sense in Liberty Dawn."
+policy:
+  allow_implicit_invocation: false

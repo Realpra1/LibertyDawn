@@ -1,0 +1,73 @@
+---
+name: comment-cnc-match
+description: Convert Liberty Dawn full-engine game logs, manifests, summaries, and replay-derived metrics into a precise chronological match narrative, emphasizing changed-versus-control AI differences, causal win/loss explanations, and what a losing AI still did well. Use after a CNC match or matched control batch before policy review or the worker's next implementation decision.
+---
+
+# Comment on a CNC Match
+
+Use a fresh Terra 5.6 medium session after every materially judged match or paired
+control batch. Remain factual; the Policy Reviewer judges whether behavior makes
+strategic sense.
+
+## Inputs and isolation
+
+The launcher job is a validated JSON path envelope with only `artifacts`, optional
+`design_reference`, and `output`. Artifacts are staged regular-file copies beneath
+the role directory's `inputs/` subtree. Read only:
+
+- The role instructions and path-only job envelope.
+- Assigned current/control logs, launch manifests, batch summaries, benchmark
+  output, and replay-derived statistics.
+- `.agents/references/LIBERTY-DAWN-DESIGN.md` when game terminology or intended
+  roles help explain an observed event.
+
+Do not read source code, task sheets, worker specs, implementation notes, or policy
+review output. Never infer an event merely because code was intended to produce it.
+
+## Evidence discipline
+
+1. Verify map, seed, factions, bots, alliances, starting conditions, options,
+   content/commit identity, headless MAX activation, world-tick progress, exit
+   state, and fatal/desync indicators. Mark comparisons invalid or limited when
+   supposedly matched inputs differ materially.
+2. Attribute factual statements to ticks/timestamps, counters, outcomes, or exact
+   artifact paths. Label a causal interpretation as `Inference` and give its
+   evidence. Label missing evidence as `Unknown`; never fill a log gap with a
+   plausible story.
+3. Reconstruct phases: opening, first contact, economic/technology development,
+   major attacks and recoveries, turning point, and finish/stop condition.
+4. Describe exactly what the changed AI and old-behavior control did differently:
+   build/tech timing, spending, income/storage, unit mix, target selection,
+   movement, engagements avoided/taken, losses, idle/stalled resources, recovery,
+   and objective/match outcome. Separate policy differences from map position,
+   opponent pressure, RNG/nondeterminism, or invalid setup.
+5. Explain the most evidence-supported causal chain for why each AI won or lost.
+   Do not reduce every result to the final army-value number.
+6. Always identify what each AI did well, especially a losing AI. Distinguish a
+   sensible decision overwhelmed by circumstances from a true blunder, without
+   turning this factual narrative into the policy verdict.
+
+## Output
+
+Write the requested `NARRATIVE.md` with:
+
+```markdown
+# Match narrative: <test/batch>
+
+## Evidence integrity and setup
+## Outcome in one paragraph
+## Chronological narrative
+## Changed AI versus old-behavior control
+## Why the changed AI won or lost
+## Why the control won or lost
+## What the losing AI did well
+## Other effective decisions
+## Observed blunders, stalls, and missed opportunities
+## Inferences, alternative explanations, and unknowns
+## Questions supplied for policy review
+## Source artifacts
+```
+
+Use concrete quantities and ticks where available. A two-game paired batch gets
+one comparative narrative unless isolation is clearer with linked per-game
+subsections. Return only the narrative path and any evidence-integrity blocker.
