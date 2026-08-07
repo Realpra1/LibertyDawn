@@ -35,6 +35,60 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
+		public void RouteZonesDistinguishTheExactGateFromFieldInterior()
+		{
+			var walls = new[]
+			{
+				new CPos(1, 1), new CPos(2, 1), new CPos(3, 1),
+				new CPos(1, 2), new CPos(1, 3), new CPos(3, 3)
+			};
+			var gate = new[] { new CPos(3, 2) };
+			Assert.That(TiberiumFieldPolicy.RouteZone(new CPos(3, 2), walls, gate),
+				Is.EqualTo(TiberiumFieldRouteZone.Gate));
+			Assert.That(TiberiumFieldPolicy.RouteZone(new CPos(2, 2), walls, gate),
+				Is.EqualTo(TiberiumFieldRouteZone.Inside));
+			Assert.That(TiberiumFieldPolicy.RouteZone(new CPos(4, 2), walls, gate),
+				Is.EqualTo(TiberiumFieldRouteZone.Outside));
+		}
+
+		[Test]
+		public void GatePathMustCrossTheEntranceInBothDirections()
+		{
+			var gate = new[] { new CPos(3, 2), new CPos(3, 3) };
+			var outbound = new[] { new CPos(5, 2), gate[0], new CPos(2, 2) };
+			var inbound = new[] { new CPos(2, 2), gate[1], new CPos(5, 2) };
+			Assert.That(TiberiumFieldPolicy.IsBidirectionalGatePath(outbound, inbound, gate), Is.True);
+			Assert.That(TiberiumFieldPolicy.IsBidirectionalGatePath(outbound,
+				new[] { new CPos(2, 2), new CPos(2, 3) }, gate), Is.False);
+		}
+
+		[Test]
+		public void LiveRoundTripRequiresRefineryGateHarvestGateAndUnloadInOrder()
+		{
+			var stage = TiberiumFieldRoundTripStage.AwaitingRefinery;
+			stage = TiberiumFieldPolicy.AdvanceRoundTrip(stage,
+				TiberiumFieldRouteZone.Outside, true, false, false);
+			Assert.That(stage, Is.EqualTo(TiberiumFieldRoundTripStage.Outbound));
+			stage = TiberiumFieldPolicy.AdvanceRoundTrip(stage,
+				TiberiumFieldRouteZone.Inside, false, true, false);
+			Assert.That(stage, Is.EqualTo(TiberiumFieldRoundTripStage.Outbound),
+				"Skipping the planned entrance must not count.");
+			stage = TiberiumFieldPolicy.AdvanceRoundTrip(stage,
+				TiberiumFieldRouteZone.Gate, false, false, false);
+			stage = TiberiumFieldPolicy.AdvanceRoundTrip(stage,
+				TiberiumFieldRouteZone.Inside, false, false, false);
+			stage = TiberiumFieldPolicy.AdvanceRoundTrip(stage,
+				TiberiumFieldRouteZone.Inside, false, true, false);
+			stage = TiberiumFieldPolicy.AdvanceRoundTrip(stage,
+				TiberiumFieldRouteZone.Gate, false, false, false);
+			stage = TiberiumFieldPolicy.AdvanceRoundTrip(stage,
+				TiberiumFieldRouteZone.Outside, false, false, false);
+			stage = TiberiumFieldPolicy.AdvanceRoundTrip(stage,
+				TiberiumFieldRouteZone.Outside, false, false, true);
+			Assert.That(stage, Is.EqualTo(TiberiumFieldRoundTripStage.Complete));
+		}
+
+		[Test]
 		public void SavedTerminalSegmentCursorRequiresCompletedActivationEligibleEnclosure()
 		{
 			Assert.That(TiberiumFieldPolicy.IsValidSavedSegmentCursor(4, 5, false, false), Is.True);
