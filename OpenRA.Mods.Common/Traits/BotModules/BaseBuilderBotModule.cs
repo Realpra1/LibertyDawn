@@ -171,6 +171,40 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Maximum range at which to build defensive structures near a combat hotspot.")]
 		public readonly int MaximumDefenseRadius = 20;
 
+		[Desc("Bot types that may use normal SAM construction for economy coverage.")]
+		public readonly HashSet<string> EconomyDefenseBotTypes = new HashSet<string>();
+
+		[Desc("Prerequisites required before economy SAM coverage becomes active.")]
+		public readonly string[] EconomyDefensePrerequisites = System.Array.Empty<string>();
+
+		[Desc("Anti-air defense structures owned by the economy-coverage placement policy.")]
+		public readonly HashSet<string> EconomyDefenseSamTypes = new HashSet<string>();
+
+		[Desc("Economy anchor types, in priority groups: unloading refineries, resonators, then used silos.")]
+		public readonly HashSet<string> EconomyDefenseRefineryTypes = new HashSet<string>();
+		public readonly HashSet<string> EconomyDefenseResonatorTypes = new HashSet<string>();
+		public readonly HashSet<string> EconomyDefenseSiloTypes = new HashSet<string>();
+
+		[Desc("Maximum total live or pending SAM sites owned by economy coverage.")]
+		public readonly int EconomyDefenseMaximumSamSites = 0;
+
+		[Desc("Minimum and maximum cells from the selected economy anchor to search for a SAM site.")]
+		public readonly int EconomyDefenseSamMinimumRadius = 2;
+		public readonly int EconomyDefenseSamMaximumRadius = 8;
+
+		[Desc("Reserve this many cells of weapon range beyond the anchor for its likely air approach.")]
+		public readonly int EconomyDefenseSamCoverageMarginCells = 2;
+
+		[Desc("Refinery approach corridor excluded from economy SAM footprints.")]
+		public readonly int EconomyDefenseRefineryLaneLengthCells = 7;
+		public readonly int EconomyDefenseRefineryLaneHalfWidthCells = 1;
+
+		[Desc("Stored-resource percentage required before a silo is a material economy anchor.")]
+		public readonly int EconomyDefenseUsedSiloThresholdPercent = 25;
+
+		[Desc("Write bounded economy SAM selection, coverage, and placement diagnostics to debug.log.")]
+		public readonly bool EconomyDefenseSamDebugLogging = false;
+
 		[Desc("Try to build another production building if there is too much cash.")]
 		public readonly int NewProductionCashThreshold = 5000;
 
@@ -313,6 +347,35 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("When should the AI start building specific buildings.")]
 		public readonly Dictionary<string, int> BuildingDelays = null;
 
+		public override void RulesetLoaded(Ruleset rules, ActorInfo ai)
+		{
+			base.RulesetLoaded(rules, ai);
+			if (EconomyDefenseSamTypes.Count == 0)
+				return;
+
+			if (EconomyDefenseBotTypes.Count == 0 || EconomyDefensePrerequisites.Length == 0 ||
+				EconomyDefenseRefineryTypes.Count == 0 || EconomyDefenseMaximumSamSites <= 0 ||
+				EconomyDefenseSamMinimumRadius < 0 ||
+				EconomyDefenseSamMaximumRadius < EconomyDefenseSamMinimumRadius ||
+				EconomyDefenseSamCoverageMarginCells < 0 || EconomyDefenseRefineryLaneLengthCells <= 0 ||
+				EconomyDefenseRefineryLaneHalfWidthCells < 0 || EconomyDefenseUsedSiloThresholdPercent < 0 ||
+				EconomyDefenseUsedSiloThresholdPercent > 100)
+				throw new YamlException("Economy SAM bot/prerequisite/actor types, cap, radii, lane, and silo threshold must be configured and valid.");
+
+			foreach (var actorType in EconomyDefenseSamTypes.Concat(EconomyDefenseRefineryTypes)
+				.Concat(EconomyDefenseResonatorTypes).Concat(EconomyDefenseSiloTypes))
+				if (!rules.Actors.ContainsKey(actorType))
+					throw new YamlException($"Economy SAM actor '{actorType}' does not exist.");
+
+			foreach (var samType in EconomyDefenseSamTypes)
+			{
+				var actor = rules.Actors[samType];
+				if (actor.TraitInfoOrDefault<BuildingInfo>() == null ||
+					!actor.TraitInfos<ArmamentInfo>().Any())
+					throw new YamlException($"Economy SAM actor '{samType}' must be a building with an armament.");
+			}
+		}
+
 		public override object Create(ActorInitializer init) { return new BaseBuilderBotModule(init.Self, this); }
 	}
 
@@ -347,6 +410,7 @@ namespace OpenRA.Mods.Common.Traits
 		PowerManager playerPower;
 		PlayerResources playerResources;
 		PlayerStatistics playerStatistics;
+		TechTree techTree;
 		IResourceLayer resourceLayer;
 		IBotPositionsUpdated[] positionsUpdatedModules;
 		IBotRequestUnitProduction[] unitProduction;
@@ -370,6 +434,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly Dictionary<uint, AirRepairBuildingReservation> airRepairBuildingReservations =
 			new Dictionary<uint, AirRepairBuildingReservation>();
 		BaseBuilderSmartEconomyManager smartEconomy;
+		BaseBuilderEconomyDefenseSamPlanner economyDefenseSam;
 
 		readonly List<BaseBuilderQueueManager> builders = new List<BaseBuilderQueueManager>();
 		UnitBuilderBotModule[] unitBuilders;
@@ -386,6 +451,7 @@ namespace OpenRA.Mods.Common.Traits
 			playerPower = self.Owner.PlayerActor.TraitOrDefault<PowerManager>();
 			playerResources = self.Owner.PlayerActor.Trait<PlayerResources>();
 			playerStatistics = self.Owner.PlayerActor.Trait<PlayerStatistics>();
+			techTree = self.Owner.PlayerActor.Trait<TechTree>();
 			resourceLayer = self.World.WorldActor.TraitOrDefault<IResourceLayer>();
 			positionsUpdatedModules = self.Owner.PlayerActor.TraitsImplementing<IBotPositionsUpdated>().ToArray();
 			unitBuilders = self.Owner.PlayerActor.TraitsImplementing<UnitBuilderBotModule>().ToArray();
@@ -395,6 +461,27 @@ namespace OpenRA.Mods.Common.Traits
 			FirstTowerPlanner = new BaseBuilderFirstTowerPlanner(this, player);
 			if (Info.EnableSmartEconomy)
 				smartEconomy = new BaseBuilderSmartEconomyManager(this, player, playerResources, unitProduction);
+			if (Info.EconomyDefenseSamTypes.Count > 0)
+				economyDefenseSam = new BaseBuilderEconomyDefenseSamPlanner(this, player, playerPower,
+					playerResources, techTree);
+		}
+
+		internal ActorInfo EconomyDefenseSamBuilding(ProductionQueue queue, IEnumerable<ActorInfo> buildables)
+		{
+			return economyDefenseSam?.ChooseBuilding(queue, buildables);
+		}
+
+		internal bool OwnsEconomyDefenseSam(ProductionQueue queue, string actorType)
+		{
+			return economyDefenseSam?.OwnsPlacement(queue, actorType) == true;
+		}
+
+		internal CPos? EconomyDefenseSamLocation(ProductionQueue queue, string actorType, ActorInfo actorInfo,
+			BuildingInfo buildingInfo,
+			bool distanceToBaseIsImportant)
+		{
+			return economyDefenseSam?.ChooseLocation(queue, actorType, actorInfo, buildingInfo,
+				distanceToBaseIsImportant);
 		}
 
 		internal bool AdaptiveProductionDebugLogging => unitBuilders.Any(u =>

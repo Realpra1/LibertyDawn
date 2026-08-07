@@ -3,6 +3,10 @@ E1:
 	Inherits@EXPERIENCE: ^GainsExperience
 	Inherits@AUTOTARGET: ^AutoTargetGroundAssaultMove
 	Inherits@DECORATIONS: ^InfantryExperienceHospitalHazmatOverrides
+	MoveAlongPath:
+		AvoidResourceTypes: Tiberium, BlueTiberium, RedTiberium
+		MaximumPathCells: 96
+		ResourceSafetyMarginCells: 2
 	Valued:
 		Cost: 120
 	Tooltip:

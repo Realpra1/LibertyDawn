@@ -198,6 +198,7 @@ namespace OpenRA.Mods.Common.Traits
 		INotifyMoving[] notifyMoving;
 		INotifyFinishedMoving[] notifyFinishedMoving;
 		IWrapMove[] moveWrappers;
+		IMobileCellValidator[] cellValidators;
 		bool requireForceMove;
 
 		public bool IsImmovable { get; private set; }
@@ -305,6 +306,7 @@ namespace OpenRA.Mods.Common.Traits
 			notifyMoving = self.TraitsImplementing<INotifyMoving>().ToArray();
 			notifyFinishedMoving = self.TraitsImplementing<INotifyFinishedMoving>().ToArray();
 			moveWrappers = self.TraitsImplementing<IWrapMove>().ToArray();
+			cellValidators = self.TraitsImplementing<IMobileCellValidator>().ToArray();
 			Pathfinder = self.World.WorldActor.Trait<IPathFinder>();
 			Locomotor = self.World.WorldActor.TraitsImplementing<Locomotor>()
 				.Single(l => l.Info.Name == Info.Locomotor);
@@ -372,7 +374,8 @@ namespace OpenRA.Mods.Common.Traits
 			if (IsTraitDisabled || IsTraitPaused || IsImmovable)
 				return;
 
-			var cell = GetAdjacentCell(nudger.Location);
+			var cell = GetAdjacentCell(nudger.Location,
+				c => cellValidators.Any(v => !v.IsValidCell(self, c)), strictAvoidance: true);
 			if (cell != null)
 				self.QueueActivity(false, MoveTo(cell.Value, 0));
 		}
@@ -394,7 +397,7 @@ namespace OpenRA.Mods.Common.Traits
 			return newCell;
 		}
 
-		public CPos? GetAdjacentCell(CPos nextCell, Func<CPos, bool> preferToAvoid = null)
+		public CPos? GetAdjacentCell(CPos nextCell, Func<CPos, bool> preferToAvoid = null, bool strictAvoidance = false)
 		{
 			var newCell = GetAdjacentEnterableCell(nextCell, preferToAvoid);
 			if (newCell == null)
@@ -403,7 +406,7 @@ namespace OpenRA.Mods.Common.Traits
 				foreach (CVec direction in CVec.Directions)
 				{
 					var p = ToCell + direction;
-					if (p != nextCell && p != ToCell)
+					if (p != nextCell && p != ToCell && (!strictAvoidance || preferToAvoid == null || !preferToAvoid(p)))
 						notStupidCells.Add(p);
 				}
 
@@ -543,7 +546,8 @@ namespace OpenRA.Mods.Common.Traits
 
 		public bool CanEnterCell(CPos cell, Actor ignoreActor = null, BlockedByActor check = BlockedByActor.All)
 		{
-			return Info.CanEnterCell(self.World, self, cell, ToSubCell, ignoreActor, check);
+			return Info.CanEnterCell(self.World, self, cell, ToSubCell, ignoreActor, check) &&
+				(cellValidators == null || cellValidators.All(v => v.IsValidCell(self, cell)));
 		}
 
 		public bool CanStayInCell(CPos cell)
