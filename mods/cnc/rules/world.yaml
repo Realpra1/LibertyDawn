@@ -69,6 +69,18 @@
 			BlueTiberium: 63
 			RedTiberium: 63
 			Beach: 50
+	Locomotor@MCVHEAVYWHEELED:
+		Name: mcvheavywheeled
+		Crushes: wall, heavywall, crate, infantry
+		TerrainSpeeds:
+			Clear: 90
+			Rough: 63
+			Road: 190
+			Bridge: 190
+			Tiberium: 63
+			BlueTiberium: 63
+			RedTiberium: 63
+			Beach: 50
     Locomotor@LIGHTTRACKED:
 		Name: lighttracked
 		Crushes: crate, infantry
