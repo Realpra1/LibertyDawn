@@ -24,20 +24,21 @@ when the dependency section directs it.
 - Task report: `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260807-bug-polish-02/workers/worker-3-cnc41/COORDINATED-CNC-ROUNDS/20260807-bug-polish-02/WORKER-3-CNC-41/REPORT.md`
 - Match-analysis directory: `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260807-bug-polish-02/analysis/worker-3-cnc41`
 - Liberty Dawn design reference: `.agents/references/LIBERTY-DAWN-DESIGN.md`
-- Full-engine game tests completed: `42`
+- Full-engine game tests completed: `50`
 - Terra cycle code reviews: `cycle 5: advisory concern adopted; red-tree lifecycle configured but unimplemented; cycle 10: advisory concern adopted; completed red enclosure identity, 1500-tick missing-only maintenance, and save/load reconstruction are absent; cycle 15: advisory concern adopted; terminal red segment state is rejected after completed enclosure and before Resonator placement; cycle 20: advisory concern adopted for handoff; real ordinary and reserved-stealth harvester route proof is absent before red activation eligibility`
 - Sol-xhigh policy escalation: `unused (requires at least 10 game tests; one maximum)`
 - PR: `https://github.com/Realpra1/LibertyDawn/pull/88` (draft; final-review CI-only response commit `237da1af47` passed Linux and Windows)
 
 ## Integrated repair assignment
 
-- Phase: `isolated implementation`
-- Current release branch/head: `not assigned`
-- Integration notes: `not assigned`
-- Repair branch: `not assigned`
-- Repair PR base: `not assigned`
-- Integrated cycles used this RC: `0/3`
-- Integrated cycles used total: `0/12`
+- Phase: `integrated testing`
+- Current release branch/head: `agent/cnc-20260807-bug-polish-02-release` / `ffb841b48750cc54b1862fb93101d3dce3a87a3f`
+- Integration notes: `COORDINATED-CNC-ROUNDS/20260807-bug-polish-02/INTEGRATION.md`
+- Repair branch: `agent/round-20260807-cnc41-rc1-repair`
+- Repair PR base: `agent/cnc-20260807-bug-polish-02-release`
+- Repair PR: `https://github.com/Realpra1/LibertyDawn/pull/93` (draft)
+- Integrated cycles used this RC: `3/3`
+- Integrated cycles used total: `3/12`
 
 Before relaunching this worker for combined testing or repair, the integrator must
 replace these fields with the exact release head, note path, branch, and counters.
@@ -1070,6 +1071,26 @@ policy review: `analysis/worker-3-cnc41/baseline-policy/POLICY-REVIEW.md`; verdi
 was a clean control with insufficient evidence for CNC-41 conformance. Decision:
 adopt its requirement that the first changed run explicitly log tree identity and
 final Resonator coverage; do not infer policy success from a clean engine exit.
+
+## Integrated repair journal
+
+| RC/cycle | Commit/change | Checks/games | Evidence and decision |
+|---|---|---|---|
+| RC1/1 | Added a persisted pre-activation `AwaitingRouteProof` phase, bidirectional exact-gate path validation with the live ordinary harvester locomotor, ordered live refinery/gate/field/gate/unload observation, and read-only observation of relevant RedTiberiumBomb reservations. Corrected red admission so completed containment plus ordinary route proof, rather than the permanent `!isRed` shortcut, can admit the Resonator. | Exact integrated baseline focused gate passed. Repair `make check` passed with 0 warnings/errors after adding the required namespace import; focused policy tests passed 19/19. Three seed-421341 full-engine runs on validated focused-map revisions reached tick 12000 without desync/fatal errors but failed route completion. Artifacts: `analysis/worker-3-cnc41/integrated-rc1-cycle-01-game/`. | All runs safely held activation after exact enclosure reconstruction. Run 1 proved a Construction Yard occupied the external entrance; run 2 removed it but retained an Airstrip occupying the internal entrance; run 3 replaced the Airstrip anchor with a smaller silo yet still reported no bidirectional path. No premature red Resonator/coverage occurred. Adopt bounded route-candidate rejection diagnostics before changing geometry or admission again; do not weaken the gate. |
+| RC1/2 | Added a rate-limited aggregate route-search rejection trace recording bounded inside-resource, eligible ordinary-harvester, linked-refinery, harvestable-candidate, outbound-path, and inbound-path counts. | `make check` passed with 0 warnings/errors. The original run-3 map passed its tick-12000 diagnostic manifest: from tick 851 onward it had 3-8 linked-refinery ordinary harvesters and 48-112 harvestable candidate pairs, but zero outbound paths. Two tick-12000 map perturbations were invalid for route proof because removing the selected gate-anchor silo changed the planned entrance and caused the manager to fill the prebuilt east gap, then enter extension planning. All three games exited normally without desync/fatal error or premature red coverage. Artifacts: `analysis/worker-3-cnc41/integrated-rc1-cycle-02-game/`. | The original failure is below admission and field selection: the hypothetical refinery-delivery-cell path query rejects every candidate. The first Commenter independently confirmed safe blocking and the zero-path sequence; routine Policy Review returned conditional pass and requested productive-route evidence. Preserve the live round-trip gate; next test the real harvester's live location as the outbound path origin while keeping the actual linked refinery delivery cell as the required return target. |
+| RC1/3 | Passed the exact linked unloading refinery as the pathfinder's ignored actor for both delivery-to-field and field-to-delivery queries, matching the engine's occupied docking-target semantics without changing the required live route sequence or activation hold. | `make check` passed with 0 warnings/errors; focused policy tests passed 19/19 with only the pre-existing integrated CNC-44 CA1825 test-build warning. The untouched exact-enclosure map and a one-cell gate-anchor clearance perturbation both ran normally to tick 12000 without desync/fatal error or premature red coverage, but neither produced the required validated route. Artifacts: `analysis/worker-3-cnc41/integrated-rc1-cycle-03-game/`; factual narrative: `integrated-rc1-cycle-03-commenter/NARRATIVE.md`; policy review: `integrated-rc1-cycle-03-policy/POLICY-REVIEW.md`. | Ignoring the refinery actor did not change the original zero-outbound-path result, proving the original east entrance is physically unreachable. The clearance perturbation was invalid: moving the silo changed the legal Resonator site from 82,58 to 77,63 and the computed gate from 87,58;87,59 to 82,58;82,59, so the prebuilt perimeter no longer represented the active plan. The final Policy Reviewer rejects feature acceptance but confirms retaining blocked activation is policy-safe and authorizes no scope/balance relaxation. The RC cycle budget is exhausted. Hand off `First iteration - testing`: pre-activation safety is repaired and proven, but productive ordinary/stealth round-trip and route-aware preconstruction gate selection remain unresolved. |
+
+## Integrated repair handoff receipt
+
+- Proposed status: `First iteration - testing`
+- Repair branch/base: `agent/round-20260807-cnc41-rc1-repair` against `agent/cnc-20260807-bug-polish-02-release`
+- Repair cycles: `3/3` this RC; `3/12` integrated total
+- Full-engine evidence: `8` RC1 games, `50` task total; every RC1 game reached tick 12000 and exited without desync, fatal error, invalid route save state, or premature powered red coverage
+- Local regression: locked `make check` passed with 0 warnings/errors; focused `TiberiumFieldPolicyTest` passed 19/19 with only the pre-existing integrated CNC-44 CA1825 test-build warning
+- Repaired safety outcome: exact containment no longer makes a red Resonator activation-eligible; activation requires a live ordinary refinery/gate/enclosed-harvest/gate/unload sequence and, when relevant, a read-only-observed reserved RedTiberiumBomb gate crossing
+- Unmet acceptance: the exact east test entrance has no actual ordinary-locomotor outbound path; no ordinary or reserved-stealth live proof, red activation, or active maintenance result exists
+- Final reviewer disposition: factual Commenter confirms missing route/round-trip evidence; Policy Reviewer rejects feature acceptance while affirming fail-closed activation and frozen scope/balance
+- Publication: product/state commit `727af8d4c8`; draft repair PR `https://github.com/Realpra1/LibertyDawn/pull/93` against the recorded release branch; validated code/state head `82003baa96`; Actions run `31189220494` passed Linux (.NET 6.0) in 2m39s and Windows (.NET 6.0) in 3m32s, with only the pre-existing unrelated CNC-44 CA1825 annotation; this receipt-only metadata successor follows the validated head
 
 ## Handoff receipt
 

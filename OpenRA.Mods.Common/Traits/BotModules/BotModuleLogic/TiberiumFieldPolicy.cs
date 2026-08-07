@@ -76,6 +76,25 @@ namespace OpenRA.Mods.Common.Traits
 		}
 	}
 
+	public enum TiberiumFieldRouteZone
+	{
+		Outside,
+		Gate,
+		Inside
+	}
+
+	public enum TiberiumFieldRoundTripStage
+	{
+		AwaitingRefinery,
+		Outbound,
+		InboundGate,
+		InsideField,
+		Harvested,
+		OutboundGate,
+		Returning,
+		Complete
+	}
+
 	public sealed class TiberiumFieldPerimeterPlan
 	{
 		public readonly CPos[] WallCells;
@@ -97,6 +116,62 @@ namespace OpenRA.Mods.Common.Traits
 	/// </summary>
 	public static class TiberiumFieldPolicy
 	{
+		public static TiberiumFieldRouteZone RouteZone(CPos cell,
+			IEnumerable<CPos> wallCells, IEnumerable<CPos> gateCells)
+		{
+			var gates = gateCells.ToHashSet();
+			if (gates.Contains(cell))
+				return TiberiumFieldRouteZone.Gate;
+
+			var walls = wallCells.ToArray();
+			if (walls.Length == 0)
+				return TiberiumFieldRouteZone.Outside;
+
+			var minX = walls.Min(c => c.X);
+			var maxX = walls.Max(c => c.X);
+			var minY = walls.Min(c => c.Y);
+			var maxY = walls.Max(c => c.Y);
+			return cell.X > minX && cell.X < maxX && cell.Y > minY && cell.Y < maxY ?
+				TiberiumFieldRouteZone.Inside : TiberiumFieldRouteZone.Outside;
+		}
+
+		public static bool IsBidirectionalGatePath(IEnumerable<CPos> outbound,
+			IEnumerable<CPos> inbound, IEnumerable<CPos> gateCells)
+		{
+			var gates = gateCells.ToHashSet();
+			return gates.Count > 0 && outbound.Any(gates.Contains) && inbound.Any(gates.Contains);
+		}
+
+		public static TiberiumFieldRoundTripStage AdvanceRoundTrip(
+			TiberiumFieldRoundTripStage stage, TiberiumFieldRouteZone zone,
+			bool emptyAtRefinery, bool harvested, bool unloadedAtRefinery)
+		{
+			switch (stage)
+			{
+				case TiberiumFieldRoundTripStage.AwaitingRefinery:
+					return emptyAtRefinery ? TiberiumFieldRoundTripStage.Outbound : stage;
+				case TiberiumFieldRoundTripStage.Outbound:
+					return zone == TiberiumFieldRouteZone.Gate ?
+						TiberiumFieldRoundTripStage.InboundGate : stage;
+				case TiberiumFieldRoundTripStage.InboundGate:
+					return zone == TiberiumFieldRouteZone.Inside ?
+						TiberiumFieldRoundTripStage.InsideField : stage;
+				case TiberiumFieldRoundTripStage.InsideField:
+					return harvested && zone == TiberiumFieldRouteZone.Inside ?
+						TiberiumFieldRoundTripStage.Harvested : stage;
+				case TiberiumFieldRoundTripStage.Harvested:
+					return zone == TiberiumFieldRouteZone.Gate ?
+						TiberiumFieldRoundTripStage.OutboundGate : stage;
+				case TiberiumFieldRoundTripStage.OutboundGate:
+					return zone == TiberiumFieldRouteZone.Outside ?
+						TiberiumFieldRoundTripStage.Returning : stage;
+				case TiberiumFieldRoundTripStage.Returning:
+					return unloadedAtRefinery ? TiberiumFieldRoundTripStage.Complete : stage;
+				default:
+					return stage;
+			}
+		}
+
 		public static bool IsValidSavedSpatialIdentity(CPos savedTreeLocation,
 			CPos liveTreeLocation, IEnumerable<CPos> resonatorFootprint,
 			Func<CPos, bool> isMapCell, long effectDistanceSquared, long effectRangeSquared)

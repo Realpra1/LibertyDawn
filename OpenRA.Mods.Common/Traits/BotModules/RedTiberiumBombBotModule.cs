@@ -77,7 +77,7 @@ namespace OpenRA.Mods.Common.Traits
 	}
 
 	public class RedTiberiumBombBotModule : ConditionalTrait<RedTiberiumBombBotModuleInfo>,
-		IBotTick, IBotUnitReservations, IBotHarvesterResourcePolicy, IGameSaveTraitData
+		IBotTick, IBotUnitReservations, IBotHarvesterResourcePolicy, IRedTiberiumBombMission, IGameSaveTraitData
 	{
 		enum MissionState { Harvesting, Armed, WaitingToDetonate, DeployOrdered }
 
@@ -142,6 +142,18 @@ namespace OpenRA.Mods.Common.Traits
 		bool IBotUnitReservations.IsUnitReserved(Actor actor)
 		{
 			return actor != null && missions.ContainsKey(actor.ActorID);
+		}
+
+		bool IRedTiberiumBombMission.TryGetMissionResourceCell(Actor harvester, out CPos resourceCell)
+		{
+			if (!IsTraitDisabled && harvester != null && missions.TryGetValue(harvester.ActorID, out var mission))
+			{
+				resourceCell = mission.ResourceCell;
+				return true;
+			}
+
+			resourceCell = default(CPos);
+			return false;
 		}
 
 		bool IBotHarvesterResourcePolicy.CanHarvestResource(Actor harvester, string resourceType)

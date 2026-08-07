@@ -640,6 +640,12 @@ namespace OpenRA.Mods.Common.Traits
 	}
 
 	[RequireExplicitImplementation]
+	public interface IRedTiberiumBombMission
+	{
+		bool TryGetMissionResourceCell(Actor harvester, out CPos resourceCell);
+	}
+
+	[RequireExplicitImplementation]
 	public interface IBotRequestPauseUnitProduction
 	{
 		bool PauseUnitProduction { get; }

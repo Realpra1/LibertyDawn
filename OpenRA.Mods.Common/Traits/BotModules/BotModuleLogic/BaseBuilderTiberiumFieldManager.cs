@@ -12,6 +12,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using OpenRA.Traits;
 
 namespace OpenRA.Mods.Common.Traits
 {
@@ -25,7 +26,8 @@ namespace OpenRA.Mods.Common.Traits
 			Producing,
 			AwaitingEnclosure,
 			AwaitingActor,
-			PlanningExtension
+			PlanningExtension,
+			AwaitingRouteProof
 		}
 
 		sealed class FieldProject
@@ -56,6 +58,20 @@ namespace OpenRA.Mods.Common.Traits
 			public CPos? ExtensionTargetCell;
 			public int ExtensionCount;
 			public int ExtensionProgressCells;
+			public uint RouteHarvesterActorId;
+			public uint RouteRefineryActorId;
+			public CPos RouteResourceCell;
+			public TiberiumFieldRoundTripStage RouteStage;
+			public int RouteLastContents;
+			public bool OrdinaryRouteProven;
+			public bool StealthRouteProven;
+		}
+
+		sealed class StealthRouteObservation
+		{
+			public CPos PreviousCell;
+			public bool SawGate;
+			public TiberiumFieldRouteZone ApproachZone;
 		}
 
 		sealed class ActiveRedEnclosure
@@ -79,6 +95,27 @@ namespace OpenRA.Mods.Common.Traits
 			public int LoadedAmount;
 		}
 
+		readonly struct GateRouteSearchSummary
+		{
+			public readonly int InsideResources;
+			public readonly int EligibleHarvesters;
+			public readonly int LinkedRefineries;
+			public readonly int HarvestableCandidates;
+			public readonly int OutboundPaths;
+			public readonly int InboundPaths;
+
+			public GateRouteSearchSummary(int insideResources, int eligibleHarvesters,
+				int linkedRefineries, int harvestableCandidates, int outboundPaths, int inboundPaths)
+			{
+				InsideResources = insideResources;
+				EligibleHarvesters = eligibleHarvesters;
+				LinkedRefineries = linkedRefineries;
+				HarvestableCandidates = harvestableCandidates;
+				OutboundPaths = outboundPaths;
+				InboundPaths = inboundPaths;
+			}
+		}
+
 		readonly BaseBuilderBotModule baseBuilder;
 		readonly World world;
 		readonly Player player;
@@ -94,11 +131,16 @@ namespace OpenRA.Mods.Common.Traits
 		readonly HashSet<uint> provenHarvestTrees = new HashSet<uint>();
 		readonly Dictionary<uint, ActiveRedEnclosure> activeRedEnclosures =
 			new Dictionary<uint, ActiveRedEnclosure>();
+		readonly Dictionary<uint, StealthRouteObservation> stealthRouteObservations =
+			new Dictionary<uint, StealthRouteObservation>();
+		readonly IBotUnitReservations[] unitReservations;
+		readonly IRedTiberiumBombMission[] redBombMissions;
 
 		FieldProject project;
 		int nextScanTick;
 		int nextAdmissionLogTick;
 		int nextWallAdmissionLogTick;
+		int nextRouteDiagnosticTick;
 		bool initialTreeScanComplete;
 		bool unbuildableLogged;
 		TiberiumFieldAdmissionResult? lastAdmissionResult;
@@ -115,6 +157,8 @@ namespace OpenRA.Mods.Common.Traits
 			this.playerResources = playerResources;
 			this.playerPower = playerPower;
 			this.resourceLayer = resourceLayer;
+			unitReservations = player.PlayerActor.TraitsImplementing<IBotUnitReservations>().ToArray();
+			redBombMissions = player.PlayerActor.TraitsImplementing<IRedTiberiumBombMission>().ToArray();
 			enabled = baseBuilder.Info.EnableTiberiumFieldPolicy &&
 				!baseBuilder.Info.TiberiumFieldExcludedBotTypes.Contains(player.BotType) &&
 				baseBuilder.Info.TiberiumFieldTreeTypes.Count > 0 &&
@@ -182,7 +226,11 @@ namespace OpenRA.Mods.Common.Traits
 
 		public void Tick()
 		{
-			if (!enabled || world.WorldTick < nextScanTick)
+			if (!enabled)
+				return;
+
+			ObserveGateTraffic();
+			if (world.WorldTick < nextScanTick)
 				return;
 
 			nextScanTick = TiberiumFieldPolicy.NextDeadline(world.WorldTick,
@@ -254,10 +302,14 @@ namespace OpenRA.Mods.Common.Traits
 				playerPower.ExcessPower + power >= baseBuilder.Info.MinimumExcessPower;
 			var hasHarvesterRoute = baseBuilder.CountActors(baseBuilder.SmartEconomyHarvesterTypes) > 0 &&
 				CountUsefulResourceCells(project.TreeLocation) > 0;
+			var isRedTree = baseBuilder.Info.TiberiumFieldRedTreeTypes.Contains(project.TreeType);
+			var redContainmentReady = !isRedTree || (RedEnclosureComplete() && project.OrdinaryRouteProven);
+			if (isRedTree)
+				hasHarvesterRoute = project.OrdinaryRouteProven;
 			var criticalRecovery = baseBuilder.SmartEconomySerializesMissingRefinery ||
 				baseBuilder.SmartEconomyShouldReserveCashForRefinery || baseBuilder.SmartEconomyWantsSilo;
 			var admission = TiberiumFieldPolicy.EvaluateAdmission(enabled,
-				!baseBuilder.Info.TiberiumFieldRedTreeTypes.Contains(project.TreeType),
+				redContainmentReady,
 				baseBuilder.OpeningActive, criticalRecovery,
 				baseBuilder.CountActors(baseBuilder.SmartEconomyRefineryTypes) > 0,
 				playerResources.ResourceCapacity > 0, hasHarvesterRoute, hasPowerMargin,
@@ -783,8 +835,10 @@ namespace OpenRA.Mods.Common.Traits
 			}
 
 			if ((project.Phase == ProjectPhase.Planned ||
-				project.Phase == ProjectPhase.PlanningEnclosure) && !ProjectPartsWithinBuildArea(tree))
+				project.Phase == ProjectPhase.PlanningEnclosure ||
+				project.Phase == ProjectPhase.AwaitingRouteProof) && !ProjectPartsWithinBuildArea(tree))
 			{
+				ResetRouteProof(false);
 				project.QueueActorId = 0;
 				project.ActiveActorType = null;
 				project.RedTargetCell = null;
@@ -798,7 +852,8 @@ namespace OpenRA.Mods.Common.Traits
 			}
 
 			if (assignedResonators.TryGetValue(project.TreeActorId, out var resonatorId) &&
-				(project.RedWallCells == null || RedEnclosureComplete()))
+				(project.RedWallCells == null || (RedEnclosureComplete() &&
+					(project.MaintenanceOnly || project.OrdinaryRouteProven))))
 			{
 				if (project.MaintenanceOnly)
 				{
@@ -850,8 +905,14 @@ namespace OpenRA.Mods.Common.Traits
 
 				if (project.RedSegmentIndex >= project.RedWallSegments.Length &&
 					!project.MaintenanceOnly && RedEnclosureComplete())
-					MarkRedEnclosureActivationEligible();
+					BeginRedRouteProof();
 
+				return;
+			}
+
+			if (project.Phase == ProjectPhase.AwaitingRouteProof)
+			{
+				RefreshRedRouteProof();
 				return;
 			}
 
@@ -882,7 +943,7 @@ namespace OpenRA.Mods.Common.Traits
 						if (project.MaintenanceOnly)
 							return;
 
-						MarkRedEnclosureActivationEligible();
+						BeginRedRouteProof();
 					}
 					else
 						project.Phase = ProjectPhase.PlanningEnclosure;
@@ -930,12 +991,16 @@ namespace OpenRA.Mods.Common.Traits
 				RetryProject("queue reservation expired without matching production");
 		}
 
-		void MarkRedEnclosureActivationEligible()
+		void BeginRedRouteProof()
 		{
-			project.Phase = ProjectPhase.Planned;
+			project.Phase = ProjectPhase.AwaitingRouteProof;
 			project.PlannedTick = world.WorldTick;
+			project.QueueActorId = 0;
+			project.ActiveActorType = null;
+			project.RedTargetCell = null;
+			ResetRouteProof(false);
 			Log("{0} tick={1} red-enclosure-complete tree={2}/{3}@{4} wall-cells={5} " +
-				"gate={6} gate-width={7} activation=eligible",
+				"gate={6} gate-width={7} activation=blocked reason=awaiting-real-harvester-route",
 				player, world.WorldTick, project.TreeActorId, project.TreeType,
 				project.TreeLocation, project.RedWallCells.Length,
 				string.Join(";", project.RedGateCells), project.RedGateCells.Length);
@@ -1152,6 +1217,319 @@ namespace OpenRA.Mods.Common.Traits
 					baseBuilder.Info.TiberiumFieldExtensionStep);
 		}
 
+		void RefreshRedRouteProof()
+		{
+			if (!RedEnclosureComplete())
+			{
+				ResetRouteProof(true);
+				project.RedSegmentIndex = Array.FindIndex(project.RedWallSegments,
+					s => s.Any(c => !HasOwnWall(c)));
+				project.RedSegmentIndex = Math.Max(0, project.RedSegmentIndex);
+				project.RedAnchorIndex = 2;
+				project.Phase = ProjectPhase.PlanningEnclosure;
+				Log("{0} tick={1} route-proof-invalidated tree={2}/{3}@{4} " +
+					"reason=enclosure-breached activation=blocked", player, world.WorldTick,
+					project.TreeActorId, project.TreeType, project.TreeLocation);
+				return;
+			}
+
+			if (!TryFindOrdinaryGateRoute(out var harvester, out var refinery,
+				out var resourceCell, out var outboundLength, out var inboundLength,
+				out var searchSummary))
+			{
+				if (project.RouteHarvesterActorId != 0)
+				{
+					ResetRouteProof(false);
+					Log("{0} tick={1} route-path-lost tree={2}/{3}@{4} " +
+						"reason=no-bidirectional-ordinary-locomotor-path activation=blocked",
+						player, world.WorldTick, project.TreeActorId, project.TreeType,
+						project.TreeLocation);
+				}
+
+				if (world.WorldTick >= nextRouteDiagnosticTick)
+				{
+					nextRouteDiagnosticTick = TiberiumFieldPolicy.NextDeadline(world.WorldTick,
+						baseBuilder.Info.TiberiumFieldProgressLogInterval);
+					Log("{0} tick={1} route-path-rejected tree={2}/{3}@{4} gate={5} " +
+						"inside-resources={6} eligible-ordinary-harvesters={7} linked-refineries={8} " +
+						"harvestable-candidates={9} outbound-paths={10} inbound-paths={11} " +
+						"exact-gate-paths=0 activation=blocked", player, world.WorldTick,
+						project.TreeActorId, project.TreeType, project.TreeLocation,
+						string.Join(";", project.RedGateCells), searchSummary.InsideResources,
+						searchSummary.EligibleHarvesters, searchSummary.LinkedRefineries,
+						searchSummary.HarvestableCandidates, searchSummary.OutboundPaths,
+						searchSummary.InboundPaths);
+				}
+
+				return;
+			}
+
+			if (project.RouteHarvesterActorId != harvester.ActorID ||
+				project.RouteRefineryActorId != refinery.ActorID || project.RouteResourceCell != resourceCell)
+			{
+				project.RouteHarvesterActorId = harvester.ActorID;
+				project.RouteRefineryActorId = refinery.ActorID;
+				project.RouteResourceCell = resourceCell;
+				project.RouteStage = TiberiumFieldRoundTripStage.AwaitingRefinery;
+				project.RouteLastContents = harvester.Trait<Harvester>().Contents.Values.Sum();
+				Log("{0} tick={1} route-path-validated tree={2}/{3}@{4} harvester={5}/{6}@{7} " +
+					"refinery={8}/{9}@{10} resource={11} gate={12} outbound-cells={13} " +
+					"inbound-cells={14} locomotor=actual activation=blocked reason=awaiting-live-round-trip",
+					player, world.WorldTick, project.TreeActorId, project.TreeType, project.TreeLocation,
+					harvester.ActorID, harvester.Info.Name, harvester.Location, refinery.ActorID,
+					refinery.Info.Name, refinery.Location, resourceCell,
+					string.Join(";", project.RedGateCells), outboundLength, inboundLength);
+			}
+
+			var relevantStealthMissions = RefreshRelevantStealthMissions();
+			if (!project.OrdinaryRouteProven || (relevantStealthMissions > 0 && !project.StealthRouteProven))
+				return;
+
+			project.Phase = ProjectPhase.Planned;
+			project.PlannedTick = world.WorldTick;
+			Log("{0} tick={1} red-route-proof-complete tree={2}/{3}@{4} harvester={5} " +
+				"refinery={6} resource={7} gate={8} ordinary-round-trip=true " +
+				"reserved-stealth={9} activation=eligible", player, world.WorldTick,
+				project.TreeActorId, project.TreeType, project.TreeLocation,
+				project.RouteHarvesterActorId, project.RouteRefineryActorId,
+				project.RouteResourceCell, string.Join(";", project.RedGateCells),
+				relevantStealthMissions == 0 ? "not-active" : "crossing-proven");
+		}
+
+		bool TryFindOrdinaryGateRoute(out Actor selectedHarvester, out Actor selectedRefinery,
+			out CPos selectedResource, out int outboundLength, out int inboundLength,
+			out GateRouteSearchSummary summary)
+		{
+			selectedHarvester = null;
+			selectedRefinery = null;
+			selectedResource = default(CPos);
+			outboundLength = 0;
+			inboundLength = 0;
+			summary = default(GateRouteSearchSummary);
+			if (project.RedWallCells == null || resourceLayer == null)
+				return false;
+
+			var tree = world.GetActorById(project.TreeActorId);
+			if (tree == null)
+				return false;
+
+			var resources = world.Map.FindTilesInCircle(tree.Location,
+				Math.Max(1, baseBuilder.Info.TiberiumFieldDemandRadius))
+				.Where(c => TiberiumFieldPolicy.RouteZone(c, project.RedWallCells,
+					project.RedGateCells) == TiberiumFieldRouteZone.Inside &&
+					resourceLayer.GetResource(c).Type != null)
+				.OrderBy(c => (c - tree.Location).LengthSquared).ThenBy(c => c.Y).ThenBy(c => c.X)
+				.Take(16).ToArray();
+			if (resources.Length == 0)
+			{
+				summary = new GateRouteSearchSummary(0, 0, 0, 0, 0, 0);
+				return false;
+			}
+
+			var harvesters = world.ActorsWithTrait<Harvester>()
+				.Where(p => p.Actor.Owner == player && p.Actor.IsInWorld && !p.Actor.IsDead &&
+					baseBuilder.SmartEconomyHarvesterTypes.Contains(p.Actor.Info.Name) &&
+					p.Actor.TraitOrDefault<Mobile>() != null &&
+					!unitReservations.Any(r => r.IsUnitReserved(p.Actor)))
+				.OrderBy(p => p.Actor.ActorID).Take(8).ToArray();
+			var linkedRefineries = 0;
+			var harvestableCandidates = 0;
+			var outboundPaths = 0;
+			var inboundPaths = 0;
+			foreach (var pair in harvesters)
+			{
+				var refinery = pair.Trait.LinkedProc ?? pair.Trait.LastLinkedProc;
+				var accept = refinery?.TraitOrDefault<IAcceptResources>();
+				if (refinery == null || refinery.Owner != player || !refinery.IsInWorld || refinery.IsDead ||
+					accept == null || !baseBuilder.SmartEconomyRefineryTypes.Contains(refinery.Info.Name))
+					continue;
+				linkedRefineries++;
+
+				var delivery = refinery.Location + accept.DeliveryOffset;
+				foreach (var resource in resources.Where(c => pair.Trait.CanHarvestCell(pair.Actor, c)))
+				{
+					harvestableCandidates++;
+					var mobile = pair.Actor.Trait<Mobile>();
+					var outbound = mobile.Pathfinder.FindUnitPath(delivery, resource, pair.Actor,
+						refinery, BlockedByActor.Immovable);
+					if (outbound.Count == 0)
+						continue;
+					outboundPaths++;
+
+					var inbound = mobile.Pathfinder.FindUnitPath(resource, delivery, pair.Actor,
+						refinery, BlockedByActor.Immovable);
+					if (inbound.Count == 0)
+						continue;
+					inboundPaths++;
+					if (!TiberiumFieldPolicy.IsBidirectionalGatePath(outbound, inbound, project.RedGateCells))
+						continue;
+
+					selectedHarvester = pair.Actor;
+					selectedRefinery = refinery;
+					selectedResource = resource;
+					outboundLength = outbound.Count;
+					inboundLength = inbound.Count;
+					summary = new GateRouteSearchSummary(resources.Length, harvesters.Length,
+						linkedRefineries, harvestableCandidates, outboundPaths, inboundPaths);
+					return true;
+				}
+			}
+
+			summary = new GateRouteSearchSummary(resources.Length, harvesters.Length,
+				linkedRefineries, harvestableCandidates, outboundPaths, inboundPaths);
+			return false;
+		}
+
+		void ObserveGateTraffic()
+		{
+			if (project == null || project.Phase != ProjectPhase.AwaitingRouteProof ||
+				project.RedWallCells == null)
+				return;
+
+			ObserveOrdinaryGateTraffic();
+			ObserveStealthGateTraffic();
+		}
+
+		void ObserveOrdinaryGateTraffic()
+		{
+			if (project.RouteHarvesterActorId == 0 || project.OrdinaryRouteProven)
+				return;
+
+			var actor = world.GetActorById(project.RouteHarvesterActorId);
+			var refinery = world.GetActorById(project.RouteRefineryActorId);
+			var harvester = actor?.TraitOrDefault<Harvester>();
+			var accept = refinery?.TraitOrDefault<IAcceptResources>();
+			if (actor == null || actor.Owner != player || !actor.IsInWorld || actor.IsDead ||
+				harvester == null || refinery == null || refinery.Owner != player || !refinery.IsInWorld ||
+				refinery.IsDead || accept == null || unitReservations.Any(r => r.IsUnitReserved(actor)))
+				return;
+
+			var contents = harvester.Contents.Values.Sum();
+			var delivery = refinery.Location + accept.DeliveryOffset;
+			var zone = TiberiumFieldPolicy.RouteZone(actor.Location,
+				project.RedWallCells, project.RedGateCells);
+			var station = actor.TraitOrDefault<IHarvesterFieldStation>();
+			var emptyAtRefinery = actor.Location == delivery && harvester.IsEmpty;
+			var harvested = contents > project.RouteLastContents && zone == TiberiumFieldRouteZone.Inside;
+			var committedInside = station != null && station.HasCommittedField &&
+				TiberiumFieldPolicy.RouteZone(station.CommittedField, project.RedWallCells,
+					project.RedGateCells) == TiberiumFieldRouteZone.Inside;
+			var unloadedAtRefinery = actor.Location == delivery && harvester.IsEmpty && committedInside &&
+				(harvester.LinkedProc == refinery || harvester.LastLinkedProc == refinery);
+			var previous = project.RouteStage;
+			project.RouteStage = TiberiumFieldPolicy.AdvanceRoundTrip(previous, zone,
+				emptyAtRefinery, harvested, unloadedAtRefinery);
+			project.RouteLastContents = contents;
+			if (project.RouteStage == previous)
+				return;
+
+			Log("{0} tick={1} gate-round-trip-progress tree={2}/{3}@{4} harvester={5}/{6}@{7} " +
+				"stage={8}->{9} zone={10} contents={11} refinery={12} gate={13}",
+				player, world.WorldTick, project.TreeActorId, project.TreeType, project.TreeLocation,
+				actor.ActorID, actor.Info.Name, actor.Location, previous, project.RouteStage,
+				zone, contents, refinery.ActorID, string.Join(";", project.RedGateCells));
+			if (project.RouteStage != TiberiumFieldRoundTripStage.Complete)
+				return;
+
+			project.OrdinaryRouteProven = true;
+			Log("{0} tick={1} gate-round-trip-proven tree={2}/{3}@{4} harvester={5}/{6} " +
+				"refinery={7}/{8} resource={9} gate={10} locomotor=actual unload-observed=true",
+				player, world.WorldTick, project.TreeActorId, project.TreeType, project.TreeLocation,
+				actor.ActorID, actor.Info.Name, refinery.ActorID, refinery.Info.Name,
+				station.CommittedField, string.Join(";", project.RedGateCells));
+		}
+
+		int RefreshRelevantStealthMissions()
+		{
+			var relevant = world.ActorsWithTrait<Harvester>()
+				.Where(p => p.Actor.Owner == player && p.Actor.IsInWorld && !p.Actor.IsDead &&
+					TryGetRedBombMissionResource(p.Actor, out var cell) &&
+					TiberiumFieldPolicy.RouteZone(cell, project.RedWallCells,
+						project.RedGateCells) == TiberiumFieldRouteZone.Inside)
+				.Select(p => p.Actor).OrderBy(a => a.ActorID).ToArray();
+			var ids = relevant.Select(a => a.ActorID).ToHashSet();
+			foreach (var stale in stealthRouteObservations.Keys.Where(id => !ids.Contains(id)).ToArray())
+				stealthRouteObservations.Remove(stale);
+			foreach (var actor in relevant)
+				if (!stealthRouteObservations.ContainsKey(actor.ActorID))
+					stealthRouteObservations.Add(actor.ActorID,
+						new StealthRouteObservation { PreviousCell = actor.Location });
+
+			return relevant.Length;
+		}
+
+		void ObserveStealthGateTraffic()
+		{
+			if (project.StealthRouteProven)
+				return;
+
+			foreach (var pair in stealthRouteObservations.OrderBy(p => p.Key).ToArray())
+			{
+				var actor = world.GetActorById(pair.Key);
+				if (actor == null || actor.Owner != player || !actor.IsInWorld || actor.IsDead ||
+					!TryGetRedBombMissionResource(actor, out var resourceCell) ||
+					TiberiumFieldPolicy.RouteZone(resourceCell, project.RedWallCells,
+						project.RedGateCells) != TiberiumFieldRouteZone.Inside)
+					continue;
+
+				var observation = pair.Value;
+				var previousZone = TiberiumFieldPolicy.RouteZone(observation.PreviousCell,
+					project.RedWallCells, project.RedGateCells);
+				var zone = TiberiumFieldPolicy.RouteZone(actor.Location,
+					project.RedWallCells, project.RedGateCells);
+				if (zone == TiberiumFieldRouteZone.Gate && previousZone != TiberiumFieldRouteZone.Gate)
+				{
+					observation.SawGate = true;
+					observation.ApproachZone = previousZone;
+				}
+				else if (observation.SawGate && zone != TiberiumFieldRouteZone.Gate)
+				{
+					if (zone != observation.ApproachZone &&
+						zone != TiberiumFieldRouteZone.Gate &&
+						observation.ApproachZone != TiberiumFieldRouteZone.Gate)
+					{
+						project.StealthRouteProven = true;
+						Log("{0} tick={1} reserved-stealth-gate-crossing tree={2}/{3}@{4} " +
+							"harvester={5}/{6} resource={7} gate={8} direction={9}-to-{10} " +
+							"reservation=RedTiberiumBomb locomotor=actual", player, world.WorldTick,
+							project.TreeActorId, project.TreeType, project.TreeLocation,
+							actor.ActorID, actor.Info.Name, resourceCell,
+							string.Join(";", project.RedGateCells), observation.ApproachZone, zone);
+						return;
+					}
+
+					observation.SawGate = false;
+				}
+
+				observation.PreviousCell = actor.Location;
+			}
+		}
+
+		bool TryGetRedBombMissionResource(Actor actor, out CPos resourceCell)
+		{
+			foreach (var mission in redBombMissions)
+				if (mission.TryGetMissionResourceCell(actor, out resourceCell))
+					return true;
+
+			resourceCell = default(CPos);
+			return false;
+		}
+
+		void ResetRouteProof(bool clearCompleted)
+		{
+			project.RouteHarvesterActorId = 0;
+			project.RouteRefineryActorId = 0;
+			project.RouteResourceCell = default(CPos);
+			project.RouteStage = TiberiumFieldRoundTripStage.AwaitingRefinery;
+			project.RouteLastContents = 0;
+			stealthRouteObservations.Clear();
+			if (clearCompleted)
+			{
+				project.OrdinaryRouteProven = false;
+				project.StealthRouteProven = false;
+			}
+		}
+
 		void ObserveHarvesterAccess(Actor[] trees)
 		{
 			var liveHarvesterIds = new HashSet<uint>();
@@ -1220,7 +1598,8 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			if ((project.Phase != ProjectPhase.Planned &&
 				project.Phase != ProjectPhase.PlanningEnclosure &&
-				project.Phase != ProjectPhase.PlanningExtension) ||
+				project.Phase != ProjectPhase.PlanningExtension &&
+				project.Phase != ProjectPhase.AwaitingRouteProof) ||
 				!TiberiumFieldPolicy.DeadlineReached(world.WorldTick, project.NextWaitingLogTick))
 				return;
 
@@ -1228,6 +1607,10 @@ namespace OpenRA.Mods.Common.Traits
 				CountResourceObstructedSegmentCells() : 0;
 			var reason = world.WorldTick < project.DeferredUntilTick ? "RetryBackoff" :
 				obstructedCells > 0 ? "EnclosureCellsResourceObstructed" :
+				project.Phase == ProjectPhase.AwaitingRouteProof ?
+					(project.RouteHarvesterActorId == 0 ? "NoBidirectionalGatePath" :
+						project.OrdinaryRouteProven ? "ReservedStealthGateCrossingPending" :
+						"LiveOrdinaryRoundTripPending") :
 				project.Phase == ProjectPhase.PlanningExtension ? "ExtensionQueueOrPlacementUnavailable" :
 				project.LastQueueOfferTick < project.PlannedTick ? "NoEligibleIdleQueue" : "QueueOrAdmissionPreempted";
 			project.NextWaitingLogTick = TiberiumFieldPolicy.NextDeadline(world.WorldTick,
@@ -1478,7 +1861,14 @@ namespace OpenRA.Mods.Common.Traits
 				SaveValue("HasExtensionTargetCell", value.ExtensionTargetCell.HasValue),
 				SaveValue("ExtensionTargetCell", value.ExtensionTargetCell ?? CPos.Zero),
 				SaveValue("ExtensionCount", value.ExtensionCount),
-				SaveValue("ExtensionProgressCells", value.ExtensionProgressCells)
+				SaveValue("ExtensionProgressCells", value.ExtensionProgressCells),
+				SaveValue("RouteHarvesterActorId", value.RouteHarvesterActorId),
+				SaveValue("RouteRefineryActorId", value.RouteRefineryActorId),
+				SaveValue("RouteResourceCell", value.RouteResourceCell),
+				SaveValue("RouteStage", (int)value.RouteStage),
+				SaveValue("RouteLastContents", value.RouteLastContents),
+				SaveValue("OrdinaryRouteProven", value.OrdinaryRouteProven),
+				SaveValue("StealthRouteProven", value.StealthRouteProven)
 			};
 			if (value.RedWallCells != null)
 			{
@@ -1538,8 +1928,18 @@ namespace OpenRA.Mods.Common.Traits
 				ActiveActorType = ReadValue(nodes, "ActiveActorType", ""),
 				MaintenanceOnly = ReadValue(nodes, "MaintenanceOnly", false),
 				ExtensionCount = ReadValue(nodes, "ExtensionCount", 0),
-				ExtensionProgressCells = ReadValue(nodes, "ExtensionProgressCells", 0)
+				ExtensionProgressCells = ReadValue(nodes, "ExtensionProgressCells", 0),
+				RouteHarvesterActorId = ReadValue<uint>(nodes, "RouteHarvesterActorId"),
+				RouteRefineryActorId = ReadValue<uint>(nodes, "RouteRefineryActorId"),
+				RouteResourceCell = ReadValue(nodes, "RouteResourceCell", default(CPos)),
+				RouteLastContents = ReadValue(nodes, "RouteLastContents", 0),
+				OrdinaryRouteProven = ReadValue(nodes, "OrdinaryRouteProven", false),
+				StealthRouteProven = ReadValue(nodes, "StealthRouteProven", false)
 			};
+			var routeStage = ReadValue(nodes, "RouteStage", 0);
+			if (!Enum.IsDefined(typeof(TiberiumFieldRoundTripStage), routeStage))
+				throw new InvalidOperationException($"unknown route stage {routeStage}");
+			loaded.RouteStage = (TiberiumFieldRoundTripStage)routeStage;
 			if (ReadValue(nodes, "HasRedTargetCell", false))
 				loaded.RedTargetCell = ReadValue<CPos>(nodes, "RedTargetCell");
 			if (ReadValue(nodes, "HasExtensionTargetCell", false))
@@ -1556,7 +1956,8 @@ namespace OpenRA.Mods.Common.Traits
 				loaded.RedGateCells = ReadCells(nodes, "RedGateCells");
 				loaded.RedWallSegments = ReadSegments(nodes, "RedWallSegments");
 				ValidatePerimeter(loaded.RedWallCells, loaded.RedGateCells, loaded.RedWallSegments);
-				var activationEligible = loaded.Phase == ProjectPhase.Planned && !loaded.MaintenanceOnly;
+				var activationEligible = (loaded.Phase == ProjectPhase.Planned ||
+					loaded.Phase == ProjectPhase.AwaitingRouteProof) && !loaded.MaintenanceOnly;
 				var enclosureComplete = loaded.RedSegmentIndex == loaded.RedWallSegments.Length &&
 					RedEnclosureComplete(loaded);
 				if (!TiberiumFieldPolicy.IsValidSavedSegmentCursor(loaded.RedSegmentIndex,
@@ -1564,7 +1965,17 @@ namespace OpenRA.Mods.Common.Traits
 					throw new InvalidOperationException($"segment cursor {loaded.RedSegmentIndex}/" +
 						$"{loaded.RedWallSegments.Length} is incompatible with phase {loaded.Phase}, " +
 						$"maintenance={loaded.MaintenanceOnly}, enclosure-complete={enclosureComplete}");
+				if (loaded.OrdinaryRouteProven && loaded.RouteStage != TiberiumFieldRoundTripStage.Complete)
+					throw new InvalidOperationException("completed ordinary route proof has an incomplete route stage");
+				if (loaded.Phase == ProjectPhase.AwaitingRouteProof && !enclosureComplete)
+					throw new InvalidOperationException("route proof phase requires a complete live enclosure");
+				if (loaded.Phase == ProjectPhase.Planned && loaded.RedSegmentIndex == loaded.RedWallSegments.Length &&
+					!loaded.MaintenanceOnly && !loaded.OrdinaryRouteProven)
+					loaded.Phase = ProjectPhase.AwaitingRouteProof;
 			}
+			else if (loaded.RouteHarvesterActorId != 0 || loaded.RouteRefineryActorId != 0 ||
+				loaded.OrdinaryRouteProven || loaded.StealthRouteProven)
+				throw new InvalidOperationException("non-red project contains red gate route state");
 
 			ValidateIdentity(loaded.TreeActorId, loaded.TreeType, loaded.TreeLocation,
 				loaded.ResonatorType, loaded.ResonatorLocation);
@@ -1572,6 +1983,7 @@ namespace OpenRA.Mods.Common.Traits
 				ValidateExpectedPerimeter(loaded.TreeLocation, loaded.ResonatorType,
 					loaded.ResonatorLocation, loaded.RedWallCells, loaded.RedGateCells,
 					loaded.RedWallSegments);
+			ValidateRouteActors(loaded);
 			return loaded;
 		}
 
@@ -1633,6 +2045,29 @@ namespace OpenRA.Mods.Common.Traits
 				effectDistanceSquared, modifierInfo.Range.LengthSquared))
 				throw new InvalidOperationException($"saved spatial identity tree {treeActorId}@{treeLocation} " +
 					$"resonator {resonatorType}@{resonatorLocation} is invalid");
+		}
+
+		void ValidateRouteActors(FieldProject loaded)
+		{
+			if (loaded.RouteHarvesterActorId == 0 && loaded.RouteRefineryActorId == 0)
+			{
+				if (loaded.RouteStage != TiberiumFieldRoundTripStage.AwaitingRefinery ||
+					loaded.OrdinaryRouteProven)
+					throw new InvalidOperationException("saved route progress is missing its harvester or refinery");
+
+				return;
+			}
+
+			var harvester = world.GetActorById(loaded.RouteHarvesterActorId);
+			var refinery = world.GetActorById(loaded.RouteRefineryActorId);
+			if (harvester == null || harvester.Owner != player || !harvester.IsInWorld || harvester.IsDead ||
+				harvester.TraitOrDefault<Harvester>() == null ||
+				refinery == null || refinery.Owner != player || !refinery.IsInWorld || refinery.IsDead ||
+				refinery.TraitOrDefault<IAcceptResources>() == null ||
+				!world.Map.Contains(loaded.RouteResourceCell) || loaded.RedWallCells == null ||
+				TiberiumFieldPolicy.RouteZone(loaded.RouteResourceCell, loaded.RedWallCells,
+					loaded.RedGateCells) != TiberiumFieldRouteZone.Inside)
+				throw new InvalidOperationException("saved harvester gate route identity is invalid");
 		}
 
 		void ValidatePerimeter(CPos[] walls, CPos[] gates, CPos[][] segments)
