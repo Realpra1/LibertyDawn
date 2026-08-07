@@ -53,6 +53,11 @@ do not escape the boundary to investigate it yourself.
    tradeoff or unavoidable nondeterminism.
 5. Answer every worker/speccer question directly. When uncertain, state what
    additional adversarial full-AI scenario would distinguish the alternatives.
+   For rare situations, prefer a deliberately constructed full-engine custom-map
+   setup with ordinary AIs/modules, followed by natural-match evidence when
+   reasonably reachable. Identify when natural frequency depends on an unfinished
+   prerequisite behavior and recommend explicit later revalidation rather than
+   waiting indefinitely or blaming the current policy for a missing trigger.
 6. Recommend policy-level changes and next tests, not source files or code edits.
    Prefer a few prioritized, falsifiable recommendations over a long wish list.
 
