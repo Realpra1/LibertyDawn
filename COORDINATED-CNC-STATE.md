@@ -1,7 +1,7 @@
 # Coordinated CNC State
 
 - Round ID: `20260807-bug-polish-02`
-- Phase: `task reader 1 active`
+- Phase: `worker 1 claimed; task reader 2 pending`
 - Common base branch: `agent/cnc-20260806-bug-polish-01-release`
 - Common base SHA: `419bee2531d4802bf922c3597b42c6eeb75ab250`
 - Coordinator model: `gpt-5.6-sol` / `high` (trial mismatch explicitly accepted by user)
@@ -19,7 +19,7 @@
 
 | Worker | Task | Branch | Worktree | State | Process/result | PR | Review | Integrated status |
 |---|---|---|---|---|---|---|---|---|
-| 1 | selection active | | | packet pending | `roles/task-reader-1/process.json` running | | | |
+| 1 | CNC-87 Repair coordinated external-role launching and large-build enforcement | | | claimed at `2026-08-07T04:57:21Z`; packet `COORDINATED-CNC-ROUNDS/20260807-bug-polish-02/TASK-PACKET-1.md` | `roles/task-reader-1/process.json` complete 0 | | | |
 | 2 | unassigned | | | | | | | |
 | 3 | unassigned | | | | | | | |
 | 4 | unassigned | | | | | | | |
