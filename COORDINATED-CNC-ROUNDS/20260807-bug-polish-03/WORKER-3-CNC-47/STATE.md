@@ -12,7 +12,7 @@ when the dependency section directs it.
 - Task: `CNC-47 — Repeatable performance baseline`
 - Change category: `performance measurement/tooling; bounded behavior-preserving engine instrumentation only if the existing seams cannot provide the required evidence`
 - Balance authority: `Frozen. Do not change the adaptive 300-unit global/configured minimum, TotalUnitLimit, costs, HP, damage, armor, speed, production/build timing, prerequisites, probabilities, resources, AI personality policy, or any gameplay tuning. Test-map-only setup may create a repeatable workload but must use ordinary released CNC actor/rule behavior during the measured interval and must be identified as test scaffolding.`
-- Status: `First iteration publication: final review response adopted; CI rerun pending`
+- Status: `First iteration - testing`
 - Common base branch/SHA: `agent/cnc-20260807-bug-polish-02-release` / `468ee64f5a0f9a9e19e260e5c5943e6e878f4705`
 - Task branch: `agent/round-20260807-cnc47-repeatable-performance-baseline`
 - Intended PR base: `agent/cnc-20260807-bug-polish-02-release`
@@ -769,19 +769,19 @@ silently exceed the budget.
 
 ## Handoff receipt
 
-- Proposed status:
-- Final branch/head:
-- PR and checks:
-- Cycles used:
-- Acceptance evidence:
-- Adversarial evidence:
-- Old-behavior control and comparative result:
+- Proposed status: `First iteration - testing`
+- Final branch/head: `agent/round-20260807-cnc47-repeatable-performance-baseline` / product-and-review-response head `e7eb19df239b249e0a99aa485f420d29132d4d4c`; the following state-only receipt commit does not change product code or evidence
+- PR and checks: `https://github.com/Realpra1/LibertyDawn/pull/95` (draft) targets `agent/cnc-20260807-bug-polish-02-release`; required Linux and Windows checks passed on the review-response head in 2m14s and 3m30s, respectively; receipt-tip checks must also be green before worker exit
+- Cycles used: `17/20`; Cycle 17 is the sole final-review response
+- Acceptance evidence: `literal acceptance not achieved or claimed`; clean Cycle-16 Fastest/20 ms bounded run reached tick 1400 in 575.464 s, kept all six ordinary bots above the 300 floor at every tick-500..1400 sample (per-bot minima 447-522), flushed replay plus 11 benchmark streams, and exited without fatal/desync/descendant leak; no complete 2,500-tick Normal/Fastest window or golden ratio/distribution exists
+- Adversarial evidence: `26 materially judged games` cover exact-base/current MAX compatibility, actual Fastest pacing, per-player floor failure, short-game lobby divergence, roster/geometry/scale/aircraft-mix pressure, observer on/off, profile perturbation, timeout/interruption/invalid content, exact cleanup, and a clean post-contention retry; clean three-case post-acceptance/final regression remains inapplicable because normal acceptance never passed
+- Old-behavior control and comparative result: exact base `468ee64f5a0f9a9e19e260e5c5943e6e878f4705`; three base plus three changed Empire Earth4 five-bot MAX games passed to tick 10,000. Throughput was 79.209 vs 91.585 ticks/s and median-of-run `tick_time` 5.696451 vs 5.778586 ms (+1.442%), but later-observed unrelated contention makes this compatibility-only, non-golden overhead evidence
 - Match narratives and routine policy-review conclusions: `policy review not applicable unless contract authority changes`
-- Terra cycle code reviews and dispositions:
+- Terra cycle code reviews and dispositions: `cycles 5/10/15 all adopted and resolved`; effective lobby identity gated, observer made single-pass/allocation-reusing with a disabled control, and weakly evidenced 500 setup reverted to 550. Final Sol-high task-PR review at `analysis/worker-3-cnc47/task-pr-review/TASK-PR-REVIEW.md` requested one provenance correction; Cycle 17 adopted it and no second response cycle occurred
 - Sol-xhigh policy escalation: `not applicable/unused`
-- Final regression:
-- Error/warning and diagnostic-cleanup result:
-- Performance/determinism result:
-- Deferred work:
-- Known failures/risks:
-- Relevant artifact paths:
+- Final regression: `not complete`; the strongest feasible fresh bounded Fastest rerun passed, but the literal three-Normal/three-Fastest tick-3000 batch, separate full-window profile, natural-conclusion MAX, save/load, and replay-playback gates were not feasible on this four-logical-CPU host
+- Error/warning and diagnostic-cleanup result: final `make check` passed 0 warnings/errors plus interface checks; `make test` passed Release build and all CNC MiniYAML/default-sequence/map validation; focused C# launch tests 14/14 and Python suites 13/13 passed; Python compile/JSON/diff checks passed; generated `__pycache__` removed. One unrelated existing CA1825 warning appeared only while compiling the broad test project
+- Performance/determinism result: Cycle-16 `tick_time` median/p95/p99/max 253.214/1,398.204/3,194.818/5,472.596 ms; Cycle-13 profile attributed 121/126 >=100 ms events and 77,267 cumulative ms to `ModularBot`; workload/hash/seed/roster are reproducible and clean replays show no desync, but independent AI matches are not claimed bit-identical and observer overhead lacks a complete numerical distribution
+- Deferred work: CNC-49 should investigate ordinary bot/actor/activity/path contention with unchanged workload gates; before `Complete - testing`, explicitly reject NaN/infinity/negative/non-monotonic measurement clocks and complete ratio/overhead/adversarial/save-load/replay evidence. Preserve the known general `xvfb-run` orphan-grandchild issue unless separately authorized
+- Known failures/risks: host becomes CPU-bound around ticks 1400-1572; no accepted Normal/Fastest ratio, three-run distribution, full-window floor trajectory, or verified <5% observer-overhead distribution; partial results correctly remain null/failed. A Cycle-16 tick-0 launch was excluded after detecting contention
+- Relevant artifact paths: task report `/root/github/LibertyDawn/COORDINATED-CNC-ROUNDS/20260807-bug-polish-03/WORKER-3-CNC-47/REPORT.md`; final bounded result `analysis/worker-3-cnc47/cycle-16-final-bounded/output-02`; final narrative `analysis/worker-3-cnc47/cycle-16-final-bounded/commenter/NARRATIVE.md`; profiles `analysis/worker-3-cnc47/cycle-{13-profile,14-orchestrator-profile}`; reviews `analysis/worker-3-cnc47/cycle-review-{05,10,15}` and `analysis/worker-3-cnc47/task-pr-review/TASK-PR-REVIEW.md`
