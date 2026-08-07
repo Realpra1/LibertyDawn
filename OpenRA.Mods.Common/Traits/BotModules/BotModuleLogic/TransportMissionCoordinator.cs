@@ -18,6 +18,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly int maximumMissions;
 		readonly Dictionary<uint, int> actorReservations = new Dictionary<uint, int>();
 		readonly Dictionary<int, HashSet<uint>> missionActors = new Dictionary<int, HashSet<uint>>();
+		readonly Dictionary<int, HashSet<uint>> parkedMissionActors = new Dictionary<int, HashSet<uint>>();
 		readonly Dictionary<CPos, int> cellClaims = new Dictionary<CPos, int>();
 		readonly Dictionary<int, HashSet<CPos>> missionCells = new Dictionary<int, HashSet<CPos>>();
 		int nextMissionId = 1;
@@ -62,7 +63,7 @@ namespace OpenRA.Mods.Common.Traits
 		public bool TryClaimCells(int missionId, IEnumerable<CPos> cells, out int conflictingMissionId)
 		{
 			conflictingMissionId = 0;
-			if (!missionActors.ContainsKey(missionId) || cells == null)
+			if ((!missionActors.ContainsKey(missionId) && !parkedMissionActors.ContainsKey(missionId)) || cells == null)
 				return false;
 
 			var requested = new HashSet<CPos>(cells);
@@ -100,16 +101,33 @@ namespace OpenRA.Mods.Common.Traits
 			missionCells.Remove(missionId);
 		}
 
+		/// <summary>
+		/// Removes a terminal loaded mission from the active capacity and releases its obsolete landing
+		/// claims while deliberately retaining carrier/passenger ownership until cargo is safely resolved.
+		/// </summary>
+		public bool ParkLoadedMission(int missionId)
+		{
+			if (!missionActors.TryGetValue(missionId, out var actors))
+				return false;
+
+			ReleaseCells(missionId);
+			missionActors.Remove(missionId);
+			parkedMissionActors.Add(missionId, actors);
+			return true;
+		}
+
 		public void Release(int missionId)
 		{
 			ReleaseCells(missionId);
-			if (!missionActors.TryGetValue(missionId, out var actors))
+			if (!missionActors.TryGetValue(missionId, out var actors) &&
+				!parkedMissionActors.TryGetValue(missionId, out actors))
 				return;
 
 			foreach (var id in actors)
 				actorReservations.Remove(id);
 
 			missionActors.Remove(missionId);
+			parkedMissionActors.Remove(missionId);
 		}
 	}
 }

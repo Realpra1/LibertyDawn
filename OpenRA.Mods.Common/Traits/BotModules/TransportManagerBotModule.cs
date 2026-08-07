@@ -158,8 +158,10 @@ namespace OpenRA.Mods.Common.Traits
 			public int PlanFailureTick;
 			public int LastRoutedPlanRevision;
 			public TransportUnloadPlan UnloadPlan;
-			public bool Returning;
+			public readonly TransportRescueRecoveryLifecycle Recovery = new TransportRescueRecoveryLifecycle();
 			public CPos? RecoveryObjective;
+			public bool Returning => Recovery.Phase != TransportRescueRecoveryPhase.Active;
+			public bool Terminal => Recovery.Phase == TransportRescueRecoveryPhase.Terminal;
 
 			public Mission(int id, Actor transport, Actor passenger, CPos destination, int tick, int deadlineTick)
 			{
@@ -315,13 +317,25 @@ namespace OpenRA.Mods.Common.Traits
 					continue;
 				}
 
-				if (world.WorldTick > mission.DeadlineTick)
+				if (mission.Recovery.TryEnterTerminal(world.WorldTick))
+				{
+					EnterTerminalRecovery(mission);
+					continue;
+				}
+
+				if (!mission.Returning && world.WorldTick > mission.DeadlineTick)
 				{
 					if (cargo.IsEmpty())
 						FinishMission(i, "timed out before pickup");
 					else
 						RecoverTimedOutCargo(mission);
 
+					continue;
+				}
+
+				if (mission.Terminal)
+				{
+					AdvanceTerminalRecovery(mission, cargo, i);
 					continue;
 				}
 
@@ -544,6 +558,102 @@ namespace OpenRA.Mods.Common.Traits
 				mission.Id, mission.RecoveryObjective, fallbackRejection);
 		}
 
+		void EnterTerminalRecovery(Mission mission)
+		{
+			bot.QueueOrder(new Order("Stop", mission.Transport, false));
+			mission.UnloadPlan = null;
+			mission.Stage = MissionStage.Travelling;
+			mission.PlanFailureTick = world.WorldTick;
+			mission.LastRoutedPlanRevision = 0;
+			coordinator.ParkLoadedMission(mission.Id);
+			Debug("mission {0} terminal loaded recovery: carrier={1} passenger={2} recoveryObjective={3} " +
+				"deadline={4} outcome=parked-reserved", mission.Id, mission.Transport, mission.Passenger,
+				mission.RecoveryObjective, mission.Recovery.DeadlineTick);
+		}
+
+		void AdvanceTerminalRecovery(Mission mission, Cargo cargo, int index)
+		{
+			if (cargo.IsEmpty())
+			{
+				Debug("mission {0} physical handoff after terminal recovery: passenger={1} cell={2} cargo=0 objective={3}",
+					mission.Id, mission.Passenger, mission.Passenger.Location, mission.Destination);
+				bot.QueueOrder(new Order("Move", mission.Passenger,
+					Target.FromCell(world, mission.Destination), false));
+				FinishMission(index, "terminal safe recovery unload complete");
+				return;
+			}
+
+			if (mission.UnloadPlan == null)
+			{
+				if (world.WorldTick - mission.PlanFailureTick < Info.LandingHoldTicks)
+					return;
+
+				if (TryPlanRecoveryFallback(mission, out var rejection) && IssueUnloadPlanRoute(mission))
+				{
+					mission.Stage = MissionStage.Travelling;
+					mission.LastOrderTick = world.WorldTick;
+					Debug("mission {0} resumed terminal safe recovery: recoveryObjective={1} carrier={2} exit={3}",
+						mission.Id, mission.RecoveryObjective, mission.UnloadPlan.CarrierCell,
+						mission.UnloadPlan.ExitCells[0]);
+					return;
+				}
+
+				coordinator.ReleaseCells(mission.Id);
+				mission.UnloadPlan = null;
+				mission.PlanFailureTick = world.WorldTick;
+				return;
+			}
+
+			var objective = mission.RecoveryObjective ?? mission.Destination;
+			if (!EnsureUnloadPlan(mission, objective, out var reason))
+			{
+				ParkTerminalPlan(mission, reason);
+				return;
+			}
+
+			if (mission.LastRoutedPlanRevision != mission.UnloadPlan.Revision)
+			{
+				if (IssueUnloadPlanRoute(mission))
+					mission.LastOrderTick = world.WorldTick;
+				else
+					ParkTerminalPlan(mission, "replacement threat route failed");
+
+				return;
+			}
+
+			if ((mission.Transport.Location - mission.UnloadPlan.CarrierCell).LengthSquared <=
+				Info.UnloadRangeCells * Info.UnloadRangeCells)
+			{
+				mission.Stage = MissionStage.Unloading;
+				mission.LastOrderTick = world.WorldTick;
+				QueuePlannedUnload(mission);
+				Debug("mission {0} committing terminal exact unload: carrier={1} exit={2} objective={3} " +
+					"revision={4} snapshot={5}", mission.Id, mission.UnloadPlan.CarrierCell,
+					mission.UnloadPlan.ExitCells[0], mission.UnloadPlan.Objective,
+					mission.UnloadPlan.Revision, mission.UnloadPlan.SnapshotTick);
+				return;
+			}
+
+			if (IsCarrierIdle(mission.Transport) && ReadyToRetry(mission))
+			{
+				if (IssueUnloadPlanRoute(mission))
+					mission.LastOrderTick = world.WorldTick;
+				else
+					ParkTerminalPlan(mission, "threat route failed");
+			}
+		}
+
+		void ParkTerminalPlan(Mission mission, string reason)
+		{
+			bot.QueueOrder(new Order("Stop", mission.Transport, false));
+			coordinator.ReleaseCells(mission.Id);
+			mission.UnloadPlan = null;
+			mission.PlanFailureTick = world.WorldTick;
+			mission.LastRoutedPlanRevision = 0;
+			Debug("mission {0} terminal recovery plan invalidated: recoveryObjective={1} reason={2}",
+				mission.Id, mission.RecoveryObjective, reason);
+		}
+
 		bool TryPlanRecoveryFallback(Mission mission, out string rejection)
 		{
 			var objective = mission.RecoveryObjective ?? mission.Destination;
@@ -742,12 +852,13 @@ namespace OpenRA.Mods.Common.Traits
 
 		void RecoverTimedOutCargo(Mission mission, string reason = "mission deadline expired")
 		{
+			if (!mission.Recovery.TryBeginReturn(world.WorldTick, Info.MissionTimeoutTicks))
+				return;
+
 			var baseCenter = squadManager?.GetRandomBaseCenter() ?? mission.Transport.Location;
-			mission.Returning = true;
 			mission.RecoveryObjective = baseCenter;
 			mission.Stage = MissionStage.Travelling;
 			mission.LastOrderTick = world.WorldTick;
-			mission.DeadlineTick = world.WorldTick + Info.MissionTimeoutTicks;
 			mission.UnloadPlan = null;
 			mission.PlanFailureTick = 0;
 			if (EnsureUnloadPlan(mission, baseCenter, out var rejection) && IssueUnloadPlanRoute(mission))

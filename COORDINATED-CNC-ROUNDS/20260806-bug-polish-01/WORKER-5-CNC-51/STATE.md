@@ -10,7 +10,7 @@ when the dependency section directs it.
 
 - Worker: `worker-5-cnc-51`
 - Task: `CNC-51 — Transport-helicopter unload recovery and threat-safe landing`
-- Status: `Complete - testing; integrated RC2 pass/no repair`
+- Status: `Complete - testing; RC3 final repair ready for RC4 integration`
 - Common base branch/SHA: `agent/cnc38-early-viki-infantry-rush` / `09ccdac3c1ecb5134a4751f2bcbd8a7970dfe6bf`
 - Task branch: `agent/round-20260806-cnc51-transport-unload`
 - Intended PR base: `agent/cnc38-early-viki-infantry-rush`
@@ -22,7 +22,7 @@ when the dependency section directs it.
 - Task report: `/root/github/LibertyDawn/COORDINATED-CNC-ROUNDS/20260806-bug-polish-01/WORKER-5-CNC-51/REPORT.md`
 - Match-analysis directory: `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260806-bug-polish-01/analysis/worker-5-cnc-51`
 - Liberty Dawn design reference: `.agents/references/LIBERTY-DAWN-DESIGN.md`
-- Full-engine game tests completed: `57`
+- Full-engine game tests completed: `66`
 - Game-run summary: runs 02-06 invalid fixture; run 07 discovery; run 08 blocker
   correction; run 09 negative control; run 10 accepted pinned-base failure
   reproduction; run 11 cycle-1 changed smoke pass; runs 12-13 invalid stationary-
@@ -53,19 +53,22 @@ when the dependency section directs it.
   harness invalid because mission 3 selected a different real squad objective and
   completed after the tick-2000 assertion, although all three useful physical
   handoffs released safely by tick 3500; integrated RC2 batches 01-02 passed six
-  of six materially distinct concurrent games.
+  of six materially distinct concurrent games; RC3 terminal-recovery fixture
+  iterations exposed coverage, observer, survival, and fixed-cutoff harness
+  defects before the clean persistent-terminal/opening pass; RC3 run 54 passed
+  the unchanged literal three-rescue regression.
 - Sol-xhigh policy escalation: `unused (requires at least 10 game tests; one maximum)`
 - PR: `https://github.com/Realpra1/LibertyDawn/pull/81`
 
 ## Integrated repair assignment
 
-- Phase: `integrated RC2 complete; combined pass/no repair`
-- Current release branch/head: `agent/cnc-20260806-bug-polish-01-release` / `fd15540ffc98c70f085688fe0b38a4a6341fc6ed`
-- Integration notes: `Integrated RC2 assignment appended to this state`
-- Repair branch: `agent/round-20260806-cnc51-rc2-repair`
+- Phase: `RC3 final review response complete; repair ready for RC4 integration`
+- Current release branch/head: `agent/cnc-20260806-bug-polish-01-release` / `2343cf158bd378b913eeb9b3001f747be43abc0a`
+- Integration notes: `RC3 final combined-review response appended to this state`
+- Repair branch: `agent/round-20260806-cnc51-rc3-final-repair`
 - Repair PR base: `agent/cnc-20260806-bug-polish-01-release`
-- Integrated cycles used this RC: `0/3`
-- Integrated cycles used total: `0/12`
+- Integrated cycles used this RC: `1/3`
+- Integrated cycles used total: `1/12`
 
 Before relaunching this worker for combined testing or repair, the integrator must
 replace these fields with the exact release head, note path, branch, and counters.
@@ -1705,3 +1708,193 @@ and `0/12` total.
   aircraft-mix breadth, and per-job resource apportionment. No unsafe landing,
   cargo retention, claim leak, compilation, CI, or combined-task failure was
   observed.
+
+## RC3 final combined-review response assignment
+
+- Exact base candidate: `2343cf158bd378b913eeb9b3001f747be43abc0a`
+  (code candidate `de855c42d39fc947c7d00b32b38c69e448ade6c4`,
+  draft PR #84).
+- Fresh final release review verdict: `ready with one fix`.
+- Review:
+  `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260806-bug-polish-01/reviews/final-rc3/REVIEW.md`.
+- This is the one final combined-review response cycle. Fix the existing CNC51
+  contract defect where a loaded route-failure rescue can renew its safe-recovery
+  deadline forever, retaining the carrier/passenger mission and reservations.
+- Preserve the first safe-return deadline or introduce one separate terminal
+  deadline set only on transition to `Returning`. An already-returning mission must
+  not recursively receive another full deadline.
+- At terminal expiry, transition exactly once to an explicit safe terminal/recovery
+  state: cancel obsolete route/unload intent, release stale landing-cell claims,
+  avoid repeated orders/logs, and deliberately retain or transfer ownership so no
+  other module steals a carrier that still contains hidden cargo. Never claim
+  success or simply release a mission while its passenger remains aboard, and never
+  force an unsafe unload merely to terminate.
+- Add a narrow deterministic lifecycle regression with every useful recovery site
+  unavailable beyond both original and recovery bounds. Assert one terminal
+  transition, no unsafe unload, no renewed-deadline loop, no stale cell claims, no
+  leaked/stealable carrier-passenger ownership, and sensible deterministic behavior
+  if a safe site later opens.
+- Use full-engine headless MAX testing from the first behavioral test. A custom map
+  that holds the persistent-no-safe-site state is appropriate and must be followed
+  by a fresh factual Commenter and Terra-medium Policy Reviewer. Keep normal/full
+  simulation concurrency at two; three is permitted only for short bounded fixtures.
+- Rerun the affected focused transport tests, the existing CNC51 literal scenario,
+  full engine tests, CNC-only validation, and `git diff --check`. Balance is frozen.
+  Do not broaden transport policy, retune values to fake a result, or change unrelated
+  AI behavior. Commit the product repair separately, then update/push state/report
+  with exact evidence and a handoff head ready for RC4 integration.
+
+### RC3 final review-response journal
+
+RC3 cycle 1 changes the loaded route-failure rescue to use a one-way recovery
+lifecycle. Its safe-return deadline is assigned only on the first transition to
+`Returning`. Expiry parks the mission exactly once: obsolete orders and landing
+claims are canceled, the mission stops consuming active rescue capacity, and its
+carrier/passenger ownership remains explicitly reserved while cargo is aboard.
+The parked mission reviews for a newly safe exact recovery plan only on the bounded
+hold cadence and can then physically unload and release normally. A deterministic
+regression covers the non-renewable deadline, single terminal transition, stale-
+claim release, non-stealable parked ownership, active-capacity release, and later
+safe-cell claim/release; its first focused run passed 4/4 coordinator tests.
+
+RC3 full-engine run 53 is predeclared on a connected Empire Earth4 derivative,
+seed `510063`, map SHA
+`6b739c128da2462d8d33f551f704a427cc48e45d126049408bf088bc02b075a8`,
+with ordinary Cabal/SkyNet bots and all normal modules. Failure hypothesis: a
+loaded rescue with its objective, current hold region, and actual base recovery
+region covered by live MSAM/Mammoth weapons can still renew its deadline, retain
+stale claims, accept an unsafe unload, or be stolen after nominal termination.
+Perturbation: six overlapping enabled threats remain beyond the original mission
+and first recovery bounds; the fixture makes the observed carrier/passenger pair damage-immune so
+weapon safety rather than attrition owns the result, then removes every threat at
+tick 5000. Failure is no physical load, unsafe exit, more than one terminal
+transition, bounded-hold renewal, release while cargo remains, carrier/order theft,
+stale-plan continuation, no response to the opening, fatal, or desync. Pass requires
+one `parked-reserved` terminal transition, cargo retained with six live threats
+through tick 4750, no repeated order/log loop, a fresh terminal safe plan after the
+opening, physical cargo-zero handoff, exact release, and clean continuation through
+tick 6000.
+
+The first run-53 fixture iteration was invalid despite advancing cleanly through
+tick 7000: one gap at fallback cell `25,20` lay just outside the declared moving
+threat envelope, and one unprotected fixture MSAM was destroyed by normal combat.
+The unchanged product correctly selected that safe gap and physically recovered at
+tick ~1200, so the run never exercised terminal expiry. The fixture-only correction
+adds a live MSAM adjacent to the actual hold center and makes only fixture threats
+damage-immune until their scripted tick-5000 retirement. No product code changed.
+
+The second run-53 fixture iteration exercised and passed the complete product
+lifecycle: one terminal transition at deadline 3975, cargo retained under six live
+threats through tick 4750, no post-terminal order/log loop, a fresh exact plan after
+the tick-5000 opening, physical exit, and release. It remains invalid as the clean
+artifact because the ordinary post-handoff Medium Tank died before the fixture's
+tick-6500 observer, whose dead-actor location read caused a fatal Lua error at tick
+5500. The final fixture-only correction makes the observed passenger damage-immune
+like the carrier, preserving ordinary ownership/orders while keeping the evidence
+observer alive. It also accepts the bounded pre-terminal 300-tick hold diagnostics;
+the review forbids renewal after terminal expiry, and none occurred there.
+
+The third fixture launch was invalid before terminal expiry: a live threat killed
+the carrier during the same boarding transition in which the prior fixture granted
+its damage-immunity condition. Cargo physically exited on carrier loss and the
+mission released honestly, but this did not exercise the intended state. The final
+fixture correction grants carrier immunity at creation before any threat exists and
+makes status probes dead-actor-safe; product code remains unchanged.
+
+The fourth fixture iteration cleanly held the same loaded terminal state through
+tick 7000, but did not reacquire a recovery plan after the six fixture threats died:
+ordinary SkyNet mobile weapons had reached the recovery/hold region by the late
+opening and kept every bounded site unsafe. This validates persistent terminal
+parking but not the opening response. The fixture now retires ordinary enemy mobile
+weapon actors at the scripted opening as well as the declared six threats; normal
+AI modules remain enabled and exercised before that controlled state transition.
+
+The fifth iteration cleanly passed every terminal lifecycle assertion and reached
+tick 7000 without fatal/desync. It was rejected only by the overlong tick-6500
+fixture assertion: after the exact terminal handoff/release and a clean cargo-zero
+tick-5500 observation, the ordinary manager correctly reused the same carrier for
+a later MSAM rescue, so cargo was legitimately one at tick 6500. The final manifest
+ends at tick 6000 and asserts the already-observed tick-5500 released state; the map
+and product are unchanged.
+
+The sixth fixture launch was invalid before terminal expiry because the conditional
+fixture immunity still allowed a same-tick lethal carrier race under this ordinary
+simulation ordering. The fixture-only final form makes the one observed `tran` and
+`mtnk` actor types unconditionally damage-immune on this packaged map; normal AI
+ownership, loading, routing, reservations, and orders remain unchanged.
+
+The seventh iteration reached tick 6000 cleanly and passed every lifecycle outcome,
+but route pressure delayed the safe commit until shortly after the fixed tick-5500
+status sample. The manifest now relies on the authoritative physical-exit,
+cargo-zero handoff, and exact release events rather than a premature fixed-cutoff
+status; no map or product code changed.
+
+The final run-53 artifact passed at tick 6000 in 17.018 seconds (352.484 valid
+ticks/s). Mission 1 entered terminal recovery exactly once at its preserved tick-
+3975 deadline, remained loaded/reserved under six live threats through tick 4750,
+and emitted no further hold/renewal order or diagnostic. The tick-5000 opening led
+to a new routed plan, exact physical exit at `12,8`, cargo zero, and release. The
+fresh factual narrative is
+`analysis/worker-5-cnc-51/rc3-terminal-comment/NARRATIVE.md`; the fresh policy
+review is approved. Evidence:
+`AUTONOMOUS-CNC-LOGS/cnc51-rc3/run-53-terminal-loaded-recovery-pass-3/`.
+
+RC3 full-engine run 54 is predeclared as the unchanged fresh-process literal
+three-rescue regression, seed `510057`, map SHA
+`34f96775d113714607fbcb97977fd7b586d4af002c6f119d29a0b906a685c8f9`.
+Failure hypothesis: parked terminal ownership or coordinator capacity changes can
+disturb ordinary concurrent claims, live Mammoth replanning, map-edge exits, or
+normal completion/release. Perturbation: three independent ordinary Cabal rescues,
+dense mobile/structure contention, direct MSAM coverage, a moving Mammoth that must
+invalidate mission 2, and edge exit `1,80` under the cumulative RC3 candidate.
+Failure is fewer than 3/3 useful physical cargo-zero handoffs, missing revision 2,
+overlapping/stale claims, timeout/safe recovery, fatal, or desync. Pass requires
+all three useful handoffs and exact releases through tick 5200 with the live-threat
+replacement route and edge plan intact.
+
+Run 54 passed at tick 5200 in 18.019 seconds (288.489 valid ticks/s). All three
+ordinary rescue missions loaded independently, selected non-overlapping plans,
+physically handed off 3/3 with cargo zero, and released exactly. Mission 2 rejected
+the live Mammoth and routed revision 2; the map-edge plan remained intact. No task
+timeout, safe recovery, fatal, or desync occurred. Evidence:
+`AUTONOMOUS-CNC-LOGS/cnc51-rc3/run-54-final-literal/`.
+
+The run-53 factual narrative was verified against its staged debug log and summary.
+The fresh Terra-medium Policy Reviewer returned `approved`: retaining explicit
+ownership while cargo is hidden, refusing unsafe unload, and releasing only after
+the physical cargo-zero handoff are aligned with the design's survival-first
+management. It recommends retaining the implemented rule without a policy change.
+Artifacts:
+`analysis/worker-5-cnc-51/rc3-terminal-comment/NARRATIVE.md` and
+`analysis/worker-5-cnc-51/rc3-terminal-policy/POLICY-REVIEW.md`.
+
+Exact repair-head verification passed: Release build with zero warnings/errors;
+98/98 focused transport, air-threat, route, and capture-targeting overlap tests;
+455/455 full Release tests; `make check`; `make check-scripts`; CNC-only
+`make test`; and `git diff --check`. The product repair is commit
+`4be958ee073f6cce62ddeb965c6664a7e7087354`.
+
+## RC3 final review-response handoff receipt
+
+- Result: `reviewed repair head ready to merge for RC4 integration`.
+- Exact base candidate: `2343cf158bd378b913eeb9b3001f747be43abc0a`;
+  code candidate `de855c42d39fc947c7d00b32b38c69e448ade6c4`.
+- Repair branch/head: `agent/round-20260806-cnc51-rc3-final-repair` /
+  `4be958ee073f6cce62ddeb965c6664a7e7087354` product commit; documentation
+  handoff is recorded by this state-only commit.
+- Product result: the first safe-return deadline is non-renewable. Expiry enters
+  one explicit parked terminal state, cancels stale intent/claims, frees active
+  mission capacity, and preserves carrier/passenger reservations while cargo is
+  hidden. A later safe opening can resume an exact plan and release only after the
+  physical handoff.
+- Behavioral result: clean run 53 proved persistent no-safe-site parking plus
+  later safe recovery; clean run 54 preserved literal 3/3 contention, live-threat
+  replan, map-edge exit, and exact release behavior.
+- Review result: factual narrative verified; policy verdict `approved` with no
+  requested change. The final combined review's sole required CNC-51 fix is
+  implemented and its lifecycle regression passes.
+- Verification: 98/98 focused and 455/455 full Release tests, zero-warning Release
+  build, `make check`, `make check-scripts`, CNC-only `make test`, and diff check
+  pass.
+- Integrated cycle usage: `1/3` this RC, `1/12` total. No balance or unrelated AI
+  policy changed.
