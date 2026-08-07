@@ -50,6 +50,11 @@ COORDINATED-CNC-ROUNDS/<round-id>/
 ```
 
 Keep `.agents/references/LIBERTY-DAWN-DESIGN.md` as the shared strategic reference.
+Keep `.agents/references/LIBERTY-DAWN-POLICY-SCRATCHPAD.md` as persistent,
+cross-round Policy Reviewer memory. It is capped at 3,000 Unicode characters and
+contains only broadly reusable game-policy observations, especially theories
+that match evidence confirmed or disproved. It supplements but never overrides
+the design reference, task scope, or current evidence.
 Store detailed per-match narratives and policy reviews under the ignored round
 analysis area, for example `.worktrees/coordinated-cnc/<round>/analysis/<worker>/`;
 commit concise conclusions and paths in worker state/report rather than flooding
@@ -72,8 +77,8 @@ Use a fresh context whenever practical:
 | Speccer | Sol 5.6 xhigh | One task packet, repository, worker-state output path |
 | Worker | Sol 5.6 high | One worker `STATE.md` only |
 | Commenter | Terra 5.6 medium | Assigned match/control logs and optional design doc |
-| Policy Reviewer | Terra 5.6 medium | Design doc, short task context, match narrative |
-| Spec Policy Reviewer | Sol 5.6 high | Design doc, short task context, proposed-policy narrative |
+| Policy Reviewer | Terra 5.6 medium | Design doc, short task context, match narrative, persistent scratchpad |
+| Spec Policy Reviewer | Sol 5.6 high | Design doc, short task context, proposed-policy narrative, persistent scratchpad |
 | Escalated Policy Reviewer | Sol 5.6 xhigh | Once after at least ten persistent-problem game tests |
 | Cycle Reviewer | Terra 5.6 medium | One worker state, cumulative scoped diff, and evidence through cycle 5/10/15/20 |
 | Reviewer | Sol 5.6 high | One task PR, its worker state, evidence |
@@ -117,6 +122,16 @@ Policy Reviewer directory as `inputs/NARRATIVE.md`; do not use symlinks. Stage a
 short `inputs/TASK-CONTEXT.md` containing task identity, why, change category,
 in/out-of-scope behavior, and explicit balance authority. The
 launcher rejects analysis inputs outside these staged roots.
+For every Policy Reviewer call, hold one shared `policy-scratchpad` slot using a
+cross-round lock directory such as `.worktrees/coordinated-cnc/shared-locks`.
+Copy the canonical scratchpad into the role directory as
+`inputs/POLICY-SCRATCHPAD.md`; the reviewer writes a complete replacement beside
+its review as `POLICY-SCRATCHPAD.md`. After a successful foreground review,
+require a regular UTF-8 file of at most 3,000 characters, then atomically replace
+the canonical scratchpad before releasing the slot. Reject a missing or oversized
+replacement and retain the prior file. Do not background a call in a way that
+releases this lock before scratchpad promotion. Commit scratchpad updates during
+ordinary coordinator-state pushes while no scratchpad writer is active.
 Run the launcher with `--print-command` to validate the same envelope before a
 native no-history spawn; give that agent only the role-instruction and job paths.
 
@@ -168,6 +183,10 @@ an existing task require a new or revised spec before selection.
   Commenter. For AI-policy work, pass its narrative to a fresh Terra-medium Policy
   Reviewer before the worker chooses the next change. These model sessions do not
   consume local game slots and can analyze while another simulation runs.
+- Serialize Policy Reviewer calls with one cross-round
+  `scripts/with_resource_slots.py --resource policy-scratchpad --capacity 1`
+  slot while staging and promoting the persistent scratchpad. Other coding,
+  game, Commenter, and review work may continue concurrently.
 - After each isolated product-change cycle 5, 10, 15, and 20 that occurs, launch
   a fresh Terra-medium `cycle-reviewer` before the next product change or
   publication. Give it only that worker's state, cumulative diff from the common

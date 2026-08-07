@@ -9,6 +9,8 @@
   tightly bounded custom fixtures
 - Large-build slots: `1`
 - Lock directory: `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260807-bug-polish-02/locks`
+- Persistent policy scratchpad: `/root/github/LibertyDawn/.agents/references/LIBERTY-DAWN-POLICY-SCRATCHPAD.md`
+- Cross-round policy lock directory: `/root/github/LibertyDawn/.worktrees/coordinated-cnc/shared-locks`
 - Prior release: [product PR #84](https://github.com/Realpra1/LibertyDawn/pull/84)
   at RC4 task-status head `419bee2531d4`, intentionally unmerged; local gates
   and exact-head Linux/Windows CI passed

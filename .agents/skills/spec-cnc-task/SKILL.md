@@ -101,8 +101,12 @@ contract, not a summary.
     Put a strict JSON job beside the output with exactly the absolute
     `design_reference`, staged `task_context`, staged `narrative`, and `output`
     paths. Launch
-    `policy-speccer` through the coordinator role launcher so a no-history fresh Sol
-    5.6 high Policy Reviewer reads only that narrative and
+    `policy-speccer` through the coordinator role launcher while holding the
+    cross-round one-slot policy-scratchpad lock. Stage the current canonical
+    scratchpad as `inputs/POLICY-SCRATCHPAD.md`; after the foreground call,
+    validate and atomically promote its at-most-3,000-character
+    `POLICY-SCRATCHPAD.md` output. The no-history fresh Sol 5.6 high Policy
+    Reviewer reads only those staged inputs and
     `.agents/references/LIBERTY-DAWN-DESIGN.md`. Record its verdict, review path,
     useful recommendations, rejected recommendations with reasons, and the
     adversarial tests it inspired in the worker state. Skip only when policy is

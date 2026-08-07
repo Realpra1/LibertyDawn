@@ -112,6 +112,18 @@ def validate_analysis_job(args: argparse.Namespace) -> None:
             "Policy Reviewer narrative must be the staged input "
             f"{expected_narrative}"
         )
+    scratchpad = output_dir / "inputs" / "POLICY-SCRATCHPAD.md"
+    if scratchpad.is_symlink() or not scratchpad.is_file():
+        raise SystemExit(
+            "Policy Reviewer scratchpad must be the staged regular file "
+            f"{scratchpad}"
+        )
+    try:
+        scratchpad_text = scratchpad.read_text(encoding="utf-8")
+    except UnicodeError as error:
+        raise SystemExit(f"Policy Reviewer scratchpad must be UTF-8: {error}") from error
+    if len(scratchpad_text) > 3000:
+        raise SystemExit("Policy Reviewer scratchpad exceeds 3000 characters")
 
 
 def parse_args() -> argparse.Namespace:

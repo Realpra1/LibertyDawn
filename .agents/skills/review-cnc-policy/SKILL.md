@@ -23,7 +23,7 @@ them with adversarial full-AI games; this role cannot certify completion.
 
 Aside from these role instructions and a validated JSON job containing only the
 four paths `design_reference`, `task_context`, `narrative`, and `output`, read
-only. Both assigned inputs are staged regular-file copies under `inputs/`:
+only. Assigned inputs are staged regular-file copies under `inputs/`:
 
 1. `.agents/references/LIBERTY-DAWN-DESIGN.md`.
 2. One short `TASK-CONTEXT.md` stating the task, why it exists, change category,
@@ -31,10 +31,27 @@ only. Both assigned inputs are staged regular-file copies under `inputs/`:
 3. One assigned `NARRATIVE.md`. At spec time this is a proposed-policy narrative
    describing current behavior, intended behavior, control policy, predicted
    situations/counters, and questions rather than completed match events.
+4. `POLICY-SCRATCHPAD.md`, the current persistent strategic scratchpad.
 
 Do not read logs, source code, diffs, task sheets, worker/spec state, reports, or
 other reviews. Ask for a better narrative when the supplied evidence is too thin;
 do not escape the boundary to investigate it yourself.
+
+## Persistent policy scratchpad
+
+Write a complete updated copy to `POLICY-SCRATCHPAD.md` beside the requested
+review. Keep it at or below 3,000 Unicode characters. Preserve only general,
+high-value understanding of Liberty Dawn policy: concise rules of thumb,
+important caveats, and theories that game evidence confirmed or disproved. Mark
+certainty honestly and retain the map, faction, or situation limits of evidence.
+Do not store task status, implementation details, source references, raw match
+chronology, or recommendations useful only to the current task.
+
+If a useful addition would exceed the cap, delete or condense the least insightful
+entry first. Do not increase the limit. Copy the scratchpad unchanged when this
+review adds no durable general insight. Treat every entry as advisory accumulated
+playtester memory; the design reference, current task boundary, and current match
+evidence take precedence.
 
 ## Review method
 
@@ -128,4 +145,4 @@ Write the requested `POLICY-REVIEW.md` with:
 At spec time, emphasize predicted counterplay, forbidden strategic outcomes,
 control comparisons, and adversarial acceptance scenarios. After a match, tie each
 judgment to facts in the narrative. Return only verdict, confidence, review path,
-and the highest-priority recommendation.
+scratchpad path/update summary, and the highest-priority recommendation.

@@ -23,6 +23,9 @@ when the dependency section directs it.
 - Large-build capacity: `1`
 - Task report: `{{TASK_REPORT_PATH}}`
 - Match-analysis directory: `{{ABSOLUTE_ANALYSIS_DIRECTORY}}`
+- Persistent policy scratchpad: `{{ABSOLUTE_POLICY_SCRATCHPAD_PATH}}` (3,000
+  characters maximum; one cross-round serialized writer)
+- Policy scratchpad lock directory: `{{ABSOLUTE_SHARED_LOCK_DIRECTORY}}`
 - Liberty Dawn design reference: `.agents/references/LIBERTY-DAWN-DESIGN.md`
 - Full-engine game tests completed: `0`
 - Terra cycle code reviews: `none yet; required after cycles 5/10/15/20 that occur`
@@ -82,6 +85,7 @@ before publication. Do not read its worker spec.
 - Verdict and confidence: `{{SPEC_POLICY_VERDICT}}`
 - Recommendations adopted as testable hypotheses: `{{SPEC_POLICY_ADOPTED}}`
 - Recommendations rejected or deferred, with reason: `{{SPEC_POLICY_REJECTED}}`
+- Persistent scratchpad update: `{{SPEC_POLICY_SCRATCHPAD_UPDATE}}`
 
 ## Acceptance and tests
 
@@ -287,13 +291,17 @@ After every materially judged full-engine match or paired control batch:
    preferences, the full spec, or desired review conclusions. Write a strict JSON
    job there with exactly the absolute `design_reference`, staged `task_context`,
    staged `narrative`, and `output` paths; output must end in `POLICY-REVIEW.md`.
-   Launch a no-history fresh
-   `policy-reviewer` role (Terra 5.6 medium). Questions embedded in the narrative
-   are the worker's questions to this playtester; the job contains no inline
-   context.
+   Launch a no-history fresh `policy-reviewer` role (Terra 5.6 medium) in the
+   foreground while holding the cross-round one-slot `policy-scratchpad` lock.
+   Before launch copy the current canonical scratchpad to
+   `inputs/POLICY-SCRATCHPAD.md`. Questions embedded in the narrative are the
+   worker's questions to this playtester; the job contains no inline context.
 5. Read the `POLICY-REVIEW.md` before choosing the next code change. Treat advice
    as hypotheses: record what inspired the next test/change and what was rejected
    with reasons. Never substitute the review for adversarial game evidence.
+   Require the role's `POLICY-SCRATCHPAD.md` to be a regular UTF-8 file no longer
+   than 3,000 characters, then atomically replace the canonical scratchpad before
+   releasing the lock. If validation fails, retain the previous scratchpad.
 
 Detailed narratives/reviews stay under the ignored analysis directory. Preserve
 their paths plus concise factual and policy conclusions in the cycle journal and
