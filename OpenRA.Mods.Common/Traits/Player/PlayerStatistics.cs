@@ -261,6 +261,30 @@ namespace OpenRA.Mods.Common.Traits
 			return new AdaptiveOutcomeDelta(creditedValue, beforeCount, stats.KillsCount, beforeValue, stats.KillsValue);
 		}
 
+		public static bool TryRecord(World world, string kind, Player player, string specialistType,
+			int economicValue, out AdaptiveOutcomeDelta delta)
+		{
+			var playerStatistics = player.PlayerActor.TraitOrDefault<PlayerStatistics>();
+			if (playerStatistics == null)
+			{
+				delta = default;
+				if (Game.Settings.Debug.BotDebug)
+					Log.Write("debug", "Adaptive specialist outcome warning at tick {0}: " +
+						"kind={1}, player={2}, specialist={3}, reason=missing-player-statistics",
+						world.WorldTick, kind, player.InternalName, specialistType);
+
+				return false;
+			}
+
+			var stats = playerStatistics.AdaptiveStats[specialistType];
+			var creditedValue = Math.Max(0, economicValue);
+			var beforeCount = stats.KillsCount;
+			var beforeValue = stats.KillsValue;
+			stats.RecordCompletedOutcome(creditedValue);
+			delta = new AdaptiveOutcomeDelta(creditedValue, beforeCount, stats.KillsCount, beforeValue, stats.KillsValue);
+			return true;
+		}
+
 		public static void WriteLog(World world, string kind, string specialistType, uint specialistId,
 			Player specialistPlayer, string targetType, uint targetId, string targetOldOwner,
 			string valueSource, string replacementType, bool genericAccounting, AdaptiveOutcomeDelta delta)
@@ -406,12 +430,20 @@ namespace OpenRA.Mods.Common.Traits
 
 				var specialistValue = self.TraitsImplementing<IAdaptiveKillValue>()
 					.Select(t => t.GetAdaptiveKillValue(self, e.Attacker)).FirstOrDefault(value => value.HasValue);
-				var economicValue = specialistValue ?? cost;
-				var delta = CompletedSpecialistOutcome.Record(e.Attacker.Owner, e.Attacker.Info.Name, economicValue);
 				if (specialistValue.HasValue)
+				{
+					var delta = CompletedSpecialistOutcome.Record(e.Attacker.Owner, e.Attacker.Info.Name, specialistValue.Value);
 					CompletedSpecialistOutcome.WriteLog(self.World, "building-demolition", e.Attacker.Info.Name,
 						e.Attacker.ActorID, e.Attacker.Owner, self.Info.Name, self.ActorID, self.Owner.InternalName,
 						"direct-sell-value", null, true, delta);
+				}
+				else
+				{
+					var killStats = attackerStats.AdaptiveStats[e.Attacker.Info.Name];
+					killStats.KillsCount++;
+					killStats.KillsValue += cost;
+					killStats.MinuteKillsValue += cost;
+				}
 			}
 		}
 

@@ -100,10 +100,11 @@ namespace OpenRA.Mods.Common.Traits
 			}
 
 			var economicValue = SpecialistAdaptiveEvidence.EconomicValue(true, pendingDirectValue, toActor.GetSellValue());
-			var delta = CompletedSpecialistOutcome.Record(specialistPlayer, pendingSpecialistType, economicValue);
-			CompletedSpecialistOutcome.WriteLog(toActor.World, "husk-restoration", pendingSpecialistType,
-				pendingSpecialistId, specialistPlayer, pendingTargetType, pendingTargetId, pendingTargetOldOwner,
-				"replacement-sell-value", toActor.Info.Name, false, delta);
+			if (CompletedSpecialistOutcome.TryRecord(toActor.World, "husk-restoration", specialistPlayer,
+				pendingSpecialistType, economicValue, out var delta))
+				CompletedSpecialistOutcome.WriteLog(toActor.World, "husk-restoration", pendingSpecialistType,
+					pendingSpecialistId, specialistPlayer, pendingTargetType, pendingTargetId, pendingTargetOldOwner,
+					"replacement-sell-value", toActor.Info.Name, false, delta);
 		}
 	}
 }
