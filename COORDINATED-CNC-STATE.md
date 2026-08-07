@@ -1,7 +1,7 @@
 # Coordinated CNC State
 
 - Round ID: `20260806-bug-polish-01`
-- Phase: `all RC2 combined handoffs complete; RC3 integration starting`
+- Phase: `RC3 integrated and locally green; final combined release review and CI active`
 - Common base branch: `agent/cnc38-early-viki-infantry-rush`
 - Common base SHA: `09ccdac3c1ecb5134a4751f2bcbd8a7970dfe6bf`
 - Coordinator model: `gpt-5.6-sol` / `high` (trial mismatch explicitly accepted by user)
@@ -11,8 +11,8 @@
   were stopped before OOM; do not use three for normal full-game acceptance.
 - Large-build slots: `1`
 - Lock directory: `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260806-bug-polish-01/locks`
-- Release candidate: `RC2` at `fd15540ffc98c70f085688fe0b38a4a6341fc6ed`
-  (code candidate `b456fd89fac88d71dfadd65c47cfb7b409d44122`)
+- Release candidate: `RC3` at `2343cf158bd378b913eeb9b3001f747be43abc0a`
+  (code candidate `de855c42d39fc947c7d00b32b38c69e448ade6c4`)
 - Release PR: [draft #84](https://github.com/Realpra1/LibertyDawn/pull/84)
 
 ## Workers
@@ -31,6 +31,7 @@
 |---|---|---|---|---|---|---|
 | RC1 preview | `0057dd25868e` | CNC-39A `937ef02048`; CNC-43 `b229612791`; CNC-43A `ade3f9d325` | none | Debug/Release build, 445/445 unit, static/interface, Lua, MiniYAML/maps, diff check passed | pending full five-task candidate | draft [#82](https://github.com/Realpra1/LibertyDawn/pull/82); CNC-39/CNC-51 excluded |
 | RC2 | `fd15540ffc98` (code `b456fd89fac8`) | all five reviewed heads | CNC-39/CNC-39A semantic reconciliation in merge commit | focused 15/15, full 454/454, `make check`, scripts, CNC content/maps, diff and scope audit passed with zero warnings/errors | starting; trial three simultaneous isolated MAX games | draft [#84](https://github.com/Realpra1/LibertyDawn/pull/84); successor because #82 was already merged |
+| RC3 | `2343cf158bd3` (code `de855c42d39f`) | all five combined-testing receipts | CNC39 repair `bc3ab411f8`; strict review response passed | focused 15/15, full 454/454, `make check`, scripts, CNC content/maps, diff/scope audit passed with zero warnings/errors | all five handoffs complete; four no-repair, CNC39 repaired and retested | draft [#84](https://github.com/Realpra1/LibertyDawn/pull/84); final combined review and CI active |
 
 ## Resume note
 
