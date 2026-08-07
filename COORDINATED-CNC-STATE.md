@@ -65,3 +65,9 @@ assigned worktrees retained their cycle-one edits. Three dead game locks were
 verified ownerless and quarantined, then five fresh Sol-high workers were
 launched from the same durable state files under `roles/worker-*-resume-1/`.
 No task was reselected and no worktree content was discarded.
+
+Task routing note (2026-08-07 18:11 UTC): a fresh Task Maker recorded `CNC-95`
+as a separate high-priority coordination-infrastructure recovery task at commit
+`9bf0ec9050`, immediately before pinned final `CNC-26C`. It covers dead-worker
+detection, truthful process status, safe exact-assignment relaunch, preserved
+worktree changes, partial-test handling, and avoiding duplicate cycle counts.
