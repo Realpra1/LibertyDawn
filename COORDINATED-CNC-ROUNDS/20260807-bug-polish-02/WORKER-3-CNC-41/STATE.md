@@ -1090,7 +1090,7 @@ final Resonator coverage; do not infer policy success from a clean engine exit.
 - Repaired safety outcome: exact containment no longer makes a red Resonator activation-eligible; activation requires a live ordinary refinery/gate/enclosed-harvest/gate/unload sequence and, when relevant, a read-only-observed reserved RedTiberiumBomb gate crossing
 - Unmet acceptance: the exact east test entrance has no actual ordinary-locomotor outbound path; no ordinary or reserved-stealth live proof, red activation, or active maintenance result exists
 - Final reviewer disposition: factual Commenter confirms missing route/round-trip evidence; Policy Reviewer rejects feature acceptance while affirming fail-closed activation and frozen scope/balance
-- Publication: product/state commit `727af8d4c8`; draft repair PR `https://github.com/Realpra1/LibertyDawn/pull/93` against the recorded release branch; receipt-metadata successor and required Linux/Windows checks follow
+- Publication: product/state commit `727af8d4c8`; draft repair PR `https://github.com/Realpra1/LibertyDawn/pull/93` against the recorded release branch; validated code/state head `82003baa96`; Actions run `31189220494` passed Linux (.NET 6.0) in 2m39s and Windows (.NET 6.0) in 3m32s, with only the pre-existing unrelated CNC-44 CA1825 annotation; this receipt-only metadata successor follows the validated head
 
 ## Handoff receipt
 
