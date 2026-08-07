@@ -33,8 +33,11 @@ contract, not a summary.
 6. Specify modular ownership: policy/config belongs in the owning rules/config;
    algorithmic invariants belong in code. Identify responsibility boundaries,
    likely cohesion problems, and oversized classes/functions that may need a
-   focused split. Avoid prescribing an implementation when several designs can
-   meet the observable contract.
+   focused split. Prefer the simplest bounded fuzzy heuristic or rule of thumb
+   that can meet the observable contract; do not prescribe exact optimization,
+   graph solvers, rigid partitions, or elaborate state machinery without concrete
+   task evidence that the simpler approach is inadequate. Avoid prescribing an
+   implementation when several designs can meet the observable contract.
 7. Define focused checks, current-control comparison, ordinary real-AI games,
    matched differential evidence where possible, contention tests, at least three
    distinct adversarial scenarios, and a final literal regression.

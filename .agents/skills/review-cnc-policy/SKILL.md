@@ -89,6 +89,11 @@ do not escape the boundary to investigate it yourself.
     of thumb when it captures most of the benefit of a global optimizer; require a
     complex scheduler/reservation system to beat that simpler control in both
     game value and measured MAX-simulation cost.
+11. Prefer simple fuzzy thresholds and rules of thumb that remain sensible under
+    noisy game state. Flag exact optimization, graph-theory solvers, rigid map
+    partitions, or elaborate state machinery as overengineering unless the task
+    and adversarial evidence show that a simpler priority, count, distance,
+    threat-map, or cooldown rule cannot satisfy the requested behavior.
 
 For harvesting questions, useful hypotheses include reusing the threat map and
 fleeing active attackers before adding global route optimization. Economy can

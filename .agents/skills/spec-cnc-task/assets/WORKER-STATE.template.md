@@ -119,6 +119,11 @@ before publication. Do not read its worker spec.
   cohesive classes and functions; split oversized responsibilities when that
   improves cohesion, testability, or hot-path clarity without unrelated churn.
   Preserve unrelated behavior and user changes.
+- Prefer the simplest bounded solution supported by evidence. Use fuzzy
+  thresholds and game-sensible rules of thumb; do not solve graph theory or add
+  exact optimizers, rigid partitions, or elaborate state machinery unless the
+  task and adversarial evidence show that simpler priority, count, distance,
+  threat-map, or cooldown rules are insufficient.
 - Put tunable policy in the owning rules/config/save/map layer and algorithmic
   invariants in code. Do not duplicate policy across AI personalities or hide a
   rules/config concern in test-only code.
