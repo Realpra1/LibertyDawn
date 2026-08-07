@@ -132,3 +132,10 @@ Task routing note: fresh Task Maker commit `9a9f4b1f43` split `CNC-86A` from
 shot-burst behavior; `CNC-86` remains pending with only its lobby-option and
 detonation contract. No active Round 03 task was changed, and no completed
 merged task was eligible for history migration.
+
+Task routing note: fresh Task Maker commit `7be701ec66` clarified pending
+`CNC-86` lobby semantics. `Unstable tiberium` is positive when selected and
+controls spontaneous instability; `tiberium explosions` is positive when
+selected and controls loose tiberium reacting to shots. Killed or deliberately
+detonated tiberium-loaded harvesters always explode regardless of either option.
+Active Round 03 selection was unchanged.
