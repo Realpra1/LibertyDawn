@@ -15,7 +15,7 @@ when the dependency section directs it.
   production/demand, capture values or scores, the 80% solo-building threshold,
   engineer pairing, the 25% retarget margin, scan timing, prerequisites, or any
   other balance/policy value to make recovery evidence pass.`
-- Status: `Implementing`
+- Status: `Complete - testing`
 - Common base branch/SHA: `agent/cnc-20260807-bug-polish-02-release` / `468ee64f5a0f9a9e19e260e5c5943e6e878f4705`
 - Task branch: `agent/round-20260807-cnc50-engineer-stall-recovery`
 - Intended PR base: `agent/cnc-20260807-bug-polish-02-release`
@@ -39,7 +39,8 @@ when the dependency section directs it.
   did not start games and are not counted)
 - Terra cycle code reviews: `cycle 5 advisory adopted: diagnostic ranking must not score unpositionable actors; CYCLE-REVIEW.md at cycle-review-05/`
 - Sol-xhigh policy escalation: `unused (requires at least 10 game tests; one maximum)`
-- PR: `none`
+- PR: `https://github.com/Realpra1/LibertyDawn/pull/97` (draft, base
+  `agent/cnc-20260807-bug-polish-02-release`)
 
 ## Integrated repair assignment
 
@@ -830,13 +831,16 @@ silently exceed the budget.
 
 ## Handoff receipt
 
-- Proposed status: `Pending task PR and required checks; final Sol-high review
-  concern is adopted and all local completion gates pass.`
+- Proposed status: `Complete - testing`
 - Final branch/head: `agent/round-20260807-cnc50-engineer-stall-recovery` /
-  `pending publication commit`
-- PR and checks: `pending publication`; local `CaptureTargetingTest` 18/18,
-  `OpenRA.Test` 516/516, `make check`, `make test` CNC MiniYAML, and
-  `git diff --check` pass.
+  implementation commit `617e47d411`; the subsequent receipt-only state commit is
+  the PR's final head and contains this handoff.
+- PR and checks: `https://github.com/Realpra1/LibertyDawn/pull/97` (draft against
+  `agent/cnc-20260807-bug-polish-02-release`); GitHub Continuous Integration
+  `Linux (.NET 6.0)` and `Windows (.NET 6.0)` passed on implementation commit
+  `617e47d411`. Local `CaptureTargetingTest` 18/18, `OpenRA.Test` 516/516,
+  `make check`, `make test` CNC MiniYAML, and `git diff --check` pass. The final
+  receipt-only head is rechecked before handoff.
 - Cycles used: `9/20 isolated product-change cycles (including the one allowed
   final-review response cycle)`
 - Acceptance evidence: `80 full-engine games recorded. Exact-base/changed
