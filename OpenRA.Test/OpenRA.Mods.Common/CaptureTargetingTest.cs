@@ -111,6 +111,56 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
+		public void SharedReservationsMatchExactPurposeTargetAndClaimantCardinality()
+		{
+			var reservations = new SpecialistTargetReservations();
+			Assert.That(reservations.TryReserve(10, 100, SpecialistAssignmentPurpose.Capture, 2), Is.True);
+			Assert.That(reservations.Matches(10, 100, SpecialistAssignmentPurpose.Capture, 2), Is.False,
+				"An incomplete pair is not a coherent paired assignment.");
+			Assert.That(reservations.TryReserve(11, 100, SpecialistAssignmentPurpose.Capture, 2), Is.True);
+			Assert.That(reservations.Matches(10, 100, SpecialistAssignmentPurpose.Capture, 2), Is.True);
+			Assert.That(reservations.Matches(10, 101, SpecialistAssignmentPurpose.Capture, 2), Is.False);
+			Assert.That(reservations.Matches(10, 100, SpecialistAssignmentPurpose.Demolition, 2), Is.False);
+			Assert.That(reservations.Matches(10, 100, SpecialistAssignmentPurpose.Capture, 1), Is.False);
+
+			Assert.That(reservations.TryGetReservation(10, out var targetId, out var purpose), Is.True);
+			Assert.That(targetId, Is.EqualTo(100));
+			Assert.That(purpose, Is.EqualTo(SpecialistAssignmentPurpose.Capture));
+		}
+
+		[Test]
+		public void MissingActivityUsesTheExistingBoundedGrace()
+		{
+			Assert.That(CaptureTargeting.ActivityGraceExpired(-1, 100, 10), Is.False);
+			Assert.That(CaptureTargeting.ActivityGraceExpired(100, 110, 10), Is.False);
+			Assert.That(CaptureTargeting.ActivityGraceExpired(100, 111, 10), Is.True);
+			Assert.That(CaptureTargeting.ActivityGraceExpired(100, 101, 0), Is.True);
+		}
+
+		[Test]
+		public void RestoredAssignmentUsesPersistedMissingActivityGraceInsteadOfOriginalAssignmentTick()
+		{
+			const int assignedTick = 50;
+			const int missingActivitySinceTick = 195;
+			const int savedWorldTick = 200;
+
+			Assert.That(CaptureTargeting.ShouldRestoreAssignmentActivity(false,
+				assignedTick, savedWorldTick, 10), Is.False,
+				"The original assignment tick is intentionally too old for a new activity grace.");
+			Assert.That(CaptureTargeting.ShouldRestoreAssignmentActivity(false,
+				missingActivitySinceTick, savedWorldTick, 10), Is.True,
+				"A save inside the persisted missing-activity grace must restore the assignment and exact claim.");
+			Assert.That(CaptureTargeting.ShouldRestoreAssignmentActivity(false,
+				missingActivitySinceTick, 205, 10), Is.True);
+			Assert.That(CaptureTargeting.ShouldRestoreAssignmentActivity(false,
+				missingActivitySinceTick, 206, 10), Is.False,
+				"Restoration must not extend the grace beyond its saved boundary.");
+			Assert.That(CaptureTargeting.ShouldRestoreAssignmentActivity(true,
+				assignedTick, savedWorldTick, 10), Is.True,
+				"Expected live activity remains authoritative regardless of assignment age.");
+		}
+
+		[Test]
 		public void SharedReservationsRestoreBothIncumbentPurposesDeterministically()
 		{
 			var captureFirst = new SpecialistTargetReservations();

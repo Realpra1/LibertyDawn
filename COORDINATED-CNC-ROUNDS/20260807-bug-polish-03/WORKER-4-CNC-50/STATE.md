@@ -15,12 +15,12 @@ when the dependency section directs it.
   production/demand, capture values or scores, the 80% solo-building threshold,
   engineer pairing, the 25% retarget margin, scan timing, prerequisites, or any
   other balance/policy value to make recovery evidence pass.`
-- Status: `Specified`
+- Status: `Implementing`
 - Common base branch/SHA: `agent/cnc-20260807-bug-polish-02-release` / `468ee64f5a0f9a9e19e260e5c5943e6e878f4705`
 - Task branch: `agent/round-20260807-cnc50-engineer-stall-recovery`
 - Intended PR base: `agent/cnc-20260807-bug-polish-02-release`
 - Cycle budget: `20` isolated code-change cycles
-- Cycles used: `0`
+- Cycles used: `9`
 - Game/build lock directory: `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260807-bug-polish-03/locks`
 - Game capacity: `2`
 - Large-build capacity: `1`
@@ -30,8 +30,14 @@ when the dependency section directs it.
   characters maximum; one cross-round serialized writer)
 - Policy scratchpad lock directory: `/root/github/LibertyDawn/.worktrees/coordinated-cnc/shared-locks`
 - Liberty Dawn design reference: `.agents/references/LIBERTY-DAWN-DESIGN.md`
-- Full-engine game tests completed: `0`
-- Terra cycle code reviews: `none yet; required after cycles 5/10/15/20 that occur`
+- Full-engine game tests completed: `80` (the prior 72-game evidence set,
+  plus eight cycle-9 launched save/load boundary attempts: one save-artifact race,
+  one missing-map-hash load, two valid but non-boundary/under-specified probes, two
+  stronger valid save runs, and two valid reload/completion runs including the
+  accepted old-assignment/missing-activity-grace boundary at ticks
+  85/190/200/201/214/223/306; two prelaunch content/launcher configuration errors
+  did not start games and are not counted)
+- Terra cycle code reviews: `cycle 5 advisory adopted: diagnostic ranking must not score unpositionable actors; CYCLE-REVIEW.md at cycle-review-05/`
 - Sol-xhigh policy escalation: `unused (requires at least 10 game tests; one maximum)`
 - PR: `none`
 
@@ -812,22 +818,100 @@ silently exceed the budget.
 
 | Cycle | Commit/change | Failure hypothesis and perturbation | Checks/games | Narrative/policy/cycle-code review | Failure/pass evidence | Decision/next harder test |
 |---|---|---|---|---|---|---|
+| 1 | Uncommitted coherent per-bot-tick assignment audit, exact reservation matching, activity grace persistence, and gated transition diagnostics | Base waits for the 125-tick planning cadence after hard target removal; identical target-death fixture at seed 50001 | `CaptureTargetingTest`: 17/17 pass; changed full-engine Cabal fixture: pass through tick 1200 | `cycle-01-commentary/NARRATIVE.md`; `cycle-01-policy/POLICY-REVIEW.md`; no cycle review due | Base invalidation/release/order/completion: 140/173/353/453. Changed: 140/143/269/363; exact same restored `mtnk` ownership and 800 credit, no desync, but release-to-order is 126 ticks and therefore one tick outside the explicit bound. | Preserve prompt exact release and normal ranking. Cycle 2 will feed the just-released manager-owned specialist into an immediate narrowly triggered ordinary planning scan, then test a valid-incumbent negative control and pair cardinality. |
+| 2 | Uncommitted bounded same-evaluation recovery set feeding just-released specialists through the unchanged planner | The scheduled recovery scan runs before queued Stop makes the engineer idle, skips it, and forces a 126-tick wait; identical target death plus distinct live-incumbent seed 50002 | `CaptureTargetingTest`: 17/17 pass; target-death and valid-incumbent full-engine games pass through tick 1200 | `cycle-02-commentary/NARRATIVE.md`; `cycle-02-policy/POLICY-REVIEW.md`; no cycle review due | Target death: invalidation/release/replacement order at 140/143/143, completed 800-value restoration at 232. Valid incumbent: assigned 89, confirmed live 140, completed restoration 328; no missing-activity release, Stop, or desync. | Adopt same-evaluation hard-invalid recovery and reviewer demand for contention negatives. Direct code inspection shows pair-to-solo health transitions are currently classified as hard invalid for both claimants; cycle 3 will preserve the incumbent by triggering normal pair reassessment instead of retiring both. |
+| 3 | Uncommitted immediate normal reassessment for pair-cardinality changes instead of hard-invalid retirement | A pair target becoming exactly solo-eligible releases both valid incumbents; then kill one pair member while exposing a solo husk | `CaptureTargetingTest`: 17/17 pass; pair-shrink seed 50003 and pair-loss seed 50004 pass through tick 1200 | `cycle-03-commentary/NARRATIVE.md`; `cycle-03-policy/POLICY-REVIEW.md`; no cycle review due | Pair shrink: pair assigned 61, health became 80% at 140, only surplus `e6#8` released 142, retained `e6#7` captured building with one 500 credit at 300. Pair loss: member killed 140, dead and surviving claims released independently at 142, survivor ordered to husk at 142 and completed one 800 credit at 226; no desync. | Retain normal pair semantics. Adopt policy recommendation to distinguish successful terminal completion from real specialist loss; cycle 4 will reorder terminal classification without changing behavior and test shrink followed by retained-claim invalidation/recovery. |
+| 4 | Uncommitted terminal audit classification checks successful target ownership before genuine specialist loss | Consumed successful engineers are mislabeled as casualties; then shrink a pair, kill retained claimant, and expose replacement while former surplus lives | `CaptureTargetingTest`: 17/17 pass; retained-loss seed 50005 and terminal-capture seed 50003 pass through tick 1200 | `cycle-04-commentary/NARRATIVE.md`; `cycle-04-policy/POLICY-REVIEW.md`; no cycle review due | Retained claim released as real `specialist-lost` at 162; former surplus received husk order at 267 (107 ticks after exposure) and completed one 800 credit at 304 as `captured`. Building control completed one 500 credit at 297/298 as `captured`; no phantom credit, mismatch, or desync. | Product behavior and diagnostics are now sufficient for broader acceptance; stop product cycles unless new falsifying evidence appears. Next: exact-base/changed all-personality matrix, relationship/transport/topology/persistence/endurance/performance gates. |
+| 5 | Uncommitted gated empty-plan diagnostics for no candidates or the highest globally excluded normal target | Hard-invalid release into an empty candidate set remains silent; destroy A with no replacement until tick 400 | `CaptureTargetingTest`: 17/17 pass; full-engine seed 50006 failed at tick 143 with `NullReferenceException` | `cycle-05-commentary/NARRATIVE.md`; `cycle-05-policy/POLICY-REVIEW.md`; `cycle-review-05/CYCLE-REVIEW.md` advisory adopted | Release occurred, then debug-only global rejection ranking tried to distance-score an in-world unpositionable neutral world actor and crashed in `DistanceSquared`; no tick-400 recovery evidence. | Treat as product failure. Cycle 6 skips unpositionable actors in diagnostic-only ranking per verified reviewer concern and reruns the same scenario from a fresh process. |
+| 6 | Uncommitted diagnostic-only guard excludes dead, removed, or unpositionable actors before global rejection ranking | Cycle-5 crash on an in-world positionless neutral world actor; identical delayed-candidate fixture at seed 50006 | `CaptureTargetingTest`: 17/17 pass; two full-engine Cabal recovery passes through tick 1200, second under the assigned round game lock | `cycle-06-commentary/NARRATIVE.md`, `cycle-06-policy/POLICY-REVIEW.md`, `cycle-06b-commentary/NARRATIVE.md`, and `cycle-06b-policy/POLICY-REVIEW.md`; both policy reviews approve scoped recovery with no balance change; latest 1,000-character scratchpad promoted; no cycle review due | Both passes released at 143, logged only scans 143/268/393, exposed B at 400, and assigned B at 518 (118 ticks); correct-lock repeat captured at 596 without exception/desync. Initial A assignment and B completion varied between passes (100/633 versus 34/596), retained as a determinism/performance question, not a policy regression. | Keep the narrow diagnostic guard. Proceed to stronger acceptance without another product change unless new falsifying evidence appears; independently test determinism/performance and remaining invalidation/ownership cases. |
+| 7 | Uncommitted bounded polling of completed-but-still-orderable specialists until idle, then ordinary replanning | An external ownership transition completes the tracked capture while leaving its surviving engineer busy on stale `CaptureActor`; expose replacement B immediately | `CaptureTargetingTest`: 17/17 pass; Brutalis external-owner run exercised through tick 1200; IronReaper run reached tick 3000 but missed the required transport-mission assertion | `cycle-07-commentary/NARRATIVE.md`; `cycle-07-policy/POLICY-REVIEW.md` approves only exact stale-state recovery and classifies the IronReaper miss as fixture/log evidence; 1,001-character scratchpad promoted; no cycle review due | Brutalis released A at 142, did not order B until 298, and captured B at 399: 156 ticks from release to order, a conclusive bound failure despite improvement over the prior 223-tick result. IronReaper completed pair dissolution, B capture, and demolition without desync, but no two-specialist transport mission was created, so that transport-specific assertion is invalid/unexercised. | Waiting for engine-idle is insufficient. Cycle 8 will stop only a completed, surviving, orderable, non-transport-owned specialist and immediately feed it through the unchanged planner; verify both the external-owner bound and a genuine terminal capture to guard consumption and credit semantics. |
+| 8 | Uncommitted immediate Stop plus ordinary replanning for a completed-but-surviving, orderable, non-transport-owned specialist; removed the cycle-7 idle-wait sets | A stale `CaptureActor` can outlive terminal ownership; cancel only that recoverable completion, while a genuine completed capture must still credit/consume exactly once | `CaptureTargetingTest`: 17/17 pass; Brutalis external-owner and Cabal terminal-capture games both passed through tick 1200 with no desync | `cycle-08-commentary/NARRATIVE.md`; `cycle-08-policy/POLICY-REVIEW.md` passes the change as recovery-only and preserves all frozen policy; 793-character scratchpad promoted; no cycle review due | External A transferred at 140, released at 142, and the same `e6#7` received B at 142 (0 ticks), then completed one 800 credit at 256. Genuine building capture emitted one 500 credit at 258 and one terminal release at 259; the surplus claimant stayed unassigned, with no phantom/duplicate credit or specialist-loss result. | Keep the bounded terminal recovery. No new product change is indicated. Restart post-fix acceptance with three distinct clean adversarial scenarios, then final regression, persistence/replay, debug-off endurance, and matched 30,000-tick performance gates. |
+| 9 | Final-review response: restored assignments validate expected activity against the persisted missing-activity timestamp, with the assigned-tick fallback retained; added focused boundary helper/test | Sol-high found that an old coherent assignment saved during its 10-tick activity gap was rejected on load using `AssignedTick`, making the persisted grace timestamp ineffective | `CaptureTargetingTest`: 18/18; `OpenRA.Test`: 516/516; `make check` and `make test` pass; accepted IronReaper save/reload boundary reaches tick 1200 without desync | `final-sol-review/FINAL-REVIEW.md` concern adopted; `review-grace-commentary/NARRATIVE.md` VALID; `review-grace-policy/POLICY-REVIEW.md` APPROVED; validated 1,056-character scratchpad atomically promoted | Assignment `e6#7 -> mtnk.husk#8` began at 85; expected activity was replaced at 190; saved at 200; load restored the old assignment and exact claimant at 201; it survived until the saved grace expired and released/replanned once at 214; A invalidated 220, B ordered 223 and captured 306 for 800 value, with no stale claim or desync. | Adopt the sole review concern. One review-response cycle is used and no further product change is authorized by the one-response gate. Publish after updating the report/state and rechecking the scoped diff. |
 
 ## Handoff receipt
 
-- Proposed status:
-- Final branch/head:
-- PR and checks:
-- Cycles used:
-- Acceptance evidence:
-- Adversarial evidence:
-- Old-behavior control and comparative result:
-- Match narratives and routine policy-review conclusions:
-- Terra cycle code reviews and dispositions:
-- Sol-xhigh policy escalation (unused, or test count/path/conclusion):
-- Final regression:
-- Error/warning and diagnostic-cleanup result:
-- Performance/determinism result:
-- Deferred work:
-- Known failures/risks:
-- Relevant artifact paths:
+- Proposed status: `Pending task PR and required checks; final Sol-high review
+  concern is adopted and all local completion gates pass.`
+- Final branch/head: `agent/round-20260807-cnc50-engineer-stall-recovery` /
+  `pending publication commit`
+- PR and checks: `pending publication`; local `CaptureTargetingTest` 18/18,
+  `OpenRA.Test` 516/516, `make check`, `make test` CNC MiniYAML, and
+  `git diff --check` pass.
+- Cycles used: `9/20 isolated product-change cycles (including the one allowed
+  final-review response cycle)`
+- Acceptance evidence: `80 full-engine games recorded. Exact-base/changed
+  ten-personality matrix: every changed bot released/ordered three ticks after
+  tick-140 invalidation and completed the 800-value recovery; nine of ten exact-
+  base bots exceeded the 125-tick order bound. Seed-50001 base versus changed
+  invalidation/release/order/completion was 140/173/353/453 versus
+  140/143/143/232.`
+- Adversarial evidence: `Three clean distinct post-cycle-8 scenarios:
+  postfix-adversarial-batch-01 hostile topology (route opens 400, order 518,
+  capture 630); postfix-transport-forced VIKI live APC ownership (mission owns
+  two Engineers, handoff/order 329, capture 477, no theft); postfix-stale-
+  persistence save/reload/fresh (same e6#7 -> mtnk.husk#11, orders 475/473,
+  captures 554/556, no stale revival/desync). Healthy incumbent, pair shrink/loss,
+  relationship churn, terminal completion, demolition contention, and no-eligible
+  negatives also pass.`
+- Old-behavior control and comparative result: `Exact base
+  468ee64f5a0f9a9e19e260e5c5943e6e878f4705 in controls/worker-4-cnc50-base.
+  Matrix replacement-order latency base/changed: Cabal 139/3, Watson 226/3,
+  HAL 9001 129/3, Brutalis 164/3, VIKI 113/3, SkyNet 170/3, IronReaper 160/3,
+  WaveMaker 139/3, Easy 210/3, Easiest 218/3 ticks; 100% changed completion with
+  unchanged ranking/value/cardinality.`
+- Match narratives and routine policy-review conclusions: `Every materially
+  judged batch received a fresh Commenter narrative and serialized fresh Policy
+  Review. Latest post-fix topology, forced transport, stale persistence, final
+  regression, natural endurance, and serial-performance reviews pass as bounded
+  recovery with frozen policy intact; invalid setups were explicitly rejected.`
+- Terra cycle code reviews and dispositions: `cycle-review-05/CYCLE-REVIEW.md
+  advisory adopted in cycle 6: diagnostic rejection ranking skips dead, removed,
+  and unpositionable actors; identical fresh reruns passed. No later threshold.
+  Final Sol-high review found one persisted-grace restoration boundary; it was
+  adopted in the sole review-response cycle. The focused and full-engine boundary
+  regressions pass, and no second review concern was requested or permitted.`
+- Sol-xhigh policy escalation (unused, or test count/path/conclusion): `unused`
+- Final regression: `final-regression-postfix-03, SkyNet vs IronReaper seed
+  50901: e6#170 A assigned 89, owner/target eliminated 140, release and B order
+  143, B capture 246/800 credit; second Engineer building order 268/capture
+  751/500; rmbo demolitions complete 1050 and 1206 with exact claims; checkpoint
+  1200, natural game over, no desync. Replay SHA-256
+  8657d31be4c1eb1dd60a8b29009783ba8df93a3c92091de6e3ac6cf4e5a5535e,
+  metadata final tick 3181 SkyNet won; two graphical playbacks reached the final
+  logged gameplay event at 3174 without desync/fatal and then remained in the UI
+  until timeout. Debug-off VIKI/Brutalis seed 50902 also captured both targets and
+  ended naturally with zero capture-manager diagnostics.`
+- Error/warning and diagnostic-cleanup result: `No task-owned error or warning.
+  Cycle-5 diagnostic crash fixed and rerun. Retained diagnostics are gated by
+  DebugLogging and bounded to transitions/planning scans; debug-off endurance and
+  all six serial performance games emitted none. Full tests printed unrelated
+  pre-existing CA1825 in AircraftHuskSpawnEligibilityTest.cs outside this diff.
+  Final local totals are CaptureTargetingTest 18/18 and OpenRA.Test 516/516.`
+- Performance/determinism result: `performance-serial-comparison.json: serial
+  same-machine/same-slot debug-off 30,000-tick seeds 50301/50302/50303; base
+  median 1303.158 ticks/s, changed 1248.543, ratio 0.958090, regression
+  4.190973%, passing the 5% gate. High per-run wall-rate variance remains an
+  explicit caveat. All six pass with identical 13,203-byte logs, zero manager
+  diagnostics, queued orders 0 at tick 30000, empty locomotor-cache endpoint,
+  and no desync. Save/reload/fresh and replay preserve deterministic ownership.`
+- Deferred work: `Coordinator may recover the missing original manual artifact;
+  CNC-59 retains neutral-building demand/transport-delivery scope. Unrelated
+  AircraftHuskSpawnEligibilityTest CA1825 is not part of CNC-50.`
+- Known failures/risks: `Original manual artifact absent; serial wall rates are
+  noisy despite passing median; graphical replay completion leaves the post-game
+  UI open and required timeout rather than automated closure. Fourteen invalid
+  harness/fixture/infrastructure games are preserved and excluded from pass
+  claims. Cycle-9 added one save-artifact race, one missing-map-hash load, and two
+  non-boundary probes before the accepted boundary pair; all are preserved and
+  excluded from pass claims. No known lifecycle, ownership, completion, desync,
+  save/grace-continuity, or frozen-policy failure remains.`
+- Relevant artifact paths: `Report at
+  /root/github/LibertyDawn/COORDINATED-CNC-ROUNDS/20260807-bug-polish-03/WORKER-4-CNC-50/REPORT.md;
+  analysis root /root/github/LibertyDawn/.worktrees/coordinated-cnc/20260807-bug-polish-03/analysis/worker-4-cnc50;
+  personality-matrix/, postfix-adversarial-batch-01/,
+  postfix-transport-forced/, postfix-stale-persistence-*,
+  final-regression-postfix-03/, final-regression-graphical-replay/,
+  natural-endurance-postfix/, performance-serial-comparison.json, and
+  cycle-review-05/; final review at final-sol-review/FINAL-REVIEW.md; accepted
+  review response at review-grace-save-06/, review-grace-reload-05/,
+  review-grace-commentary/, and review-grace-policy/.`
