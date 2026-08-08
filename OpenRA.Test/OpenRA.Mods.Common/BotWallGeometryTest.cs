@@ -119,6 +119,111 @@ namespace OpenRA.Test
 		}
 
 		[Test]
+		public void ClusterScreenIsEnemyFacingNonCollinearAndOpenInward()
+		{
+			var center = new CPos(50, 50);
+			var lines = BotWallGeometry.OpenScreenLines(center, new CVec(1, 0), 3, 4, 3);
+			var cells = lines.SelectMany(line => line).Distinct().ToArray();
+
+			Assert.That(lines.Count, Is.EqualTo(3));
+			Assert.That(lines[0].All(c => c.X == 53), Is.True, "front faces east");
+			Assert.That(cells.Select(c => c.X).Distinct().Count(), Is.GreaterThan(1), "flanks make the screen non-collinear");
+			Assert.That(cells.Any(c => c.X < 50), Is.False, "the inward/west side remains open");
+			Assert.That(cells, Does.Not.Contain(center));
+		}
+
+		[Test]
+		public void ClusterScreenFallbacksShrinkDeterministicallyWithoutLosingTheirFlanks()
+		{
+			var center = new CPos(50, 50);
+			var variants = BotWallGeometry.OpenScreenVariants(center, new CVec(1, 0), 3, 4, 3);
+
+			Assert.That(variants.Count, Is.EqualTo(5));
+			Assert.That(variants.Select(v => v.SelectMany(line => line).Distinct().Count()),
+				Is.EqualTo(new[] { 15, 11, 7, 7, 7 }));
+			foreach (var lines in variants)
+			{
+				var cells = lines.SelectMany(line => line).Distinct().ToArray();
+				Assert.That(lines.Count, Is.EqualTo(3));
+				Assert.That(lines.All(line => line.Count >= 2), Is.True);
+				Assert.That(cells.Select(c => c.X).Distinct().Count(), Is.GreaterThan(1));
+				Assert.That(cells.Any(c => c.X < center.X), Is.False, "the inward side remains open");
+			}
+
+			Assert.That(variants[3][0], Is.EqualTo(variants[2][0].Select(c => c + new CVec(0, -1))),
+				"the first lateral fallback shifts the smallest screen one cell across");
+			Assert.That(variants[4][0], Is.EqualTo(variants[2][0].Select(c => c + new CVec(0, 1))),
+				"the second lateral fallback shifts the smallest screen the other way");
+		}
+
+		[Test]
+		public void ClusterScreenPlacementSequenceCannotLineBuildAcrossTheInwardSide()
+		{
+			var lines = BotWallGeometry.OpenScreenLines(new CPos(50, 50), new CVec(1, 0), 3, 4, 3);
+			var placements = BotWallGeometry.OpenScreenPlacements(lines);
+			var intended = new HashSet<CPos>(lines.SelectMany(line => line));
+
+			Assert.That(placements.Select(p => p.Cell), Is.EqualTo(new[]
+			{
+				lines[1][lines[1].Count - 1],
+				lines[2][lines[2].Count - 1],
+				lines[0][0],
+				lines[0][lines[0].Count - 1]
+			}));
+			Assert.That(placements.Select(p => p.UseLineBuild), Is.EqualTo(new[] { false, false, true, true }));
+
+			var built = new HashSet<CPos>();
+			foreach (var placement in placements)
+			{
+				if (placement.UseLineBuild)
+					AddLineBuildSegments(built, placement.Cell, 15);
+				built.Add(placement.Cell);
+			}
+
+			Assert.That(built, Is.EquivalentTo(intended));
+			var leftRear = lines[1][lines[1].Count - 1];
+			var rightRear = lines[2][lines[2].Count - 1];
+			Assert.That(built.Any(c => c.X == leftRear.X && c.Y > leftRear.Y && c.Y < rightRear.Y),
+				Is.False, "the two inward flank ends are never connected");
+		}
+
+		[Test]
+		public void RepairReservationIncludesOnlyThePersistedReachableApproachCell()
+		{
+			var footprint = new[]
+			{
+				new CPos(35, 30),
+				new CPos(34, 31), new CPos(35, 31), new CPos(36, 31),
+				new CPos(35, 32)
+			};
+			var reserved = BotWallGeometry.WithApproachCell(footprint, new CPos(33, 31));
+
+			Assert.That(reserved, Is.EquivalentTo(new[]
+			{
+				new CPos(35, 30),
+				new CPos(33, 31), new CPos(34, 31), new CPos(35, 31), new CPos(36, 31),
+				new CPos(35, 32)
+			}));
+		}
+
+		static void AddLineBuildSegments(HashSet<CPos> built, CPos cell, int range)
+		{
+			foreach (var direction in new[] { new CVec(1, 0), new CVec(0, 1), new CVec(-1, 0), new CVec(0, -1) })
+			{
+				for (var distance = 1; distance < range; distance++)
+				{
+					var candidate = cell + direction * distance;
+					if (!built.Contains(candidate))
+						continue;
+
+					for (var segment = 1; segment < distance; segment++)
+						built.Add(cell + direction * segment);
+					break;
+				}
+			}
+		}
+
+		[Test]
 		public void EnclosureSurroundsTheWholeBuildingFootprint()
 		{
 			var topLeft = new CPos(50, 50);
@@ -193,6 +298,22 @@ namespace OpenRA.Test
 
 			Assert.That(CanEscape(new CPos(60, 60), blocked), Is.False);
 			Assert.That(BotWallGeometry.CanEscape(new CPos(60, 60), c => OutsideMap(c) || blocked.Contains(c), MaxCells, 0), Is.True);
+		}
+
+		[Test]
+		public void CausalRemovalRestoresABoundedRoute()
+		{
+			var start = new CPos(60, 60);
+			var target = new CPos(70, 60);
+			var blocked = new HashSet<CPos>();
+			for (var y = 0; y < 120; y++)
+				blocked.Add(new CPos(65, y));
+
+			Assert.That(BotWallGeometry.CanReachAny(start, new[] { target },
+				c => OutsideMap(c) || blocked.Contains(c), MaxCells), Is.False);
+			blocked.Remove(new CPos(65, 60));
+			Assert.That(BotWallGeometry.CanReachAny(start, new[] { target },
+				c => OutsideMap(c) || blocked.Contains(c), MaxCells), Is.True);
 		}
 	}
 }

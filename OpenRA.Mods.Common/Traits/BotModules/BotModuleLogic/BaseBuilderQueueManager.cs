@@ -130,6 +130,20 @@ namespace OpenRA.Mods.Common.Traits
 		bool TickQueue(IBot bot, ProductionQueue queue)
 		{
 			var currentBuilding = queue.AllQueued().FirstOrDefault();
+			if (currentBuilding != null)
+			{
+				var priorityRecoveryActive = baseBuilder.OpeningActive ||
+					baseBuilder.SmartEconomySerializesMissingRefinery ||
+					(playerPower != null && (playerPower.PowerState != PowerState.Normal ||
+						playerPower.ExcessPower < minimumExcessPower));
+				var recovery = baseBuilder.DefenseClusterManager?.TryChooseQueuedRepairRecovery(
+					queue, queue.BuildableItems(), priorityRecoveryActive);
+				if (recovery != null)
+				{
+					bot.QueueOrder(Order.StartProduction(queue.Actor, recovery.Name, 1));
+					baseBuilder.LogProductionSpend(recovery, queue);
+				}
+			}
 
 			// Waiting to build something
 			if (currentBuilding == null && failCount < baseBuilder.Info.MaximumFailedPlacementAttempts)
@@ -151,6 +165,7 @@ namespace OpenRA.Mods.Common.Traits
 				CPos? location = null;
 				string orderString = "PlaceBuilding";
 				var fieldPlacement = false;
+				var clusterPlacement = false;
 
 				// Check if Building is a plug for other Building
 				var actorInfo = world.Map.Rules.Actors[currentBuilding.Item];
@@ -174,12 +189,19 @@ namespace OpenRA.Mods.Common.Traits
 					if (fieldLineBuild)
 						orderString = "LineBuild";
 				}
+				else if (baseBuilder.DefenseClusterManager?.OwnsPlacement(queue, actorInfo.Name) == true)
+				{
+					clusterPlacement = true;
+					location = baseBuilder.DefenseClusterManager.ChooseLocation(queue, actorInfo,
+						actorInfo.TraitInfo<BuildingInfo>());
+				}
 				else if (baseBuilder.WallPlanner != null && baseBuilder.WallPlanner.IsWallType(actorInfo.Name))
 				{
-					// Walls are laid out in lines by the wall planner rather than dropped on some
-					// free cell in the base like an ordinary building.
-					orderString = "LineBuild";
-					location = baseBuilder.WallPlanner.TakeWallCell(actorInfo.Name);
+					// Cluster screens use individual rear anchors followed by LineBuild front anchors;
+					// construction-yard enclosure anchors remain ordinary LineBuild orders.
+					location = baseBuilder.WallPlanner.TakeWallCell(actorInfo.Name, out var wallLineBuild);
+					if (wallLineBuild)
+						orderString = "LineBuild";
 				}
 				else
 				{
@@ -208,6 +230,8 @@ namespace OpenRA.Mods.Common.Traits
 				{
 					if (fieldPlacement)
 						baseBuilder.TiberiumFieldManager.PlacementFailed("reserved site became illegal before placement");
+					if (clusterPlacement)
+						baseBuilder.DefenseClusterManager.PlacementFailed("no safe legal local site");
 
 					AIUtils.BotDebug($"{player} has nowhere to place {DisplayName(currentBuilding.Item)}");
 					bot.QueueOrder(Order.CancelProduction(queue.Actor, currentBuilding.Item, 1));
@@ -235,6 +259,8 @@ namespace OpenRA.Mods.Common.Traits
 					});
 					if (fieldPlacement)
 						baseBuilder.TiberiumFieldManager.PlacementOrdered();
+					if (clusterPlacement)
+						baseBuilder.DefenseClusterManager.PlacementOrdered();
 
 					return true;
 				}
@@ -422,6 +448,19 @@ namespace OpenRA.Mods.Common.Traits
 				}
 			}
 
+			// Once a two-tower operational core covers every required role, do not let repeatable
+			// discretionary economy, air-repair, or field projects displace the causal local repair.
+			// The cluster still needs its configured actor minimum before it can complete.
+			// Opening and missing-refinery recovery above still retain priority.
+			var clusterRepair = baseBuilder.DefenseClusterManager?
+				.TryChoosePriorityRepairFacility(queue, buildableThings);
+			if (clusterRepair != null)
+			{
+				AIUtils.BotDebug("{0} decided to build {1}: active cluster local repair",
+					queue.Actor.Owner, DisplayName(clusterRepair.Name));
+				return clusterRepair;
+			}
+
 			// Persistent loaded-harvester congestion is stronger evidence than a fixed
 			// harvester/refinery ratio. Add unloading capacity before discretionary scaling.
 			if (baseBuilder.SmartEconomyWantsRefinery)
@@ -469,6 +508,17 @@ namespace OpenRA.Mods.Common.Traits
 				AIUtils.BotDebug("{0} decided to build {1}: reserved Tiberium field project",
 					queue.Actor.Owner, DisplayName(fieldBuilding.Name));
 				return fieldBuilding;
+			}
+
+			// The pressured strongpoint is discretionary relative to every established recovery,
+			// opening, economy-SAM, repair-capacity, and field owner above. It serializes one
+			// tower or local repair request across all Facts/queues.
+			var clusterBuilding = baseBuilder.DefenseClusterManager?.TryChooseBuilding(queue, buildableThings);
+			if (clusterBuilding != null)
+			{
+				AIUtils.BotDebug("{0} decided to build {1}: active attacked-tower cluster",
+					queue.Actor.Owner, DisplayName(clusterBuilding.Name));
+				return clusterBuilding;
 			}
 
 			// Preserve the original random production-building selector when cash is floating.
@@ -687,7 +737,10 @@ namespace OpenRA.Mods.Common.Traits
 						.ClosestTo(world.Map.CenterOfCell(baseBuilder.DefenseCenter));
 
 					var targetCell = closestEnemy != null ? closestEnemy.Location : baseCenter;
-					lastUsedDefenseLocation = findPos(lastUsedDefenseLocation ?? baseBuilder.DefenseCenter,
+					var placementCenter = baseBuilder.DefenseClusterManager != null &&
+						baseBuilder.DefenseClusterManager.TryTakeOrdinaryDefenseCenter(out var attackedBuildingCenter) ?
+						attackedBuildingCenter : lastUsedDefenseLocation ?? baseBuilder.DefenseCenter;
+					lastUsedDefenseLocation = findPos(placementCenter,
 						targetCell, baseBuilder.Info.MinimumDefenseRadius, baseBuilder.Info.MaximumDefenseRadius);
 					return lastUsedDefenseLocation;
 
