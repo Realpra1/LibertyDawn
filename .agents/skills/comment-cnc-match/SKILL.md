@@ -1,13 +1,13 @@
 ---
 name: comment-cnc-match
-description: Convert Liberty Dawn full-engine game logs, manifests, summaries, and replay-derived metrics into a precise chronological match narrative, emphasizing changed-versus-control AI differences, causal win/loss explanations, and what a losing AI still did well. Use after a CNC match or matched control batch before policy review or the worker's next implementation decision.
+description: Convert one Liberty Dawn full-engine game's logs, manifest, summary, and replay-derived metrics into a precise chronological narrative, including control differences, win/loss causes, early build and troop actions, late purchases, and individual-unit stories. Use after each CNC test game before policy review.
 ---
 
 # Comment on a CNC Match
 
-Use a fresh Terra 5.6 medium session after every materially judged match or paired
-control batch. Remain factual; the Policy Reviewer judges whether behavior makes
-strategic sense.
+Use a fresh Luna 5.6 medium session after every judged game. One game receives one
+narrative; never combine games into a batch narrative. Remain factual; the Policy
+Reviewer judges whether behavior makes strategic sense.
 
 ## Inputs and isolation
 
@@ -36,6 +36,8 @@ review output. Never infer an event merely because code was intended to produce 
    plausible story.
 3. Reconstruct phases: opening, first contact, economic/technology development,
    major attacks and recoveries, turning point, and finish/stop condition.
+   Explicitly reconstruct the early build order and early troop actions, including
+   idle, scouting, rushing, defending, gathering, and first-contact orders.
 4. Describe exactly what the changed AI and old-behavior control did differently:
    build/tech timing, spending, income/storage, unit mix, target selection,
    movement, engagements avoided/taken, losses, idle/stalled resources, recovery,
@@ -46,7 +48,10 @@ review output. Never infer an event merely because code was intended to produce 
 6. Always identify what each AI did well, especially a losing AI. Distinguish a
    sensible decision overwhelmed by circumstances from a true blunder, without
    turning this factual narrative into the policy verdict.
-7. When stable actor IDs and sufficient events exist, follow two or three
+7. If an AI went broke or lost, identify the last three structures or units it
+   completed beforehand, in order, with timing/cost when available and whether
+   each purchase plausibly helped, delayed recovery, or exposed a queue stall.
+8. When stable actor IDs and sufficient events exist, follow two or three
    representative individual units in detail rather than relying only on global
    totals. Prefer a changed-feature unit that succeeded, one that failed or was
    lost, and optionally an effective losing-AI unit. Reconstruct creation, mission
@@ -64,11 +69,14 @@ review output. Never infer an event merely because code was intended to produce 
 Write the requested `NARRATIVE.md` with:
 
 ```markdown
-# Match narrative: <test/batch>
+# Match narrative: <test/game>
 
 ## Evidence integrity and setup
 ## Outcome in one paragraph
 ## Chronological narrative
+## Early build order
+## Early troop actions
+## Last three productions before insolvency or defeat
 ## Individual unit stories
 ## Changed AI versus old-behavior control
 ## Why the changed AI won or lost
@@ -81,6 +89,5 @@ Write the requested `NARRATIVE.md` with:
 ## Source artifacts
 ```
 
-Use concrete quantities and ticks where available. A two-game paired batch gets
-one comparative narrative unless isolation is clearer with linked per-game
-subsections. Return only the narrative path and any evidence-integrity blocker.
+Use concrete quantities and ticks where available. Return only the narrative path
+and any evidence-integrity blocker.

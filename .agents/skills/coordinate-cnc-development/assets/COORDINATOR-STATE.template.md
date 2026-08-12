@@ -4,7 +4,7 @@
 - Phase: `planning`
 - Common base branch: `{{BASE_BRANCH}}`
 - Common base SHA: `{{BASE_SHA}}`
-- Coordinator model: `gpt-5.6-terra` / `medium`
+- Coordinator model: `gpt-5.6-luna` / `medium`
 - Game slots: `2`
 - Large-build slots: `1`
 - Lock directory: `{{ABSOLUTE_LOCK_DIRECTORY}}`

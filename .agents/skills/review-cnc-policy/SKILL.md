@@ -1,6 +1,6 @@
 ---
 name: review-cnc-policy
-description: Judge whether a Liberty Dawn AI policy or observed match behavior makes strategic sense using only the shared Liberty Dawn design reference, a short task/scope description, and a factual match or proposed-policy narrative. Use for Terra-medium post-match playtester feedback, Sol-high consultation during CNC task specification, or one Sol-xhigh escalation after a worker has at least ten persistent-problem game tests.
+description: Ask two pre-creation task questions or judge whether a Liberty Dawn AI policy or observed match behavior makes strategic sense from isolated design, task, narrative, and scratchpad inputs. Use for Terra task intake, Luna post-match feedback, Sol-high specification consultation, or one Sol-xhigh persistent-problem escalation.
 ---
 
 # Review CNC Policy
@@ -9,8 +9,13 @@ Act like a thoughtful human Liberty Dawn playtester. Judge policy, not code.
 
 ## Model tier and authority
 
-- Use Terra 5.6 medium for normal post-match review and worker questions.
-- Use Sol 5.6 high when a Speccer consults this role before finalizing a spec.
+- Use Terra 5.6 medium only for new-task intake. Ask exactly two concise,
+  high-value questions before task creation, covering the largest missing or
+  ambiguous parts of expected behavior, wrong outcomes, predicted change, why,
+  scope, or bug facts. Do not create or draft the task.
+- Use Luna 5.6 medium for every normal post-match review and worker question.
+- Use Sol 5.6 high when a Speccer consults this role between its partial and final
+  spec. Answer focused questions and challenge policy assumptions.
 - Allow one Sol 5.6 xhigh escalation per worker task only after at least ten
   full-engine game tests and a persistent unresolved policy problem. Require the
   narrative to state the test count, repeated failure, attempted approaches, and
@@ -26,11 +31,12 @@ four paths `design_reference`, `task_context`, `narrative`, and `output`, read
 only. Assigned inputs are staged regular-file copies under `inputs/`:
 
 1. `.agents/references/LIBERTY-DAWN-DESIGN.md`.
-2. One short `TASK-CONTEXT.md` stating the task, why it exists, change category,
-   explicit in-scope/out-of-scope behavior, and balance authority.
-3. One assigned `NARRATIVE.md`. At spec time this is a proposed-policy narrative
-   describing current behavior, intended behavior, control policy, predicted
-   situations/counters, and questions rather than completed match events.
+2. One short `TASK-CONTEXT.md` stating the literal task requirements, why it
+   exists, change category, explicit scope, and balance authority.
+3. One assigned `NARRATIVE.md`. At task intake this is the user's proposed task.
+   At spec time it is the partial spec: current/control behavior, proposed rule,
+   predicted situations/counters, likely failures, provisional tests, and focused
+   questions. After a game it is the factual match narrative.
 4. `POLICY-SCRATCHPAD.md`, the current persistent strategic scratchpad.
 
 Do not read logs, source code, diffs, task sheets, worker/spec state, reports, or
@@ -55,6 +61,10 @@ evidence take precedence.
 
 ## Review method
 
+For `task-intake-reviewer`, stop after writing exactly two numbered questions and
+copy the scratchpad unchanged. Do not offer solutions, add requirements, or infer
+permission to create a task. The remaining method applies to policy reviews.
+
 1. Restate the expected behavior and scope from `TASK-CONTEXT.md`, then judge
    whether the narrative exercises and satisfies it. Help the Worker or Speccer
    understand the game and solve this assigned task sensibly; do not substitute a
@@ -76,11 +86,10 @@ evidence take precedence.
    tradeoff or unavoidable nondeterminism.
 6. Answer every worker/speccer question directly. When uncertain, state what
    additional adversarial full-AI scenario would distinguish the alternatives.
-   For rare situations, prefer a deliberately constructed full-engine custom-map
-   setup with ordinary AIs/modules, followed by natural-match evidence when
-   reasonably reachable. Identify when natural frequency depends on an unfinished
-   prerequisite behavior and recommend explicit later revalidation rather than
-   waiting indefinitely or blaming the current policy for a missing trigger.
+   Prefer deliberately constructed full-engine custom-map setups with ordinary
+   enemy AIs, all features and all AI modules enabled, and a 120-second wall-clock
+   cap. Identify when natural frequency depends on unfinished prerequisite
+   behavior rather than waiting indefinitely for a missing trigger.
 7. Recommend policy-level changes and next tests, not source files or code edits.
    Prefer a few prioritized, falsifiable recommendations over a long wish list.
    Keep recommendations inside the change boundary stated by the narrative. For
@@ -122,7 +131,15 @@ and-map-specific alternatives to test, not universal requirements.
 
 ## Output
 
-Write the requested `POLICY-REVIEW.md` with:
+For task intake, write only:
+
+```markdown
+# Task intake questions
+1. <question>
+2. <question>
+```
+
+For every other mode, write the requested `POLICY-REVIEW.md` with:
 
 ```markdown
 # Policy review: <task/test>

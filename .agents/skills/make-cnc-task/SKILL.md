@@ -5,9 +5,17 @@ description: Validate, draft, add, amend, or update statuses in the Liberty Dawn
 
 # Make or Update a CNC Task
 
-Use Terra 5.6 medium. Act as the only task-sheet writer. Read applicable
+Use Luna 5.6 medium. Act as the only task-sheet writer. Read applicable
 `AGENTS.md`, the task sheet, the exact request/receipt, and only directly linked
 task material.
+
+Never create a task from an agent idea, reviewer suggestion, test anomaly, status
+question, or ordinary user question. A new task requires an explicit user request
+plus a completed Terra-medium intake receipt containing the two questions asked
+before creation and the user's answers. Without both, do not edit the task sheet;
+return `not authorized` and route the idea to `DEFERRED_WORK.md`. Existing-task
+amendments explicitly requested by the user and structured status/release receipts
+do not repeat this new-task gate.
 
 The active task sheet is for executable and pending work. Keep completed-release
 history in the append-only root file `AUTONOMOUS-CNC-TASK-HISTORY.md`. No agent

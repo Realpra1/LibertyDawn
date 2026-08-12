@@ -4,9 +4,8 @@
 - Phase: `paused by user before coordinator workflow update; no role processes active`
 - Common base branch: `agent/cnc-20260807-bug-polish-02-release`
 - Common base SHA: `468ee64f5a0f9a9e19e260e5c5943e6e878f4705`
-- Coordinator model: `gpt-5.6-terra` / `medium` (user identifies this current
-  coordinator session as Luna medium); delegated worker tiers remain pinned
-  independently
+- Coordinator model: `gpt-5.6-luna` / `medium`; delegated cycle tiers are pinned
+  independently by the updated coordinator launcher
 - Game slots: `2` for ordinary/full MAX simulations; `3` only for short,
   tightly bounded custom fixtures
 - Large-build slots: `1`
@@ -168,3 +167,9 @@ and approves the coordinator update.
 
 CNC-47 closure audit findings and potentially reusable benchmarking references
 were moved to `DEFERRED_WORK.md`. Normal coordinator work remains paused.
+
+Workflow update (2026-08-12): coordinator and focused role skills now use the
+user-requested Luna coordinator/task roles, Sol-high first cycle and speccing,
+Terra cycles 2-5, optional minor-only Luna cycles 6-15, and two bounded custom
+full-engine games with per-game Luna narration/policy review per cycle. Normal
+development remains paused pending user approval of this workflow revision.

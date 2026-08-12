@@ -1,6 +1,6 @@
 ---
 name: review-cnc-pr
-description: Review either an in-progress Liberty Dawn CNC worker diff at a five-cycle checkpoint or one completed task pull request, focusing on correctness, regressions, code quality, technical debt, readability, determinism, and simulation CPU cost. Use for advisory Terra-medium cycle reviews and the final independent Sol-high gate before a task enters a coordinated release candidate.
+description: Review a Liberty Dawn CNC worker diff at its cycle-5 checkpoint or a completed task PR for correctness, regressions, code quality, technical debt, readability, determinism, and simulation CPU cost. Use for one advisory Terra review and the final independent Sol-high gate.
 ---
 
 # Review CNC Worker Code
@@ -8,7 +8,7 @@ description: Review either an in-progress Liberty Dawn CNC worker diff at a five
 The job must declare one mode:
 
 - `cycle`: use a fresh Terra 5.6 medium session after isolated product-change
-  cycles 5, 10, 15, and 20 that occur. Review the cumulative current diff and
+  cycle 5. Review the cumulative current diff and
   latest evidence while the worker can still react inside its normal budget.
 - `final`: use a fresh Sol 5.6 high session for the completed task PR.
 
@@ -52,8 +52,10 @@ other worker specs.
    real match.
 6. Support performance blockers with a credible hot-path argument or measurement;
    do not block on speculative micro-optimization.
-7. In `final` mode, verify that real-AI/MAX, matched differential, contention, three clean
-   adversarial scenarios, final acceptance regression, save/load where relevant,
+7. In `final` mode, verify that every cycle has at least two distinct custom
+   full-engine games capped at 120 seconds wall-clock with all features, all AI
+   modules, and ordinary enemy AIs enabled. Verify matched differential,
+   contention, final acceptance regression, save/load where relevant,
    diagnostic cleanup, and required checks satisfy the worker contract. Missing
    or unexercised evidence is a finding, not an assumption.
 8. In `final` mode, require the first behavioral test after implementation to be a full-engine
@@ -75,10 +77,9 @@ other worker specs.
    signal, and observed pass/failure evidence. Confirm difficulty increased as
    soon as behavior first worked and that unexpected results changed the next
    test or implementation decision.
-11. In `final` mode, verify a fresh Terra Commenter produced a factual narrative after every
-   materially judged match/batch and that every AI-policy narrative received a
-   fresh Terra Policy Review before the next worker decision. For AI-policy specs,
-   require the recorded Sol-high spec consultation. Permit at most one Sol-xhigh
+11. In `final` mode, verify every game received its own fresh Luna Commenter and
+   Luna Policy Reviewer before the next worker decision. For AI-policy specs,
+   require the recorded partial-spec Sol-high consultation. Permit at most one Sol-xhigh
    policy escalation, only after the recorded tenth game test. Flag leaked source,
    logs, full task/spec context, or outcome-driven rewriting across the Policy
    Reviewer's design-document-plus-short-task-context-plus-narrative boundary.

@@ -1,11 +1,11 @@
 ---
 name: spec-cnc-task
-description: Convert one isolated Liberty Dawn CNC task packet into a complete worker-local state and implementation contract by investigating relevant code, history, configs, tests, maps, logs, and active PR relationships. Use in a fresh Sol-xhigh session before assigning one CNC task to an implementation worker.
+description: Convert one isolated Liberty Dawn CNC task packet into a complete worker-local contract by investigating evidence, writing a partial spec, consulting a Sol-high policy reviewer, and finishing durable worker state. Use in a fresh Sol-high session before assigning a coordinated CNC task.
 ---
 
 # Spec One CNC Task
 
-Use Sol 5.6 xhigh. Read applicable `AGENTS.md`, exactly one supplied task packet,
+Use Sol 5.6 high. Read applicable `AGENTS.md`, exactly one supplied task packet,
 and the repository evidence relevant to that task. Do not read the full task
 sheet, other worker specs, or unrelated reports. Do not modify product code.
 
@@ -38,20 +38,22 @@ contract, not a summary.
    graph solvers, rigid partitions, or elaborate state machinery without concrete
    task evidence that the simpler approach is inadequate. Avoid prescribing an
    implementation when several designs can meet the observable contract.
-7. Define focused checks, current-control comparison, ordinary real-AI games,
-   matched differential evidence where possible, contention tests, at least three
-   distinct adversarial scenarios, and a final literal regression.
+7. Define focused checks, current-control comparison, and distinct adversarial
+   full-engine custom scenarios. Every cycle needs at least two different games,
+   each capped at 120 seconds wall-clock with all features, all AI modules, and
+   ordinary enemy AIs enabled.
 8. Require evidence that the intended map, options, bots, actors, ticks, scenario,
    and final outcome occurred. Requests, reservations, movement, or logs without
    the player-visible result are not acceptance.
-9. Record the common base SHA, task branch, intended PR base, cycle budget of 20,
+9. Record the common base SHA, task branch, intended PR base, primary budget of
+   five cycles and optional minor-fix budget through cycle 15,
    global resource-lock path/capacity, and all durable output paths.
 10. Specify useful bounded diagnostics, handled error/warning boundaries, and the
     exact evidence needed to distinguish request, rejection, reservation owner,
     competing consumer, state transition, order, and final outcome. Require noisy
     temporary diagnostics to be removed before publication.
 11. Make the first behavioral test after the first implementation change a
-    full-engine simulation with ordinary real AI and relevant normal modules,
+    full-engine simulation with ordinary real AI and all AI modules,
     normally at headless MAX. A focused custom map and obvious cheese setup may
     accelerate the first event, but the full game engine and normal AI must be
     active from test 1. Treat unit tests and passive fixtures as supplementary;
@@ -96,13 +98,14 @@ contract, not a summary.
     or a loss as strong evidence of an implementation error or bad strategic
     policy. Require investigation and correction or a concrete task-specific
     explanation; logs showing the feature fired are never enough.
-18. Before finalizing any AI-behavior or policy spec, write a concise proposed-
-    policy narrative containing current/control behavior, proposed rule of thumb,
-    expected situations and counters, predicted benefit/tradeoffs, forbidden
-    blunders, and focused questions. Copy it (not symlink it) to the review role's
+18. Before finalizing the worker state, write a partial spec containing the task,
+    current/control behavior, proposed rule of thumb, expected situations and
+    counters, predicted benefit/tradeoffs, forbidden blunders, provisional tests,
+    and focused questions. Copy it (not symlink it) to the review role's
     `inputs/NARRATIVE.md`. Write a separate short `inputs/TASK-CONTEXT.md` with
-    task ID/title, expected change, why, change category, in/out-of-scope behavior,
-    and exact balance authority; exclude source, full spec, and preferred verdict.
+    task ID/title, literal task requirements, expected change, why, change
+    category, in/out-of-scope behavior, and exact balance authority; exclude
+    source, unrelated task-sheet context, and preferred verdict.
     Put a strict JSON job beside the output with exactly the absolute
     `design_reference`, staged `task_context`, staged `narrative`, and `output`
     paths. Launch
@@ -116,12 +119,10 @@ contract, not a summary.
     useful recommendations, rejected recommendations with reasons, and the
     adversarial tests it inspired in the worker state. Skip only when policy is
     genuinely irrelevant, recording why.
-19. Require fresh Terra-medium code reviews after product-change cycles 5, 10,
-    15, and 20 that occur. Each checkpoint reviews only this worker's state,
-    cumulative scoped diff, and evidence so far and returns at most one advisory
-    concern. Require the worker to record adoption or evidence-based rejection;
-    an adopted correction consumes the next ordinary cycle. These checkpoints do
-    not replace the final Sol-high PR review or increase the 20-cycle budget.
+19. Require one fresh Terra-medium code review after cycle 5. Specify that cycle 1
+    uses Sol high, cycles 2-5 use Terra medium for evidence-led correction, and
+    optional cycles 6-15 use Luna medium only for minor obvious fixes/testing.
+    Unresolved architecture or policy after cycle 5 requires help, not blind churn.
 
 Keep the coordinator state concise; all task detail belongs in this worker state.
 Return only the task ID, worker-state path, base SHA, and material cross-worker

@@ -13,12 +13,15 @@ from datetime import datetime, timezone
 
 
 ROLES = {
-    "task-reader": ("gpt-5.6-terra", "medium", "read-cnc-task/SKILL.md"),
-    "task-maker": ("gpt-5.6-terra", "medium", "make-cnc-task/SKILL.md"),
-    "speccer": ("gpt-5.6-sol", "xhigh", "spec-cnc-task/SKILL.md"),
-    "worker": ("gpt-5.6-sol", "high", None),
-    "commenter": ("gpt-5.6-terra", "medium", "comment-cnc-match/SKILL.md"),
-    "policy-reviewer": ("gpt-5.6-terra", "medium", "review-cnc-policy/SKILL.md"),
+    "task-reader": ("gpt-5.6-luna", "medium", "read-cnc-task/SKILL.md"),
+    "task-maker": ("gpt-5.6-luna", "medium", "make-cnc-task/SKILL.md"),
+    "task-intake-reviewer": ("gpt-5.6-terra", "medium", "review-cnc-policy/SKILL.md"),
+    "speccer": ("gpt-5.6-sol", "high", "spec-cnc-task/SKILL.md"),
+    "worker-sol": ("gpt-5.6-sol", "high", None),
+    "worker-terra": ("gpt-5.6-terra", "medium", None),
+    "worker-luna": ("gpt-5.6-luna", "medium", None),
+    "commenter": ("gpt-5.6-luna", "medium", "comment-cnc-match/SKILL.md"),
+    "policy-reviewer": ("gpt-5.6-luna", "medium", "review-cnc-policy/SKILL.md"),
     "policy-speccer": ("gpt-5.6-sol", "high", "review-cnc-policy/SKILL.md"),
     "policy-escalation": ("gpt-5.6-sol", "xhigh", "review-cnc-policy/SKILL.md"),
     "cycle-reviewer": ("gpt-5.6-terra", "medium", "review-cnc-pr/SKILL.md"),
@@ -26,7 +29,12 @@ ROLES = {
     "integrator": ("gpt-5.6-sol", "high", "integrate-cnc-release/SKILL.md"),
 }
 
-POLICY_ROLES = {"policy-reviewer", "policy-speccer", "policy-escalation"}
+POLICY_ROLES = {
+    "task-intake-reviewer",
+    "policy-reviewer",
+    "policy-speccer",
+    "policy-escalation",
+}
 
 
 def _resolved_path(value: object, field: str) -> pathlib.Path:
@@ -160,8 +168,8 @@ def build_command(args: argparse.Namespace) -> tuple[list[str], str]:
     else:
         prompt = (
             f"Read and work the file at {job_file}. It is your complete assigned "
-            "task contract. Continue its implementation and evidence loop until its "
-            "handoff condition is met."
+            "task contract. Perform exactly the single development/test cycle or "
+            "handoff action it currently authorizes, update durable state, then return."
         )
 
     command = [

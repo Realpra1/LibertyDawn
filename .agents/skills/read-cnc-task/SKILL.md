@@ -5,7 +5,7 @@ description: Read the Liberty Dawn autonomous CNC task sheet and select exactly 
 
 # Read One CNC Task
 
-Use Terra 5.6 medium. Do not modify Git, product code, task-sheet state, or
+Use Luna 5.6 medium. Do not modify Git, product code, task-sheet state, or
 coordinator state; write only the requested task-packet file.
 
 1. Read applicable `AGENTS.md`, `AUTONOMOUS-CNC-TASKS.md`, `DEFERRED_WORK.md`, the
