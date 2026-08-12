@@ -70,6 +70,13 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Actor types that should generally be excluded from attack squads.")]
 		public readonly HashSet<string> ExcludeFromSquadsTypes = new HashSet<string>();
 
+		[Desc("Direct-combat actor types this module may affirmatively retain under its bounded degraded fallback.",
+			"Aircraft, transports, artillery, stealth, capture, economy, and support actors must not be listed.")]
+		public readonly HashSet<string> FailsafeDirectCombatTypes = new HashSet<string>();
+
+		[Desc("Maximum ticks between degraded fallback reconsiderations. Unchanged active orders are not reissued.")]
+		public readonly int FailsafeReconsiderInterval = 75;
+
 		[Desc("Actor types that are considered construction yards (base builders).")]
 		public readonly HashSet<string> ConstructionYardTypes = new HashSet<string>();
 
@@ -491,6 +498,14 @@ namespace OpenRA.Mods.Common.Traits
 				GroundAirMarkedAaBonus < 0 || GroundAirMarkedAaDuration < 0)
 				throw new YamlException("Ground strategic penalties, percentages, and air-mark values are invalid.");
 
+			if (FailsafeReconsiderInterval <= 0)
+				throw new YamlException("FailsafeReconsiderInterval must be greater than zero.");
+			if (FailsafeDirectCombatTypes.Any(t => ExcludeFromSquadsTypes.Contains(t) || AirUnitsTypes.Contains(t) || NavalUnitsTypes.Contains(t)))
+				throw new YamlException("FailsafeDirectCombatTypes cannot include excluded, air, or naval actor types.");
+			foreach (var actorName in FailsafeDirectCombatTypes)
+				if (!rules.Actors.TryGetValue(actorName, out var actor) || !actor.HasTraitInfo<AttackBaseInfo>())
+					throw new YamlException($"FailsafeDirectCombatTypes actor '{actorName}' must exist and have an attack trait.");
+
 			foreach (var actorName in AirPassiveRepairActors)
 			{
 				if (!rules.Actors.TryGetValue(actorName, out var actor) ||
@@ -504,7 +519,7 @@ namespace OpenRA.Mods.Common.Traits
 	}
 
 	public class SquadManagerBotModule : ConditionalTrait<SquadManagerBotModuleInfo>, IBotEnabled, IBotTick, IBotRespondToAttack,
-		IBotPositionsUpdated, INotifyKilled, INotifyAppliedDamage, IGameSaveTraitData
+		IBotPositionsUpdated, INotifyKilled, INotifyAppliedDamage, IGameSaveTraitData, IAdvancedBotTick
 	{
 		public CPos GetRandomBaseCenter()
 		{
@@ -544,6 +559,11 @@ namespace OpenRA.Mods.Common.Traits
 		int minAttackForceDelayTicks;
 		int airSafetyTicks;
 		int adaptiveAirRiskTicks;
+		bool advancedBehaviorEnabled = true;
+		int fallbackReconsiderTicks;
+		Actor fallbackTarget;
+		readonly HashSet<uint> fallbackOrderedActors = new HashSet<uint>();
+		readonly Dictionary<uint, CPos> fallbackOrderTargets = new Dictionary<uint, CPos>();
 
 		public SquadManagerBotModule(Actor self, SquadManagerBotModuleInfo info)
 			: base(info)
@@ -656,7 +676,24 @@ namespace OpenRA.Mods.Common.Traits
 
 		void IBotTick.BotTick(IBot bot)
 		{
-			AssignRolesToIdleUnits(bot);
+			if (advancedBehaviorEnabled)
+				AssignRolesToIdleUnits(bot);
+			else
+				AssignRolesToIdleUnitsDegraded(bot);
+		}
+
+		string IAdvancedBotTick.FailsafeModuleId => "SquadManagerBotModule";
+
+		void IAdvancedBotTick.SetAdvancedBehaviorEnabled(bool enabled)
+		{
+			if (advancedBehaviorEnabled == enabled)
+				return;
+
+			advancedBehaviorEnabled = enabled;
+			fallbackReconsiderTicks = 0;
+			fallbackTarget = null;
+			fallbackOrderedActors.Clear();
+			fallbackOrderTargets.Clear();
 		}
 
 		internal Actor FindClosestEnemy(WPos pos)
@@ -917,6 +954,85 @@ namespace OpenRA.Mods.Common.Traits
 				minAttackForceDelayTicks = Info.MinimumAttackForceDelay;
 				CreateAttackForce(bot);
 			}
+		}
+
+		void AssignRolesToIdleUnitsDegraded(IBot bot)
+		{
+			CleanSquads();
+			activeUnits.RemoveAll(unitCannotBeOrdered);
+			activeUnits.RemoveAll(IsReservedForSpecialBehavior);
+			unitsHangingAroundTheBase.RemoveAll(unitCannotBeOrdered);
+			unitsHangingAroundTheBase.RemoveAll(IsReservedForSpecialBehavior);
+
+			if (--rushTicks <= 0)
+			{
+				rushTicks = Info.RushInterval;
+				TryToRushAttack(bot);
+			}
+
+			if (--attackForceTicks <= 0)
+			{
+				attackForceTicks = Info.AttackForceInterval;
+				foreach (var squad in Squads)
+					if (squad.Type != SquadType.GeneralAttack && squad.Type != SquadType.Air)
+						squad.Update();
+			}
+
+			if (--assignRolesTicks <= 0)
+			{
+				assignRolesTicks = Info.AssignRolesInterval;
+				FindNewUnits(bot);
+			}
+
+			if (--minAttackForceDelayTicks <= 0)
+			{
+				minAttackForceDelayTicks = Info.MinimumAttackForceDelay;
+				CreateAttackForce(bot);
+			}
+
+			foreach (var n in notifyIdleBaseUnits)
+				n.UpdatedIdleBaseUnits(unitsHangingAroundTheBase);
+
+			if (--fallbackReconsiderTicks > 0)
+				return;
+			fallbackReconsiderTicks = Info.FailsafeReconsiderInterval;
+
+			var candidates = activeUnits.Where(a => !unitCannotBeOrdered(a) &&
+				Info.FailsafeDirectCombatTypes.Contains(a.Info.Name) && a.Info.HasTraitInfo<AttackBaseInfo>() &&
+				!IsReservedForSpecialBehavior(a) && !IsUnitProtectingBase(a) && !IsUnitTemporarilyControlled(a))
+				.OrderBy(a => a.ActorID).ToList();
+			fallbackOrderedActors.RemoveWhere(id => candidates.All(a => a.ActorID != id));
+			foreach (var id in fallbackOrderTargets.Keys.Where(id => candidates.All(a => a.ActorID != id)).ToList())
+				fallbackOrderTargets.Remove(id);
+			if (candidates.Count == 0)
+				return;
+
+			if (!IsPreferredEnemyUnit(fallbackTarget) || !IsNotHiddenUnit(fallbackTarget))
+			{
+				fallbackTarget = FindClosestEnemy(candidates.Select(a => a.CenterPosition).Average());
+				fallbackOrderedActors.Clear();
+				fallbackOrderTargets.Clear();
+			}
+
+			if (fallbackTarget == null)
+				return;
+
+			var orderable = candidates.Where(a => !fallbackOrderedActors.Contains(a.ActorID) ||
+				!fallbackOrderTargets.TryGetValue(a.ActorID, out var target) || target != fallbackTarget.Location).ToArray();
+			if (orderable.Length == 0)
+				return;
+
+			bot.QueueOrder(new Order("AttackMove", null, Target.FromCell(World, fallbackTarget.Location), false,
+				groupedActors: orderable));
+			foreach (var actor in orderable)
+			{
+				fallbackOrderedActors.Add(actor.ActorID);
+				fallbackOrderTargets[actor.ActorID] = fallbackTarget.Location;
+			}
+			if (Info.GroundTargetDebugLogging)
+				Log.Write("debug", "Squad failsafe fallback [{0}]: owner=SquadManagerBotModule accepted={1} " +
+					"target={2}#{3} order=AttackMove cadence={4}.", Player.PlayerName, orderable.Length,
+					fallbackTarget.Info.Name, fallbackTarget.ActorID, Info.FailsafeReconsiderInterval);
 		}
 
 		void FindNewUnits(IBot bot)
@@ -1212,6 +1328,12 @@ namespace OpenRA.Mods.Common.Traits
 				new MiniYamlNode("AttackForceTicks", FieldSaver.FormatValue(attackForceTicks)),
 				new MiniYamlNode("MinAttackForceDelayTicks", FieldSaver.FormatValue(minAttackForceDelayTicks)),
 				new MiniYamlNode("AdaptiveAirRiskTicks", FieldSaver.FormatValue(adaptiveAirRiskTicks)),
+				new MiniYamlNode("AdvancedBehaviorEnabled", FieldSaver.FormatValue(advancedBehaviorEnabled)),
+				new MiniYamlNode("FallbackReconsiderTicks", FieldSaver.FormatValue(fallbackReconsiderTicks)),
+				new MiniYamlNode("FallbackTarget", FieldSaver.FormatValue(fallbackTarget?.ActorID ?? 0)),
+				new MiniYamlNode("FallbackOrderedActors", FieldSaver.FormatValue(fallbackOrderedActors.ToArray())),
+				new MiniYamlNode("FallbackOrderTargetActors", FieldSaver.FormatValue(fallbackOrderTargets.Keys.ToArray())),
+				new MiniYamlNode("FallbackOrderTargetCells", FieldSaver.FormatValue(fallbackOrderTargets.Values.ToArray())),
 				new MiniYamlNode("AdaptiveAirRisk", "", adaptiveAirRisk.OrderBy(e => e.Key).Select(e =>
 				{
 					var state = e.Value.ExportState();
@@ -1270,6 +1392,35 @@ namespace OpenRA.Mods.Common.Traits
 			var adaptiveAirRiskTicksNode = data.FirstOrDefault(n => n.Key == "AdaptiveAirRiskTicks");
 			if (adaptiveAirRiskTicksNode != null)
 				adaptiveAirRiskTicks = FieldLoader.GetValue<int>("AdaptiveAirRiskTicks", adaptiveAirRiskTicksNode.Value.Value);
+
+			var advancedBehaviorNode = data.FirstOrDefault(n => n.Key == "AdvancedBehaviorEnabled");
+			if (advancedBehaviorNode != null)
+				advancedBehaviorEnabled = FieldLoader.GetValue<bool>("AdvancedBehaviorEnabled", advancedBehaviorNode.Value.Value);
+			var fallbackTicksNode = data.FirstOrDefault(n => n.Key == "FallbackReconsiderTicks");
+			if (fallbackTicksNode != null)
+				fallbackReconsiderTicks = FieldLoader.GetValue<int>("FallbackReconsiderTicks", fallbackTicksNode.Value.Value);
+			var fallbackTargetNode = data.FirstOrDefault(n => n.Key == "FallbackTarget");
+			if (fallbackTargetNode != null)
+				fallbackTarget = self.World.GetActorById(FieldLoader.GetValue<uint>("FallbackTarget", fallbackTargetNode.Value.Value));
+			var fallbackActorsNode = data.FirstOrDefault(n => n.Key == "FallbackOrderedActors");
+			if (fallbackActorsNode != null)
+			{
+				fallbackOrderedActors.Clear();
+				foreach (var actorId in FieldLoader.GetValue<uint[]>("FallbackOrderedActors", fallbackActorsNode.Value.Value))
+					if (self.World.GetActorById(actorId) != null)
+						fallbackOrderedActors.Add(actorId);
+			}
+			var fallbackTargetActorsNode = data.FirstOrDefault(n => n.Key == "FallbackOrderTargetActors");
+			var fallbackTargetCellsNode = data.FirstOrDefault(n => n.Key == "FallbackOrderTargetCells");
+			if (fallbackTargetActorsNode != null && fallbackTargetCellsNode != null)
+			{
+				var actorIds = FieldLoader.GetValue<uint[]>("FallbackOrderTargetActors", fallbackTargetActorsNode.Value.Value);
+				var cells = FieldLoader.GetValue<CPos[]>("FallbackOrderTargetCells", fallbackTargetCellsNode.Value.Value);
+				fallbackOrderTargets.Clear();
+				for (var i = 0; i < Math.Min(actorIds.Length, cells.Length); i++)
+					if (self.World.GetActorById(actorIds[i]) != null)
+						fallbackOrderTargets[actorIds[i]] = cells[i];
+			}
 
 			var adaptiveAirRiskNode = data.FirstOrDefault(n => n.Key == "AdaptiveAirRisk");
 			if (adaptiveAirRiskNode != null)

@@ -38,10 +38,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly int minimumLimit;
 		readonly int reductionStep;
 		readonly int recoverySamples;
-
-		int lastWorldTick = -1;
-		int lastLocalTick;
-		long lastRunTime;
+		readonly SimulationPacingSampler pacingSampler;
 		int healthySamples;
 
 		public int EffectiveLimit { get; private set; }
@@ -54,27 +51,17 @@ namespace OpenRA.Mods.Common.Traits
 			this.minimumLimit = Math.Max(GlobalMinimumLimit, minimumLimit);
 			this.reductionStep = Math.Max(1, reductionStep);
 			this.recoverySamples = Math.Max(1, recoverySamples);
+			pacingSampler = new SimulationPacingSampler(this.sampleInterval);
 		}
 
 		public AdaptiveUnitCapSample Update(int worldTick, int localTick, int timestep, long runTime,
 			int committedUnits, int enforcementCeiling)
 		{
-			if (lastWorldTick < 0 || worldTick < lastWorldTick || localTick < lastLocalTick || runTime < lastRunTime)
-			{
-				ResetSample(worldTick, localTick, runTime);
-				return new AdaptiveUnitCapSample(false, 0, EffectiveLimit, "initializing");
-			}
-
-			var worldTicks = worldTick - lastWorldTick;
-			if (worldTicks < sampleInterval)
+			var pacing = pacingSampler.Update(worldTick, localTick, timestep, runTime);
+			if (!pacing.Sampled)
 				return new AdaptiveUnitCapSample(false, 0, EffectiveLimit, "waiting");
 
-			var localTicks = localTick - lastLocalTick;
-			var expectedMilliseconds = Math.Max(1L, (long)worldTicks * Math.Max(1, timestep));
-			var pausedTicks = Math.Max(0, localTicks - worldTicks);
-			var activeMilliseconds = Math.Max(0L, runTime - lastRunTime - (long)pausedTicks * Math.Max(1, timestep));
-			var ratio = activeMilliseconds / (double)expectedMilliseconds;
-			ResetSample(worldTick, localTick, runTime);
+			var ratio = pacing.RealTimeRatio;
 
 			if (enforcementCeiling <= 0)
 				return new AdaptiveUnitCapSample(true, ratio, 0, "disabled-no-ceiling");
@@ -110,11 +97,5 @@ namespace OpenRA.Mods.Common.Traits
 			return new AdaptiveUnitCapSample(true, ratio, EffectiveLimit, "recovering");
 		}
 
-		void ResetSample(int worldTick, int localTick, long runTime)
-		{
-			lastWorldTick = worldTick;
-			lastLocalTick = localTick;
-			lastRunTime = runTime;
-		}
 	}
 }

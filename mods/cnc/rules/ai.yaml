@@ -2,33 +2,53 @@ Player:
 	ModularBot@Cabal:
 		Name: Cabal
 		Type: cabal
+		AdvancedSquadCpuFailsafe: true
+		AdvancedSquadModules: SquadManagerBotModule
 	ModularBot@Watson:
 		Name: Watson
 		Type: watson
+		AdvancedSquadCpuFailsafe: true
+		AdvancedSquadModules: SquadManagerBotModule
 	ModularBot@HAL9001:
 		Name: HAL 9001
 		Type: hal9001
+		AdvancedSquadCpuFailsafe: true
+		AdvancedSquadModules: SquadManagerBotModule
     ModularBot@Brutalis:
 		Name: Brutalis
 		Type: brutalis
+		AdvancedSquadCpuFailsafe: true
+		AdvancedSquadModules: SquadManagerBotModule
     ModularBot@VIKI:
 		Name: VIKI
 		Type: viki
+		AdvancedSquadCpuFailsafe: true
+		AdvancedSquadModules: SquadManagerBotModule
     ModularBot@SkyNet:
 		Name: SkyNet
 		Type: skynet
+		AdvancedSquadCpuFailsafe: true
+		AdvancedSquadModules: SquadManagerBotModule
     ModularBot@IronReaper:
 		Name: IronReaper
 		Type: ironreaper
+		AdvancedSquadCpuFailsafe: true
+		AdvancedSquadModules: SquadManagerBotModule
     ModularBot@WaveMaker:
 		Name: WaveMaker
 		Type: wavemaker
+		AdvancedSquadCpuFailsafe: true
+		AdvancedSquadModules: SquadManagerBotModule
     ModularBot@Easy:
 		Name: Easy
 		Type: Easy
+		AdvancedSquadCpuFailsafe: true
+		AdvancedSquadModules: SquadManagerBotModule
     ModularBot@Easiest:
 		Name: Easiest
 		Type: Easiest
+		AdvancedSquadCpuFailsafe: true
+		AdvancedSquadModules: SquadManagerBotModule
 	GrantConditionOnBotOwner@cabal:
 		Condition: enable-cabal-ai
 		Bots: cabal
@@ -728,6 +748,7 @@ Player:
 		RequiresCondition: enable-cabal-ai
 		SquadSize: 15
 		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck, tran
+		FailsafeDirectCombatTypes: e1, e2, e3, e4, e5, bggy, bike, jeep, ltnk, mtnk, ftnk, htnk
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
@@ -824,6 +845,7 @@ Player:
 		RequiresCondition: enable-watson-ai
 		SquadSize: 15
 		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck, tran
+		FailsafeDirectCombatTypes: e1, e2, e3, e4, e5, bggy, bike, jeep, ltnk, mtnk, ftnk, htnk
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
@@ -920,6 +942,7 @@ Player:
 		RequiresCondition: enable-hal9001-ai
 		SquadSize: 8
 		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck, tran
+		FailsafeDirectCombatTypes: e1, e2, e3, e4, e5, bggy, bike, jeep, ltnk, mtnk, ftnk, htnk
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
@@ -1100,6 +1123,7 @@ Player:
 		UseCohesiveGroundSquad: true
 		GroundTargetDebugLogging: false
 		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck, tran
+		FailsafeDirectCombatTypes: e1, e2, e3, e4, e5, bggy, bike, jeep, ltnk, mtnk, ftnk, htnk
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
@@ -1107,6 +1131,7 @@ Player:
 		RequiresCondition: enable-wavemaker-ai
 		SquadSize: 120
 		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck, tran
+		FailsafeDirectCombatTypes: e1, e2, e3, e4, e5, bggy, bike, jeep, ltnk, mtnk, ftnk, htnk
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
@@ -1298,6 +1323,7 @@ Player:
 		UseCohesiveGroundSquad: true
 		GroundTargetDebugLogging: false
 		ExcludeFromSquadsTypes: harv, sharv, mcv, a10, e6, rmbo, truck, tran
+		FailsafeDirectCombatTypes: e1, e2, e3, e4, e5, bggy, bike, jeep, ltnk, mtnk, ftnk, htnk
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
@@ -1507,6 +1533,7 @@ Player:
 		UseCohesiveGroundSquad: true
 		GroundTargetDebugLogging: false
 		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck, tran
+		FailsafeDirectCombatTypes: e1, e2, e3, e4, e5, bggy, bike, jeep, ltnk, mtnk, ftnk, htnk
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
@@ -1870,6 +1897,7 @@ Player:
 		GroundTargetDebugLogging: false
         MaxBaseRadius: 49
 		ExcludeFromSquadsTypes: harv, sharv, mcv, a10, e6, rmbo, truck, tran
+		FailsafeDirectCombatTypes: e1, e2, e3, e4, e5, bggy, bike, jeep, ltnk, mtnk, ftnk, htnk
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
@@ -2046,6 +2074,7 @@ Player:
 		RequiresCondition: enable-Easy-ai
 		SquadSize: 4
 		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck, tran
+		FailsafeDirectCombatTypes: e1, e2, e3, e4, e5, bggy, bike, jeep, ltnk, mtnk, ftnk, htnk
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
@@ -2192,6 +2221,7 @@ Player:
 		RequiresCondition: enable-Easiest-ai
 		SquadSize: 3
 		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck, tran
+		FailsafeDirectCombatTypes: e1, e2, e3, e4, e5, bggy, bike, jeep, ltnk, mtnk, ftnk, htnk
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss

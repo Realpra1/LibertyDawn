@@ -590,6 +590,13 @@ namespace OpenRA.Mods.Common.Traits
 	public interface IBotTick { void BotTick(IBot bot); }
 
 	[RequireExplicitImplementation]
+	public interface IAdvancedBotTick
+	{
+		string FailsafeModuleId { get; }
+		void SetAdvancedBehaviorEnabled(bool enabled);
+	}
+
+	[RequireExplicitImplementation]
 	public interface IBotRespondToAttack { void RespondToAttack(IBot bot, Actor self, AttackInfo e); }
 
 	[RequireExplicitImplementation]
