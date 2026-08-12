@@ -348,3 +348,100 @@ passed 5/5; `git diff --check` passed. Both final serial full-engine games held
 both game slots, used isolated support/content/runtime artifacts, and stayed
 within 120 seconds. CNC-100 is now at `886519f69d`; no dependency code was merged,
 so prior controls remain stale for final integration.
+
+# CNC-96 explicit Sol-high continuation cycle 8 report
+
+## Result
+
+The cycle-7 `SimpleIdleGuardControl` failed its pressured behavior and performance
+comparison and has been removed. This is cleanup of a default-off diagnostic,
+not a gameplay fix: the published Economy field-defense source is again identical
+to pre-cycle-7 commit `c16b212ecd`, and normal behavior never enabled the control.
+No balance, cadence, composition, threat policy, field coverage, production,
+reservation, or ordinary module changed.
+
+The final pair used two ordinary Nod Brutalis bots, forced Economy II, 12
+harvesters plus 288 other mobile actors and structures per player, all normal
+modules/features, seed `9608`, unrestricted host affinity while holding both game
+slots for serial isolation, MAX speed, tick-2200 exit, and
+the staged CNC content root `/root/github/LibertyDawn/.build/cnc33a/runtime-content`.
+Both maps used identical terrain (`map.bin` SHA-256
+`98bc62a4dfe6f7f6eb00ebff9a4dc4b1c11b030fa75053e185d1d524473b09f3`)
+and identical scripted pressure (`f1635b370dcc2ec243d7187653e496fe8ee29990585581cae4ce69d484babc32`):
+six hostile Medium Tanks attacked the reachable 73,42 field at tick 1500,
+deterministic infantry were removed at tick 1750, and prior anchors were blocked
+at tick 1751. The enabled archive SHA-256 was
+`98f6fa9cbb7deee7d480f2647627af1c0b5579c48e7af9ad3fb82d2bc65b40e3`;
+the simple-control archive was
+`34b726a5960b46ea3cf4cba54b102597fecb1538c67e7328c8732630fa4f11a4`.
+Their intentional map differences are title/rules filename and the one
+`SimpleIdleGuardControl: true` rules override; a lobby toggle was not added
+because it would broaden a diagnostic already under falsification.
+
+## Equivalence and hot-path comparison
+
+| Gate | Current formation | Simple idle diagnostic | Disposition |
+|---|---|---|---|
+| Calls/cadence | 2,200 Economy calls/player; 4,400 aggregated Stealth/Chemical calls/player; 25/75-tick cadence | Identical | Pass |
+| Fields/unloads | 5 commitments, 5 unload completions | 5 commitments, 5 unload completions | Count parity only; identities/timing diverged |
+| Mixed replacement/reachability | 22 assignments, 2 releases, 1 missing-role replacement, 29 bounded reforms; alternate destinations after blocking | 24 assignments, 5 releases, 2 missing-role replacements; repeated `simple-anchor-unavailable` for the same MSAM at ticks 2126/2151/2176 | Fail: retry/release churn and incomplete local recovery |
+| Direct field-defense work/orders | `157.031ms` combined, `26.797ms` max, 108 orders | `269.362ms`, `28.403ms` max, 246 orders; 169 logged simple returns | Fail: 71% more direct time and 2.28x orders |
+| Stealth/Chemical work/orders | `8,911.929ms`, `1,251.254ms` max, 2,237 orders | `11,130.614ms`, `1,262.557ms` max, 2,374 orders | Fail: downstream specialist work rose 25% |
+| Completed ticks | mean/p50/p95/p99/max `11.370/6/14/94/2406.207ms`; 32 freezes; 75-tick cadence; `28.024s` wall | `12.417/6/13/167/2412.929ms`; 36 freezes; same cadence; `31.029s` | Fail: worse p99, count, mean and wall time; maximum unchanged |
+| Terminal load/allocation | 475 actors; allocated `5,745,000,200`; GC `684/214/13`; WS `550,457,344` | 489 actors; `5,236,352,768`; GC `623/194/13`; WS `551,002,112` | Workload diverged; lower allocation did not improve tails |
+
+The current game passed canonical validation at
+`cycle-8/game-1-enabled-final2/` and the simple control at
+`cycle-8/game-2-simple-final/`; each reached tick 2200 in under 32 seconds with
+no exception, desync, forbidden occupancy, or missing required field/replacement
+markers. Earlier runs that used unlogged display-message gates or removed actors
+before commitment are retained as harness evidence and are not counted.
+
+Source inspection explains the stable 75-tick nomination without yet authorizing
+a fix. Each configured `StealthTankSquadBotModule` instance scans eligible owned
+actors, materializes and sorts the full enemy set, rebuilds a threat snapshot,
+scores all useful targets before taking 48, compares each retained candidate
+against every threat for each active group, may count nearby infantry, and may
+perform hazard-aware path searches per ordered specialist. CNC config runs both
+StealthTank and Chemical instances at the same 75-tick cadence. The largest
+post-startup tails in both games align with those spans (for example the simple
+control's tick-1276 world `1019.187ms` contains `639.582ms + 370.686ms` of the
+two players' aggregated specialist work). Economy field defense separately
+enumerates committed harvesters, refineries, resource modifiers and bounded
+role candidates every 25 ticks, then performs safe path searches on new,
+invalidated, stalled, or pursuit-break destinations. Its direct maxima remained
+below 29ms and never owned the multi-hundred-millisecond tail.
+
+The simplest behavior-preserving Stealth candidate for a later matched test is a
+scan-local immutable feature/threat snapshot or equally local memoization that
+removes repeated trait/property enumeration while retaining exact enemy order,
+candidate scores, danger results, route searches, orders, and 75-tick cadence.
+This cycle does not implement it: the pair proves module ownership and
+same-tick alignment, but downstream loss/order divergence does not yet prove
+which repeated scoring/threat/path component is causal. A cache, phase change,
+candidate reduction, cadence change, or weaker route check is not authorized.
+
+## Reviewer disposition, checks, and next authorization
+
+Each final valid game received its own fresh Luna Commenter and Luna Policy
+Reviewer at `cycle-8/game-1-final-analysis/` and `cycle-8/game-2-analysis/`.
+Both policy verdicts were `insufficient evidence`, high confidence. They accept
+mixed screens, same-tick role replacement, safe route rejection, reform and
+stance restoration as provisional behavior. The control reviewer identifies
+the repeated `simple-anchor-unavailable` release/retry as its clearest weakness.
+The worker adopts their strongest recommendation to keep exact bounded
+completed-tail/module/order attribution and run a matched behavior-preserving
+Stealth hot-path intervention next. Suggestions to widen anchors, hold missing
+fields, change extension policy, or tune composition are rejected for cycle 8
+because they alter strategy policy outside CNC-96's frozen scope. No durable
+general scratchpad entry was warranted.
+
+Checks: protected Release `make all` passed with zero warnings/errors;
+`python3 -m unittest tests/test_launch_ai_parallel.py` passed 5/5; both serial
+canonical games held both game slots and stayed below 120 seconds;
+`git diff --check` passed. Cycle 9 is authorized by the user's explicit Sol-high
+continuation covering cycles 6-10 and must be a fresh invocation performing
+exactly one cycle. It should retain the restored normal field path and test only
+an exact-decision, scan-local Stealth attribution or bounded snapshot candidate;
+do not revive simple idle guards or change cadence, candidate bounds, policy,
+balance, coverage, modules, or actor workload.
