@@ -523,3 +523,77 @@ passed 5/5; `git diff --check` passed. CNC-100 remains at `886519f69d` and was
 not merged. Proposed status remains `First iteration - testing`: cycle 9 adds
 better per-instance attribution and a default-off diagnostic but neither literal
 paced acceptance nor a behavior-preserving causal fix.
+
+# CNC-96 explicit Sol-high continuation cycle 10 report
+
+## Result
+
+The authorized snapshot candidate has been removed. Normal Economy field-defense
+and Stealth behavior are restored exactly; no gameplay, policy, cadence, balance,
+candidate, coverage, module, or actor-workload change remains. Benchmark-only
+per-instance Stealth/Chemical identities remain because they distinguish the two
+configured modules without affecting simulation decisions.
+
+Cycle 10 added test-only bounded Lua acknowledgements for all six scripted attack
+orders, route arrival/progress, four named terminal losses, and four blockers. It
+also enabled the existing bounded specialist target/route/order diagnostics in the
+ignored test map. The corrected map archive is SHA-256
+`5bab991977b2d2e84586e66399af8ed96d76f2c1e7a75b752b3542a6020135e8`;
+its terrain is `98bc62a4dfe6f7f6eb00ebff9a4dc4b1c11b030fa75053e185d1d524473b09f3`
+and script is `e3e48b93542d4d2b2749154d26adf788d152b9e6bf2dec81abfa7a6213d36af7`.
+Both final controls used seed 9610, two ordinary Nod Brutalis bots, forced Economy
+II, at least 300 mobile starting actors per player, all modules, MAX speed,
+`taskset -c 0`, serial ownership of both game slots, tick-2200 exit, and staged
+content `/root/github/LibertyDawn/.build/cnc33a/runtime-content`.
+
+## Equivalence gate and games
+
+| Gate | Corrected old path A | Identical old path B | Disposition |
+|---|---|---|---|
+| Scenario execution | 6 attack orders; 4/4 named losses terminal; 4/4 blockers live; route result 0 arrivals/4 alive | Same requests/losses/blockers; route result 3 arrivals/5 alive | Fail: exact scenario outcome diverged |
+| Cadence/calls | 2,200 calls per player/module; 75-tick specialist cadence | Identical calls/cadence | Pass |
+| Exact specialist trace | 105 target and 105 hazard-route lines | 111 target and 111 hazard-route lines; targets/scores/waypoints differ | Fail |
+| Stealth work/orders | P1 `3273.780ms/676`; P2 `7535.705ms/1433` | P1 `4582.265ms/962`; P2 `5298.514ms/1101` | Fail |
+| Field work/orders | P1 `59.550ms/15`; P2 `83.605ms/52` | P1 `92.302ms/36`; P2 `161.210ms/62` | Fail |
+| Field decisions | 3 commitments; 15 assignments | 4 commitments; 22 assignments | Fail |
+| Completed ticks | mean/p50/p95/p99/max `14.972/8/19/106/3206.237ms`; 36 freezes | `15.589/9/20/138/3110.874ms`; 35 freezes | Fail: repeat variability exceeds a safe candidate comparison |
+| Terminal load | 471 actors/122 effects; allocated `5,118,680,736`; GC `611/119/14` | 498 actors/109 effects; `5,268,776,152`; GC `629/118/14` | Fail |
+
+The first valid acknowledgement game used queued `Destroy()` and showed only two
+of four victims terminal at the immediate check; its fresh reviews correctly
+identified the missing terminal contract. The test was repaired to immediate
+`Kill()` and the two final controls above each passed canonical validation in
+37.032s and 38.033s. Two earlier launches are invalid setup evidence: one Lua
+property query failed before completion, and one passed tick 2200 but failed the
+overly strict `dead=true` marker because queued removal is not immediate.
+
+The final controls prove that the old path is not repeatable enough to establish
+the exact decision/workload baseline required by the contract. The Lua event
+hashes, exact specialist traces, downstream work/orders, actor/effect load, field
+commitments, and terminal outcomes differ under otherwise matched conditions.
+Accordingly the default-off snapshot was not retested and was removed, as cycle
+10 explicitly required when exact equivalence could not be demonstrated. The
+repeated 75-tick tails remain diagnostic evidence, not authorization for a fix.
+
+## Review disposition, checks, and handoff
+
+Every valid game received its own isolated fresh Luna Commenter and Policy
+Reviewer. The preliminary acknowledgement review is under
+`cycle-10/game-old-a-analysis/`; corrected final controls are under
+`cycle-10/game-{1,2}-final-analysis/`. Reviewers conditionally accepted hazard
+routing, mixed field screens, terminal named losses, blockers, missing-role
+replacement and stance/reform behavior, but rejected performance acceptance due
+to 35-36 freeze ticks and maxima above three seconds. Their relevant highest-
+priority recommendation—explicit terminal and route evidence plus an identical
+unchanged-workload control—was adopted. Proposed forced re-target/retreat and
+unrelated VIKI/crate tests were rejected because they change or leave CNC-96's
+frozen performance scope. No durable scratchpad promotion was warranted.
+
+Checks passed: protected Release `make all` with zero warnings/errors; launcher
+tests 5/5; focused classifier/launch tests 18/18 (one pre-existing analyzer
+warning); `git diff --check`; and all three valid full-engine games under 120
+seconds while holding both game slots. Proposed status remains
+`First iteration - testing`. Literal paced acceptance, stable old-control
+decisions, save/load/replay, GC/scheduler attribution, the historical matrix,
+and a behavior-preserving causal fix remain incomplete. Cycle 10 exhausts the
+user-authorized Sol-high continuation; no further cycle is authorized.
