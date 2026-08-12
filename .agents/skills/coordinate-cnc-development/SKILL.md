@@ -28,6 +28,13 @@ After compaction, interruption, or a test cycle, reread this skill and coordinat
 state. Restart a fresh role from its durable input instead of reconstructing its
 context.
 
+For unattended rounds, install `scripts/coordination_watchdog.sh` as a
+five-minute cron job. It starts a lock-protected Luna coordinator audit with a
+four-minute bound; the audit rereads this skill and state, checks process records
+and durable timestamps, and routes eligible next work. It must not duplicate a
+live role or interrupt a healthy build/game. Keep JSON output under the ignored
+coordination worktree and remove the cron when the round is explicitly paused.
+
 ## Roles and models
 
 | Role | Model | Scope |
@@ -132,6 +139,11 @@ child, no durable output movement, and no declared wait for two consecutive
 audits, send a checkpoint request; safely relaunch or escalate only after the
 role's exact assignment and process evidence show it is stalled. Never kill a
 healthy game merely because its parent agent is quiet.
+
+The coordinator must perform these audits in a loop while work remains. A user
+status question is an observation point, not the end of the loop: answer it,
+reread this skill/state when due, and continue routing. If the interactive turn
+ends, the watchdog provides the same recovery path.
 
 ## Development-cycle contract
 
