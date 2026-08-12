@@ -9,6 +9,7 @@
  */
 #endregion
 
+using System;
 using System.Linq;
 
 namespace OpenRA.Mods.Common.Traits
@@ -94,9 +95,19 @@ namespace OpenRA.Mods.Common.Traits
 				return null;
 
 			var preferred = FirstTowerPlacementLogic.PreferredLocation(yard.Location, yardInfo.Dimensions, towerBuildingInfo.Dimensions);
+			Func<CPos, bool> isLegal = c => world.Map.Contains(c) &&
+				world.CanPlaceBuilding(c, towerInfo, towerBuildingInfo, null) &&
+				towerBuildingInfo.IsCloseEnoughToBase(world, player, towerInfo, c);
+			var reservedFallback = FirstTowerPlacementLogic.ClosestLegalLocation(preferred,
+				Info.FirstTowerSearchRadius, isLegal);
 			var selected = FirstTowerPlacementLogic.ClosestLegalLocation(preferred, Info.FirstTowerSearchRadius,
-				c => world.Map.Contains(c) && world.CanPlaceBuilding(c, towerInfo, towerBuildingInfo, null) &&
-					towerBuildingInfo.IsCloseEnoughToBase(world, player, towerInfo, c));
+				c => isLegal(c) && !baseBuilder.WallPlanner.OverlapsConstructionYardEnclosure(c, towerBuildingInfo));
+			if (selected == null)
+				selected = reservedFallback;
+			if (reservedFallback != null && baseBuilder.WallPlanner.OverlapsConstructionYardEnclosure(
+				reservedFallback.Value, towerBuildingInfo))
+				baseBuilder.WallPlanner.LogReservationDecision(towerInfo.Name, reservedFallback.Value,
+					selected ?? reservedFallback.Value, selected == reservedFallback);
 
 			if (selected == null)
 			{

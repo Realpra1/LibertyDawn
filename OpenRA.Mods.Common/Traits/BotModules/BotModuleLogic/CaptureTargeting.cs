@@ -69,6 +69,27 @@ namespace OpenRA.Mods.Common.Traits
 				reservation.Claimants.ToArray() : System.Array.Empty<uint>();
 		}
 
+		public bool TryGetReservation(uint specialistId, out uint targetId,
+			out SpecialistAssignmentPurpose purpose)
+		{
+			purpose = default(SpecialistAssignmentPurpose);
+			if (!targetBySpecialist.TryGetValue(specialistId, out targetId) ||
+				!byTarget.TryGetValue(targetId, out var reservation))
+				return false;
+
+			purpose = reservation.Purpose;
+			return true;
+		}
+
+		public bool Matches(uint specialistId, uint targetId,
+			SpecialistAssignmentPurpose purpose, int expectedClaimants)
+		{
+			return targetBySpecialist.TryGetValue(specialistId, out var currentTarget) &&
+				currentTarget == targetId && byTarget.TryGetValue(targetId, out var reservation) &&
+				reservation.Purpose == purpose && reservation.Claimants.Contains(specialistId) &&
+				reservation.Claimants.Count == System.Math.Max(1, expectedClaimants);
+		}
+
 		public bool TryReserve(uint specialistId, uint targetId, SpecialistAssignmentPurpose purpose, int maximumClaimants)
 		{
 			maximumClaimants = System.Math.Max(1, maximumClaimants);
@@ -190,6 +211,18 @@ namespace OpenRA.Mods.Common.Traits
 				return replacementScore > 0;
 
 			return replacementScore * 100 > currentScore * (100 + System.Math.Max(0, minimumImprovementPercent));
+		}
+
+		public static bool ActivityGraceExpired(int missingActivitySinceTick, int worldTick, int graceTicks)
+		{
+			return missingActivitySinceTick >= 0 &&
+				worldTick - missingActivitySinceTick > System.Math.Max(0, graceTicks);
+		}
+
+		public static bool ShouldRestoreAssignmentActivity(bool hasExpectedActivity,
+			int missingActivitySinceTick, int worldTick, int graceTicks)
+		{
+			return hasExpectedActivity || !ActivityGraceExpired(missingActivitySinceTick, worldTick, graceTicks);
 		}
 
 		public static double PairScore(double firstScore, double secondScore)

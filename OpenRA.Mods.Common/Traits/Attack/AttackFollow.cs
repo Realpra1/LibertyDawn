@@ -31,6 +31,9 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Range to stay away from min and max ranges to give some leeway if the target starts moving.")]
 		public readonly WDist RangeMargin = WDist.FromCells(1);
 
+		[Desc("Optional owner-scoped policy key that approaches using the shortest currently usable target-valid weapon range.")]
+		public readonly string ApproachRangePolicy = null;
+
 		public override object Create(ActorInitializer init) { return new AttackFollow(init.Self, this); }
 	}
 
@@ -42,6 +45,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		Mobile mobile;
 		AutoTarget autoTarget;
+		IBotAttackApproachPolicy[] approachPolicies;
 		bool requestedForceAttack;
 		Activity requestedTargetPresetForActivity;
 		bool opportunityForceAttack;
@@ -77,7 +81,40 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			mobile = self.TraitOrDefault<Mobile>();
 			autoTarget = self.TraitOrDefault<AutoTarget>();
+			approachPolicies = string.IsNullOrEmpty(Info.ApproachRangePolicy) ?
+				Array.Empty<IBotAttackApproachPolicy>() :
+				self.Owner.PlayerActor.TraitsImplementing<IBotAttackApproachPolicy>().ToArray();
 			base.Created(self);
+		}
+
+		WDist GetApproachMaximumRangeVersusTarget(Actor self, in Target target)
+		{
+			var fallback = GetMaximumRangeVersusTarget(target);
+			if (!IsApproachPolicyActive(self))
+				return fallback;
+
+			var approachRange = WDist.MaxValue;
+			foreach (var armament in Armaments)
+			{
+				if (armament.IsTraitDisabled || armament.IsTraitPaused ||
+					!armament.Weapon.IsValidAgainst(target, self.World, self))
+					continue;
+
+				var range = armament.MaxRange();
+				if (range > WDist.Zero && range < approachRange)
+					approachRange = range;
+			}
+
+			if (approachRange == WDist.MaxValue)
+				approachRange = fallback;
+
+			return approachRange;
+		}
+
+		bool IsApproachPolicyActive(Actor self)
+		{
+			return approachPolicies.Length > 0 &&
+				approachPolicies.Any(p => p.IsAttackApproachPolicyActive(self, Info.ApproachRangePolicy));
 		}
 
 		protected bool CanAimAtTarget(Actor self, in Target target, bool forceAttack)
@@ -246,7 +283,7 @@ namespace OpenRA.Mods.Common.Traits
 				    || target.Type == TargetType.FrozenActor || target.Type == TargetType.Terrain)
 				{
 					lastVisibleTarget = Target.FromPos(target.CenterPosition);
-					lastVisibleMaximumRange = attack.GetMaximumRangeVersusTarget(target);
+					lastVisibleMaximumRange = attack.GetApproachMaximumRangeVersusTarget(self, target);
 					lastVisibleMinimumRange = attack.GetMinimumRangeVersusTarget(target);
 
 					if (target.Type == TargetType.Actor)
@@ -282,7 +319,7 @@ namespace OpenRA.Mods.Common.Traits
 				if (!targetIsHiddenActor && target.Type == TargetType.Actor)
 				{
 					lastVisibleTarget = Target.FromTargetPositions(target);
-					lastVisibleMaximumRange = attack.GetMaximumRangeVersusTarget(target);
+					lastVisibleMaximumRange = attack.GetApproachMaximumRangeVersusTarget(self, target);
 					lastVisibleMinimumRange = attack.GetMinimumRange();
 					lastVisibleOwner = target.Actor.Owner;
 					lastVisibleTargetTypes = target.Actor.GetEnabledTargetTypes();
@@ -302,7 +339,7 @@ namespace OpenRA.Mods.Common.Traits
 				else if (target.Type == TargetType.FrozenActor && !lastVisibleTarget.IsValidFor(self))
 				{
 					lastVisibleTarget = Target.FromTargetPositions(target);
-					lastVisibleMaximumRange = attack.GetMaximumRangeVersusTarget(target);
+					lastVisibleMaximumRange = attack.GetApproachMaximumRangeVersusTarget(self, target);
 					lastVisibleOwner = target.FrozenActor.Owner;
 					lastVisibleTargetTypes = target.FrozenActor.TargetTypes;
 				}

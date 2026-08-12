@@ -125,6 +125,9 @@ namespace OpenRA.Mods.Common.Traits
 				.OrderBy(c => (c - anchor.Value.Cell).LengthSquared)
 				.ThenBy(c => c.X).ThenBy(c => c.Y);
 
+			const int ComparableCandidateLimit = 8;
+			CPos? reservedFallback = null;
+			var legalCandidates = 0;
 			foreach (var cell in cells)
 			{
 				if ((cell - anchor.Value.Cell).LengthSquared > coverageRadius * coverageRadius ||
@@ -133,9 +136,29 @@ namespace OpenRA.Mods.Common.Traits
 					(distanceToBaseIsImportant && !buildingInfo.IsCloseEnoughToBase(world, player, actorInfo, cell)))
 					continue;
 
+				legalCandidates++;
+				if (baseBuilder.WallPlanner.OverlapsConstructionYardEnclosure(cell, buildingInfo))
+				{
+					if (reservedFallback == null)
+						reservedFallback = cell;
+					if (legalCandidates >= ComparableCandidateLimit)
+						break;
+					continue;
+				}
+
+				if (reservedFallback != null)
+					baseBuilder.WallPlanner.LogReservationDecision(actorType,
+						reservedFallback.Value, cell, false);
 				Debug("placement type={0} anchor={1} priority={2} cell={3} coverage={4}", actorType,
 					anchor.Value.ActorId, anchor.Value.Priority, cell, coverageRadius);
 				return cell;
+			}
+
+			if (reservedFallback != null)
+			{
+				baseBuilder.WallPlanner.LogReservationDecision(actorType,
+					reservedFallback.Value, reservedFallback.Value, true);
+				return reservedFallback;
 			}
 
 			Debug("withheld placement type={0} anchor={1}: no legal powered coverage cell", actorType,

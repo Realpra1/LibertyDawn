@@ -55,19 +55,35 @@ namespace OpenRA
 			Languages = Array.Empty<string>();
 
 			// Take a local copy of the manifest
+			Game.StartupDiagnostic("manifest", "copy-enter id={0}", mod.Id);
 			Manifest = new Manifest(mod.Id, mod.Package);
+			Game.StartupDiagnostic("manifest", "copy-exit assemblies={0} packages={1}",
+				Manifest.Assemblies.Length, Manifest.Packages?.Count ?? 0);
+			Game.StartupDiagnostic("assemblies", "object-creator-enter");
 			ObjectCreator = new ObjectCreator(Manifest, mods);
+			Game.StartupDiagnostic("assemblies", "object-creator-exit");
+			Game.StartupDiagnostic("package-loaders", "discover-enter formats={0}", Manifest.PackageFormats.Length);
 			PackageLoaders = ObjectCreator.GetLoaders<IPackageLoader>(Manifest.PackageFormats, "package");
+			Game.StartupDiagnostic("package-loaders", "discover-exit count={0}", PackageLoaders.Length);
 
+			Game.StartupDiagnostic("filesystem", "create-enter");
 			ModFiles = new FS(mod.Id, mods, PackageLoaders);
+			Game.StartupDiagnostic("filesystem", "manifest-mount-enter packages={0}", Manifest.Packages?.Count ?? 0);
 			ModFiles.LoadFromManifest(Manifest);
+			Game.StartupDiagnostic("filesystem", "manifest-mount-exit");
+			Game.StartupDiagnostic("manifest", "custom-data-enter");
 			Manifest.LoadCustomData(ObjectCreator);
+			Game.StartupDiagnostic("manifest", "custom-data-exit");
 
 			if (useLoadScreen)
 			{
+				Game.StartupDiagnostic("load-screen", "create-enter type={0}", Manifest.LoadScreen.Value);
 				LoadScreen = ObjectCreator.CreateObject<ILoadScreen>(Manifest.LoadScreen.Value);
+				Game.StartupDiagnostic("load-screen", "init-enter");
 				LoadScreen.Init(this, Manifest.LoadScreen.ToDictionary(my => my.Value));
+				Game.StartupDiagnostic("load-screen", "display-enter");
 				LoadScreen.Display();
+				Game.StartupDiagnostic("load-screen", "display-exit");
 			}
 
 			WidgetLoader = new WidgetLoader(this);
@@ -76,6 +92,8 @@ namespace OpenRA
 			SoundLoaders = ObjectCreator.GetLoaders<ISoundLoader>(Manifest.SoundFormats, "sound");
 			SpriteLoaders = ObjectCreator.GetLoaders<ISpriteLoader>(Manifest.SpriteFormats, "sprite");
 			VideoLoaders = ObjectCreator.GetLoaders<IVideoLoader>(Manifest.VideoFormats, "video");
+			Game.StartupDiagnostic("media-loaders", "sound={0} sprite={1} video={2}",
+				SoundLoaders.Length, SpriteLoaders.Length, VideoLoaders.Length);
 
 			var terrainFormat = Manifest.Get<TerrainFormat>();
 			var terrainLoader = ObjectCreator.FindType(terrainFormat.Type + "Loader");
@@ -103,6 +121,7 @@ namespace OpenRA
 			ModelSequenceLoader.OnMissingModelError = s => Log.Write("debug", s);
 
 			Hotkeys = new HotkeyManager(ModFiles, Game.Settings.Keys, Manifest);
+			Game.StartupDiagnostic("mod-data", "core-services-ready");
 
 			defaultRules = Exts.Lazy(() => Ruleset.LoadDefaults(this));
 			defaultTerrainInfo = Exts.Lazy(() =>

@@ -534,6 +534,7 @@ namespace OpenRA.Mods.Common.Traits
 				var wallInfo = world.Map.Rules.Actors[actorType];
 				var wallBuilding = wallInfo.TraitInfoOrDefault<BuildingInfo>();
 				bool IsLegal(CPos cell) => wallBuilding != null &&
+					!baseBuilder.WallPlanner.IsConstructionYardEnclosureReserved(cell) &&
 					world.CanPlaceBuilding(cell, wallInfo, wallBuilding, null) &&
 					wallBuilding.IsCloseEnoughToBase(world, player, wallInfo, cell);
 				if (!IsLegal(targetCell) && project.RedAnchorIndex >= 2)
@@ -1250,7 +1251,8 @@ namespace OpenRA.Mods.Common.Traits
 			IEnumerable<CPos> candidates = project.RedAnchorIndex == 0 ? new[] { segment[0] } :
 				project.RedAnchorIndex == 1 ? new[] { segment[segment.Length - 1] } :
 				segment.Where(c => !HasOwnWall(c));
-			return candidates.Where(c => world.CanPlaceBuilding(c, wallInfo, wallBuilding, null) &&
+			return candidates.Where(c => !baseBuilder.WallPlanner.IsConstructionYardEnclosureReserved(c) &&
+				world.CanPlaceBuilding(c, wallInfo, wallBuilding, null) &&
 				wallBuilding.IsCloseEnoughToBase(world, player, wallInfo, c))
 				.Select(c => (CPos?)c).FirstOrDefault();
 		}
@@ -1311,6 +1313,7 @@ namespace OpenRA.Mods.Common.Traits
 		bool IsPotentialResonatorSite(CPos cell, ActorInfo resonatorInfo, BuildingInfo buildingInfo, Actor tree)
 		{
 			if (tree == null || !tree.IsInWorld || tree.IsDead ||
+				baseBuilder.WallPlanner.OverlapsConstructionYardEnclosure(cell, buildingInfo) ||
 				!world.CanPlaceBuilding(cell, resonatorInfo, buildingInfo, null))
 				return false;
 
@@ -1378,7 +1381,8 @@ namespace OpenRA.Mods.Common.Traits
 
 		bool IsLegalExtensionCell(CPos cell, ActorInfo powerInfo, BuildingInfo buildingInfo)
 		{
-			return world.CanPlaceBuilding(cell, powerInfo, buildingInfo, null) &&
+			return !baseBuilder.WallPlanner.OverlapsConstructionYardEnclosure(cell, buildingInfo) &&
+				world.CanPlaceBuilding(cell, powerInfo, buildingInfo, null) &&
 				buildingInfo.IsCloseEnoughToBase(world, player, powerInfo, cell) &&
 				(resourceLayer == null || buildingInfo.Tiles(cell)
 					.All(c => resourceLayer.GetResource(c).Type == null));

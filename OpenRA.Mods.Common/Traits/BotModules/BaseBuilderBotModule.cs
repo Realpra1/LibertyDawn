@@ -11,6 +11,7 @@
 
 using System.Collections.Generic;
 using System.Linq;
+using OpenRA.Primitives;
 using OpenRA.Traits;
 
 namespace OpenRA.Mods.Common.Traits
@@ -373,6 +374,15 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Empty cells left between the construction yard footprint and its enclosure.")]
 		public readonly int ConstructionYardEnclosureMargin = 1;
 
+		[Desc("Width of the deliberate vehicle access opening in the construction-yard enclosure.")]
+		public readonly int ConstructionYardEnclosureAccessWidth = 3;
+
+		[Desc("Absolute world tick when construction-yard enclosure planning, reservations, and repairs stop.")]
+		public readonly int ConstructionYardEnclosureCutoffTick = 7500;
+
+		[Desc("Ticks between bounded missing-cell maintenance scans for the construction-yard enclosure.")]
+		public readonly int ConstructionYardEnclosureMaintenanceInterval = 250;
+
 		[Desc("Write construction-yard enclosure planning and failure diagnostics to debug.log.")]
 		public readonly bool ConstructionYardEnclosureDebugLogging = false;
 
@@ -398,6 +408,46 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Name of the locomotor used to verify the AI can still move around after walling.")]
 		public readonly string WallPathCheckLocomotor = "wheeled";
 
+		[Desc("Enable one attacked-tower defense cluster. Default-off so other bots and mods retain control behavior.")]
+		public readonly bool EnableDefenseClusterPolicy = false;
+
+		[Desc("Ordered tower alternatives owned by the active defense cluster.")]
+		public readonly string[] DefenseClusterTowerTypes = System.Array.Empty<string>();
+
+		[Desc("Configured tower capabilities. Actors are also validated against their loaded weapon target capability.")]
+		public readonly HashSet<string> DefenseClusterAntiInfantryTypes = new HashSet<string>();
+		public readonly HashSet<string> DefenseClusterAntiGroundTypes = new HashSet<string>();
+		public readonly HashSet<string> DefenseClusterAntiAirTypes = new HashSet<string>();
+
+		[Desc("Ordered local passive-repair facility alternatives.")]
+		public readonly string[] DefenseClusterRepairFacilityTypes = System.Array.Empty<string>();
+
+		[Desc("Minimum distinct live tower actors and maximum tower-center radius for a complete cluster.")]
+		public readonly int DefenseClusterMinimumTowers = 3;
+		public readonly int DefenseClusterRadius = 9;
+
+		[Desc("Minimum and maximum top-left search radius for cluster tower/facility placements.")]
+		public readonly int DefenseClusterPlacementMinimumRadius = 2;
+		public readonly int DefenseClusterPlacementMaximumRadius = 8;
+
+		[Desc("Ticks that the first attacked tower retains the primary anchor, and reservation/retry timing.")]
+		public readonly int DefenseClusterAnchorLease = 750;
+		public readonly int DefenseClusterReservationTimeout = 750;
+		public readonly int DefenseClusterMaintenanceInterval = 125;
+		public readonly int DefenseClusterRetryDelay = 750;
+		public readonly int DefenseClusterMaximumPlacementFailures = 3;
+
+		[Desc("Open-screen geometry: enemy-facing setback, half-width, and flank depth in cells.")]
+		public readonly int DefenseClusterWallSetback = 3;
+		public readonly int DefenseClusterWallHalfWidth = 4;
+		public readonly int DefenseClusterWallFlankDepth = 3;
+
+		[Desc("Maximum cells examined by each local route check.")]
+		public readonly int DefenseClusterPathCheckMaximumCells = 3000;
+
+		[Desc("Ticks to retain an attacked non-tower structure as the next ordinary defense placement center.")]
+		public readonly int DefenseClusterOrdinaryDefenseLease = 750;
+
 		[Desc("What buildings to the AI should build.", "What integer percentage of the total base must be this type of building.")]
 		public readonly Dictionary<string, int> BuildingFractions = null;
 
@@ -410,6 +460,53 @@ namespace OpenRA.Mods.Common.Traits
 		public override void RulesetLoaded(Ruleset rules, ActorInfo ai)
 		{
 			base.RulesetLoaded(rules, ai);
+			if (EnableDefenseClusterPolicy)
+			{
+				if (DefenseClusterTowerTypes.Length == 0 || DefenseClusterRepairFacilityTypes.Length == 0 ||
+					WallTypes.Count == 0 || DefenseClusterMinimumTowers < 3 || DefenseClusterRadius <= 0 ||
+					DefenseClusterPlacementMinimumRadius < 0 ||
+					DefenseClusterPlacementMaximumRadius < DefenseClusterPlacementMinimumRadius ||
+					DefenseClusterRadius < DefenseClusterPlacementMaximumRadius || DefenseClusterAnchorLease <= 0 ||
+					DefenseClusterReservationTimeout <= 0 || DefenseClusterMaintenanceInterval <= 0 ||
+					DefenseClusterRetryDelay <= 0 || DefenseClusterMaximumPlacementFailures <= 0 ||
+					DefenseClusterWallSetback <= 0 || DefenseClusterWallHalfWidth < 2 ||
+					DefenseClusterWallFlankDepth <= 0 || DefenseClusterPathCheckMaximumCells < 64 ||
+					DefenseClusterOrdinaryDefenseLease <= 0)
+					throw new YamlException("Defense cluster tower/facility/wall types, count, radii, lease, retry, screen, and path caps must be configured and valid.");
+
+				var towerTypes = new HashSet<string>(DefenseClusterTowerTypes);
+				if (towerTypes.Count != DefenseClusterTowerTypes.Length ||
+					DefenseClusterAntiInfantryTypes.Count == 0 || DefenseClusterAntiGroundTypes.Count == 0 ||
+					DefenseClusterAntiAirTypes.Count == 0 ||
+					DefenseClusterAntiInfantryTypes.Concat(DefenseClusterAntiGroundTypes)
+						.Concat(DefenseClusterAntiAirTypes).Any(t => !towerTypes.Contains(t)))
+					throw new YamlException("Defense cluster role types must be non-empty subsets of the unique tower list.");
+
+				ValidateDefenseClusterRole(rules, DefenseClusterAntiInfantryTypes,
+					new BitSet<TargetableType>("Ground", "Infantry"), "anti-infantry");
+				ValidateDefenseClusterRole(rules, DefenseClusterAntiGroundTypes,
+					new BitSet<TargetableType>("Ground", "Vehicle"), "anti-ground");
+				ValidateDefenseClusterRole(rules, DefenseClusterAntiAirTypes,
+					new BitSet<TargetableType>("Air"), "anti-air");
+
+				foreach (var towerType in towerTypes)
+					if (!rules.Actors.TryGetValue(towerType, out var tower) ||
+						tower.TraitInfoOrDefault<BuildingInfo>() == null || !tower.TraitInfos<ArmamentInfo>().Any())
+						throw new YamlException($"Defense cluster tower '{towerType}' must be a building with an armament.");
+
+				foreach (var facilityType in DefenseClusterRepairFacilityTypes)
+					if (!rules.Actors.TryGetValue(facilityType, out var facility) ||
+						facility.TraitInfoOrDefault<BuildingInfo>() == null ||
+						!facility.TraitInfos<GrantConditionInRangeInfo>().Any(t => t.Granter &&
+							t.ValidRelationships.HasRelationship(PlayerRelationship.Ally) && t.Range.Length > 0))
+						throw new YamlException($"Defense cluster facility '{facilityType}' must be a building with an allied repair-range granter.");
+
+				foreach (var wallType in WallTypes)
+					if (!rules.Actors.TryGetValue(wallType, out var wall) || wall.TraitInfoOrDefault<BuildingInfo>() == null ||
+						wall.TraitInfoOrDefault<LineBuildInfo>() == null || wall.TraitInfoOrDefault<SellableInfo>() == null)
+						throw new YamlException($"Defense cluster wall '{wallType}' must be a sellable line-build building.");
+			}
+
 			if (EconomyDefenseSamTypes.Count == 0)
 				return;
 
@@ -434,6 +531,17 @@ namespace OpenRA.Mods.Common.Traits
 					!actor.TraitInfos<ArmamentInfo>().Any())
 					throw new YamlException($"Economy SAM actor '{samType}' must be a building with an armament.");
 			}
+		}
+
+		static void ValidateDefenseClusterRole(Ruleset rules, IEnumerable<string> actorTypes,
+			BitSet<TargetableType> targetTypes, string role)
+		{
+			foreach (var actorType in actorTypes)
+				if (!rules.Actors.TryGetValue(actorType, out var actor) ||
+					!actor.TraitInfos<ArmamentInfo>().Any(a => !string.IsNullOrEmpty(a.Weapon) &&
+						rules.Weapons.TryGetValue(a.Weapon.ToLowerInvariant(), out var weapon) &&
+						weapon.IsValidTarget(targetTypes)))
+					throw new YamlException($"Defense cluster {role} actor '{actorType}' has no weapon capable of targeting that role.");
 		}
 
 		public override object Create(ActorInitializer init) { return new BaseBuilderBotModule(init.Self, this); }
@@ -465,6 +573,7 @@ namespace OpenRA.Mods.Common.Traits
 		internal BaseBuilderWallPlanner WallPlanner { get; private set; }
 		internal BaseBuilderFirstTowerPlanner FirstTowerPlanner { get; private set; }
 		internal BaseBuilderTiberiumFieldManager TiberiumFieldManager { get; private set; }
+		internal BaseBuilderDefenseClusterManager DefenseClusterManager { get; private set; }
 
 		readonly World world;
 		readonly Player player;
@@ -520,6 +629,7 @@ namespace OpenRA.Mods.Common.Traits
 			rallyPointManagers = self.Owner.PlayerActor.TraitsImplementing<IBotRallyPointManager>().ToArray();
 			WallPlanner = new BaseBuilderWallPlanner(this, player);
 			FirstTowerPlanner = new BaseBuilderFirstTowerPlanner(this, player);
+			DefenseClusterManager = new BaseBuilderDefenseClusterManager(this, player, playerPower);
 			TiberiumFieldManager = new BaseBuilderTiberiumFieldManager(this, player,
 				playerResources, playerPower, resourceLayer);
 			if (Info.EnableSmartEconomy)
@@ -669,9 +779,11 @@ namespace OpenRA.Mods.Common.Traits
 
 		void IBotTick.BotTick(IBot bot)
 		{
+			WallPlanner?.Tick();
 			UpdateOpening(bot);
 			smartEconomy?.Tick(bot);
 			TiberiumFieldManager?.Tick();
+			DefenseClusterManager?.Tick(bot);
 			FirstTowerPlanner.Update();
 			SetRallyPointsForNewProductionBuildings(bot);
 
@@ -1064,7 +1176,7 @@ namespace OpenRA.Mods.Common.Traits
 				.Any(queue => !queue.AllQueued().Any() && queue.BuildableItems().Any(item => item.Name == type)));
 		}
 
-		bool IsCurrentlyBuildable(string type)
+		internal bool IsCurrentlyBuildable(string type)
 		{
 			if (!world.Map.Rules.Actors.TryGetValue(type, out var actor))
 				return false;
@@ -1091,6 +1203,8 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (!e.Attacker.Info.HasTraitInfo<ITargetableInfo>())
 				return;
+
+			DefenseClusterManager?.ObserveAttack(self, e);
 
 			// Protect buildings
 			if (self.Info.HasTraitInfo<BuildingInfo>())
@@ -1204,9 +1318,15 @@ namespace OpenRA.Mods.Common.Traits
 				new MiniYamlNode("EconomyDefenseSamReservationTick", FieldSaver.FormatValue(economyDefenseSam?.ReservationTick ?? 0)),
 				new MiniYamlNode("FirstTowerPlacementComplete", FieldSaver.FormatValue(FirstTowerPlanner.Complete))
 			};
+			var enclosureState = WallPlanner?.IssueTraitData();
+			if (enclosureState != null)
+				data.Add(enclosureState);
 			var fieldState = TiberiumFieldManager?.IssueTraitData();
 			if (fieldState != null)
 				data.Add(fieldState);
+			var clusterState = DefenseClusterManager?.IssueTraitData();
+			if (clusterState != null)
+				data.Add(clusterState);
 
 			return data;
 		}
@@ -1223,6 +1343,9 @@ namespace OpenRA.Mods.Common.Traits
 			var defenseCenterNode = data.FirstOrDefault(n => n.Key == "DefenseCenter");
 			if (defenseCenterNode != null)
 				defenseCenter = FieldLoader.GetValue<CPos>("DefenseCenter", defenseCenterNode.Value.Value);
+
+			DefenseClusterManager?.ResolveTraitData(data);
+			WallPlanner?.ResolveTraitData(data);
 
 			var openingInitializedNode = data.FirstOrDefault(n => n.Key == "OpeningInitialized");
 			if (openingInitializedNode != null)
@@ -1349,6 +1472,7 @@ namespace OpenRA.Mods.Common.Traits
 			if (firstTowerNode != null)
 				FirstTowerPlanner.Complete = FieldLoader.GetValue<bool>("FirstTowerPlacementComplete", firstTowerNode.Value.Value);
 
+			WallPlanner?.ResolveTraitData(data);
 			TiberiumFieldManager?.ResolveTraitData(data);
 		}
 	}

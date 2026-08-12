@@ -63,6 +63,12 @@ namespace OpenRA.Mods.Common.Traits
 				(long)reinforcementCount * 100 >= (long)formationCount * reinforcementRatioPercent;
 		}
 
+		/// <summary>Prevents the squad from ordering units that are owned by a higher-priority temporary role.</summary>
+		public static bool CanOrderGroundReinforcement(bool isProtectingBase, bool isTemporarilyControlled)
+		{
+			return !isProtectingBase && !isTemporarilyControlled;
+		}
+
 		/// <summary>
 		/// Gives damaged targets a bounded finishing incentive. Full health keeps the authored value and
 		/// near-zero health approaches, but never reaches, twice that value.
