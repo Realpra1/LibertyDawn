@@ -62,6 +62,11 @@ contract, not a summary.
     topology such as Archipelago. For persisted behavior, include save/load and
     reject a reloaded state as sole acceptance. For hot paths, define a bounded
     CPU/allocation expectation and measurement or credible regression signal.
+    For a performance task, require the bounded matched scenario defined in the
+    worker template: two ordinary Iron Reapers with at least 300 units plus
+    structures each, at most two real-time minutes per tested version/config,
+    pre-Codex versus newest, and newest advanced squad modules disabled versus
+    enabled.
 13. Write a concise implementation/publication plan covering desired and forbidden
     behavior, ownership, instrumentation, tests, task report, PR, and checks.
 14. Treat full-AI game simulations as cheap primary feedback that substitutes for

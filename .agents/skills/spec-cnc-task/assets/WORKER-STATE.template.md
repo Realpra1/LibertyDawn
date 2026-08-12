@@ -188,6 +188,25 @@ reachable. If natural occurrence depends on unfinished prerequisite behavior
 future revalidation instead of wasting cycles waiting for an event the current
 build seldom creates or treating its absence as failure of this task.
 
+For performance tests, prefer a bounded matched custom scenario over an
+open-ended stress match. Give two ordinary Iron Reapers at least 300 units plus
+representative structures each; raise the count only when the intended test
+requires it. Run each tested game version/configuration for at most two minutes
+of real wall-clock time. Keep map bytes, seed, starts, actors, structures, rules,
+options, and measurement window aligned, then compare:
+
+1. The named pre-Codex game checkpoint against the newest tested build.
+2. The newest build with advanced squad AI modules disabled against the same
+   build with them enabled.
+
+If the pre-Codex build cannot expose the module toggle, use a three-way matrix:
+pre-Codex, newest-disabled, newest-enabled. Record simulated ticks completed,
+per-tick latency distribution/spikes, CPU time, peak memory, actor counts, and
+errors/stalls. A two-minute cutoff is a valid bounded performance result, not a
+gameplay win/loss; terminate and clean up the exact process tree at the cutoff.
+Do not change unit counts, rules, logging, or map state between matched legs, and
+do not interpret debug-heavy or contended runs as golden performance evidence.
+
 For every change to AI strategy, priorities, economy, production, targeting,
 recovery, or tactics, compare against old behavior repeatedly throughout the loop.
 Prefer a same-build feature-disabled control. If unavailable, run the recorded
