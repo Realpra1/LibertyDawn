@@ -164,3 +164,22 @@ The fresh reviewers accepted the frozen-policy, valid-rendered evidence and requ
 
 - GC-pause and scheduler-throttle metrics remain unavailable; the logger flush/backlog, save/load/replay continuation, and historical/newest matrix remain incomplete.
 - The affinity contrast cannot identify whether tick-76 belongs to StealthTankSquad internals, the enclosing world work, allocation/GC, or another simultaneous owner. A causal same-build intervention is still required before a code fix.
+
+# CNC-96 cycle 5 report
+
+## Result
+
+No product code or AI policy changed. A diagnostic-only, in-map control removed exactly `StealthTankSquadBotModule` and `StealthTankSquadBotModule@chemical`, retaining the same 600-actor placement, seed `9601`, IronReaper factions/roster, normal rendered pacing, package diagnostics, staged content, one-CPU constraint, and tick-150 exit. This intentionally reduces work, so it is causal evidence only and cannot be a product fix or acceptance claim.
+
+## Valid paired games
+
+- Enabled control: `cycle-5/game-1-enabled/` passed tick 150 in `17.024s`, with no exception/desync. Completed tick p50/p95/p99/max was `16/46/497/1201ms`; the tick-76 world span was `494.492ms`, including player-1/player-2 StealthTank spans `365.131/112.318ms`, and tick 77 was `496.280ms`. The run settled to ordinary post-boundary tick times and kept the candidate modules at 300 calls per player.
+- Candidate-off diagnostic: `cycle-5/game-2-candidate-off/` passed tick 150 in `17.020s`, with no exception/desync. Completed tick p50/p95/p99/max was `17/45/338/1329ms`; the same boundary was only `67.181ms` at tick 76. The two candidate module identities are absent; all listed remaining modules retained 150 calls per player. Startup immediate work persisted and increased to `1272.448ms`; paced render remained ~`59ms` p50 with 142/176 samples above the diagnostic 50ms threshold, while present stayed below threshold.
+
+The paired movement strongly nominates the two-trait boundary as a contributor to the tick-76/77 simulation stall, but it does not distinguish the traits' intrinsic cost from downstream workload/order effects and it violates workload equivalence by disabling ordinary AI work. It therefore does not authorize a phase shift, cache, reduced scan, or other behavior change.
+
+## Review disposition and handoff
+
+Fresh Luna commenter and policy artifacts are under `cycle-5/game-{1,2}-analysis/{commenter/NARRATIVE.md,policy/POLICY-REVIEW.md}`. Both games were accepted as valid frozen-policy evidence. The Game 2 reviewer’s strongest recommendation—adopted—is a repeated like-for-like paired comparison with workload/outcome/equivalence metrics before assigning ownership. This primary tier is exhausted (five cycles), so the task is handed off as `Needs help` rather than making an unproven AI change.
+
+Checks: both serial paced full-engine games passed the launcher’s map/bot/content/benchmark/exit validation within 120 seconds; `git diff --check` passed. Cycle 4's focused automated checks remained `18/18`; there was no code to rebuild in cycle 5.
