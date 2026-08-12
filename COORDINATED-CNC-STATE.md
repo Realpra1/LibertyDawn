@@ -22,6 +22,12 @@
   pending enclosure ownership plus a missing save/load regression test. A focused
   follow-up repair PR is in progress; do not treat the merged release as ready for
   playtest until that repair is reviewed and checked.
+- Follow-up PR #100 (`fix/cnc-wall-save-reservation`, head
+  `761d4f02a7891f02900e8075648b3ece466709de`) removes the duplicate wall
+  reservation restore and adds module-level save/load regression coverage.
+  Terra re-review is ready; 22 focused enclosure tests and the full build pass;
+  GitHub CI is queued. Full-engine save/load was attempted but stopped before
+  tick 1 on Linux renderer initialization, so it is not gameplay evidence.
 
 ## Workers
 
