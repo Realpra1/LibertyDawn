@@ -1,7 +1,7 @@
 # Coordinated CNC State
 
 - Round ID: `20260807-bug-polish-03`
-- Phase: `valid integration cycle 1 pending; startup blocker repaired; CNC-47 withdrawn/excluded`
+- Phase: `valid integration cycle 1 passed; diagnostic merge pending; CNC-47 withdrawn/excluded`
 - Common base branch: `agent/cnc-20260807-bug-polish-02-release`
 - Common base SHA: `468ee64f5a0f9a9e19e260e5c5943e6e878f4705`
 - Coordinator model: `gpt-5.6-luna` / `medium`; delegated cycle tiers are pinned
@@ -30,7 +30,7 @@
 
 ## Release rounds
 
-| RC1 | `37ede3f9303191cbeec228518479061f715fcb32` | CNC-45, CNC-46, CNC-50, CNC-52 | startup setup repaired; Terra cycle 1 pending | `make check`, `make test` passed; corrected RC1 reached ticks 1,000 and 3,000 | `0/5 valid` | use canonical launcher with `--content /root/github/LibertyDawn/.build/cnc33a/runtime-content`; prior invalid launches consumed no cycles |
+| RC1 | `37ede3f9303191cbeec228518479061f715fcb32` | CNC-45, CNC-46, CNC-50, CNC-52 | Terra cycle 1 passed; reviewed startup diagnostics pending merge | `make check`, `make test` passed; two cycle-1 games reached tick 8,000 | `1/5 valid` | canonical launcher/content preflight required; cycle 1 operationally clean but timing-only telemetry was insufficient for strategic acceptance |
 |---|---|---|---|---|---|---|
 
 ## Resume note
@@ -207,3 +207,12 @@ The four isolated tasks had substantial valid gameplay evidence (conservative
 artifact counts CNC-45 30, CNC-46 61, CNC-50 75, CNC-52 33); only later manual
 integration setup was invalid. Begin valid integration cycle 1 with Terra medium
 and the normal worker launcher/preflight.
+
+Valid integration cycle 1 (2026-08-12): exact RC1 ran Empire Earth seed 451203
+with Brutalis/Skynet/Cabal to tick 8,000 in 20.022s and Chokepoint seed 451205
+with Skynet/Brutalis to tick 8,000 in 11.009s. Both canonical headless MAX runs
+produced benchmarks/replays and no desync, fatal error, exception, or content
+fallback. Per-game Luna narratives and policy reviews completed; reviewers found
+the timing-only telemetry sufficient for operational/no-regression evidence but
+not for strategic task acceptance, so no repair was authorized. Receipt:
+`.worktrees/coordinated-cnc/20260807-bug-polish-03/analysis/integration-cycle-01-valid/INTEGRATION-NOTES.md`.
