@@ -29,11 +29,13 @@ state. Restart a fresh role from its durable input instead of reconstructing its
 context.
 
 For unattended rounds, install `scripts/coordination_watchdog.sh` as a
-five-minute cron job. It starts a lock-protected Luna coordinator audit with a
+one-minute cron job. It starts a lock-protected Luna coordinator audit with a
 four-minute bound; the audit rereads this skill and state, checks process records
-and durable timestamps, and routes eligible next work. It must not duplicate a
-live role or interrupt a healthy build/game. Keep JSON output under the ignored
-coordination worktree and remove the cron when the round is explicitly paused.
+and durable timestamps, and routes eligible next work. The one-minute wake lets
+it react quickly after the four-minute audit identifies a stall; the lock and
+live-process checks prevent overlapping audits or duplicate workers. Keep JSON
+output under the ignored coordination worktree and remove the cron when the
+round is explicitly paused.
 
 ## Roles and models
 
