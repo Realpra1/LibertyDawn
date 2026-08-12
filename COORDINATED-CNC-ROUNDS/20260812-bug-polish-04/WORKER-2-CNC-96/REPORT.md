@@ -134,3 +134,33 @@ The required Luna code review found that phase samples could include a secondary
 ## Next evidence-driven step
 
 Keep all AI work unchanged. Extend the same matched affinity pair beyond startup and add bounded per-tick phase joins plus available scheduler/GC-pause attribution before testing any owning-boundary intervention. The existing 25-tick evidence supports diagnosis only, not acceptance or a gameplay fix.
+
+# CNC-96 cycle 4 report
+
+## Result
+
+No product code or gameplay policy changed. The observation window was extended from 25 to 150 rendered world ticks using the exact existing map, seed, roster, content, normal pacing, and package diagnostics. The corrected serial affinity pair shows that the startup tail is separated, while a second aligned world/module stall occurs at tick 76. It is a causal candidate, not a proven fix boundary: both StealthTankSquad module spans and the enclosing world phase coincide, but no same-build intervention has yet moved it.
+
+## Valid games and comparison
+
+- Constrained (`taskset -c 0`): passed tick 150 in 17.023s. Completed tick p50/p95/p99/max was `17/47/502/1198.630ms` with six >=50ms samples; render `59/63/170/169.391ms` with 143 samples; present max `45.872ms` with none. Startup immediate was `1151.204ms`; at tick 76, world reached `496.674ms`, player-1 and player-2 StealthTankSquad reached `368.974ms` and `115.081ms`, and the following completed tick was `501.650ms`.
+- Unrestricted affinity: passed tick 150 in 11.012s. Completed tick p50/p95/p99/max was `10/28/417/1058.724ms` with four >=50ms samples; render `20/27/31/104.551ms` with one sample; present max `20.117ms` with none. Startup immediate was `1019.671ms`; at tick 76, world reached `415.176ms`, the same two modules reached `309.353ms` and `98.712ms`, and tick 77 was `416.597ms`.
+- Both runs retained 150 calls for ordinary modules (300 for each StealthTankSquad module), unchanged actors through the relevant window (748 until tick 100; 750 later), the required map/bot/exit markers, benchmark/replay artifacts, and no exception/desync. The valid artifacts are `cycle-4/game-{1-constrained-final,2-unconstrained-final}/`; fresh commentary/policy reviews are at the corresponding `game-{1,2}-analysis/` directories.
+- The explicit `mods/cnc` content override was an invalid setup: it timed out loading content before world tick 1. It is retained at `cycle-4/game-1-constrained/` and is not counted. The final pair verified the previous successful isolated `SupportDir/Content` target `/root/github/LibertyDawn/.build/cnc33a/runtime-content` before launch.
+
+## Interpretation and next gate
+
+Removing one-CPU affinity materially improves ordinary rendered flow (constrained render p50 59ms versus 20ms and 143 versus one render tails), but does not remove the startup or tick-76 simulation tails. Host capacity is therefore a material amplifier, not an isolated complete diagnosis. The tick-76 alignment is the first repeated non-startup candidate and must receive a same-build, workload-equivalent diagnostic intervention before any behavior-preserving change. Preserve call counts, module order, urgent work, reservations, save/load state, deterministic replay, and all balance values; do not phase-shift or disable AI work from temporal proximity alone.
+
+The fresh reviewers accepted the frozen-policy, valid-rendered evidence and require the exact affinity parity comparison; that comparison has now passed. Their next recommendation is to compare completed post-startup tick/render/present and phase tails under a narrowly controlled candidate test. This is adopted for the next cycle. No reviewer advice was rejected.
+
+## Checks
+
+- `dotnet test OpenRA.Test/OpenRA.Test.csproj --no-restore --filter 'FullyQualifiedName~LaunchArgumentsTest|FullyQualifiedName~PeriodicStallClassifierTest' --nologo`: 18/18 passed.
+- `git diff --check`: passed.
+- Two valid full-engine, serial paced rendered games passed at world tick 150; each process remained within the 120-second cap.
+
+## Remaining risks
+
+- GC-pause and scheduler-throttle metrics remain unavailable; the logger flush/backlog, save/load/replay continuation, and historical/newest matrix remain incomplete.
+- The affinity contrast cannot identify whether tick-76 belongs to StealthTankSquad internals, the enclosing world work, allocation/GC, or another simultaneous owner. A causal same-build intervention is still required before a code fix.
