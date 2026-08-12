@@ -271,6 +271,7 @@ namespace OpenRA.Mods.Common.Traits
 				new MiniYamlNode("AdvancedFailsafeOffender", FieldSaver.FormatValue(state.Offender ?? "")),
 				new MiniYamlNode("AdvancedFailsafeBreachSamples", FieldSaver.FormatValue(state.BreachSamples)),
 				new MiniYamlNode("AdvancedFailsafeHealthySamples", FieldSaver.FormatValue(state.HealthySamples)),
+				new MiniYamlNode("AdvancedFailsafeRecoveryProbe", FieldSaver.FormatValue(state.RecoveryProbe ?? "")),
 			};
 		}
 
@@ -287,7 +288,8 @@ namespace OpenRA.Mods.Common.Traits
 				fields.TryGetValue("AdvancedFailsafeBreachSamples", out var breachNode) ?
 					FieldLoader.GetValue<int>("AdvancedFailsafeBreachSamples", breachNode.Value.Value) : 0,
 				fields.TryGetValue("AdvancedFailsafeHealthySamples", out var healthyNode) ?
-					FieldLoader.GetValue<int>("AdvancedFailsafeHealthySamples", healthyNode.Value.Value) : 0);
+					FieldLoader.GetValue<int>("AdvancedFailsafeHealthySamples", healthyNode.Value.Value) : 0,
+				fields.TryGetValue("AdvancedFailsafeRecoveryProbe", out var recoveryProbeNode) ? recoveryProbeNode.Value.Value : null);
 			pendingFailsafeState = state;
 			if (advancedFailsafe != null)
 			{

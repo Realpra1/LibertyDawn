@@ -42,13 +42,16 @@ namespace OpenRA.Mods.Common.Traits
 		public readonly string Offender;
 		public readonly int BreachSamples;
 		public readonly int HealthySamples;
+		public readonly string RecoveryProbe;
 
-		public AdvancedBotFailsafeState(string[] disabledModules, string offender, int breachSamples, int healthySamples)
+		public AdvancedBotFailsafeState(string[] disabledModules, string offender, int breachSamples, int healthySamples,
+			string recoveryProbe)
 		{
 			DisabledModules = disabledModules;
 			Offender = offender;
 			BreachSamples = breachSamples;
 			HealthySamples = healthySamples;
+			RecoveryProbe = recoveryProbe;
 		}
 	}
 
@@ -152,7 +155,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		public AdvancedBotFailsafeState ExportState()
 		{
-			return new AdvancedBotFailsafeState(DisabledModules.ToArray(), offender, breachSamples, healthySamples);
+			return new AdvancedBotFailsafeState(DisabledModules.ToArray(), offender, breachSamples, healthySamples, recoveryProbe);
 		}
 
 		public void ImportState(AdvancedBotFailsafeState state)
@@ -165,7 +168,8 @@ namespace OpenRA.Mods.Common.Traits
 			offender = moduleOrder.Contains(state.Offender) ? state.Offender : null;
 			breachSamples = Math.Max(0, state.BreachSamples);
 			healthySamples = Math.Max(0, state.HealthySamples);
-			recoveryProbe = null;
+			recoveryProbe = moduleOrder.Contains(state.RecoveryProbe) && !disabled.Contains(state.RecoveryProbe) ?
+				state.RecoveryProbe : null;
 		}
 	}
 }

@@ -115,6 +115,25 @@ namespace OpenRA.Test
 		}
 
 		[Test]
+		public void ExportImportPreservesRecoveryProbeForImmediateReshed()
+		{
+			var first = Create("advanced");
+			var times = new Dictionary<string, double> { { "advanced", 75 } };
+			first.Update(Slow, 100, times);
+			first.Update(Slow, 100, times);
+			first.Update(Healthy, 100, times);
+			first.Update(Healthy, 100, times);
+			first.Update(Healthy, 100, times);
+
+			var restored = Create("advanced");
+			restored.ImportState(first.ExportState());
+
+			Assert.That(restored.IsEnabled("advanced"), Is.True);
+			Assert.That(restored.Update(Slow, 100, times).Transition, Is.EqualTo("re-shed"));
+			Assert.That(restored.IsEnabled("advanced"), Is.False);
+		}
+
+		[Test]
 		public void PacingSamplerRejectsMaximumSpeedAndRegression()
 		{
 			var sampler = new SimulationPacingSampler(10);

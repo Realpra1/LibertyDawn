@@ -34,8 +34,15 @@ def main() -> None:
 	parser.add_argument("--output", required=True, type=Path)
 	args = parser.parse_args()
 	root = Path(__file__).resolve().parent.parent
+	# Keep the same scenario bytes for enabled and disabled feature legs. The
+	# performance contract requires at least 300 representative units per AI.
+	high_unit_support = ", ".join(
+		["e1"] * 80 + ["e2"] * 40 + ["e3"] * 30 + ["e4"] * 20 + ["e5"] * 10 +
+		["bggy"] * 20 + ["bike"] * 20 + ["jeep"] * 20 + ["ltnk"] * 25 +
+		["mtnk"] * 25 + ["ftnk"] * 10 + ["htnk"] * 10 + ["arty"] * 5 + ["msam"] * 5
+	)
 
-	high_unit_rules = """Player:
+	high_unit_rules = f"""Player:
 \tModularBot@IronReaperObserver:
 \t\tName: Iron Reaper Observer
 \t\tType: ironreaper-observer
@@ -57,7 +64,7 @@ World:
 \t\tClassName: CNC-100 high-unit failsafe stress
 \t\tFactions: nod
 \t\tBaseActor: mcv
-\t\tSupportActors: harv, harv, harv, harv, e1, e1, e1, e1, e1, e2, e2, e3, e3, e4, e4, e5, bggy, bike, ltnk, ltnk, ftnk, htnk, arty, stnk, msam, tran, heli
+\t\tSupportActors: harv, harv, harv, harv, {high_unit_support}
 \t\tOuterSupportRadius: 18
 \t\tUpgrades: upgrade.covert1, upgrade.covert2, upgrade.covert3, upgrade.recon1, upgrade.recon2, upgrade.recon3, upgrade.economy1, upgrade.economy2, upgrade.economy3
 \tStartingUnits@cnc100stressgdi:
@@ -65,7 +72,7 @@ World:
 \t\tClassName: CNC-100 high-unit failsafe stress
 \t\tFactions: gdi
 \t\tBaseActor: mcv
-\t\tSupportActors: harv, harv, harv, harv, e1, e1, e1, e1, e1, e2, e2, e3, e3, e4, e4, e5, jeep, mtnk, mtnk, mtnk, htnk, mlrs, msam, apc, tran, orca
+\t\tSupportActors: harv, harv, harv, harv, {high_unit_support}
 \t\tOuterSupportRadius: 18
 \t\tUpgrades: upgrade.covert1, upgrade.covert2, upgrade.covert3, upgrade.recon1, upgrade.recon2, upgrade.recon3, upgrade.economy1, upgrade.economy2, upgrade.economy3
 """
