@@ -98,6 +98,11 @@ reviews, and code reviews continue independently. Wait only for a task's own
 durable prerequisite, a named cross-worker dependency, a contested resource
 slot, or the merge/integration gate that genuinely needs all included heads.
 Workers may code while other workers' simulations or analysis roles run.
+Maintain useful occupancy: if a worker is not blocked on its own code/check or
+required analysis, start its next bounded game run; if a task has no native slot,
+use the external role launcher with its durable packet/state. Do not leave a
+development slot idle while an eligible packet, worker cycle, or game test is
+ready.
 
 ## Development-cycle contract
 
