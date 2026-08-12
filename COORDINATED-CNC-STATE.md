@@ -166,11 +166,5 @@ running. A newly launched read-only CNC-47 audit was interrupted. Do not launch
 reviews, integration, replacement tasks, or a new round until the user supplies
 and approves the coordinator update.
 
-CNC-47 closure audit (2026-08-12): targeted read-only Sol-high review confirmed
-that closed PR #95/head `e9a70b7adb8c` produced substantial measurement tooling
-and useful diagnostic evidence, but no valid repeatable baseline or demonstrated
-runtime improvement. Do not integrate or cherry-pick its monolithic head. A
-future well-defined task may selectively reimplement paced-headless speed
-acceptance, fail-closed measurement/provenance helpers, and finite-clock checks;
-preserve Cycle 13/16 metrics only as diagnostic reference. Normal coordinator
-work remains paused.
+CNC-47 closure audit findings and potentially reusable benchmarking references
+were moved to `DEFERRED_WORK.md`. Normal coordinator work remains paused.
