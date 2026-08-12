@@ -32,6 +32,13 @@ when the dependency section directs it.
 - Sol-xhigh policy escalation: `unused (requires at least 10 game tests; one maximum)`
 - PR: `https://github.com/Realpra1/LibertyDawn/pull/94` (draft; base `agent/cnc-20260807-bug-polish-02-release`)
 
+## Final-review response (2026-08-12)
+
+- Terra final review: `AUTONOMOUS-CNC-LOGS/20260807-bug-polish-03/WORKER-1-CNC-45/terra-final-task-review-20260812/FINAL-REVIEW.md` returned **blocked**.
+- Response: **rejected without product change**. The nominated blocker requires a fresh, current-head acceptance campaign: matched control, both scoped-AI mature-force observations, raid/crush/approach recovery, adversarial topology/ownership cases, save/load/replay, five-AI MAX comparison, and a natural-conclusion game. This cannot be truthfully closed by one bounded response cycle; the worker has already consumed 20/20 isolated product cycles, and the report confirms every listed acceptance item is presently absent.
+- Confirmed additional finding: `EconomyTankHarassmentBotModule.SelectTarget` performs visibility filtering, `IsReachable`, `CanAttackTarget`, and a full deterministic sort before `Take(Info.MaximumTargetCandidates)`. A safe correction needs a new product cycle plus the missing blocked-topology/five-AI evidence; it is not applied here because that would be an unvalidated cycle 21 outside the assignment budget.
+- No source/config/balance behavior changed. Keep status `First iteration - testing`; this branch is not eligible to advance until a coordinator-authorized continuation supplies the missing acceptance package and, if retained, repairs and measures the raid shortlist bound.
+
 ## Integrated repair assignment
 
 - Phase: `isolated implementation`
