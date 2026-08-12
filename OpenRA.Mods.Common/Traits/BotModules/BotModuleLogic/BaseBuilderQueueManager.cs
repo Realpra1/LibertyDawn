@@ -147,6 +147,7 @@ namespace OpenRA.Mods.Common.Traits
 					baseBuilder.LogProductionSpend(recovery, queue);
 				}
 			}
+
 			if (IsDefenseQueue)
 				baseBuilder.WallPlanner?.LogConstructionYardEnclosureQueueState(queue, currentBuilding,
 					playerResources.Cash, playerResources.Resources);

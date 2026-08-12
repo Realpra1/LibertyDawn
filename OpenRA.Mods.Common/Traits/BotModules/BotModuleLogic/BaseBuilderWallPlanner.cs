@@ -590,9 +590,10 @@ namespace OpenRA.Mods.Common.Traits
 					{
 						rejectionReason = "placement";
 						rejectionCell = cell;
-						return false;
-					}
-					if (!wallBuildingInfo.IsCloseEnoughToBase(world, player, wallInfo, cell))
+					return false;
+				}
+
+				if (!wallBuildingInfo.IsCloseEnoughToBase(world, player, wallInfo, cell))
 					{
 						rejectionReason = "adjacency";
 						rejectionCell = cell;
