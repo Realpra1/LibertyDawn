@@ -502,6 +502,7 @@ namespace OpenRA
 				StartupDiagnostic("load-screen", "before-load-aborted");
 				return;
 			}
+
 			StartupDiagnostic("load-screen", "before-load-exit");
 
 			StartupDiagnostic("asset-loaders", "initialize-enter");
