@@ -9,10 +9,14 @@
  */
 #endregion
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
+using System.Reflection.Emit;
 using NUnit.Framework;
 using OpenRA.Mods.Common.Traits;
+using OpenRA.Traits;
 
 namespace OpenRA.Test.Mods.Common
 {
@@ -196,6 +200,92 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(stale.TryRestore(loadedQueue, "sbag", 5900, _ => true, (_, __) => false), Is.False,
 				"Stale save data must not redirect an unrelated wall build to the saved endpoint.");
 			Assert.That(stale.HasReservation, Is.False);
+		}
+
+		[Test]
+		public void PendingEndpointOwnershipSaveLoadKeepsTheOriginalQueueReservation()
+		{
+			var savedQueueId = FieldLoader.GetValue<uint>("PendingQueueActorId", FieldSaver.FormatValue(41u));
+			var savedQueueType = FieldLoader.GetValue<string>("PendingQueueType", FieldSaver.FormatValue("Building"));
+			var savedWallType = FieldLoader.GetValue<string>("PendingWallType", FieldSaver.FormatValue("sbag"));
+			var savedReservedTick = FieldLoader.GetValue<int>("PendingQueueReservedTick", FieldSaver.FormatValue(5900));
+			var restoredQueue = new object();
+			var competingQueue = new object();
+			var ownership = new ConstructionYardEnclosureBuildOwnership<object>();
+
+			Assert.That(ownership.TryRestore(restoredQueue, savedWallType, savedReservedTick,
+				queue => ReferenceEquals(queue, restoredQueue) && savedQueueId == 41u && savedQueueType == "Building",
+				(queue, type) => ReferenceEquals(queue, restoredQueue) && type == savedWallType), Is.True);
+			Assert.That(ownership.Owns(restoredQueue, savedWallType), Is.True,
+				"Loading a pending enclosure must retain its original queue reservation.");
+			Assert.That(ownership.Owns(competingQueue, savedWallType), Is.False);
+			Assert.That(ownership.Refresh(5925, 100, _ => true,
+				(queue, type) => ReferenceEquals(queue, restoredQueue) && type == savedWallType), Is.False,
+				"The restored queue must keep ownership while its saved wall is still queued.");
+		}
+
+		[Test]
+		public void BaseBuilderSaveLoadRestoresPendingEnclosureReservationOnce()
+		{
+			var resolve = typeof(BaseBuilderBotModule).GetInterfaceMap(typeof(IGameSaveTraitData)).TargetMethods
+				.Single(m => m.Name.EndsWith(".ResolveTraitData", StringComparison.Ordinal));
+			var calls = CalledMethods(resolve).Count(m => m.Name == "ResolveTraitData" &&
+				m.DeclaringType?.Name == "BaseBuilderWallPlanner");
+
+			Assert.That(calls, Is.EqualTo(1),
+				"The module must restore the pending enclosure queue reservation only once; a second restore clears it after the production queue has consumed the saved build.");
+		}
+
+		static IEnumerable<MethodBase> CalledMethods(MethodInfo method)
+		{
+			var instructions = method.GetMethodBody().GetILAsByteArray();
+			for (var offset = 0; offset < instructions.Length;)
+			{
+				var opcode = (int)instructions[offset++];
+				if (opcode == 0xfe)
+					opcode = 0xfe00 | instructions[offset++];
+
+				var operation = OpCodeFor(opcode);
+				if (operation.OperandType == OperandType.InlineMethod)
+				{
+					var token = BitConverter.ToInt32(instructions, offset);
+					offset += 4;
+					yield return method.Module.ResolveMethod(token);
+					continue;
+				}
+
+				offset += OperandSize(operation.OperandType, instructions, offset);
+			}
+		}
+
+		static OpCode OpCodeFor(int value)
+		{
+			return typeof(OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static)
+				.Select(f => (OpCode)f.GetValue(null)).Single(opcode => (ushort)opcode.Value == value);
+		}
+
+		static int OperandSize(OperandType operandType, byte[] instructions, int offset)
+		{
+			switch (operandType)
+			{
+				case OperandType.InlineNone: return 0;
+				case OperandType.ShortInlineBrTarget:
+				case OperandType.ShortInlineI:
+				case OperandType.ShortInlineVar: return 1;
+				case OperandType.InlineVar: return 2;
+				case OperandType.InlineI:
+				case OperandType.InlineBrTarget:
+				case OperandType.InlineField:
+				case OperandType.InlineSig:
+				case OperandType.InlineString:
+				case OperandType.InlineTok:
+				case OperandType.InlineType: return 4;
+				case OperandType.InlineI8:
+				case OperandType.InlineR: return 8;
+				case OperandType.ShortInlineR: return 4;
+				case OperandType.InlineSwitch: return 4 + 4 * BitConverter.ToInt32(instructions, offset);
+				default: throw new ArgumentOutOfRangeException(nameof(operandType));
+			}
 		}
 
 		[TestCase(0, 0, true)]
