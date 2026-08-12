@@ -69,9 +69,14 @@ namespace OpenRA.Mods.Common.Activities
 				.Where(c => Mobile.CanStayInCell(c));
 		}
 
+		protected virtual Actor IgnoredActorForMovement(Actor self)
+		{
+			return null;
+		}
+
 		protected override void OnFirstRun(Actor self)
 		{
-			QueueChild(Mobile.MoveTo(check => CalculatePathToTarget(self, check)));
+			QueueChild(Mobile.MoveTo(check => CalculatePathToTarget(self, check), IgnoredActorForMovement(self)));
 		}
 
 		public override bool Tick(Actor self)
@@ -100,7 +105,7 @@ namespace OpenRA.Mods.Common.Activities
 
 			// Target has moved, and MoveAdjacentTo is still valid.
 			if (!IsCanceling && shouldRepath)
-				QueueChild(Mobile.MoveTo(check => CalculatePathToTarget(self, check)));
+				QueueChild(Mobile.MoveTo(check => CalculatePathToTarget(self, check), IgnoredActorForMovement(self)));
 
 			// The last queued child activity is guaranteed to be the inner move,
 			// so if the child activity queue is empty it means the move completed.
@@ -128,9 +133,10 @@ namespace OpenRA.Mods.Common.Activities
 			{
 				searchCells.Clear();
 				searchCellsTick = self.World.WorldTick;
+				var ignoreActor = IgnoredActorForMovement(self);
 				foreach (var cell in CandidateMovementCells(self))
 				{
-					if (Mobile.CanEnterCell(cell))
+					if (Mobile.CanEnterCell(cell, ignoreActor))
 					{
 						if (cell == loc)
 							return (true, PathFinder.NoPath);
@@ -143,8 +149,9 @@ namespace OpenRA.Mods.Common.Activities
 			if (!searchCells.Any())
 				return (false, PathFinder.NoPath);
 
-			using (var fromSrc = PathSearch.ToTargetCell(self.World, Mobile.Locomotor, self, searchCells, loc, check))
-			using (var fromDest = PathSearch.ToTargetCell(self.World, Mobile.Locomotor, self, loc, lastVisibleTargetLocation, check, inReverse: true))
+			var ignoredActor = IgnoredActorForMovement(self);
+			using (var fromSrc = PathSearch.ToTargetCell(self.World, Mobile.Locomotor, self, searchCells, loc, check, ignoreActor: ignoredActor))
+			using (var fromDest = PathSearch.ToTargetCell(self.World, Mobile.Locomotor, self, loc, lastVisibleTargetLocation, check, ignoreActor: ignoredActor, inReverse: true))
 				return (false, Mobile.Pathfinder.FindBidiPath(fromSrc, fromDest));
 		}
 

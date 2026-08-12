@@ -104,6 +104,75 @@ Player:
 		ScoutSafetyRadiusCells: 5
 		ScoutRangeMarginCells: 1
 		DebugLogging: false
+	EconomyTroopProductionBotModule:
+		RequiresCondition: enable-brutalis-ai || enable-ironreaper-ai
+		RequiredPrerequisites: upgrade.economy3
+		MammothTypes: htnk
+		DirectFireVehicleTypes: ltnk, ftnk, ctnk, mtnk, stnk, apc, bggy, bike, jeep, htnk
+		ScreenTypes: e1
+		ArtilleryTypes: mlrs
+		AntiAirTypes: msam
+		HarvesterTypes: harv, sharv
+		AttackApproachPolicy: economy-mammoth
+		MinimumHarvesters: 3
+		MinimumScreen: 4
+		MinimumArtillery: 1
+		MinimumAntiAir: 1
+		MinimumAvailableCash: 1000
+		MinimumMaintainCash: 0
+		MammothTargetValuePercent: 55
+		CriticalThreatRadiusCells: 10
+		MaximumCriticalActors: 16
+		ScanInterval: 75
+		ReadinessObservationTicks: 300
+		DecisionLogInterval: 750
+		DebugLogging: true
+	EconomyTankHarassmentBotModule:
+		RequiresCondition: enable-brutalis-ai || enable-ironreaper-ai
+		RequiredPrerequisites: upgrade.economy3
+		TankTypes: mtnk
+		TargetPriorities:
+			harv: 10000
+			sharv: 10000
+			proc: 7000
+			resonator: 6500
+			silo: 5500
+			weap: 4500
+			afld: 4500
+		MinimumTanks: 2
+		MaximumTanks: 4
+		MobileDefenseReserve: 2
+		ScanInterval: 50
+		OrderInterval: 50
+		MissionTimeout: 900
+		NoProgressTimeout: 250
+		TargetDefenseRadiusCells: 6
+		MaximumTargetDefenderValuePercent: 75
+		MaximumTargetCandidates: 48
+		DebugLogging: true
+	EconomyMammothCrushBotModule:
+		RequiresCondition: enable-brutalis-ai || enable-ironreaper-ai
+		RequiredPrerequisites: upgrade.economy3
+		MammothTypes: htnk
+		InfantryTypes: e1, e2, e3, e4, e5, e6, rmbo
+		PreferredInfantryTypes: e3
+		MaximumMammoths: 2
+		MinimumHealthPercent: 65
+		MaximumTargetDistanceCells: 5
+		MaximumRouteDetourCells: 3
+		LeashCells: 7
+		DenseInfantryRadiusCells: 3
+		MaximumNearbyInfantry: 3
+		ThreatRadiusCells: 5
+		MaximumNearbyArmedThreats: 2
+		ScanInterval: 25
+		OrderInterval: 25
+		MissionTimeout: 175
+		NoProgressTimeout: 75
+		GroupCooldown: 750
+		MaximumMammothCandidates: 8
+		MaximumTargetCandidates: 32
+		DebugLogging: true
 	CovertHarassmentBotModule:
 		RequiresCondition: enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai
 		RequiredPrerequisites: upgrade.covert1
