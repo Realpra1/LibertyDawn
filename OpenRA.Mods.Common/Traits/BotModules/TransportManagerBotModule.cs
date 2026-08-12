@@ -152,6 +152,7 @@ namespace OpenRA.Mods.Common.Traits
 			public readonly Actor Transport;
 			public readonly Actor Passenger;
 			public readonly CPos Destination;
+			public readonly Actor Objective;
 			public readonly int CreatedTick;
 			public int DeadlineTick;
 			public MissionStage Stage;
@@ -172,6 +173,12 @@ namespace OpenRA.Mods.Common.Traits
 				Destination = destination;
 				CreatedTick = LastOrderTick = tick;
 				DeadlineTick = deadlineTick;
+			}
+
+			public Mission(int id, Actor transport, Actor passenger, Actor objective, int tick, int deadlineTick)
+				: this(id, transport, passenger, objective.Location, tick, deadlineTick)
+			{
+				Objective = objective;
 			}
 		}
 
@@ -244,60 +251,61 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		bool IBotTransportObjectiveService.CanTransportTo(
-			Actor passenger, CPos destination, IBotUnitReservations reservationOwner)
+			Actor passenger, Actor objective, IBotUnitReservations reservationOwner)
 		{
-			var available = TryPrepareObjectiveTransport(passenger, destination, reservationOwner,
+			var available = TryPrepareObjectiveTransport(passenger, objective, reservationOwner,
 				out _, out _, out _, out var rejection);
 			if (!available)
-				Debug("objective transport unavailable passenger={0} destination={1}: {2}",
-					passenger, destination, rejection);
+				Debug("objective transport unavailable passenger={0} objective={1}: {2}",
+					passenger, objective, rejection);
 
 			return available;
 		}
 
 		bool IBotTransportObjectiveService.TryRequestTransport(
-			Actor passenger, CPos destination, IBotUnitReservations reservationOwner)
+			Actor passenger, Actor objective, IBotUnitReservations reservationOwner)
 		{
 			if (passenger == null || reservationOwner == null || !reservationOwner.IsUnitReserved(passenger) ||
+				objective == null || objective.IsDead || !objective.IsInWorld ||
 				missions.Any(existing => existing.Passenger == passenger))
 				return false;
 
-			if (!TryPrepareObjectiveTransport(passenger, destination, reservationOwner,
+			if (!TryPrepareObjectiveTransport(passenger, objective, reservationOwner,
 				out var transport, out var pickupRoute, out _, out var rejection))
 			{
-				Debug("objective transport rejected passenger={0} destination={1}: {2}",
-					passenger, destination, rejection);
+				Debug("objective transport rejected passenger={0} objective={1}: {2}",
+					passenger, objective, rejection);
 				return false;
 			}
 
 			var missionId = coordinator.TryReserve(new[] { transport.ActorID, passenger.ActorID });
-			if (missionId == 0 || !unloadPlanner.TryPlan(missionId, transport, new[] { passenger }, destination,
+			if (missionId == 0 || !unloadPlanner.TryPlan(missionId, transport, new[] { passenger }, objective.Location,
 				Info.LandingSearchRadiusCells, Info.LandingUsefulnessRadiusCells, 1,
 				out var unloadPlan, out rejection))
 			{
 				if (missionId != 0)
 					coordinator.Release(missionId);
 
-				Debug("objective transport reservation rejected passenger={0} destination={1}: {2}",
-					passenger, destination, rejection);
+				Debug("objective transport reservation rejected passenger={0} objective={1}: {2}",
+					passenger, objective, rejection);
 				return false;
 			}
 
 			var distanceCells = Math.Abs(transport.Location.X - passenger.Location.X) +
 				Math.Abs(transport.Location.Y - passenger.Location.Y) +
-				Math.Abs(passenger.Location.X - destination.X) + Math.Abs(passenger.Location.Y - destination.Y);
+				Math.Abs(passenger.Location.X - objective.Location.X) + Math.Abs(passenger.Location.Y - objective.Location.Y);
 			var speed = transport.Info.TraitInfoOrDefault<AircraftInfo>()?.Speed ?? 1;
 			var travelAllowance = (int)Math.Min(int.MaxValue,
 				distanceCells * 1024L * 3 / Math.Max(1, speed) + 1000);
-			var mission = new Mission(missionId, transport, passenger, destination, world.WorldTick,
+			var mission = new Mission(missionId, transport, passenger, objective, world.WorldTick,
 				world.WorldTick + Math.Max(Info.MissionTimeoutTicks, travelAllowance))
 			{
 				UnloadPlan = unloadPlan
 			};
 			missions.Add(mission);
 			IssueRoutedMove(transport, passenger.Location, pickupRoute);
-			Debug("created objective mission {0}: transport={1} passenger={2} destination={3} " +
-				"carrier={4} exit={5}", missionId, transport, passenger, destination,
+			Debug("created objective mission {0}: transport={1} passenger={2} objective={3} " +
+				"carrier={4} exit={5}", missionId, transport, passenger, objective,
 				unloadPlan.CarrierCell, unloadPlan.ExitCells[0]);
 			return true;
 		}
@@ -435,8 +443,7 @@ namespace OpenRA.Mods.Common.Traits
 					Debug("mission {0} physical handoff: passenger={1} cell={2} cargo=0 objective={3} outcome={4}",
 						mission.Id, mission.Passenger, mission.Passenger.Location, mission.Destination,
 						mission.Returning ? "safe-recovery" : "useful-rescue");
-					bot.QueueOrder(new Order("Move", mission.Passenger,
-						Target.FromCell(world, mission.Destination), false));
+					QueueObjectiveHandoff(mission);
 					FinishMission(i, mission.Returning ? "safe recovery unload complete" : "rescue complete");
 				}
 				else if (!EnsureUnloadPlan(mission, mission.UnloadPlan?.Objective ??
@@ -664,8 +671,7 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				Debug("mission {0} physical handoff after terminal recovery: passenger={1} cell={2} cargo=0 objective={3}",
 					mission.Id, mission.Passenger, mission.Passenger.Location, mission.Destination);
-				bot.QueueOrder(new Order("Move", mission.Passenger,
-					Target.FromCell(world, mission.Destination), false));
+				QueueObjectiveHandoff(mission);
 				FinishMission(index, "terminal safe recovery unload complete");
 				return;
 			}
@@ -730,6 +736,18 @@ namespace OpenRA.Mods.Common.Traits
 			}
 		}
 
+		void QueueObjectiveHandoff(Mission mission)
+		{
+			if (mission.Objective != null && !mission.Objective.IsDead && mission.Objective.IsInWorld)
+			{
+				bot.QueueOrder(new Order("CaptureActor", mission.Passenger, Target.FromActor(mission.Objective), false));
+				Debug("mission {0} handed off capture passenger={1} target={2}",
+					mission.Id, mission.Passenger, mission.Objective);
+			}
+			else
+				bot.QueueOrder(new Order("Move", mission.Passenger, Target.FromCell(world, mission.Destination), false));
+		}
+
 		void ParkTerminalPlan(Mission mission, string reason)
 		{
 			bot.QueueOrder(new Order("Stop", mission.Transport, false));
@@ -757,7 +775,7 @@ namespace OpenRA.Mods.Common.Traits
 			return true;
 		}
 
-		bool TryPrepareObjectiveTransport(Actor passenger, CPos destination,
+		bool TryPrepareObjectiveTransport(Actor passenger, Actor objective,
 			IBotUnitReservations reservationOwner, out Actor transport, out List<CPos> pickupRoute,
 			out TransportUnloadPlan unloadPlan, out string rejection)
 		{
@@ -765,7 +783,8 @@ namespace OpenRA.Mods.Common.Traits
 			pickupRoute = null;
 			unloadPlan = null;
 			rejection = "transport service is unavailable";
-			if (bot == null || !IsUsable(passenger) || passenger.TraitOrDefault<Passenger>()?.Transport != null ||
+			if (bot == null || !IsUsable(passenger) || objective == null || objective.IsDead || !objective.IsInWorld ||
+				passenger.TraitOrDefault<Passenger>()?.Transport != null ||
 				coordinator.MissionCount >= Info.MaximumActiveMissions)
 				return false;
 
@@ -790,7 +809,7 @@ namespace OpenRA.Mods.Common.Traits
 				return false;
 			}
 
-			return unloadPlanner.TryPlanWithoutClaim(0, transport, new[] { passenger }, destination,
+			return unloadPlanner.TryPlanWithoutClaim(0, transport, new[] { passenger }, objective.Location,
 				Info.LandingSearchRadiusCells, Info.LandingUsefulnessRadiusCells, 1, Array.Empty<CPos>(),
 				out unloadPlan, out rejection);
 		}

@@ -759,13 +759,13 @@ namespace OpenRA.Mods.Common.Traits
 		bool CanUseExistingTransport(TraitPair<CaptureManager> capturer, Actor target)
 		{
 			return IsOwnedRestorableHuskTarget(target, capturer) && transportServices != null &&
-				transportServices.Any(service => service.CanTransportTo(capturer.Actor, target.Location, this));
+				transportServices.Any(service => service.CanTransportTo(capturer.Actor, target, this));
 		}
 
 		bool TryRequestCaptureTransport(Actor capturer, Actor target)
 		{
 			return transportServices != null && transportServices.Any(service =>
-				service.TryRequestTransport(capturer, target.Location, this));
+				service.TryRequestTransport(capturer, target, this));
 		}
 
 		bool IsCaptureTransportActive(Actor capturer)

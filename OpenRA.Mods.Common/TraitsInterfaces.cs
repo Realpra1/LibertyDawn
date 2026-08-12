@@ -640,8 +640,8 @@ namespace OpenRA.Mods.Common.Traits
 	[RequireExplicitImplementation]
 	public interface IBotTransportObjectiveService
 	{
-		bool CanTransportTo(Actor passenger, CPos destination, IBotUnitReservations reservationOwner);
-		bool TryRequestTransport(Actor passenger, CPos destination, IBotUnitReservations reservationOwner);
+		bool CanTransportTo(Actor passenger, Actor objective, IBotUnitReservations reservationOwner);
+		bool TryRequestTransport(Actor passenger, Actor objective, IBotUnitReservations reservationOwner);
 		bool IsTransporting(Actor passenger);
 		void CancelTransport(Actor passenger);
 	}
