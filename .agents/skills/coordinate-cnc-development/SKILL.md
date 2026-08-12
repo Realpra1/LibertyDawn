@@ -55,8 +55,8 @@ Use exact model IDs `gpt-5.6-luna`, `gpt-5.6-terra`, and `gpt-5.6-sol` through
 launcher when native slots are full. Never share a mutable worktree.
 
 Analysis roles run in exclusive output directories under `workspace-write`.
-Commenter jobs contain only `artifacts`, optional `design_reference`, and
-`output`. Policy jobs contain exactly `design_reference`, `task_context`,
+Commenter jobs contain `artifacts`, `task_context`, optional `design_reference`,
+and `output`. Policy jobs contain exactly `design_reference`, `task_context`,
 `narrative`, and `output`. Stage regular-file copies under `inputs/`; never pass
 source, diffs, full specs, or preferred conclusions. Serialize policy calls with
 the shared `policy-scratchpad` slot, stage the canonical scratchpad, and promote a

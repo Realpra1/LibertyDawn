@@ -188,7 +188,8 @@ actor counts, and errors/stalls; do not call contended/debug-heavy runs golden.
 ## Analysis isolation
 
 For each game, stage only authorized artifacts for the Commenter. Stage its
-`NARRATIVE.md`, a short task context (ID/title, why, category, in/out of scope,
+`NARRATIVE.md`, a short current task context (ID/title, literal behavior, why,
+category, in/out of scope,
 balance authority), design reference, and current scratchpad for the Policy
 Reviewer. Use strict launcher JSON envelopes. Serialize policy calls, validate the
 reviewer's replacement scratchpad as UTF-8 and <=3,000 characters, then promote

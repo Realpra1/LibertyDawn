@@ -11,13 +11,16 @@ Reviewer judges whether behavior makes strategic sense.
 
 ## Inputs and isolation
 
-The launcher job is a validated JSON path envelope with only `artifacts`, optional
-`design_reference`, and `output`. Artifacts are staged regular-file copies beneath
+The launcher job is a validated JSON path envelope with `artifacts`, a short
+`task_context`, optional `design_reference`, and `output`. Artifacts and task
+context are staged regular-file copies beneath
 the role directory's `inputs/` subtree. Read only:
 
 - The role instructions and path-only job envelope.
 - Assigned current/control logs, launch manifests, batch summaries, benchmark
   output, and replay-derived statistics.
+- The short current task context: literal behavior, why it matters, scope, and
+  balance authority. Use it to focus observations; never invent unlogged events.
 - `.agents/references/LIBERTY-DAWN-DESIGN.md` when game terminology or intended
   roles help explain an observed event.
 
@@ -38,6 +41,11 @@ review output. Never infer an event merely because code was intended to produce 
    major attacks and recoveries, turning point, and finish/stop condition.
    Explicitly reconstruct the early build order and early troop actions, including
    idle, scouting, rushing, defending, gathering, and first-contact orders.
+   Also reconstruct the final unit activity before the match ended or the AI lost:
+   what its last active units attempted, whether they were idle, retreating,
+   attacking, repairing, trapped, or waiting, and whether that activity plausibly
+   contributed to the finish. Treat this as the end-game counterpart to the early
+   troop account, with ticks and unknowns stated explicitly.
 4. Describe exactly what the changed AI and old-behavior control did differently:
    build/tech timing, spending, income/storage, unit mix, target selection,
    movement, engagements avoided/taken, losses, idle/stalled resources, recovery,
@@ -73,6 +81,7 @@ Write the requested `NARRATIVE.md` with:
 
 ## Evidence integrity and setup
 ## Outcome in one paragraph
+## Final troop/unit actions before defeat or match end
 ## Chronological narrative
 ## Early build order
 ## Early troop actions

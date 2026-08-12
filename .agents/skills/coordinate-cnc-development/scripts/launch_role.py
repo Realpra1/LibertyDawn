@@ -87,10 +87,10 @@ def validate_analysis_job(args: argparse.Namespace) -> None:
             )
 
     if args.role == "commenter":
-        allowed = {"artifacts", "design_reference", "output"}
-        if set(job) - allowed or not {"artifacts", "output"} <= set(job):
+        allowed = {"artifacts", "task_context", "design_reference", "output"}
+        if set(job) - allowed or not {"artifacts", "task_context", "output"} <= set(job):
             raise SystemExit(
-                "Commenter job permits only artifacts, optional design_reference, and output"
+                "Commenter job permits artifacts, task_context, optional design_reference, and output"
             )
         artifacts = job["artifacts"]
         if not isinstance(artifacts, list) or not artifacts:
@@ -103,6 +103,13 @@ def validate_analysis_job(args: argparse.Namespace) -> None:
                     f"Commenter artifact must be a staged regular file under {input_dir}: "
                     f"{artifact}"
                 )
+        task_context = _resolved_path(job["task_context"], "task_context")
+        expected_task_context = output_dir / "inputs" / "TASK-CONTEXT.md"
+        if not task_context.is_file() or task_context != expected_task_context:
+            raise SystemExit(
+                "Commenter task context must be the staged input "
+                f"{expected_task_context}"
+            )
         return
 
     if set(job) != {"design_reference", "task_context", "narrative", "output"}:
