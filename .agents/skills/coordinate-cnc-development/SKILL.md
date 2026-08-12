@@ -109,6 +109,15 @@ use the external role launcher with its durable packet/state. Do not leave a
 development slot idle while an eligible packet, worker cycle, or game test is
 ready.
 
+Completion is a routing event, not a stopping point. When any worker, narrator,
+reviewer, or integration supervisor exits, immediately consume its receipt,
+update only the coordinator state, and launch the next authorized role or test
+for that stream. A cycle marked `First iteration - testing` still advances to
+its next cycle; it is not a reason to pause the round. A blocked stream gets a
+targeted diagnosis or is recorded as blocked, while unrelated streams continue.
+Do not finish a coordinator turn, report the round idle, or wait for user input
+while any eligible next cycle, review, game, or integration action exists.
+
 For every coordinator status receipt, report all five selected task streams
 individually, including each task's model/role, current phase, build or game
 wait, active test, analysis/review, completion, blocker, and next action. Do not
@@ -170,6 +179,12 @@ this tail. Luna workers may fix a narrow defect, assertion, guard, configuration
 mistake, or test setup; they must not introduce new architecture, policy, balance,
 or broad refactors. Stop the tail and request help as soon as the fix is no longer
 obvious. Never exceed 15 isolated cycles.
+
+After a worker receipt, re-read the coordinator state and route that stream
+again: launch cycle N+1 when authorized, launch its required reviewer when due,
+or hand it to the merger/integration gate when complete. Do this independently
+for all five streams; completion of one stream must never leave the other four
+waiting for a new coordinator invocation.
 
 For old/new performance comparisons, use matched custom scenarios with many
 pre-spawned units and structures (normally two Iron Reapers with at least 300
