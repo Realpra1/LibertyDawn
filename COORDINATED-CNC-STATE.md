@@ -1,7 +1,7 @@
 # Coordinated CNC State
 
 - Round ID: `20260807-bug-polish-03`
-- Phase: `five valid integration cycles complete; Terra final release review pending; CNC-47 withdrawn/excluded`
+- Phase: `post-merge save/load repair pending; CNC-47 withdrawn/excluded`
 - Common base branch: `agent/cnc-20260807-bug-polish-02-release`
 - Common base SHA: `468ee64f5a0f9a9e19e260e5c5943e6e878f4705`
 - Coordinator model: `gpt-5.6-luna` / `medium`; delegated cycle tiers are pinned
@@ -17,6 +17,11 @@
   2026-08-07 18:20:52 UTC after 2× Linux/2× Windows CI passed
 - Release candidate: `RC2` / `9f0c314ec77814506983def57c3d414e2e5aa56b`
 - Release PR: [#99](https://github.com/Realpra1/LibertyDawn/pull/99) (draft, mergeable; CI pending)
+- PR #99 was merged by the user at `4e12088061ac277c51de2e658dc0209337b80968`.
+  Terra final review then found a duplicate wall-planner state restore that clears
+  pending enclosure ownership plus a missing save/load regression test. A focused
+  follow-up repair PR is in progress; do not treat the merged release as ready for
+  playtest until that repair is reviewed and checked.
 
 ## Workers
 
