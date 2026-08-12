@@ -106,6 +106,16 @@ games. Each game:
 - gets its own fresh Luna Commenter and its own fresh Luna Policy Reviewer before
   the next code decision. Never combine two games into one analysis call.
 
+Making the game run correctly is part of every worker's job. A launch that fails
+before the intended map reaches world tick 1 is not a game, not evidence, and not
+a completed cycle. The worker must diagnose and repair its own build, content,
+launcher, path, display/audio, process-cleanup, or test-scenario setup in the
+task worktree as needed, then rerun the game. Do not repeat an identical broken
+launch and count it as testing. If a common host/runtime blocker remains after
+reasonable targeted diagnosis, preserve the exact logs and process evidence,
+stop the affected workstream, and report the blocker for user/environment help;
+do not spend the remaining cycle budget pretending the product was tested.
+
 Cycle 1 is the substantial Sol-high implementation. Cycles 2-5 are Terra-medium
 corrections to observed bugs or wrong assumptions, not redesign invitations. After
 cycle 3, run one Luna-medium cycle code review before cycle 4. If the task is still
@@ -152,6 +162,10 @@ newest with advanced squad modules disabled, and newest with them enabled.
    with the same bounded two-games-per-cycle contract and Luna narration/policy
    review. Put fixes on task-scoped repair branches and merge reviewed fixes into
    the stable branch. Stop after five release-wide integration test/fix cycles.
+   A pre-map-start launch failure invalidates that integration cycle; the Luna
+   worker must repair the launcher/runtime setup or isolate the common host cause
+   before consuming another integration cycle. Five repeated invalid launches are
+   not a successful release test.
 5. When the candidate passes, send structured receipts to Task Maker and promote
    the draft release PR. The user decides whether to merge it.
 

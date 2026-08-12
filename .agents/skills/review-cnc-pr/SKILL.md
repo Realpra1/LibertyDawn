@@ -53,13 +53,18 @@ review only when a concrete conflict or failure requires its contract.
 5. Treat runtime game evidence and deterministic checks as evidence, not author
    confidence. A code review does not replace builds, tests, CI, profiling, or a
    real match.
+   Treat any process that fails or hangs before world tick 1 as an invalid test
+   setup, not a gameplay loss. Check that the worker attempted to repair the
+   launch/content/runtime path and did not count repeated identical startup
+   failures as completed game cycles.
 6. Support performance blockers with a credible hot-path argument or measurement;
    do not block on speculative micro-optimization.
 7. In `final` mode, verify that every cycle has at least two distinct custom
    full-engine games capped at 120 seconds wall-clock with all features, all AI
    modules, and ordinary enemy AIs enabled. Verify matched differential,
    contention, final acceptance regression, save/load where relevant,
-   diagnostic cleanup, and required checks satisfy the worker contract. Missing
+   diagnostic cleanup, valid map-start/world-tick evidence, and required checks
+   satisfy the worker contract. Missing
    or unexercised evidence is a finding, not an assumption.
 8. In `final` mode, require the first behavioral test after implementation to be a full-engine
    ordinary-AI simulation, normally headless MAX. Reject unit-test-only early

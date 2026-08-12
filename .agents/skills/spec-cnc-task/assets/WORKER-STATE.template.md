@@ -119,6 +119,11 @@ invalid harness is not another cycle. For the current cycle:
    the full engine, a custom scenario, all features, all AI modules, and
    ordinary enemy AIs from test 1. Normally use headless MAX and stop at 120
    seconds wall-clock; MAX may advance much farther in game time.
+   Making this game launch and load the intended map is part of the worker's
+   assignment. A process that dies, hangs, or remains before world tick 1 is not
+   a game and does not count toward the cycle or its evidence. Repair task-local
+   build/content/launcher/display/audio/process-cleanup/scenario problems and
+   rerun; never repeat an identical broken launch as a nominal test.
 4. Before each game record its failure hypothesis, changed pressure/assumption,
    exact failure signal, and player-visible pass evidence. Vary geometry, timing,
    resources, losses, counts, topology, competing managers, old-control setting,
@@ -133,6 +138,11 @@ Use `with_resource_slots.py` around shared resources and the game
 launcher/supervisor as the completion helper. Await the bounded process/result;
 do not burn agent turns sleeping or repeatedly polling. Isolate every map, support
 directory, port, log, replay, save, benchmark, and display.
+
+If targeted setup diagnosis cannot make the full engine reach world tick 1, save
+the exact startup logs, command, process tree, and checkout comparison, then mark
+the cycle blocked and request environment help. Do not advance the cycle counter,
+produce a narrative for a nonexistent match, or claim task acceptance.
 
 Custom setups should force rare decisions while retaining real AIs/modules: for
 example pre-place damaged/healthy capturable structures and engineers, destroy a

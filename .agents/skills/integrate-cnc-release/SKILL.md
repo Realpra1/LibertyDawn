@@ -38,6 +38,14 @@ runs at least two distinct adversarial custom scenarios; each game:
 - receives its own fresh Luna-medium Commenter narrative and its own fresh
   Luna-medium Policy Review before the next change.
 
+The integrator and integration workers own game readiness as well as product
+behavior. A run that never reaches world tick 1 is an invalid test, not a failed
+game and not a consumed integration cycle. Repair the exact release checkout's
+build/content/launcher/display/audio/process cleanup or scenario setup, then
+rerun. Do not repeat an identical pre-map-start launch five times. If matched
+base/release diagnosis proves a host/runtime blocker, preserve the evidence and
+request environment help; do not promote the release or claim integrated testing.
+
 Use strict analysis envelopes and the serialized persistent scratchpad contract
 from the coordinator skill. Treat analyses as advice, not proof. Compare every
 strategic change with its recorded feature-disabled/base/older control under
