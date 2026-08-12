@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run one to three isolated Linux headless MAX games from a JSON manifest."""
+"""Run one to three isolated Linux headless MAX or paced rendered games from a JSON manifest."""
 
 from __future__ import annotations
 
@@ -24,6 +24,7 @@ MAX_TICK_PATTERNS = (
     re.compile(r"world tick (\d+)", re.IGNORECASE),
 )
 HEADLESS_MARKER = "Headless MAX automation enabled"
+PACED_MARKER = "Paced rendered automation enabled"
 MAX_MARKER = "MAX game speed enabled"
 STARTED_MARKER = "Headless MAX automation started map"
 NATURAL_MARKER = "Headless MAX automation reached natural game over"
@@ -38,6 +39,7 @@ ISOLATED_ARGUMENTS = (
     "Launch.ExitAtTick=",
     "Launch.GameSave=",
     "Launch.Headless=",
+    "Launch.Paced=",
     "Launch.Map=",
 )
 
@@ -51,6 +53,7 @@ class RunSpec:
     name: str
     source_path: Path
     source_kind: str
+    mode: str
     seed: int | None
     lobby_commands: str | None
     exit_at_tick: int | None
@@ -172,12 +175,17 @@ def load_manifest(path: Path, default_timeout: float) -> tuple[dict[str, Any], l
         if not source_path.is_file():
             raise ConfigurationError(f"Run '{name}' input does not exist: {source_path}")
 
+        mode = config.get("mode", "headless")
+        if mode not in ("headless", "paced"):
+            raise ConfigurationError(f"Run '{name}' mode must be 'headless' or 'paced'.")
+
         lobby_commands = config.get("lobby_commands")
         if source_kind == "map":
+            expected_speed = "max" if mode == "headless" else "normal"
             if not isinstance(lobby_commands, str) or not re.search(
-                r"(?:^|;)\s*option gamespeed max\s*(?:;|$)", lobby_commands, re.IGNORECASE
+                rf"(?:^|;)\s*option gamespeed {expected_speed}\s*(?:;|$)", lobby_commands, re.IGNORECASE
             ):
-                raise ConfigurationError(f"Run '{name}' map lobby_commands must select gamespeed max.")
+                raise ConfigurationError(f"Run '{name}' map lobby_commands must select gamespeed {expected_speed}.")
             if "\n" in lobby_commands or "\r" in lobby_commands:
                 raise ConfigurationError(f"Run '{name}' lobby_commands must not contain newlines.")
         elif lobby_commands is not None:
@@ -227,6 +235,7 @@ def load_manifest(path: Path, default_timeout: float) -> tuple[dict[str, Any], l
             name=name,
             source_path=source_path,
             source_kind=source_kind,
+            mode=mode,
             seed=config.get("seed"),
             lobby_commands=lobby_commands,
             exit_at_tick=exit_at_tick,
@@ -292,7 +301,7 @@ def prepare_run(
         str(launcher),
         f"Engine.SupportDir={support_dir}",
         "Debug.BotDebug=true",
-        "Launch.Headless=true",
+        f"Launch.{'Headless' if spec.mode == 'headless' else 'Paced'}=true",
         f"Launch.Benchmark={spec.name}-",
     ))
     if spec.source_kind == "map":
@@ -380,13 +389,23 @@ def finalize_run(run: ActiveRun) -> dict[str, Any]:
         reasons.append("timeout")
     if exit_code != 0:
         reasons.append(f"exit code {exit_code}")
-    if HEADLESS_MARKER not in text:
-        reasons.append("headless activation marker missing")
-    if MAX_MARKER not in text:
-        reasons.append("MAX activation marker missing")
-    if STARTED_MARKER not in text:
+    if run.spec.mode == "headless":
+        if HEADLESS_MARKER not in text:
+            reasons.append("headless activation marker missing")
+        if MAX_MARKER not in text:
+            reasons.append("MAX activation marker missing")
+    elif PACED_MARKER not in text:
+        reasons.append("paced activation marker missing")
+    started_marker = STARTED_MARKER if run.spec.mode == "headless" else "Paced rendered automation started map"
+    if started_marker not in text:
         reasons.append("actual map/bot start marker missing")
-    exit_marker = BOUNDED_MARKER if run.spec.exit_at_tick is not None else NATURAL_MARKER
+    if run.spec.mode == "paced":
+        exit_marker = (
+            "Paced rendered automation reached configured exit"
+            if run.spec.exit_at_tick is not None else "Paced rendered automation reached natural game over"
+        )
+    else:
+        exit_marker = BOUNDED_MARKER if run.spec.exit_at_tick is not None else NATURAL_MARKER
     if exit_marker not in text:
         reasons.append(
             "configured exit marker missing"
@@ -416,6 +435,7 @@ def finalize_run(run: ActiveRun) -> dict[str, Any]:
         "finished_utc": datetime.now(timezone.utc).isoformat(),
         "display_start": run.display_start,
         "network_endpoint": "engine-assigned ephemeral loopback",
+        "mode": run.spec.mode,
         "source_copy": str(run.runtime_input),
         "support_directory": str(run.support_dir),
         "logs": [str(path.relative_to(run.run_dir)) for path in log_paths if path.exists()],

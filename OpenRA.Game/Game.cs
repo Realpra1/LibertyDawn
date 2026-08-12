@@ -63,6 +63,7 @@ namespace OpenRA
 		public static bool IsAutomatedGameSaveLoad { get; private set; }
 		public static bool IsHeadlessAutomationRequested { get; private set; }
 		public static bool IsHeadlessAutomation { get; private set; }
+		public static bool IsPacedAutomation { get; private set; }
 		static bool startupDiagnosticsEnabled;
 		static readonly Stopwatch StartupDiagnosticsTimer = Stopwatch.StartNew();
 
@@ -219,7 +220,7 @@ namespace OpenRA
 			Ui.KeyboardFocusWidget = null;
 
 			OrderManager.StartGame();
-			if (IsHeadlessAutomation)
+			if (IsHeadlessAutomation || IsPacedAutomation)
 			{
 				var bots = OrderManager.LobbyInfo.Clients
 					.Where(client => client.IsBot)
@@ -227,8 +228,8 @@ namespace OpenRA
 					.Select(client => string.Format(CultureInfo.InvariantCulture,
 						"{0}: bot={1}, faction={2}, team={3}, spawn={4}", client.Name, client.Bot,
 						client.Faction, client.Team, client.SpawnPoint));
-				Log.Write("debug", "Headless MAX automation started map '{0}' with bots: {1}.",
-					map.Title, string.Join("; ", bots));
+				Log.Write("debug", "{0} automation started map '{1}' with bots: {2}.",
+					IsHeadlessAutomation ? "Headless MAX" : "Paced rendered", map.Title, string.Join("; ", bots));
 			}
 
 			worldRenderer.RefreshPalette();
@@ -1105,6 +1106,12 @@ namespace OpenRA
 			Log.Write("debug", "Headless MAX automation enabled: game rendering suppressed; input events remain bounded.");
 		}
 
+		public static void ConfigurePacedAutomation()
+		{
+			IsPacedAutomation = true;
+			Log.Write("debug", "Paced rendered automation enabled: normal rendering and presentation remain active.");
+		}
+
 		public static void ConfigureAutomatedSave(int worldTick, string filename)
 		{
 			automatedSaveTick = Math.Max(0, worldTick);
@@ -1122,8 +1129,8 @@ namespace OpenRA
 				return;
 
 			automatedExitTick = -1;
-			Log.Write("debug", "Headless MAX automation reached configured exit at world tick {0}; exiting.",
-				world.WorldTick);
+			Log.Write("debug", "{0} automation reached configured exit at world tick {1}; exiting.",
+				IsHeadlessAutomation ? "Headless MAX" : "Paced rendered", world.WorldTick);
 			FinishBenchmark();
 		}
 
@@ -1195,13 +1202,15 @@ namespace OpenRA
 
 		public static void FinishBenchmark()
 		{
-			if (automatedExitRequested || (benchmark == null && !IsHeadlessAutomation))
+			if (automatedExitRequested || (benchmark == null && !IsHeadlessAutomation && !IsPacedAutomation))
 				return;
 
 			automatedExitRequested = true;
 			benchmark?.Write();
 			if (IsHeadlessAutomation)
 				Log.Write("debug", "Headless MAX automation reached natural game over; exiting.");
+			else if (IsPacedAutomation)
+				Log.Write("debug", "Paced rendered automation reached natural game over; exiting.");
 
 			Exit();
 		}

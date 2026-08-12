@@ -80,3 +80,28 @@ Narrative: `cycle-1/game-2-analysis/commenter/NARRATIVE.md`. Policy: `cycle-1/ga
 - Add explicit benchmark overhead counters, thread CPU/scheduling/throttle where exposed, GC pause duration where supported, logger queue/backlog/flush markers, save/load/replay continuation, and gameplay outcome counters.
 - The current runtime sample is intentionally sparse and performs one bounded log-directory enumeration every 25 ticks in benchmark mode. Its overhead needs a longer profiler-on/off control.
 - No PR was opened in this first-iteration cycle; coordinator publication can follow after reviewing the commit.
+
+# CNC-96 cycle 2 report
+
+## Result
+
+Added bounded paced rendered automation without changing simulation or AI policy. It preserves isolated content, benchmark, replay, world-tick, timeout, and configured-exit behavior while keeping the normal render/present path active. Two serial one-CPU, 600-mobile-actor IronReaper runs completed tick 25 and captured presented timing. This proves a player-visible startup/render tail exists in the constrained setup; it does not identify an owning cause or justify an AI scheduling fix.
+
+## Evidence
+
+- Exact map SHA-256: `e10c252a154dd9797ffef7c648aae3d794e93d51ddf807c169e53df670d7bc46`; seed 9601, normal speed, two NOD IronReapers, same teams/spawns/cash/content, `taskset -c 0`, serial Xvfb display 90, 748 actors.
+- Package-default paced game: tick 25 in 7.007s. Tick p50/p95/p99/max 16/547/1259/1258.279ms (4 >=50ms); render 49/68/215/214.435ms (23); present 1/47/199/198.517ms (1). Player-1 BaseBuilder max 186.848ms and StealthTankSquad max 58.056ms at tick 1, but the 1.258s tick remains unattributed.
+- Logging-on paced game: tick 25 in 7.011s. Tick 18/537/1221/1220.599ms (5); render 48/65/179/178.227ms (23); present 1/46/48/47.288ms (0). Calls/orders and actors remained equal; log bytes rose 8,192 to 13,926. The short interior window does not exercise the five-second flush, so logging remains unproven.
+
+## Review disposition and checks
+
+Fresh commenter/policy artifacts exist per game under `cycle-2/game-{1-paced-default,2-paced-logging}-final-analysis/`; both high-confidence verdicts are `insufficient evidence`. Adopted: preserve all AI work/decisions, repeat comparable paced runs, and separate configured-stop/natural-game-over/winner reporting. Rejected: deferring or changing BaseBuilder/StealthTankSquad work, which would alter frozen AI work without causal proof.
+
+- `python3 -m unittest tests/test_launch_ai_parallel.py`: 5/5 passed.
+- `dotnet test OpenRA.Test/OpenRA.Test.csproj --filter FullyQualifiedName~LaunchArgumentsTest`: 14/14 passed.
+- `git diff --check`: passed.
+- Protected full `make all` helper is absent from this worktree; focused .NET compilation occurred through the test project. The next worker must run the protected full build once its canonical helper is restored/located.
+
+## Next evidence-driven step
+
+Do not change AI cadence or workload. First add bounded attribution that separates tick-1 engine/init, module, render/present, GC, and host-scheduler cost; repeat the exact paced control, then make a same-build intervention only if it materially moves that measured boundary.

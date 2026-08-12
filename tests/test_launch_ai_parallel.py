@@ -31,13 +31,14 @@ debug = logs / "debug.log"
 if source == "fail":
     debug.write_text("Fatal error from fake launcher\n", encoding="utf-8")
     raise SystemExit(7)
+mode = "paced" if arguments.get("Launch.Paced") == "true" else "headless"
 debug.write_text(
-    "Headless MAX automation enabled\n"
-    "Headless MAX automation started map 'Fake Map' with bots: Fake: bot=viki.\n"
-    "MAX game speed enabled at world tick 0.\n"
-    f"MAX progress: world={exit_tick}, local={exit_tick}, net={exit_tick}, queued-orders=0.\n"
-    f"Headless MAX automation reached configured exit at world tick {exit_tick}; exiting.\n"
-    "Loaded ordinary bot VIKI on isolated map\n",
+    ("Paced rendered automation enabled\n" if mode == "paced" else "Headless MAX automation enabled\n")
+    + ("Paced rendered automation started map 'Fake Map' with bots: Fake: bot=viki.\n" if mode == "paced" else "Headless MAX automation started map 'Fake Map' with bots: Fake: bot=viki.\n")
+    + ("" if mode == "paced" else "MAX game speed enabled at world tick 0.\n")
+    + f"MAX progress: world={exit_tick}, local={exit_tick}, net={exit_tick}, queued-orders=0.\n"
+    + (f"Paced rendered automation reached configured exit at world tick {exit_tick}; exiting.\n" if mode == "paced" else f"Headless MAX automation reached configured exit at world tick {exit_tick}; exiting.\n")
+    + "Loaded ordinary bot VIKI on isolated map\n",
     encoding="utf-8",
 )
 (logs / "fake-tick_time.csv").write_text("tick,time [ms]\n", encoding="utf-8")
@@ -85,6 +86,12 @@ class ParallelLauncherTest(unittest.TestCase):
         ])
         with self.assertRaisesRegex(parallel.ConfigurationError, "gamespeed max"):
             parallel.load_manifest(non_max, 10)
+
+        paced_max = self.write_manifest([
+            {"name": "paced", "mode": "paced", "map": str(game_map), "lobby_commands": "option gamespeed max"}
+        ])
+        with self.assertRaisesRegex(parallel.ConfigurationError, "gamespeed normal"):
+            parallel.load_manifest(paced_max, 10)
 
     def test_failed_child_does_not_hide_or_stop_healthy_sibling(self):
         passing_map = self.map("passing.oramap")
@@ -175,6 +182,23 @@ class ParallelLauncherTest(unittest.TestCase):
             self.assertEqual(summary["passed"], 3)
             durations.append(summary["duration_seconds"])
         self.assertLess(durations[1], durations[0])
+
+    def test_paced_run_uses_rendered_automation_without_max_marker(self):
+        game_map = self.map("paced.oramap")
+        manifest = self.write_manifest([{
+            "name": "paced", "mode": "paced", "map": str(game_map),
+            "lobby_commands": "option gamespeed normal", "exit_at_tick": 100,
+        }])
+        output = self.root / "paced-output"
+        exit_code = parallel.main([
+            "--manifest", str(manifest), "--output", str(output), "--jobs", "1",
+            "--launcher", str(self.launcher), "--content", str(self.content), "--no-xvfb",
+            "--poll-interval", "0.02", "--progress-interval", "1",
+        ])
+        self.assertEqual(exit_code, 0)
+        command = json.loads((output / "paced" / "command.json").read_text(encoding="utf-8"))
+        self.assertIn("Launch.Paced=true", command)
+        self.assertNotIn("Launch.Headless=true", command)
 
 
 if __name__ == "__main__":
