@@ -97,7 +97,12 @@ authorized development cycle. Other speccers, workers, games, narrators, policy
 reviews, and code reviews continue independently. Wait only for a task's own
 durable prerequisite, a named cross-worker dependency, a contested resource
 slot, or the merge/integration gate that genuinely needs all included heads.
-Workers may code while other workers' simulations or analysis roles run.
+Workers may code while other workers' simulations or analysis roles run. Never
+wait for a native sub-agent slot when an authorized role is ready: launch it
+immediately through `scripts/launch_role.py` (or the repository's equivalent
+external supervisor) with its durable packet/state, isolated worktree/output,
+and pinned model. Native delegation and external launch are interchangeable
+execution paths; slot scarcity must not serialize unrelated tasks.
 Maintain useful occupancy: if a worker is not blocked on its own code/check or
 required analysis, start its next bounded game run; if a task has no native slot,
 use the external role launcher with its durable packet/state. Do not leave a
