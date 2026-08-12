@@ -643,6 +643,7 @@ namespace OpenRA.Mods.Common.Traits
 		bool CanTransportTo(Actor passenger, Actor objective, IBotUnitReservations reservationOwner);
 		bool TryRequestTransport(Actor passenger, Actor objective, IBotUnitReservations reservationOwner);
 		bool IsTransporting(Actor passenger);
+		bool TryConsumeTimedOutObjective(Actor passenger, Actor objective);
 		void CancelTransport(Actor passenger);
 	}
 

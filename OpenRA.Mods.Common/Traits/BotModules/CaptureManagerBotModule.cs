@@ -773,6 +773,12 @@ namespace OpenRA.Mods.Common.Traits
 			return transportServices != null && transportServices.Any(service => service.IsTransporting(capturer));
 		}
 
+		bool ConsumeTimedOutCaptureTransport(Actor capturer, Actor target)
+		{
+			return transportServices != null && transportServices.Any(service =>
+				service.TryConsumeTimedOutObjective(capturer, target));
+		}
+
 		void CancelCaptureTransport(Actor capturer)
 		{
 			if (transportServices == null)
@@ -1085,6 +1091,9 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (purpose == SpecialistAssignmentPurpose.Capture)
 			{
+				if (ConsumeTimedOutCaptureTransport(specialist, target))
+					return "transport-handoff-timeout";
+
 				var captureManager = specialist.TraitOrDefault<CaptureManager>();
 				if (captureManager == null || !CanCaptureByRules(
 					new TraitPair<CaptureManager>(specialist, captureManager), target))
@@ -1147,6 +1156,13 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				deferredTargets[pair.Key] = new DeferredTarget(target,
 					world.WorldTick + StalledAssignmentTicks(purpose));
+			}
+			else if (result == "transport-handoff-timeout")
+			{
+				// The same unloaded Engineer has already spent its bounded objective handoff.
+				// Keep it available for other work, but do not recreate an identical stalled order
+				// until this exact live target disappears.
+				deferredTargets[pair.Key] = new DeferredTarget(target, int.MaxValue);
 			}
 
 			if (purpose == SpecialistAssignmentPurpose.Capture)

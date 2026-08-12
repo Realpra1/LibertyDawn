@@ -192,6 +192,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly World world;
 		readonly Player player;
 		readonly TransportMissionCoordinator coordinator;
+		readonly TransportObjectiveTimeoutLedger timedOutObjectives = new TransportObjectiveTimeoutLedger();
 		readonly TransportUnloadPlanner unloadPlanner;
 		readonly List<Mission> missions = new List<Mission>();
 		readonly Dictionary<uint, BlockedObservation> blocked = new Dictionary<uint, BlockedObservation>();
@@ -271,6 +272,8 @@ namespace OpenRA.Mods.Common.Traits
 				missions.Any(existing => existing.Passenger == passenger))
 				return false;
 
+			timedOutObjectives.Clear(passenger.ActorID);
+
 			if (!TryPrepareObjectiveTransport(passenger, objective, reservationOwner,
 				out var transport, out var pickupRoute, out _, out var rejection))
 			{
@@ -314,6 +317,12 @@ namespace OpenRA.Mods.Common.Traits
 		bool IBotTransportObjectiveService.IsTransporting(Actor passenger)
 		{
 			return passenger != null && missions.Any(mission => mission.Passenger == passenger);
+		}
+
+		bool IBotTransportObjectiveService.TryConsumeTimedOutObjective(Actor passenger, Actor objective)
+		{
+			return passenger != null && objective != null &&
+				timedOutObjectives.TryConsume(passenger.ActorID, objective.ActorID);
 		}
 
 		void IBotTransportObjectiveService.CancelTransport(Actor passenger)
@@ -1093,6 +1102,9 @@ namespace OpenRA.Mods.Common.Traits
 		void FinishMission(int index, string reason)
 		{
 			var mission = missions[index];
+			if (reason == "capture handoff timed out" && mission.Objective != null)
+				timedOutObjectives.Record(mission.Passenger.ActorID, mission.Objective.ActorID);
+
 			coordinator.Release(mission.Id);
 			missions.RemoveAt(index);
 			Debug("released mission {0}: {1}", mission.Id, reason);
