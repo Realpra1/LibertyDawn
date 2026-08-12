@@ -1426,6 +1426,26 @@ Player:
 		WallDistanceFromTower: 3
 		MaximumWallSegments: 150
 		WallPathCheckLocomotor: wheeled
+		EnableDefenseClusterPolicy: true
+		DefenseClusterTowerTypes: atwr, gtwr, gun, sam, obli
+		DefenseClusterAntiInfantryTypes: gtwr, atwr, obli
+		DefenseClusterAntiGroundTypes: gun, atwr, obli
+		DefenseClusterAntiAirTypes: sam, atwr
+		DefenseClusterRepairFacilityTypes: fix
+		DefenseClusterMinimumTowers: 3
+		DefenseClusterRadius: 9
+		DefenseClusterPlacementMinimumRadius: 2
+		DefenseClusterPlacementMaximumRadius: 8
+		DefenseClusterAnchorLease: 750
+		DefenseClusterReservationTimeout: 750
+		DefenseClusterMaintenanceInterval: 125
+		DefenseClusterRetryDelay: 750
+		DefenseClusterMaximumPlacementFailures: 3
+		DefenseClusterWallSetback: 3
+		DefenseClusterWallHalfWidth: 4
+		DefenseClusterWallFlankDepth: 3
+		DefenseClusterPathCheckMaximumCells: 3000
+		DefenseClusterOrdinaryDefenseLease: 750
 		BuildingLimits:
 			pyle: 3
 			hand: 3
@@ -1435,7 +1455,7 @@ Player:
 			hpad: 5
 			eye: 1
 			tmpl: 1
-			fix: 1
+			fix: 2
 			silo: 1
 			gtwr: 25
 			gun: 25
