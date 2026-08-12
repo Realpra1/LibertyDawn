@@ -36,7 +36,11 @@ file/report, and exits. Do not loop into another model tier in the same context.
   for an explicitly authorized blocker escalation`
 
 The Terra Integrator fills these fields before combined testing. Integrated work
-uses the same task boundary, two-game contract, and minor-fix restraint.
+uses this normal worker's same task boundary, canonical game launcher, installed
+content staging, preflight, two-game contract, and minor-fix restraint. Prefer
+`launch-ai-parallel.py --content <installed-runtime-content>` and verify the
+isolated `SupportDir/Content` target before every game; an incomplete custom
+launch command is not an integration setup.
 
 ## Why and predicted change
 

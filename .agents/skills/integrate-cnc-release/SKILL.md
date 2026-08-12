@@ -27,8 +27,13 @@ integrated failure that requires its contract.
 
 Run at most five release-wide integration test/fix cycles. Launch fresh
 Terra-medium integration workers or test-only agents from durable assignments;
-use task-scoped repair branches based on the current release head. Every cycle
-runs at least two distinct adversarial custom scenarios; each game:
+use task-scoped repair branches based on the current release head. Integration
+workers use the same worker-state game contract, helpers, and preflight as normal
+workers. Prefer `launch-ai-parallel.py` with an explicit valid `--content` path;
+verify the isolated `SupportDir/Content` target, checkout-local engine/mod paths,
+map, timeout, cleanup, and artifact destinations before launch. Do not substitute
+an incomplete hand-written command. Every cycle runs at least two distinct
+adversarial custom scenarios; each game:
 
 - uses the full engine, all features, all AI modules, and ordinary enemy
   AIs from test 1;
@@ -45,6 +50,11 @@ build/content/launcher/display/audio/process cleanup or scenario setup, then
 rerun. Do not repeat an identical pre-map-start launch five times. If matched
 base/release diagnosis proves a host/runtime blocker, preserve the evidence and
 request environment help; do not promote the release or claim integrated testing.
+
+Before diagnosing product startup, reproduce the newest preserved successful
+worker launch with its exact launcher inputs. Missing installed content commonly
+redirects CNC to `modcontent`; treat `Loading mod: modcontent` in an automated
+headless run as a setup failure and check `SupportDir/Content` first.
 
 Use strict analysis envelopes and the serialized persistent scratchpad contract
 from the coordinator skill. Treat analyses as advice, not proof. Compare every

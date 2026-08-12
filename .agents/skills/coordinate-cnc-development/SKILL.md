@@ -161,9 +161,14 @@ newest with advanced squad modules disabled, and newest with them enabled.
    PR to `bleed`; source PRs stay open.
 4. Use fresh Terra-medium integration workers/testers for the combined candidate's
    first five integration cycles,
-   with the same bounded two-games-per-cycle contract and Luna narration/policy
-   review. Put fixes on task-scoped repair branches and merge reviewed fixes into
-   the stable branch. Stop after five release-wide integration test/fix cycles.
+   with the normal worker's complete game setup, bounded two-games-per-cycle
+   contract, and Luna narration/policy review. Use the repository's canonical
+   full-engine launcher and pass its installed-content argument; verify each
+   isolated support directory contains the staged `Content` link before launch.
+   A custom command must reproduce the same content, engine-directory, support,
+   map, display/audio, timeout, cleanup, and artifact preflight. Put fixes on
+   task-scoped repair branches and merge reviewed fixes into the stable branch.
+   Stop after five release-wide integration test/fix cycles.
    A pre-map-start launch failure invalidates that integration cycle; the Terra
    worker must repair the launcher/runtime setup or isolate the common host cause
    before consuming another integration cycle. Five repeated invalid launches are
