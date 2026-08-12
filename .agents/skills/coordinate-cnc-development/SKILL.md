@@ -46,7 +46,8 @@ context.
 | Cycle-3 Reviewer | Luna medium | One advisory code concern |
 | Task/release Reviewer | Terra medium | Independent PR/release gate |
 | Integrator/Merger | Terra medium | Merge and release coordination |
-| Integration worker/tester | Luna medium | Combined testing and minor fixes |
+| Integration worker/tester (cycles 1-5) | Terra medium | Combined testing and minor fixes |
+| Integration escalation | Sol medium | Explicitly authorized diagnosis when Terra cannot clear a blocker |
 
 Use exact model IDs `gpt-5.6-luna`, `gpt-5.6-terra`, and `gpt-5.6-sol` through
 `scripts/launch_role.py`. Use fresh no-history agents where practical; use the
@@ -158,11 +159,12 @@ newest with advanced squad modules disabled, and newest with them enabled.
 3. Launch the Terra-medium Integrator after reviewed PRs and checks are ready. It
    merges feature heads locally into one stable release branch and opens one draft
    PR to `bleed`; source PRs stay open.
-4. Use fresh Luna-medium integration workers/testers for the combined candidate,
+4. Use fresh Terra-medium integration workers/testers for the combined candidate's
+   first five integration cycles,
    with the same bounded two-games-per-cycle contract and Luna narration/policy
    review. Put fixes on task-scoped repair branches and merge reviewed fixes into
    the stable branch. Stop after five release-wide integration test/fix cycles.
-   A pre-map-start launch failure invalidates that integration cycle; the Luna
+   A pre-map-start launch failure invalidates that integration cycle; the Terra
    worker must repair the launcher/runtime setup or isolate the common host cause
    before consuming another integration cycle. Five repeated invalid launches are
    not a successful release test.

@@ -32,7 +32,8 @@ file/report, and exits. Do not loop into another model tier in the same context.
 - Phase/release head: `isolated` / `not assigned`
 - Repair branch/base: `not assigned`
 - Release-wide integration cycle: `not assigned; maximum 5`
-- Integrated role model: `Luna medium for worker or test-only agent`
+- Integrated role model: `Terra medium for integration cycles 1-5; Sol medium only
+  for an explicitly authorized blocker escalation`
 
 The Terra Integrator fills these fields before combined testing. Integrated work
 uses the same task boundary, two-game contract, and minor-fix restraint.

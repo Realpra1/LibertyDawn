@@ -26,7 +26,7 @@ integrated failure that requires its contract.
 ## Combined testing and repair
 
 Run at most five release-wide integration test/fix cycles. Launch fresh
-Luna-medium integration workers or test-only agents from durable assignments;
+Terra-medium integration workers or test-only agents from durable assignments;
 use task-scoped repair branches based on the current release head. Every cycle
 runs at least two distinct adversarial custom scenarios; each game:
 

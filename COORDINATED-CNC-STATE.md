@@ -1,7 +1,7 @@
 # Coordinated CNC State
 
 - Round ID: `20260807-bug-polish-03`
-- Phase: `blocked after five integration cycles; CNC-47 withdrawn/excluded`
+- Phase: `integration startup diagnosis; CNC-47 withdrawn/excluded`
 - Common base branch: `agent/cnc-20260807-bug-polish-02-release`
 - Common base SHA: `468ee64f5a0f9a9e19e260e5c5943e6e878f4705`
 - Coordinator model: `gpt-5.6-luna` / `medium`; delegated cycle tiers are pinned
@@ -30,7 +30,7 @@
 
 ## Release rounds
 
-| RC1 | `37ede3f9303191cbeec228518479061f715fcb32` | CNC-45, CNC-46, CNC-50, CNC-52 | none | `make check`, `make test` passed; CI pending | `5/5` | blocked: PR #90 base and RC1 both stall at tick 0 loading `cnc/modcontent`; awaiting host/engine environment help |
+| RC1 | `37ede3f9303191cbeec228518479061f715fcb32` | CNC-45, CNC-46, CNC-50, CNC-52 | startup diagnosis in progress | `make check`, `make test` passed; CI pending | `0/5 valid` | prior base/RC1 launches stalled before tick 1 loading `cnc/modcontent`; invalid launches did not consume integration cycles; Sol-medium escalation authorized |
 |---|---|---|---|---|---|---|
 
 ## Resume note
@@ -176,17 +176,20 @@ full-engine games with per-game Luna narration/policy review per cycle. Normal
 development remains paused pending user approval of this workflow revision.
 
 Integration refinement (2026-08-12): the merger/integrator is Terra medium;
-combined workers, test-only agents, narrators, and policy reviewers are Luna
-medium. Integrated testing/fixing is capped at five release-wide cycles.
+combined workers and test-only agents are Terra medium for integration cycles
+1-5; narrators and policy reviewers remain Luna medium. Integrated
+testing/fixing is capped at five valid release-wide cycles. The current startup
+blocker alone is explicitly escalated to one Sol-medium diagnostic worker.
 
 Code-review refinement (2026-08-12): the advisory checkpoint now runs after
 cycle 3 with Luna medium. Individual task-PR and final integrated-release reviews
 both use Terra medium.
 
-Integration result (2026-08-12): RC1 completed all five bounded integration
-diagnosis cycles. Exact PR #90 base and RC1 matched startup tests both stalled
+Integration result correction (2026-08-12): the prior attempts did not complete
+any valid integration cycle. Exact PR #90 base and RC1 matched startup tests stalled
 before world tick 0 while loading `cnc/modcontent`, with no gameplay artifacts.
 All recorded OpenRA/Xvfb/launcher/Mono/dotnet processes were cleaned. The
-failure is classified as a common host/engine startup blocker, not an RC1 task
-regression. Do not start a new coordinator round until the environment is fixed
-and this release receives valid combined full-engine evidence.
+failure is currently classified as a common host/engine startup blocker, not an
+RC1 task regression. A Sol-medium escalation must reproduce a genuinely known-good
+historical launch, add bounded startup-stage diagnostics around mod loading, and
+identify or repair the failure before valid combined testing resumes.
