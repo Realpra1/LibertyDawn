@@ -1,8 +1,23 @@
-# Liberty Dawn policy scratchpad
+# Policy review scratchpad
 
-- **Engineer recovery (provisional, general):** Permanent idle time caused by a dead target, invalid relationship, vanished capture purpose, or mismatched claim is an excessive specialist blunder. Release only obsolete ownership, then reuse the ordinary deterministic capture ranking; do not invent a nearest-target preference.
-- **Healthy specialist idleness (high confidence):** A visible target is not necessarily eligible. Reachability, relationship, health/pair rules, deferral, reservations, and explicit transport or other module ownership can all justify waiting.
-- **Robust revalidation (provisional):** Transition-triggered checks plus a cheap periodic audit are preferable to per-tick global scans. A brief missing activity may receive bounded grace only while target, eligibility, matching claim, reachability, and legitimate ownership remain valid; it must not preserve phantom work indefinitely.
-- **Evidence standard (high confidence):** Diagnostics alone do not prove improved policy. Compare control and changed behavior after controlled invalidation, require useful work within a declared bound, and include negative controls for valid incumbents, owned specialists, duplicate claims, and no eligible targets.
-- **Early enclosure policy (provisional):** A partial wall with deliberate, traffic-proven access is safer than a perfect ring that can imprison the economy or army. Soft wall reservations should yield when no comparably safe and timely site exists for survival-critical construction. Retry transiently blocked local cells only within a bounded window; release impossible cells and expired maintenance rather than chasing cosmetic completeness.
-- **Counter discipline (high confidence):** Do not promote a neutral or opportunistic unit into a reliable counter merely because terrain prolongs its survival. In particular, Tiberium-healing Visceroids remain poor choices against tanks; use them only for their listed infantry/building pressure unless controlled game evidence establishes a vehicle interaction.
+- Engineer recovery work should preserve valid assignments across save/load,
+  honor the existing missing-activity grace, and release only genuinely stale
+  or removed-target work for deterministic replanning. This supports Engineers'
+  strategic roles without needless incumbent loss. (Evidence-limited to the
+  reported recovery scenarios; advisory.)
+
+- Resonators are controlled ecological investments, not automatic economic
+  upgrades. Favor a defended, legal site near reachable Tiberium while avoiding
+  infantry corridors and dangerous base geometry; the right choice is
+  faction-, map-, and situation-dependent. (Design-reference rule; advisory.)
+
+- For rare structure placement, random-cell discovery can create starvation even
+  when legal sites exist. Prefer a bounded deterministic or finite candidate
+  scan with simple safety/adjacency filters and cooldown-based retries. Confirm
+  demand, resources, prerequisites, and queue ownership separately before
+  attributing failure to placement. (Hypothesis from an underspecified
+  Resonator narrative; requires full-engine validation.)
+
+- Keep balance frozen when diagnosing AI placement. Do not change costs, stats,
+  prerequisites, resource values, or probabilities to mask a missing request,
+  illegal-site diagnosis, or queue failure. (General guardrail.)
