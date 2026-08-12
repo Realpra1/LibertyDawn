@@ -98,6 +98,25 @@ namespace OpenRA.Test
 		}
 
 		[Test]
+		public void UnreliableZeroCostWindowsDoNotRecoverDisabledModule()
+		{
+			var controller = Create("advanced");
+			var pressure = new Dictionary<string, double> { { "advanced", 75 } };
+			var disabled = new Dictionary<string, double> { { "advanced", 0 } };
+			controller.Update(Maximum, 100, pressure);
+			controller.Update(Maximum, 100, pressure);
+
+			for (var i = 0; i < 10; i++)
+				Assert.That(controller.Update(Maximum, 25, disabled).Transition, Is.EqualTo("cooldown"));
+
+			Assert.That(controller.IsEnabled("advanced"), Is.False);
+			Assert.That(controller.Update(Healthy, 25, disabled).Transition, Is.EqualTo("cooldown"));
+			Assert.That(controller.Update(Healthy, 25, disabled).Transition, Is.EqualTo("cooldown"));
+			Assert.That(controller.Update(Healthy, 25, disabled).Transition, Is.EqualTo("enabled-probe"));
+			Assert.That(controller.Update(Slow, 100, pressure).Transition, Is.EqualTo("re-shed"));
+		}
+
+		[Test]
 		public void ExportImportPreservesDegradedStateAndCooldownProgress()
 		{
 			var first = Create("advanced");

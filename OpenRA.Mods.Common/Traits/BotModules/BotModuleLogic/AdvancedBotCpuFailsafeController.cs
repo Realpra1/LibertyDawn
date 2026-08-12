@@ -134,6 +134,16 @@ namespace OpenRA.Mods.Common.Traits
 				return new AdvancedBotFailsafeDecision("healthy", null, reason, advancedMilliseconds, totalMilliseconds);
 			}
 
+			// An unreliable share window cannot prove recovery while work is disabled:
+			// its missing cost alone can make the window appear healthy. Wait for a
+			// reliable normal-speed window before probing, then evaluate the enabled
+			// probe normally on the next sample.
+			if (!pacing.Reliable)
+			{
+				healthySamples = 0;
+				return new AdvancedBotFailsafeDecision("cooldown", null, reason, advancedMilliseconds, totalMilliseconds);
+			}
+
 			healthySamples++;
 			var recovery = moduleOrder.FirstOrDefault(m => disabled.Contains(m) && !string.Equals(m, offender, StringComparison.Ordinal));
 			var required = recoverySamplesRequired;
