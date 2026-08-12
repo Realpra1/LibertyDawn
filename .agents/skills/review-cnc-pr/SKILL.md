@@ -1,16 +1,17 @@
 ---
 name: review-cnc-pr
-description: Review a Liberty Dawn CNC worker diff at its cycle-5 checkpoint or a completed task PR for correctness, regressions, code quality, technical debt, readability, determinism, and simulation CPU cost. Use for one advisory Terra review and the final independent Sol-high gate.
+description: Review a Liberty Dawn CNC worker diff at its cycle-3 checkpoint or a completed task/release PR for correctness, regressions, code quality, technical debt, readability, determinism, and simulation CPU cost. Use for one advisory Luna review and independent Terra task/release gates.
 ---
 
 # Review CNC Worker Code
 
 The job must declare one mode:
 
-- `cycle`: use a fresh Terra 5.6 medium session after isolated product-change
-  cycle 5. Review the cumulative current diff and
+- `cycle`: use a fresh Luna 5.6 medium session after isolated product-change
+  cycle 3. Review the cumulative current diff and
   latest evidence while the worker can still react inside its normal budget.
-- `final`: use a fresh Sol 5.6 high session for the completed task PR.
+- `final`: use a fresh Terra 5.6 medium session for a completed task or integrated
+  release PR.
 
 Do not modify Git, product code, worker state, task-sheet state, coordinator
 state, or a PR; write only the requested review file. Never create tasks, expand
@@ -25,9 +26,11 @@ The worker records whether it adopts or rejects the concern; an adopted product
 change starts the next ordinary code-change cycle. This advisory review does not
 replace the final gate or grant extra cycles.
 
-In `final` mode, read the assigned worker state/spec, task report, PR diff and
-commits, relevant surrounding code, test evidence, and required checks. Read no
-other worker specs.
+In `final` mode, the job identifies `task` or `release`. For a task PR, read its
+worker state/report, diff, commits, evidence, and checks. For the integrated PR,
+read integration state, combined diff/commits, included task review receipts,
+combined evidence, and checks. Read an individual worker spec during release
+review only when a concrete conflict or failure requires its contract.
 
 1. Read applicable `AGENTS.md` and only the artifacts allowed by the selected
    mode above.

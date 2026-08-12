@@ -119,7 +119,7 @@ contract, not a summary.
     useful recommendations, rejected recommendations with reasons, and the
     adversarial tests it inspired in the worker state. Skip only when policy is
     genuinely irrelevant, recording why.
-19. Require one fresh Terra-medium code review after cycle 5. Specify that cycle 1
+19. Require one fresh Luna-medium code review after cycle 3. Specify that cycle 1
     uses Sol high, cycles 2-5 use Terra medium for evidence-led correction, and
     optional cycles 6-15 use Luna medium only for minor obvious fixes/testing.
     Unresolved architecture or policy after cycle 5 requires help, not blind churn.

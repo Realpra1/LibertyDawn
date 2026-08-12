@@ -43,8 +43,8 @@ context.
 | Worker optional cycles 6-15 | Luna medium | Minor obvious fixes/testing only |
 | Match Commenter | Luna medium | One factual narrative per game |
 | Match Policy Reviewer | Luna medium | One policy review per game |
-| Cycle-5 Reviewer | Terra medium | One advisory code concern |
-| Final Reviewer | Sol high | Independent PR/release gate |
+| Cycle-3 Reviewer | Luna medium | One advisory code concern |
+| Task/release Reviewer | Terra medium | Independent PR/release gate |
 | Integrator/Merger | Terra medium | Merge and release coordination |
 | Integration worker/tester | Luna medium | Combined testing and minor fixes |
 
@@ -107,10 +107,10 @@ games. Each game:
   the next code decision. Never combine two games into one analysis call.
 
 Cycle 1 is the substantial Sol-high implementation. Cycles 2-5 are Terra-medium
-corrections to observed bugs or wrong assumptions, not redesign invitations. At
-cycle 5, run one Terra-medium cycle code review. If the task is still not close to
-the spec, report `Needs help`/`First iteration - testing`; five failed rounds are
-evidence that the approach or spec needs human or stronger-agent help.
+corrections to observed bugs or wrong assumptions, not redesign invitations. After
+cycle 3, run one Luna-medium cycle code review before cycle 4. If the task is still
+not close to the spec after cycle 5, report `Needs help`/`First iteration -
+testing`; five failed rounds require human or stronger-agent help.
 
 The coordinator may authorize up to ten extra cycles (6-15) only when remaining
 work is minor and obvious. Luna workers, narrators, and policy reviewers handle
@@ -142,7 +142,7 @@ newest with advanced squad modules disabled, and newest with them enabled.
 
 1. Each worker opens one task PR and proposes `Complete - testing` or `First
    iteration - testing` with evidence and remaining risks.
-2. Launch one fresh Sol-high final Reviewer per PR. Return its single highest
+2. Launch one fresh Terra-medium final Reviewer per PR. Return its single highest
    compatible correction for at most one response cycle using the model tier
    appropriate to the current phase.
 3. Launch the Terra-medium Integrator after reviewed PRs and checks are ready. It

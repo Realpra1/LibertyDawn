@@ -178,3 +178,7 @@ development remains paused pending user approval of this workflow revision.
 Integration refinement (2026-08-12): the merger/integrator is Terra medium;
 combined workers, test-only agents, narrators, and policy reviewers are Luna
 medium. Integrated testing/fixing is capped at five release-wide cycles.
+
+Code-review refinement (2026-08-12): the advisory checkpoint now runs after
+cycle 3 with Luna medium. Individual task-PR and final integrated-release reviews
+both use Terra medium.

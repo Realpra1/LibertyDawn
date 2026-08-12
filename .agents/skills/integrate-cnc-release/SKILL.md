@@ -19,7 +19,7 @@ integrated failure that requires its contract.
 3. Run build/unit/static checks, inspect the combined diff, push the stable branch,
    and open one draft PR to `bleed`. Keep source PRs open; never merge them through
    GitHub or merge `bleed`.
-4. Before promotion, run a fresh Sol-high release review for cross-task leakage,
+4. Before promotion, run a fresh Terra-medium release review for cross-task leakage,
    duplicated policy, conflict damage, nondeterminism, unbounded CPU work, noisy
    diagnostics, missing evidence, and unauthorized balance changes.
 

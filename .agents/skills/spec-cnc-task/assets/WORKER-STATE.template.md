@@ -22,7 +22,7 @@ coordinator state, other skills, or other worker specs. Read applicable
 - Design: `.agents/references/LIBERTY-DAWN-DESIGN.md`
 - Policy scratchpad/lock: `{{ABSOLUTE_POLICY_SCRATCHPAD_PATH}}` /
   `{{ABSOLUTE_SHARED_LOCK_DIRECTORY}}`
-- Games completed: `0`; cycle-5 review: `not due`; PR: `none`
+- Games completed: `0`; cycle-3 review: `not due`; PR: `none`
 
 Each worker invocation performs only the current authorized cycle, updates this
 file/report, and exits. Do not loop into another model tier in the same context.
@@ -156,8 +156,8 @@ actor counts, and errors/stalls; do not call contended/debug-heavy runs golden.
 
 - Cycle 1/Sol high: implement the coherent initial solution.
 - Cycles 2-5/Terra medium: correct evidenced bugs and wrong assumptions. Do not
-  casually redesign. After cycle 5 obtain one Terra code review with at most one
-  advisory concern and record adoption/rejection.
+  casually redesign. After cycle 3 obtain one Luna code review with at most one
+  advisory concern, record adoption/rejection, then continue to cycle 4.
 - If unresolved after cycle 5, mark `Needs help` or `First iteration - testing`
   unless all remaining work is minor and obvious.
 - Cycles 6-15/Luna medium: require coordinator authorization. Only narrow guards,
@@ -178,7 +178,7 @@ it atomically. Keep detailed analysis ignored; record concise conclusions/paths.
 
 Propose `Complete - testing` only when literal acceptance, required adversarial
 evidence, final regression, checks, report, PR, and CI pass. Otherwise propose
-`First iteration - testing` with exact failures and risks. A final Sol-high review
+`First iteration - testing` with exact failures and risks. A final Terra review
 may return one compatible correction; it consumes an available cycle. Never merge
 the PR.
 
@@ -199,6 +199,6 @@ performance, checks/CI, deferred work, and risks.
 - Acceptance/adversarial/final-regression evidence:
 - Old-control comparative result:
 - Per-game narrative and policy-review paths/conclusions:
-- Cycle-5 code review/disposition:
+- Cycle-3 code review/disposition:
 - Diagnostic/performance result:
 - Deferred work and known risks:
