@@ -1327,9 +1327,6 @@ namespace OpenRA.Mods.Common.Traits
 			var clusterState = DefenseClusterManager?.IssueTraitData();
 			if (clusterState != null)
 				data.Add(clusterState);
-			var clusterWallState = WallPlanner?.IssueTraitData();
-			if (clusterWallState != null)
-				data.Add(clusterWallState);
 
 			return data;
 		}
