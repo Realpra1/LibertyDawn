@@ -6,8 +6,8 @@ description: Convert one Liberty Dawn full-engine game's logs, manifest, summary
 # Comment on a CNC Match
 
 Use a fresh Luna 5.6 medium session after every judged game. One game receives one
-narrative; never combine games into a batch narrative. Remain factual; the Policy
-Reviewer judges whether behavior makes strategic sense.
+ narrative; never combine games into a batch narrative. Remain strictly factual;
+ the Policy Reviewer judges strategy and causality.
 
 ## Inputs and isolation
 
@@ -43,19 +43,20 @@ review output. Never infer an event merely because code was intended to produce 
    idle, scouting, rushing, defending, gathering, and first-contact orders.
    Also reconstruct the final unit activity before the match ended or the AI lost:
    what its last active units attempted, whether they were idle, retreating,
-   attacking, repairing, trapped, or waiting, and whether that activity plausibly
-   contributed to the finish. Treat this as the end-game counterpart to the early
-   troop account, with ticks and unknowns stated explicitly.
+   attacking, repairing, trapped, or waiting. Treat this as the end-game
+   counterpart to the early troop account, with ticks and unknowns stated
+   explicitly; do not infer whether it caused or contributed to the finish.
 4. Describe exactly what the changed AI and old-behavior control did differently:
    build/tech timing, spending, income/storage, unit mix, target selection,
    movement, engagements avoided/taken, losses, idle/stalled resources, recovery,
    and objective/match outcome. Separate policy differences from map position,
    opponent pressure, RNG/nondeterminism, or invalid setup.
-5. Explain the most evidence-supported causal chain for why each AI won or lost.
-   Do not reduce every result to the final army-value number.
-6. Always identify what each AI did well, especially a losing AI. Distinguish a
-   sensible decision overwhelmed by circumstances from a true blunder, without
-   turning this factual narrative into the policy verdict.
+5. Describe the observed sequence ending in each AI's win, loss, or stop condition
+   without assigning causes or strategic blame. Do not reduce the report to the
+   final army-value number.
+6. List concrete actions by each AI, including actions by a losing AI. Do not label
+   decisions sensible, blunders, or causal; leave those judgments to the Policy
+   Reviewer.
 7. If an AI went broke or lost, identify the last three structures or units it
    completed beforehand, in order, with timing/cost when available and whether
    each purchase plausibly helped, delayed recovery, or exposed a queue stall.
@@ -88,11 +89,9 @@ Write the requested `NARRATIVE.md` with:
 ## Last three productions before insolvency or defeat
 ## Individual unit stories
 ## Changed AI versus old-behavior control
-## Why the changed AI won or lost
-## Why the control won or lost
-## What the losing AI did well
-## Other effective decisions
-## Observed blunders, stalls, and missed opportunities
+## Observed changed-AI and control outcomes
+## Observed losing-AI actions
+## Observed stalls, idle periods, and missed orders
 ## Inferences, alternative explanations, and unknowns
 ## Questions supplied for policy review
 ## Source artifacts
