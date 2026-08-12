@@ -55,6 +55,7 @@ namespace OpenRA
 
 		static bool takeScreenshot = false;
 		static Benchmark benchmark = null;
+		public static bool IsBenchmarking => benchmark != null;
 		static int automatedSaveTick = -1;
 		static string automatedSaveName;
 		static int automatedExitTick = -1;
@@ -686,7 +687,7 @@ namespace OpenRA
 						Sync.RunUnsynced(world, () => world.TickRender(worldRenderer));
 				}
 
-				benchmark?.Tick(LocalTick);
+				benchmark?.Tick(LocalTick, world);
 				if (worldTicked && ReferenceEquals(orderManager, OrderManager))
 					TryAutomatedExit(world);
 			}
@@ -791,6 +792,7 @@ namespace OpenRA
 			PerfHistory.Items["render_widgets"].Tick();
 			PerfHistory.Items["render_flip"].Tick();
 			PerfHistory.Items["terrain_lighting"].Tick();
+			benchmark?.Render(RenderFrame);
 		}
 
 		static void Loop()
@@ -1087,6 +1089,11 @@ namespace OpenRA
 		public static void BenchmarkMode(string prefix)
 		{
 			benchmark = new Benchmark(prefix);
+		}
+
+		public static void RecordBotModuleSample(int playerIndex, string module, double milliseconds, int queuedOrders)
+		{
+			benchmark?.BotModule(LocalTick, playerIndex, module, milliseconds, queuedOrders);
 		}
 
 		public static void ConfigureHeadlessAutomation()

@@ -11,6 +11,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using OpenRA.Support;
 using OpenRA.Traits;
@@ -92,7 +93,22 @@ namespace OpenRA.Mods.Common.Traits
 				{
 					foreach (var t in tickModules)
 						if (t.IsTraitEnabled())
-							t.BotTick(this);
+						{
+							if (!Game.IsBenchmarking)
+							{
+								t.BotTick(this);
+								continue;
+							}
+
+							var start = Stopwatch.GetTimestamp();
+							var queuedOrders = orders.Count;
+							try { t.BotTick(this); }
+							finally
+							{
+								var elapsed = 1000.0 * Math.Max(0, Stopwatch.GetTimestamp() - start) / Stopwatch.Frequency;
+								Game.RecordBotModuleSample(player.ClientIndex, t.GetType().Name, elapsed, orders.Count - queuedOrders);
+							}
+						}
 				});
 			}
 
