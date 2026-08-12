@@ -1,7 +1,7 @@
 # Coordinated CNC State
 
 - Round ID: `20260807-bug-polish-03`
-- Phase: `valid integration cycle 1 passed; diagnostic merge pending; CNC-47 withdrawn/excluded`
+- Phase: `valid integration cycle 2 pending on RC2; CNC-47 withdrawn/excluded`
 - Common base branch: `agent/cnc-20260807-bug-polish-02-release`
 - Common base SHA: `468ee64f5a0f9a9e19e260e5c5943e6e878f4705`
 - Coordinator model: `gpt-5.6-luna` / `medium`; delegated cycle tiers are pinned
@@ -15,7 +15,7 @@
 - Prior release: [product PR #90](https://github.com/Realpra1/LibertyDawn/pull/90)
   at final task-status head `468ee64f5a0f`; merged by the user into `bleed` at
   2026-08-07 18:20:52 UTC after 2× Linux/2× Windows CI passed
-- Release candidate: `RC1` / `37ede3f9303191cbeec228518479061f715fcb32`
+- Release candidate: `RC2` / `9f0c314ec77814506983def57c3d414e2e5aa56b`
 - Release PR: [#99](https://github.com/Realpra1/LibertyDawn/pull/99) (draft, mergeable; CI pending)
 
 ## Workers
@@ -31,6 +31,7 @@
 ## Release rounds
 
 | RC1 | `37ede3f9303191cbeec228518479061f715fcb32` | CNC-45, CNC-46, CNC-50, CNC-52 | Terra cycle 1 passed; reviewed startup diagnostics pending merge | `make check`, `make test` passed; two cycle-1 games reached tick 8,000 | `1/5 valid` | canonical launcher/content preflight required; cycle 1 operationally clean but timing-only telemetry was insufficient for strategic acceptance |
+| RC2 | `9f0c314ec77814506983def57c3d414e2e5aa56b` | RC1 plus reviewed opt-in startup diagnostics | Terra cycle 2 pending | focused build, `make check`, `make test`, diff check passed | `0` additional | PR #99 pushed; diagnostics silent unless `Debug.StartupDiagnostics=true` |
 |---|---|---|---|---|---|---|
 
 ## Resume note
