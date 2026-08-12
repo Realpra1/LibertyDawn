@@ -90,8 +90,14 @@ two-question new-task gate. Normal questions never enter this flow.
    `worker-sol`. Relaunch each later cycle from its durable state: `worker-terra`
    for cycles 2-5 and, only when allowed below, `worker-luna` for cycles 6-15.
 
-Run fewer than five tasks when fewer are eligible; never invent work. Workers may
-code while other workers' simulations or analysis roles run.
+Run fewer than five tasks when fewer are eligible; never invent work. Do not add
+barriers between unrelated tasks: as soon as one task has a valid packet/state,
+launch its speccer; as soon as its worker state is complete, launch its next
+authorized development cycle. Other speccers, workers, games, narrators, policy
+reviews, and code reviews continue independently. Wait only for a task's own
+durable prerequisite, a named cross-worker dependency, a contested resource
+slot, or the merge/integration gate that genuinely needs all included heads.
+Workers may code while other workers' simulations or analysis roles run.
 
 ## Development-cycle contract
 
