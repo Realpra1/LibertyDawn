@@ -6,8 +6,8 @@ description: Convert one Liberty Dawn full-engine game's logs, manifest, summary
 # Comment on a CNC Match
 
 Use a fresh Luna 5.6 medium session after every judged game. One game receives one
- narrative; never combine games into a batch narrative. Remain strictly factual;
- the Policy Reviewer judges strategy and causality.
+narrative; never combine games into a batch narrative. Remain strictly factual;
+the Policy Reviewer judges strategy and causality.
 
 ## Inputs and isolation
 
