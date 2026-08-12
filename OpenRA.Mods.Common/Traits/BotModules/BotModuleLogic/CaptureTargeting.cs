@@ -181,6 +181,12 @@ namespace OpenRA.Mods.Common.Traits
 
 	public static class CaptureTargeting
 	{
+		public static bool IsCapabilityScopedOwnedRestorationCandidate(bool sameOwner, bool hasHusk,
+			bool isBuilding, bool hasValidTransform, bool hasMatchingCapture)
+		{
+			return sameOwner && hasHusk && !isBuilding && hasValidTransform && hasMatchingCapture;
+		}
+
 		public static int EconomicValue(int directValue, int transformedValue)
 		{
 			return System.Math.Max(0, System.Math.Max(directValue, transformedValue));

@@ -634,6 +634,19 @@ namespace OpenRA.Mods.Common.Traits
 	}
 
 	/// <summary>
+	/// Coordinates a bounded transport handoff for an already-owned objective without authorizing
+	/// transport production. The requesting reservation owner retains strategic ownership of the passenger.
+	/// </summary>
+	[RequireExplicitImplementation]
+	public interface IBotTransportObjectiveService
+	{
+		bool CanTransportTo(Actor passenger, CPos destination, IBotUnitReservations reservationOwner);
+		bool TryRequestTransport(Actor passenger, CPos destination, IBotUnitReservations reservationOwner);
+		bool IsTransporting(Actor passenger);
+		void CancelTransport(Actor passenger);
+	}
+
+	/// <summary>
 	/// Marks a unit as temporarily ordered by a squad-owned tactical deviation. Unlike a reservation,
 	/// this does not remove the actor from its normal squad and must be released promptly.
 	/// </summary>

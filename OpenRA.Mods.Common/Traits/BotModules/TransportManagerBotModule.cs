@@ -141,7 +141,8 @@ namespace OpenRA.Mods.Common.Traits
 	}
 
 	public class TransportManagerBotModule : ConditionalTrait<TransportManagerBotModuleInfo>,
-		IBotEnabled, IBotTick, IBotTransportReservations, IBotUnitReservations, IBotRespondToAttack
+		IBotEnabled, IBotTick, IBotTransportReservations, IBotUnitReservations,
+		IBotTransportObjectiveService, IBotRespondToAttack
 	{
 		enum MissionStage { Gathering, Travelling, Unloading }
 
@@ -204,9 +205,10 @@ namespace OpenRA.Mods.Common.Traits
 			coordinator = new TransportMissionCoordinator(info.MaximumActiveMissions);
 			unloadPlanner = new TransportUnloadPlanner(world, player, info, coordinator);
 			infantryAssault = new InfantryAssaultTransportManager(world, player, info, coordinator, unloadPlanner,
-				IssueRoutedMove, RequestTransportHelicopter, IsReservedForOtherBehavior, RememberSafeIdleStaging);
+				IssueRoutedMove, RequestTransportHelicopter, actor => IsReservedForOtherBehavior(actor), RememberSafeIdleStaging);
 			heavyDrop = new HeavyDropTransportManager(world, player, info, coordinator, unloadPlanner,
-				IssueRoutedMove, RequestTransportHelicopter, () => squadManager, IsReservedForOtherBehavior,
+				IssueRoutedMove, RequestTransportHelicopter, () => squadManager,
+				actor => IsReservedForOtherBehavior(actor),
 				RememberSafeIdleStaging);
 		}
 
@@ -241,10 +243,95 @@ namespace OpenRA.Mods.Common.Traits
 			return actor != null && coordinator.IsReserved(actor.ActorID);
 		}
 
-		bool IsReservedForOtherBehavior(Actor actor)
+		bool IBotTransportObjectiveService.CanTransportTo(
+			Actor passenger, CPos destination, IBotUnitReservations reservationOwner)
+		{
+			var available = TryPrepareObjectiveTransport(passenger, destination, reservationOwner,
+				out _, out _, out _, out var rejection);
+			if (!available)
+				Debug("objective transport unavailable passenger={0} destination={1}: {2}",
+					passenger, destination, rejection);
+
+			return available;
+		}
+
+		bool IBotTransportObjectiveService.TryRequestTransport(
+			Actor passenger, CPos destination, IBotUnitReservations reservationOwner)
+		{
+			if (passenger == null || reservationOwner == null || !reservationOwner.IsUnitReserved(passenger) ||
+				missions.Any(existing => existing.Passenger == passenger))
+				return false;
+
+			if (!TryPrepareObjectiveTransport(passenger, destination, reservationOwner,
+				out var transport, out var pickupRoute, out _, out var rejection))
+			{
+				Debug("objective transport rejected passenger={0} destination={1}: {2}",
+					passenger, destination, rejection);
+				return false;
+			}
+
+			var missionId = coordinator.TryReserve(new[] { transport.ActorID, passenger.ActorID });
+			if (missionId == 0 || !unloadPlanner.TryPlan(missionId, transport, new[] { passenger }, destination,
+				Info.LandingSearchRadiusCells, Info.LandingUsefulnessRadiusCells, 1,
+				out var unloadPlan, out rejection))
+			{
+				if (missionId != 0)
+					coordinator.Release(missionId);
+
+				Debug("objective transport reservation rejected passenger={0} destination={1}: {2}",
+					passenger, destination, rejection);
+				return false;
+			}
+
+			var distanceCells = Math.Abs(transport.Location.X - passenger.Location.X) +
+				Math.Abs(transport.Location.Y - passenger.Location.Y) +
+				Math.Abs(passenger.Location.X - destination.X) + Math.Abs(passenger.Location.Y - destination.Y);
+			var speed = transport.Info.TraitInfoOrDefault<AircraftInfo>()?.Speed ?? 1;
+			var travelAllowance = (int)Math.Min(int.MaxValue,
+				distanceCells * 1024L * 3 / Math.Max(1, speed) + 1000);
+			var mission = new Mission(missionId, transport, passenger, destination, world.WorldTick,
+				world.WorldTick + Math.Max(Info.MissionTimeoutTicks, travelAllowance))
+			{
+				UnloadPlan = unloadPlan
+			};
+			missions.Add(mission);
+			IssueRoutedMove(transport, passenger.Location, pickupRoute);
+			Debug("created objective mission {0}: transport={1} passenger={2} destination={3} " +
+				"carrier={4} exit={5}", missionId, transport, passenger, destination,
+				unloadPlan.CarrierCell, unloadPlan.ExitCells[0]);
+			return true;
+		}
+
+		bool IBotTransportObjectiveService.IsTransporting(Actor passenger)
+		{
+			return passenger != null && missions.Any(mission => mission.Passenger == passenger);
+		}
+
+		void IBotTransportObjectiveService.CancelTransport(Actor passenger)
+		{
+			for (var i = missions.Count - 1; i >= 0; i--)
+			{
+				var mission = missions[i];
+				if (mission.Passenger != passenger)
+					continue;
+
+				var cargo = mission.Transport.TraitOrDefault<Cargo>();
+				if (cargo != null && cargo.Passengers.Any(actor => actor == passenger))
+					RecoverTimedOutCargo(mission, "objective canceled");
+				else
+				{
+					if (bot != null && IsUsable(mission.Transport))
+						bot.QueueOrder(new Order("Stop", mission.Transport, false));
+
+					FinishMission(i, "objective canceled before pickup");
+				}
+			}
+		}
+
+		bool IsReservedForOtherBehavior(Actor actor, IBotUnitReservations ignoredReservation = null)
 		{
 			return actor != null && otherUnitReservations != null &&
-				otherUnitReservations.Any(r => r.IsUnitReserved(actor));
+				otherUnitReservations.Any(r => !ReferenceEquals(r, ignoredReservation) && r.IsUnitReserved(actor));
 		}
 
 		void IBotRespondToAttack.RespondToAttack(IBot enabledBot, Actor self, AttackInfo e)
@@ -670,6 +757,44 @@ namespace OpenRA.Mods.Common.Traits
 			return true;
 		}
 
+		bool TryPrepareObjectiveTransport(Actor passenger, CPos destination,
+			IBotUnitReservations reservationOwner, out Actor transport, out List<CPos> pickupRoute,
+			out TransportUnloadPlan unloadPlan, out string rejection)
+		{
+			transport = null;
+			pickupRoute = null;
+			unloadPlan = null;
+			rejection = "transport service is unavailable";
+			if (bot == null || !IsUsable(passenger) || passenger.TraitOrDefault<Passenger>()?.Transport != null ||
+				coordinator.MissionCount >= Info.MaximumActiveMissions)
+				return false;
+
+			RefreshSquadManager();
+			transport = FindAvailableTransport(passenger, reservationOwner);
+			if (transport == null)
+			{
+				rejection = "no existing compatible healthy empty transport";
+				return false;
+			}
+
+			if (AirStateBase.SafeIndependentAirThreatAt(squadManager, passenger.Location) > 0)
+			{
+				rejection = "pickup cell is covered by anti-air threat";
+				return false;
+			}
+
+			pickupRoute = AirStateBase.SafeIndependentAirRoute(squadManager, transport, passenger.Location);
+			if (pickupRoute == null)
+			{
+				rejection = "no bounded pickup route";
+				return false;
+			}
+
+			return unloadPlanner.TryPlanWithoutClaim(0, transport, new[] { passenger }, destination,
+				Info.LandingSearchRadiusCells, Info.LandingUsefulnessRadiusCells, 1, Array.Empty<CPos>(),
+				out unloadPlan, out rejection);
+		}
+
 		bool TryCreateRescueMission()
 		{
 			foreach (var id in blocked.Keys.Where(id => !IsUsable(world.GetActorById(id))).ToList())
@@ -739,11 +864,12 @@ namespace OpenRA.Mods.Common.Traits
 			return false;
 		}
 
-		Actor FindAvailableTransport(Actor passenger)
+		Actor FindAvailableTransport(Actor passenger, IBotUnitReservations ignoredReservation = null)
 		{
 			return world.Actors.Where(a => IsUsable(a) && a.Owner == player &&
 				Info.TransportHelicopterTypes.Contains(a.Info.Name) && !coordinator.IsReserved(a.ActorID) &&
 				!IsReservedForOtherBehavior(a) &&
+				!IsReservedForOtherBehavior(passenger, ignoredReservation) &&
 				a.TraitOrDefault<Cargo>()?.IsEmpty() == true && !NeedsRepair(a) &&
 				a.Trait<Cargo>().HasSpace(passenger.Trait<Passenger>().Info.Weight))
 				.OrderBy(a => (a.Location - passenger.Location).LengthSquared).ThenBy(a => a.ActorID).FirstOrDefault();
@@ -832,6 +958,11 @@ namespace OpenRA.Mods.Common.Traits
 		void IssueRoutedMove(Actor transport, CPos destination, Order finalOrder = null)
 		{
 			var route = AirStateBase.SafeIndependentAirRoute(squadManager, transport, destination) ?? new List<CPos>();
+			IssueRoutedMove(transport, destination, route, finalOrder);
+		}
+
+		void IssueRoutedMove(Actor transport, CPos destination, List<CPos> route, Order finalOrder = null)
+		{
 			Debug("routed {0} to {1} via {2} threat-aware waypoint(s)", transport, destination, route.Count);
 			var queued = false;
 			foreach (var waypoint in route)
