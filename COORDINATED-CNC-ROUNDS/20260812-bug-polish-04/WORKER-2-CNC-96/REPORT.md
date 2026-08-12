@@ -259,3 +259,92 @@ passed. No product source changed, so no new build was required. Cycle 7 is
 authorized by the user's five-cycle Sol-high continuation (cycles 6-10) and must
 be a fresh invocation; it should use the reviewer-requested workload-equivalent
 replacement control and must not redesign or tune balance.
+
+# CNC-96 explicit Sol-high continuation cycle 7 report
+
+## Result
+
+Added a default-off diagnostic `SimpleIdleGuardControl` to the existing
+`EconomyFieldDefenseBotModule`. Normal play remains on the old path. The control
+uses the same 25-tick scan, field detection, deterministic candidate gate, mixed
+role counts, reservations, defensive stance, safety hazards, production demand,
+loss replacement, and save-owned destination state. It plans one safe local
+anchor per assigned defender, then issues a safe return only after displacement
+instead of repeatedly managing the normal field formation. No balance value,
+ordinary default, strategy composition, cadence, or other AI module changed.
+
+The cycle started from cycle 6's forced-Economy-II Brutalis setup and retained
+12 harvesters plus 288 other mobile actors per side, three living field clusters,
+all modules/features, normal enemies and losses, seed `9607`, one-CPU affinity,
+MAX speed, tick-2000 exit, and staged content
+`/root/github/LibertyDawn/.build/cnc33a/runtime-content`. The enabled map SHA-256
+was `1c30dbe204c6f917abf0af35a8f99406e04cce05b9e1c5187e0288048cb3a179`;
+the diagnostic-control map was
+`0271a911270b692c8f367f47a8ca3d4fbf83bfc4a352fc45db635ce7b78d031b`.
+
+## Equivalence gate and valid games
+
+| Gate | Guard enabled | Simple idle control | Disposition |
+|---|---|---|---|
+| Cadence/module calls | 2,000 calls/player; 25-tick configured scan | Identical calls/cadence | Pass |
+| Initial actors/content/seed | 760 actors; same geometry/roster/content/seed | 760; matched | Pass |
+| Field safety/reachability | Safe routed formations; no forbidden occupancy | Safe local anchors/returns; no forbidden occupancy | Bounded scenario pass |
+| Mixed reservations/recovery | Four fields by tick 2000; 20 assignment events including four missing-role replacements | Seven fields; 30 assignment events including two replacements | Fail: different committed workload |
+| Guard work/orders | `190.017ms` total, `37.979ms` max, 92 queued orders | `270.095ms` total, `43.444ms` max, 289 queued orders | Fail: control did more direct work/orders |
+| Harvesting/production | Four unloads; Harvester orders 14; UnitBuilder orders 41 | Seven unloads; Harvester orders 12; UnitBuilder orders 39 | Active in both; not equivalent |
+| Ordinary squads | SquadManager 5,272 orders; StealthTank 2,108 | SquadManager 5,288; StealthTank 2,418 | General squads near parity, advanced squad work diverged |
+| Loss/load outcome | 615 terminal actors | 492 terminal actors | Fail: materially different losses/downstream load |
+| Completed tick tails | p50/p95/p99/max `8/17/112/2868.549ms`; 29 freezes; `35.042s` wall | `8/18/136/2868.109ms`; 34 freezes; `36.052s` wall | No material improvement; control is worse at p99/count/mean |
+| Determinism/save-load/urgent threat | One fixed-seed run; losses/replacement occurred | One fixed-seed run; losses/replacement occurred | Repeat replay/save and explicit threat bounds remain unproven |
+
+- Game 1, `cycle-7/game-1-enabled/`, passed canonical validation at tick
+  2000 in `35.042s`, with mean tick `15.885ms`, p99 `112ms`, 29 >=50ms
+  samples, four total committed fields, no exception/desync, continued unloads,
+  complete mixed screens, and missing-role replacement. Its largest tails were
+  again dominated by the enclosing world and StealthTankSquad spans, not direct
+  guard work.
+- The first simple-control launch, `cycle-7/game-2-simple/`, passed the engine
+  bound but exposed an invalid test assumption: requiring already-near candidates
+  left only one MSAM assigned. It is retained as harness evidence and is not the
+  counted comparison. The corrected control reused the normal candidate gate and
+  one-time safe station placement.
+- Game 2, `cycle-7/game-2-simple-final/`, passed tick 2000 in `36.052s`, with
+  mean tick `16.514ms`, p99 `136ms`, 34 >=50ms samples, seven committed fields,
+  no forbidden occupancy/exception/desync, continuing unloads, full mixed role
+  counts, and replacement after losses. It did not reduce tails and was not
+  workload-equivalent: direct guard orders tripled, terminal actors fell by 123,
+  and downstream StealthTank work increased.
+
+The replacement therefore fails the task's causal and equivalence gates. It is
+not a product fix, and it supplies no basis for a cache, phase shift, cadence
+change, reduced coverage, or strategic policy change. The default-off diagnostic
+is retained only so the next explicitly authorized cycle can falsify its threat,
+blocked-anchor, and loss behavior without rebuilding a second control mechanism.
+
+## Reviewer disposition, checks, and next test
+
+Each valid game received its own fresh Luna Commenter and Luna Policy Reviewer
+under `cycle-7/game-{1,2}-analysis/`. Game 1 found the unload-before-commit mixed
+screen and role replacement sensible but causal evidence insufficient. Game 2's
+single-game review called the observed idle guard conditionally acceptable while
+explicitly requiring a changed/control threat test; the worker rejects a broader
+behavior-preserving claim because the paired workload, losses, fields, orders,
+and tails diverged. One commenter misread the effects column as actor count; the
+narrative and downstream review were corrected to the verified `760 -> 492`
+actor result.
+
+Adopted strongest recommendation: cycle 8 should use one shared deterministic
+scenario with a reachable scripted attack on a guarded field, a blocked or
+invalidated anchor, and a defender-loss/replacement case. It must assert threat
+departure/return bounds, continued unloads, field-local reservations and mixed
+coverage, and compare per-tick planning/path/update tails. Extension fallback,
+commit-age, threat-policy, balance, and composition suggestions remain rejected
+as outside CNC-96's frozen performance scope. No durable general scratchpad entry
+was proposed or promoted.
+
+Checks: protected `make all` passed twice after the diagnostic/harness correction
+with zero warnings/errors; `python3 -m unittest tests/test_launch_ai_parallel.py`
+passed 5/5; `git diff --check` passed. Both final serial full-engine games held
+both game slots, used isolated support/content/runtime artifacts, and stayed
+within 120 seconds. CNC-100 is now at `886519f69d`; no dependency code was merged,
+so prior controls remain stale for final integration.

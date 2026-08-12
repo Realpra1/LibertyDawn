@@ -41,6 +41,8 @@ namespace OpenRA.Mods.Common.Traits
 		public readonly int RouteRetryTicks = 250;
 		public readonly int MaximumCandidatesPerRole = 48;
 		public readonly int MaximumOutstandingRequestsPerRole = 1;
+		[Desc("Diagnostic control that anchors assigned defenders without repeatedly planning a station formation.")]
+		public readonly bool SimpleIdleGuardControl = false;
 		public readonly bool DebugLogging = false;
 
 		public override void RulesetLoaded(Ruleset rules, ActorInfo ai)
@@ -208,7 +210,10 @@ namespace OpenRA.Mods.Common.Traits
 			ownedMovementHazards.UnionWith(projectedResourceHazards);
 			Rebalance();
 			UpdateProductionRequests();
-			UpdateOrders();
+			if (Info.SimpleIdleGuardControl)
+				UpdateSimpleIdleGuardOrders();
+			else
+				UpdateOrders();
 			LogComposition();
 		}
 
@@ -460,6 +465,70 @@ namespace OpenRA.Mods.Common.Traits
 				Position(field, field.Tanks, used, false);
 				Position(field, field.Infantry, used, false);
 				Position(field, field.AntiAir, used, false);
+			}
+		}
+
+		void UpdateSimpleIdleGuardOrders()
+		{
+			var used = new HashSet<CPos>();
+			foreach (var field in fields.Values.OrderBy(f => f.HarvesterId))
+			{
+				MaintainSimpleIdleGuardOrders(field, field.Tanks, used);
+				MaintainSimpleIdleGuardOrders(field, field.Infantry, used);
+				MaintainSimpleIdleGuardOrders(field, field.AntiAir, used);
+			}
+		}
+
+		void MaintainSimpleIdleGuardOrders(FieldAssignment field, HashSet<uint> actorIds, HashSet<CPos> used)
+		{
+			foreach (var actor in actorIds.Select(world.GetActorById).Where(IsOwnedUsable).OrderBy(a => a.ActorID).ToArray())
+			{
+				LogUnsafeOccupancy(actor, field);
+				var newAnchor = false;
+				if (!field.Destinations.TryGetValue(actor.ActorID, out var anchor) || used.Contains(anchor) ||
+					!IsSafeCell(actor, anchor))
+				{
+					if (!TryFindDestination(actor, field.Station, used, out anchor, out _))
+					{
+						Release(field, actor, "simple-anchor-unavailable");
+						continue;
+					}
+
+					field.Destinations[actor.ActorID] = anchor;
+					newAnchor = true;
+					Debug("simple idle guard defender={0} field={1} anchor={2}",
+						actor.ActorID, field.HarvesterId, anchor);
+				}
+
+				used.Add(anchor);
+
+				var distance = (actor.CenterPosition - world.Map.CenterOfCell(anchor)).HorizontalLengthSquared;
+				if (EconomyFieldDefensePolicy.IsWithinFormation(actor.Location, anchor,
+					distance, Info.FormationToleranceCells))
+					continue;
+
+				var busyAttack = IsBusyAttacking(actor);
+				if (!newAnchor && busyAttack && !EconomyFieldDefensePolicy.ShouldReform(distance,
+					Info.FormationToleranceCells, Info.EngagementLeashCells))
+					continue;
+
+				if (lastOrderTicks.TryGetValue(actor.ActorID, out var last) &&
+					world.WorldTick < last + Info.OrderInterval)
+					continue;
+
+				if (!TryFindSafePath(actor, anchor, out var path))
+				{
+					Release(field, actor, "simple-return-route-invalidated");
+					continue;
+				}
+
+				if (path.Count < 2)
+					continue;
+
+				QueueRoute(actor, anchor, path, false);
+				lastOrderTicks[actor.ActorID] = world.WorldTick;
+				Debug("simple idle guard return defender={0} field={1} anchor={2} waypoints={3}",
+					actor.ActorID, field.HarvesterId, anchor, path.Count);
 			}
 		}
 
