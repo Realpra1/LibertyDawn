@@ -183,3 +183,79 @@ The paired movement strongly nominates the two-trait boundary as a contributor t
 Fresh Luna commenter and policy artifacts are under `cycle-5/game-{1,2}-analysis/{commenter/NARRATIVE.md,policy/POLICY-REVIEW.md}`. Both games were accepted as valid frozen-policy evidence. The Game 2 reviewer’s strongest recommendation—adopted—is a repeated like-for-like paired comparison with workload/outcome/equivalence metrics before assigning ownership. This primary tier is exhausted (five cycles), so the task is handed off as `Needs help` rather than making an unproven AI change.
 
 Checks: both serial paced full-engine games passed the launcher’s map/bot/content/benchmark/exit validation within 120 seconds; `git diff --check` passed. Cycle 4's focused automated checks remained `18/18`; there was no code to rebuild in cycle 5.
+
+# CNC-96 explicit Sol-high continuation cycle 6 report
+
+## Result
+
+No product code, balance value, cadence, or AI policy changed. This cycle tested
+the original Economy-field guard hypothesis directly with two ordinary Nod
+Brutalis bots on forced Economy II, twelve pre-spawned harvesters across three
+living fields and 288 other mobile actors per player. Canonical headless MAX was
+used so unmodified harvest/unload timing could commit real fields within the
+120-second wall bound. The matched in-map control removed only
+`EconomyFieldDefenseBotModule`; all actors, structures, fields, seed `9606`, bots,
+factions, teams/spawns, cash, other modules, staged content, one-CPU affinity,
+diagnostics, and tick-2000 exit were retained.
+
+The enabled map SHA-256 was
+`a0d273c7495bbf752e3415d8d2dfe8b8a6b6d845fbac2f77e717f33c3632694e`;
+the disabled control was
+`79909ae20d9a2ac8aebbff2a0b21ba69bec93b2fc96254c78952a3ef972277f4`.
+Their sole intentional difference is the diagnostic trait override and enabled
+guard logging. Invalid rendered setup attempts that reached tick 600/1000 without
+a committed field are retained under `cycle-6/game-1-enabled{,-final}/` and are
+not counted.
+
+## Valid games and comparison
+
+- Guard enabled: `cycle-6/game-1-enabled-max/` passed tick 2000 in `33.041s`
+  with no exception/desync. Completed ticks were p50/p95/p99/max
+  `9/17/160/1377.099ms`, mean `14.994ms`, with `39` >=50ms samples and reported
+  cadence `74`. Three fields committed for Brutalis 2; the module recorded 11
+  defender assignments, 14 reforms, and 45 queued orders. Its two player spans
+  totaled `136.462ms` across the normal 2000 calls per player, with direct maxima
+  `22.340/46.426ms`.
+- Guard-disabled control: `cycle-6/game-2-control-max/` passed tick 2000 in
+  `32.025s`. Completed ticks were `9/18/115/1369.828ms`, mean `14.514ms`, with
+  `33` >=50ms samples and cadence `75`. Six actual unloads completed; no guard
+  event or module span was present. Initial actors were equal at 760; terminal
+  actors differed (`657` enabled versus `625` control), so later strategic work
+  and outcomes are not workload-equivalent.
+- The first active guard scan at logic tick 1576 led to completed tick 1577 of
+  `182.698ms` versus `22.437ms` in control, but the enabled world span also
+  contained a `110.649ms` StealthTankSquad span. At logic tick 1851, after two
+  more fields committed, completed tick 1852 was `59.022ms` versus `17.563ms`.
+  At logic tick 1951, completed tick 1952 was `472.821ms` versus `203.445ms`,
+  while the enabled StealthTankSquad spans totaled about `460ms` versus the
+  control's `181.308ms`. Guard reservations/orders therefore changed downstream
+  squad work; proximity cannot assign the full tail to guard planning.
+
+This is a causal nomination, not a correction gate. The direct guard span stayed
+below 50ms, only three fields became active late, the disabled control necessarily
+changed ordinary reservations/orders, and the largest aligned tails remained
+dominated by simultaneous StealthTankSquad work. The modest p99/freeze-count and
+wall-time movement is not enough to select a behavior-preserving cache, phase
+shift, or reduced policy. No correction was made.
+
+## Reviewer disposition and next authorization
+
+Each valid game received its own fresh Luna-medium Commenter and Policy Reviewer
+under `cycle-6/game-{1,2}-analysis/`. Both policy verdicts were `insufficient
+evidence` with high confidence. Game 1 accepted the mixed Medium Tank/two-infantry/
+MSAM screen as sensible Brutalis Economy behavior. Both strongest recommendations
+were adopted: preserve exact field safety, reachability, reservations, production,
+recovery, determinism, and urgent response, then repeat the matched test with a
+workload-equivalent simplest idle/guard-near-owned-field replacement rather than
+treating disabled guards as a product fix. Reviewer suggestions about extension
+fallback, threat policy, or balance were not adopted because they are outside
+CNC-96's frozen performance scope.
+
+Checks: both serial full-engine games passed canonical map/bot/content/tick/
+benchmark/exit/fatal validation while holding both game slots and remained below
+120 seconds; staged content was
+`/root/github/LibertyDawn/.build/cnc33a/runtime-content`; `git diff --check`
+passed. No product source changed, so no new build was required. Cycle 7 is
+authorized by the user's five-cycle Sol-high continuation (cycles 6-10) and must
+be a fresh invocation; it should use the reviewer-requested workload-equivalent
+replacement control and must not redesign or tune balance.
