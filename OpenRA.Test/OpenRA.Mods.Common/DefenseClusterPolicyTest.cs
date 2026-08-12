@@ -206,5 +206,18 @@ namespace OpenRA.Test
 			Assert.That(DefenseClusterPolicy.CanQueueRepairRecovery(true, false, false, 2), Is.False,
 				"the handoff must not grow an already multi-item queue");
 		}
+
+		[Test]
+		public void RepairIntentPersistsBeforeAQueueReservationAndOnlyClearsForALiveLocalFacility()
+		{
+			Assert.That(DefenseClusterPolicy.ShouldPersistRepairIntent(true, true, false), Is.True,
+				"a role-ready core with a protected site must retain its local-repair obligation before a queue accepts it");
+			Assert.That(DefenseClusterPolicy.ShouldPersistRepairIntent(true, false, false), Is.False,
+				"an unprotected site is not yet a safe persistent obligation");
+			Assert.That(DefenseClusterPolicy.ShouldPersistRepairIntent(false, true, false), Is.False,
+				"the intent starts only after the role-ready core exists");
+			Assert.That(DefenseClusterPolicy.ShouldPersistRepairIntent(true, true, true), Is.False,
+				"a qualifying live local facility satisfies the obligation");
+		}
 	}
 }

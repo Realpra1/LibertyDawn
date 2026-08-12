@@ -217,6 +217,12 @@ namespace OpenRA.Mods.Common.Traits
 			return !recoveryPending || stableActorId == 0 || candidateActorId == stableActorId;
 		}
 
+		public static bool ShouldPersistRepairIntent(bool roleReadyCore, bool protectedSite,
+			bool hasLocalRepairFacility)
+		{
+			return roleReadyCore && protectedSite && !hasLocalRepairFacility;
+		}
+
 		public static bool CanQueueRepairRecovery(bool recoveryPending, bool handoffUsed,
 			bool priorityRecoveryActive, int queuedItems)
 		{

@@ -54,7 +54,11 @@ namespace OpenRA.Mods.Common.Traits
 		CPos ordinaryDefenseCenter;
 		CPos lastEnemyLocation;
 		bool completionLogged;
-		bool repairRecoveryPending;
+
+		// This is an obligation, not merely recovery from a previously accepted queue item.
+		// It is established as soon as a role-ready core has a protected local site, so an
+		// occupied Building queue cannot make the local repair goal unreachable.
+		bool repairIntentPending;
 		bool repairRecoveryHandoffUsed;
 
 		public BaseBuilderDefenseClusterManager(BaseBuilderBotModule baseBuilder, Player player,
@@ -110,6 +114,7 @@ namespace OpenRA.Mods.Common.Traits
 				{
 					completionLogged = false;
 					nextRetryTick = 0;
+					ClearRepairIntent();
 					ClearProtectedRepairSite("anchor-change");
 					RememberLegacyClusterWalls(ActiveAnchor);
 					Log("anchor {0}->{1} attacked={2}#{3} cell={4} attacker={5}#{6} damage={7}",
@@ -166,10 +171,10 @@ namespace OpenRA.Mods.Common.Traits
 				return;
 
 			var liveRepair = LocalRepairFacility(anchor);
-			if (liveRepair != null && repairRecoveryPending)
+			if (liveRepair != null && repairIntentPending)
 			{
-				ClearRepairRecovery();
-				Log("repair-recovery-complete actor={0}#{1} cell={2}", liveRepair.Info.Name,
+				ClearRepairIntent();
+				Log("repair-intent-complete actor={0}#{1} cell={2}", liveRepair.Info.Name,
 					liveRepair.ActorID, liveRepair.Location);
 			}
 
@@ -180,11 +185,14 @@ namespace OpenRA.Mods.Common.Traits
 			if (state.TryPromotePending(world.WorldTick, Info.DefenseClusterAnchorLease, MinimumClusterComplete()))
 			{
 				completionLogged = false;
+				ClearRepairIntent();
 				ClearProtectedRepairSite("pending-promotion");
 				RememberLegacyClusterWalls(ActiveAnchor);
 				Log("promoted pending anchor={0}", state.AnchorActorId);
 				anchor = ActiveAnchor;
 			}
+
+			EnsureRepairIntent(anchor);
 
 			var complete = MinimumClusterComplete();
 			if (complete && !completionLogged)
@@ -238,7 +246,7 @@ namespace OpenRA.Mods.Common.Traits
 				return null;
 
 			var stableProducer = PreferredRepairProducer(queue.Info.Type);
-			if (!DefenseClusterPolicy.CanUseRepairProducer(repairRecoveryPending, queue.Actor.ActorID,
+			if (!DefenseClusterPolicy.CanUseRepairProducer(repairIntentPending, queue.Actor.ActorID,
 				stableProducer?.ActorID ?? 0))
 				return null;
 
@@ -253,7 +261,7 @@ namespace OpenRA.Mods.Common.Traits
 		public ActorInfo TryChooseQueuedRepairRecovery(ProductionQueue queue,
 			IEnumerable<ActorInfo> buildables, bool priorityRecoveryActive)
 		{
-			if (!enabled || queue == null || world.WorldTick < nextRetryTick || !repairRecoveryPending)
+			if (!enabled || queue == null || world.WorldTick < nextRetryTick || !repairIntentPending)
 				return null;
 
 			var stableProducer = PreferredRepairProducer(queue.Info.Type);
@@ -261,7 +269,7 @@ namespace OpenRA.Mods.Common.Traits
 				return null;
 
 			var queuedItems = queue.AllQueued().Count();
-			if (!DefenseClusterPolicy.CanQueueRepairRecovery(repairRecoveryPending,
+			if (!DefenseClusterPolicy.CanQueueRepairRecovery(repairIntentPending,
 				repairRecoveryHandoffUsed, priorityRecoveryActive, queuedItems))
 			{
 				var reason = repairRecoveryHandoffUsed ? "handoff-used" :
@@ -371,7 +379,7 @@ namespace OpenRA.Mods.Common.Traits
 			};
 			Log("reserved goal={0} actor={1} queue={2}#{3} producer={4}@{5} recovery={6}",
 				repairFacility ? "repair" : "tower", actor.Name, queue.Info.Type, queue.Actor.ActorID,
-				queue.Actor.Info.Name, queue.Actor.Location, repairFacility && repairRecoveryPending);
+				queue.Actor.Info.Name, queue.Actor.Location, repairFacility && repairIntentPending);
 			return actor;
 		}
 
@@ -490,10 +498,8 @@ namespace OpenRA.Mods.Common.Traits
 
 			var repairFacility = reservation.RepairFacility;
 			Log("placement-ordered actor={0} queue={1} recovery={2}", reservation.ActorType,
-				reservation.QueueActorId, repairFacility && repairRecoveryPending);
+				reservation.QueueActorId, repairFacility && repairIntentPending);
 			reservation = null;
-			if (repairFacility)
-				ClearRepairRecovery();
 			state.RecordPlacementProgress();
 		}
 
@@ -697,6 +703,38 @@ namespace OpenRA.Mods.Common.Traits
 			return committed < limit;
 		}
 
+		void EnsureRepairIntent(Actor anchor)
+		{
+			if (repairIntentPending || anchor == null || LocalRepairFacility(anchor) != null)
+				return;
+
+			var towers = LiveNearbyTowers(anchor).ToArray();
+			var operationalRoles = DefenseClusterPolicy.CoveredRoles(
+				towers.Where(IsOperationalTower).Select(RolesForActor));
+			var repairReadyTowerCount = Math.Max(1, Info.DefenseClusterMinimumTowers - 1);
+			if (towers.Length < repairReadyTowerCount ||
+				(operationalRoles & RequiredRoles()) != RequiredRoles())
+				return;
+
+			if (!TryGetProtectedRepairSite(anchor, null, out _, out _, out _))
+			{
+				if (!TryFindRepairSite(anchor, false, out var facilityInfo, out _, out var site, out _))
+					return;
+
+				ProtectRepairSite(anchor, facilityInfo, site);
+			}
+
+			if (!DefenseClusterPolicy.ShouldPersistRepairIntent(true,
+				repairSiteState.Matches(anchor.ActorID, null), false))
+				return;
+
+			repairIntentPending = true;
+			repairRecoveryHandoffUsed = false;
+			nextRetryTick = world.WorldTick;
+			Log("repair-intent-pending anchor={0} site={1} actor={2}", anchor.ActorID,
+				repairSiteState.Site, repairSiteState.FacilityType);
+		}
+
 		void RefreshReservation()
 		{
 			if (reservation == null)
@@ -721,11 +759,13 @@ namespace OpenRA.Mods.Common.Traits
 					reservation.RepairFacility ? "repair" : "tower", reason, age);
 				if (reservation.RepairFacility)
 				{
-					if (!repairRecoveryPending)
-						repairRecoveryHandoffUsed = false;
-					repairRecoveryPending = true;
+					// A producer loss starts a new bounded handoff episode. The intent may
+					// predate the first reservation, but a handoff consumed by the lost
+					// producer must not strand that persisted obligation.
+					repairRecoveryHandoffUsed = false;
+					repairIntentPending = true;
 					nextRetryTick = world.WorldTick;
-					Log("repair-recovery-pending actor={0} lost-queue={1} reason={2}",
+					Log("repair-intent-retained actor={0} lost-queue={1} reason={2}",
 						reservation.ActorType, reservation.QueueActorId, reason);
 				}
 
@@ -733,9 +773,9 @@ namespace OpenRA.Mods.Common.Traits
 			}
 		}
 
-		void ClearRepairRecovery()
+		void ClearRepairIntent()
 		{
-			repairRecoveryPending = false;
+			repairIntentPending = false;
 			repairRecoveryHandoffUsed = false;
 		}
 
@@ -1073,7 +1113,7 @@ namespace OpenRA.Mods.Common.Traits
 			if (!state.HasAnchor)
 			{
 				reservation = null;
-				ClearRepairRecovery();
+				ClearRepairIntent();
 			}
 
 			RememberLegacyClusterWalls(ActiveAnchor);
@@ -1147,7 +1187,7 @@ namespace OpenRA.Mods.Common.Traits
 				Save("ReservationActorType", reservation?.ActorType ?? ""),
 				Save("ReservationTick", reservation?.Tick ?? 0),
 				Save("ReservationRepairFacility", reservation?.RepairFacility ?? false),
-				Save("RepairRecoveryPending", repairRecoveryPending),
+				Save("RepairIntentPending", repairIntentPending),
 				Save("RepairRecoveryHandoffUsed", repairRecoveryHandoffUsed)
 			}));
 		}
@@ -1198,7 +1238,8 @@ namespace OpenRA.Mods.Common.Traits
 						Tick = Read<int>(nodes, "ReservationTick", 0),
 						RepairFacility = Read(nodes, "ReservationRepairFacility", false)
 					};
-				repairRecoveryPending = Read(nodes, "RepairRecoveryPending", false);
+				repairIntentPending = Read(nodes, "RepairIntentPending",
+					Read(nodes, "RepairRecoveryPending", false));
 				repairRecoveryHandoffUsed = Read(nodes, "RepairRecoveryHandoffUsed", false);
 				Log("load-restored anchor={0} pending={1} reservation={2}", state.AnchorActorId,
 					state.PendingActorId, reservation?.ActorType ?? "none");
@@ -1207,7 +1248,7 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				state.Restore(0, 0, 0, 0, 0, 0);
 				reservation = null;
-				ClearRepairRecovery();
+				ClearRepairIntent();
 				repairSiteState.Clear();
 				legacyClusterWallCells.Clear();
 				Log("load-invalid type={0} message={1}; reconstructing from live world", ex.GetType().Name, ex.Message);
