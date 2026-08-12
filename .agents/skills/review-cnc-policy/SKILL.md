@@ -66,6 +66,12 @@ evidence take precedence.
 
 ## Review method
 
+The narrator supplies facts only. This role owns the interpretation that the
+narrator no longer makes: whether an observed action was sensible or a blunder,
+what the changed or control AI did well (including a losing AI), which observed
+decisions plausibly contributed to winning or losing, and what policy or next
+test follows. Tie every such judgment to narrated facts and label uncertainty.
+
 For `task-intake-reviewer`, stop after writing exactly two numbered questions and
 copy the scratchpad unchanged. Do not offer solutions, add requirements, or infer
 permission to create a task. The remaining method applies to policy reviews.
