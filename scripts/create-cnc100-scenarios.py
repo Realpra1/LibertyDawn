@@ -57,6 +57,9 @@ def main() -> None:
 \t\tBots: ironreaper, ironreaper-observer
 \tSquadManagerBotModule@ironreaper:
 \t\tGroundTargetDebugLogging: true
+\t\tFailsafeTestAdvancedWorkMilliseconds: 15
+\tSquadManagerBotModule@ironreaper-observer:
+\t\tFailsafeTestAdvancedWorkMilliseconds: 0
 
 World:
 \tStartingUnits@cnc100stressnod:
@@ -93,6 +96,9 @@ World:
 \tSquadManagerBotModule@ironreaper:
 \t\tGroundTargetDebugLogging: true
 \t\tFailsafeReconsiderInterval: 75
+\t\tFailsafeTestAdvancedWorkMilliseconds: 15
+\tSquadManagerBotModule@ironreaper-observer:
+\t\tFailsafeTestAdvancedWorkMilliseconds: 0
 
 World:
 \tStartingUnits@cnc100mixednod:
@@ -115,6 +121,9 @@ World:
 
 	write_map(root / "mods/cnc/maps/Empire-Earth.oramap", args.output / "cnc100-high-unit.oramap",
 		"CNC-100 High Unit Failsafe", high_unit_rules)
+	write_map(root / "mods/cnc/maps/Empire-Earth.oramap", args.output / "cnc100-high-unit-failsafe-disabled.oramap",
+		"CNC-100 High Unit Failsafe Disabled", high_unit_rules.replace(
+			"\t\tAdvancedSquadSampleInterval: 40", "\t\tAdvancedSquadCpuFailsafe: false\n\t\tAdvancedSquadSampleInterval: 40"))
 	write_map(root / "mods/cnc/maps/island-duel.oramap", args.output / "cnc100-mixed-archipelago.oramap",
 		"CNC-100 Mixed Ownership Archipelago", mixed_rules)
 
