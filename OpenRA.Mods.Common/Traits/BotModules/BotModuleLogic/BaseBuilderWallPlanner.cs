@@ -210,23 +210,28 @@ namespace OpenRA.Mods.Common.Traits
 
 			RefreshEnclosureBuildOwnership();
 			var available = buildables.ToDictionary(a => a.Name);
-			foreach (var type in Info.ConstructionYardEnclosureWallTypes)
-				if (available.TryGetValue(type, out var wall) && PeekAnchor(type) != null &&
-					pendingPurpose == PendingWallPurpose.Enclosure)
-				{
-					if (!enclosureBuildOwnership.HasReservation &&
-						!enclosureBuildOwnership.TryReserve(queue, type, world.WorldTick))
-						return null;
-					if (!enclosureBuildOwnership.Owns(queue, type))
-						return null;
+			var type = ConstructionYardEnclosurePolicy.FirstAvailableType(
+				Info.ConstructionYardEnclosureWallTypes, available.ContainsKey);
+			if (type == null)
+				return null;
 
-					LogEnclosure("{0} tick={1} requested wall={2} yard={3}@{4} queue={5}/{6} cash/queue accepted for production choice.",
-						player, world.WorldTick, type, enclosureYardActorId, enclosureYardLocation,
-						queue.Actor.ActorID, queue.Info.Type);
-					return wall;
-				}
+			if (pendingPurpose == PendingWallPurpose.Enclosure && pendingWallType != type &&
+				!enclosureBuildOwnership.HasReservation)
+				ClearPendingAnchors();
 
-			return null;
+			if (PeekAnchor(type) == null || pendingPurpose != PendingWallPurpose.Enclosure)
+				return null;
+
+			if (!enclosureBuildOwnership.HasReservation &&
+				!enclosureBuildOwnership.TryReserve(queue, type, world.WorldTick))
+				return null;
+			if (!enclosureBuildOwnership.Owns(queue, type))
+				return null;
+
+			LogEnclosure("{0} tick={1} requested wall={2} yard={3}@{4} queue={5}/{6} cash/queue accepted for production choice.",
+				player, world.WorldTick, type, enclosureYardActorId, enclosureYardLocation,
+				queue.Actor.ActorID, queue.Info.Type);
+			return available[type];
 		}
 
 		/// <summary>Gate used when deciding what to put into the production queue.</summary>
@@ -243,7 +248,7 @@ namespace OpenRA.Mods.Common.Traits
 				enclosureBuildOwnership.Owns(queue, actorType));
 		}
 
-		/// <summary>Consumes the next anchor. The caller issues a "LineBuild" order for it.</summary>
+		/// <summary>Consumes the next wall cell. The overload reports whether the caller should use LineBuild.</summary>
 		public CPos? TakeWallCell(ProductionQueue queue, string actorType)
 		{
 			return TakeWallCell(queue, actorType, out _);
@@ -264,17 +269,18 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (cell != null)
 			{
+				useLineBuild = !pendingIndividualWallCells.Remove(cell.Value);
 				if (pendingPurpose == PendingWallPurpose.Enclosure)
 				{
+					useLineBuild = false;
 					issuedEnclosureCells[cell.Value] = world.WorldTick;
-					LogEnclosure("{0} tick={1} issued LineBuild yard={2}/{3}@{4} wall={5} cell={6} repair={7}.",
+					LogEnclosure("{0} tick={1} issued PlaceBuilding yard={2}/{3}@{4} wall={5} cell={6} repair={7}.",
 						player, world.WorldTick, enclosureYardActorId, enclosureYardType, enclosureYardLocation,
 						actorType, cell.Value, observedEnclosureWalls.Contains(cell.Value));
 					enclosureBuildOwnership.Release();
 				}
 
 				pendingAnchors.RemoveAt(0);
-				useLineBuild = !pendingIndividualWallCells.Remove(cell.Value);
 				if (pendingAnchors.Count == 0)
 				{
 					if (pendingPurpose == PendingWallPurpose.Enclosure)
@@ -636,15 +642,25 @@ namespace OpenRA.Mods.Common.Traits
 				return false;
 			}
 
-			var run = ConstructionYardEnclosurePolicy.FirstLegalMissingRun(enclosurePlan,
-				HasOwnWall, c => CanAnchorAt(c, wallInfo, wallBuildingInfo));
-			if (run.Length == 0)
+			var candidates = ConstructionYardEnclosurePolicy.OrderedLegalMissingCells(enclosurePlan,
+				enclosureYardLocation, HasOwnWall, c => CanAnchorAt(c, wallInfo, wallBuildingInfo));
+			CPos? destination = null;
+			CPos routeOrigin = default;
+			List<CPos> route = null;
+			foreach (var candidate in candidates)
+				if (TryFindExactEnclosureRoute(candidate, out routeOrigin, out route))
+				{
+					destination = candidate;
+					break;
+				}
+
+			if (destination == null)
 			{
 				nextEnclosureScanTick = NextEnclosureScanTick();
 				var missingCells = enclosurePlan.WallCells.Where(c => !HasOwnWall(c)).ToArray();
-				LogEnclosure("{0} tick={1} pending yard={2}@{3}: missing={4} legal=0 access={5}.",
+				LogEnclosure("{0} tick={1} pending yard={2}@{3}: missing={4} legal={5} routed=0 access={6}.",
 					player, world.WorldTick, enclosureYardActorId, enclosureYardLocation,
-					missingCells.Length, string.Join(",", enclosurePlan.AccessCells));
+					missingCells.Length, candidates.Length, string.Join(",", enclosurePlan.AccessCells));
 				if (Info.ConstructionYardEnclosureDebugLogging)
 					LogEnclosure("{0} tick={1} pending-cell-status yard={2}@{3}: {4}.",
 						player, world.WorldTick, enclosureYardActorId, enclosureYardLocation,
@@ -653,17 +669,84 @@ namespace OpenRA.Mods.Common.Traits
 				return false;
 			}
 
-			run = run.Take(Math.Min(remainingCapacity, MaxWallRun(wallInfo))).ToArray();
-			pendingAnchors.Add(run[0]);
-			if (run.Length > 1)
-				pendingAnchors.Add(run[run.Length - 1]);
+			pendingAnchors.Add(destination.Value);
 			pendingWallType = wallInfo.Name;
 			pendingPurpose = PendingWallPurpose.Enclosure;
-			LogEnclosure("{0} tick={1} planned yard={2}/{3}@{4} wall={5} run={6}->{7} cells={8} anchors={9} repair={10}.",
+			LogEnclosure("{0} tick={1} planned yard={2}/{3}@{4} wall={5} cell={6} rank={7}/{8} route={9}->{10} path-cells={11} repair={12}.",
 				player, world.WorldTick, enclosureYardActorId, enclosureYardType, enclosureYardLocation,
-				wallInfo.Name, run[0], run[run.Length - 1], run.Length, pendingAnchors.Count,
-				run.Any(observedEnclosureWalls.Contains));
+				wallInfo.Name, destination.Value, Array.IndexOf(candidates, destination.Value) + 1,
+				candidates.Length, routeOrigin, destination.Value, route.Count,
+				observedEnclosureWalls.Contains(destination.Value));
 			return true;
+		}
+
+		bool TryFindExactEnclosureRoute(CPos destination, out CPos origin, out List<CPos> route)
+		{
+			origin = default;
+			route = null;
+			if (locomotor == null)
+				return false;
+
+			var routeOrigin = enclosurePlan.AccessCells
+				.Where(CanRouteProbeEnter)
+				.OrderBy(c => (c - enclosureYardLocation).LengthSquared)
+				.ThenBy(c => c.X).ThenBy(c => c.Y)
+				.Select(c => (CPos?)c).FirstOrDefault();
+			if (routeOrigin == null || !CanRouteProbeEnter(destination))
+				return false;
+
+			using (var search = PathSearch.ToTargetCell(world, locomotor, null,
+				routeOrigin.Value, destination, BlockedByActor.All, laneBias: false))
+			{
+				for (var expanded = 0; expanded < PathCheckMaxCells && search.CanExpand; expanded++)
+				{
+					var cell = search.Expand();
+					if (!search.IsTarget(cell))
+						continue;
+
+					var found = ReconstructReversedPath(search.Graph, cell, PathCheckMaxCells);
+					if (!ConstructionYardEnclosurePolicy.IsExactReversedRoute(found,
+						routeOrigin.Value, destination, c => !CanRouteProbeEnter(c), IsFactFootprintCell))
+						return false;
+
+					origin = routeOrigin.Value;
+					route = found;
+					return true;
+				}
+			}
+
+			return false;
+		}
+
+		static List<CPos> ReconstructReversedPath(IPathGraph graph, CPos destination, int maximumCells)
+		{
+			var route = new List<CPos>();
+			var current = destination;
+			while (route.Count < maximumCells)
+			{
+				route.Add(current);
+				var previous = graph[current].PreviousNode;
+				if (previous == current)
+					break;
+				current = previous;
+			}
+
+			return route;
+		}
+
+		bool CanRouteProbeEnter(CPos cell)
+		{
+			return world.Map.Contains(cell) && !IsFactFootprintCell(cell) &&
+				locomotor.MovementCostForCell(cell) != PathGraph.MovementCostForUnreachableCell &&
+				!world.ActorMap.GetActorsAt(cell).Any(a => a.IsInWorld && !a.IsDead) &&
+				locomotor.CanMoveFreelyInto(null, cell, BlockedByActor.All, null);
+		}
+
+		bool IsFactFootprintCell(CPos cell)
+		{
+			return cell.Layer == enclosureYardLocation.Layer &&
+				cell.X >= enclosureYardLocation.X && cell.X < enclosureYardLocation.X + enclosureYardDimensions.X &&
+				cell.Y >= enclosureYardLocation.Y && cell.Y < enclosureYardLocation.Y + enclosureYardDimensions.Y;
 		}
 
 		void LogEnclosure(string format, params object[] args)
