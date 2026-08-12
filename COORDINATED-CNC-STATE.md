@@ -1,14 +1,14 @@
 # Coordinated CNC State
 
 - Round ID: `20260812-bug-polish-04`
-- Phase: `cycle 4 dispatched for CNC-100/96/97/98; CNC-107 valid replacement cycle 2; do not idle`
+- Phase: `CNC-100 cycle-3 review pending; CNC-96/97 cycle 5, CNC-107 cycle 3, CNC-98 cycle-4 retry dispatched; do not idle`
 - Active-round state: `COORDINATED-CNC-ROUNDS/20260812-bug-polish-04/`
 - Active tasks: CNC-100, CNC-96, CNC-107, CNC-97, CNC-98. The historical Round
   03 records below are retained for provenance only and are not the active queue.
-- Cycle 4 external supervisors for CNC-100/96/97/98 and the valid replacement
-  cycle 2 supervisor for CNC-107 were launched at 2026-08-12 20:08 CEST under
-  each worker's `EXTERNAL-CYCLE-*` directory. CNC-107's prior blocked cycle was
-  not consumed; its runtime setup is now repaired and this rerun is authorized.
+- Cycle-3 Luna review for CNC-100 and the next independent worker actions were
+  launched at 2026-08-12 20:27 CEST: CNC-96 and CNC-97 cycle 5, CNC-107 cycle 3,
+  and a fresh CNC-98 cycle-4 retry after its stale duplicate-process guard.
+  CNC-107's prior blocked cycle was not consumed; its runtime setup is repaired.
 - Common base branch: `agent/cnc-20260807-bug-polish-02-release`
 - Common base SHA: `468ee64f5a0f9a9e19e260e5c5943e6e878f4705`
 - Coordinator model: `gpt-5.6-luna` / `medium`; delegated cycle tiers are pinned
