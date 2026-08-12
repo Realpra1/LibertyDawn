@@ -331,7 +331,7 @@ namespace OpenRA.Mods.Common.Traits
 			while (pendingAnchors.Count > 0 && !CanUsePendingAnchor(pendingAnchors[0], wallInfo, bi))
 			{
 				if (pendingPurpose == PendingWallPurpose.Enclosure && Info.ConstructionYardEnclosureDebugLogging)
-					LogEnclosure("{0} tick={1} dropped stale enclosure anchor yard={2}@{3} cell={4} reason={5}.",
+					LogEnclosure("{0} tick={1} deferred stale enclosure anchor yard={2}@{3} cell={4} reason={5}; no production or placement issued.",
 						player, world.WorldTick, enclosureYardActorId, enclosureYardLocation,
 						pendingAnchors[0], DescribeEnclosureCell(pendingAnchors[0], wallInfo, bi));
 				pendingAnchors.RemoveAt(0);
