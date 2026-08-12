@@ -16,8 +16,8 @@ coordinator state, other skills, or other worker specs. Read applicable
 - Current cycle: `1`; cycles used: `0/5 primary`, `0/10 optional Luna`
 - Required model: cycle 1 `Sol high`; cycles 2-5 `Terra medium`; cycles 6-15
   `Luna medium` only when coordinator authorizes minor obvious work; at most two
-  exceptional `Sol medium` escalation cycles may follow an unresolved compatible
-  code/policy-review blocker
+  exceptional `Sol medium` escalation cycles may follow only a critical blocker
+  that makes safe release or engine execution impossible
 - Game/build capacity: `2` / `1`; lock: `{{ABSOLUTE_LOCK_DIRECTORY}}`
 - Report: `{{TASK_REPORT_PATH}}`
 - Analysis directory: `{{ABSOLUTE_ANALYSIS_DIRECTORY}}`

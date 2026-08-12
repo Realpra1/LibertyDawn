@@ -70,9 +70,11 @@ observations without freezing the release. Insufficient evidence is a blocker
 only when the omitted evidence is literal task acceptance or a required control;
 never turn reviewer uncertainty into an automatic veto or ignore sound advice.
 Apply the same rule to the Terra task/release code review: record the required
-fix's disposition and, if it is compatible but unresolved after the normal
-response, request the coordinator's exceptional Sol-medium escalation path
-before declaring the release blocked.
+fix's disposition. Request exceptional Sol-medium escalation only for a critical
+finding that makes the release unsafe/impossible to run or for a common engine/
+launcher blocker. Missing evidence or a plausible first iteration should be
+reported as `First iteration - testing`, not escalated or treated as a fatal
+release stop.
 
 When repair is needed:
 

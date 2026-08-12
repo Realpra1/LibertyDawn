@@ -123,12 +123,15 @@ corrections to observed bugs or wrong assumptions, not redesign invitations. Aft
 cycle 3, run one Luna-medium cycle code review before cycle 4. If the task is still
 not close to the spec after cycle 5, report `Needs help`/`First iteration -
 testing`; five failed rounds require human or stronger-agent help. If a code or
-policy reviewer identifies a compatible blocker and the normal worker has made a
-good-faith response without resolving it, the coordinator may authorize at most
-two exceptional Sol-medium cycles for that same worker/task. Each must name the
-review finding, make the smallest targeted correction, run the normal two games,
-and record why escalation was needed. Do not use this path for ordinary work or
-to bypass Terra cycles; stop after two and request help if still blocked.
+policy reviewer identifies a critical finding that makes the release unsafe or
+impossible to run—or a common engine/launcher blocker—and the normal worker has
+made a good-faith response without resolving it, the coordinator may authorize
+at most two exceptional Sol-medium cycles. Each must name the critical finding,
+make the smallest targeted correction, run the normal two games, and record why
+escalation was necessary. Missing evidence, an imperfect but plausible solution,
+or ordinary policy disagreement is not escalation-worthy; mark `First iteration -
+testing`. Do not use this path for ordinary work or to bypass Terra cycles; stop
+after two and request help if still blocked.
 
 The coordinator may authorize up to ten extra cycles (6-15) only when remaining
 work is minor and obvious. Luna workers, narrators, and policy reviewers handle

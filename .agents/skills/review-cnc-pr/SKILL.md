@@ -108,12 +108,14 @@ review only when a concrete conflict or failure requires its contract.
    release blockers even though the ordinary final review-response budget is one
    code/test cycle.
 15. The worker may reject a finding with concrete evidence. Record the disagreement
-   rather than arguing indefinitely. If a compatible code-review finding remains
-   unresolved after the normal response cycle and blocks progress, the coordinator
-   may authorize at most two exceptional Sol-medium worker cycles. These are a
-   recovery path, not a new default tier: each cycle must target the finding,
-   retain the task boundary, run the normal two adversarial games, and stop after
-   the second cycle with `Needs help` if it still cannot be resolved.
+   rather than arguing indefinitely. Exceptional Sol-medium recovery is allowed
+   only when unresolved work makes the release unsafe or impossible to run, such
+   as a critical correctness, corruption, security, determinism, or common
+   engine/launcher blocker. Missing evidence, a plausible first solution, or an
+   unpolished policy is not enough; mark `First iteration - testing`. When the
+   strict stop condition applies, authorize at most two Sol-medium cycles; each
+   targets the finding, retains scope, runs the normal two games, and stops after
+   the second with `Needs help` if unresolved.
 
 Write the requested review file. For `cycle`, return only verdict (`clear` or
 `advisory concern`), `advisory_concern`, and its path. For `final`, return only
