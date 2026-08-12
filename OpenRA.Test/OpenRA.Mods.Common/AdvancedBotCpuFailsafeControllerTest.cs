@@ -82,6 +82,22 @@ namespace OpenRA.Test
 		}
 
 		[Test]
+		public void ReliableHealthyWindowsRecoverOneProbeAndDoNotRepeatIt()
+		{
+			var controller = Create("first", "second");
+			var pressure = new Dictionary<string, double> { { "first", 60 }, { "second", 40 } };
+			var quiet = new Dictionary<string, double> { { "first", 0 }, { "second", 0 } };
+			controller.Update(Slow, 100, pressure);
+			controller.Update(Slow, 100, pressure);
+
+			Assert.That(controller.Update(Healthy, 100, quiet).Transition, Is.EqualTo("cooldown"));
+			Assert.That(controller.Update(Healthy, 100, quiet).Transition, Is.EqualTo("cooldown"));
+			Assert.That(controller.Update(Healthy, 100, quiet).Transition, Is.EqualTo("enabled-probe"));
+			Assert.That(controller.DisabledModules, Is.Empty);
+			Assert.That(controller.Update(Healthy, 100, quiet).Transition, Is.EqualTo("healthy"));
+		}
+
+		[Test]
 		public void FailedRecoveryProbeIsImmediatelyReshed()
 		{
 			var controller = Create("advanced");

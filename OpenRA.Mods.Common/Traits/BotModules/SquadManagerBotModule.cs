@@ -1031,8 +1031,9 @@ namespace OpenRA.Mods.Common.Traits
 			}
 			if (Info.GroundTargetDebugLogging)
 				Log.Write("debug", "Squad failsafe fallback [{0}]: owner=SquadManagerBotModule accepted={1} " +
-					"target={2}#{3} order=AttackMove cadence={4}.", Player.PlayerName, orderable.Length,
-					fallbackTarget.Info.Name, fallbackTarget.ActorID, Info.FailsafeReconsiderInterval);
+					"actors={2} target={3}#{4} order=AttackMove cadence={5}.", Player.PlayerName, orderable.Length,
+					string.Join(",", orderable.Select(a => a.Info.Name + "#" + a.ActorID)), fallbackTarget.Info.Name,
+					fallbackTarget.ActorID, Info.FailsafeReconsiderInterval);
 		}
 
 		void FindNewUnits(IBot bot)
