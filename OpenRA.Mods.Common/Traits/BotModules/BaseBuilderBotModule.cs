@@ -1472,7 +1472,6 @@ namespace OpenRA.Mods.Common.Traits
 			if (firstTowerNode != null)
 				FirstTowerPlanner.Complete = FieldLoader.GetValue<bool>("FirstTowerPlacementComplete", firstTowerNode.Value.Value);
 
-			WallPlanner?.ResolveTraitData(data);
 			TiberiumFieldManager?.ResolveTraitData(data);
 		}
 	}
