@@ -5,7 +5,7 @@ description: Combine reviewed Liberty Dawn CNC task branches into one stable rel
 
 # Integrate a CNC Release
 
-Use Sol 5.6 high. Read applicable `AGENTS.md`, the integration job, reviewed heads,
+Use Terra 5.6 medium. Read applicable `AGENTS.md`, the integration job, reviewed heads,
 PR/check summaries, and worker receipts. Read a worker state only for a conflict or
 integrated failure that requires its contract.
 
@@ -25,10 +25,10 @@ integrated failure that requires its contract.
 
 ## Combined testing and repair
 
-Each relevant worker may perform at most three integrated repair cycles. Relaunch
-from its updated durable state on a task-scoped repair branch based on the current
-release head. Every cycle runs at least two distinct adversarial custom scenarios;
-each game:
+Run at most five release-wide integration test/fix cycles. Launch fresh
+Luna-medium integration workers or test-only agents from durable assignments;
+use task-scoped repair branches based on the current release head. Every cycle
+runs at least two distinct adversarial custom scenarios; each game:
 
 - uses the full engine, all features, all AI modules, and ordinary enemy
   AIs from test 1;
@@ -52,8 +52,9 @@ When repair is needed:
 3. Merge reviewed repair heads locally into the stable branch, creating the next
    candidate, then rerun combined checks and affected game scenarios.
 
-Stop after three integrated repair cycles per task. Publish the safest proven
-subset and mark unresolved work `First iteration - testing`; do not churn.
+Stop after five total integration cycles even when several tasks remain active.
+Publish the safest proven subset and mark unresolved work `First iteration -
+testing`; do not churn.
 
 For performance comparisons, use matched custom maps with many pre-spawned units
 and structures, normally two Iron Reapers with at least 300 units plus structures

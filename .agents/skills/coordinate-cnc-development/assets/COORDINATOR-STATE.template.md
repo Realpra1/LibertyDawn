@@ -10,6 +10,7 @@
 - Lock directory: `{{ABSOLUTE_LOCK_DIRECTORY}}`
 - Release candidate: `none`
 - Release PR: `none`
+- Release-wide integration cycles: `0/5`
 
 ## Workers
 

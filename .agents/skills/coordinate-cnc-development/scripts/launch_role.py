@@ -20,13 +20,15 @@ ROLES = {
     "worker-sol": ("gpt-5.6-sol", "high", None),
     "worker-terra": ("gpt-5.6-terra", "medium", None),
     "worker-luna": ("gpt-5.6-luna", "medium", None),
+    "integration-worker": ("gpt-5.6-luna", "medium", None),
+    "integration-tester": ("gpt-5.6-luna", "medium", None),
     "commenter": ("gpt-5.6-luna", "medium", "comment-cnc-match/SKILL.md"),
     "policy-reviewer": ("gpt-5.6-luna", "medium", "review-cnc-policy/SKILL.md"),
     "policy-speccer": ("gpt-5.6-sol", "high", "review-cnc-policy/SKILL.md"),
     "policy-escalation": ("gpt-5.6-sol", "xhigh", "review-cnc-policy/SKILL.md"),
     "cycle-reviewer": ("gpt-5.6-terra", "medium", "review-cnc-pr/SKILL.md"),
     "reviewer": ("gpt-5.6-sol", "high", "review-cnc-pr/SKILL.md"),
-    "integrator": ("gpt-5.6-sol", "high", "integrate-cnc-release/SKILL.md"),
+    "integrator": ("gpt-5.6-terra", "medium", "integrate-cnc-release/SKILL.md"),
 }
 
 POLICY_ROLES = {

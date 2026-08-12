@@ -44,7 +44,9 @@ context.
 | Match Commenter | Luna medium | One factual narrative per game |
 | Match Policy Reviewer | Luna medium | One policy review per game |
 | Cycle-5 Reviewer | Terra medium | One advisory code concern |
-| Final Reviewer/Integrator | Sol high | PR and release gates |
+| Final Reviewer | Sol high | Independent PR/release gate |
+| Integrator/Merger | Terra medium | Merge and release coordination |
+| Integration worker/tester | Luna medium | Combined testing and minor fixes |
 
 Use exact model IDs `gpt-5.6-luna`, `gpt-5.6-terra`, and `gpt-5.6-sol` through
 `scripts/launch_role.py`. Use fresh no-history agents where practical; use the
@@ -143,12 +145,13 @@ newest with advanced squad modules disabled, and newest with them enabled.
 2. Launch one fresh Sol-high final Reviewer per PR. Return its single highest
    compatible correction for at most one response cycle using the model tier
    appropriate to the current phase.
-3. Launch the Sol-high Integrator after reviewed PRs and checks are ready. It
+3. Launch the Terra-medium Integrator after reviewed PRs and checks are ready. It
    merges feature heads locally into one stable release branch and opens one draft
    PR to `bleed`; source PRs stay open.
-4. Test the combined candidate with the same bounded two-games-per-cycle contract.
-   Put fixes on task-scoped repair branches, review them, and merge them into the
-   stable release branch. Use at most three integrated repair cycles per task.
+4. Use fresh Luna-medium integration workers/testers for the combined candidate,
+   with the same bounded two-games-per-cycle contract and Luna narration/policy
+   review. Put fixes on task-scoped repair branches and merge reviewed fixes into
+   the stable branch. Stop after five release-wide integration test/fix cycles.
 5. When the candidate passes, send structured receipts to Task Maker and promote
    the draft release PR. The user decides whether to merge it.
 

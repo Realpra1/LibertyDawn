@@ -79,8 +79,9 @@ Model audit (2026-08-07 18:20 UTC): active-round external envelopes match the
 role table. Commenters and ordinary Policy Reviewers use Terra medium;
 spec-policy consultation uses Sol high; workers use Sol high. Task Readers and
 Task Makers were fresh Terra-medium native roles; Speccers were Sol xhigh. No
-cycle reviewer has launched yet; it must use Terra medium. Final PR Reviewers
-and the Integrator remain Sol high by design. The coordinator is now the
+cycle reviewer had launched yet; it required Terra medium. At that historical
+point Final PR Reviewers and the Integrator were Sol high; the later workflow
+revision supersedes the Integrator tier. The coordinator is now the
 user-selected Luna-medium/Terra-medium session. Dead pre-interruption worker
 envelopes are historical records, not additional running Sol sessions.
 
@@ -173,3 +174,7 @@ user-requested Luna coordinator/task roles, Sol-high first cycle and speccing,
 Terra cycles 2-5, optional minor-only Luna cycles 6-15, and two bounded custom
 full-engine games with per-game Luna narration/policy review per cycle. Normal
 development remains paused pending user approval of this workflow revision.
+
+Integration refinement (2026-08-12): the merger/integrator is Terra medium;
+combined workers, test-only agents, narrators, and policy reviewers are Luna
+medium. Integrated testing/fixing is capped at five release-wide cycles.
