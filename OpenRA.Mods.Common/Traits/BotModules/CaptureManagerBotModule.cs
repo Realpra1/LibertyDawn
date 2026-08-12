@@ -92,6 +92,7 @@ namespace OpenRA.Mods.Common.Traits
 			WPos lastSpecialistPosition;
 			int lastTargetHealth;
 			public int LastProgressTick { get; private set; }
+			public int MissingActivitySinceTick { get; private set; }
 			public WPos LastSpecialistPosition { get { return lastSpecialistPosition; } }
 			public int LastTargetHealth { get { return lastTargetHealth; } }
 
@@ -104,10 +105,11 @@ namespace OpenRA.Mods.Common.Traits
 				lastSpecialistPosition = specialist.CenterPosition;
 				lastTargetHealth = TargetHealth;
 				LastProgressTick = assignedTick;
+				MissingActivitySinceTick = assignedTick;
 			}
 
 			public SpecialistAssignment(Actor target, int targetHealth, int assignedTick, int maximumClaimants,
-				WPos lastSpecialistPosition, int lastTargetHealth, int lastProgressTick)
+				WPos lastSpecialistPosition, int lastTargetHealth, int lastProgressTick, int missingActivitySinceTick)
 			{
 				Target = target;
 				TargetHealth = targetHealth;
@@ -116,6 +118,7 @@ namespace OpenRA.Mods.Common.Traits
 				this.lastSpecialistPosition = lastSpecialistPosition;
 				this.lastTargetHealth = lastTargetHealth;
 				LastProgressTick = lastProgressTick;
+				MissingActivitySinceTick = missingActivitySinceTick;
 			}
 
 			public void ObserveProgress(Actor specialist, int worldTick)
@@ -130,10 +133,22 @@ namespace OpenRA.Mods.Common.Traits
 				LastProgressTick = worldTick;
 			}
 
+			public void ObserveActivity(bool hasExpectedActivity, int worldTick)
+			{
+				if (hasExpectedActivity)
+				{
+					MissingActivitySinceTick = -1;
+					return;
+				}
+
+				if (MissingActivitySinceTick < 0)
+					MissingActivitySinceTick = worldTick;
+			}
+
 			public SpecialistAssignment WithMaximumClaimants(int maximumClaimants)
 			{
 				return new SpecialistAssignment(Target, TargetHealth, AssignedTick, maximumClaimants,
-					lastSpecialistPosition, lastTargetHealth, LastProgressTick);
+					lastSpecialistPosition, lastTargetHealth, LastProgressTick, MissingActivitySinceTick);
 			}
 		}
 
@@ -160,6 +175,7 @@ namespace OpenRA.Mods.Common.Traits
 			public WPos LastSpecialistPosition;
 			public int LastTargetHealth;
 			public int LastProgressTick;
+			public int MissingActivitySinceTick;
 		}
 
 		const int PendingOrderGraceTicks = 10;
@@ -179,6 +195,8 @@ namespace OpenRA.Mods.Common.Traits
 		readonly Dictionary<Actor, SpecialistAssignment> activeCapturers = new Dictionary<Actor, SpecialistAssignment>();
 		readonly Dictionary<Actor, SpecialistAssignment> activeDemolitionUnits = new Dictionary<Actor, SpecialistAssignment>();
 		readonly Dictionary<Actor, DeferredTarget> deferredTargets = new Dictionary<Actor, DeferredTarget>();
+		readonly HashSet<Actor> pendingCaptureRecovery = new HashSet<Actor>();
+		readonly HashSet<Actor> pendingDemolitionRecovery = new HashSet<Actor>();
 		readonly SpecialistTargetReservations targetReservations = new SpecialistTargetReservations();
 
 		public CaptureManagerBotModule(Actor self, CaptureManagerBotModuleInfo info)
@@ -216,16 +234,17 @@ namespace OpenRA.Mods.Common.Traits
 
 		void IBotTick.BotTick(IBot bot)
 		{
-			// Capture and demolition consume their specialist before the next reassessment can run.
-			// Retire only those unavailable actors promptly so a pair's sabotage is observed before
-			// its survivor changes ownership, while keeping planning and world scans on their cadence.
-			RetireUnavailableAssignments(bot, activeCapturers, "capture", SpecialistAssignmentPurpose.Capture);
-			RetireUnavailableAssignments(bot, activeDemolitionUnits, "demolition", SpecialistAssignmentPurpose.Demolition);
+			// Audit only the small active-specialist sets each tick. Candidate/world scans stay on
+			// their normal cadence unless a transition makes an owned specialist available again.
+			pendingCaptureRecovery.Clear();
+			pendingDemolitionRecovery.Clear();
+			var reassessCapture = AuditAssignments(bot, activeCapturers, "capture", SpecialistAssignmentPurpose.Capture,
+				pendingCaptureRecovery);
+			var reassessDemolition = AuditAssignments(bot, activeDemolitionUnits, "demolition",
+				SpecialistAssignmentPurpose.Demolition, pendingDemolitionRecovery);
 
-			var scanCapture = --minCaptureDelayTicks <= 0;
-			var scanDemolition = --minDemolitionDelayTicks <= 0;
-			if (scanCapture || scanDemolition)
-				RefreshAssignments(bot);
+			var scanCapture = reassessCapture || pendingCaptureRecovery.Count != 0 || --minCaptureDelayTicks <= 0;
+			var scanDemolition = reassessDemolition || pendingDemolitionRecovery.Count != 0 || --minDemolitionDelayTicks <= 0;
 
 			if (scanCapture)
 			{
@@ -269,7 +288,8 @@ namespace OpenRA.Mods.Common.Traits
 			if (!Info.CapturingActorTypes.Any() || player.WinState != WinState.Undefined)
 				return;
 			var capturers = world.ActorsHavingTrait<IPositionable>()
-				.Where(a => a.Owner == player && (a.IsIdle || activeCapturers.ContainsKey(a)) &&
+				.Where(a => a.Owner == player && (a.IsIdle || activeCapturers.ContainsKey(a) ||
+					pendingCaptureRecovery.Contains(a)) &&
 					Info.CapturingActorTypes.Contains(a.Info.Name) && a.Info.HasTraitInfo<CapturesInfo>() &&
 					!IsReservedForTransport(a))
 				.Select(a => new TraitPair<CaptureManager>(a, a.TraitOrDefault<CaptureManager>()))
@@ -313,7 +333,10 @@ namespace OpenRA.Mods.Common.Traits
 			candidates = candidates.Concat(allCandidates.Where(candidate => activeCapturers.Values.Any(assignment =>
 				assignment.Target == candidate.Actor))).GroupBy(candidate => candidate.Actor.ActorID).Select(group => group.First()).ToArray();
 			if (candidates.Length == 0)
+			{
+				DebugEmptyCapturePlan(capturers, targetOptions);
 				return;
+			}
 
 			var reserved = new HashSet<int>();
 			var retainedPairActors = new HashSet<Actor>();
@@ -683,11 +706,16 @@ namespace OpenRA.Mods.Common.Traits
 		bool HasReachableCaptureApproach(Actor capturer, Actor target)
 		{
 			var mobile = capturer.TraitOrDefault<Mobile>();
-			return mobile == null || domainIndex == null ||
-				Util.AdjacentCells(world, Target.FromActor(target)).Any(cell =>
-					mobile.CanStayInCell(cell) &&
+			if (mobile == null || domainIndex == null)
+				return true;
+
+			foreach (var cell in Util.AdjacentCells(world, Target.FromActor(target)))
+				if (mobile.CanStayInCell(cell) &&
 					mobile.CanEnterCell(cell, check: BlockedByActor.Immovable) &&
-					domainIndex.IsPassable(capturer.Location, cell, mobile.Locomotor));
+					domainIndex.IsPassable(capturer.Location, cell, mobile.Locomotor))
+					return true;
+
+			return false;
 		}
 
 		void DebugHighestPriorityRejection(TraitPair<CaptureManager> capturer,
@@ -721,6 +749,91 @@ namespace OpenRA.Mods.Common.Traits
 				rejected.Reason, rejected.Candidate.Value,
 				DistanceCells(DistanceSquared(capturer.Actor, rejected.Candidate.Actor)), rejected.Score,
 				rejected.Candidate.IsBuilding, rejected.Candidate.HitPoints, rejected.Candidate.MaxHitPoints);
+		}
+
+		void DebugEmptyCapturePlan(TraitPair<CaptureManager>[] capturers, IEnumerable<Actor> targetOptions)
+		{
+			if (!Info.DebugLogging)
+				return;
+
+			Actor rejectedTarget = null;
+			string rejectionReason = null;
+			double rejectedScore = -1;
+			var rejectedIsBuilding = false;
+			foreach (var target in targetOptions)
+			{
+				if (target.IsDead || !target.IsInWorld || target.TraitOrDefault<IPositionable>() == null)
+					continue;
+
+				var reason = GlobalCaptureRejectionReason(capturers, target);
+				if (reason == null)
+					continue;
+
+				var candidate = new CaptureCandidate(target, CaptureEconomicValue(target));
+				var score = capturers.Max(capturer => CaptureScore(capturer.Actor, candidate));
+				if (rejectedTarget != null && (score < rejectedScore ||
+					(score == rejectedScore && candidate.IsBuilding == rejectedIsBuilding &&
+						target.ActorID > rejectedTarget.ActorID) ||
+					(score == rejectedScore && !candidate.IsBuilding && rejectedIsBuilding)))
+					continue;
+
+				rejectedTarget = target;
+				rejectionReason = reason;
+				rejectedScore = score;
+				rejectedIsBuilding = candidate.IsBuilding;
+			}
+
+			foreach (var capturer in capturers)
+			{
+				var actor = capturer.Actor;
+				var activity = actor.CurrentActivity == null ? "none" : actor.CurrentActivity.GetType().Name;
+				var hasAssignment = activeCapturers.TryGetValue(actor, out var assignment);
+				var hasReservation = targetReservations.TryGetReservation(actor.ActorID,
+					out var reservedTarget, out var reservedPurpose);
+				var assignmentState = hasAssignment ? string.Format("{0}#{1}", assignment.Target.Info.Name,
+					assignment.Target.ActorID) : "none";
+				var reservationState = hasReservation ? string.Format("{0}/{1}", reservedTarget, reservedPurpose) : "none";
+
+				if (rejectedTarget == null)
+				{
+					Debug("capture {0}#{1} planning empty: idle={2}, activity={3}, assignment={4}, " +
+						"reservation={5}, transport-owned={6}, rejected=no-candidates", actor.Info.Name,
+						actor.ActorID, actor.IsIdle, activity, assignmentState, reservationState,
+						IsReservedForTransport(actor));
+					continue;
+				}
+
+				var candidate = new CaptureCandidate(rejectedTarget, CaptureEconomicValue(rejectedTarget));
+				var relationship = player.RelationshipWith(rejectedTarget.Owner);
+				var claimants = string.Join(",", targetReservations.Claimants(rejectedTarget.ActorID));
+				Debug("capture {0}#{1} planning empty: idle={2}, activity={3}, assignment={4}, " +
+					"reservation={5}, transport-owned={6}, candidate={7}#{8}, owner={9}, relationship={10}, " +
+					"value={11}, distance-cells={12:0.0}, score={13:0.0}, target-claimants=[{14}], rejected={15}",
+					actor.Info.Name, actor.ActorID, actor.IsIdle, activity, assignmentState, reservationState,
+					IsReservedForTransport(actor), rejectedTarget.Info.Name, rejectedTarget.ActorID,
+					rejectedTarget.Owner.InternalName, relationship, candidate.Value,
+					DistanceCells(DistanceSquared(actor, rejectedTarget)), CaptureScore(actor, candidate),
+					claimants, rejectionReason);
+			}
+		}
+
+		string GlobalCaptureRejectionReason(TraitPair<CaptureManager>[] capturers, Actor target)
+		{
+			if (targetReservations.IsReservedForOtherPurpose(target.ActorID, SpecialistAssignmentPurpose.Capture))
+				return "reserved-by-demolition";
+
+			if (capturers.All(capturer => IsTargetDeferred(capturer.Actor, target)))
+				return "deferred";
+
+			var captureManager = target.TraitOrDefault<CaptureManager>();
+			if (captureManager == null || !capturers.Any(capturer =>
+				captureManager.CanBeTargetedBy(target, capturer.Actor, capturer.Trait)))
+				return "capture-ineligible";
+
+			if (Info.CapturableActorTypes.Any() && !Info.CapturableActorTypes.Contains(target.Info.Name.ToLowerInvariant()))
+				return "actor-type-excluded";
+
+			return null;
 		}
 
 		string CaptureRejectionReason(TraitPair<CaptureManager> capturer, CaptureCandidate candidate,
@@ -778,7 +891,8 @@ namespace OpenRA.Mods.Common.Traits
 			if (Info.DemolitionActorTypes.Count == 0 || player.WinState != WinState.Undefined)
 				return;
 
-			var demolitionUnits = world.Actors.Where(a => a.Owner == player && a.IsIdle &&
+			var demolitionUnits = world.Actors.Where(a => a.Owner == player &&
+				(a.IsIdle || pendingDemolitionRecovery.Contains(a)) &&
 				Info.DemolitionActorTypes.Contains(a.Info.Name) && a.Info.HasTraitInfo<DemolitionInfo>() &&
 				!activeDemolitionUnits.ContainsKey(a) && !IsReservedForTransport(a)).ToArray();
 
@@ -813,102 +927,164 @@ namespace OpenRA.Mods.Common.Traits
 			}
 		}
 
-		void RefreshAssignments(IBot bot)
-		{
-			RetireFinishedAssignments(bot, activeCapturers, "capture", SpecialistAssignmentPurpose.Capture);
-			RetireFinishedAssignments(bot, activeDemolitionUnits, "demolition", SpecialistAssignmentPurpose.Demolition);
-			ReleaseTransportReservations(activeCapturers);
-			ReleaseTransportReservations(activeDemolitionUnits);
-		}
-
-		void ReleaseTransportReservations(Dictionary<Actor, SpecialistAssignment> assignments)
-		{
-			foreach (var actor in assignments.Keys.Where(IsReservedForTransport).ToArray())
-			{
-				assignments.Remove(actor);
-				targetReservations.Release(actor.ActorID);
-				Debug("released {0}#{1} to a transport mission", actor.Info.Name, actor.ActorID);
-			}
-		}
-
 		bool IsReservedForTransport(Actor actor)
 		{
 			return transportReservations != null && transportReservations.Any(r => r.IsTransportReserved(actor));
 		}
 
-		void RetireFinishedAssignments(IBot bot, Dictionary<Actor, SpecialistAssignment> assignments, string action,
-			SpecialistAssignmentPurpose purpose)
+		bool AuditAssignments(IBot bot, Dictionary<Actor, SpecialistAssignment> assignments, string action,
+			SpecialistAssignmentPurpose purpose, HashSet<Actor> pendingRecovery)
 		{
-			foreach (var pair in assignments.Where(pair => ShouldRetireAssignment(pair.Key, pair.Value, purpose)).ToArray())
-				RetireAssignment(bot, assignments, pair, action, purpose);
-		}
-
-		void RetireUnavailableAssignments(IBot bot, Dictionary<Actor, SpecialistAssignment> assignments, string action,
-			SpecialistAssignmentPurpose purpose)
-		{
+			var requestReassessment = false;
 			while (true)
 			{
-				var unavailable = default(KeyValuePair<Actor, SpecialistAssignment>);
+				var invalid = default(KeyValuePair<Actor, SpecialistAssignment>);
+				string result = null;
 				foreach (var pair in assignments)
-					if (unitCannotBeOrdered(pair.Key))
+				{
+					var candidateResult = AssignmentInvalidationReason(pair.Key, pair.Value, purpose);
+					if (candidateResult == "pair-state-changed")
 					{
-						unavailable = pair;
-						break;
+						requestReassessment = true;
+						continue;
 					}
 
-				if (unavailable.Key == null)
-					return;
+					if (candidateResult != null && (invalid.Key == null || pair.Key.ActorID < invalid.Key.ActorID))
+					{
+						invalid = pair;
+						result = candidateResult;
+					}
+				}
 
-				RetireAssignment(bot, assignments, unavailable, action, purpose);
+				if (invalid.Key == null)
+					return requestReassessment;
+
+				var transportOwned = result == "transport-owned";
+				var specialistLost = result == "specialist-lost";
+				var completed = result == "captured" || result == "sabotaged";
+				var recoverableCompletion = completed && !unitCannotBeOrdered(invalid.Key) &&
+					!IsReservedForTransport(invalid.Key);
+				var recoverableInvalidation = !transportOwned && !specialistLost && !completed;
+				var stopSpecialist = (recoverableCompletion || recoverableInvalidation) && !invalid.Key.IsIdle;
+				RetireAssignment(bot, assignments, invalid, action, purpose, result, stopSpecialist);
+				if (recoverableCompletion || recoverableInvalidation)
+					pendingRecovery.Add(invalid.Key);
 			}
 		}
 
+		string AssignmentInvalidationReason(Actor specialist, SpecialistAssignment assignment,
+			SpecialistAssignmentPurpose purpose)
+		{
+			var target = assignment.Target;
+			if (target.IsDead || !target.IsInWorld)
+				return "target-removed";
+
+			if (target.Owner == player)
+				return purpose == SpecialistAssignmentPurpose.Capture ? "captured" : "sabotaged";
+
+			if (unitCannotBeOrdered(specialist))
+				return "specialist-lost";
+
+			if (IsReservedForTransport(specialist))
+				return "transport-owned";
+
+			if (!HasValidRelationship(target, purpose))
+				return "relationship-invalid";
+
+			if (!targetReservations.Matches(specialist.ActorID, target.ActorID, purpose,
+				assignment.MaximumClaimants))
+				return "reservation-mismatch";
+
+			if (purpose == SpecialistAssignmentPurpose.Capture)
+			{
+				var captureManager = specialist.TraitOrDefault<CaptureManager>();
+				if (captureManager == null || !CanCaptureByRules(
+					new TraitPair<CaptureManager>(specialist, captureManager), target))
+					return "capture-ineligible";
+
+				var expectedClaimants = RequiresPair(new CaptureCandidate(target, CaptureEconomicValue(target))) ? 2 : 1;
+				if (assignment.MaximumClaimants != expectedClaimants)
+					return "pair-state-changed";
+
+				if (!HasReachableCaptureApproach(specialist, target))
+					return "unreachable-approach";
+			}
+
+			var expectedActivity = HasExpectedActivity(specialist, purpose) ||
+				(purpose == SpecialistAssignmentPurpose.Demolition &&
+					HasPendingAutonomousDemolition(target, specialist));
+			assignment.ObserveActivity(expectedActivity, world.WorldTick);
+			if (!expectedActivity)
+				return CaptureTargeting.ActivityGraceExpired(assignment.MissingActivitySinceTick,
+					world.WorldTick, PendingOrderGraceTicks) ? "missing-activity" : null;
+
+			assignment.ObserveProgress(specialist, world.WorldTick);
+			return world.WorldTick - assignment.LastProgressTick > StalledAssignmentTicks(purpose) ?
+				"non-progressing" : null;
+		}
+
+		static bool HasPendingAutonomousDemolition(Actor target, Actor specialist)
+		{
+			foreach (var demolishable in target.TraitsImplementing<Demolishable>())
+				if (demolishable.HasPendingAutonomousDemolition(specialist))
+					return true;
+
+			return false;
+		}
+
 		void RetireAssignment(IBot bot, Dictionary<Actor, SpecialistAssignment> assignments,
-			KeyValuePair<Actor, SpecialistAssignment> pair, string action, SpecialistAssignmentPurpose purpose)
+			KeyValuePair<Actor, SpecialistAssignment> pair, string action, SpecialistAssignmentPurpose purpose,
+			string result = null, bool stopSpecialist = false)
 		{
 			var target = pair.Value.Target;
 			var targetRemoved = target.IsDead || !target.IsInWorld;
 			var targetHealth = targetRemoved ? 0 : target.TraitOrDefault<IHealth>()?.HP ?? 0;
 			var relationshipInvalid = !targetRemoved && !HasValidRelationship(target, purpose);
 			var nonProgressing = world.WorldTick - pair.Value.LastProgressTick > StalledAssignmentTicks(purpose);
-			var result = targetRemoved ? "target-removed" :
+			result = result ?? (targetRemoved ? "target-removed" :
 				target.Owner == player ? "captured" :
 				targetHealth < pair.Value.TargetHealth ? "sabotaged" :
 				pair.Key.IsDead || !pair.Key.IsInWorld ? "specialist-lost" :
 				relationshipInvalid ? "relationship-invalid" :
-				nonProgressing ? "non-progressing" : "specialist-idle";
-			Debug("{0} {1}#{2} released from {3}#{4}: result={5}", action, pair.Key.Info.Name,
-				pair.Key.ActorID, target.Info.Name, target.ActorID, result);
+				nonProgressing ? "non-progressing" : "specialist-idle");
+			DebugAssignmentRelease(action, pair, purpose, result);
 			if (result == "non-progressing")
 			{
 				deferredTargets[pair.Key] = new DeferredTarget(target,
 					world.WorldTick + StalledAssignmentTicks(purpose));
-				bot.QueueOrder(new Order("Stop", pair.Key, false));
 			}
+
+			if (stopSpecialist && !unitCannotBeOrdered(pair.Key))
+				bot.QueueOrder(new Order("Stop", pair.Key, false));
 
 			assignments.Remove(pair.Key);
 			targetReservations.Release(pair.Key.ActorID);
 		}
 
-		bool ShouldRetireAssignment(Actor specialist, SpecialistAssignment assignment,
-			SpecialistAssignmentPurpose purpose)
+		void DebugAssignmentRelease(string action, KeyValuePair<Actor, SpecialistAssignment> pair,
+			SpecialistAssignmentPurpose purpose, string result)
 		{
-			if (unitCannotBeOrdered(specialist) || !HasValidRelationship(assignment.Target, purpose))
-				return true;
+			if (!Info.DebugLogging)
+				return;
 
-			if (world.WorldTick - assignment.AssignedTick <= PendingOrderGraceTicks)
-				return false;
-
-			if (purpose == SpecialistAssignmentPurpose.Demolition &&
-				assignment.Target.TraitsImplementing<Demolishable>()
-					.Any(d => d.HasPendingAutonomousDemolition(specialist)))
-				return false;
-
-			assignment.ObserveProgress(specialist, world.WorldTick);
-			if (world.WorldTick - assignment.LastProgressTick > StalledAssignmentTicks(purpose))
-				return true;
-
-			return specialist.IsIdle || !HasExpectedActivity(specialist, purpose);
+			var specialist = pair.Key;
+			var assignment = pair.Value;
+			var target = assignment.Target;
+			var hasReservation = targetReservations.TryGetReservation(specialist.ActorID,
+				out var reservedTarget, out var reservedPurpose);
+			var claimants = string.Join(",", targetReservations.Claimants(target.ActorID));
+			var activity = specialist.CurrentActivity == null ? "none" : specialist.CurrentActivity.GetType().Name;
+			var relationship = target.IsDead || !target.IsInWorld ? "none" :
+				player.RelationshipWith(target.Owner).ToString();
+			Debug("{0} {1}#{2} released from {3}#{4}: result={5}, idle={6}, activity={7}, " +
+				"target-live={8}, target-owner={9}, relationship={10}, last-progress={11}, " +
+				"reservation={12}/{13}/{14}, expected-purpose={15}, expected-claimants={16}, " +
+				"target-claimants=[{17}], transport-owned={18}", action, specialist.Info.Name,
+				specialist.ActorID, target.Info.Name, target.ActorID, result, specialist.IsIdle, activity,
+				!target.IsDead && target.IsInWorld, target.Owner.InternalName, relationship,
+				assignment.LastProgressTick, hasReservation, reservedTarget,
+				hasReservation ? reservedPurpose.ToString() : "none", purpose, assignment.MaximumClaimants,
+				claimants, IsReservedForTransport(specialist));
 		}
 
 		int StalledAssignmentTicks(SpecialistAssignmentPurpose purpose)
@@ -937,9 +1113,18 @@ namespace OpenRA.Mods.Common.Traits
 			if (actor.IsIdle || actor.CurrentActivity == null)
 				return false;
 
-			return purpose == SpecialistAssignmentPurpose.Capture ?
-				actor.CurrentActivity.ActivitiesImplementing<Activities.CaptureActor>().Any() :
-				actor.CurrentActivity.ActivitiesImplementing<Activities.Demolish>().Any();
+			if (purpose == SpecialistAssignmentPurpose.Capture)
+			{
+				foreach (var activity in actor.CurrentActivity.ActivitiesImplementing<Activities.CaptureActor>())
+					return true;
+			}
+			else
+			{
+				foreach (var activity in actor.CurrentActivity.ActivitiesImplementing<Activities.Demolish>())
+					return true;
+			}
+
+			return false;
 		}
 
 		bool HasValidRelationship(Actor target, SpecialistAssignmentPurpose purpose)
@@ -995,7 +1180,8 @@ namespace OpenRA.Mods.Common.Traits
 				new MiniYamlNode("AssignedTick", FieldSaver.FormatValue(pair.Value.AssignedTick)),
 				new MiniYamlNode("LastSpecialistPosition", FieldSaver.FormatValue(pair.Value.LastSpecialistPosition)),
 				new MiniYamlNode("LastTargetHealth", FieldSaver.FormatValue(pair.Value.LastTargetHealth)),
-				new MiniYamlNode("LastProgressTick", FieldSaver.FormatValue(pair.Value.LastProgressTick))
+				new MiniYamlNode("LastProgressTick", FieldSaver.FormatValue(pair.Value.LastProgressTick)),
+				new MiniYamlNode("MissingActivitySinceTick", FieldSaver.FormatValue(pair.Value.MissingActivitySinceTick))
 			});
 		}
 
@@ -1035,6 +1221,14 @@ namespace OpenRA.Mods.Common.Traits
 				return FieldLoader.GetValue<T>(key, value.Value.Value);
 			}
 
+			T LoadOrDefault<T>(string key, T fallback)
+			{
+				var value = node.Value.Nodes.FirstOrDefault(n => n.Key == key);
+				return value == null ? fallback : FieldLoader.GetValue<T>(key, value.Value.Value);
+			}
+
+			var assignedTick = Load<int>("AssignedTick");
+
 			return new SavedAssignment
 			{
 				SpecialistId = Load<uint>("Specialist"),
@@ -1042,10 +1236,11 @@ namespace OpenRA.Mods.Common.Traits
 				Purpose = (SpecialistAssignmentPurpose)Load<int>("Purpose"),
 				MaximumClaimants = Load<int>("MaximumClaimants"),
 				TargetHealth = Load<int>("TargetHealth"),
-				AssignedTick = Load<int>("AssignedTick"),
+				AssignedTick = assignedTick,
 				LastSpecialistPosition = Load<WPos>("LastSpecialistPosition"),
 				LastTargetHealth = Load<int>("LastTargetHealth"),
-				LastProgressTick = Load<int>("LastProgressTick")
+				LastProgressTick = Load<int>("LastProgressTick"),
+				MissingActivitySinceTick = LoadOrDefault("MissingActivitySinceTick", assignedTick)
 			};
 		}
 
@@ -1072,7 +1267,8 @@ namespace OpenRA.Mods.Common.Traits
 					continue;
 
 				var assignment = new SpecialistAssignment(candidate.Target, saved.TargetHealth, saved.AssignedTick,
-					saved.MaximumClaimants, saved.LastSpecialistPosition, saved.LastTargetHealth, saved.LastProgressTick);
+					saved.MaximumClaimants, saved.LastSpecialistPosition, saved.LastTargetHealth, saved.LastProgressTick,
+					saved.MissingActivitySinceTick);
 				var assignments = saved.Purpose == SpecialistAssignmentPurpose.Capture ?
 					activeCapturers : activeDemolitionUnits;
 				assignments.Add(candidate.Specialist, assignment);
@@ -1089,8 +1285,9 @@ namespace OpenRA.Mods.Common.Traits
 				!HasValidRelationship(target, saved.Purpose))
 				return false;
 
-			var expectedActivity = HasExpectedActivity(specialist, saved.Purpose) ||
-				world.WorldTick - saved.AssignedTick <= PendingOrderGraceTicks;
+			var expectedActivity = CaptureTargeting.ShouldRestoreAssignmentActivity(
+				HasExpectedActivity(specialist, saved.Purpose), saved.MissingActivitySinceTick,
+				world.WorldTick, PendingOrderGraceTicks);
 			if (!expectedActivity)
 				return false;
 
