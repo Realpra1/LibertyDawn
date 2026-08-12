@@ -22,9 +22,10 @@ In `cycle` mode, read only the assigned worker state, cumulative diff from its
 recorded base, relevant surrounding code, and evidence through the named cycle.
 Return at most one high-value compatible concern. Do not penalize final evidence,
 CI, publication, or later adversarial cases merely because they are not due yet.
-The worker records whether it adopts or rejects the concern; an adopted product
-change starts the next ordinary code-change cycle. This advisory review does not
-replace the final gate or grant extra cycles.
+The worker records whether it adopts or rejects the concern, with a concrete
+reason when rejecting; an adopted product change starts the next ordinary
+code-change cycle. This advisory review does not replace the final gate or grant
+extra cycles.
 
 In `final` mode, the job identifies `task` or `release`. For a task PR, read its
 worker state/report, diff, commits, evidence, and checks. For the integrated PR,
@@ -94,6 +95,10 @@ review only when a concrete conflict or failure requires its contract.
 12. In `final` mode, treat Commenter and Policy Reviewer output as interpretation, not completion
    evidence. Confirm the worker checked cited facts, documented adopted/rejected
    advice, and validated recommendations through later adversarial full-AI games.
+   The worker or coordinator must explicitly disposition this review's required
+   fix and highest-impact concern: implement it in the next focused cycle, or
+   reject it with concrete scope, evidence, or safety reasons. Silent disregard
+   is a process failure.
 13. List findings by severity with file/line, failure mechanism, affected spec
    clause, and smallest safe correction. Avoid cosmetic preferences.
 14. In `cycle` mode, nominate at most one `advisory_concern`, using `none` when no
@@ -103,7 +108,12 @@ review only when a concrete conflict or failure requires its contract.
    release blockers even though the ordinary final review-response budget is one
    code/test cycle.
 15. The worker may reject a finding with concrete evidence. Record the disagreement
-   rather than arguing indefinitely.
+   rather than arguing indefinitely. If a compatible code-review finding remains
+   unresolved after the normal response cycle and blocks progress, the coordinator
+   may authorize at most two exceptional Sol-medium worker cycles. These are a
+   recovery path, not a new default tier: each cycle must target the finding,
+   retain the task boundary, run the normal two adversarial games, and stop after
+   the second cycle with `Needs help` if it still cannot be resolved.
 
 Write the requested review file. For `cycle`, return only verdict (`clear` or
 `advisory concern`), `advisory_concern`, and its path. For `final`, return only

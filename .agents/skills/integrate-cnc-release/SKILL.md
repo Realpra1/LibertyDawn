@@ -69,6 +69,10 @@ follow-up for required follow-up, and record advisory or thin-telemetry
 observations without freezing the release. Insufficient evidence is a blocker
 only when the omitted evidence is literal task acceptance or a required control;
 never turn reviewer uncertainty into an automatic veto or ignore sound advice.
+Apply the same rule to the Terra task/release code review: record the required
+fix's disposition and, if it is compatible but unresolved after the normal
+response, request the coordinator's exceptional Sol-medium escalation path
+before declaring the release blocked.
 
 When repair is needed:
 

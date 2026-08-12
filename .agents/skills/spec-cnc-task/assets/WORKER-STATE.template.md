@@ -15,7 +15,9 @@ coordinator state, other skills, or other worker specs. Read applicable
 - Task branch / PR base: `{{TASK_BRANCH}}` / `{{PR_BASE}}`
 - Current cycle: `1`; cycles used: `0/5 primary`, `0/10 optional Luna`
 - Required model: cycle 1 `Sol high`; cycles 2-5 `Terra medium`; cycles 6-15
-  `Luna medium` only when coordinator authorizes minor obvious work
+  `Luna medium` only when coordinator authorizes minor obvious work; at most two
+  exceptional `Sol medium` escalation cycles may follow an unresolved compatible
+  code/policy-review blocker
 - Game/build capacity: `2` / `1`; lock: `{{ABSOLUTE_LOCK_DIRECTORY}}`
 - Report: `{{TASK_REPORT_PATH}}`
 - Analysis directory: `{{ABSOLUTE_ANALYSIS_DIRECTORY}}`

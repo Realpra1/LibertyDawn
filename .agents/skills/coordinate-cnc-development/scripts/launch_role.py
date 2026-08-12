@@ -19,6 +19,7 @@ ROLES = {
     "speccer": ("gpt-5.6-sol", "high", "spec-cnc-task/SKILL.md"),
     "worker-sol": ("gpt-5.6-sol", "high", None),
     "worker-terra": ("gpt-5.6-terra", "medium", None),
+    "worker-escalation": ("gpt-5.6-sol", "medium", None),
     "worker-luna": ("gpt-5.6-luna", "medium", None),
     "integration-worker": ("gpt-5.6-terra", "medium", None),
     "integration-tester": ("gpt-5.6-terra", "medium", None),
