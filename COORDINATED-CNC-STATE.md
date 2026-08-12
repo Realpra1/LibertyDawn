@@ -1,7 +1,7 @@
 # Coordinated CNC State
 
 - Round ID: `20260807-bug-polish-03`
-- Phase: `valid integration cycle 4 passed on RC2; final integration cycle pending; CNC-47 withdrawn/excluded`
+- Phase: `five valid integration cycles complete; Terra final release review pending; CNC-47 withdrawn/excluded`
 - Common base branch: `agent/cnc-20260807-bug-polish-02-release`
 - Common base SHA: `468ee64f5a0f9a9e19e260e5c5943e6e878f4705`
 - Coordinator model: `gpt-5.6-luna` / `medium`; delegated cycle tiers are pinned
@@ -31,7 +31,7 @@
 ## Release rounds
 
 | RC1 | `37ede3f9303191cbeec228518479061f715fcb32` | CNC-45, CNC-46, CNC-50, CNC-52 | Terra cycle 1 passed; reviewed startup diagnostics pending merge | `make check`, `make test` passed; two cycle-1 games reached tick 8,000 | `1/5 valid` | canonical launcher/content preflight required; cycle 1 operationally clean but timing-only telemetry was insufficient for strategic acceptance |
-| RC2 | `9f0c314ec77814506983def57c3d414e2e5aa56b` | RC1 plus reviewed opt-in startup diagnostics | Terra cycle 4 passed; no repair | current/base economy and engineer controls completed cleanly; concrete units/recovery/reservation outcomes observed | `4/5 valid total` | cycle 5 should close matched manifests/outcomes and focused fallback coverage; no product defect or escalation shown |
+| RC2 | `9f0c314ec77814506983def57c3d414e2e5aa56b` | RC1 plus reviewed opt-in startup diagnostics | Terra cycle 5 passed; final review pending | matched maps, economy/defense, engineer fallback, wall repair, content links, replay/benchmark/cleanup all passed | `5/5 valid total` | no critical defect; cycle-5 narrator/policy envelopes incomplete, recorded First iteration; require Terra final release review |
 |---|---|---|---|---|---|---|
 
 ## Resume note
