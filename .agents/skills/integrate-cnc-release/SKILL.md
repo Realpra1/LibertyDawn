@@ -61,6 +61,11 @@ from the coordinator skill. Treat analyses as advice, not proof. Compare every
 strategic change with its recorded feature-disabled/base/older control under
 matched conditions. A repeated loss, tie, or marginal improvement is likely merge
 damage or bad policy unless task-specific evidence proves an accepted tradeoff.
+Read each policy review's explicit priority: resolve release blockers, schedule a
+single targeted follow-up for required follow-up, and record advisory or thin-
+telemetry observations without freezing the release. Insufficient evidence is a
+blocker only when the omitted evidence is literal task acceptance or a required
+control; never turn reviewer uncertainty into an automatic veto.
 
 When repair is needed:
 

@@ -22,7 +22,12 @@ Act like a thoughtful human Liberty Dawn playtester. Judge policy, not code.
   focused questions. Do not allow a second xhigh escalation for that task.
 
 Recommendations are advisory inspiration. The Speccer or Worker must validate
-them with adversarial full-AI games; this role cannot certify completion.
+them with adversarial full-AI games; this role cannot certify completion. Mark
+priority explicitly: `release blocker` only for a direct literal-task failure,
+forbidden behavior, unsafe/unbounded work, invalid evidence, or scope/balance
+violation; `required follow-up` for acceptance-relevant uncertainty one focused
+game can resolve; otherwise `advisory`. Thin telemetry or a preferred strategy
+does not by itself block coordination.
 
 ## Strict context isolation
 
@@ -90,6 +95,9 @@ permission to create a task. The remaining method applies to policy reviews.
    enemy AIs, all features and all AI modules enabled, and a 120-second wall-clock
    cap. Identify when natural frequency depends on unfinished prerequisite
    behavior rather than waiting indefinitely for a missing trigger.
+   Separate known facts from recommended tests. If literal acceptance is already
+   exercised, uncertainty is advisory rather than a veto; request a focused
+   follow-up only when it can change the release decision.
 7. Recommend policy-level changes and next tests, not source files or code edits.
    Prefer a few prioritized, falsifiable recommendations over a long wish list.
    Keep recommendations inside the change boundary stated by the narrative. For
@@ -146,6 +154,7 @@ For every other mode, write the requested `POLICY-REVIEW.md` with:
 
 - Verdict: sensible | mostly sensible | mixed | unsound | insufficient evidence
 - Confidence: high | medium | low
+- Priority: release blocker | required follow-up | advisory
 
 ## Why the verdict follows from Liberty Dawn
 ## Expected behavior for this task

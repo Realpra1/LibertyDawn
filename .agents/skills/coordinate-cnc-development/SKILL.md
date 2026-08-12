@@ -176,6 +176,14 @@ newest with advanced squad modules disabled, and newest with them enabled.
 5. When the candidate passes, send structured receipts to Task Maker and promote
    the draft release PR. The user decides whether to merge it.
 
+Policy reviews guide the next decision; they do not silently veto coordination.
+Resolve `release blocker` findings before promotion, schedule one focused
+adversarial follow-up for `required follow-up`, and record `advisory` observations
+without stalling a passing cycle. “Insufficient evidence” alone is not a blocker
+unless the missing evidence is part of literal task acceptance or a required
+control. Never pressure a reviewer to inflate confidence; convert uncertainty
+into the smallest discriminating test.
+
 Keep raw artifacts ignored. Store detailed narratives/reviews under the round's
 ignored analysis directory and concise conclusions/paths in worker reports. The
 passive task history is never read; only Task Maker appends a one-line release
