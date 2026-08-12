@@ -134,8 +134,11 @@ invalid harness is not another cycle. For the current cycle:
    resources, losses, counts, topology, competing managers, old-control setting,
    or save/load as relevant. Never spend both games on near copies.
 5. Give each game—not a batch—to its own fresh Luna Commenter and Luna Policy
-   Reviewer. Read both before deciding the next change. Verify narrative facts;
-   treat policy advice as hypotheses, not acceptance.
+   Reviewer. Read both before deciding the next change. Verify narrative facts.
+   The worker must carry the strongest policy recommendation into the next
+   focused test or code change, or record an explicit rejection with a concrete
+   scope, evidence, or safety reason; silently ignoring correct reviewer advice
+   is not an acceptable cycle decision.
 6. Remove answered/noisy diagnostics, update the journal/report/state, commit, and
    exit so the coordinator can select the next model tier.
 
@@ -215,5 +218,7 @@ performance, checks/CI, deferred work, and risks.
 - Old-control comparative result:
 - Per-game narrative and policy-review paths/conclusions:
 - Cycle-3 code review/disposition:
+- Policy recommendations/disposition: accepted recommendation -> next test/change;
+  rejected recommendation -> concrete reason and replacement test:
 - Diagnostic/performance result:
 - Deferred work and known risks:

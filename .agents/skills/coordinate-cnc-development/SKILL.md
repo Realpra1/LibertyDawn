@@ -177,12 +177,16 @@ newest with advanced squad modules disabled, and newest with them enabled.
    the draft release PR. The user decides whether to merge it.
 
 Policy reviews guide the next decision; they do not silently veto coordination.
+Workers and the coordinator must explicitly disposition every highest-priority
+recommendation: implement it in the next smallest change, test it in the next
+focused game, or reject it with a concrete scope, evidence, or safety reason.
+Silently ignoring a correct policy recommendation is a failed process step.
 Resolve `release blocker` findings before promotion, schedule one focused
 adversarial follow-up for `required follow-up`, and record `advisory` observations
 without stalling a passing cycle. “Insufficient evidence” alone is not a blocker
 unless the missing evidence is part of literal task acceptance or a required
 control. Never pressure a reviewer to inflate confidence; convert uncertainty
-into the smallest discriminating test.
+into the smallest discriminating test and record the result.
 
 Keep raw artifacts ignored. Store detailed narratives/reviews under the round's
 ignored analysis directory and concise conclusions/paths in worker reports. The
