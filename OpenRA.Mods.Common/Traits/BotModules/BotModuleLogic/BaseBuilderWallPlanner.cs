@@ -325,9 +325,10 @@ namespace OpenRA.Mods.Common.Traits
 
 		void DropStaleAnchors(ActorInfo wallInfo, BuildingInfo bi)
 		{
-			// Anchors are planned before the wall is ordered, so the world may have moved on. Anything
-			// we can no longer legally start a building on is dropped.
-			while (pendingAnchors.Count > 0 && !CanAnchorAt(pendingAnchors[0], wallInfo, bi))
+			// Anchors are planned before the wall is ordered, so the world may have moved on. Enclosure
+			// cells additionally need their exact ordinary route when they are consumed: an intervening
+			// actor or wall must defer this attempt instead of issuing a now-unreachable placement.
+			while (pendingAnchors.Count > 0 && !CanUsePendingAnchor(pendingAnchors[0], wallInfo, bi))
 			{
 				if (pendingPurpose == PendingWallPurpose.Enclosure && Info.ConstructionYardEnclosureDebugLogging)
 					LogEnclosure("{0} tick={1} dropped stale enclosure anchor yard={2}@{3} cell={4} reason={5}.",
@@ -338,6 +339,17 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (pendingAnchors.Count == 0)
 				ClearPendingAnchors();
+		}
+
+		bool CanUsePendingAnchor(CPos cell, ActorInfo wallInfo, BuildingInfo bi)
+		{
+			if (!CanAnchorAt(cell, wallInfo, bi))
+				return false;
+
+			if (pendingPurpose != PendingWallPurpose.Enclosure)
+				return true;
+
+			return TryFindExactEnclosureRoute(cell, out _, out _);
 		}
 
 		void ClearPendingAnchors()

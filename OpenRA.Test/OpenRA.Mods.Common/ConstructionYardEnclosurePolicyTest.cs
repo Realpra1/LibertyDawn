@@ -130,6 +130,22 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
+		public void ExactRouteValidationRejectsAPathThatBecomesBlockedBeforePlacement()
+		{
+			var origin = new CPos(51, 53);
+			var destination = new CPos(53, 51);
+			var route = new[]
+			{
+				destination, new CPos(53, 52), new CPos(52, 53), origin
+			};
+			var newlyBlocked = new HashSet<CPos> { new CPos(53, 52) };
+
+			Assert.That(ConstructionYardEnclosurePolicy.IsExactReversedRoute(route,
+				origin, destination, newlyBlocked.Contains, _ => false), Is.False,
+				"A route accepted at selection must be rejected if a live blocker arrives before placement.");
+		}
+
+		[Test]
 		public void WallPreferenceFallsBackWithoutInventingAnotherType()
 		{
 			var preference = new[] { "brik", "sbag", "cycl" };
