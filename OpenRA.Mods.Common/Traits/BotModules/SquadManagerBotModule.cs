@@ -18,6 +18,14 @@ using OpenRA.Traits;
 
 namespace OpenRA.Mods.Common.Traits
 {
+	enum GeneralGroundMissionStatus
+	{
+		MissingSquad,
+		InvalidTarget,
+		Urgent,
+		Ready
+	}
+
 	[Desc("Manages AI squads.")]
 	public class SquadManagerBotModuleInfo : ConditionalTraitInfo
 	{
@@ -526,6 +534,7 @@ namespace OpenRA.Mods.Common.Traits
 		IBotNotifyIdleBaseUnits[] notifyIdleBaseUnits;
 		IBotTransportReservations[] transportReservations;
 		IBotUnitReservations[] unitReservations;
+		IBotTemporaryUnitControl[] temporaryUnitControls;
 
 		CPos initialBaseCenter;
 
@@ -618,6 +627,7 @@ namespace OpenRA.Mods.Common.Traits
 			notifyIdleBaseUnits = self.Owner.PlayerActor.TraitsImplementing<IBotNotifyIdleBaseUnits>().ToArray();
 			transportReservations = self.Owner.PlayerActor.TraitsImplementing<IBotTransportReservations>().ToArray();
 			unitReservations = self.Owner.PlayerActor.TraitsImplementing<IBotUnitReservations>().ToArray();
+			temporaryUnitControls = self.Owner.PlayerActor.TraitsImplementing<IBotTemporaryUnitControl>().ToArray();
 		}
 
 		protected override void TraitEnabled(Actor self)
@@ -691,6 +701,58 @@ namespace OpenRA.Mods.Common.Traits
 		internal bool IsUnitProtectingBase(Actor actor)
 		{
 			return actor != null && Squads.Any(s => s.Type == SquadType.Protection && s.Units.Contains(actor));
+		}
+
+		internal bool IsUnitTemporarilyControlled(Actor actor)
+		{
+			return actor != null && temporaryUnitControls != null &&
+				temporaryUnitControls.Any(c => c.IsUnitTemporarilyControlled(actor));
+		}
+
+		internal bool TryGetGeneralGroundMission(Actor actor, out Actor target,
+			out WPos formationCenter, out CPos objective, out bool urgent)
+		{
+			var status = GetGeneralGroundMissionStatus(actor, out target, out formationCenter, out objective);
+			urgent = status == GeneralGroundMissionStatus.Urgent;
+			return status == GeneralGroundMissionStatus.Ready || urgent;
+		}
+
+		internal GeneralGroundMissionStatus GetGeneralGroundMissionStatus(Actor actor, out Actor target,
+			out WPos formationCenter, out CPos objective)
+		{
+			var squad = Squads.FirstOrDefault(s => s.Type == SquadType.GeneralAttack && s.Units.Contains(actor));
+			if (squad == null)
+			{
+				target = null;
+				formationCenter = WPos.Zero;
+				objective = CPos.Zero;
+				return GeneralGroundMissionStatus.MissingSquad;
+			}
+
+			formationCenter = squad.GroundFormationCenter;
+			if (!squad.IsTargetValid)
+			{
+				target = null;
+				objective = CPos.Zero;
+				return GeneralGroundMissionStatus.InvalidTarget;
+			}
+
+			target = squad.TargetActor;
+			objective = target.Location;
+			return IsUnitProtectingBase(actor) || squad.FuzzyStateMachine.Is<GroundUnitsFleeState>() ?
+				GeneralGroundMissionStatus.Urgent : GeneralGroundMissionStatus.Ready;
+		}
+
+		internal CPos GroundRecoveryDestination()
+		{
+			var squad = Squads.FirstOrDefault(s => s.Type == SquadType.GeneralAttack);
+			if (squad?.IsTargetValid == true)
+				return squad.TargetActor.Location;
+
+			if (squad?.IsValid == true)
+				return World.Map.CellContaining(squad.GroundFormationCenter);
+
+			return initialBaseCenter;
 		}
 
 		// HACK: Use of this function requires that there is one squad of this type.

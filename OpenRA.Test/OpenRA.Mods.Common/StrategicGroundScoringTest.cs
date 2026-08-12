@@ -45,6 +45,14 @@ namespace OpenRA.Test
 		}
 
 		[Test]
+		public void TemporaryRoleOwnershipPreventsGroundReinforcementOrders()
+		{
+			Assert.That(StrategicGroundScoring.CanOrderGroundReinforcement(false, false), Is.True);
+			Assert.That(StrategicGroundScoring.CanOrderGroundReinforcement(true, false), Is.False);
+			Assert.That(StrategicGroundScoring.CanOrderGroundReinforcement(false, true), Is.False);
+		}
+
+		[Test]
 		public void SlowestMemberMakesTheSameJourneyMoreExpensive()
 		{
 			var slow = StrategicGroundScoring.ScoreCell(5000, 5000, 0, 60, 50, 100, 8, 50);

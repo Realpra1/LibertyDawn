@@ -38,6 +38,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		{
 			ChangeState(squad, previousState, saveCurrentState);
 		}
+
+		public bool Is<T>() where T : IState { return currentState is T; }
 	}
 
 	interface IState

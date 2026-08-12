@@ -728,6 +728,8 @@ HTNK:
 		Voice: Attack
 	AttackTurreted:
 		Voice: Attack
+		ApproachRangePolicy: economy-mammoth
+	EconomyMammothCrushMove:
 	WithMuzzleOverlay:
 	ChangesHealth:
 		Step: 0

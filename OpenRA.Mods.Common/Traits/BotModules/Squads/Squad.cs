@@ -312,10 +312,11 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		internal List<Actor> GroundFormationUnits(bool bootstrapIfEmpty = false)
 		{
 			var formation = Units.Where(a => !GroundReinforcements.Contains(a.ActorID) &&
-				!SquadManager.IsUnitProtectingBase(a)).ToList();
+				!SquadManager.IsUnitProtectingBase(a) && !SquadManager.IsUnitTemporarilyControlled(a)).ToList();
 			if (formation.Count == 0 && bootstrapIfEmpty)
 			{
-				var replacement = Units.Where(a => !SquadManager.IsUnitProtectingBase(a))
+				var replacement = Units.Where(a => !SquadManager.IsUnitProtectingBase(a) &&
+					!SquadManager.IsUnitTemporarilyControlled(a))
 					.OrderBy(a => hasGroundFormationCenter ?
 					(a.CenterPosition - groundLastFormationCenter).LengthSquared : (long)a.ActorID)
 					.ThenBy(a => a.ActorID).FirstOrDefault();
@@ -361,7 +362,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		{
 			var formationCount = GroundFormationUnits(bootstrapIfEmpty: true).Count;
 			var reinforcementCount = Units.Count(a => GroundReinforcements.Contains(a.ActorID) &&
-				!SquadManager.IsUnitProtectingBase(a));
+				StrategicGroundScoring.CanOrderGroundReinforcement(
+					SquadManager.IsUnitProtectingBase(a), SquadManager.IsUnitTemporarilyControlled(a)));
 			var minimum = SquadManager.Info.GroundReinforcementHoldMinimum > 0 ?
 				SquadManager.Info.GroundReinforcementHoldMinimum : System.Math.Max(2, SquadManager.Info.SquadSize / 2);
 			var hold = StrategicGroundScoring.ShouldHoldForReinforcements(formationCount,
@@ -388,7 +390,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var joinDistance = WDist.FromCells(SquadManager.Info.GroundReinforcementJoinRadius).Length;
 			var joinDistanceSquared = (long)joinDistance * joinDistance;
 			foreach (var reinforcement in Units.Where(a => GroundReinforcements.Contains(a.ActorID) &&
-				!SquadManager.IsUnitProtectingBase(a))
+				StrategicGroundScoring.CanOrderGroundReinforcement(
+					SquadManager.IsUnitProtectingBase(a), SquadManager.IsUnitTemporarilyControlled(a)))
 				.OrderBy(a => a.ActorID).ToList())
 			{
 				if ((reinforcement.CenterPosition - center).LengthSquared <= joinDistanceSquared)

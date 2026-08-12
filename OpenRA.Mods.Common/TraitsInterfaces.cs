@@ -633,6 +633,23 @@ namespace OpenRA.Mods.Common.Traits
 		bool IsUnitReserved(Actor actor);
 	}
 
+	/// <summary>
+	/// Marks a unit as temporarily ordered by a squad-owned tactical deviation. Unlike a reservation,
+	/// this does not remove the actor from its normal squad and must be released promptly.
+	/// </summary>
+	[RequireExplicitImplementation]
+	public interface IBotTemporaryUnitControl
+	{
+		bool IsUnitTemporarilyControlled(Actor actor);
+	}
+
+	/// <summary>Owner-scoped opt-in for attack approach policies configured on individual actors.</summary>
+	[RequireExplicitImplementation]
+	public interface IBotAttackApproachPolicy
+	{
+		bool IsAttackApproachPolicyActive(Actor attacker, string policy);
+	}
+
 	[RequireExplicitImplementation]
 	public interface IBotHarvesterResourcePolicy
 	{
