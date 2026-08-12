@@ -62,6 +62,8 @@ namespace OpenRA
 		public static bool IsAutomatedGameSaveLoad { get; private set; }
 		public static bool IsHeadlessAutomationRequested { get; private set; }
 		public static bool IsHeadlessAutomation { get; private set; }
+		static bool startupDiagnosticsEnabled;
+		static readonly Stopwatch StartupDiagnosticsTimer = Stopwatch.StartNew();
 
 		public static event Action OnShellmapLoaded = () => { };
 
@@ -315,6 +317,8 @@ namespace OpenRA
 
 		static void Initialize(Arguments args)
 		{
+			startupDiagnosticsEnabled = FieldLoader.GetValue<bool>("Debug.StartupDiagnostics",
+				args.GetValue("Debug.StartupDiagnostics", "False"));
 			IsHeadlessAutomationRequested = FieldLoader.GetValue<bool>("Launch.Headless",
 				args.GetValue("Launch.Headless", "False"));
 
@@ -325,6 +329,10 @@ namespace OpenRA
 			var supportDirArg = args.GetValue("Engine.SupportDir", null);
 			if (!string.IsNullOrEmpty(supportDirArg))
 				Platform.OverrideSupportDir(supportDirArg);
+
+			StartupDiagnostic("paths", "engine={0} support={1} content={2} content-exists={3}",
+				Platform.EngineDir, Platform.SupportDir, Path.Combine(Platform.SupportDir, "Content"),
+				Directory.Exists(Path.Combine(Platform.SupportDir, "Content")));
 
 			Console.WriteLine("Platform is {0}", Platform.CurrentPlatform);
 
@@ -475,21 +483,38 @@ namespace OpenRA
 				throw new InvalidOperationException($"Unknown or invalid mod '{mod}'.");
 
 			Console.WriteLine("Loading mod: {0}", mod);
+			StartupDiagnostic("mod", "begin id={0} package={1}", mod, Mods[mod].Package.Name);
 
 			Sound.StopVideo();
+			StartupDiagnostic("sound", "video-stopped");
 
+			StartupDiagnostic("mod-data", "construct-enter");
 			ModData = new ModData(Mods[mod], Mods, true);
+			StartupDiagnostic("mod-data", "construct-exit");
 
+			StartupDiagnostic("profile", "load-enter");
 			LocalPlayerProfile = new LocalPlayerProfile(Path.Combine(Platform.SupportDir, Settings.Game.AuthProfile), ModData.Manifest.Get<PlayerDatabase>());
+			StartupDiagnostic("profile", "load-exit");
 
+			StartupDiagnostic("load-screen", "before-load-enter");
 			if (!ModData.LoadScreen.BeforeLoad())
+			{
+				StartupDiagnostic("load-screen", "before-load-aborted");
 				return;
+			}
+			StartupDiagnostic("load-screen", "before-load-exit");
 
+			StartupDiagnostic("asset-loaders", "initialize-enter");
 			ModData.InitializeLoaders(ModData.DefaultFileSystem);
+			StartupDiagnostic("asset-loaders", "initialize-exit");
+			StartupDiagnostic("fonts", "initialize-enter");
 			Renderer.InitializeFonts(ModData);
+			StartupDiagnostic("fonts", "initialize-exit");
 
+			StartupDiagnostic("maps", "load-enter folders={0}", ModData.Manifest.MapFolders.Count);
 			using (new PerfTimer("LoadMaps"))
 				ModData.MapCache.LoadMaps();
+			StartupDiagnostic("maps", "load-exit locations={0}", ModData.MapCache.MapLocations.Count);
 
 			var grid = ModData.Manifest.Contains<MapGrid>() ? ModData.Manifest.Get<MapGrid>() : null;
 			Renderer.InitializeDepthBuffer(grid);
@@ -510,7 +535,20 @@ namespace OpenRA
 
 			JoinLocal();
 
+			StartupDiagnostic("load-screen", "start-game-enter");
 			ModData.LoadScreen.StartGame(args);
+			StartupDiagnostic("load-screen", "start-game-exit");
+		}
+
+		internal static void StartupDiagnostic(string stage, string format, params object[] args)
+		{
+			if (!startupDiagnosticsEnabled)
+				return;
+
+			Console.WriteLine("Startup diagnostic: elapsed={0}ms thread={1} stage={2} {3}",
+				StartupDiagnosticsTimer.ElapsedMilliseconds, Environment.CurrentManagedThreadId,
+				stage, string.Format(CultureInfo.InvariantCulture, format, args));
+			Console.Out.Flush();
 		}
 
 		public static void LoadEditor(string mapUid)
