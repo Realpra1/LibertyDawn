@@ -17,33 +17,12 @@ using OpenRA.Traits;
 namespace OpenRA.Mods.Common.Traits
 {
 	/// <summary>
-	/// One idea, in full: find a defensive tower that has no wall in front of it, and put a wall in
-	/// front of it.
-	///
-	/// The wall is a single straight line on the tower's enemy facing side, handed to
-	/// <see cref="BaseBuilderQueueManager"/> as two LineBuild anchors. The engine fills every cell
-	/// between the anchors for free, so only the two ends are ever paid for - which is why the planner
-	/// takes the *longest* placeable run in the window rather than the first one that fits. One long
-	/// wall costs the same two segments as a short one, so short ones are simply waste.
-	///
-	/// Two things stop the bot walling itself in:
-	///  * Structural: a wall is one straight line, never a ring, so it cannot enclose anything alone.
-	///  * Behavioural: before a line is accepted, a bounded flood fill from beside the construction
-	///    yard has to still get EscapeDistance cells clear of it with the line treated as solid.
-	///
-	/// The planner never touches an RNG, so the same world state always produces the same plan. Bot
-	/// modules run host-only inside Sync.RunUnsynced; where the surrounding bot code does need
-	/// randomness it uses World.LocalRandom, never SharedRandom.
-	///
-	/// Cost: a planning pass looks at up to MaxTowersPerPass towers and runs at most one flood fill,
-	/// and only happens once the previous line has been fully ordered. A pass that finds nothing puts
-	/// the planner to sleep for PlanRetryDelay ticks.
+	/// Preserves the first construction-yard enclosure and replaces the old arbitrary tower line with
+	/// one bounded, access-checked open screen around the active defense cluster. Planning is local,
+	/// deterministic, and retried only after a fixed delay.
 	/// </summary>
 	class BaseBuilderWallPlanner
 	{
-		/// <summary>Towers examined in a single planning pass.</summary>
-		const int MaxTowersPerPass = 4;
-
 		/// <summary>Ticks to wait after a pass that found nothing to wall.</summary>
 		const int PlanRetryDelay = 500;
 
@@ -54,34 +33,22 @@ namespace OpenRA.Mods.Common.Traits
 		/// </summary>
 		const int EscapeDistance = 20;
 
-		/// <summary>
-		/// Cell budget for the "can we still get out" flood fill. Reaching EscapeDistance across open
-		/// ground costs about 840 cells, so this leaves better than twice the headroom for terrain that
-		/// makes the route wind. Running out of budget just means the wall is not built.
-		/// </summary>
-		const int PathCheckMaxCells = 3000;
-
-		/// <summary>A wall this short buys almost no free cells between its two paid-for anchors.</summary>
-		const int MinLineLength = 4;
-
-		/// <summary>Towers remembered as already dealt with, oldest dropped first.</summary>
-		const int MaxHandledTowers = 64;
-
 		const int MaxEnclosureAttempts = 8;
 
 		readonly BaseBuilderBotModule baseBuilder;
 		readonly World world;
 		readonly Player player;
 
-		// The LineBuild anchors of the wall currently being ordered. Two of them, or none.
+		// Wall anchors currently being ordered. Cluster screens mix individual rear anchors with
+		// LineBuild front anchors so the inward flank ends can never auto-connect to each other.
 		readonly List<CPos> pendingAnchors = new List<CPos>();
+		readonly HashSet<CPos> pendingIndividualWallCells = new HashSet<CPos>();
 		string pendingWallType;
 
-		// Towers we have already planned a wall for, or tried and failed to.
-		readonly HashSet<uint> handledTowers = new HashSet<uint>();
-		readonly Queue<uint> handledTowerOrder = new Queue<uint>();
 		readonly HashSet<uint> handledEnclosureYards = new HashSet<uint>();
 		readonly Dictionary<uint, int> enclosureAttempts = new Dictionary<uint, int>();
+		readonly HashSet<CPos> clusterWallCells = new HashSet<CPos>();
+		uint clusterScreenAnchorId;
 
 		int nextPlanTick;
 
@@ -113,6 +80,11 @@ namespace OpenRA.Mods.Common.Traits
 			return Info.WallTypes.Contains(actorType) || Info.ConstructionYardEnclosureWallTypes.Contains(actorType);
 		}
 
+		public bool OwnsClusterWallCell(CPos cell)
+		{
+			return clusterWallCells.Contains(cell);
+		}
+
 		public ActorInfo ConstructionYardEnclosureWall(IEnumerable<ActorInfo> buildables, Actor[] playerBuildings)
 		{
 			if (!Enabled || Info.ConstructionYardEnclosureWallTypes.Length == 0 || WallCount(playerBuildings) >= Info.MaximumWallSegments)
@@ -138,15 +110,20 @@ namespace OpenRA.Mods.Common.Traits
 			return PeekAnchor(actorType) != null;
 		}
 
-		/// <summary>Consumes the next anchor. The caller issues a "LineBuild" order for it.</summary>
-		public CPos? TakeWallCell(string actorType)
+		/// <summary>Consumes the next anchor and reports whether the caller should use LineBuild.</summary>
+		public CPos? TakeWallCell(string actorType, out bool useLineBuild)
 		{
+			useLineBuild = true;
 			var cell = PeekAnchor(actorType);
 			if (cell != null)
 			{
 				pendingAnchors.RemoveAt(0);
+				useLineBuild = !pendingIndividualWallCells.Remove(cell.Value);
 				if (pendingAnchors.Count == 0)
+				{
 					pendingWallType = null;
+					pendingIndividualWallCells.Clear();
+				}
 			}
 
 			return cell;
@@ -184,10 +161,16 @@ namespace OpenRA.Mods.Common.Traits
 			// Anchors are planned before the wall is ordered, so the world may have moved on. Anything
 			// we can no longer legally start a building on is dropped.
 			while (pendingAnchors.Count > 0 && !CanAnchorAt(pendingAnchors[0], wallInfo, bi))
+			{
+				pendingIndividualWallCells.Remove(pendingAnchors[0]);
 				pendingAnchors.RemoveAt(0);
+			}
 
 			if (pendingAnchors.Count == 0)
+			{
 				pendingWallType = null;
+				pendingIndividualWallCells.Clear();
+			}
 		}
 
 		int WallCount(Actor[] playerBuildings)
@@ -223,11 +206,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		// --- planning -----------------------------------------------------------------------------
 
-		/// <summary>
-		/// Finds the unwalled tower closest to the enemy and lays one wall line across its enemy facing
-		/// side. Towers are ordered by distance then ActorID, so the choice is a pure function of the
-		/// world state.
-		/// </summary>
+		/// <summary>Preserves the first-Fact enclosure, then plans only the active cluster's open screen.</summary>
 		void PlanNext(ActorInfo wallInfo, BuildingInfo wallBuildingInfo)
 		{
 			ResolveWorldTraits();
@@ -238,57 +217,132 @@ namespace OpenRA.Mods.Common.Traits
 			if (TryPlanConstructionYardEnclosure(wallInfo, wallBuildingInfo))
 				return;
 
-			var targetCell = EnemyDirectionTarget();
-			var maxRun = MaxWallRun(wallInfo);
-			var setback = Info.WallDistanceFromTower.Clamp(1, 8);
-
-			var towers = world.ActorsHavingTrait<Building>()
-				.Where(a => a.Owner == player && a.IsInWorld && !a.IsDead
-					&& Info.WalledDefenseTypes.Contains(a.Info.Name)
-					&& !handledTowers.Contains(a.ActorID))
-				.OrderBy(a => (a.Location - targetCell).LengthSquared)
-				.ThenBy(a => a.ActorID)
-				.Take(MaxTowersPerPass);
-
-			foreach (var tower in towers)
+			var cluster = baseBuilder.DefenseClusterManager;
+			var anchor = cluster?.ActiveAnchor;
+			if (cluster == null || !cluster.Enabled || !cluster.ReadyForWallScreen || anchor == null)
 			{
-				// Whatever happens, don't reconsider this tower: re-running a plan that already failed,
-				// every time the build queue asks for a wall, is not worth the scan.
-				MarkTowerHandled(tower.ActorID);
+				nextPlanTick = world.WorldTick + PlanRetryDelay;
+				return;
+			}
 
-				var facing = BotWallGeometry.DominantDirection(tower.Location, targetCell);
-				var window = BotWallGeometry.LineCells(tower.Location + (facing * setback),
-					BotWallGeometry.Perpendicular(facing), maxRun);
+			var facing = BotWallGeometry.DominantDirection(anchor.Location, cluster.ScreenEnemyLocation);
+			var variants = BotWallGeometry.OpenScreenVariants(anchor.Location, facing,
+				Info.DefenseClusterWallSetback, Info.DefenseClusterWallHalfWidth,
+				Info.DefenseClusterWallFlankDepth);
+			if (clusterScreenAnchorId == anchor.ActorID && variants.Any(lines =>
+				lines.SelectMany(line => line).Distinct().All(HasOwnWall)))
+			{
+				nextPlanTick = world.WorldTick + PlanRetryDelay;
+				return;
+			}
 
-				// Already shielded - the wall we would build is the wall that is already there.
-				if (window.Any(HasOwnWall))
-					continue;
-
-				var line = BotWallGeometry.LongestUsableRun(window,
-					c => CanAnchorAt(c, wallInfo, wallBuildingInfo), MinLineLength);
-
-				if (line.Count == 0)
-					continue;
-
-				if (!KeepsBaseOpen(line))
+			string rejectionReason = null;
+			CPos? rejectionCell = null;
+			List<List<CPos>> acceptedLines = null;
+			List<CPos> planned = null;
+			var attemptedVariants = 0;
+			foreach (var lines in variants)
+			{
+				attemptedVariants++;
+				planned = lines.SelectMany(line => line).Distinct().ToList();
+				if (CanUseClusterScreen(lines, planned, wallInfo, wallBuildingInfo,
+					out rejectionReason, out rejectionCell))
 				{
-					AIUtils.BotDebug("{0} rejected a wall in front of {1} at {2}: it would cut the base off.",
-						player, tower.Info.Name, tower.Location);
-					continue;
+					acceptedLines = lines;
+					break;
 				}
+			}
 
-				// Two anchors however long the line is - LineBuild fills everything between them for free.
-				pendingAnchors.Add(line[0]);
-				pendingAnchors.Add(line[line.Count - 1]);
+			if (acceptedLines == null)
+			{
+				nextPlanTick = world.WorldTick + PlanRetryDelay;
+				if (Game.Settings.Debug.BotDebug)
+					Log.Write("debug", "AI defense cluster: {0} tick={1} rejected screen anchor={2} variants={3} " +
+						"cells={4} reason={5} cell={6} facing={7}", player, world.WorldTick, anchor.ActorID,
+						attemptedVariants, planned?.Count ?? 0, rejectionReason,
+						rejectionCell?.ToString() ?? "none", facing);
+				return;
+			}
+
+			pendingAnchors.Clear();
+			pendingIndividualWallCells.Clear();
+			if (planned.Any(HasOwnWall))
+			{
+				// A partial/reloaded screen has arbitrary existing connectors. Place only the missing
+				// intended cells individually so LineBuild cannot bridge across the inward opening.
+				foreach (var cell in planned.Where(c => !HasOwnWall(c)))
+				{
+					pendingAnchors.Add(cell);
+					pendingIndividualWallCells.Add(cell);
+				}
+			}
+			else
+			{
+				foreach (var placement in BotWallGeometry.OpenScreenPlacements(acceptedLines))
+				{
+					pendingAnchors.Add(placement.Cell);
+					if (!placement.UseLineBuild)
+						pendingIndividualWallCells.Add(placement.Cell);
+				}
+			}
+
+			if (pendingAnchors.Count > 0)
+			{
 				pendingWallType = wallInfo.Name;
-
-				AIUtils.BotDebug("{0} is walling {1} cells in front of {2} at {3}.",
-					player, line.Count, tower.Info.Name, tower.Location);
+				clusterScreenAnchorId = anchor.ActorID;
+				clusterWallCells.UnionWith(planned);
+				if (Game.Settings.Debug.BotDebug)
+					Log.Write("debug", "AI defense cluster: {0} tick={1} planned open-screen anchor={2} cells={3} " +
+						"anchors={4} individual={5} variant={6}/{7}", player, world.WorldTick, anchor.ActorID,
+						planned.Count, pendingAnchors.Count, pendingIndividualWallCells.Count,
+						attemptedVariants, variants.Count);
 				return;
 			}
 
 			// Nothing usable this pass. Don't come back for a while - a failed pass is the expensive one.
 			nextPlanTick = world.WorldTick + PlanRetryDelay;
+		}
+
+		bool CanUseClusterScreen(List<List<CPos>> lines, List<CPos> planned, ActorInfo wallInfo,
+			BuildingInfo wallBuildingInfo, out string rejectionReason, out CPos? rejectionCell)
+		{
+			rejectionReason = null;
+			rejectionCell = null;
+			var maxRun = MaxWallRun(wallInfo);
+			foreach (var line in lines)
+			{
+				if (line.Count > maxRun)
+				{
+					rejectionReason = "line-range";
+					return false;
+				}
+
+				foreach (var cell in line)
+				{
+					if (HasOwnWall(cell))
+						continue;
+
+					if (!world.CanPlaceBuilding(cell, wallInfo, wallBuildingInfo, null))
+					{
+						rejectionReason = "placement";
+						rejectionCell = cell;
+						return false;
+					}
+
+					if (!wallBuildingInfo.IsCloseEnoughToBase(world, player, wallInfo, cell))
+					{
+						rejectionReason = "adjacency";
+						rejectionCell = cell;
+						return false;
+					}
+				}
+			}
+
+			if (KeepsBaseOpen(planned))
+				return true;
+
+			rejectionReason = "access";
+			return false;
 		}
 
 		bool TryPlanConstructionYardEnclosure(ActorInfo wallInfo, BuildingInfo wallBuildingInfo)
@@ -408,16 +462,6 @@ namespace OpenRA.Mods.Common.Traits
 			return lineBuild != null ? lineBuild.Range.Clamp(1, 32) : 1;
 		}
 
-		void MarkTowerHandled(uint actorID)
-		{
-			if (!handledTowers.Add(actorID))
-				return;
-
-			handledTowerOrder.Enqueue(actorID);
-			while (handledTowerOrder.Count > MaxHandledTowers)
-				handledTowers.Remove(handledTowerOrder.Dequeue());
-		}
-
 		bool HasOwnWall(CPos cell)
 		{
 			if (buildingInfluence == null)
@@ -441,10 +485,9 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			var start = FindPathCheckStart(StableBaseCenter());
 
-			// Without a start cell there is nothing to check, so fall back to the structural guarantee
-			// that one straight line cannot enclose anything on its own.
+			// A multi-sided screen has no safe structural fallback when a valid path start cannot be found.
 			if (start == null)
-				return true;
+				return false;
 
 			var planned = new HashSet<CPos>(line);
 			if (planned.Contains(start.Value))
@@ -452,13 +495,14 @@ namespace OpenRA.Mods.Common.Traits
 
 			return BotWallGeometry.CanEscape(start.Value,
 				c => planned.Contains(c) || IsBlocked(c),
-				PathCheckMaxCells,
+				Info.DefenseClusterPathCheckMaximumCells,
 				EscapeDistance);
 		}
 
 		CPos? FindPathCheckStart(CPos around)
 		{
-			foreach (var cell in world.Map.FindTilesInCircle(around, 6))
+			foreach (var cell in world.Map.FindTilesInCircle(around, 6)
+				.OrderByDescending(c => (c - around).LengthSquared).ThenBy(c => c.X).ThenBy(c => c.Y))
 				if (!IsBlocked(cell))
 					return cell;
 
@@ -474,6 +518,66 @@ namespace OpenRA.Mods.Common.Traits
 				return true;
 
 			return buildingInfluence != null && buildingInfluence.AnyBuildingAt(cell);
+		}
+
+		public MiniYamlNode IssueTraitData()
+		{
+			if (!Info.EnableDefenseClusterPolicy)
+				return null;
+
+			return new MiniYamlNode("DefenseClusterWallState", new MiniYaml("", new List<MiniYamlNode>
+			{
+				new MiniYamlNode("PendingWallType", FieldSaver.FormatValue(pendingWallType ?? "")),
+				new MiniYamlNode("PendingAnchors", FieldSaver.FormatValue(pendingAnchors.ToArray())),
+				new MiniYamlNode("PendingIndividualWallCells", FieldSaver.FormatValue(pendingIndividualWallCells
+					.OrderBy(c => c.X).ThenBy(c => c.Y).ToArray())),
+				new MiniYamlNode("ClusterScreenAnchorId", FieldSaver.FormatValue(clusterScreenAnchorId)),
+				new MiniYamlNode("ClusterWallCells", FieldSaver.FormatValue(clusterWallCells
+					.OrderBy(c => c.X).ThenBy(c => c.Y).ToArray())),
+				new MiniYamlNode("NextPlanTick", FieldSaver.FormatValue(nextPlanTick))
+			}));
+		}
+
+		public void ResolveTraitData(List<MiniYamlNode> data)
+		{
+			if (!Info.EnableDefenseClusterPolicy)
+				return;
+
+			var state = data.FirstOrDefault(n => n.Key == "DefenseClusterWallState");
+			if (state == null)
+				return;
+
+			try
+			{
+				var nodes = state.Value.Nodes;
+				pendingWallType = Read(nodes, "PendingWallType", "");
+				pendingAnchors.Clear();
+				pendingAnchors.AddRange(Read(nodes, "PendingAnchors", System.Array.Empty<CPos>()));
+				pendingIndividualWallCells.Clear();
+				pendingIndividualWallCells.UnionWith(Read(nodes, "PendingIndividualWallCells",
+					System.Array.Empty<CPos>()));
+				clusterScreenAnchorId = Read<uint>(nodes, "ClusterScreenAnchorId", 0);
+				clusterWallCells.Clear();
+				clusterWallCells.UnionWith(Read(nodes, "ClusterWallCells", System.Array.Empty<CPos>()));
+				nextPlanTick = Read<int>(nodes, "NextPlanTick", world.WorldTick);
+			}
+			catch (System.Exception ex)
+			{
+				pendingWallType = null;
+				pendingAnchors.Clear();
+				pendingIndividualWallCells.Clear();
+				clusterScreenAnchorId = 0;
+				clusterWallCells.Clear();
+				if (Game.Settings.Debug.BotDebug)
+					Log.Write("debug", "AI defense cluster: {0} tick={1} invalid wall save type={2} message={3}; reconstructing",
+						player, world.WorldTick, ex.GetType().Name, ex.Message);
+			}
+		}
+
+		static T Read<T>(List<MiniYamlNode> nodes, string key, T fallback)
+		{
+			var node = nodes.FirstOrDefault(n => n.Key == key);
+			return node == null ? fallback : FieldLoader.GetValue<T>(key, node.Value.Value);
 		}
 	}
 }
