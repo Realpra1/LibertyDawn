@@ -1,7 +1,7 @@
 # Coordinated CNC State
 
 - Round ID: `20260807-bug-polish-03`
-- Phase: `integration startup diagnosis; CNC-47 withdrawn/excluded`
+- Phase: `valid integration cycle 1 pending; startup blocker repaired; CNC-47 withdrawn/excluded`
 - Common base branch: `agent/cnc-20260807-bug-polish-02-release`
 - Common base SHA: `468ee64f5a0f9a9e19e260e5c5943e6e878f4705`
 - Coordinator model: `gpt-5.6-luna` / `medium`; delegated cycle tiers are pinned
@@ -30,7 +30,7 @@
 
 ## Release rounds
 
-| RC1 | `37ede3f9303191cbeec228518479061f715fcb32` | CNC-45, CNC-46, CNC-50, CNC-52 | startup diagnosis in progress | `make check`, `make test` passed; CI pending | `0/5 valid` | prior base/RC1 launches stalled before tick 1 loading `cnc/modcontent`; invalid launches did not consume integration cycles; Sol-medium escalation authorized |
+| RC1 | `37ede3f9303191cbeec228518479061f715fcb32` | CNC-45, CNC-46, CNC-50, CNC-52 | startup setup repaired; Terra cycle 1 pending | `make check`, `make test` passed; corrected RC1 reached ticks 1,000 and 3,000 | `0/5 valid` | use canonical launcher with `--content /root/github/LibertyDawn/.build/cnc33a/runtime-content`; prior invalid launches consumed no cycles |
 |---|---|---|---|---|---|---|
 
 ## Resume note
@@ -193,3 +193,17 @@ failure is currently classified as a common host/engine startup blocker, not an
 RC1 task regression. A Sol-medium escalation must reproduce a genuinely known-good
 historical launch, add bounded startup-stage diagnostics around mod loading, and
 identify or repair the failure before valid combined testing resumes.
+
+Startup escalation result (2026-08-12): Sol-medium worker proved the integration
+launches omitted the canonical harness's required `SupportDir/Content` link. This
+caused CNC's intentional missing-content fallback into the interactive
+`modcontent` installer, which waits under headless rendering. With
+`--content /root/github/LibertyDawn/.build/cnc33a/runtime-content`, exact RC1
+reached tick 1,000 and two concurrent full-engine smokes reached tick 3,000.
+Opt-in bounded startup-stage diagnostics are committed on isolated branch
+`agent/round-20260807-startup-diagnostic` at `48c679f2c700`; evidence is in
+`AUTONOMOUS-CNC-LOGS/20260807-bug-polish-03/startup-diagnostic/RESULT.md`.
+The four isolated tasks had substantial valid gameplay evidence (conservative
+artifact counts CNC-45 30, CNC-46 61, CNC-50 75, CNC-52 33); only later manual
+integration setup was invalid. Begin valid integration cycle 1 with Terra medium
+and the normal worker launcher/preflight.
