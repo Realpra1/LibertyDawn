@@ -17,6 +17,16 @@ namespace OpenRA.Test.Mods.Common
 	[TestFixture]
 	public sealed class CrateExplorationPolicyTest
 	{
+		[TestCase(false, false, true)]
+		[TestCase(false, true, true)]
+		[TestCase(true, false, true)]
+		[TestCase(true, true, false)]
+		public void ConfiguredConstructionGateControlsCrateCollection(bool requireMissingMcv,
+			bool hasMcv, bool expected)
+		{
+			Assert.That(CrateExplorationPolicy.CanCollectCrates(requireMissingMcv, hasMcv), Is.EqualTo(expected));
+		}
+
 		[TestCase(0, true, 0, true)]
 		[TestCase(1, true, 0, false)]
 		[TestCase(5000, false, 0, true)]

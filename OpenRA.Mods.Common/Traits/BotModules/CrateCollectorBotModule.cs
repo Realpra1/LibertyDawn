@@ -34,6 +34,12 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Maximum simultaneous exploration assignments outside emergency recovery.")]
 		public readonly int NormalScoutLimit = 10;
 
+		[Desc("Whether this personality may assign collectors to stale or unexplored map regions.")]
+		public readonly bool EnableRegionExploration = true;
+
+		[Desc("Only collect crates after all configured MCV/construction-yard forms are absent.")]
+		public readonly bool RequireMissingMcvForCrates = false;
+
 		[ActorReference(dictionaryReference: LintDictionaryReference.Keys)]
 		[Desc("Ordinary explorer actor priorities. Higher values are preferred; unlisted actors are not used.")]
 		public readonly Dictionary<string, int> NormalScoutActorPriorities = new Dictionary<string, int>();
@@ -72,8 +78,8 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			base.RulesetLoaded(rules, ai);
 			if (ScanInterval <= 0 || InitialScanDelay <= 0 || CoarseCellSize <= 0 || MaximumRegionCandidates <= 0 ||
-				NormalScoutLimit <= 0 || NormalScoutActorPriorities.Count == 0 ||
-				NormalScoutActorPriorities.Any(kv => kv.Value <= 0) ||
+				(EnableRegionExploration && (NormalScoutLimit <= 0 || NormalScoutActorPriorities.Count == 0)) ||
+				NormalScoutLimit < 0 || NormalScoutActorPriorities.Any(kv => kv.Value <= 0) ||
 				AssignmentStallInterval < ScanInterval || EmergencyCashThreshold < 0 ||
 				EmergencySellInterval <= 0 || MinimumCollectorHealthPercent <= 0 ||
 				MinimumCollectorHealthPercent > 100 || string.IsNullOrEmpty(CrateCrushClass))
@@ -138,7 +144,9 @@ namespace OpenRA.Mods.Common.Traits
 			transportReservations = self.Owner.PlayerActor.TraitsImplementing<IBotTransportReservations>().ToArray();
 			squadManager = self.Owner.PlayerActor.TraitsImplementing<SquadManagerBotModule>()
 				.FirstOrDefault(m => !m.IsTraitDisabled);
-			BuildRegions();
+			if (Info.EnableRegionExploration)
+				BuildRegions();
+
 			base.Created(self);
 		}
 
@@ -158,7 +166,7 @@ namespace OpenRA.Mods.Common.Traits
 		bool IBotUnitReservations.IsUnitReserved(Actor actor)
 		{
 			return actor != null && (assignments.ContainsKey(actor.ActorID) ||
-				(initialScanPending && IsSuitableCollector(actor)));
+				(initialScanPending && Info.EnableRegionExploration && IsSuitableCollector(actor)));
 		}
 
 		// Specialist modules may outrank provisional ordinary exploration while still respecting
@@ -178,13 +186,18 @@ namespace OpenRA.Mods.Common.Traits
 				squadManager = player.PlayerActor.TraitsImplementing<SquadManagerBotModule>()
 					.FirstOrDefault(m => !m.IsTraitDisabled);
 
-			RefreshRegionVisibility();
-			var emergency = IsEmergency();
-			var temporarilyBlocked = ReviewAssignments(emergency);
-			if (!emergency)
+			if (Info.EnableRegionExploration)
+				RefreshRegionVisibility();
+
+			var hasMcv = HasConstructionCapability();
+			var emergency = IsEmergency(hasMcv);
+			var canCollectCrates = CrateExplorationPolicy.CanCollectCrates(
+				Info.RequireMissingMcvForCrates, hasMcv);
+			var temporarilyBlocked = ReviewAssignments(bot, emergency, canCollectCrates);
+			if (Info.EnableRegionExploration && !emergency)
 				TrimNormalScoutAssignments();
 
-			var visibleCrates = VisibleCrates();
+			var visibleCrates = canCollectCrates ? VisibleCrates() : new List<Actor>();
 
 			if (emergency && visibleCrates.Any(c => !assignments.Values.Any(a =>
 				a.Kind == AssignmentKind.Crate && a.TargetActorId == c.ActorID)))
@@ -197,13 +210,16 @@ namespace OpenRA.Mods.Common.Traits
 			AssignVisibleCrates(bot, visibleCrates, collectors);
 
 			collectors.RemoveAll(a => assignments.ContainsKey(a.ActorID));
-			var scoutLimit = emergency ? int.MaxValue : Math.Max(0, Info.NormalScoutLimit - ScoutAssignmentCount());
-			var scoutCandidates = emergency ? collectors.OrderBy(a => a.ActorID).ToList() :
-				CrateExplorationPolicy.SelectNormalScoutCandidates(collectors.Select(a => a.Info.Name).ToList(),
-					Info.NormalScoutActorPriorities, collectors.Count).Select(i => collectors[i]).ToList();
-			AssignScouts(bot, scoutCandidates, scoutLimit, emergency);
+			if (Info.EnableRegionExploration)
+			{
+				var scoutLimit = emergency ? int.MaxValue : Math.Max(0, Info.NormalScoutLimit - ScoutAssignmentCount());
+				var scoutCandidates = emergency ? collectors.OrderBy(a => a.ActorID).ToList() :
+					CrateExplorationPolicy.SelectNormalScoutCandidates(collectors.Select(a => a.Info.Name).ToList(),
+						Info.NormalScoutActorPriorities, collectors.Count).Select(i => collectors[i]).ToList();
+				AssignScouts(bot, scoutCandidates, scoutLimit, emergency);
+			}
 
-			if (emergency && !world.Actors.Any(IsPotentialCollector))
+			if (Info.EnableRegionExploration && emergency && !world.Actors.Any(IsPotentialCollector))
 				TryEmergencySale(bot);
 
 			var otherReserved = 0;
@@ -219,8 +235,9 @@ namespace OpenRA.Mods.Common.Traits
 						otherReserved++;
 				}
 
-			Debug("scan emergency={0} visible-crates={1} assignments={2} scouts={3}/{4} collectors={5} cursor={6} other-reserved={7} cargo={8}",
-				emergency, visibleCrates.Count, assignments.Count, ScoutAssignmentCount(),
+			Debug("scan emergency={0} has-mcv={1} crates-allowed={2} regions-allowed={3} visible-crates={4} assignments={5} scouts={6}/{7} collectors={8} cursor={9} other-reserved={10} cargo={11}",
+				emergency, hasMcv, canCollectCrates, Info.EnableRegionExploration, visibleCrates.Count,
+				assignments.Count, ScoutAssignmentCount(),
 				emergency ? -1 : Info.NormalScoutLimit, collectors.Count, coverageCursor,
 				otherReserved, loadedOrBoarding);
 			initialScanPending = false;
@@ -281,15 +298,19 @@ namespace OpenRA.Mods.Common.Traits
 					lastVisibleTicks[i] = world.WorldTick;
 		}
 
-		bool IsEmergency()
+		bool HasConstructionCapability()
+		{
+			return world.Actors.Any(a => a.Owner == player && a.IsInWorld && !a.IsDead &&
+				Info.McvTypes.Contains(a.Info.Name));
+		}
+
+		bool IsEmergency(bool hasMcv)
 		{
 			var spendable = resources != null ? resources.Cash + resources.Resources : 0;
-			var hasMcv = world.Actors.Any(a => a.Owner == player && a.IsInWorld && !a.IsDead &&
-				Info.McvTypes.Contains(a.Info.Name));
 			return CrateExplorationPolicy.IsEmergency(spendable, hasMcv, Info.EmergencyCashThreshold);
 		}
 
-		HashSet<uint> ReviewAssignments(bool emergency)
+		HashSet<uint> ReviewAssignments(IBot bot, bool emergency, bool canCollectCrates)
 		{
 			var temporarilyBlocked = new HashSet<uint>();
 			foreach (var unitId in assignments.Keys.OrderBy(id => id).ToList())
@@ -301,10 +322,13 @@ namespace OpenRA.Mods.Common.Traits
 					releaseReason = "collector unavailable";
 				else if (assignment.Kind == AssignmentKind.Crate)
 				{
-					var crate = world.GetActorById(assignment.TargetActorId);
-					if (!IsVisibleCrate(crate))
+					if (!canCollectCrates)
+						releaseReason = "construction capability restored";
+					else if (!IsVisibleCrate(world.GetActorById(assignment.TargetActorId)))
 						releaseReason = "crate gone or hidden";
 				}
+				else if (!Info.EnableRegionExploration)
+					releaseReason = "region exploration disabled";
 				else if (!emergency && !IsNormalScout(unit))
 					releaseReason = "not eligible for ordinary exploration";
 				else if (assignment.RegionIndex < 0 || assignment.RegionIndex >= regions.Count ||
@@ -328,7 +352,13 @@ namespace OpenRA.Mods.Common.Traits
 				}
 
 				if (!string.IsNullOrEmpty(releaseReason))
+				{
+					if (unit != null && ((assignment.Kind == AssignmentKind.Crate && !canCollectCrates) ||
+						(assignment.Kind == AssignmentKind.Scout && !Info.EnableRegionExploration)))
+						bot.QueueOrder(new Order("Stop", unit, false));
+
 					ReleaseAssignment(unitId, releaseReason);
+				}
 			}
 
 			return temporarilyBlocked;
