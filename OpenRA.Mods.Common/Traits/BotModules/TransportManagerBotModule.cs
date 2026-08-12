@@ -419,9 +419,11 @@ namespace OpenRA.Mods.Common.Traits
 					continue;
 				}
 
-				if (!mission.Returning && mission.Stage != MissionStage.Handoff && world.WorldTick > mission.DeadlineTick)
+				if (!mission.Returning && world.WorldTick > mission.DeadlineTick)
 				{
-					if (cargo.IsEmpty())
+					if (mission.Stage == MissionStage.Handoff)
+						FinishMission(i, "capture handoff timed out");
+					else if (cargo.IsEmpty())
 						FinishMission(i, "timed out before pickup");
 					else
 						RecoverTimedOutCargo(mission);
@@ -450,7 +452,7 @@ namespace OpenRA.Mods.Common.Traits
 						FinishMission(i, mission.Returning ? "safe recovery unload complete" : "rescue complete");
 					}
 					else
-						mission.Stage = MissionStage.Handoff;
+						BeginObjectiveHandoff(mission);
 				}
 				else if (mission.Stage == MissionStage.Handoff)
 					AdvanceObjectiveHandoff(mission, i);
@@ -754,6 +756,16 @@ namespace OpenRA.Mods.Common.Traits
 			}
 			else
 				bot.QueueOrder(new Order("Move", mission.Passenger, Target.FromCell(world, mission.Destination), false));
+		}
+
+		void BeginObjectiveHandoff(Mission mission)
+		{
+			mission.Stage = MissionStage.Handoff;
+			// The unload/cargo transition can defer order delivery by a scan. Keep the strategic
+			// claim through that narrow gap, but never let a rejected CaptureActor strand it.
+			mission.DeadlineTick = world.WorldTick + Math.Max(Info.ScanInterval, Info.LandingReplanInterval) * 3;
+			Debug("mission {0} capture handoff began at tick {1}: deadline={2} passenger={3} target={4}",
+				mission.Id, world.WorldTick, mission.DeadlineTick, mission.Passenger, mission.Objective);
 		}
 
 		void AdvanceObjectiveHandoff(Mission mission, int index)
