@@ -1,7 +1,7 @@
 # Coordinated CNC State
 
 - Round ID: `20260807-bug-polish-03`
-- Phase: `paused by user before coordinator workflow update; no role processes active`
+- Phase: `blocked after five integration cycles; CNC-47 withdrawn/excluded`
 - Common base branch: `agent/cnc-20260807-bug-polish-02-release`
 - Common base SHA: `468ee64f5a0f9a9e19e260e5c5943e6e878f4705`
 - Coordinator model: `gpt-5.6-luna` / `medium`; delegated cycle tiers are pinned
@@ -15,22 +15,22 @@
 - Prior release: [product PR #90](https://github.com/Realpra1/LibertyDawn/pull/90)
   at final task-status head `468ee64f5a0f`; merged by the user into `bleed` at
   2026-08-07 18:20:52 UTC after 2× Linux/2× Windows CI passed
-- Release candidate: `none`
-- Release PR: `none`
+- Release candidate: `RC1` / `37ede3f9303191cbeec228518479061f715fcb32`
+- Release PR: [#99](https://github.com/Realpra1/LibertyDawn/pull/99) (draft, mergeable; CI pending)
 
 ## Workers
 
 | Worker | Task | Branch | Worktree | State | Process/result | PR | Review | Integrated status |
 |---|---|---|---|---|---|---|---|---|
-| 1 | CNC-45 Economy troop production/use | `agent/round-20260807-cnc45-economy-troop-use` | `.worktrees/coordinated-cnc/20260807-bug-polish-03/workers/worker-1-cnc45` | assignment `92edf1f42a`; no prerequisite; preserve CNC-43/CNC-36 ownership surfaces | `roles/worker-1-resume-1/process.json` running PID `1032810` | | | |
-| 2 | CNC-46 Defense clusters | `agent/round-20260807-cnc46-defense-clusters` | `.worktrees/coordinated-cnc/20260807-bug-polish-03/workers/worker-2-cnc46` | assignment `1cea87332d`; preserve CNC-52 enclosure ownership and keep CNC-91 sparse towers subordinate | `roles/worker-2-resume-1/process.json` running PID `1032812` | | | |
+| 1 | CNC-45 Economy troop production/use | `agent/round-20260807-cnc45-economy-troop-use` | `.worktrees/coordinated-cnc/20260807-bug-polish-03/workers/worker-1-cnc45` | assignment `92edf1f42a`; no prerequisite; preserve CNC-43/CNC-36 ownership surfaces | `roles/worker-1-resume-1/process.json` complete exit 0 | | pending Terra review | |
+| 2 | CNC-46 Defense clusters | `agent/round-20260807-cnc46-defense-clusters` | `.worktrees/coordinated-cnc/20260807-bug-polish-03/workers/worker-2-cnc46` | assignment `1cea87332d`; preserve CNC-52 enclosure ownership and keep CNC-91 sparse towers subordinate | `roles/worker-2-resume-1/process.json` complete exit 0 | | pending Terra review | |
 | 3 | CNC-47 Repeatable performance baseline | `agent/round-20260807-cnc47-repeatable-performance-baseline` | `.worktrees/coordinated-cnc/20260807-bug-polish-03/workers/worker-3-cnc47` | withdrawn by user as poorly defined; head `e9a70b7adb8c`; never integrate | `roles/worker-3-resume-1/process.json` complete exit 0; process absent | [closed draft PR #95](https://github.com/Realpra1/LibertyDawn/pull/95) | not applicable | excluded |
-| 4 | CNC-50 Late-game engineer stall recovery | `agent/round-20260807-cnc50-engineer-stall-recovery` | `.worktrees/coordinated-cnc/20260807-bug-polish-03/workers/worker-4-cnc50` | assignment `49c24d7d29`; preserve CNC-39/CNC-39A; CNC-59 out of scope; named manual evidence absent but non-blocking | `roles/worker-4-resume-1/process.json` running PID `1032864` | | | |
-| 5 | CNC-52 Starting-Fact wall hole prevention/repair | `agent/round-20260807-cnc52-first-fact-wall-holes` | `.worktrees/coordinated-cnc/20260807-bug-polish-03/workers/worker-5-cnc52` | assignment `d32362502b`; first-Fact maintenance before tick 7,500; CNC-46 owns general wall self-blocking/selling | `roles/worker-5-resume-1/process.json` running PID `1032916` | | | |
+| 4 | CNC-50 Late-game engineer stall recovery | `agent/round-20260807-cnc50-engineer-stall-recovery` | `.worktrees/coordinated-cnc/20260807-bug-polish-03/workers/worker-4-cnc50` | assignment `49c24d7d29`; preserve CNC-39/CNC-39A; CNC-59 out of scope; named manual evidence absent but non-blocking | `roles/worker-4-resume-1/process.json` complete exit 0 | | pending Terra review | |
+| 5 | CNC-52 Starting-Fact wall hole prevention/repair | `agent/round-20260807-cnc52-first-fact-wall-holes` | `.worktrees/coordinated-cnc/20260807-bug-polish-03/workers/worker-5-cnc52` | assignment `d32362502b`; first-Fact maintenance before tick 7,500; CNC-46 owns general wall self-blocking/selling | `roles/worker-5-resume-1/process.json` complete exit 0 | | pending Terra review | |
 
 ## Release rounds
 
-| RC | Head | Included heads | Repair heads | Build/checks | Integrated tests | Result |
+| RC1 | `37ede3f9303191cbeec228518479061f715fcb32` | CNC-45, CNC-46, CNC-50, CNC-52 | none | `make check`, `make test` passed; CI pending | `5/5` | blocked: PR #90 base and RC1 both stall at tick 0 loading `cnc/modcontent`; awaiting host/engine environment help |
 |---|---|---|---|---|---|---|
 
 ## Resume note
@@ -160,11 +160,11 @@ head `e9a70b7adb8c` is excluded from integration, and Task Maker commit
 task was selected into the active Round 03 batch.
 
 Coordinator pause (2026-08-12): the user requested that the normal coordinator
-process not run until its workflow is updated. All five recorded external worker
+process not run until its workflow was updated. All five recorded external worker
 and supervisor processes were already complete/absent; no game/build child was
-running. A newly launched read-only CNC-47 audit was interrupted. Do not launch
-reviews, integration, replacement tasks, or a new round until the user supplies
-and approves the coordinator update.
+running. A newly launched read-only CNC-47 audit was interrupted. The user has
+now approved resumption; continue this release from individual task-PR review,
+excluding CNC-47, before starting any new round.
 
 CNC-47 closure audit findings and potentially reusable benchmarking references
 were moved to `DEFERRED_WORK.md`. Normal coordinator work remains paused.
@@ -182,3 +182,11 @@ medium. Integrated testing/fixing is capped at five release-wide cycles.
 Code-review refinement (2026-08-12): the advisory checkpoint now runs after
 cycle 3 with Luna medium. Individual task-PR and final integrated-release reviews
 both use Terra medium.
+
+Integration result (2026-08-12): RC1 completed all five bounded integration
+diagnosis cycles. Exact PR #90 base and RC1 matched startup tests both stalled
+before world tick 0 while loading `cnc/modcontent`, with no gameplay artifacts.
+All recorded OpenRA/Xvfb/launcher/Mono/dotnet processes were cleaned. The
+failure is classified as a common host/engine startup blocker, not an RC1 task
+regression. Do not start a new coordinator round until the environment is fixed
+and this release receives valid combined full-engine evidence.
