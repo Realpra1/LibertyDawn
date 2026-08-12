@@ -104,6 +104,21 @@ use the external role launcher with its durable packet/state. Do not leave a
 development slot idle while an eligible packet, worker cycle, or game test is
 ready.
 
+For every coordinator status receipt, report all five selected task streams
+individually, including each task's model/role, current phase, build or game
+wait, active test, analysis/review, completion, blocker, and next action. Do not
+omit a task because it is waiting for a resource or has already completed its
+cycle.
+
+Every two minutes during concurrent development, perform a lightweight progress
+audit of each active role's process record, child game/build state, durable state
+timestamp, and latest output. A build, bounded game, or required analysis that is
+still advancing is healthy and must not be interrupted. If a role has no live
+child, no durable output movement, and no declared wait for two consecutive
+audits, send a checkpoint request; safely relaunch or escalate only after the
+role's exact assignment and process evidence show it is stalled. Never kill a
+healthy game merely because its parent agent is quiet.
+
 ## Development-cycle contract
 
 A worker invocation performs exactly one code-change/test cycle, updates durable
