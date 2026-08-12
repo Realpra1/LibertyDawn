@@ -1063,6 +1063,11 @@ namespace OpenRA.Mods.Common.Traits
 			if (unitCannotBeOrdered(specialist) && !captureTransportActive)
 				return "specialist-lost";
 
+			// Cargo is briefly removed from the world while an unload frame-end task completes.
+			// The active objective transport remains the exact reservation owner during that handoff.
+			if (!specialist.IsInWorld && captureTransportActive)
+				return null;
+
 			var ownedRestoration = purpose == SpecialistAssignmentPurpose.Capture &&
 				IsOwnedRestorableHuskTarget(target, specialist);
 			if (target.Owner == player && !ownedRestoration)

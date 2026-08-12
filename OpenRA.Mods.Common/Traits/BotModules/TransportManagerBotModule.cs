@@ -144,7 +144,7 @@ namespace OpenRA.Mods.Common.Traits
 		IBotEnabled, IBotTick, IBotTransportReservations, IBotUnitReservations,
 		IBotTransportObjectiveService, IBotRespondToAttack
 	{
-		enum MissionStage { Gathering, Travelling, Unloading }
+		enum MissionStage { Gathering, Travelling, Unloading, Handoff }
 
 		sealed class Mission
 		{
@@ -157,6 +157,7 @@ namespace OpenRA.Mods.Common.Traits
 			public int DeadlineTick;
 			public MissionStage Stage;
 			public int LastOrderTick;
+			public bool CaptureHandoffQueued;
 			public int PlanFailureTick;
 			public int LastRoutedPlanRevision;
 			public TransportUnloadPlan UnloadPlan;
@@ -418,7 +419,7 @@ namespace OpenRA.Mods.Common.Traits
 					continue;
 				}
 
-				if (!mission.Returning && world.WorldTick > mission.DeadlineTick)
+				if (!mission.Returning && mission.Stage != MissionStage.Handoff && world.WorldTick > mission.DeadlineTick)
 				{
 					if (cargo.IsEmpty())
 						FinishMission(i, "timed out before pickup");
@@ -438,14 +439,21 @@ namespace OpenRA.Mods.Common.Traits
 					AdvanceGathering(mission, cargo, i);
 				else if (mission.Stage == MissionStage.Travelling)
 					AdvanceTravel(mission);
-				else if (cargo.IsEmpty())
+				else if (cargo.IsEmpty() && mission.Stage != MissionStage.Handoff)
 				{
-					Debug("mission {0} physical handoff: passenger={1} cell={2} cargo=0 objective={3} outcome={4}",
-						mission.Id, mission.Passenger, mission.Passenger.Location, mission.Destination,
+					Debug("mission {0} physical handoff tick={1}: passenger={2} cell={3} cargo=0 objective={4} outcome={5}",
+						mission.Id, world.WorldTick, mission.Passenger, mission.Passenger.Location, mission.Destination,
 						mission.Returning ? "safe-recovery" : "useful-rescue");
-					QueueObjectiveHandoff(mission);
-					FinishMission(i, mission.Returning ? "safe recovery unload complete" : "rescue complete");
+					if (mission.Objective == null)
+					{
+						QueueObjectiveHandoff(mission);
+						FinishMission(i, mission.Returning ? "safe recovery unload complete" : "rescue complete");
+					}
+					else
+						mission.Stage = MissionStage.Handoff;
 				}
+				else if (mission.Stage == MissionStage.Handoff)
+					AdvanceObjectiveHandoff(mission, i);
 				else if (!EnsureUnloadPlan(mission, mission.UnloadPlan?.Objective ??
 					mission.RecoveryObjective ?? mission.Destination, out var reason))
 					HandlePlanFailure(mission, reason);
@@ -741,11 +749,52 @@ namespace OpenRA.Mods.Common.Traits
 			if (mission.Objective != null && !mission.Objective.IsDead && mission.Objective.IsInWorld)
 			{
 				bot.QueueOrder(new Order("CaptureActor", mission.Passenger, Target.FromActor(mission.Objective), false));
-				Debug("mission {0} handed off capture passenger={1} target={2}",
-					mission.Id, mission.Passenger, mission.Objective);
+				Debug("mission {0} handed off capture tick={1} passenger={2} target={3}",
+					mission.Id, world.WorldTick, mission.Passenger, mission.Objective);
 			}
 			else
 				bot.QueueOrder(new Order("Move", mission.Passenger, Target.FromCell(world, mission.Destination), false));
+		}
+
+		void AdvanceObjectiveHandoff(Mission mission, int index)
+		{
+			if (mission.Objective == null || mission.Objective.IsDead || !mission.Objective.IsInWorld)
+			{
+				FinishMission(index, "objective removed after unload");
+				return;
+			}
+
+			var passenger = mission.Passenger.TraitOrDefault<Passenger>();
+			if (!mission.Passenger.IsInWorld || passenger?.Transport != null || HasRideTransportActivity(mission.Passenger))
+				return;
+
+			if (!mission.CaptureHandoffQueued)
+			{
+				QueueObjectiveHandoff(mission);
+				mission.CaptureHandoffQueued = true;
+				Debug("mission {0} capture handoff queued at tick {1}: passenger={2} target={3}",
+					mission.Id, world.WorldTick, mission.Passenger, mission.Objective);
+				return;
+			}
+
+			if (!HasCaptureActivity(mission.Passenger))
+				return;
+
+			Debug("mission {0} capture handoff active at tick {1}: passenger={2} target={3}",
+				mission.Id, world.WorldTick, mission.Passenger, mission.Objective);
+			FinishMission(index, "capture handoff active");
+		}
+
+		static bool HasRideTransportActivity(Actor actor)
+		{
+			return actor.CurrentActivity != null && actor.CurrentActivity
+				.ActivitiesImplementing<Activities.RideTransport>().Any();
+		}
+
+		static bool HasCaptureActivity(Actor actor)
+		{
+			return actor.CurrentActivity != null && actor.CurrentActivity
+				.ActivitiesImplementing<Activities.CaptureActor>().Any();
 		}
 
 		void ParkTerminalPlan(Mission mission, string reason)
