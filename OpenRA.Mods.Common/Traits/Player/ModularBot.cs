@@ -106,7 +106,8 @@ namespace OpenRA.Mods.Common.Traits
 							finally
 							{
 								var elapsed = 1000.0 * Math.Max(0, Stopwatch.GetTimestamp() - start) / Stopwatch.Frequency;
-								Game.RecordBotModuleSample(player.ClientIndex, t.GetType().Name, elapsed, orders.Count - queuedOrders);
+								var identity = (t as IBotPerformanceIdentity)?.PerformanceIdentity ?? t.GetType().Name;
+								Game.RecordBotModuleSample(player.ClientIndex, identity, elapsed, orders.Count - queuedOrders);
 							}
 						}
 				});

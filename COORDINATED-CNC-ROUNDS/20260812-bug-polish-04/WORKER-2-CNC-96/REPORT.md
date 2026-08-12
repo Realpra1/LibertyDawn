@@ -445,3 +445,81 @@ exactly one cycle. It should retain the restored normal field path and test only
 an exact-decision, scan-local Stealth attribution or bounded snapshot candidate;
 do not revive simple idle guards or change cadence, candidate bounds, policy,
 balance, coverage, modules, or actor workload.
+
+# CNC-96 explicit Sol-high continuation cycle 9 report
+
+## Result
+
+Cycle 9 tested the authorized scan-local Stealth threat optimization and did
+not retain it as normal behavior. A first combined immutable-feature plus
+cell-danger memoization candidate materially reduced specialist time but changed
+orders and terminal workload; the cell cache was removed immediately. The final
+candidate captures only target types and positions once inside the same
+synchronous 75-tick scan. It also failed the exact-decision/workload gate, so
+`UseScanLocalThreatSnapshot` is diagnostic-only and defaults false. The false
+path avoids even the extra snapshot reads. Normal targeting, scoring, danger,
+routing, order, candidate, cadence, strategy, and balance behavior remains on
+the old path.
+
+Benchmark attribution now gives duplicate module instances stable identities,
+separating `StealthTankSquadBotModule/stealth-tank` from `/chemical`. This is
+opt-in benchmark output only and does not affect normal order execution. No
+Economy field-defense behavior changed.
+
+## Equivalence gate and final games
+
+The pre-change gate is recorded in ignored artifact `cycle-9/GAME-PLAN.md`:
+unchanged 75-tick cadence and 2,200 calls per player/instance, actor-ID enemy
+ordering, all threats and 48 candidate bounds, exact scores/danger/routes/orders,
+no new urgent path or save state, deterministic scan-local lifetime, and full
+ordinary AI workload. Both final games used the exact cycle-8 pressured terrain
+and Lua, two ordinary Nod Brutalis bots, 12 harvesters plus 288 other mobile
+actors and structures per side, all modules/features, seed `9609`, MAX speed,
+tick 2200, staged content `/root/github/LibertyDawn/.build/cnc33a/runtime-content`,
+`taskset -c 0` from allowed CPUs `0-3`, and both game slots held serially. The
+snapshot archive SHA-256 is
+`30a2641d03e90479138a3befe9687df722d5c78db57e3edbddae5302eabe3465`;
+the old-path control is
+`18bda695a0ae92452b5f5d5c47d444e87b530a226a226d063cb81dd8036853a3`.
+Only title and the explicit true/false overrides for both specialist instances
+differ.
+
+| Gate | Snapshot enabled | Old threat-read control | Disposition |
+|---|---|---|---|
+| Calls/cadence | 2,200 calls per player per labeled instance; 75-tick scans | Identical | Pass |
+| Chemical work/orders | P1 `5.811ms/0`; P2 `6.860ms/0` | `6.367ms/0`; `6.727ms/0` | Parity |
+| Stealth work/orders | P1 `4681.447ms/1163`; P2 `8692.744ms/1657` | `5032.091ms/1081`; `5203.383ms/1097` | Fail: decisions/workload diverged |
+| Field work/orders | P1 `58.111ms/46`; P2 `162.644ms/62` | `80.289ms/40`; `109.145ms/57` | Fail: downstream fields diverged |
+| Squad Manager orders | P1/P2 `3645/3291` | `3247/3125` | Fail: downstream combat diverged |
+| Completed ticks | mean/p50/p95/p99/max `15.886/9/17/131/1540.074ms`; 37 freezes | `13.894/8/16/115/3088.200ms`; 36 freezes | Fail: lower max only; mean/p99/count worse |
+| Terminal load | 574 actors, 128 effects; allocated `5,477,846,328`; GC `654/134/14` | 495 actors, 102 effects; `5,141,815,360`; GC `614/113/14` | Fail: not equivalent |
+
+Both canonical runs passed all required map/bot/field/replacement/world-tick
+markers at tick 2200 without exception, desync, simple-idle, or forbidden-
+occupancy markers and stayed below 39 wall seconds. Final artifacts are
+`cycle-9/game-1-final/` and `cycle-9/game-2-final/`. The earlier combined-cache
+pair is retained as rejected diagnostic evidence only. Repeating the old path
+also varied materially across attempts (including specialist orders and
+terminal actors), so the scenario cannot establish exact decision equivalence
+from aggregate totals alone. No tail improvement or product fix is claimed.
+
+## Review disposition and checks
+
+Each final game received its own isolated fresh Luna Commenter and Policy
+Reviewer at `cycle-9/game-{1,2}-final-analysis/`. Reviewers found the logged
+mixed 1-tank/2-infantry/1-AA screens, same-role replacement, stance restoration,
+and no-safe-route release sensible. They also found the intended scripted
+attack/loss/block events unverified because the scenario emits no captured
+runtime acknowledgement or combat/loss trace; headless artifacts cannot prove
+player-visible continuity. Their highest-priority recommendation is adopted for
+cycle 10: add bounded deterministic scenario acknowledgements and an exact
+target/route/order decision trace before retesting a candidate. Suggestions to
+change cadence, policy, composition, coverage, or balance remain rejected as
+out of scope. No scratchpad promotion was warranted.
+
+Protected Release `make all` passed after the final default-off cleanup with
+zero warnings/errors; `python3 -m unittest tests/test_launch_ai_parallel.py`
+passed 5/5; `git diff --check` passed. CNC-100 remains at `886519f69d` and was
+not merged. Proposed status remains `First iteration - testing`: cycle 9 adds
+better per-instance attribution and a default-off diagnostic but neither literal
+paced acceptance nor a behavior-preserving causal fix.

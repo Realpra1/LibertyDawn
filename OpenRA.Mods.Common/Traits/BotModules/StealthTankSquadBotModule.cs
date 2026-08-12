@@ -78,6 +78,8 @@ namespace OpenRA.Mods.Common.Traits
 		public readonly int InfantryClusterBonusPercentPerNearbyActor = 0;
 		public readonly int MaximumInfantryClusterMultiplierPercent = 100;
 		public readonly bool CrushInfantryTargets = true;
+		[Desc("Reuse immutable threat features during one scan. Disable only for matched diagnostics.")]
+		public readonly bool UseScanLocalThreatSnapshot = false;
 		public readonly bool DebugLogging = false;
 
 		public override void RulesetLoaded(Ruleset rules, ActorInfo ai)
@@ -102,7 +104,7 @@ namespace OpenRA.Mods.Common.Traits
 	}
 
 	public class StealthTankSquadBotModule : ConditionalTrait<StealthTankSquadBotModuleInfo>,
-		IBotEnabled, IBotTick, IBotUnitReservations
+		IBotEnabled, IBotTick, IBotUnitReservations, IBotPerformanceIdentity
 	{
 		sealed class SpecialistGroup
 		{
@@ -128,6 +130,8 @@ namespace OpenRA.Mods.Common.Traits
 		sealed class Threat
 		{
 			public Actor Actor;
+			public WPos CenterPosition;
+			public BitSet<TargetableType> TargetTypes;
 			public int WeaponRangeCells;
 			public int DetectorRangeCells;
 			public int Value;
@@ -192,6 +196,9 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			return actor != null && reserved.Contains(actor.ActorID);
 		}
+
+		string IBotPerformanceIdentity.PerformanceIdentity =>
+			$"{GetType().Name}/{Info.SquadLabel}";
 
 		void IBotTick.BotTick(IBot enabledBot)
 		{
@@ -281,6 +288,9 @@ namespace OpenRA.Mods.Common.Traits
 			return new Threat
 			{
 				Actor = actor,
+				CenterPosition = Info.UseScanLocalThreatSnapshot ? actor.CenterPosition : default(WPos),
+				TargetTypes = Info.UseScanLocalThreatSnapshot ?
+					actor.GetEnabledTargetTypes() : default(BitSet<TargetableType>),
 				WeaponRangeCells = weaponRange,
 				DetectorRangeCells = detectorRange,
 				Value = Math.Max(1, actor.Info.TraitInfoOrDefault<ValuedInfo>()?.Cost ?? 1),
@@ -335,7 +345,7 @@ namespace OpenRA.Mods.Common.Traits
 					if (role == StealthTankSquadRole.Harass)
 					{
 						var clearTarget = defenders.Where(d =>
-							d.Actor.GetEnabledTargetTypes().Overlaps(GroundTargetTypes))
+							ThreatTargetTypes(d).Overlaps(GroundTargetTypes))
 							.OrderBy(d => d.Value).ThenBy(d => d.Actor.ActorID).FirstOrDefault()?.Actor;
 						if (clearTarget != null)
 							defendedOpportunities.Add(new DefendedOpportunity
@@ -625,14 +635,14 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				var detectorRange = StealthTankSquadPolicy.BufferedRange(threat.DetectorRangeCells,
 					Info.DetectorRangeBufferCells);
-				var ignoreWeapon = threat.Actor.GetEnabledTargetTypes()
+				var ignoreWeapon = ThreatTargetTypes(threat)
 					.Overlaps(Info.IgnoredHarassmentWeaponThreatTypes);
 				var weaponRange = StealthTankSquadPolicy.BufferedRange(ignoreWeapon ? 0 : threat.WeaponRangeCells,
 					Info.ThreatRangeBufferCells);
 				var canKiteTarget = threat.Actor == intendedTarget && detectorRange <= 0 &&
 					ownRange >= threat.WeaponRangeCells + Info.KiteRangeMarginCells;
 				var range = Math.Max(detectorRange, canKiteTarget ? 0 : weaponRange);
-				if (range > 0 && (position - threat.Actor.CenterPosition).Length <= range * 1024)
+				if (range > 0 && (position - ThreatPosition(threat)).Length <= range * 1024)
 					return true;
 			}
 
@@ -646,7 +656,7 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				var detectorRange = StealthTankSquadPolicy.BufferedRange(threat.DetectorRangeCells,
 					Info.DetectorRangeBufferCells);
-				var ignoreWeapon = threat.Actor.GetEnabledTargetTypes()
+				var ignoreWeapon = ThreatTargetTypes(threat)
 					.Overlaps(Info.IgnoredHarassmentWeaponThreatTypes);
 				var weaponRange = StealthTankSquadPolicy.BufferedRange(ignoreWeapon ? 0 : threat.WeaponRangeCells,
 					Info.ThreatRangeBufferCells);
@@ -654,11 +664,21 @@ namespace OpenRA.Mods.Common.Traits
 					ownRange >= threat.WeaponRangeCells + Info.KiteRangeMarginCells;
 				var range = StealthTankSquadPolicy.TransitThreatRange(detectorRange, weaponRange,
 					threat.WeaponIsEngaged, canKiteTarget);
-				if (range > 0 && (position - threat.Actor.CenterPosition).Length <= range * 1024)
+				if (range > 0 && (position - ThreatPosition(threat)).Length <= range * 1024)
 					return true;
 			}
 
 			return false;
+		}
+
+		BitSet<TargetableType> ThreatTargetTypes(Threat threat)
+		{
+			return Info.UseScanLocalThreatSnapshot ? threat.TargetTypes : threat.Actor.GetEnabledTargetTypes();
+		}
+
+		WPos ThreatPosition(Threat threat)
+		{
+			return Info.UseScanLocalThreatSnapshot ? threat.CenterPosition : threat.Actor.CenterPosition;
 		}
 
 		int InfantryClusterMultiplier(StealthTankSquadRole role, Actor actor)
@@ -718,17 +738,17 @@ namespace OpenRA.Mods.Common.Traits
 				var detectorRange = StealthTankSquadPolicy.BufferedRange(threat.DetectorRangeCells,
 					Info.DetectorRangeBufferCells);
 				var ignoreWeapon = stopAtFirstDanger &&
-					threat.Actor.GetEnabledTargetTypes().Overlaps(Info.IgnoredHarassmentWeaponThreatTypes);
+					ThreatTargetTypes(threat).Overlaps(Info.IgnoredHarassmentWeaponThreatTypes);
 				var weaponRange = StealthTankSquadPolicy.BufferedRange(ignoreWeapon ? 0 : threat.WeaponRangeCells,
 					Info.ThreatRangeBufferCells);
-				var targetDistance = (threat.Actor.CenterPosition - target.CenterPosition).Length / 1024;
+				var targetDistance = (ThreatPosition(threat) - target.CenterPosition).Length / 1024;
 				var endpointDanger = (detectorRange > 0 && targetDistance <= detectorRange) ||
 					(weaponRange > 0 && targetDistance <= weaponRange &&
 						(threat.Actor != target || ownRange < threat.WeaponRangeCells + Info.KiteRangeMarginCells));
 				var canKiteTarget = threat.Actor == target && detectorRange <= 0 &&
 					ownRange >= threat.WeaponRangeCells + Info.KiteRangeMarginCells;
 
-				var routeDanger = SegmentPassesWithin(start, target.CenterPosition, threat.Actor.CenterPosition,
+				var routeDanger = SegmentPassesWithin(start, target.CenterPosition, ThreatPosition(threat),
 					StealthTankSquadPolicy.TransitThreatRange(detectorRange, weaponRange,
 						threat.WeaponIsEngaged, canKiteTarget));
 				if (!endpointDanger && !routeDanger)
