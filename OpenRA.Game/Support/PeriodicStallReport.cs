@@ -245,6 +245,7 @@ namespace OpenRA.Support
 		readonly FixedLatencyHistogram renders = new FixedLatencyHistogram(FreezeThresholdMs);
 		readonly FixedLatencyHistogram presents = new FixedLatencyHistogram(FreezeThresholdMs);
 		readonly Dictionary<string, ModuleAggregate> modules = new Dictionary<string, ModuleAggregate>();
+		readonly Dictionary<string, ModuleAggregate> logicPhases = new Dictionary<string, ModuleAggregate>();
 		readonly List<RuntimeSample> runtimeSamples = new List<RuntimeSample>(MaximumRuntimeSamples);
 		readonly List<TailEvent> tailEvents = new List<TailEvent>(MaximumTailEvents);
 		readonly MethodInfo totalAllocatedBytes = typeof(GC).GetMethod("GetTotalAllocatedBytes", new[] { typeof(bool) });
@@ -282,6 +283,15 @@ namespace OpenRA.Support
 			aggregate.TotalMilliseconds += milliseconds;
 			aggregate.MaximumMilliseconds = Math.Max(aggregate.MaximumMilliseconds, milliseconds);
 			RecordTail(tick, key, milliseconds);
+		}
+
+		public void RecordLogicPhase(int tick, string phase, double milliseconds)
+		{
+			var aggregate = logicPhases.GetOrAdd(phase);
+			aggregate.Calls++;
+			aggregate.TotalMilliseconds += milliseconds;
+			aggregate.MaximumMilliseconds = Math.Max(aggregate.MaximumMilliseconds, milliseconds);
+			RecordTail(tick, "logic/" + phase, milliseconds);
 		}
 
 		void RecordTail(int tick, string source, double milliseconds)
@@ -393,6 +403,11 @@ namespace OpenRA.Support
 			foreach (var item in modules.OrderBy(x => x.Key, StringComparer.Ordinal))
 				Log.Write(channel, string.Format(CultureInfo.InvariantCulture, "module\t{0}\t{1}\t{2:F3}\t{3:F3}\t{4}",
 					item.Key, item.Value.Calls, item.Value.TotalMilliseconds, item.Value.MaximumMilliseconds, item.Value.Orders));
+
+			Log.Write(channel, "logic-phase\tidentity\tcalls\ttotal_ms\tmax_ms");
+			foreach (var item in logicPhases.OrderBy(x => x.Key, StringComparer.Ordinal))
+				Log.Write(channel, string.Format(CultureInfo.InvariantCulture, "logic-phase\t{0}\t{1}\t{2:F3}\t{3:F3}",
+					item.Key, item.Value.Calls, item.Value.TotalMilliseconds, item.Value.MaximumMilliseconds));
 
 			Log.Write(channel, "tail\ttick_or_frame\tsource\tmilliseconds");
 			foreach (var item in tailEvents.OrderBy(x => x.Tick).ThenBy(x => x.Source, StringComparer.Ordinal))

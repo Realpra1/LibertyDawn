@@ -105,3 +105,32 @@ Fresh commenter/policy artifacts exist per game under `cycle-2/game-{1-paced-def
 ## Next evidence-driven step
 
 Do not change AI cadence or workload. First add bounded attribution that separates tick-1 engine/init, module, render/present, GC, and host-scheduler cost; repeat the exact paced control, then make a same-build intervention only if it materially moves that measured boundary.
+
+# CNC-96 cycle 3 report
+
+## Result
+
+Added bounded, benchmark-only attribution for the existing `immediate`, `order-generator`, `world`, and `tick-render` logic phases. The samples are restricted to the active simulation world, preserving the benchmark's existing primary-world identity. No simulation decision, order, cadence, AI workload, policy, or balance setting changed.
+
+## Final valid games
+
+- Constrained (`taskset -c 0`): tick 25 in 7.011s; tick p50/p95/p99/max `16/351/1226/1225.233ms`, five >=50ms; render `36/69/192/191.159ms`, 24/50 >=50ms; present max `48.186ms`. Attribution: `immediate` max `1168.771ms` at initial local tick 0, `world` max `299.140ms` at tick 1, player-1 BaseBuilder max `118.070ms` at tick 1.
+- Unconstrained affinity: tick 25 in 5.006s; tick `11/294/1083/1082.219ms`, three >=50ms; render `7/28/100/99.937ms`, 1/95 >=50ms; present max `21.104ms`. Attribution remains startup-dominated: `immediate` max `1049.766ms`, `world` max `260.618ms`, BaseBuilder max `102.391ms`.
+
+Both serial paced rendered legs used the exact cycle-2 map SHA, seed 9601, two Nod IronReapers, 748 actors, normal speed, package diagnostics, staged runtime content, and configured tick-25 exit. They passed required map/bot/exit markers with no exception or desync. Final artifacts are under `cycle-3/game-{1-constrained,2-unconstrained}-final/`; fresh analysis accompanies each final leg.
+
+## Interpretation and disposition
+
+The new evidence attributes the dominant tail to startup `immediate` work, with secondary early `world` work; the named bot module is substantially smaller than the unexplained immediate maximum. The unrestricted control reduces observed tails and recurring rendered-widget cost, but it does not eliminate the startup stall. At 25 ticks neither leg establishes a periodic simulation cadence or a causal owner for a behavior-changing fix. Logging remains unproven and no AI schedule/field-defense intervention is authorized.
+
+The required Luna code review found that phase samples could include a secondary shellmap world. The final code confines phase recording to `Game.OrderManager`; the two final legs were rerun after that reporting-integrity repair. The concern is adopted and closed.
+
+## Checks
+
+- `dotnet test OpenRA.Test/OpenRA.Test.csproj --filter 'FullyQualifiedName~PeriodicStallClassifierTest|FullyQualifiedName~LaunchArgumentsTest'`: 18/18 passed.
+- `python3 -m unittest tests/test_launch_ai_parallel.py`: 5/5 passed.
+- `git diff --check`: passed.
+
+## Next evidence-driven step
+
+Keep all AI work unchanged. Extend the same matched affinity pair beyond startup and add bounded per-tick phase joins plus available scheduler/GC-pause attribution before testing any owning-boundary intervention. The existing 25-tick evidence supports diagnosis only, not acceptance or a gameplay fix.

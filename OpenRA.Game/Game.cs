@@ -643,6 +643,10 @@ namespace OpenRA
 			var tick = RunTime;
 			var worldTicked = false;
 
+			// Benchmark.Tick records the active world only. Keep the phase attribution on
+			// that same world when a shellmap is also being ticked during a transition.
+			var recordLogicPhases = benchmark != null && ReferenceEquals(orderManager, Game.OrderManager);
+
 			var world = orderManager.World;
 
 			if (Ui.LastTickTime.ShouldAdvance(tick))
@@ -661,9 +665,11 @@ namespace OpenRA
 					else
 						orderManager.LastTickTime.AdvanceTickTime(tick);
 
+					var phaseStart = recordLogicPhases ? Stopwatch.GetTimestamp() : 0;
 					Sound.Tick();
-
 					Sync.RunUnsynced(world, orderManager.TickImmediate);
+					if (recordLogicPhases)
+						benchmark.LogicPhase(LocalTick, "immediate", ElapsedMilliseconds(phaseStart));
 
 					if (world == null)
 						return false;
@@ -671,12 +677,18 @@ namespace OpenRA
 					if (orderManager.TryTick())
 					{
 						worldTicked = true;
+						phaseStart = recordLogicPhases ? Stopwatch.GetTimestamp() : 0;
 						Sync.RunUnsynced(world, () =>
 						{
 							world.OrderGenerator.Tick(world);
 						});
+						if (recordLogicPhases)
+							benchmark.LogicPhase(LocalTick, "order-generator", ElapsedMilliseconds(phaseStart));
 
+						phaseStart = recordLogicPhases ? Stopwatch.GetTimestamp() : 0;
 						world.Tick();
+						if (recordLogicPhases)
+							benchmark.LogicPhase(LocalTick, "world", ElapsedMilliseconds(phaseStart));
 						if (ReferenceEquals(orderManager, OrderManager))
 							TryAutomatedSave(world);
 
@@ -685,7 +697,12 @@ namespace OpenRA
 
 					// Wait until we have done our first world Tick before TickRendering
 					if (orderManager.LocalFrameNumber > 0 && !IsHeadlessAutomation)
+					{
+						phaseStart = recordLogicPhases ? Stopwatch.GetTimestamp() : 0;
 						Sync.RunUnsynced(world, () => world.TickRender(worldRenderer));
+						if (recordLogicPhases)
+							benchmark.LogicPhase(LocalTick, "tick-render", ElapsedMilliseconds(phaseStart));
+					}
 				}
 
 				benchmark?.Tick(LocalTick, world);
@@ -694,6 +711,11 @@ namespace OpenRA
 			}
 
 			return worldTicked;
+		}
+
+		static double ElapsedMilliseconds(long start)
+		{
+			return 1000.0 * Math.Max(0, Stopwatch.GetTimestamp() - start) / Stopwatch.Frequency;
 		}
 
 		static bool LogicTick(bool forceCurrentWorldTick = false)

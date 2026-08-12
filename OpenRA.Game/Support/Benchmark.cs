@@ -42,6 +42,11 @@ namespace OpenRA.Support
 			periodicStallReport.RecordModule(tick, playerIndex, module, milliseconds, queuedOrders);
 		}
 
+		public void LogicPhase(int tick, string phase, double milliseconds)
+		{
+			periodicStallReport.RecordLogicPhase(tick, phase, milliseconds);
+		}
+
 		class BenchmarkPoint
 		{
 			public int Tick { get; private set; }
