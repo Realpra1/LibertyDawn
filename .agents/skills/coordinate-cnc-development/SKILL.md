@@ -19,6 +19,11 @@ record that fact and pin every launched role exactly.
 - Treat user messages as control input. Answer questions and continue unless the
   user explicitly pauses. A question, observation, worker idea, test anomaly, or
   reviewer suggestion is not permission to create a task.
+- Continuation is authorized by default for the active round. Do not stop after
+  a status response, a `First iteration - testing` handoff, a `Needs help`
+  handoff, or the end of the primary five cycles. Continue reviews, integration,
+  and the allowed Luna minor-fix/testing tail until the release is integrated or
+  the user explicitly says to pause/stop.
 - Create or amend a task only after the user explicitly asks. Put worthwhile
   unrequested ideas in `DEFERRED_WORK.md`; do not route them to Task Maker.
 - Freeze balance unless the selected task expressly authorizes the exact surface.
@@ -193,6 +198,13 @@ this tail. Luna workers may fix a narrow defect, assertion, guard, configuration
 mistake, or test setup; they must not introduce new architecture, policy, balance,
 or broad refactors. Stop the tail and request help as soon as the fix is no longer
 obvious. Never exceed 15 isolated cycles.
+
+When a task reaches `First iteration - testing` or `Needs help` after cycle 5,
+inspect its durable handoff and continue with Luna cycles 6-15 whenever the
+remaining work is minor, obvious, or evidence-only. This is normal authorized
+continuation, not an escalation and not permission to redesign. If the task is
+not suitable for a Luna fix, route its final review/integration handoff while
+the other streams continue; do not leave the entire round idle waiting for it.
 
 After a worker receipt, re-read the coordinator state and route that stream
 again: launch cycle N+1 when authorized, launch its required reviewer when due,
