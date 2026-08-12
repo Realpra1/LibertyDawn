@@ -37,6 +37,12 @@ Record explicit balance authority. If the user did not expressly request a
 balance change, write that balance is frozen; never infer tuning permission from
 a desired gameplay or AI outcome.
 
+Default behavior scope is universal: unless the user explicitly restricts a
+task to a named AI, faction, branch, or module, assume the behavior must apply
+to every AI that has (or later gains) the required prerequisites. Treat a named
+AI in a bug report as an observation/example, not an accidental scope limit;
+record any intentional exception in the task contract.
+
 A bug report additionally requires:
 
 - What happened.

@@ -27,6 +27,10 @@ contract, not a summary.
    scenario and its final observable outcome.
 4. Inventory every ordinary AI/module that can issue orders to, reserve, produce,
    consume, repair, or retarget the same actors, queues, cash, or targets.
+   Unless the task explicitly names a narrower scope, specify and test the
+   behavior for every AI that has or can obtain the prerequisites. A named AI
+   from the report is an observed example, not a permission to implement a
+   one-AI special case; document any deliberate exception.
 5. List likely wrong approaches, hidden assumptions, regressions, performance
    traps, and diagnostic blind spots. State explicitly when another worker's PR
    may alter the solution and tell this worker which branch/PR commits to monitor.
