@@ -188,6 +188,42 @@ World:
 		Upgrades: upgrade.covert1, upgrade.covert2, upgrade.covert3, upgrade.recon1, upgrade.recon2, upgrade.recon3, upgrade.economy1, upgrade.economy2, upgrade.economy3
 """
 
+	registry_save_load_rules = """Player:
+	UnassignedCombatUnitRegistryBotModule:
+		DebugLogging: true
+		AuditInterval: 3000
+		AuditActorsPerTick: 16
+	ModularBot@IronReaper:
+		AdvancedSquadSampleInterval: 30
+	SquadManagerBotModule@ironreaper:
+		GroundTargetDebugLogging: true
+		ExcludeFromSquadsTypes: harv, sharv, mcv, a10, e6, rmbo, truck, tran, arty
+	StealthTankSquadBotModule:
+		DebugLogging: true
+	StealthTankSquadBotModule@chemical:
+		DebugLogging: true
+	CovertHarassmentBotModule:
+		DebugLogging: true
+
+World:
+	StartingUnits@cnc100registrysavenod:
+		Class: cnc100-registry-save
+		ClassName: CNC-100 registry save-load continuity
+		Factions: nod
+		BaseActor: mcv
+		SupportActors: harv, harv, e1, e1, e2, e3, e4, bggy, bike, ltnk, mtnk, arty, arty, stnk, stnk, ctnk, ctnk, msam
+		OuterSupportRadius: 14
+		Upgrades: upgrade.covert1, upgrade.covert2, upgrade.covert3, upgrade.recon1, upgrade.recon2, upgrade.recon3, upgrade.economy1, upgrade.economy2, upgrade.economy3
+	StartingUnits@cnc100registrysavegdi:
+		Class: cnc100-registry-save
+		ClassName: CNC-100 registry save-load continuity
+		Factions: gdi
+		BaseActor: mcv
+		SupportActors: harv, harv, e1, e1, e2, e3, e4, jeep, bike, ltnk, mtnk, arty, arty, stnk, stnk, ctnk, ctnk, msam
+		OuterSupportRadius: 14
+		Upgrades: upgrade.covert1, upgrade.covert2, upgrade.covert3, upgrade.recon1, upgrade.recon2, upgrade.recon3, upgrade.economy1, upgrade.economy2, upgrade.economy3
+"""
+
 	write_map(root / "mods/cnc/maps/Empire-Earth.oramap", args.output / "cnc100-high-unit.oramap",
 		"CNC-100 High Unit Failsafe", high_unit_rules)
 	write_map(root / "mods/cnc/maps/Empire-Earth.oramap", args.output / "cnc100-high-unit-failsafe-disabled.oramap",
@@ -231,6 +267,23 @@ World:
 	write_map(root / "mods/cnc/maps/island-duel.oramap", args.output / "cnc100-registry-specialist-release.oramap",
 		"CNC-100 Unassigned Registry Covert Release", covert_rules.replace(
 			"Player:\n", "Player:\n\tUnassignedCombatUnitRegistryBotModule:\n\t\tDebugLogging: true\n", 1).replace(
+			"\tCovertHarassmentBotModule:\n\t\tDebugLogging: true",
+			"\tCovertHarassmentBotModule:\n\t\tDebugLogging: true\n"
+			"\t\tFailsafeTestAdvancedWorkMilliseconds: 20\n\t\tFailsafeTestAdvancedWorkFromTick: 60\n"
+			"\t\tFailsafeTestAdvancedWorkUntilTick: 300"))
+	write_map(root / "mods/cnc/maps/island-duel.oramap", args.output / "cnc100-registry-save-load.oramap",
+		"CNC-100 Registry Save-Load Continuity", registry_save_load_rules)
+	write_map(root / "mods/cnc/maps/island-duel.oramap", args.output / "cnc100-registry-staggered-audit.oramap",
+		"CNC-100 Registry Staggered Audit", covert_rules.replace(
+			"Player:\n", "Player:\n\tUnassignedCombatUnitRegistryBotModule:\n\t\tDebugLogging: true\n"
+			"\t\tAuditInterval: 3000\n\t\tAuditActorsPerTick: 16\n"
+			"\t\tAuditTestSkipActorType: e2\n", 1).replace(
+			"\t\tGroundTargetDebugLogging: true\n\tCovertHarassmentBotModule:",
+			"\t\tGroundTargetDebugLogging: true\n"
+			"\t\tExcludeFromSquadsTypes: harv, sharv, mcv, a10, e6, rmbo, truck, tran, e2\n"
+			"\t\tFailsafeDirectCombatTypes: e1, e3, e4, e5, bggy, bike, jeep, ltnk, mtnk, ftnk, htnk\n"
+			"\tCovertHarassmentBotModule:").replace(
+			"\t\tSupportActors: harv, harv, sharv, bike", "\t\tSupportActors: harv, harv, sharv, e2, bike").replace(
 			"\tCovertHarassmentBotModule:\n\t\tDebugLogging: true",
 			"\tCovertHarassmentBotModule:\n\t\tDebugLogging: true\n"
 			"\t\tFailsafeTestAdvancedWorkMilliseconds: 20\n\t\tFailsafeTestAdvancedWorkFromTick: 60\n"

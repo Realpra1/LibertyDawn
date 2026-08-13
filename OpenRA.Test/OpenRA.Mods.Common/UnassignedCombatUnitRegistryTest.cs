@@ -54,6 +54,54 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
+		public void ClaimedAndUnassignedTruthRoundTripsWithoutOverlap()
+		{
+			var registry = new UnassignedCombatUnitRegistry();
+			registry.Import(new uint[] { 7, 3, 9 }, new uint[] { 9, 11 });
+
+			Assert.That(registry.ActorIds, Is.EqualTo(new uint[] { 3, 7 }));
+			Assert.That(registry.ClaimedActorIds, Is.EqualTo(new uint[] { 9, 11 }));
+			Assert.That(registry.Register(9), Is.False, "A claimed actor must not also become unassigned.");
+			Assert.That(registry.Release(9), Is.True);
+			Assert.That(registry.Register(9), Is.True);
+			Assert.That(registry.Claim(9), Is.True);
+			Assert.That(registry.ActorIds, Is.EqualTo(new uint[] { 3, 7 }));
+			Assert.That(registry.IsClaimed(9), Is.True);
+		}
+
+		[Test]
+		public void AuditStartsAreDeterministicallyStaggeredPerPlayer()
+		{
+			Assert.That(UnassignedCombatUnitRegistry.StaggeredAuditStartOffset(3000, 0, 4), Is.EqualTo(0));
+			Assert.That(UnassignedCombatUnitRegistry.StaggeredAuditStartOffset(3000, 1, 4), Is.EqualTo(750));
+			Assert.That(UnassignedCombatUnitRegistry.StaggeredAuditStartOffset(3000, 2, 4), Is.EqualTo(1500));
+			Assert.That(UnassignedCombatUnitRegistry.StaggeredAuditStartOffset(3000, 3, 4), Is.EqualTo(2250));
+		}
+
+		[Test]
+		public void AuditSlicesActorIdsWithinThePerTickBudget()
+		{
+			uint nextActorId = 1;
+			Assert.That(UnassignedCombatUnitRegistry.NextAuditActorIds(ref nextActorId, 10, 4),
+				Is.EqualTo(new uint[] { 1, 2, 3, 4 }));
+			Assert.That(UnassignedCombatUnitRegistry.NextAuditActorIds(ref nextActorId, 10, 4),
+				Is.EqualTo(new uint[] { 5, 6, 7, 8 }));
+			Assert.That(UnassignedCombatUnitRegistry.NextAuditActorIds(ref nextActorId, 10, 4),
+				Is.EqualTo(new uint[] { 9, 10 }));
+			Assert.That(UnassignedCombatUnitRegistry.NextAuditActorIds(ref nextActorId, 10, 4), Is.Empty,
+				"A completed audit must do no actor lookup work on ordinary bot ticks.");
+		}
+
+		[Test]
+		public void ActorIdDigestIsStableAcrossInputOrder()
+		{
+			Assert.That(UnassignedCombatUnitRegistry.StableActorIdDigest(new uint[] { 9, 3, 7 }),
+				Is.EqualTo(UnassignedCombatUnitRegistry.StableActorIdDigest(new uint[] { 7, 9, 3 })));
+			Assert.That(UnassignedCombatUnitRegistry.StableActorIdDigest(new uint[] { 3, 7 }),
+				Is.Not.EqualTo(UnassignedCombatUnitRegistry.StableActorIdDigest(new uint[] { 3, 7, 9 })));
+		}
+
+		[Test]
 		public void DisabledAdvancedSquadPrefersPreCodexAssaultOverGenericFallback()
 		{
 			Assert.That(UnassignedCombatUnitRecruitmentPolicy.SelectFallback(false, true, true),
