@@ -199,6 +199,14 @@ namespace OpenRA.Mods.Common.Traits
 		WithdrawOrHold
 	}
 
+	public enum CommandoFallbackDeadlineAction
+	{
+		Wait,
+		Renew,
+		Stop,
+		Release
+	}
+
 	public static class CaptureTargeting
 	{
 		public static bool ConfirmedOwnerless(int firstObservedTick, int worldTick, int graceTicks,
@@ -224,6 +232,19 @@ namespace OpenRA.Mods.Common.Traits
 		public static bool ShouldRerouteHold(bool destinationThreatened, bool safeDestinationFound)
 		{
 			return destinationThreatened && safeDestinationFound;
+		}
+
+		public static CommandoFallbackDeadlineAction FallbackDeadlineAction(
+			bool deadlineDue, bool idle, bool madeProgress, bool stopPending)
+		{
+			if (stopPending)
+				return idle ? CommandoFallbackDeadlineAction.Release :
+					deadlineDue ? CommandoFallbackDeadlineAction.Stop : CommandoFallbackDeadlineAction.Wait;
+
+			if (!deadlineDue || idle)
+				return CommandoFallbackDeadlineAction.Wait;
+
+			return madeProgress ? CommandoFallbackDeadlineAction.Renew : CommandoFallbackDeadlineAction.Stop;
 		}
 
 		public static long ThreatCoverageMargin(long distanceSquared, int range)

@@ -195,13 +195,41 @@ namespace OpenRA.Test.Mods.Common
 				new MiniYamlNode("Target", FieldSaver.FormatValue((uint)0)),
 				new MiniYamlNode("Destination", FieldSaver.FormatValue(new CPos(41, 29))),
 				new MiniYamlNode("AssignedTick", FieldSaver.FormatValue(200)),
-				new MiniYamlNode("ReconsiderTick", FieldSaver.FormatValue(325))
+				new MiniYamlNode("ReconsiderTick", FieldSaver.FormatValue(325)),
+				new MiniYamlNode("LastSpecialistPosition", FieldSaver.FormatValue(new WPos(100, 200, 0))),
+				new MiniYamlNode("LastTargetHealth", FieldSaver.FormatValue(75)),
+				new MiniYamlNode("StopPending", FieldSaver.FormatValue(true))
 			});
 
 			Assert.That(RoundTripPrivateSaveRecord(moduleType, "LoadCommandoConfirmation",
 				"SaveCommandoConfirmation", confirmation), Is.EqualTo(Serialize(confirmation)));
 			Assert.That(RoundTripPrivateSaveRecord(moduleType, "LoadCommandoFallback",
 				"SaveCommandoFallback", fallback), Is.EqualTo(Serialize(fallback)));
+		}
+
+		[Test]
+		public void NonIdleFallbackDeadlineRenewsOnlyForConcreteProgress()
+		{
+			Assert.That(CaptureTargeting.FallbackDeadlineAction(false, false, false, false),
+				Is.EqualTo(CommandoFallbackDeadlineAction.Wait));
+			Assert.That(CaptureTargeting.FallbackDeadlineAction(true, false, true, false),
+				Is.EqualTo(CommandoFallbackDeadlineAction.Renew));
+			Assert.That(CaptureTargeting.FallbackDeadlineAction(true, false, false, false),
+				Is.EqualTo(CommandoFallbackDeadlineAction.Stop));
+			Assert.That(CaptureTargeting.FallbackDeadlineAction(true, true, false, false),
+				Is.EqualTo(CommandoFallbackDeadlineAction.Wait),
+				"Idle holds retain their existing target-aware reconsideration path.");
+		}
+
+		[Test]
+		public void StoppedFallbackReleasesOnIdleAndRetriesStopWhileBlocked()
+		{
+			Assert.That(CaptureTargeting.FallbackDeadlineAction(false, false, false, true),
+				Is.EqualTo(CommandoFallbackDeadlineAction.Wait));
+			Assert.That(CaptureTargeting.FallbackDeadlineAction(true, false, false, true),
+				Is.EqualTo(CommandoFallbackDeadlineAction.Stop));
+			Assert.That(CaptureTargeting.FallbackDeadlineAction(false, true, false, true),
+				Is.EqualTo(CommandoFallbackDeadlineAction.Release));
 		}
 
 		static string RoundTripPrivateSaveRecord(Type moduleType, string loadName, string saveName,

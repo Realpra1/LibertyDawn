@@ -214,6 +214,9 @@ namespace OpenRA.Mods.Common.Traits
 			public CPos Destination;
 			public int AssignedTick;
 			public int ReconsiderTick;
+			public WPos LastSpecialistPosition;
+			public int LastTargetHealth;
+			public bool StopPending;
 		}
 
 		enum CommandoFallbackPurpose
@@ -229,15 +232,32 @@ namespace OpenRA.Mods.Common.Traits
 			public readonly CPos Destination;
 			public readonly int AssignedTick;
 			public int ReconsiderTick;
+			public WPos LastSpecialistPosition;
+			public int LastTargetHealth;
+			public bool StopPending;
 
 			public CommandoFallback(CommandoFallbackPurpose purpose, Actor target, CPos destination,
-				int assignedTick, int reconsiderTick)
+				int assignedTick, int reconsiderTick, WPos lastSpecialistPosition,
+				int lastTargetHealth = 0, bool stopPending = false)
 			{
 				Purpose = purpose;
 				Target = target;
 				Destination = destination;
 				AssignedTick = assignedTick;
 				ReconsiderTick = reconsiderTick;
+				LastSpecialistPosition = lastSpecialistPosition;
+				LastTargetHealth = lastTargetHealth;
+				StopPending = stopPending;
+			}
+
+			public bool ObserveProgress(Actor specialist)
+			{
+				var targetHealth = Target?.TraitOrDefault<IHealth>()?.HP ?? 0;
+				var progressed = specialist.CenterPosition != LastSpecialistPosition ||
+					(Target != null && targetHealth < LastTargetHealth);
+				LastSpecialistPosition = specialist.CenterPosition;
+				LastTargetHealth = targetHealth;
+				return progressed;
 			}
 		}
 
@@ -350,7 +370,7 @@ namespace OpenRA.Mods.Common.Traits
 				pendingCaptureRecovery);
 			var reassessDemolition = AuditAssignments(bot, activeDemolitionUnits, "demolition",
 				SpecialistAssignmentPurpose.Demolition, pendingDemolitionRecovery);
-			var reassessFallback = AuditCommandoFallbacks();
+			var reassessFallback = AuditCommandoFallbacks(bot);
 
 			var scanCapture = reassessCapture || pendingCaptureRecovery.Count != 0 || --minCaptureDelayTicks <= 0;
 			var scanDemolition = reassessDemolition || reassessFallback || pendingDemolitionRecovery.Count != 0 ||
@@ -1422,7 +1442,8 @@ namespace OpenRA.Mods.Common.Traits
 				bot.QueueOrder(new Order("Attack", unit, Target.FromActor(combatTarget), false));
 				commandoFallbacks.Add(unit, new CommandoFallback(CommandoFallbackPurpose.Combat,
 					combatTarget, CPos.Zero, world.WorldTick, world.WorldTick + StalledAssignmentTicks(
-						SpecialistAssignmentPurpose.Demolition)));
+						SpecialistAssignmentPurpose.Demolition), unit.CenterPosition,
+					combatTarget.TraitOrDefault<IHealth>()?.HP ?? 0));
 				demolitionIdleSince.Remove(unit);
 				Debug("commando {0}#{1} transition=favorable-combat target={2}#{3} ownership=recovered " +
 					"threat=fightable-infantry", unit.Info.Name, unit.ActorID, combatTarget.Info.Name,
@@ -1440,7 +1461,8 @@ namespace OpenRA.Mods.Common.Traits
 
 			bot.QueueOrder(new Order("Move", unit, Target.FromCell(world, holdCell.Value), false));
 			commandoFallbacks.Add(unit, new CommandoFallback(CommandoFallbackPurpose.Hold, null,
-				holdCell.Value, world.WorldTick, world.WorldTick + Math.Max(1, Info.DemolitionHoldReconsiderTicks)));
+				holdCell.Value, world.WorldTick, world.WorldTick + Math.Max(1, Info.DemolitionHoldReconsiderTicks),
+				unit.CenterPosition));
 			demolitionIdleSince.Remove(unit);
 			Debug("commando {0}#{1} transition=safe-hold destination={2} ownership=recovered " +
 				"reason=no-viable-demolition threat={3} reconsider={4}", unit.Info.Name, unit.ActorID,
@@ -1519,7 +1541,7 @@ namespace OpenRA.Mods.Common.Traits
 					new Order(order, unit, Target.FromCell(world, destination.Value), false));
 				commandoFallbacks[unit] = new CommandoFallback(CommandoFallbackPurpose.Hold, null,
 					destination.Value, world.WorldTick,
-					world.WorldTick + Math.Max(1, Info.DemolitionHoldReconsiderTicks));
+					world.WorldTick + Math.Max(1, Info.DemolitionHoldReconsiderTicks), unit.CenterPosition);
 				Debug("commando {0}#{1} transition=hold-reroute reason=destination-threatened " +
 					"old-destination={2} destination={3} reconsider={4}", unit.Info.Name, unit.ActorID,
 					previous.Destination, destination.Value,
@@ -1580,7 +1602,7 @@ namespace OpenRA.Mods.Common.Traits
 			return FindSafeDemolitionRoute(unit, target, threats) != null;
 		}
 
-		bool AuditCommandoFallbacks()
+		bool AuditCommandoFallbacks(IBot bot)
 		{
 			var reassess = false;
 			foreach (var pair in commandoFallbacks.OrderBy(pair => pair.Key.ActorID).ToArray())
@@ -1594,14 +1616,42 @@ namespace OpenRA.Mods.Common.Traits
 					(fallback.Target == null || fallback.Target.IsDead || !fallback.Target.IsInWorld ||
 					player.RelationshipWith(fallback.Target.Owner) != PlayerRelationship.Enemy ||
 					(unit.IsIdle && world.WorldTick - fallback.AssignedTick >= PendingOrderGraceTicks));
-				if (!invalid && !combatComplete)
+				var deadlineDue = world.WorldTick >= fallback.ReconsiderTick;
+				var progress = deadlineDue && !unit.IsIdle && !fallback.StopPending && fallback.ObserveProgress(unit);
+				var deadlineAction = CaptureTargeting.FallbackDeadlineAction(
+					deadlineDue, unit.IsIdle, progress, fallback.StopPending);
+				if (!invalid && !combatComplete && deadlineAction == CommandoFallbackDeadlineAction.Renew)
+				{
+					fallback.ReconsiderTick = world.WorldTick + (fallback.Purpose == CommandoFallbackPurpose.Hold ?
+						Math.Max(1, Info.DemolitionHoldReconsiderTicks) :
+						StalledAssignmentTicks(SpecialistAssignmentPurpose.Demolition));
+					Debug("commando {0}#{1} transition=fallback-progress purpose={2} ownership={3} reconsider={4}",
+						unit.Info.Name, unit.ActorID, fallback.Purpose, OwnershipState(unit), fallback.ReconsiderTick);
+					continue;
+				}
+
+				if (!invalid && !combatComplete && deadlineAction == CommandoFallbackDeadlineAction.Stop)
+				{
+					if (!unitCannotBeOrdered(unit))
+						bot.QueueOrder(new Order("Stop", unit, false));
+					fallback.StopPending = true;
+					fallback.ReconsiderTick = world.WorldTick + PendingOrderGraceTicks;
+					Debug("commando {0}#{1} transition=fallback-stop reason=non-progressing-deadline " +
+						"ownership={2} purpose={3} reassess={4}", unit.Info.Name, unit.ActorID,
+						OwnershipState(unit), fallback.Purpose, fallback.ReconsiderTick);
+					continue;
+				}
+
+				var deadlineRelease = deadlineAction == CommandoFallbackDeadlineAction.Release;
+				if (!invalid && !combatComplete && !deadlineRelease)
 					continue;
 
 				commandoFallbacks.Remove(unit);
 				demolitionIdleSince.Remove(unit);
 				reassess = true;
 				Debug("commando {0}#{1} transition=release reason={2} ownership={3} purpose={4}",
-					unit.Info.Name, unit.ActorID, invalid ? "owner-conflict" : "combat-complete",
+					unit.Info.Name, unit.ActorID, invalid ? "owner-conflict" :
+						deadlineRelease ? "fallback-deadline" : "combat-complete",
 					OwnershipState(unit), fallback.Purpose);
 			}
 
@@ -1914,7 +1964,10 @@ namespace OpenRA.Mods.Common.Traits
 							TargetId = pair.Value.Target?.ActorID ?? 0,
 							Destination = pair.Value.Destination,
 							AssignedTick = pair.Value.AssignedTick,
-							ReconsiderTick = pair.Value.ReconsiderTick
+							ReconsiderTick = pair.Value.ReconsiderTick,
+							LastSpecialistPosition = pair.Value.LastSpecialistPosition,
+							LastTargetHealth = pair.Value.LastTargetHealth,
+							StopPending = pair.Value.StopPending
 						})).ToList()),
 				new MiniYamlNode("CaptureManagerDeferredTargets", "", deferredTargets.OrderBy(pair => pair.Key.ActorID).Select(pair =>
 					new MiniYamlNode("DeferredTarget", "", new List<MiniYamlNode>
@@ -1962,7 +2015,10 @@ namespace OpenRA.Mods.Common.Traits
 				new MiniYamlNode("Target", FieldSaver.FormatValue(saved.TargetId)),
 				new MiniYamlNode("Destination", FieldSaver.FormatValue(saved.Destination)),
 				new MiniYamlNode("AssignedTick", FieldSaver.FormatValue(saved.AssignedTick)),
-				new MiniYamlNode("ReconsiderTick", FieldSaver.FormatValue(saved.ReconsiderTick))
+				new MiniYamlNode("ReconsiderTick", FieldSaver.FormatValue(saved.ReconsiderTick)),
+				new MiniYamlNode("LastSpecialistPosition", FieldSaver.FormatValue(saved.LastSpecialistPosition)),
+				new MiniYamlNode("LastTargetHealth", FieldSaver.FormatValue(saved.LastTargetHealth)),
+				new MiniYamlNode("StopPending", FieldSaver.FormatValue(saved.StopPending))
 			});
 		}
 
@@ -2021,7 +2077,10 @@ namespace OpenRA.Mods.Common.Traits
 				TargetId = LoadId(node, "Target"),
 				Destination = LoadValue<CPos>(node, "Destination"),
 				AssignedTick = LoadValue<int>(node, "AssignedTick"),
-				ReconsiderTick = LoadValue<int>(node, "ReconsiderTick")
+				ReconsiderTick = LoadValue<int>(node, "ReconsiderTick"),
+				LastSpecialistPosition = LoadValueOrDefault(node, "LastSpecialistPosition", WPos.Zero),
+				LastTargetHealth = LoadValueOrDefault(node, "LastTargetHealth", 0),
+				StopPending = LoadValueOrDefault(node, "StopPending", false)
 			};
 		}
 
@@ -2139,7 +2198,8 @@ namespace OpenRA.Mods.Common.Traits
 					continue;
 
 				commandoFallbacks.Add(specialist, new CommandoFallback(saved.Purpose, target,
-					saved.Destination, saved.AssignedTick, saved.ReconsiderTick));
+					saved.Destination, saved.AssignedTick, saved.ReconsiderTick,
+					saved.LastSpecialistPosition, saved.LastTargetHealth, saved.StopPending));
 				Debug("restored commando {0}#{1} ownership=fallback purpose={2} target={3} " +
 					"destination={4} assigned={5} reconsider={6}", specialist.Info.Name, specialist.ActorID,
 					saved.Purpose, saved.TargetId, saved.Destination, saved.AssignedTick, saved.ReconsiderTick);
@@ -2192,6 +2252,12 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			var value = node.Value.Nodes.First(n => n.Key == key);
 			return FieldLoader.GetValue<T>(key, value.Value.Value);
+		}
+
+		static T LoadValueOrDefault<T>(MiniYamlNode node, string key, T fallback)
+		{
+			var value = node.Value.Nodes.FirstOrDefault(n => n.Key == key);
+			return value == null ? fallback : FieldLoader.GetValue<T>(key, value.Value.Value);
 		}
 
 		void Debug(string format, params object[] args)
