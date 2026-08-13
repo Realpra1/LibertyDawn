@@ -90,3 +90,21 @@
 - Durable result: integration is **4 / 5**. Cycle 5 must use proven per-task
   fixtures/toggles and final regression, not novel combined topology. Publication,
   push, PR update, and merge authority remain absent.
+
+## Integration cycle 5 complete — promotable
+
+- Candidate tested: `468218b0c1dbde5d4ba8bda3cf41cd2a8d4faef0`.
+- Exactly two byte-identical proven fixtures passed with their canonical setups:
+  CNC-97/CNC-98 crate/husk at tick 2800 in 6.007 seconds, and CNC-107 hostile
+  corner-first at tick 7600 in 18.019 seconds with its save artifact.
+- All required collection attribution, post-construction gating, aircraft-husk
+  handoff/restoration, corner probes, wall confirmation, bounded terminal, and
+  engine-safety assertions passed.
+- Separate fresh Luna narration and policy review completed per game; both reviews
+  judged the bounded behavior mostly sensible and found no release blocker.
+- Final combined diff, Debug/interface, and Release test checks passed. No source
+  or balance repair was required across all five integration cycles.
+- Durable result: integration is **5 / 5** and the cumulative CNC-97/CNC-98/CNC-107
+  candidate is **promotable**. CNC-96 and CNC-100 remain excluded as recorded.
+  Publication is authorized only for this cumulative branch and one draft PR to
+  `bleed`; do not merge it.

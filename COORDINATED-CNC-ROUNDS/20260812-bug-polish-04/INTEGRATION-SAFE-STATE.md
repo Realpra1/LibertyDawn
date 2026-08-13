@@ -11,12 +11,14 @@
   `1ace5799d507db0ec9b5103ec95c9714930b4036`.
 - Candidate head before integration cycle 4:
   `a735f2afed3b63e88c7c04677a00593c1102bc4a`.
-- Current candidate: this branch's HEAD after the cycle-4 receipt commit; no source
-  repair was required in cycles 1 through 4.
+- Candidate head before integration cycle 5:
+  `468218b0c1dbde5d4ba8bda3cf41cd2a8d4faef0`.
+- Current candidate: this branch's HEAD after the cycle-5 receipt commit; no source
+  repair was required in any integration cycle.
 - Target: `bleed`; this branch must remain a draft cumulative PR and must never
   merge `bleed` directly.
-- Publication authority: **not granted**. Do not push this branch or create/update
-  a GitHub PR until an authorized publisher receives this receipt.
+- Publication authority: granted for the cumulative release branch and one draft
+  pull request to `bleed`; never merge `bleed` directly.
 
 ## Included, verified source heads
 
@@ -51,7 +53,8 @@ was performed.
 
 ## Five-cycle integration handoff
 
-Integration cycle count is **4 / 5**. Each cycle must
+Integration cycle count is **5 / 5**. The bounded integration program is complete.
+Each consumed cycle used
 use the current candidate head, a fresh Sol-medium focused integration worker,
 two distinct full-engine adversarial CNC scenarios, isolated support/content,
 fresh per-game commentary and policy review, and combined static checks after any
@@ -64,7 +67,7 @@ world tick 1.
 | 2 | CNC-98 construction-state transition and crate/region release under concurrent construction | complete: crate/husk pass; CNC-107 fixture inconclusive |
 | 3 | CNC-107 pending wall route/reload and access preservation alongside ordinary AI pressure | complete: exact connected and hostile task fixtures passed; no source repair |
 | 4 | Cross-task resource/order contention, target loss/recovery, and save/reload | complete: two valid games exposed fixture failures; no source repair |
-| 5 | Matched full-regression control and final release review | pending |
+| 5 | Matched full-regression control and final release review | complete: exact proven CNC-97/98 and CNC-107 regressions passed |
 
 If any repair is needed, create an owning task-scoped repair branch from the
 recorded candidate head, obtain its review, merge it locally with a merge commit,
@@ -205,3 +208,30 @@ cycle counter. Stop after cycle 5 and retain only the safest proven subset.
   passed.
 - Cycle 4 is consumed exactly once. Cycle 5 must use proven per-task fixtures and
   toggles plus final regression; do not author another combined topology.
+
+## Integration cycle 5 receipt
+
+- Tested exact candidate: `468218b0c1dbde5d4ba8bda3cf41cd2a8d4faef0`.
+  Used only byte-identical previously proven fixtures and their canonical lobby,
+  seed, tick, launcher, and installed-content setup.
+- CNC-97/CNC-98 combined fixture SHA-256
+  `1023032a095d02baafdaa0e3ec7717d5727aac3637cca54ae02472948baa6a26`,
+  seed `40202`, passed at tick 2800, exit 0, in 6.007 seconds. Exact collector/crate
+  attribution passed, construction restoration gated the second crate and region
+  exploration, and concurrent transport handoff restored the owned ORCA husk
+  alive with a post-restore order.
+- CNC-107 hostile fixture SHA-256
+  `ae40d1588763fb26aed40fe3f3b48e73ef2c1894f0cdf285222071ff30c7926e`,
+  seed `10762`, passed at tick 7600, exit 0, in 18.019 seconds. Pre/post-corner
+  probes, confirmed corner wall placement, bounded no-route final state, and save
+  creation all reproduced without fatal, exception, or desync signals.
+- Separate fresh Luna narration and policy review completed for both games. Both
+  policy reviews judged the bounded behavior `mostly sensible` with medium
+  confidence and identified no release-blocking result.
+- Final combined checks passed: `git diff --check origin/bleed...HEAD`, `make
+  check` (Debug, 0 warnings/errors and interface checks), and Release
+  `OpenRA.Test`.
+- Exactly five integration cycles are consumed. No source or balance repair was
+  required. The cumulative release candidate is **promotable** as the safest
+  proven CNC-97/CNC-98/CNC-107 subset; CNC-96 and CNC-100 remain excluded under
+  the recorded risk boundary. Stop testing after this cycle.
