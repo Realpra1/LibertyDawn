@@ -191,8 +191,41 @@ namespace OpenRA.Mods.Common.Traits
 		}
 	}
 
+	public enum DemolitionApproachResponse
+	{
+		Direct,
+		FightThrough,
+		RouteAround,
+		WithdrawOrHold
+	}
+
 	public static class CaptureTargeting
 	{
+		public static bool ConfirmedOwnerless(int firstObservedTick, int worldTick, int graceTicks,
+			bool idle, bool hasActivity, bool reserved, bool transportOwned)
+		{
+			return idle && !hasActivity && !reserved && !transportOwned &&
+				worldTick - firstObservedTick >= System.Math.Max(1, graceTicks);
+		}
+
+		public static DemolitionApproachResponse DemolitionApproach(
+			bool directRouteThreatened, bool favorableFight, bool safeAlternateRoute)
+		{
+			if (!directRouteThreatened)
+				return DemolitionApproachResponse.Direct;
+
+			if (favorableFight)
+				return DemolitionApproachResponse.FightThrough;
+
+			return safeAlternateRoute ? DemolitionApproachResponse.RouteAround :
+				DemolitionApproachResponse.WithdrawOrHold;
+		}
+
+		public static bool CanPreemptDemolition(bool actionableCapture, bool plantedCharge)
+		{
+			return actionableCapture && !plantedCharge;
+		}
+
 		public static IReadOnlyList<DemolitionAllocation> TargetFirstDemolitionAllocation(
 			long[,] distances, bool[,] viable)
 		{

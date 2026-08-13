@@ -333,5 +333,43 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(allocation[0].Unit, Is.EqualTo(0));
 			Assert.That(allocation[0].Target, Is.EqualTo(0));
 		}
+
+		[Test]
+		public void OwnerlessConfirmationRequiresAStableIdleUnreservedGrace()
+		{
+			Assert.That(CaptureTargeting.ConfirmedOwnerless(100, 109, 10,
+				idle: true, hasActivity: false, reserved: false, transportOwned: false), Is.False);
+			Assert.That(CaptureTargeting.ConfirmedOwnerless(100, 110, 10,
+				idle: true, hasActivity: false, reserved: false, transportOwned: false), Is.True);
+			Assert.That(CaptureTargeting.ConfirmedOwnerless(100, 120, 10,
+				idle: false, hasActivity: false, reserved: false, transportOwned: false), Is.False);
+			Assert.That(CaptureTargeting.ConfirmedOwnerless(100, 120, 10,
+				idle: true, hasActivity: true, reserved: false, transportOwned: false), Is.False);
+			Assert.That(CaptureTargeting.ConfirmedOwnerless(100, 120, 10,
+				idle: true, hasActivity: false, reserved: true, transportOwned: false), Is.False);
+			Assert.That(CaptureTargeting.ConfirmedOwnerless(100, 120, 10,
+				idle: true, hasActivity: false, reserved: false, transportOwned: true), Is.False);
+		}
+
+		[TestCase(false, false, false, DemolitionApproachResponse.Direct)]
+		[TestCase(true, true, false, DemolitionApproachResponse.FightThrough)]
+		[TestCase(true, false, true, DemolitionApproachResponse.RouteAround)]
+		[TestCase(true, false, false, DemolitionApproachResponse.WithdrawOrHold)]
+		public void DemolitionApproachHasExplicitThreatStateExits(bool threatened, bool favorableFight,
+			bool alternateRoute, DemolitionApproachResponse expected)
+		{
+			Assert.That(CaptureTargeting.DemolitionApproach(threatened, favorableFight, alternateRoute),
+				Is.EqualTo(expected));
+		}
+
+		[TestCase(false, false, false)]
+		[TestCase(true, true, false)]
+		[TestCase(true, false, true)]
+		public void CapturePreemptsOnlyReversibleDemolition(bool actionableCapture, bool plantedCharge,
+			bool expected)
+		{
+			Assert.That(CaptureTargeting.CanPreemptDemolition(actionableCapture, plantedCharge),
+				Is.EqualTo(expected));
+		}
 	}
 }

@@ -12,6 +12,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using OpenRA.Mods.Common.Pathfinder;
+using OpenRA.Mods.Common.Traits.BotModules.Squads;
+using OpenRA.Primitives;
 using OpenRA.Traits;
 
 namespace OpenRA.Mods.Common.Traits
@@ -55,6 +58,24 @@ namespace OpenRA.Mods.Common.Traits
 
 		[Desc("Minimum delay (in ticks) between trying to demolish with DemolitionActorTypes.")]
 		public readonly int MinimumDemolitionDelay = 375;
+
+		[Desc("Ticks that an otherwise unowned idle demolition specialist must remain eligible before recovery.")]
+		public readonly int DemolitionIdleConfirmationTicks = 10;
+
+		[Desc("Maximum distance for recovered demolition specialists to engage exposed infantry.")]
+		public readonly int DemolitionFallbackCombatRadiusCells = 8;
+
+		[Desc("Extra cells around hostile weapon range rejected by direct demolition approaches.")]
+		public readonly int DemolitionThreatBufferCells = 2;
+
+		[Desc("Maximum cells between queued waypoints on a threat-aware demolition approach.")]
+		public readonly int DemolitionRouteWaypointSpacing = 8;
+
+		[Desc("Radius searched for a safe owned hold when no demolition or favorable combat is viable.")]
+		public readonly int DemolitionHoldSearchRadiusCells = 6;
+
+		[Desc("Ticks between reconsidering an owned demolition-specialist hold.")]
+		public readonly int DemolitionHoldReconsiderTicks = 125;
 
 		[Desc("Write capture and demolition assignments to debug.log.")]
 		public readonly bool DebugLogging = false;
@@ -179,6 +200,45 @@ namespace OpenRA.Mods.Common.Traits
 			public int MissingActivitySinceTick;
 		}
 
+		enum CommandoFallbackPurpose
+		{
+			Combat,
+			Hold
+		}
+
+		sealed class CommandoFallback
+		{
+			public readonly CommandoFallbackPurpose Purpose;
+			public readonly Actor Target;
+			public readonly CPos Destination;
+			public readonly int AssignedTick;
+			public int ReconsiderTick;
+
+			public CommandoFallback(CommandoFallbackPurpose purpose, Actor target, CPos destination,
+				int assignedTick, int reconsiderTick)
+			{
+				Purpose = purpose;
+				Target = target;
+				Destination = destination;
+				AssignedTick = assignedTick;
+				ReconsiderTick = reconsiderTick;
+			}
+		}
+
+		readonly struct CommandoThreat
+		{
+			public readonly Actor Actor;
+			public readonly int Range;
+			public readonly int Value;
+
+			public CommandoThreat(Actor actor, int range)
+			{
+				Actor = actor;
+				Range = range;
+				Value = Math.Max(1, actor.Info.TraitInfoOrDefault<ValuedInfo>()?.Cost ?? 1);
+			}
+		}
+
 		const int PendingOrderGraceTicks = 10;
 
 		readonly World world;
@@ -188,6 +248,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly int maximumCaptureTargetOptions;
 		IBotTransportReservations[] transportReservations;
 		IBotUnitReservations[] unitReservations;
+		IBotTemporaryUnitControl[] temporaryUnitControls;
 		IBotTransportObjectiveService[] transportServices;
 		DomainIndex domainIndex;
 		int minCaptureDelayTicks;
@@ -200,7 +261,10 @@ namespace OpenRA.Mods.Common.Traits
 		readonly Dictionary<Actor, DeferredTarget> deferredTargets = new Dictionary<Actor, DeferredTarget>();
 		readonly HashSet<Actor> pendingCaptureRecovery = new HashSet<Actor>();
 		readonly HashSet<Actor> pendingDemolitionRecovery = new HashSet<Actor>();
+		readonly Dictionary<Actor, int> demolitionIdleSince = new Dictionary<Actor, int>();
+		readonly Dictionary<Actor, CommandoFallback> commandoFallbacks = new Dictionary<Actor, CommandoFallback>();
 		readonly SpecialistTargetReservations targetReservations = new SpecialistTargetReservations();
+		static readonly BitSet<TargetableType> InfantryTargetTypes = new BitSet<TargetableType>("Infantry");
 
 		public CaptureManagerBotModule(Actor self, CaptureManagerBotModuleInfo info)
 			: base(info)
@@ -227,6 +291,7 @@ namespace OpenRA.Mods.Common.Traits
 			transportReservations = self.Owner.PlayerActor.TraitsImplementing<IBotTransportReservations>().ToArray();
 			unitReservations = self.Owner.PlayerActor.TraitsImplementing<IBotUnitReservations>()
 				.Where(reservation => reservation != this).ToArray();
+			temporaryUnitControls = self.Owner.PlayerActor.TraitsImplementing<IBotTemporaryUnitControl>().ToArray();
 			transportServices = self.Owner.PlayerActor.TraitsImplementing<IBotTransportObjectiveService>().ToArray();
 			base.Created(self);
 		}
@@ -234,6 +299,7 @@ namespace OpenRA.Mods.Common.Traits
 		bool IBotUnitReservations.IsUnitReserved(Actor actor)
 		{
 			return actor != null && (activeCapturers.ContainsKey(actor) || activeDemolitionUnits.ContainsKey(actor) ||
+				commandoFallbacks.ContainsKey(actor) ||
 				targetReservations.TryGetReservation(actor.ActorID, out _, out _));
 		}
 
@@ -254,9 +320,11 @@ namespace OpenRA.Mods.Common.Traits
 				pendingCaptureRecovery);
 			var reassessDemolition = AuditAssignments(bot, activeDemolitionUnits, "demolition",
 				SpecialistAssignmentPurpose.Demolition, pendingDemolitionRecovery);
+			var reassessFallback = AuditCommandoFallbacks();
 
 			var scanCapture = reassessCapture || pendingCaptureRecovery.Count != 0 || --minCaptureDelayTicks <= 0;
-			var scanDemolition = reassessDemolition || pendingDemolitionRecovery.Count != 0 || --minDemolitionDelayTicks <= 0;
+			var scanDemolition = reassessDemolition || reassessFallback || pendingDemolitionRecovery.Count != 0 ||
+				--minDemolitionDelayTicks <= 0;
 
 			if (scanCapture)
 			{
@@ -322,6 +390,8 @@ namespace OpenRA.Mods.Common.Traits
 			var targetOptions = relationshipTargets.Concat(ownedRestorableTargets)
 				.GroupBy(target => target.ActorID).Select(group => group.First())
 				.OrderBy(target => target.ActorID).ToArray();
+
+			PreemptReversibleDemolitions(bot, capturers, targetOptions);
 
 			var capturableTargetOptions = targetOptions
 				.Where(target => !targetReservations.IsReservedForOtherPurpose(
@@ -438,6 +508,47 @@ namespace OpenRA.Mods.Common.Traits
 					incumbentIndex >= 0 ? string.Format(", previous={0}#{1}, previous-score={2:0.0}",
 						oldTarget.Actor.Info.Name, oldTarget.Actor.ActorID, scores[incumbentIndex]) : string.Empty);
 				activeCapturers[capturer.Actor] = new SpecialistAssignment(capturer.Actor, target.Actor, world.WorldTick, 1);
+			}
+		}
+
+		void PreemptReversibleDemolitions(IBot bot, TraitPair<CaptureManager>[] capturers, Actor[] targetOptions)
+		{
+			foreach (var target in targetOptions.OrderBy(target => target.ActorID))
+			{
+				var captureCandidate = new CaptureCandidate(target, CaptureEconomicValue(target));
+				if (RequiresPair(captureCandidate))
+					continue;
+
+				var demolition = activeDemolitionUnits.Where(pair => pair.Value.Target == target)
+					.OrderBy(pair => pair.Key.ActorID).FirstOrDefault();
+				if (demolition.Key == null)
+					continue;
+
+				var capturer = capturers.Where(candidate => candidate.Actor.IsIdle &&
+					!activeCapturers.ContainsKey(candidate.Actor) &&
+					!targetReservations.TryGetReservation(candidate.Actor.ActorID, out _, out _) &&
+					(unitReservations == null || !unitReservations.Any(r => r.IsUnitReserved(candidate.Actor))) &&
+					CanCapture(candidate, target) && HasReachableCaptureApproach(candidate.Actor, target))
+					.OrderBy(candidate => DistanceSquared(candidate.Actor, target))
+					.ThenBy(candidate => candidate.Actor.ActorID).FirstOrDefault();
+				if (!CaptureTargeting.CanPreemptDemolition(capturer.Actor != null,
+					HasPendingAutonomousDemolition(target, demolition.Key)))
+					continue;
+
+				RetireAssignment(bot, activeDemolitionUnits, demolition, "demolition",
+					SpecialistAssignmentPurpose.Demolition, "capture-preempted", stopSpecialist: true);
+				pendingDemolitionRecovery.Add(demolition.Key);
+				if (!targetReservations.TryReserve(capturer.Actor.ActorID, target.ActorID,
+					SpecialistAssignmentPurpose.Capture, 1))
+					continue;
+
+				bot.QueueOrder(new Order("CaptureActor", capturer.Actor, Target.FromActor(target), false));
+				activeCapturers.Add(capturer.Actor,
+					new SpecialistAssignment(capturer.Actor, target, world.WorldTick, 1));
+				Debug("ownership target={0}#{1} transition=demolition-to-capture planted=false " +
+					"released-specialist={2}#{3} capture-owner={4}#{5}", target.Info.Name, target.ActorID,
+					demolition.Key.Info.Name, demolition.Key.ActorID, capturer.Actor.Info.Name,
+					capturer.Actor.ActorID);
 			}
 		}
 
@@ -979,14 +1090,6 @@ namespace OpenRA.Mods.Common.Traits
 			if (Info.DemolitionActorTypes.Count == 0 || player.WinState != WinState.Undefined)
 				return;
 
-			var demolitionUnits = world.Actors.Where(a => a.Owner == player && a.IsIdle &&
-				Info.DemolitionActorTypes.Contains(a.Info.Name) && a.Info.HasTraitInfo<DemolitionInfo>() &&
-				!activeDemolitionUnits.ContainsKey(a) && !IsReservedForTransport(a) &&
-				(unitReservations == null || !unitReservations.Any(r => r.IsUnitReserved(a))))
-				.OrderBy(unit => unit.ActorID).ToArray();
-			if (demolitionUnits.Length == 0)
-				return;
-
 			var targets = world.Actors.Where(a => !a.IsDead && a.IsInWorld &&
 				player.RelationshipWith(a.Owner) == PlayerRelationship.Enemy &&
 				a.Info.HasTraitInfo<BuildingInfo>() &&
@@ -994,47 +1097,418 @@ namespace OpenRA.Mods.Common.Traits
 				!targetReservations.IsReserved(a.ActorID))
 				.OrderByDescending(a => a.GetSellValue()).ThenBy(a => a.ActorID)
 				.Take(maximumCaptureTargetOptions).ToArray();
-			if (targets.Length == 0)
+			var threats = CommandoThreats();
+			ReconsiderCommandoHolds(targets, threats);
+
+			var demolitionUnits = world.Actors.Where(IsUnownedIdleCommando)
+				.OrderBy(unit => unit.ActorID).ToArray();
+			var confirmedUnits = demolitionUnits.Where(ConfirmIdleCommando).ToArray();
+			foreach (var stale in demolitionIdleSince.Keys.Where(actor => !demolitionUnits.Contains(actor)).ToArray())
+				demolitionIdleSince.Remove(stale);
+
+			if (confirmedUnits.Length == 0)
 				return;
 
-			var distances = new long[demolitionUnits.Length, targets.Length];
-			var viable = new bool[demolitionUnits.Length, targets.Length];
-			for (var unitIndex = 0; unitIndex < demolitionUnits.Length; unitIndex++)
+			var distances = new long[confirmedUnits.Length, targets.Length];
+			var viable = new bool[confirmedUnits.Length, targets.Length];
+			for (var unitIndex = 0; unitIndex < confirmedUnits.Length; unitIndex++)
 			{
-				var unit = demolitionUnits[unitIndex];
+				var unit = confirmedUnits[unitIndex];
 				for (var targetIndex = 0; targetIndex < targets.Length; targetIndex++)
 				{
 					var target = targets[targetIndex];
 					distances[unitIndex, targetIndex] = DistanceSquared(unit, target);
-					viable[unitIndex, targetIndex] = !IsTargetDeferred(unit, target) &&
-						target.TraitsImplementing<IDemolishable>().Any(d => d.IsValidTarget(target, unit)) &&
-						HasReachableDemolitionApproach(unit, target);
+					viable[unitIndex, targetIndex] = HasCheapDemolitionResponse(unit, target, threats);
 				}
 			}
 
+			var assigned = new HashSet<Actor>();
 			foreach (var allocation in CaptureTargeting.TargetFirstDemolitionAllocation(distances, viable))
 			{
-				var unit = demolitionUnits[allocation.Unit];
+				var unit = confirmedUnits[allocation.Unit];
 				var target = targets[allocation.Target];
-				if (!unit.IsIdle || unitCannotBeOrdered(unit) || IsReservedForTransport(unit) ||
-					(unitReservations != null && unitReservations.Any(r => r.IsUnitReserved(unit))) ||
+				var routeThreats = RouteThreats(unit, target, threats);
+				var favorableFight = IsFavorableDemolitionFight(unit, target, routeThreats);
+				var safeRoute = routeThreats.Length > 0 && !favorableFight ?
+					FindSafeDemolitionRoute(unit, target, threats) : null;
+				var response = CaptureTargeting.DemolitionApproach(routeThreats.Length > 0,
+					favorableFight, safeRoute != null);
+				if (!IsUnownedIdleCommando(unit) ||
 					target.IsDead || !target.IsInWorld || targetReservations.IsReserved(target.ActorID))
+				{
+					Debug("commando {0}#{1} transition=release reason=pre-order-revalidation target={2}#{3} " +
+						"ownership={4} threat={5}", unit.Info.Name, unit.ActorID, target.Info.Name, target.ActorID,
+						OwnershipState(unit), ThreatState(routeThreats));
 					continue;
+				}
+
+				if (response == DemolitionApproachResponse.WithdrawOrHold)
+				{
+					Debug("commando {0}#{1} transition=withdraw-or-hold target={2}#{3} ownership=confirmed-ownerless " +
+						"threat={4} route=no-safe-alternate", unit.Info.Name, unit.ActorID, target.Info.Name,
+						target.ActorID, ThreatState(routeThreats));
+					continue;
+				}
 
 				if (!targetReservations.TryReserve(unit.ActorID, target.ActorID,
 					SpecialistAssignmentPurpose.Demolition, 1))
 					continue;
 
-				bot.QueueOrder(new Order("C4", unit, Target.FromActor(target), false)
-				{
-					ExtraData = Demolition.AutonomousOrderMarker
-				});
+				QueueDemolitionApproach(bot, unit, target, response, routeThreats, safeRoute);
 				AIUtils.BotDebug("AI ({0}): Ordered {1} to demolish {2}", player.ClientIndex, unit, target);
-				Debug("demolish {0}#{1} -> {2}#{3}: value={4}, distance-cells={5:0.0}", unit.Info.Name,
+				Debug("demolish {0}#{1} -> {2}#{3}: value={4}, distance-cells={5:0.0}, " +
+					"transition=approach, ownership=confirmed-ownerless, route={6}, threat={7}",
+					unit.Info.Name,
 					unit.ActorID, target.Info.Name, target.ActorID, target.GetSellValue(),
-					System.Math.Sqrt((target.CenterPosition - unit.CenterPosition).LengthSquared) / 1024d);
+					System.Math.Sqrt((target.CenterPosition - unit.CenterPosition).LengthSquared) / 1024d,
+					response, ThreatState(routeThreats));
 				activeDemolitionUnits.Add(unit, new SpecialistAssignment(unit, target, world.WorldTick, 1));
+				demolitionIdleSince.Remove(unit);
+				assigned.Add(unit);
 			}
+
+			foreach (var unit in confirmedUnits.Where(unit => !assigned.Contains(unit)))
+				AssignCommandoFallback(bot, unit, threats, targets);
+		}
+
+		bool IsUnownedIdleCommando(Actor actor)
+		{
+			return actor.Owner == player && actor.IsIdle && !unitCannotBeOrdered(actor) &&
+				Info.DemolitionActorTypes.Contains(actor.Info.Name) && actor.Info.HasTraitInfo<DemolitionInfo>() &&
+				!activeDemolitionUnits.ContainsKey(actor) && !activeCapturers.ContainsKey(actor) &&
+				!commandoFallbacks.ContainsKey(actor) && !IsReservedForTransport(actor) &&
+				(unitReservations == null || !unitReservations.Any(r => r.IsUnitReserved(actor))) &&
+				(temporaryUnitControls == null || !temporaryUnitControls.Any(c => c.IsUnitTemporarilyControlled(actor)));
+		}
+
+		bool ConfirmIdleCommando(Actor actor)
+		{
+			if (!demolitionIdleSince.TryGetValue(actor, out var idleSince))
+			{
+				demolitionIdleSince.Add(actor, world.WorldTick);
+				minDemolitionDelayTicks = Math.Min(minDemolitionDelayTicks,
+					Math.Max(1, Info.DemolitionIdleConfirmationTicks));
+				Debug("commando {0}#{1} ownership=candidate-ownerless transition=confirming idle-since={2} " +
+					"recheck={3}", actor.Info.Name, actor.ActorID, world.WorldTick,
+					world.WorldTick + Info.DemolitionIdleConfirmationTicks);
+				return false;
+			}
+
+			return CaptureTargeting.ConfirmedOwnerless(idleSince, world.WorldTick,
+				Info.DemolitionIdleConfirmationTicks, actor.IsIdle, actor.CurrentActivity != null,
+				(unitReservations != null && unitReservations.Any(r => r.IsUnitReserved(actor))) ||
+				(temporaryUnitControls != null && temporaryUnitControls.Any(c => c.IsUnitTemporarilyControlled(actor))),
+				IsReservedForTransport(actor));
+		}
+
+		CommandoThreat[] CommandoThreats()
+		{
+			return world.Actors.Where(actor => !actor.IsDead && actor.IsInWorld &&
+				player.RelationshipWith(actor.Owner) == PlayerRelationship.Enemy)
+				.Select(actor => new CommandoThreat(actor, actor.TraitsImplementing<Armament>()
+					.Where(armament => !armament.IsTraitDisabled)
+					.Select(armament => armament.MaxRange().Length).DefaultIfEmpty(0).Max()))
+				.Where(threat => threat.Range > 0)
+				.OrderByDescending(threat => threat.Value).ThenBy(threat => threat.Actor.ActorID)
+				.Take(maximumCaptureTargetOptions * 4).ToArray();
+		}
+
+		CommandoThreat[] RouteThreats(Actor specialist, Actor target, CommandoThreat[] threats)
+		{
+			var targetTypes = specialist.GetEnabledTargetTypes();
+			return threats.Where(threat =>
+				threat.Actor.TraitsImplementing<Armament>().Any(armament =>
+					!armament.IsTraitDisabled && armament.Weapon.IsValidTarget(targetTypes)))
+				.Where(threat =>
+				{
+				var range = threat.Range + WDist.FromCells(Math.Max(0, Info.DemolitionThreatBufferCells)).Length;
+				return AirThreatGeometry.DistanceSquaredToSegment(threat.Actor.CenterPosition,
+					specialist.CenterPosition, target.CenterPosition) <= (long)range * range;
+				}).OrderBy(threat => threat.Actor.ActorID).ToArray();
+		}
+
+		bool IsFavorableDemolitionFight(Actor specialist, Actor target, CommandoThreat[] threats)
+		{
+			if (threats.Length == 0)
+				return false;
+
+			var specialistValue = Math.Max(1, specialist.Info.TraitInfoOrDefault<ValuedInfo>()?.Cost ?? 1);
+			var threatValue = 0;
+			foreach (var threat in threats)
+			{
+				var isDemolitionObjective = threat.Actor == target && target.GetSellValue() <= specialistValue;
+				var isFightableInfantry = threat.Actor.GetEnabledTargetTypes().Overlaps(InfantryTargetTypes) &&
+					StateBase.CanAttackTarget(specialist, threat.Actor);
+				if (!isDemolitionObjective && !isFightableInfantry)
+					return false;
+
+				threatValue += threat.Value;
+			}
+
+			return threatValue <= specialistValue;
+		}
+
+		bool HasCheapDemolitionResponse(Actor specialist, Actor target, CommandoThreat[] threats)
+		{
+			if (IsTargetDeferred(specialist, target) ||
+				!target.TraitsImplementing<IDemolishable>().Any(d => d.IsValidTarget(target, specialist)) ||
+				!HasReachableDemolitionApproach(specialist, target))
+				return false;
+
+			var routeThreats = RouteThreats(specialist, target, threats);
+			if (routeThreats.Length == 0 || IsFavorableDemolitionFight(specialist, target, routeThreats))
+				return true;
+
+			var mobile = specialist.TraitOrDefault<Mobile>();
+			return mobile != null && Util.AdjacentCells(world, Target.FromActor(target)).Any(cell =>
+				mobile.CanStayInCell(cell) && mobile.CanEnterCell(cell, check: BlockedByActor.Immovable) &&
+				!IsThreatenedCell(specialist, cell, threats));
+		}
+
+		List<CPos> FindSafeDemolitionRoute(Actor specialist, Actor target, CommandoThreat[] threats)
+		{
+			var mobile = specialist.TraitOrDefault<Mobile>();
+			if (mobile == null)
+				return null;
+
+			var approachCells = Util.AdjacentCells(world, Target.FromActor(target))
+				.Where(cell => mobile.CanStayInCell(cell) &&
+					mobile.CanEnterCell(cell, check: BlockedByActor.Immovable) &&
+					!IsThreatenedCell(specialist, cell, threats)).ToHashSet();
+			if (approachCells.Count == 0)
+				return null;
+
+			List<CPos> path;
+			using (var search = PathSearch.ToTargetCellByPredicate(world, mobile.Locomotor, specialist,
+				new[] { specialist.Location }, approachCells.Contains, BlockedByActor.Immovable,
+				cell => IsThreatenedCell(specialist, cell, threats) ? PathGraph.PathCostForInvalidPath : 0))
+				path = mobile.Pathfinder.FindPath(search);
+
+			if (path.Count == 0)
+				return null;
+
+			path.Reverse();
+			return path;
+		}
+
+		void QueueDemolitionApproach(IBot bot, Actor specialist, Actor target,
+			DemolitionApproachResponse response, CommandoThreat[] threats, List<CPos> safeRoute)
+		{
+			var queued = false;
+			if (response == DemolitionApproachResponse.FightThrough)
+			{
+				foreach (var threat in threats.Where(threat => threat.Actor != target &&
+					threat.Actor.GetEnabledTargetTypes().Overlaps(InfantryTargetTypes) &&
+					StateBase.CanAttackTarget(specialist, threat.Actor)).OrderBy(threat => threat.Actor.ActorID))
+				{
+					bot.QueueOrder(new Order("Attack", specialist, Target.FromActor(threat.Actor), queued));
+					queued = true;
+				}
+			}
+			else if (response == DemolitionApproachResponse.RouteAround && safeRoute != null)
+			{
+				var spacing = Math.Max(1, Info.DemolitionRouteWaypointSpacing);
+				for (var i = Math.Min(spacing, safeRoute.Count - 1); i < safeRoute.Count; i += spacing)
+				{
+					bot.QueueOrder(new Order("Move", specialist, Target.FromCell(world, safeRoute[i]), queued));
+					queued = true;
+				}
+
+				if (safeRoute.Count > 1 && (safeRoute.Count - 1) % spacing != 0)
+				{
+					bot.QueueOrder(new Order("Move", specialist,
+						Target.FromCell(world, safeRoute[safeRoute.Count - 1]), queued));
+					queued = true;
+				}
+			}
+
+			bot.QueueOrder(new Order("C4", specialist, Target.FromActor(target), queued)
+			{
+				ExtraData = Demolition.AutonomousOrderMarker
+			});
+		}
+
+		void AssignCommandoFallback(IBot bot, Actor unit, CommandoThreat[] threats, Actor[] targets)
+		{
+			if (!IsUnownedIdleCommando(unit))
+				return;
+
+			var combatTarget = world.FindActorsInCircle(unit.CenterPosition,
+				WDist.FromCells(Math.Max(1, Info.DemolitionFallbackCombatRadiusCells)))
+				.Where(actor => !actor.IsDead && actor.IsInWorld &&
+					player.RelationshipWith(actor.Owner) == PlayerRelationship.Enemy &&
+					actor.GetEnabledTargetTypes().Overlaps(InfantryTargetTypes) &&
+					StateBase.CanAttackTarget(unit, actor) &&
+					IsFavorableDemolitionFight(unit, actor, RouteThreats(unit, actor, threats)))
+				.OrderBy(actor => DistanceSquared(unit, actor)).ThenBy(actor => actor.ActorID).FirstOrDefault();
+			if (combatTarget != null)
+			{
+				bot.QueueOrder(new Order("Attack", unit, Target.FromActor(combatTarget), false));
+				commandoFallbacks.Add(unit, new CommandoFallback(CommandoFallbackPurpose.Combat,
+					combatTarget, CPos.Zero, world.WorldTick, world.WorldTick + StalledAssignmentTicks(
+						SpecialistAssignmentPurpose.Demolition)));
+				demolitionIdleSince.Remove(unit);
+				Debug("commando {0}#{1} transition=favorable-combat target={2}#{3} ownership=recovered " +
+					"threat=fightable-infantry", unit.Info.Name, unit.ActorID, combatTarget.Info.Name,
+					combatTarget.ActorID);
+				return;
+			}
+
+			var holdCell = FindSafeCommandoHoldCell(unit, threats);
+			if (holdCell == null)
+			{
+				Debug("commando {0}#{1} transition=release reason=no-safe-hold ownership={2} " +
+					"targets={3}", unit.Info.Name, unit.ActorID, OwnershipState(unit), targets.Length);
+				return;
+			}
+
+			bot.QueueOrder(new Order("Move", unit, Target.FromCell(world, holdCell.Value), false));
+			commandoFallbacks.Add(unit, new CommandoFallback(CommandoFallbackPurpose.Hold, null,
+				holdCell.Value, world.WorldTick, world.WorldTick + Math.Max(1, Info.DemolitionHoldReconsiderTicks)));
+			demolitionIdleSince.Remove(unit);
+			Debug("commando {0}#{1} transition=safe-hold destination={2} ownership=recovered " +
+				"reason=no-viable-demolition reconsider={3}", unit.Info.Name, unit.ActorID, holdCell.Value,
+				world.WorldTick + Math.Max(1, Info.DemolitionHoldReconsiderTicks));
+		}
+
+		CPos? FindSafeCommandoHoldCell(Actor unit, CommandoThreat[] threats)
+		{
+			var mobile = unit.TraitOrDefault<Mobile>();
+			if (mobile == null)
+				return null;
+
+			return world.Map.FindTilesInAnnulus(unit.Location, 2,
+				Math.Max(2, Info.DemolitionHoldSearchRadiusCells))
+				.Where(cell => mobile.CanStayInCell(cell) &&
+					mobile.CanEnterCell(cell, check: BlockedByActor.Immovable) &&
+					(domainIndex == null || domainIndex.IsPassable(unit.Location, cell, mobile.Locomotor)) &&
+					!IsThreatenedCell(unit, cell, threats))
+				.OrderByDescending(cell => threats.Select(threat =>
+					(long)(world.Map.CenterOfCell(cell) - threat.Actor.CenterPosition).LengthSquared)
+					.DefaultIfEmpty(long.MaxValue).Min())
+				.ThenBy(cell => (cell - unit.Location).LengthSquared)
+				.ThenBy(cell => cell.X).ThenBy(cell => cell.Y).Select(cell => (CPos?)cell).FirstOrDefault();
+		}
+
+		bool IsThreatenedCell(Actor unit, CPos cell, CommandoThreat[] threats)
+		{
+			var targetTypes = unit.GetEnabledTargetTypes();
+			var position = world.Map.CenterOfCell(cell);
+			foreach (var threat in threats)
+			{
+				if (!threat.Actor.TraitsImplementing<Armament>().Any(armament =>
+					!armament.IsTraitDisabled && armament.Weapon.IsValidTarget(targetTypes)))
+					continue;
+
+				var range = threat.Range + WDist.FromCells(Math.Max(0, Info.DemolitionThreatBufferCells)).Length;
+				if ((position - threat.Actor.CenterPosition).LengthSquared <= (long)range * range)
+					return true;
+			}
+
+			return false;
+		}
+
+		void ReconsiderCommandoHolds(Actor[] targets, CommandoThreat[] threats)
+		{
+			var due = commandoFallbacks.Where(pair => pair.Value.Purpose == CommandoFallbackPurpose.Hold &&
+				world.WorldTick >= pair.Value.ReconsiderTick && pair.Key.IsIdle)
+				.OrderBy(pair => pair.Key.ActorID).ToArray();
+			if (due.Length == 0)
+				return;
+
+			var distances = new long[due.Length, targets.Length];
+			var viable = new bool[due.Length, targets.Length];
+			for (var unitIndex = 0; unitIndex < due.Length; unitIndex++)
+			{
+				var unit = due[unitIndex].Key;
+				for (var targetIndex = 0; targetIndex < targets.Length; targetIndex++)
+				{
+					distances[unitIndex, targetIndex] = DistanceSquared(unit, targets[targetIndex]);
+					viable[unitIndex, targetIndex] = HasViableDemolitionResponse(unit,
+						targets[targetIndex], threats);
+				}
+			}
+
+			var resumed = CaptureTargeting.TargetFirstDemolitionAllocation(distances, viable)
+				.Select(allocation => due[allocation.Unit].Key).ToHashSet();
+			foreach (var pair in due)
+			{
+				var unit = pair.Key;
+				if (resumed.Contains(unit))
+				{
+					commandoFallbacks.Remove(unit);
+					demolitionIdleSince[unit] = world.WorldTick - Math.Max(1, Info.DemolitionIdleConfirmationTicks);
+					Debug("commando {0}#{1} transition=hold-resume reason=viable-objective " +
+						"ownership=released-for-demolition", unit.Info.Name, unit.ActorID);
+					continue;
+				}
+
+				pair.Value.ReconsiderTick = world.WorldTick + Math.Max(1, Info.DemolitionHoldReconsiderTicks);
+				Debug("commando {0}#{1} transition=hold-continue reason=no-unreserved-safe-objective " +
+					"destination={2} reconsider={3}", unit.Info.Name, unit.ActorID,
+					pair.Value.Destination, pair.Value.ReconsiderTick);
+			}
+		}
+
+		bool HasViableDemolitionResponse(Actor unit, Actor target, CommandoThreat[] threats)
+		{
+			if (IsTargetDeferred(unit, target) ||
+				!target.TraitsImplementing<IDemolishable>().Any(d => d.IsValidTarget(target, unit)) ||
+				!HasReachableDemolitionApproach(unit, target))
+				return false;
+
+			var routeThreats = RouteThreats(unit, target, threats);
+			if (routeThreats.Length == 0 || IsFavorableDemolitionFight(unit, target, routeThreats))
+				return true;
+
+			return FindSafeDemolitionRoute(unit, target, threats) != null;
+		}
+
+		bool AuditCommandoFallbacks()
+		{
+			var reassess = false;
+			foreach (var pair in commandoFallbacks.OrderBy(pair => pair.Key.ActorID).ToArray())
+			{
+				var unit = pair.Key;
+				var fallback = pair.Value;
+				var invalid = unitCannotBeOrdered(unit) || IsReservedForTransport(unit) ||
+					(unitReservations != null && unitReservations.Any(r => r.IsUnitReserved(unit))) ||
+					(temporaryUnitControls != null && temporaryUnitControls.Any(c => c.IsUnitTemporarilyControlled(unit)));
+				var combatComplete = fallback.Purpose == CommandoFallbackPurpose.Combat &&
+					(fallback.Target == null || fallback.Target.IsDead || !fallback.Target.IsInWorld ||
+					player.RelationshipWith(fallback.Target.Owner) != PlayerRelationship.Enemy ||
+					(unit.IsIdle && world.WorldTick - fallback.AssignedTick >= PendingOrderGraceTicks));
+				if (!invalid && !combatComplete)
+					continue;
+
+				commandoFallbacks.Remove(unit);
+				demolitionIdleSince.Remove(unit);
+				reassess = true;
+				Debug("commando {0}#{1} transition=release reason={2} ownership={3} purpose={4}",
+					unit.Info.Name, unit.ActorID, invalid ? "owner-conflict" : "combat-complete",
+					OwnershipState(unit), fallback.Purpose);
+			}
+
+			return reassess;
+		}
+
+		string OwnershipState(Actor actor)
+		{
+			if (unitCannotBeOrdered(actor))
+				return "not-orderable";
+			if (IsReservedForTransport(actor))
+				return "transport";
+			if (unitReservations != null && unitReservations.Any(r => r.IsUnitReserved(actor)))
+				return "unit-reservation";
+			if (temporaryUnitControls != null && temporaryUnitControls.Any(c => c.IsUnitTemporarilyControlled(actor)))
+				return "temporary-control";
+			return actor.IsIdle ? "ownerless-idle" : "activity";
+		}
+
+		static string ThreatState(CommandoThreat[] threats)
+		{
+			return threats == null || threats.Length == 0 ? "clear" : string.Format("persistent:{0}#{1}",
+				threats[0].Actor.Info.Name, threats[0].Actor.ActorID);
 		}
 
 		bool HasReachableDemolitionApproach(Actor specialist, Actor target)
