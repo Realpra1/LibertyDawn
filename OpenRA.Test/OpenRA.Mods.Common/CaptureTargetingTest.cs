@@ -287,5 +287,51 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(allocation.SecondTarget, Is.EqualTo(1));
 			Assert.That(allocation.Score, Is.EqualTo(200));
 		}
+
+		[Test]
+		public void DemolitionAllocationIsTargetFirstAndChoosesNearestViableSpecialist()
+		{
+			var distances = new long[,]
+			{
+				{ 900, 4 },
+				{ 9, 100 },
+				{ 1, 1 }
+			};
+			var viable = new bool[,]
+			{
+				{ true, true },
+				{ true, true },
+				{ false, true }
+			};
+
+			var allocation = CaptureTargeting.TargetFirstDemolitionAllocation(distances, viable);
+
+			Assert.That(allocation.Select(pair => pair.Target), Is.EqualTo(new[] { 0, 1 }));
+			Assert.That(allocation.Select(pair => pair.Unit), Is.EqualTo(new[] { 1, 2 }),
+				"The lower-ID far specialist must not consume the target before the nearer viable specialist.");
+		}
+
+		[Test]
+		public void DemolitionAllocationUsesStableUnitTieAndLeavesSurplusUnassigned()
+		{
+			var distances = new long[,]
+			{
+				{ 25 },
+				{ 25 },
+				{ 4 }
+			};
+			var viable = new bool[,]
+			{
+				{ true },
+				{ true },
+				{ false }
+			};
+
+			var allocation = CaptureTargeting.TargetFirstDemolitionAllocation(distances, viable);
+
+			Assert.That(allocation.Count, Is.EqualTo(1));
+			Assert.That(allocation[0].Unit, Is.EqualTo(0));
+			Assert.That(allocation[0].Target, Is.EqualTo(0));
+		}
 	}
 }

@@ -187,6 +187,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly Predicate<Actor> unitCannotBeOrdered;
 		readonly int maximumCaptureTargetOptions;
 		IBotTransportReservations[] transportReservations;
+		IBotUnitReservations[] unitReservations;
 		IBotTransportObjectiveService[] transportServices;
 		DomainIndex domainIndex;
 		int minCaptureDelayTicks;
@@ -224,6 +225,8 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			domainIndex = world.WorldActor.TraitOrDefault<DomainIndex>();
 			transportReservations = self.Owner.PlayerActor.TraitsImplementing<IBotTransportReservations>().ToArray();
+			unitReservations = self.Owner.PlayerActor.TraitsImplementing<IBotUnitReservations>()
+				.Where(reservation => reservation != this).ToArray();
 			transportServices = self.Owner.PlayerActor.TraitsImplementing<IBotTransportObjectiveService>().ToArray();
 			base.Created(self);
 		}
@@ -976,24 +979,46 @@ namespace OpenRA.Mods.Common.Traits
 			if (Info.DemolitionActorTypes.Count == 0 || player.WinState != WinState.Undefined)
 				return;
 
-			var demolitionUnits = world.Actors.Where(a => a.Owner == player &&
-				(a.IsIdle || pendingDemolitionRecovery.Contains(a)) &&
+			var demolitionUnits = world.Actors.Where(a => a.Owner == player && a.IsIdle &&
 				Info.DemolitionActorTypes.Contains(a.Info.Name) && a.Info.HasTraitInfo<DemolitionInfo>() &&
-				!activeDemolitionUnits.ContainsKey(a) && !IsReservedForTransport(a)).ToArray();
+				!activeDemolitionUnits.ContainsKey(a) && !IsReservedForTransport(a) &&
+				(unitReservations == null || !unitReservations.Any(r => r.IsUnitReserved(a))))
+				.OrderBy(unit => unit.ActorID).ToArray();
+			if (demolitionUnits.Length == 0)
+				return;
 
-			foreach (var unit in demolitionUnits.OrderBy(unit => unit.ActorID))
+			var targets = world.Actors.Where(a => !a.IsDead && a.IsInWorld &&
+				player.RelationshipWith(a.Owner) == PlayerRelationship.Enemy &&
+				a.Info.HasTraitInfo<BuildingInfo>() &&
+				(!Info.CheckCaptureTargetsForVisibility || a.CanBeViewedByPlayer(player)) &&
+				!targetReservations.IsReserved(a.ActorID))
+				.OrderByDescending(a => a.GetSellValue()).ThenBy(a => a.ActorID)
+				.Take(maximumCaptureTargetOptions).ToArray();
+			if (targets.Length == 0)
+				return;
+
+			var distances = new long[demolitionUnits.Length, targets.Length];
+			var viable = new bool[demolitionUnits.Length, targets.Length];
+			for (var unitIndex = 0; unitIndex < demolitionUnits.Length; unitIndex++)
 			{
-				var target = world.Actors.Where(a => !a.IsDead && a.IsInWorld &&
-					player.RelationshipWith(a.Owner) == PlayerRelationship.Enemy &&
-					a.Info.HasTraitInfo<BuildingInfo>() &&
-					a.TraitsImplementing<IDemolishable>().Any(d => d.IsValidTarget(a, unit)) &&
-					(!Info.CheckCaptureTargetsForVisibility || a.CanBeViewedByPlayer(player)) &&
-					!IsTargetDeferred(unit, a) &&
-					!targetReservations.IsReserved(a.ActorID))
-					.OrderByDescending(a => a.GetSellValue())
-					.Take(maximumCaptureTargetOptions)
-					.MinByOrDefault(a => (a.CenterPosition - unit.CenterPosition).LengthSquared);
-				if (target == null)
+				var unit = demolitionUnits[unitIndex];
+				for (var targetIndex = 0; targetIndex < targets.Length; targetIndex++)
+				{
+					var target = targets[targetIndex];
+					distances[unitIndex, targetIndex] = DistanceSquared(unit, target);
+					viable[unitIndex, targetIndex] = !IsTargetDeferred(unit, target) &&
+						target.TraitsImplementing<IDemolishable>().Any(d => d.IsValidTarget(target, unit)) &&
+						HasReachableDemolitionApproach(unit, target);
+				}
+			}
+
+			foreach (var allocation in CaptureTargeting.TargetFirstDemolitionAllocation(distances, viable))
+			{
+				var unit = demolitionUnits[allocation.Unit];
+				var target = targets[allocation.Target];
+				if (!unit.IsIdle || unitCannotBeOrdered(unit) || IsReservedForTransport(unit) ||
+					(unitReservations != null && unitReservations.Any(r => r.IsUnitReserved(unit))) ||
+					target.IsDead || !target.IsInWorld || targetReservations.IsReserved(target.ActorID))
 					continue;
 
 				if (!targetReservations.TryReserve(unit.ActorID, target.ActorID,
@@ -1010,6 +1035,20 @@ namespace OpenRA.Mods.Common.Traits
 					System.Math.Sqrt((target.CenterPosition - unit.CenterPosition).LengthSquared) / 1024d);
 				activeDemolitionUnits.Add(unit, new SpecialistAssignment(unit, target, world.WorldTick, 1));
 			}
+		}
+
+		bool HasReachableDemolitionApproach(Actor specialist, Actor target)
+		{
+			var mobile = specialist.TraitOrDefault<Mobile>();
+			if (mobile == null || domainIndex == null)
+				return true;
+
+			foreach (var cell in Util.AdjacentCells(world, Target.FromActor(target)))
+				if (mobile.CanStayInCell(cell) && mobile.CanEnterCell(cell, check: BlockedByActor.Immovable) &&
+					domainIndex.IsPassable(specialist.Location, cell, mobile.Locomotor))
+					return true;
+
+			return false;
 		}
 
 		bool IsReservedForTransport(Actor actor)
