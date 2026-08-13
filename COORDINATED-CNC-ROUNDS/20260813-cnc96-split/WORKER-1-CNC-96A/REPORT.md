@@ -2,11 +2,12 @@
 
 ## Status
 
-Cycles 1-8 implemented and checked. Cycle 8 proved detector-only engagement
-continuation and detector-plus-armed Stop attribution, then exposed and corrected
-two lifecycle boundaries. Proposed status remains `First iteration - testing`:
-the exact two-game cap was exhausted before the final active-engagement retention
-correction could receive full-engine proof.
+Cycles 1-10 implemented and checked. Cycle 10 proves detector-plus-armed Stop
+suppresses new fire after already-committed missiles, and proves a damaged member
+with no repair remains active/reserved through scripted death. Proposed status
+remains `First iteration - testing`: the exact two-game cap was exhausted with no
+surviving actor for the <=25 resume and with `ReserveOpeningPair` handing the
+intended repair actor to ordinary AI before repair/rejoin could be exercised.
 
 ## Task boundary
 
@@ -1045,3 +1046,65 @@ preflight, and `git diff --check` passed. Exactly two valid games ran. Proposed
 status remains `First iteration - testing`: blocker ordering passes and exact
 assignment release is proved, but shot/damage timing needs one narrow diagnostic
 cycle before Terra final review; repair behavior still lacks engine evidence.
+## Cycle 10 evidence — causal Stop telemetry and repair lifecycle
+
+Cycle 10 started exactly at durable head `94c12dce8892ff437763ea5508f752973c25a3bd`.
+The only product correction is the missing terminal `Repair` order after a safe
+repair route: the prior lifecycle queued Move waypoint(s), marked the member as
+repairing, and excluded it from combat, but never invoked `Repairable.ResolveOrder`
+to enter `Resupply`. It now queues the compatible facility actor as a queued
+`Repair` target. Opt-in specialist logs additionally record exact safety ticks,
+pre-Stop activity, armament reload/FireDelay/Burst, and exact resume identity.
+No cadence, threshold, priority, balance, route, cache, Air, or config value changed.
+
+### Game A — detector plus armed Stop and committed missile diagnosis
+
+The full-engine VIKI/Nod versus Brutalis/GDI all-module, no-Air game reached tick
+1900 in 6.006s with exit 0 and no exception/fatal/desync. Armed MTNK support was
+injected at tick 601. At exact local boundary 625 both VIKI STNK activities were
+`Attack`; one ground armament was reloading with delay 68/burst 2 and the other
+with delay 3/burst 1. Both received Stop with exact MHQ owner/range18 and MTNK
+owner/range7. Four already-committed missiles impacted at ticks 650/651/660/661;
+no later Harvester impact or newly queued specialist Attack was logged through
+the extended armed window. This resolves cycle 9's armed boolean: it mixed the
+24 ticks before Stop and unavoidable launched missiles with unsafe continued fire.
+
+The extended window exposed a separate fixture failure: assignment changed from
+two specialists to one and then zero before shooter removal at tick 801, proving
+both held STNKs died. Therefore no actor remained to satisfy the exact <=25-tick
+resume requirement. This is an engine-valid behavioral failure, not proof of a
+resume-code defect. Raw tick mean/p50/p95/p99/max were
+`0.723/0.253/1.520/8.208/1053.159ms`, four >=50ms, startup-dominated.
+
+- Artifact: `analysis/20260813-cnc96-split/worker-1-cnc-96a/cycle10/games/game-a-valid/cycle10-armed-recovery`
+- Fresh Luna narrative/review: `cycle10/reviews/game-a-narrator/NARRATIVE.md`; `cycle10/reviews/game-a-policy/POLICY-REVIEW.md` (Stop/in-flight supported; resume failed).
+
+### Game B — no-repair active pass, repair fixture conflict
+
+The distinct full-engine VIKI/Brutalis all-module, no-Air game reached tick 2200
+in 6.006s with exit 0 and no integrity fault. Two named STNKs began at
+6000/15000 with no facility; specialist telemetry recorded `total=2 reserved=2`.
+The Lua object-identity callback proves the exact no-repair actor repeatedly dealt
+Harvester damage from tick 200 while remaining at 6000 HP. It was alive and had
+damaged the target at tick 451, when the fixture deliberately destroyed it; one
+committed missile landed at tick 465. This literally proves active/reserved
+no-repair behavior through death rather than parking or waiting.
+
+The same death invalidated the intended repair phase: with one eligible STNK,
+`ReserveOpeningPair` correctly changed assignment to `total=1 reserved=0 groups=0
+ordinary=1`. The compatible `fix` created at tick 451 stayed alive, but the
+specialist module no longer owned the survivor; health stayed 6000/15000 and no
+specialist repair/rejoin could occur. This is fixture-conflicted missing coverage,
+not evidence against the Repair order. Raw tick mean/p50/p95/p99/max were
+`0.615/0.212/1.358/11.842/1125.856ms`, three >=50ms, startup-dominated.
+
+- Artifact: `analysis/20260813-cnc96-split/worker-1-cnc-96a/cycle10/games/game-b-valid/cycle10-repair`
+- Fresh Luna narrative/review: `cycle10/reviews/game-b-narrator/NARRATIVE.md`; `cycle10/reviews/game-b-policy/POLICY-REVIEW.md` (no-repair pass; repair/rejoin unproved).
+
+One pre-completion Game A attempt failed at tick 649 because Lua used an unsupported
+`ActorID` property; it was repaired before the two valid games and is excluded.
+Protected Release CNC compilation passed with zero warnings/errors, full CNC
+MiniYAML lint passed, focused policy tests remain 79/79, Lua syntax and diff checks
+pass. At the exact two-game cap the result remains `First iteration - testing`:
+not ready for Terra final review/publication until a surviving <=25 resume and a
+reserved compatible repair/full-rejoin are both proved.

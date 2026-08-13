@@ -398,13 +398,20 @@ namespace OpenRA.Mods.Common.Traits
 					orders++;
 					detectorFound |= detectorExposure;
 					if (Info.DebugLogging)
-						Log.Write("debug", "AI stealth local safety {0} [{1}:{2}] stopped {3}#{4}: detector={5} armed-coverage={6} engaged-weapon={7} blue-adjacent={8} detector-source={9} detector-owner={10} detector-buffered-range={11} armed-source={12} armed-owner={13} armed-buffered-range={14}.",
-							Info.SquadLabel, player.PlayerName, group.Index, unit.Info.Name, unit.ActorID,
+					{
+						var activity = unit.CurrentActivity?.GetType().Name ?? "none";
+						var armament = string.Join(",", unit.TraitsImplementing<Armament>()
+							.Where(a => !a.IsTraitDisabled).Select(a =>
+								$"{a.Info.Weapon}:reload={a.IsReloading}:delay={a.FireDelay}:burst={a.Burst}"));
+						Log.Write("debug", "AI stealth local safety {0} [{1}:{2}] tick={3} stopped {4}#{5}: activity={6} armament={7} detector={8} armed-coverage={9} engaged-weapon={10} blue-adjacent={11} detector-source={12} detector-owner={13} detector-buffered-range={14} armed-source={15} armed-owner={16} armed-buffered-range={17}.",
+							Info.SquadLabel, player.PlayerName, group.Index, world.WorldTick, unit.Info.Name, unit.ActorID,
+							activity, armament,
 							detectorExposure, armedCoverage, engagedWeaponExposure, blueAdjacent,
 							detector == null ? "none" : detector.Info.Name + "#" + detector.ActorID,
 							detector == null ? "none" : detector.Owner.InternalName, detectorRange,
 							armedSupport == null ? "none" : armedSupport.Info.Name + "#" + armedSupport.ActorID,
 							armedSupport == null ? "none" : armedSupport.Owner.InternalName, armedRange);
+					}
 					if (detectorExposure && armedCoverage)
 					{
 						group.SuspendedEngagementTarget = group.Target;
@@ -433,9 +440,11 @@ namespace OpenRA.Mods.Common.Traits
 					BeginRetainedPlan(group, suspendedTarget,
 						units.Select(a => a.CenterPosition).Average());
 					if (Info.DebugLogging)
-						Log.Write("debug", "AI stealth local safety {0} [{1}:{2}] resumed target {3}#{4}: detector-only-or-clear=true units={5}.",
-							Info.SquadLabel, player.PlayerName, group.Index, suspendedTarget.Info.Name,
-							suspendedTarget.ActorID, units.Length);
+						Log.Write("debug", "AI stealth local safety {0} [{1}:{2}] tick={3} resumed target {4}#{5}: detector-only-or-clear=true units={6} activities={7}.",
+							Info.SquadLabel, player.PlayerName, group.Index, world.WorldTick,
+							suspendedTarget.Info.Name, suspendedTarget.ActorID, units.Length,
+							string.Join(",", units.Select(a => a.Info.Name + "#" + a.ActorID + ":" +
+								(a.CurrentActivity?.GetType().Name ?? "none"))));
 				}
 				else if (group.SuspendedEngagementTarget != null && !validSuspendedTarget)
 				{
@@ -520,6 +529,7 @@ namespace OpenRA.Mods.Common.Traits
 				bot.QueueOrder(new Order("Move", unit, Target.FromCell(world, waypoint), queued));
 				queued = true;
 			}
+			bot.QueueOrder(new Order("Repair", unit, Target.FromActor(facility), queued));
 
 			repairing.Add(unit.ActorID);
 			repairTargets[unit.ActorID] = facility.ActorID;
@@ -529,7 +539,7 @@ namespace OpenRA.Mods.Common.Traits
 				Log.Write("debug", "AI stealth repair {0} [{1}] {2}#{3}: {4}/{5} HP, moving by {6} waypoint(s) to compatible safe repair aura {7}#{8}.",
 					Info.SquadLabel, player.PlayerName, unit.Info.Name, unit.ActorID, health.HP,
 					health.MaxHP, route.Count, facility.Info.Name, facility.ActorID);
-			return route.Count;
+			return route.Count + 1;
 		}
 
 		List<CPos> FindRepairRoute(Actor unit, out Actor facility)
