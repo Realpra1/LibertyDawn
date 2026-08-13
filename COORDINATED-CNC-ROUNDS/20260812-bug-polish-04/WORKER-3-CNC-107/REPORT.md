@@ -5,9 +5,9 @@
 - Proposed status: `Complete - testing`
 - Cycle/model: `5 / Sol medium completed; 5/5 primary cycles used`
 - Branch: `agent/round-20260812-cnc107-wall-repair`
-- Head: `9a587e9911` before the cycle-5 state/report commit
+- Head: `8b7b9c0b12` at PR publication; final receipt update follows
 - Base: `4e12088061ac277c51de2e658dc0209337b80968`
-- PR/CI: pending publication; local focused and prior full/build checks pass
+- PR/CI: draft [#103](https://github.com/Realpra1/LibertyDawn/pull/103) open against `bleed`; GitHub CI started; local focused and prior full/build checks pass
 
 ## Cycle 5 — task-owner resolution and terminal no-route acceptance
 
@@ -170,7 +170,8 @@ Cycle 1 implements and validates the coherent initial solution. It is not propos
   single-process allocation benchmark remain advisory. The pending save/reload,
   cutoff, fallback, ownership, stable order, and plan validation already have
   focused or full-engine evidence.
-- Task PR/CI and final review remain release-process steps after this publication.
+- Independent final review and integration remain release-process steps after task
+  PR #103; GitHub CI started at publication.
 - The nearest metric is squared distance to the saved bound Fact location. This is deterministic and matches the packet wording/test evidence, but later adversarial tests should retain equal-distance ties to guard the interpretation.
 - The path probe is intentionally strict: any live actor in a path cell blocks acceptance. That satisfies the literal no-occupied-path rule but may defer routes that a movable ally could eventually vacate; cadence retries are the intended recovery.
 
