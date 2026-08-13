@@ -39,7 +39,8 @@ def main() -> None:
 	high_unit_support = ", ".join(
 		["e1"] * 80 + ["e2"] * 40 + ["e3"] * 30 + ["e4"] * 20 + ["e5"] * 10 +
 		["bggy"] * 20 + ["bike"] * 20 + ["jeep"] * 20 + ["ltnk"] * 25 +
-		["mtnk"] * 25 + ["ftnk"] * 10 + ["htnk"] * 10 + ["arty"] * 5 + ["msam"] * 5
+		["mtnk"] * 25 + ["ftnk"] * 10 + ["htnk"] * 10 + ["stnk"] * 10 + ["ctnk"] * 10 +
+		["arty"] * 5 + ["msam"] * 5
 	)
 
 	high_unit_rules = f"""Player:
@@ -94,6 +95,10 @@ World:
 \tSquadManagerBotModule@ironreaper:
 \t\tGroundTargetDebugLogging: true
 \t\tFailsafeReconsiderInterval: 75
+\tStealthTankSquadBotModule:
+\t\tDebugLogging: true
+\tStealthTankSquadBotModule@chemical:
+\t\tDebugLogging: true
 \t\tFailsafeTestAdvancedWorkMilliseconds: 15
 
 World:

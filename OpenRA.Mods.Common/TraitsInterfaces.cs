@@ -597,6 +597,9 @@ namespace OpenRA.Mods.Common.Traits
 	}
 
 	[RequireExplicitImplementation]
+	public interface IBotPerformanceIdentity { string PerformanceIdentity { get; } }
+
+	[RequireExplicitImplementation]
 	public interface IBotRespondToAttack { void RespondToAttack(IBot bot, Actor self, AttackInfo e); }
 
 	[RequireExplicitImplementation]

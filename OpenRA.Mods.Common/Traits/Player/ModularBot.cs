@@ -170,18 +170,31 @@ namespace OpenRA.Mods.Common.Traits
 					foreach (var t in tickModules)
 						if (t.IsTraitEnabled())
 						{
-							if (advancedFailsafe == null || !(t is IAdvancedBotTick advanced) ||
-								!advancedElapsed.ContainsKey(advanced.FailsafeModuleId) ||
-								!advancedFailsafe.IsEnabled(advanced.FailsafeModuleId))
+							var advanced = t as IAdvancedBotTick;
+							var accountAdvanced = advancedFailsafe != null && advanced != null &&
+								advancedElapsed.ContainsKey(advanced.FailsafeModuleId) &&
+								advancedFailsafe.IsEnabled(advanced.FailsafeModuleId);
+							if (!accountAdvanced && !Game.IsBenchmarking)
 							{
 								t.BotTick(this);
 								continue;
 							}
 
 							var start = Stopwatch.GetTimestamp();
-							t.BotTick(this);
-							advancedElapsed[advanced.FailsafeModuleId] += 1000d *
-								Math.Max(0, Stopwatch.GetTimestamp() - start) / Stopwatch.Frequency;
+							var queuedOrders = orders.Count;
+							try { t.BotTick(this); }
+							finally
+							{
+								var elapsed = 1000.0 * Math.Max(0, Stopwatch.GetTimestamp() - start) / Stopwatch.Frequency;
+								if (accountAdvanced)
+									advancedElapsed[advanced.FailsafeModuleId] += elapsed;
+
+								if (Game.IsBenchmarking)
+								{
+									var identity = (t as IBotPerformanceIdentity)?.PerformanceIdentity ?? t.GetType().Name;
+									Game.RecordBotModuleSample(player.ClientIndex, identity, elapsed, orders.Count - queuedOrders);
+								}
+							}
 						}
 				});
 			}
@@ -216,6 +229,8 @@ namespace OpenRA.Mods.Common.Traits
 			// same-window floor when the completed tick samples have not caught up.
 			var compatibleTotalElapsed = Math.Max(totalSimulationElapsed, Math.Max(0, sampleElapsed));
 			var decision = advancedFailsafe.Update(pacing, compatibleTotalElapsed, advancedElapsed);
+			var advancedBreakdown = string.Join(",", info.AdvancedSquadModules.Select(module =>
+				string.Format("{0}:{1:0.000}", module, advancedElapsed[module])));
 			totalSimulationElapsed = 0;
 			foreach (var module in info.AdvancedSquadModules)
 				advancedElapsed[module] = 0;
@@ -225,8 +240,6 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (info.AdvancedSquadFailsafeDebugLogging && decision.Transition != "healthy" && decision.Transition != "cooldown")
 			{
-				var advancedBreakdown = string.Join(",", info.AdvancedSquadModules.Select(module =>
-					string.Format("{0}:{1:0.000}", module, advancedElapsed[module])));
 				Log.Write("debug", "Advanced squad failsafe [{0}]: source={1} reliable={2} reason={3} ratio={4:0.000} " +
 					"window={5} total-ms={6:0.000} advanced-ms={7:0.000} module-ms={8} share={9:P1} threshold={10:P0} " +
 					"transition={11} module={12} offender={13} disabled={14}.", player.PlayerName,
