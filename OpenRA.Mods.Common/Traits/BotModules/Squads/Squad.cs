@@ -9,7 +9,9 @@
  */
 #endregion
 
+using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using OpenRA.Support;
 using OpenRA.Traits;
@@ -121,7 +123,10 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 						return;
 				}
 
-				FuzzyStateMachine.Update(this);
+				if (Type == SquadType.Air && Game.IsBenchmarking)
+					BenchmarkAirWork("strategy", () => FuzzyStateMachine.Update(this));
+				else
+					FuzzyStateMachine.Update(this);
 			}
 		}
 
@@ -132,7 +137,27 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		public void TickAirSafety()
 		{
 			if (IsValid && Type == SquadType.Air)
-				AirStateBase.TickAirSafety(this);
+			{
+				if (Game.IsBenchmarking)
+					BenchmarkAirWork("local-safety", () => AirStateBase.TickAirSafety(this));
+				else
+					AirStateBase.TickAirSafety(this);
+			}
+		}
+
+		void BenchmarkAirWork(string phase, Action work)
+		{
+			var start = Stopwatch.GetTimestamp();
+			var modularBot = Bot as ModularBot;
+			var queuedOrders = modularBot?.QueuedOrderCount ?? 0;
+			try { work(); }
+			finally
+			{
+				var elapsed = 1000.0 * Math.Max(0, Stopwatch.GetTimestamp() - start) / Stopwatch.Frequency;
+				var addedOrders = modularBot == null ? 0 : modularBot.QueuedOrderCount - queuedOrders;
+				Game.RecordBotModuleSample(Bot.Player.ClientIndex,
+					$"AirSquad/{AirProfile}/{phase}", elapsed, Math.Max(0, addedOrders));
+			}
 		}
 
 		/// <summary>Drops sightings that have aged out. Called before the memory is read or written.</summary>

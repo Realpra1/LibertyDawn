@@ -89,6 +89,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly ModularBotInfo info;
 		readonly World world;
 		readonly Queue<Order> orders = new Queue<Order>();
+		internal int QueuedOrderCount => orders.Count;
 
 		Player player;
 

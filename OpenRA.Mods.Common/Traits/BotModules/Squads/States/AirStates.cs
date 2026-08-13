@@ -11,6 +11,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using OpenRA.GameRules;
 using OpenRA.Mods.Common.Projectiles;
@@ -142,6 +143,31 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		{
 			var coarseSize = owner.SquadManager.Info.AirInfluenceCellSize;
 			return new CPos(cell.X / coarseSize, cell.Y / coarseSize);
+		}
+
+		static void RecordAirPhase(Squad owner, string phase, long started)
+		{
+			if (!Game.IsBenchmarking)
+				return;
+
+			var elapsed = 1000.0 * Math.Max(0, Stopwatch.GetTimestamp() - started) / Stopwatch.Frequency;
+			Game.RecordBotModuleSample(owner.Bot.Player.ClientIndex,
+				$"AirSquad/{owner.AirProfile}/{phase}", elapsed, 0);
+		}
+
+		static List<CPos> FindAirRoute(Squad owner, float[] danger, int width, int height,
+			int startX, int startY, int goalX, int goalY, float dangerCost)
+		{
+			var started = Stopwatch.GetTimestamp();
+			try
+			{
+				return ThreatAwareRoutePlanner.FindRoute(danger, width, height,
+					startX, startY, goalX, goalY, dangerCost);
+			}
+			finally
+			{
+				RecordAirPhase(owner, "coarse-route", started);
+			}
 		}
 
 		protected static void PromoteArrivedAirReinforcements(Squad owner)
@@ -701,8 +727,11 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			}
 
 			var cacheKey = owner.AirProfile + ":" + squadSpeed;
-			if (!profileCaches.TryGetValue(cacheKey, out var cache) || cache.Width != width || cache.Height != height ||
-				owner.World.WorldTick - cache.Tick >= info.AirInfluenceCacheInterval)
+			var influenceStarted = Stopwatch.GetTimestamp();
+			var rebuildInfluence = !profileCaches.TryGetValue(cacheKey, out var cache) ||
+				cache.Width != width || cache.Height != height ||
+				owner.World.WorldTick - cache.Tick >= info.AirInfluenceCacheInterval;
+			if (rebuildInfluence)
 			{
 				var rebuiltDanger = new float[width * height];
 				var rebuiltCandidates = new List<(Actor Actor, int Utility, float ConfiguredWeight)>();
@@ -764,6 +793,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				};
 				profileCaches[cacheKey] = cache;
 			}
+			RecordAirPhase(owner, rebuildInfluence ? "influence-build" : "influence-cache-hit", influenceStarted);
 
 			var danger = cache.Danger;
 			var candidates = cache.Candidates;
@@ -974,7 +1004,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 				var clearCell = new CPos(plan.ClearTarget.Location.X / coarseSize,
 					plan.ClearTarget.Location.Y / coarseSize);
-				var route = ThreatAwareRoutePlanner.FindRoute(danger, width, height, startX, startY,
+				var route = FindAirRoute(owner, danger, width, height, startX, startY,
 					Math.Clamp(clearCell.X, 0, width - 1), Math.Clamp(clearCell.Y, 0, height - 1),
 					info.AirRouteThreatPenalty);
 				if (route == null)
@@ -1009,7 +1039,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				var goalX = Math.Clamp(cell.X, 0, width - 1);
 				var goalY = Math.Clamp(cell.Y, 0, height - 1);
 				var clusteredOpportunityValue = cellUtility[cell];
-				var route = ThreatAwareRoutePlanner.FindRoute(danger, width, height, startX, startY, goalX, goalY,
+				var route = FindAirRoute(owner, danger, width, height, startX, startY, goalX, goalY,
 					info.AirRouteThreatPenalty);
 				if (route == null)
 				{
@@ -1361,7 +1391,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var startY = Math.Clamp(start.Y / coarseSize, 0, cache.Height - 1);
 			var goalX = Math.Clamp(targetCell.X / coarseSize, 0, cache.Width - 1);
 			var goalY = Math.Clamp(targetCell.Y / coarseSize, 0, cache.Height - 1);
-			var route = ThreatAwareRoutePlanner.FindRoute(cache.Danger, cache.Width, cache.Height,
+			var route = FindAirRoute(owner, cache.Danger, cache.Width, cache.Height,
 				startX, startY, goalX, goalY, info.AirRouteThreatPenalty);
 			if (route == null)
 				return null;
@@ -2291,7 +2321,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					continue;
 				}
 
-				var route = ThreatAwareRoutePlanner.FindRoute(
+				var route = FindAirRoute(owner,
 					danger, width, height, startX, startY, goalX, goalY, info.AirRouteThreatPenalty);
 				if (route == null)
 					continue;
@@ -2378,7 +2408,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					danger[goalY * width + goalX] > 0)
 					continue;
 
-				var route = ThreatAwareRoutePlanner.FindRoute(
+				var route = FindAirRoute(owner,
 					danger, width, height, startX, startY, goalX, goalY, info.AirRouteThreatPenalty);
 				if (route == null)
 					continue;
