@@ -2,14 +2,15 @@
 
 ## Status
 
-- Candidate: first iteration - testing
+- Candidate: integrated testing complete; final release review pending
 - Integration cycle 1: complete
-- Valid counted full-engine games: exactly 2
+- Integration cycle 2: complete
+- Valid counted full-engine games: cycle 1 exactly 2; cycle 2 exactly 2; total 4
 - Release blocker: none observed
 - Balance changes: none
-- Next action: a bounded cycle 2 is required before release-ready status because the
-  counted pressure game did not produce a literal field-defense assignment and its
-  ownership audit was aggregate rather than an exact per-actor assertion.
+- Next action: final cumulative release review. Cycle 3 is not required: cycle 2
+  closed the literal field-assignment and save-load ownership gaps without finding
+  a concrete product defect.
 
 ## Integrated ancestry
 
@@ -85,12 +86,20 @@ and CNC-96 repair, specialist, transport-objective, and launcher contracts.
 - Both reviewers' durable general lessons were atomically promoted to the bounded
   policy scratchpad.
 
-## Required bounded cycle 2 focus
+## Cycle 2 closure
 
-Use the same cumulative candidate and one adversarial ordinary-AI pressure fixture
-that guarantees at least one actual field-defense commitment. Assert after every
-shed/probe transition that each released specialist and field defender has exactly
-one eligible owner, while Harvesters remain excluded. Continue from a created save
-and verify post-load ownership, CPU/order bounds, and clean teardown. Do not change
-balance or policy; modify product code only if this focused run reveals a concrete
-defect.
+Two further distinct paced full-engine games used the same candidate and ordinary
+IronReaper/Brutalis AIs. Game A ran 2,600 ticks and forced real field commitments,
+mixed defenders, Stealth module shed/probe/recovery, registry release/claim, zero-
+correction audits after reconstruction, Harvester exclusion, a tick-2,400 save,
+and clean teardown. Game B loaded that exact save and continued to tick 3,200;
+loaded registries reported `overlap=0`, field assignments/routes restored, later
+audits required zero corrections, field defense continued to grow, the disabled
+module recovered, and teardown was clean. No product change was required.
+
+Fresh Luna factual narrators and policy reviewers completed for both games. Game A
+policy found insufficient evidence for strategic superiority but retained the
+ownership and module-handoff behavior as integration acceptance requirements.
+Game B judged save-load continuity mostly sensible with medium confidence. Their
+matched-control and richer combat/board telemetry recommendations are future
+policy-quality work, not a literal integration gap or release blocker.

@@ -65,3 +65,58 @@ and later exploratory evidence probes are not counted.
 
 Raw local evidence is intentionally untracked. The concise state and this receipt
 are the durable Git evidence for cycle 1.
+
+## Integration cycle 2 receipt
+
+Cycle 2 used exactly two additional distinct successful full-engine games. Invalid
+tick-zero content-link setup attempts were stopped and are not counted. The valid
+launcher staged installed CNC content from
+`/root/github/LibertyDawn/.build/cnc33a/runtime-content`.
+
+### Game A: field commitment and ownership transitions
+
+- Evidence: `analysis/20260813-ten-task-playtest/cycle-2/game-a-counted/cycle2-field-ownership/`
+- Seed `962201`; paced rendered; IronReaper Nod versus Brutalis GDI; passed with
+  exit 0 and 2,600 valid ticks in 111.217 seconds.
+- Runtime map SHA-256:
+  `8c609882e7c1eb505ef5dc732c6a546d7b8aeeec5d47c4634a21e46c73482d5f`.
+- Both AIs committed economy fields and assigned actual Medium Tank, infantry, and
+  Mobile SAM defenders. IronReaper's forced Stealth module load triggered disable,
+  released-actor registration, enabled probes, re-shed, and eventual recovery.
+- Registry audits after initial reconstruction reported zero corrections through
+  the transitions; no Harvester/MCV entered fallback registration or combat orders.
+- A 42,591-byte save was created at tick 2,400 with SHA-256
+  `f19012e4932b6101e95a53acac3dbfaf1032a6de0a882e2f980e58476568ae49`.
+- Periodic stall and bot-module/order telemetry were emitted and the configured
+  teardown was clean, with no fatal error, desync, or unhandled exception.
+
+### Game B: post-load continuity
+
+- Evidence: `analysis/20260813-ten-task-playtest/cycle-2/game-b-counted/cycle2-field-post-load/`
+- Paced rendered load of Game A's exact save; passed with exit 0 and continuation
+  from tick 2,400 through tick 3,200 in 39.058 seconds.
+- The staged save SHA-256 matched Game A:
+  `f19012e4932b6101e95a53acac3dbfaf1032a6de0a882e2f980e58476568ae49`.
+- Registry load evidence reported `overlap=0` for both players. Economy field scan
+  phase, assignments, destinations, routes, and order progress restored; field
+  compositions and new assignments continued after load.
+- Every post-load registry audit reported zero corrections. The disabled Stealth
+  module advanced through enabled-probe, probe-pending, and recovered. No Harvester
+  entered fallback registration/orders; teardown was clean.
+- Performance telemetry captured the load boundary (including a bounded 895.608 ms
+  startup/load tick and 253.596 ms world phase) without sustained runaway work.
+
+### Cycle 2 independent analysis
+
+The required counted analyses are fresh `gpt-5.6-luna` medium sessions:
+
+- `analysis/20260813-ten-task-playtest/cycle-2/reviews/game-a-luna-commenter/NARRATIVE.md`
+- `analysis/20260813-ten-task-playtest/cycle-2/reviews/game-a-luna-policy/POLICY-REVIEW.md`
+- `analysis/20260813-ten-task-playtest/cycle-2/reviews/game-b-luna-commenter/NARRATIVE.md`
+- `analysis/20260813-ten-task-playtest/cycle-2/reviews/game-b-luna-policy/POLICY-REVIEW.md`
+
+Earlier Terra analyses are retained locally as supplemental cross-checks only and
+are not counted. Luna recommendations for matched strategic controls, temporary
+field-protection visibility, and richer board/combat traces are deferred policy-
+quality work. They do not contradict the demonstrated ownership continuity or
+identify a concrete combined product defect. No cycle-2 product code was changed.
