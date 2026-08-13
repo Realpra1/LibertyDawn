@@ -23,6 +23,12 @@ namespace OpenRA.Mods.Common.Traits.BotModules
 		public IEnumerable<KeyValuePair<string, uint[]>> Groups => released.Select(g =>
 			new KeyValuePair<string, uint[]>(g.Key, g.Value.ToArray()));
 
+		public static bool IsEligibleForGenericFallback(ISet<string> directCombatTypes, string actorType,
+			bool hasAttackTrait)
+		{
+			return hasAttackTrait && directCombatTypes.Contains(actorType);
+		}
+
 		public void Retain(string source, IEnumerable<uint> actorIds)
 		{
 			if (string.IsNullOrEmpty(source))

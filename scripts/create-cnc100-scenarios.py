@@ -213,6 +213,13 @@ World:
 			"\t\tFailsafeTestAdvancedWorkFromTick: 60\n\t\tFailsafeTestAdvancedWorkUntilTick: 300\n"
 			"\tStealthTankSquadBotModule:").replace(
 			"\t\tFailsafeTestAdvancedWorkMilliseconds: 15", "\t\tFailsafeTestAdvancedWorkMilliseconds: 20"))
+	write_map(root / "mods/cnc/maps/Empire-Earth.oramap", args.output / "cnc100-allowlist-artillery.oramap",
+		"CNC-100 Released Artillery Exclusion", high_unit_rules.replace(
+			"\t\tGroundTargetDebugLogging: true\n\tStealthTankSquadBotModule:",
+			"\t\tGroundTargetDebugLogging: true\n\t\tFailsafeTestAdvancedWorkMilliseconds: 20\n"
+			"\t\tFailsafeTestAdvancedWorkFromTick: 60\n\t\tFailsafeTestAdvancedWorkUntilTick: 300\n"
+			"\tCovertHarassmentBotModule:\n\t\tDebugLogging: true\n\tStealthTankSquadBotModule:").replace(
+			"\t\tFailsafeTestAdvancedWorkMilliseconds: 15", "\t\tFailsafeTestAdvancedWorkMilliseconds: 20"))
 
 
 if __name__ == "__main__":

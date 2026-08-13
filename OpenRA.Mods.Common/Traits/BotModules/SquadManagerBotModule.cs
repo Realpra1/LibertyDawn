@@ -1049,7 +1049,8 @@ namespace OpenRA.Mods.Common.Traits
 			var retainedGroups = releasedFallbackOwnership.Groups.Select(g => new KeyValuePair<string, Actor[]>(g.Key,
 				g.Value.Select(World.GetActorById).Where(a => !unitCannotBeOrdered(a)).OrderBy(a => a.ActorID).ToArray())).ToArray();
 			var releasedGroups = retainedGroups.Select(g => new KeyValuePair<string, Actor[]>(g.Key,
-				g.Value.Where(a => a.Info.HasTraitInfo<AttackBaseInfo>() && !IsReservedForSpecialBehavior(a) &&
+				g.Value.Where(a => AdvancedBotFallbackOwnership.IsEligibleForGenericFallback(Info.FailsafeDirectCombatTypes,
+					a.Info.Name, a.Info.HasTraitInfo<AttackBaseInfo>()) && !IsReservedForSpecialBehavior(a) &&
 					!IsUnitProtectingBase(a) && !IsUnitTemporarilyControlled(a)).ToArray())).Where(g => g.Value.Length > 0).ToArray();
 			var releasedActorIds = new HashSet<uint>(releasedGroups.SelectMany(g => g.Value).Select(a => a.ActorID));
 			if (Info.GroundTargetDebugLogging)

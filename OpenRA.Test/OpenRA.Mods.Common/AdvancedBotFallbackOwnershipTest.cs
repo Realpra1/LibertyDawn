@@ -9,6 +9,7 @@
  */
 #endregion
 
+using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using OpenRA.Mods.Common.Traits.BotModules;
@@ -55,6 +56,29 @@ namespace OpenRA.Test.Mods.Common
 			restored.Import(state.Sources, state.ActorIds);
 
 			Assert.That(restored.Export(), Is.EqualTo(state));
+		}
+
+		[Test]
+		public void GenericFallbackRequiresConfiguredDirectCombatTypeAndAttackCapability()
+		{
+			var directCombatTypes = new HashSet<string> { "e1", "mtnk" };
+
+			Assert.That(AdvancedBotFallbackOwnership.IsEligibleForGenericFallback(
+				directCombatTypes, "mtnk", true), Is.True);
+			Assert.That(AdvancedBotFallbackOwnership.IsEligibleForGenericFallback(
+				directCombatTypes, "mtnk", false), Is.False);
+		}
+
+		[TestCase("arty")]
+		[TestCase("msam")]
+		[TestCase("stnk")]
+		[TestCase("ctnk")]
+		public void ReleasedSpecialistsOutsideAllowlistNeverReceiveGenericFallback(string actorType)
+		{
+			var directCombatTypes = new HashSet<string> { "e1", "mtnk" };
+
+			Assert.That(AdvancedBotFallbackOwnership.IsEligibleForGenericFallback(
+				directCombatTypes, actorType, true), Is.False);
 		}
 	}
 }
