@@ -390,7 +390,7 @@ Player:
 			Tiberium: 6000
 		DebugLogging: false
 	CrateCollectorBotModule:
-		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai || enable-Easiest-ai
+		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai || enable-Easiest-ai
 		ScanInterval: 250
 		CoarseCellSize: 6
 		MaximumRegionCandidates: 32
@@ -404,6 +404,21 @@ Player:
 		McvTypes: mcv, fact
 		ExcludedCollectorTypes: truck, harv, sharv, mcv, e6, rmbo, tran
 		EmergencySellActorTypes: nuke, nuk2, hq
+		EmergencySellInterval: 1500
+		MinimumCollectorHealthPercent: 75
+		DebugLogging: false
+	CrateCollectorBotModule@VIKI:
+		RequiresCondition: enable-viki-ai
+		ScanInterval: 250
+		CoarseCellSize: 6
+		MaximumRegionCandidates: 32
+		NormalScoutLimit: 0
+		EnableRegionExploration: false
+		RequireMissingMcvForCrates: true
+		AssignmentStallInterval: 500
+		EmergencyCashThreshold: 0
+		McvTypes: mcv, fact
+		ExcludedCollectorTypes: truck, harv, sharv, mcv, e2, e5, e6, rmbo, tran
 		EmergencySellInterval: 1500
 		MinimumCollectorHealthPercent: 75
 		DebugLogging: false
@@ -641,6 +656,12 @@ Player:
 		DemolitionActorTypes: rmbo
 		MinimumCaptureDelay: 125
 		MinimumDemolitionDelay: 375
+		DemolitionIdleConfirmationTicks: 10
+		DemolitionFallbackCombatRadiusCells: 10
+		DemolitionThreatBufferCells: 2
+		DemolitionRouteWaypointSpacing: 8
+		DemolitionHoldSearchRadiusCells: 6
+		DemolitionHoldReconsiderTicks: 125
 		MaximumCaptureTargetOptions: 15
 		CaptureDistanceBias: 10
 		CaptureRetargetImprovement: 25

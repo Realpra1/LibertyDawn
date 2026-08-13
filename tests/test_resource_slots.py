@@ -3,6 +3,7 @@
 import json
 import os
 import select
+import shutil
 import signal
 import subprocess
 import sys
@@ -23,7 +24,17 @@ class ResourceSlotsTest(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(prefix="cnc87-slots-test-")
         self.root = Path(self.temporary.name)
-        self.lock_dir = self.root / "locks"
+        self.repository = self.root / "repository"
+        self.helper = (
+            self.repository
+            / ".agents/skills/coordinate-cnc-development/scripts/with_resource_slots.py"
+        )
+        self.helper.parent.mkdir(parents=True)
+        shutil.copy2(HELPER, self.helper)
+        subprocess.run(
+            ["git", "init", "-q", str(self.repository)], check=True, timeout=3
+        )
+        self.lock_dir = self.repository / ".agents" / "locks"
         self.sequence = 0
         self.processes = []
         self.stderr_buffers = {}
@@ -48,7 +59,7 @@ class ResourceSlotsTest(unittest.TestCase):
     def large_build(self, entry_role, command, timeout=3):
         return [
             sys.executable,
-            str(HELPER),
+            str(self.helper),
             "--lock-dir",
             str(self.lock_dir),
             "--large-build-entry",
@@ -62,7 +73,7 @@ class ResourceSlotsTest(unittest.TestCase):
     def generic(self, resource, capacity, command, timeout=3):
         return [
             sys.executable,
-            str(HELPER),
+            str(self.helper),
             "--lock-dir",
             str(self.lock_dir),
             "--resource",
@@ -75,6 +86,19 @@ class ResourceSlotsTest(unittest.TestCase):
             str(timeout),
             "--",
             *command,
+        ]
+
+    def status(self, resource, capacity, lock_dir=None):
+        return [
+            sys.executable,
+            str(self.helper),
+            "--lock-dir",
+            str(lock_dir or self.lock_dir),
+            "--resource",
+            resource,
+            "--capacity",
+            str(capacity),
+            "--status",
         ]
 
     def marker_command(self, entered, release=None, exited=None, child_delay=None):
@@ -350,7 +374,7 @@ class ResourceSlotsTest(unittest.TestCase):
         invalid = subprocess.run(
             [
                 sys.executable,
-                str(HELPER),
+                str(self.helper),
                 "--lock-dir",
                 str(self.lock_dir),
                 "--resource",
@@ -375,7 +399,7 @@ class ResourceSlotsTest(unittest.TestCase):
         completed = subprocess.run(
             [
                 sys.executable,
-                str(HELPER),
+                str(self.helper),
                 "--lock-dir",
                 str(not_a_directory),
                 "--large-build-entry",
@@ -468,6 +492,93 @@ class ResourceSlotsTest(unittest.TestCase):
         build_release.write_text("release\n", encoding="utf-8")
         self.assertEqual(build.communicate(timeout=3)[0], "")
         self.assertEqual(build.returncode, 0)
+
+    def test_registered_resources_reject_split_namespace_and_wrong_capacity(self):
+        for resource, capacity in (("game", 2), ("policy-scratchpad", 1)):
+            split = subprocess.run(
+                self.status(resource, capacity, self.root / "round-local-locks"),
+                capture_output=True,
+                text=True,
+                timeout=3,
+            )
+            self.assertEqual(78, split.returncode, split.stderr)
+            self.assertIn("rejected conflicting namespace", split.stderr)
+            self.assertFalse((self.root / "round-local-locks").exists())
+
+            wrong = subprocess.run(
+                self.status(resource, capacity + 1),
+                capture_output=True,
+                text=True,
+                timeout=3,
+            )
+            self.assertEqual(78, wrong.returncode, wrong.stderr)
+            self.assertIn("rejected caller capacity", wrong.stderr)
+
+    def test_status_uses_flock_and_labels_retained_json_last_known(self):
+        entered = self.root / "status-holder-enter"
+        release = self.root / "status-holder-release"
+        holder = self.track(
+            subprocess.Popen(
+                self.generic(
+                    "policy-scratchpad",
+                    1,
+                    self.marker_command(entered, release),
+                ),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+        )
+        self.wait_path(entered)
+        path = self.lock_dir / "policy-scratchpad-1.lock"
+        before = path.stat()
+        live = subprocess.run(
+            self.status("policy-scratchpad", 1),
+            capture_output=True,
+            text=True,
+            timeout=3,
+        )
+        self.assertEqual(0, live.returncode, live.stderr)
+        self.assertIn('"availability": "contended"', live.stderr)
+        self.assertIn('"metadata_classification": "last-known"', live.stderr)
+        self.assertEqual((before.st_dev, before.st_ino), (path.stat().st_dev, path.stat().st_ino))
+
+        release.write_text("release\n", encoding="utf-8")
+        holder.communicate(timeout=3)
+        retained = path.read_text(encoding="utf-8")
+        available = subprocess.run(
+            self.status("policy-scratchpad", 1),
+            capture_output=True,
+            text=True,
+            timeout=3,
+        )
+        self.assertEqual(0, available.returncode, available.stderr)
+        self.assertIn('"availability": "available"', available.stderr)
+        self.assertIn('"metadata_classification": "last-known"', available.stderr)
+        self.assertIn(retained.strip().replace('"', '\\"')[:20], available.stderr)
+        self.assertEqual((before.st_dev, before.st_ino), (path.stat().st_dev, path.stat().st_ino))
+
+    def test_production_caller_documents_use_one_global_namespace(self):
+        relative_paths = (
+            ".agents/skills/coordinate-cnc-development/SKILL.md",
+            ".agents/skills/spec-cnc-task/assets/WORKER-STATE.template.md",
+            ".agents/skills/integrate-cnc-release/SKILL.md",
+            ".agents/skills/review-cnc-pr/SKILL.md",
+        )
+        documents = {
+            path: (REPO_ROOT / path).read_text(encoding="utf-8")
+            for path in relative_paths
+        }
+        combined = "\n".join(documents.values())
+        self.assertNotIn("absolute-round-lock-dir", combined)
+        self.assertNotIn("round's absolute lock directory", combined)
+        self.assertIn("<repository-root>/.agents/locks", combined)
+        self.assertIn("{{REPOSITORY_ROOT}}/.agents/locks", combined)
+        self.assertIn("--large-build-entry worker", combined)
+        self.assertIn("--large-build-entry reviewer", combined)
+        self.assertIn("--large-build-entry integrator", combined)
+        self.assertIn("--resource policy-scratchpad --capacity 1", combined)
+        self.assertIn("--resource game --capacity 2", combined)
 
 
 if __name__ == "__main__":
