@@ -25,6 +25,7 @@ namespace OpenRA.Support
 		readonly int flushInterval;
 		readonly Func<string, TextWriter> writerFactory;
 		readonly Dictionary<string, BenchmarkChannel> channels = new Dictionary<string, BenchmarkChannel>();
+		readonly PeriodicStallReport periodicStallReport = new PeriodicStallReport();
 		int? lastTick;
 		bool finished;
 
@@ -38,7 +39,7 @@ namespace OpenRA.Support
 			this.flushInterval = flushInterval > 0 ? flushInterval : throw new ArgumentOutOfRangeException(nameof(flushInterval));
 		}
 
-		public void Tick(int localTick)
+		public void Tick(int localTick, World world)
 		{
 			if (finished || lastTick == localTick)
 				return;
@@ -46,6 +47,23 @@ namespace OpenRA.Support
 			lastTick = localTick;
 			foreach (var item in PerfHistory.Items)
 				channels.GetOrAdd(item.Key, CreateChannel).Write(localTick, item.Value.LastValue);
+
+			periodicStallReport.RecordTick(localTick, world);
+		}
+
+		public void Render(int renderFrame)
+		{
+			periodicStallReport.RecordRender(renderFrame);
+		}
+
+		public void BotModule(int tick, int playerIndex, string module, double milliseconds, int queuedOrders)
+		{
+			periodicStallReport.RecordModule(tick, playerIndex, module, milliseconds, queuedOrders);
+		}
+
+		public void LogicPhase(int tick, string phase, double milliseconds)
+		{
+			periodicStallReport.RecordLogicPhase(tick, phase, milliseconds);
 		}
 
 		BenchmarkChannel CreateChannel(string name)
@@ -97,6 +115,7 @@ namespace OpenRA.Support
 			if (finished)
 				return;
 
+			periodicStallReport.Write(prefix);
 			finished = true;
 			Exception error = null;
 			foreach (var channel in channels.Values)

@@ -590,6 +590,16 @@ namespace OpenRA.Mods.Common.Traits
 	public interface IBotTick { void BotTick(IBot bot); }
 
 	[RequireExplicitImplementation]
+	public interface IAdvancedBotTick
+	{
+		string FailsafeModuleId { get; }
+		void SetAdvancedBehaviorEnabled(bool enabled);
+	}
+
+	[RequireExplicitImplementation]
+	public interface IBotPerformanceIdentity { string PerformanceIdentity { get; } }
+
+	[RequireExplicitImplementation]
 	public interface IBotRespondToAttack { void RespondToAttack(IBot bot, Actor self, AttackInfo e); }
 
 	[RequireExplicitImplementation]
@@ -645,6 +655,19 @@ namespace OpenRA.Mods.Common.Traits
 		bool IsTransporting(Actor passenger);
 		bool TryConsumeTimedOutObjective(Actor passenger, Actor objective);
 		void CancelTransport(Actor passenger);
+	}
+
+	/// <summary>
+	/// Owner-scoped handoff point for live combat units that are not currently claimed by a squad or
+	/// dedicated controller. Releases must be registered before the previous owner clears its reservation.
+	/// </summary>
+	[RequireExplicitImplementation]
+	public interface IUnassignedCombatUnitRegistry
+	{
+		IEnumerable<Actor> UnassignedActors { get; }
+		bool IsRegistered(Actor actor);
+		void RegisterReleasedActors(IEnumerable<Actor> actors);
+		void ClaimActors(IEnumerable<Actor> actors);
 	}
 
 	/// <summary>

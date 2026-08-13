@@ -55,6 +55,7 @@ namespace OpenRA
 
 		static bool takeScreenshot = false;
 		static Benchmark benchmark = null;
+		public static bool IsBenchmarking => benchmark != null;
 		static int automatedSaveTick = -1;
 		static string automatedSaveName;
 		static int automatedExitTick = -1;
@@ -62,6 +63,7 @@ namespace OpenRA
 		public static bool IsAutomatedGameSaveLoad { get; private set; }
 		public static bool IsHeadlessAutomationRequested { get; private set; }
 		public static bool IsHeadlessAutomation { get; private set; }
+		public static bool IsPacedAutomation { get; private set; }
 		static bool startupDiagnosticsEnabled;
 		static readonly Stopwatch StartupDiagnosticsTimer = Stopwatch.StartNew();
 
@@ -218,7 +220,7 @@ namespace OpenRA
 			Ui.KeyboardFocusWidget = null;
 
 			OrderManager.StartGame();
-			if (IsHeadlessAutomation)
+			if (IsHeadlessAutomation || IsPacedAutomation)
 			{
 				var bots = OrderManager.LobbyInfo.Clients
 					.Where(client => client.IsBot)
@@ -226,8 +228,8 @@ namespace OpenRA
 					.Select(client => string.Format(CultureInfo.InvariantCulture,
 						"{0}: bot={1}, faction={2}, team={3}, spawn={4}", client.Name, client.Bot,
 						client.Faction, client.Team, client.SpawnPoint));
-				Log.Write("debug", "Headless MAX automation started map '{0}' with bots: {1}.",
-					map.Title, string.Join("; ", bots));
+				Log.Write("debug", "{0} automation started map '{1}' with bots: {2}.",
+					IsHeadlessAutomation ? "Headless MAX" : "Paced rendered", map.Title, string.Join("; ", bots));
 			}
 
 			worldRenderer.RefreshPalette();
@@ -641,6 +643,10 @@ namespace OpenRA
 			var tick = RunTime;
 			var worldTicked = false;
 
+			// Benchmark.Tick records the active world only. Keep the phase attribution on
+			// that same world when a shellmap is also being ticked during a transition.
+			var recordLogicPhases = benchmark != null && ReferenceEquals(orderManager, Game.OrderManager);
+
 			var world = orderManager.World;
 
 			if (Ui.LastTickTime.ShouldAdvance(tick))
@@ -659,9 +665,11 @@ namespace OpenRA
 					else
 						orderManager.LastTickTime.AdvanceTickTime(tick);
 
+					var phaseStart = recordLogicPhases ? Stopwatch.GetTimestamp() : 0;
 					Sound.Tick();
-
 					Sync.RunUnsynced(world, orderManager.TickImmediate);
+					if (recordLogicPhases)
+						benchmark.LogicPhase(LocalTick, "immediate", ElapsedMilliseconds(phaseStart));
 
 					if (world == null)
 						return false;
@@ -669,23 +677,34 @@ namespace OpenRA
 					if (orderManager.TryTick())
 					{
 						worldTicked = true;
+						phaseStart = recordLogicPhases ? Stopwatch.GetTimestamp() : 0;
 						Sync.RunUnsynced(world, () =>
 						{
 							world.OrderGenerator.Tick(world);
 						});
+						if (recordLogicPhases)
+							benchmark.LogicPhase(LocalTick, "order-generator", ElapsedMilliseconds(phaseStart));
 
+						phaseStart = recordLogicPhases ? Stopwatch.GetTimestamp() : 0;
 						world.Tick();
+						if (recordLogicPhases)
+							benchmark.LogicPhase(LocalTick, "world", ElapsedMilliseconds(phaseStart));
 						if (ReferenceEquals(orderManager, OrderManager))
 							TryAutomatedSave(world);
 
 						PerfHistory.Tick();
 						if (ReferenceEquals(orderManager, OrderManager))
-							benchmark?.Tick(orderManager.LocalFrameNumber);
+							benchmark?.Tick(orderManager.LocalFrameNumber, world);
 					}
 
 					// Wait until we have done our first world Tick before TickRendering
 					if (orderManager.LocalFrameNumber > 0 && !IsHeadlessAutomation)
+					{
+						phaseStart = recordLogicPhases ? Stopwatch.GetTimestamp() : 0;
 						Sync.RunUnsynced(world, () => world.TickRender(worldRenderer));
+						if (recordLogicPhases)
+							benchmark.LogicPhase(LocalTick, "tick-render", ElapsedMilliseconds(phaseStart));
+					}
 				}
 
 				if (worldTicked && ReferenceEquals(orderManager, OrderManager))
@@ -693,6 +712,11 @@ namespace OpenRA
 			}
 
 			return worldTicked;
+		}
+
+		static double ElapsedMilliseconds(long start)
+		{
+			return 1000.0 * Math.Max(0, Stopwatch.GetTimestamp() - start) / Stopwatch.Frequency;
 		}
 
 		static bool LogicTick(bool forceCurrentWorldTick = false)
@@ -792,6 +816,7 @@ namespace OpenRA
 			PerfHistory.Items["render_widgets"].Tick();
 			PerfHistory.Items["render_flip"].Tick();
 			PerfHistory.Items["terrain_lighting"].Tick();
+			benchmark?.Render(RenderFrame);
 		}
 
 		static void Loop()
@@ -1090,6 +1115,11 @@ namespace OpenRA
 			benchmark = new Benchmark(prefix);
 		}
 
+		public static void RecordBotModuleSample(int playerIndex, string module, double milliseconds, int queuedOrders)
+		{
+			benchmark?.BotModule(LocalTick, playerIndex, module, milliseconds, queuedOrders);
+		}
+
 		public static void ConfigureHeadlessAutomation()
 		{
 			if (!IsHeadlessAutomationRequested)
@@ -1097,6 +1127,12 @@ namespace OpenRA
 
 			IsHeadlessAutomation = true;
 			Log.Write("debug", "Headless MAX automation enabled: game rendering suppressed; input events remain bounded.");
+		}
+
+		public static void ConfigurePacedAutomation()
+		{
+			IsPacedAutomation = true;
+			Log.Write("debug", "Paced rendered automation enabled: normal rendering and presentation remain active.");
 		}
 
 		public static void ConfigureAutomatedSave(int worldTick, string filename)
@@ -1116,9 +1152,9 @@ namespace OpenRA
 				return;
 
 			automatedExitTick = -1;
-			Log.Write("debug", "Headless MAX automation reached configured exit at world tick {0}; exiting.",
-				world.WorldTick);
-			FinishBenchmark();
+			Log.Write("debug", "{0} automation reached configured exit at world tick {1}; exiting.",
+				IsHeadlessAutomation ? "Headless MAX" : "Paced rendered", world.WorldTick);
+			FinishBenchmark(false);
 		}
 
 		static void TryAutomatedSave(World world)
@@ -1187,15 +1223,19 @@ namespace OpenRA
 			CreateAndStartLocalServer(map.Uid, orders, randomSeed);
 		}
 
-		public static void FinishBenchmark()
+		public static void FinishBenchmark() { FinishBenchmark(true); }
+
+		static void FinishBenchmark(bool naturalGameOver)
 		{
-			if (automatedExitRequested || (benchmark == null && !IsHeadlessAutomation))
+			if (automatedExitRequested || (benchmark == null && !IsHeadlessAutomation && !IsPacedAutomation))
 				return;
 
 			automatedExitRequested = true;
 			benchmark?.Write();
-			if (IsHeadlessAutomation)
+			if (naturalGameOver && IsHeadlessAutomation)
 				Log.Write("debug", "Headless MAX automation reached natural game over; exiting.");
+			else if (naturalGameOver && IsPacedAutomation)
+				Log.Write("debug", "Paced rendered automation reached natural game over; exiting.");
 
 			Exit();
 		}
