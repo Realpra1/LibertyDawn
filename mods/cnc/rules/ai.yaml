@@ -1,4 +1,7 @@
 Player:
+	UnassignedCombatUnitRegistryBotModule:
+		ExcludedActorTypes: harv, sharv, mcv, amcv
+		DebugLogging: false
 	ModularBot@Cabal:
 		Name: Cabal
 		Type: cabal

@@ -220,6 +220,21 @@ World:
 			"\t\tFailsafeTestAdvancedWorkFromTick: 60\n\t\tFailsafeTestAdvancedWorkUntilTick: 300\n"
 			"\tCovertHarassmentBotModule:\n\t\tDebugLogging: true\n\tStealthTankSquadBotModule:").replace(
 			"\t\tFailsafeTestAdvancedWorkMilliseconds: 15", "\t\tFailsafeTestAdvancedWorkMilliseconds: 20"))
+	write_map(root / "mods/cnc/maps/Empire-Earth.oramap", args.output / "cnc100-registry-ordinary.oramap",
+		"CNC-100 Unassigned Registry Covert Release", high_unit_rules.replace(
+			"Player:\n", "Player:\n\tUnassignedCombatUnitRegistryBotModule:\n\t\tDebugLogging: true\n", 1).replace(
+			"\t\tGroundTargetDebugLogging: true\n\tStealthTankSquadBotModule:",
+			"\t\tGroundTargetDebugLogging: true\n\t\tFailsafeTestAdvancedWorkMilliseconds: 20\n"
+			"\t\tFailsafeTestAdvancedWorkFromTick: 60\n\t\tFailsafeTestAdvancedWorkUntilTick: 300\n"
+			"\tCovertHarassmentBotModule:\n\t\tDebugLogging: true\n\tStealthTankSquadBotModule:").replace(
+			"\t\tFailsafeTestAdvancedWorkMilliseconds: 15", "\t\tFailsafeTestAdvancedWorkMilliseconds: 20"))
+	write_map(root / "mods/cnc/maps/island-duel.oramap", args.output / "cnc100-registry-specialist-release.oramap",
+		"CNC-100 Unassigned Registry Covert Release", covert_rules.replace(
+			"Player:\n", "Player:\n\tUnassignedCombatUnitRegistryBotModule:\n\t\tDebugLogging: true\n", 1).replace(
+			"\tCovertHarassmentBotModule:\n\t\tDebugLogging: true",
+			"\tCovertHarassmentBotModule:\n\t\tDebugLogging: true\n"
+			"\t\tFailsafeTestAdvancedWorkMilliseconds: 20\n\t\tFailsafeTestAdvancedWorkFromTick: 60\n"
+			"\t\tFailsafeTestAdvancedWorkUntilTick: 300"))
 
 
 if __name__ == "__main__":

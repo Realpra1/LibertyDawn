@@ -142,6 +142,7 @@ namespace OpenRA.Mods.Common.Traits
 		IBot bot;
 		IBotUnitReservations[] otherReservations;
 		IBotTransportReservations[] transportReservations;
+		IUnassignedCombatUnitRegistry unassignedCombatUnits;
 		SquadManagerBotModule squadManager;
 		DomainIndex domainIndex;
 		IResourceLayer resourceLayer;
@@ -174,6 +175,7 @@ namespace OpenRA.Mods.Common.Traits
 			otherReservations = player.PlayerActor.TraitsImplementing<IBotUnitReservations>()
 				.Where(r => !ReferenceEquals(r, this)).ToArray();
 			transportReservations = player.PlayerActor.TraitsImplementing<IBotTransportReservations>().ToArray();
+			unassignedCombatUnits = player.PlayerActor.TraitOrDefault<IUnassignedCombatUnitRegistry>();
 			RefreshSquadManager();
 			base.Created(self);
 		}
@@ -277,6 +279,9 @@ namespace OpenRA.Mods.Common.Traits
 
 			foreach (var id in field.Tanks.Concat(field.Infantry).Concat(field.AntiAir).ToArray())
 			{
+				var actor = world.GetActorById(id);
+				if (actor != null)
+					unassignedCombatUnits?.RegisterReleasedActors(new[] { actor });
 				RestoreStance(id);
 				reserved.Remove(id);
 				lastOrderTicks.Remove(id);
@@ -329,6 +334,8 @@ namespace OpenRA.Mods.Common.Traits
 				Fill(field, field.Infantry, Info.InfantryTypes, Info.InfantryPerHarvester);
 				Fill(field, field.AntiAir, Info.AntiAirTypes, Info.AntiAirPerHarvester);
 			}
+
+			unassignedCombatUnits?.ClaimActors(reserved.Select(world.GetActorById).Where(a => a != null));
 		}
 
 		void Prune(FieldAssignment field, HashSet<uint> actors, HashSet<string> types, string role,
@@ -342,6 +349,8 @@ namespace OpenRA.Mods.Common.Traits
 				if (reason != null)
 				{
 					var actorType = actor?.Info.Name ?? "missing";
+					if (actor != null)
+						unassignedCombatUnits?.RegisterReleasedActors(new[] { actor });
 					RestoreStance(id);
 					actors.Remove(id);
 					field.Destinations.Remove(id);
@@ -808,6 +817,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		void Release(FieldAssignment field, Actor actor, string reason)
 		{
+			unassignedCombatUnits?.RegisterReleasedActors(new[] { actor });
 			RestoreStance(actor.ActorID);
 			field.Tanks.Remove(actor.ActorID);
 			field.Infantry.Remove(actor.ActorID);
@@ -824,6 +834,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		void ClearState(string reason)
 		{
+			unassignedCombatUnits?.RegisterReleasedActors(reserved.Select(world.GetActorById).Where(a => a != null));
 			CancelProductionRequests(reason);
 			foreach (var id in originalStances.Keys.ToArray())
 				RestoreStance(id);
@@ -1012,6 +1023,8 @@ namespace OpenRA.Mods.Common.Traits
 				reserved.UnionWith(field.Infantry);
 				reserved.UnionWith(field.AntiAir);
 			}
+
+			unassignedCombatUnits?.ClaimActors(reserved.Select(world.GetActorById).Where(a => a != null));
 
 			RestoreRouteState(data);
 		}

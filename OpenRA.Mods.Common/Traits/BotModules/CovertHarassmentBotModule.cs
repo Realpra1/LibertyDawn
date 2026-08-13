@@ -8,6 +8,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using OpenRA.Mods.Common.Activities;
 using OpenRA.Mods.Common.Traits.BotModules.Squads;
@@ -34,6 +35,12 @@ namespace OpenRA.Mods.Common.Traits
 		public readonly int ScanInterval = 50;
 		public readonly int OrderInterval = 50;
 		public readonly int MaximumTargetCandidates = 48;
+		[Desc("Test-only unsynced advanced-work pressure in milliseconds. Leave at zero outside isolated failsafe evidence maps.")]
+		public readonly int FailsafeTestAdvancedWorkMilliseconds = 0;
+		[Desc("First world tick for test-only advanced-work pressure.")]
+		public readonly int FailsafeTestAdvancedWorkFromTick = 0;
+		[Desc("Exclusive final world tick for test-only advanced-work pressure. Zero leaves it unbounded.")]
+		public readonly int FailsafeTestAdvancedWorkUntilTick = 0;
 		public readonly bool DebugLogging = false;
 
 		public override void RulesetLoaded(Ruleset rules, ActorInfo ai)
@@ -43,7 +50,10 @@ namespace OpenRA.Mods.Common.Traits
 				TowerTypes.Count == 0 || TargetPriorities.Count == 0 || MinimumCoreUnits <= 0 ||
 				MaximumCoreUnits < MinimumCoreUnits || CoreUnitsPerSupport <= 0 || MaximumSupportUnits <= 0 ||
 				SupportJoinRadiusCells <= 0 || SupportFollowDistanceCells < 0 || ScanInterval <= 0 ||
-				OrderInterval <= 0 || MaximumTargetCandidates <= 0 || TargetPriorities.Any(p => p.Value <= 0))
+				OrderInterval <= 0 || MaximumTargetCandidates <= 0 || TargetPriorities.Any(p => p.Value <= 0) ||
+				FailsafeTestAdvancedWorkMilliseconds < 0 || FailsafeTestAdvancedWorkFromTick < 0 ||
+				FailsafeTestAdvancedWorkUntilTick < 0 || (FailsafeTestAdvancedWorkUntilTick > 0 &&
+					FailsafeTestAdvancedWorkUntilTick <= FailsafeTestAdvancedWorkFromTick))
 				throw new YamlException("Covert harassment prerequisites, types, priorities, group bounds, and intervals must be configured and valid.");
 
 			foreach (var actorType in CoreTypes.Concat(SupportTypes).Concat(TowerTypes).Concat(TargetPriorities.Keys))
@@ -65,6 +75,7 @@ namespace OpenRA.Mods.Common.Traits
 		IBot bot;
 		IBotUnitReservations[] otherReservations;
 		IBotTransportReservations[] transportReservations;
+		IUnassignedCombatUnitRegistry unassignedCombatUnits;
 		SquadManagerBotModule squadManager;
 		DomainIndex domainIndex;
 		TechTree techTree;
@@ -88,6 +99,7 @@ namespace OpenRA.Mods.Common.Traits
 			otherReservations = player.PlayerActor.TraitsImplementing<IBotUnitReservations>()
 				.Where(r => !ReferenceEquals(r, this)).ToArray();
 			transportReservations = player.PlayerActor.TraitsImplementing<IBotTransportReservations>().ToArray();
+			unassignedCombatUnits = player.PlayerActor.TraitOrDefault<IUnassignedCombatUnitRegistry>();
 			RefreshSquadManager();
 			base.Created(self);
 		}
@@ -137,7 +149,11 @@ namespace OpenRA.Mods.Common.Traits
 
 		void IBotTick.BotTick(IBot enabledBot)
 		{
-			if (IsTraitDisabled || !advancedBehaviorEnabled || player.WinState != WinState.Undefined || --scanTicks > 0)
+			if (IsTraitDisabled || !advancedBehaviorEnabled || player.WinState != WinState.Undefined)
+				return;
+
+			RunFailsafeTestPressure();
+			if (--scanTicks > 0)
 				return;
 
 			scanTicks = Info.ScanInterval;
@@ -153,6 +169,20 @@ namespace OpenRA.Mods.Common.Traits
 				return;
 
 			UpdateOrders();
+		}
+
+		void RunFailsafeTestPressure()
+		{
+			if (Info.FailsafeTestAdvancedWorkMilliseconds == 0 ||
+				world.WorldTick < Info.FailsafeTestAdvancedWorkFromTick ||
+				(Info.FailsafeTestAdvancedWorkUntilTick > 0 &&
+					world.WorldTick >= Info.FailsafeTestAdvancedWorkUntilTick))
+				return;
+
+			var deadline = Stopwatch.GetTimestamp() +
+				(long)Info.FailsafeTestAdvancedWorkMilliseconds * Stopwatch.Frequency / 1000;
+			while (Stopwatch.GetTimestamp() < deadline)
+				;
 		}
 
 		void RefreshSquadManager()
@@ -207,6 +237,7 @@ namespace OpenRA.Mods.Common.Traits
 			reserved.Clear();
 			reserved.UnionWith(core);
 			reserved.UnionWith(support);
+			unassignedCombatUnits?.ClaimActors(Actors(reserved));
 
 			var bikeCount = selectedCore.Count(a => a.Info.Name == "bike");
 			var buggyCount = selectedCore.Count(a => a.Info.Name == "bggy");
@@ -377,6 +408,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		void ClearState(string reason)
 		{
+			unassignedCombatUnits?.RegisterReleasedActors(Actors(reserved));
 			if (reserved.Count > 0 || target != null)
 				Debug("released squad: {0}", reason);
 
@@ -434,6 +466,7 @@ namespace OpenRA.Mods.Common.Traits
 			reserved.Clear();
 			reserved.UnionWith(core);
 			reserved.UnionWith(support);
+			unassignedCombatUnits?.ClaimActors(Actors(reserved));
 		}
 
 		static void LoadIds(HashSet<uint> ids, MiniYamlNode node)

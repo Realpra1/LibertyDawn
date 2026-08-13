@@ -644,6 +644,19 @@ namespace OpenRA.Mods.Common.Traits
 	}
 
 	/// <summary>
+	/// Owner-scoped handoff point for live combat units that are not currently claimed by a squad or
+	/// dedicated controller. Releases must be registered before the previous owner clears its reservation.
+	/// </summary>
+	[RequireExplicitImplementation]
+	public interface IUnassignedCombatUnitRegistry
+	{
+		IEnumerable<Actor> UnassignedActors { get; }
+		bool IsRegistered(Actor actor);
+		void RegisterReleasedActors(IEnumerable<Actor> actors);
+		void ClaimActors(IEnumerable<Actor> actors);
+	}
+
+	/// <summary>
 	/// Marks a unit as temporarily ordered by a squad-owned tactical deviation. Unlike a reservation,
 	/// this does not remove the actor from its normal squad and must be released promptly.
 	/// </summary>

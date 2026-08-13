@@ -563,6 +563,7 @@ namespace OpenRA.Mods.Common.Traits
 		IBotTransportReservations[] transportReservations;
 		IBotUnitReservations[] unitReservations;
 		IBotTemporaryUnitControl[] temporaryUnitControls;
+		IUnassignedCombatUnitRegistry unassignedCombatUnits;
 
 		CPos initialBaseCenter;
 
@@ -662,6 +663,7 @@ namespace OpenRA.Mods.Common.Traits
 			transportReservations = self.Owner.PlayerActor.TraitsImplementing<IBotTransportReservations>().ToArray();
 			unitReservations = self.Owner.PlayerActor.TraitsImplementing<IBotUnitReservations>().ToArray();
 			temporaryUnitControls = self.Owner.PlayerActor.TraitsImplementing<IBotTemporaryUnitControl>().ToArray();
+			unassignedCombatUnits = self.Owner.PlayerActor.TraitOrDefault<IUnassignedCombatUnitRegistry>();
 		}
 
 		protected override void TraitEnabled(Actor self)
@@ -737,6 +739,7 @@ namespace OpenRA.Mods.Common.Traits
 		internal void RetainFailsafeReleasedActors(string source, IEnumerable<Actor> actors)
 		{
 			var released = actors.Where(a => !unitCannotBeOrdered(a)).OrderBy(a => a.ActorID).ToArray();
+			unassignedCombatUnits?.RegisterReleasedActors(released);
 			releasedFallbackOwnership.Retain(source, released.Select(a => a.ActorID));
 			fallbackReconsiderTicks = 0;
 			if (Info.GroundTargetDebugLogging && released.Length > 0)
@@ -914,6 +917,7 @@ namespace OpenRA.Mods.Common.Traits
 			unitsHangingAroundTheBase.RemoveAll(units.Contains);
 			activeUnits.RemoveAll(units.Contains);
 			activeUnits.AddRange(units);
+			unassignedCombatUnits?.ClaimActors(units);
 
 			var target = IsPreferredEnemyUnit(preferredTarget) ? preferredTarget :
 				FindClosestEnemy(units.Select(a => a.CenterPosition).Average());
@@ -946,6 +950,7 @@ namespace OpenRA.Mods.Common.Traits
 			activeUnits.RemoveAll(units.Contains);
 			unitsHangingAroundTheBase.AddRange(units);
 			activeUnits.AddRange(units);
+			unassignedCombatUnits?.ClaimActors(units);
 			foreach (var n in notifyIdleBaseUnits)
 				n.UpdatedIdleBaseUnits(unitsHangingAroundTheBase);
 
@@ -1171,6 +1176,7 @@ namespace OpenRA.Mods.Common.Traits
 				}
 
 				activeUnits.Add(a);
+				unassignedCombatUnits?.ClaimActors(new[] { a });
 			}
 
 			// Keep actor-level evidence bounded: oversized initial rosters are not useful handoff telemetry.

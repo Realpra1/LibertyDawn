@@ -157,6 +157,7 @@ namespace OpenRA.Mods.Common.Traits
 		IBot bot;
 		SquadManagerBotModule squadManager;
 		IBotTransportReservations[] transportReservations;
+		IUnassignedCombatUnitRegistry unassignedCombatUnits;
 		IResourceLayer resourceLayer;
 		DomainIndex domainIndex;
 		int scanTicks;
@@ -176,6 +177,7 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			RefreshSquadManager();
 			transportReservations = self.Owner.PlayerActor.TraitsImplementing<IBotTransportReservations>().ToArray();
+			unassignedCombatUnits = self.Owner.PlayerActor.TraitOrDefault<IUnassignedCombatUnitRegistry>();
 			resourceLayer = world.WorldActor.TraitOrDefault<IResourceLayer>();
 			domainIndex = world.WorldActor.TraitOrDefault<DomainIndex>();
 			base.Created(self);
@@ -195,11 +197,13 @@ namespace OpenRA.Mods.Common.Traits
 		void ReleaseSpecialists(string reason)
 		{
 			var released = reserved.OrderBy(id => id).ToArray();
+			var releasedActors = released.Select(player.World.GetActorById).Where(a => a != null).ToArray();
+			unassignedCombatUnits?.RegisterReleasedActors(releasedActors);
 			if (reason == "failsafe-degraded")
 			{
 				RefreshSquadManager();
 				squadManager?.RetainFailsafeReleasedActors(
-					$"StealthTankSquadBotModule/{Info.SquadLabel}", released.Select(player.World.GetActorById).Where(a => a != null));
+					$"StealthTankSquadBotModule/{Info.SquadLabel}", releasedActors);
 			}
 			reserved.Clear();
 			lastEligibleCount = -1;
@@ -311,7 +315,10 @@ namespace OpenRA.Mods.Common.Traits
 			var previous = new HashSet<uint>(reserved);
 			reserved.Clear();
 			foreach (var actor in selected)
+			{
 				reserved.Add(actor.ActorID);
+				unassignedCombatUnits?.ClaimActors(new[] { actor });
+			}
 
 			foreach (var group in groups)
 				group.Units.Clear();
