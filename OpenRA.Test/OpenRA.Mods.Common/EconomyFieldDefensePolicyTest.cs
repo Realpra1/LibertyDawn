@@ -313,6 +313,38 @@ namespace OpenRA.Test
 				Is.EqualTo(new[] { (10u, 7u), (20u, 8u) }));
 		}
 
+		[Test]
+		public void DetectedDuplicateUpgradesTargetlessPendingDirtyEvent()
+		{
+			var dirty = new EconomyFieldDefenseDirtyAssignments();
+			var reasons = new Dictionary<uint, string>();
+			var enemyTargets = new Dictionary<uint, CPos>();
+			Assert.That(dirty.Enqueue(10, 7), Is.True);
+			reasons[7] = "assigned-guard-attacked";
+
+			Assert.That(dirty.Enqueue(10, 7), Is.False,
+				"The actionable callback must merge into the existing deterministic queue entry.");
+			Assert.That(EconomyFieldDefensePolicy.MergeDetectedDirtyEvent(7,
+				"associated-harvester-attacked", new CPos(20, 21), reasons, enemyTargets), Is.True);
+			Assert.That(reasons[7], Is.EqualTo("associated-harvester-attacked"));
+			Assert.That(enemyTargets[7], Is.EqualTo(new CPos(20, 21)));
+			Assert.That(dirty.Drain().Select(item => (item.FieldId, item.ActorId)),
+				Is.EqualTo(new[] { (10u, 7u) }),
+				"Upgrading the target must not enqueue duplicate validity work.");
+		}
+
+		[Test]
+		public void TargetlessDuplicateDoesNotErasePendingDetectedEvent()
+		{
+			var reasons = new Dictionary<uint, string> { { 7, "associated-harvester-attacked" } };
+			var enemyTargets = new Dictionary<uint, CPos> { { 7, new CPos(20, 21) } };
+
+			Assert.That(EconomyFieldDefensePolicy.MergeDetectedDirtyEvent(7,
+				"assigned-guard-attacked", null, reasons, enemyTargets), Is.False);
+			Assert.That(reasons[7], Is.EqualTo("associated-harvester-attacked"));
+			Assert.That(enemyTargets[7], Is.EqualTo(new CPos(20, 21)));
+		}
+
 		[TestCase(10, 10, 10, 10, 2, false)]
 		[TestCase(10, 10, 12, 10, 2, false)]
 		[TestCase(10, 10, 13, 10, 2, true)]

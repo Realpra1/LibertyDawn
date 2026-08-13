@@ -172,6 +172,17 @@ namespace OpenRA.Mods.Common.Traits
 	/// <summary>World-independent transition and demand rules for economy field defense.</summary>
 	public static class EconomyFieldDefensePolicy
 	{
+		public static bool MergeDetectedDirtyEvent(uint actorId, string reason, CPos? detectedEnemy,
+			IDictionary<uint, string> dirtyReasons, IDictionary<uint, CPos> dirtyEnemyTargets)
+		{
+			if (!detectedEnemy.HasValue)
+				return false;
+
+			dirtyReasons[actorId] = reason;
+			dirtyEnemyTargets[actorId] = detectedEnemy.Value;
+			return true;
+		}
+
 		public static HarvesterFieldContextState Harvested(HarvesterFieldContextState state, CPos actualCell)
 		{
 			return new HarvesterFieldContextState(true, actualCell, state.HasCommitted, state.Committed);

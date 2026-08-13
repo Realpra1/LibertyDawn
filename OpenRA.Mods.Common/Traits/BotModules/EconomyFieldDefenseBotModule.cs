@@ -333,13 +333,18 @@ namespace OpenRA.Mods.Common.Traits
 			if (!dirtyAssignments.Enqueue(fieldId, actorId))
 			{
 				dirtyDeduplicated++;
+				if (EconomyFieldDefensePolicy.MergeDetectedDirtyEvent(actorId, reason, detectedEnemy,
+					dirtyReasons, dirtyEnemyTargets))
+					Debug("dirty merge field={0} actor={1} result=target-upgraded target={2} reason={3}",
+						fieldId, actorId, detectedEnemy.Value, reason);
+
 				return;
 			}
 
 			dirtyEnqueued++;
 			dirtyReasons[actorId] = reason;
-			if (detectedEnemy.HasValue)
-				dirtyEnemyTargets[actorId] = detectedEnemy.Value;
+			EconomyFieldDefensePolicy.MergeDetectedDirtyEvent(actorId, reason, detectedEnemy,
+				dirtyReasons, dirtyEnemyTargets);
 			Debug("dirty enqueue field={0} actor={1} reason={2}", fieldId, actorId, reason);
 		}
 
