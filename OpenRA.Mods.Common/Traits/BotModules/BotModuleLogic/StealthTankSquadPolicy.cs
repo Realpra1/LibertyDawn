@@ -12,6 +12,7 @@ using System.Linq;
 namespace OpenRA.Mods.Common.Traits
 {
 	public enum StealthTankSquadRole { Harass, Attack }
+	public enum SpecialistDefenderClearAction { None, CrushInfantry, SnipeTank }
 	public enum StealthTankPlanInvalidation
 	{
 		None,
@@ -146,6 +147,20 @@ namespace OpenRA.Mods.Common.Traits
 				.OrderByDescending(i => unlockedScores[i])
 				.ThenBy(i => i)
 				.First();
+		}
+
+		public static SpecialistDefenderClearAction DefenderClearAction(bool isInfantry, bool isTank,
+			bool canCrushInfantry, int packageDefenderCount, int ownRangeCells,
+			int defenderWeaponRangeCells, int defenderDetectorRangeCells, int safetyMarginCells)
+		{
+			if (isInfantry && canCrushInfantry && packageDefenderCount == 1 && defenderDetectorRangeCells <= 0)
+				return SpecialistDefenderClearAction.CrushInfantry;
+
+			if (isTank && defenderWeaponRangeCells > 0 && defenderDetectorRangeCells <= 0 &&
+				ownRangeCells >= defenderWeaponRangeCells + Math.Max(0, safetyMarginCells))
+				return SpecialistDefenderClearAction.SnipeTank;
+
+			return SpecialistDefenderClearAction.None;
 		}
 
 		public static int BufferedRange(int rangeCells, int bufferCells)

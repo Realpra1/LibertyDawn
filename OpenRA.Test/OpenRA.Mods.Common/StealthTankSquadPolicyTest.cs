@@ -193,6 +193,21 @@ namespace OpenRA.Test.Mods.Common
 				new[] { 300, 100, 200, 50 }, new long[] { 9000, 1000, 8000, 500 }, 2), Is.EqualTo(1));
 		}
 
+		[TestCase(true, false, true, 1, 8, 2, 0, 1, SpecialistDefenderClearAction.CrushInfantry)]
+		[TestCase(true, false, true, 2, 8, 2, 0, 1, SpecialistDefenderClearAction.None)]
+		[TestCase(true, false, false, 1, 8, 2, 0, 1, SpecialistDefenderClearAction.None)]
+		[TestCase(true, false, true, 1, 8, 2, 2, 1, SpecialistDefenderClearAction.None)]
+		[TestCase(false, true, true, 3, 8, 5, 0, 3, SpecialistDefenderClearAction.SnipeTank)]
+		[TestCase(false, true, true, 3, 7, 5, 0, 3, SpecialistDefenderClearAction.None)]
+		[TestCase(false, true, true, 3, 8, 5, 2, 3, SpecialistDefenderClearAction.None)]
+		public void DefenderClearingRequiresAnExplicitSafeCapability(bool infantry, bool tank, bool canCrush,
+			int packageCount, int ownRange, int weaponRange, int detectorRange, int kiteMargin,
+			SpecialistDefenderClearAction expected)
+		{
+			Assert.That(StealthTankSquadPolicy.DefenderClearAction(infantry, tank, canCrush,
+				packageCount, ownRange, weaponRange, detectorRange, kiteMargin), Is.EqualTo(expected));
+		}
+
 		[Test]
 		public void SafetyBufferDoesNotInventAThreatCapability()
 		{

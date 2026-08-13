@@ -455,3 +455,118 @@ No automated Match Policy Reviewer ran. The user must decide before cycle 4:
   final diagnostics cleanup, PR, and CI remain on the multi-cycle ladder.
 - The historical `8024fd2` tree remains incompatible and was not relabelled or
   backported.
+
+## Cycle 4 — capability-gated defender clearing and engagement safety
+
+The user's manual review retained cycle 3's working 4-cell specialist map and
+25-tick engagement check, and authorized a behavior-first cycle. Air uses an exact
+configured 6-cell influence grid (`AirInfluenceCellSize: 6`); the specialist stays
+at 4 because cycle 3 measured it working and there was no evidence that matching
+Air's numeric resolution would improve ground behavior or cost.
+
+### Implementation
+
+- `StealthTankSquadPolicy.DefenderClearAction` makes the rare all-defended fallback
+  explicit and testable. It returns `CrushInfantry` only for one isolated infantry
+  blocker when the profile can crush and the blocker has no detector. It returns
+  `SnipeTank` only for a non-detector tank whose weapon range plus the configured
+  threat buffer and kite margin remains within specialist range. All other actors
+  remain invalid clearing targets.
+- Both Stealth and Chemical profiles still execute this one implementation.
+  Chemical's existing `CrushInfantryTargets: false` prevents it from acquiring the
+  crush action; no profile branch, target-priority, composition, cadence, balance,
+  or YAML policy changed.
+- A snipe plan now chooses only approach cells outside the same buffered threat
+  envelope used by the 25-tick local safety check, avoiding a plan that would be
+  immediately stopped. Crush routing deliberately validates terrain/domain while
+  ignoring the crushable actor occupying the destination cell.
+- The engagement check emits one bounded reason line when it acts, separating
+  detector, engaged-weapon, and Blue-adjacency evidence. Detecting a newly local
+  actor invalidates the shared factual view and that profile's coarse map so the
+  next 75-tick strategy boundary cannot restore a stale unsafe route.
+- Pending explosion cells remain conservatively represented in the coarse map,
+  but the final source honors the required 125-tick cache lifetime. The cycle-3
+  compatibility branch had rebuilt the full 4-cell grid every 75-tick scan whenever
+  a pending radius was configured; removing that special case restores the Air-
+  shaped bounded cache without weakening the declared hazard map.
+
+### Game 1 — ambient-target fixture failure
+
+`cycle4-defender` ran headless MAX with two ordinary IronReapers, all modules, two
+reserved Stealth Tanks per side, seed `960401`, and a 2,000-tick bound. It completed
+in `8.006s`, exit code 0, without exception/desync/fatal markers. The harness failed
+only because the required weakest-defender selection was absent.
+
+The map still contained ambient Creeps scenery. Both squads selected `arco#183`
+at tick 1 and every later logged strategy boundary, issued a zero-waypoint hazard
+route, and withheld both units. The intended west harvester/infantry remained
+`35000/35000` and `5000/5000`; the east harvester/tank remained `35000/35000` and
+`45000/45000` through tick 1950. This is invalid weakest-defender evidence, but it
+factually demonstrates that the safety layer did not fall back to an unsafe direct
+attack when no coarse route existed.
+
+Direct two-AI Stealth totals were `267.277ms/4000` outer dispatches. Strategy was
+`262.305ms/54` calls and local safety `1.740ms/160`. Tick mean/p50/p95/p99/max were
+`2.054/1/4/12/1104.909ms`; the three >=50ms samples were startup, and the worst
+tick after tick 3 was `44.358ms` at tick 748. No AirSquad existed in this narrow
+fixture, so aggregate SquadManager timing is not presented as Air evidence.
+
+- Artifact: `analysis/20260813-cnc96-split/worker-1-cnc-96a/games/cycle4-defender/cycle4-defender`
+- Narrative: `analysis/20260813-cnc96-split/worker-1-cnc-96a/commenters/cycle4-defender/NARRATIVE.md`
+
+### Game 2 — detector proof and failed defender fixture
+
+`cycle4-combined-retry2` ran the corrected sequential fixture to tick 2200 in
+`7.006s`, seed `960403`, exit code 0, without exception/desync/fatal markers. Two
+tick-0 setup attempts were excluded: one destroyed the Creeps player actor, and one
+had a Lua userdata formatting error. Neither advanced a valid test world.
+
+Open harvesters first caused the west group to acquire a real route. At tick 100
+the script injected `mhq#244` three cells from the group. At the next 25-tick local
+safety boundary both `stnk#223` and `stnk#224` received Stop orders with
+`detector=True`, `engaged-weapon=False`, `blue-adjacent=False`; the next strategy
+record rebuilt current facts and issued no stale route. This is direct detector
+reaction evidence.
+
+The east group's open route was withheld before it engaged, so the injected Blue
+seeder did not produce a `blue-adjacent=True` response. After the defended stage
+began, west explicitly logged rejected `harv#246` with blocker `e1#247`; east
+logged rejected `harv#248` with blocker `mtnk#249`. Both groups reached the 20-scan
+patience boundary and attempted one route search, but no reachable clear was
+selected and no actor took damage. Inspection found a concrete product defect:
+crush endpoint validation rejected the cell precisely because the crushable actor
+occupied it. Final source now ignores that actor for endpoint occupancy while
+retaining terrain/domain validation. The east fixture also moved its target away
+from the previously proven reachable coordinate, so it cannot distinguish policy
+from map reachability. No third game was run under the two-valid-game cap.
+
+Direct two-AI Stealth outer cost was `163.020ms/4400` dispatches, or
+`0.074ms/game tick`; strategy was `154.950ms/60` (`2.583ms/call`) and local safety
+was `4.666ms/176` (`0.027ms/call`, two Stop orders). Tick mean/p50/p95/p99/max were
+`1.672/1/4/11/1058.881ms`; the three >=50ms events were startup, and the worst tick
+after tick 3 was `40.774ms` at tick 1294.
+
+For the requested correctly denominated Air comparison, the latest shared-load
+cycle-3 saturation remains authoritative: Air strategy `1316.446ms/84`, Air local
+safety `23.157ms/144`, specialist strategy `299.722ms/48`, and specialist local
+safety `10.884ms/144`. Cycle-4's no-air fixtures are not cross-workload evidence.
+
+- Artifact: `analysis/20260813-cnc96-split/worker-1-cnc-96a/games/cycle4-combined-retry2/cycle4-combined`
+- Narrative: `analysis/20260813-cnc96-split/worker-1-cnc-96a/commenters/cycle4-combined/NARRATIVE.md`
+
+### Checks and manual gate
+
+- `make all`: passed, zero warnings/errors.
+- Focused `StealthTankSquadPolicyTest`: `52/52` passed. Seven cases cover the
+  defender capability boundaries in addition to existing cadence/cache/isolation
+  coverage.
+- `git diff --check`: passed.
+- No automated Match Policy Reviewer ran. Each valid game received its own fresh
+  Luna factual narrative.
+
+The narrow code direction remains sensible, but visible weakest-defender clearing
+and Blue engagement are not proved. Proposed status remains `First iteration -
+testing`. A cycle 5, only if the user authorizes it, should use the already proven
+reachable west/east coordinates, begin with engaged groups, and separately prove
+isolated-infantry crush, outside-range Medium Tank snipe, subsequent Harvester
+reassessment/damage, and Blue-adjacency Stop. It must not add a third cycle-4 game.
