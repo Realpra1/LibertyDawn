@@ -39,7 +39,7 @@ namespace OpenRA.Support
 			this.flushInterval = flushInterval > 0 ? flushInterval : throw new ArgumentOutOfRangeException(nameof(flushInterval));
 		}
 
-		public void Tick(int localTick, World world)
+		public void Tick(int localTick, World world = null)
 		{
 			if (finished || lastTick == localTick)
 				return;
@@ -48,7 +48,8 @@ namespace OpenRA.Support
 			foreach (var item in PerfHistory.Items)
 				channels.GetOrAdd(item.Key, CreateChannel).Write(localTick, item.Value.LastValue);
 
-			periodicStallReport.RecordTick(localTick, world);
+			if (world != null)
+				periodicStallReport.RecordTick(localTick, world);
 		}
 
 		public void Render(int renderFrame)

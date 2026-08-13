@@ -179,11 +179,12 @@ namespace OpenRA.Mods.Common.Traits
 			}
 		}
 
+		const int LocalSafetySearchRadiusCells = 20;
+
 		static readonly BitSet<TargetableType> TankTargetTypes = new BitSet<TargetableType>("Tank");
 		static readonly BitSet<TargetableType> GroundTargetTypes = new BitSet<TargetableType>("Ground");
 		static readonly BitSet<TargetableType> InfantryTargetTypes = new BitSet<TargetableType>("Infantry");
 		static readonly BitSet<TargetableType> StructureTargetTypes = new BitSet<TargetableType>("Structure");
-		const int LocalSafetySearchRadiusCells = 20;
 
 		readonly World world;
 		readonly Player player;
@@ -473,6 +474,7 @@ namespace OpenRA.Mods.Common.Traits
 							armedSupport == null ? "none" : armedSupport.Info.Name + "#" + armedSupport.ActorID,
 							armedSupport == null ? "none" : armedSupport.Owner.InternalName, armedRange);
 					}
+
 					if (detectorExposure && armedCoverage)
 					{
 						group.SuspendedEngagementTarget = group.Target;
@@ -530,6 +532,7 @@ namespace OpenRA.Mods.Common.Traits
 		int UpdateRepairLifecycle(Actor unit)
 		{
 			var health = unit.TraitOrDefault<IHealth>();
+			RefreshSquadManager();
 			var threshold = squadManager?.Info.HealthRetreatThreshold ?? 0f;
 			if (health == null || threshold <= 0)
 				return 0;
@@ -590,6 +593,7 @@ namespace OpenRA.Mods.Common.Traits
 				bot.QueueOrder(new Order("Move", unit, Target.FromCell(world, waypoint), queued));
 				queued = true;
 			}
+
 			bot.QueueOrder(new Order("Repair", unit, Target.FromActor(facility), queued));
 
 			repairing.Add(unit.ActorID);
@@ -847,6 +851,7 @@ namespace OpenRA.Mods.Common.Traits
 				ClearRetainedPlan(group);
 				return;
 			}
+
 			if (activeUnits.Length == 0)
 				return;
 
@@ -966,6 +971,7 @@ namespace OpenRA.Mods.Common.Traits
 				selectedScore = score;
 				selectedDanger = defendingValue;
 			}
+
 			scanCandidateThreatTicks += Stopwatch.GetTimestamp() - phaseStarted;
 
 			phaseStarted = Stopwatch.GetTimestamp();
@@ -1280,6 +1286,7 @@ namespace OpenRA.Mods.Common.Traits
 					scanQueuedOrders++;
 				}
 			}
+
 			scanOrderTicks += Stopwatch.GetTimestamp() - phaseStarted;
 
 			if (Info.DebugLogging)
@@ -1444,6 +1451,7 @@ namespace OpenRA.Mods.Common.Traits
 					Info.ThreatRangeBufferCells);
 				MarkThreatRange(map, threat, Math.Max(detectorRange, weaponRange));
 			}
+
 			MarkPendingExplosionCells(map);
 
 			scanThreatMapTicks += Stopwatch.GetTimestamp() - started;

@@ -793,6 +793,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				};
 				profileCaches[cacheKey] = cache;
 			}
+
 			RecordAirPhase(owner, rebuildInfluence ? "influence-build" : "influence-cache-hit", influenceStarted);
 
 			var danger = cache.Danger;
