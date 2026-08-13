@@ -215,6 +215,17 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(StealthTankSquadPolicy.BufferedRange(5, 2), Is.EqualTo(7));
 		}
 
+		[TestCase(true, 0, 3, 8, true)]
+		[TestCase(true, 0, 8, 8, false)]
+		[TestCase(false, 0, 3, 8, false)]
+		[TestCase(true, 5, 3, 8, false)]
+		public void OnlyUnarmedPrimaryTargetDetectorMayBeOutranged(bool threatIsTarget,
+			int weaponRange, int detectorRange, int ownRange, bool expected)
+		{
+			Assert.That(StealthTankSquadPolicy.CanOutrangeTargetDetector(threatIsTarget,
+				weaponRange, detectorRange, ownRange), Is.EqualTo(expected));
+		}
+
 		[TestCase(0, 7, false, false, 0)]
 		[TestCase(0, 7, true, false, 7)]
 		[TestCase(5, 7, false, false, 5)]

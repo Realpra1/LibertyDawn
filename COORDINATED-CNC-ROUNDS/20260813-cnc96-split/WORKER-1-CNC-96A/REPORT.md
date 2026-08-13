@@ -2,11 +2,11 @@
 
 ## Status
 
-Cycles 1-3 implemented and checked. Cycle 3 ran two distinct adversarial full-engine
-games and one fresh factual Luna narrative for each. Proposed status remains
-`First iteration - testing`, stopped at the required user manual-policy gate. The
-Air-shaped coarse routing removes the measured multi-second specialist hitch while
-the reachable case preserves orders, target damage/destruction, survival, and recovery.
+Cycles 1-7 implemented and checked. Cycle 7 fixed and proved the unarmed
+self-detecting primary-target case, then exposed a corrected detector-engagement
+policy boundary after its second valid game. Proposed status remains
+`First iteration - testing`: Air-shaped coarse routing retains its measured
+performance improvement, but detector-only engagement veto remains too conservative.
 
 ## Task boundary
 
@@ -775,3 +775,110 @@ and identifies the exact range/capability detector defect. The next cycle must
 narrowly correct it and prove outside-range SnipeTank, defender kill, and
 Harvester reassessment while retaining dedicated-detector safety; it must also
 isolate detector regression from residual Blue.
+
+## Cycle 7 — capability/range-aware self-detector correction
+
+The authorized Sol-medium cycle began from durable head `76b7406777b464d52370519e702aec2d9252ef87`.
+The concrete defect was in preliminary candidate screening: a target's own
+detector was treated as unavoidable before the existing route planner could test
+an outside-coverage firing approach. The narrow correction permits screening only
+when the threat actor is the primary target, has no ground weapon, has positive
+detector range, and the specialist's range is strictly greater than the buffered
+detector range. Separate detectors and armed targets never receive the exception.
+The unchanged 4-cell/125-tick influence map still contains the target detector, so
+the existing route search must find an approach outside its coverage.
+
+No authored config, balance, target priority, cadence, candidate/group bound,
+profile distinction, Air behavior, local engagement response, or stable-plan
+invalidation changed. Four focused cases cover the positive unarmed target, equal
+range rejection, separate detector rejection, and armed detector rejection. One
+bounded debug line records actor/owner plus raw, buffered, and own ranges when the
+candidate-only exception applies.
+
+Exactly two valid VIKI/Nod versus Brutalis/GDI headless-MAX games ran with all
+ordinary modules enabled and no aircraft. Both maps contained only multiplayer
+spawn actors before Lua setup; they did not destroy Neutral crates at runtime.
+One initial Game A process reached combat but a Lua callback used unsupported
+`ActorID`; its summary recorded world tick 0 and it is excluded. The callback
+was corrected to supported type/owner/location fields and both source and packaged
+Lua were checked ActorID-free before the valid runs.
+
+### Game A — unarmed self-detecting primary target
+
+`cycle7-self-detector` (seed `960701`) reached tick 1800 in `6.008s`,
+exit 0, without fatal/exception/desync or Air identity. VIKI formed the two-unit
+specialist group, logged the Harvester's raw detector range 2, buffered range 4,
+and own range 8, and found a two-waypoint route at tick 76. At tick 162 exact Lua
+attribution recorded a Multi0 `stnk` at `30,21` damaging the Multi1 fixture
+Harvester at `38,21`: cell-distance-squared 64, target health
+`483000/500000`. The target was dead by tick 1501.
+
+The launcher wrapper marked the valid run failed only because three manifest
+regexes treated square brackets as character classes; the raw bracketed facts,
+configured exit, and behavioral requirements are present. The fresh Luna factual
+narrative correctly treats this as bookkeeping, does not call Brutalis an old
+control, and does not infer why later zero-waypoint routes were withheld. Its
+fresh Luna policy review returned `mostly sensible` / medium confidence with no
+blocker; repeated later withholding is advisory and unrelated to the proved
+fixture target.
+
+- Artifact: `analysis/20260813-cnc96-split/worker-1-cnc-96a/cycle7/games/game-a-retry1/cycle7-self-detector`
+- Narrative: `analysis/20260813-cnc96-split/worker-1-cnc-96a/cycle7/reviews/game-a-luna-narrator/NARRATIVE.md`
+- Policy: `analysis/20260813-cnc96-split/worker-1-cnc-96a/cycle7/reviews/game-a-luna-policy/POLICY-REVIEW.md`
+- Performance: tick mean/p50/p95/p99/max `1.571/1/3/9/1206.752ms`;
+  three >=50ms events were startup and post-tick-3 max was `25.362ms`.
+  VIKI Stealth used `117.521ms/1800` outer dispatches, worst `51.293ms`,
+  and 18 orders. Final working set was about `573MB`, allocated bytes
+  `1.064GB`, GC `117/41/13`.
+
+### Game B — completed under a superseded detector-alone premise
+
+`cycle7-detector-recovery` (seed `960702`) reached tick 2300 in
+`7.007s`, exit 0, without fatal/exception/desync or Air identity. With a
+Brutalis MHQ at `31,21`, VIKI reported all candidates dangerous and named
+`mhq#50` as the blocker; the fixture Harvester remained
+`500000/500000` through tick 701. The MHQ was removed at tick 901 with no
+prior damage. VIKI replanned at tick 976 and at tick 1113 a Multi0 `stnk`
+at `30,21` damaged the Multi1 Harvester at `38,21`, again distance 8;
+the target was dead by tick 2101.
+
+The wrapper's only miss was a doubled space in the removal event. The fresh Luna
+narrative accurately reconstructs the run. Its policy review returned
+`sensible` / high confidence under the supplied premise. Immediately after the
+game, however, the user authoritatively corrected that premise: firing reveals a
+Stealth Tank anyway, so detector-only coverage must not veto or Stop an engagement.
+A lone unarmed MHQ is defenseless and may itself be attacked. Detection remains
+relevant to concealed routing/approach; engagement deterrence requires detector
+coverage plus armed enemy support capable of punishing the intended firing or
+escape area. Therefore Game B is a valid engine run and routing observation, but
+its detector-alone hold is **not acceptance**, and its policy review is
+superseded.
+
+- Artifact: `analysis/20260813-cnc96-split/worker-1-cnc-96a/cycle7/games/game-b/cycle7-detector-recovery`
+- Narrative: `analysis/20260813-cnc96-split/worker-1-cnc-96a/cycle7/reviews/game-b-luna-narrator/NARRATIVE.md`
+- Superseded policy: `analysis/20260813-cnc96-split/worker-1-cnc-96a/cycle7/reviews/game-b-luna-policy/POLICY-REVIEW.md`
+- Performance: tick mean/p50/p95/p99/max `1.335/1/2/8/1167.924ms`;
+  three >=50ms events were startup and post-tick-3 max was `27.092ms`.
+  VIKI Stealth used `96.482ms/2300` outer dispatches, worst `37.425ms`,
+  and 6 orders. Final working set was about `575MB`, allocated bytes
+  `1.157GB`, GC `129/44/13`.
+
+### Checks and next boundary
+
+- Protected Release build and full CNC MiniYAML/map lint passed with zero
+  warnings/errors; both packaged cycle-7 maps also linted independently.
+- Focused `StealthTankSquadPolicyTest` passed `56/56`; Lua syntax and
+  `git diff --check` passed.
+- The 75-tick strategy, engagement-only 25-tick safety, 4-cell specialist grid,
+  125-tick cache, shared Stealth/Chemical implementation, and Air isolation
+  remained unchanged.
+- Exactly two valid games were consumed; no post-correction game or product churn
+  occurred.
+
+Proposed status remains `First iteration - testing`. The self-detector
+candidate correction is implemented and literally proved. A separately authorized
+cycle 8 must make engagement response armed-support-aware and test an MHQ plus
+armed supporting defender, then remove or neutralize the shooter while the MHQ
+remains and prove reassessment/attack. Explicit SnipeTank/defender kill, other
+personalities, reservations/blocked routes, controls, paced agreement, save/load,
+final review, PR/CI, and diagnostic cleanup remain open.

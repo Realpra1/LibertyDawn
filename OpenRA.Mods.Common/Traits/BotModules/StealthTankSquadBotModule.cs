@@ -1173,14 +1173,25 @@ namespace OpenRA.Mods.Common.Traits
 				var weaponRange = StealthTankSquadPolicy.BufferedRange(ignoreWeapon ? 0 : threat.WeaponRangeCells,
 					Info.ThreatRangeBufferCells);
 				var targetDistance = (threat.Actor.CenterPosition - target.CenterPosition).Length / 1024;
-				var endpointDanger = (detectorRange > 0 && targetDistance <= detectorRange) ||
+
+				// Candidate screening only proves whether an approach may exist. The route planner
+				// still keeps this detector in its influence map and must find a firing cell outside
+				// its coverage. Never apply this exception to an armed target or a separate detector.
+				var canOutrangeTargetDetector = StealthTankSquadPolicy.CanOutrangeTargetDetector(
+					threat.Actor == target, threat.WeaponRangeCells, detectorRange, ownRange);
+				if (Info.DebugLogging && canOutrangeTargetDetector)
+					Log.Write("debug", "AI stealth target-local detector {0} [{1}] target={2}#{3} target-owner={4} raw-detector-range={5} buffered-detector-range={6} own-range={7} candidate-screen=permitted route-coverage=required.",
+						Info.SquadLabel, player.PlayerName, target.Info.Name, target.ActorID,
+						target.Owner.InternalName, threat.DetectorRangeCells, detectorRange, ownRange);
+				var endpointDanger = (!canOutrangeTargetDetector && detectorRange > 0 &&
+					targetDistance <= detectorRange) ||
 					(weaponRange > 0 && targetDistance <= weaponRange &&
 						(threat.Actor != target || ownRange < threat.WeaponRangeCells + Info.KiteRangeMarginCells));
 				var canKiteTarget = threat.Actor == target && detectorRange <= 0 &&
 					ownRange >= threat.WeaponRangeCells + Info.KiteRangeMarginCells;
 
 				var routeDanger = SegmentPassesWithin(start, target.CenterPosition, threat.Actor.CenterPosition,
-					StealthTankSquadPolicy.TransitThreatRange(detectorRange, weaponRange,
+					StealthTankSquadPolicy.TransitThreatRange(canOutrangeTargetDetector ? 0 : detectorRange, weaponRange,
 						threat.WeaponIsEngaged, canKiteTarget));
 				if (!endpointDanger && !routeDanger)
 					continue;

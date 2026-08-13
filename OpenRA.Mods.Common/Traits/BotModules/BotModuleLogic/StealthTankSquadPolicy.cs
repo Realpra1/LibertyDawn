@@ -168,6 +168,13 @@ namespace OpenRA.Mods.Common.Traits
 			return rangeCells > 0 ? rangeCells + Math.Max(0, bufferCells) : 0;
 		}
 
+		public static bool CanOutrangeTargetDetector(bool threatIsTarget, int weaponRangeCells,
+			int detectorRangeCells, int ownRangeCells)
+		{
+			return threatIsTarget && weaponRangeCells <= 0 && detectorRangeCells > 0 &&
+				ownRangeCells > detectorRangeCells;
+		}
+
 		public static int TransitThreatRange(int detectorRangeCells, int weaponRangeCells,
 			bool weaponIsEngaged, bool canKiteTarget)
 		{
