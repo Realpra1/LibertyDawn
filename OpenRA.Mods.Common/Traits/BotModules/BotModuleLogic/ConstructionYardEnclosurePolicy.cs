@@ -229,6 +229,33 @@ namespace OpenRA.Mods.Common.Traits
 			return true;
 		}
 
+		public static bool TryFirstExactRoute(IEnumerable<CPos> accessCells, CPos yardLocation, CPos destination,
+			Func<CPos, bool> canEnter, Func<CPos, CPos, IEnumerable<CPos>> findRoute,
+			Func<CPos, bool> isBlocked, Func<CPos, bool> isFactFootprint,
+			out CPos origin, out CPos[] route)
+		{
+			origin = default;
+			route = null;
+			if (accessCells == null || canEnter == null || findRoute == null ||
+				isBlocked == null || isFactFootprint == null || !canEnter(destination))
+				return false;
+
+			foreach (var candidate in accessCells.Where(canEnter)
+				.OrderBy(c => (c - yardLocation).LengthSquared)
+				.ThenBy(c => c.X).ThenBy(c => c.Y))
+			{
+				var found = findRoute(candidate, destination)?.ToArray();
+				if (!IsExactReversedRoute(found, candidate, destination, isBlocked, isFactFootprint))
+					continue;
+
+				origin = candidate;
+				route = found;
+				return true;
+			}
+
+			return false;
+		}
+
 		public static string FirstAvailableType(IEnumerable<string> preferenceOrder, Func<string, bool> isAvailable)
 		{
 			if (preferenceOrder == null || isAvailable == null)

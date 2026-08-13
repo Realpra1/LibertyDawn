@@ -146,6 +146,32 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
+		public void ExactRouteFallsBackFromDisconnectedNearestAccessOrigin()
+		{
+			var access = new[] { new CPos(52, 53), new CPos(50, 53), new CPos(51, 53) };
+			var destination = new CPos(53, 51);
+			var attempted = new List<CPos>();
+			var alternateRoute = new[]
+			{
+				destination, new CPos(53, 52), new CPos(52, 53), new CPos(51, 53)
+			};
+
+			var found = ConstructionYardEnclosurePolicy.TryFirstExactRoute(access,
+				new CPos(50, 50), destination, _ => true,
+				(candidateOrigin, _) =>
+				{
+					attempted.Add(candidateOrigin);
+					return candidateOrigin == new CPos(51, 53) ? alternateRoute : null;
+				}, _ => false, _ => false, out var origin, out var route);
+
+			Assert.That(found, Is.True);
+			Assert.That(origin, Is.EqualTo(new CPos(51, 53)));
+			Assert.That(route, Is.EqualTo(alternateRoute));
+			Assert.That(attempted, Is.EqualTo(new[] { new CPos(50, 53), new CPos(51, 53) }),
+				"A disconnected nearest origin must not prevent deterministic fallback to another access cell.");
+		}
+
+		[Test]
 		public void WallPreferenceFallsBackWithoutInventingAnotherType()
 		{
 			var preference = new[] { "brik", "sbag", "cycl" };

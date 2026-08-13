@@ -699,16 +699,19 @@ namespace OpenRA.Mods.Common.Traits
 			if (locomotor == null)
 				return false;
 
-			var routeOrigin = enclosurePlan.AccessCells
-				.Where(CanRouteProbeEnter)
-				.OrderBy(c => (c - enclosureYardLocation).LengthSquared)
-				.ThenBy(c => c.X).ThenBy(c => c.Y)
-				.Select(c => (CPos?)c).FirstOrDefault();
-			if (routeOrigin == null || !CanRouteProbeEnter(destination))
+			if (!ConstructionYardEnclosurePolicy.TryFirstExactRoute(enclosurePlan.AccessCells,
+				enclosureYardLocation, destination, CanRouteProbeEnter, FindReversedEnclosureRoute,
+				c => !CanRouteProbeEnter(c), IsFactFootprintCell, out origin, out var found))
 				return false;
 
+			route = found.ToList();
+			return true;
+		}
+
+		IEnumerable<CPos> FindReversedEnclosureRoute(CPos origin, CPos destination)
+		{
 			using (var search = PathSearch.ToTargetCell(world, locomotor, null,
-				routeOrigin.Value, destination, BlockedByActor.All, laneBias: false))
+				origin, destination, BlockedByActor.All, laneBias: false))
 			{
 				for (var expanded = 0; expanded < PathCheckMaxCells && search.CanExpand; expanded++)
 				{
@@ -716,18 +719,11 @@ namespace OpenRA.Mods.Common.Traits
 					if (!search.IsTarget(cell))
 						continue;
 
-					var found = ReconstructReversedPath(search.Graph, cell, PathCheckMaxCells);
-					if (!ConstructionYardEnclosurePolicy.IsExactReversedRoute(found,
-						routeOrigin.Value, destination, c => !CanRouteProbeEnter(c), IsFactFootprintCell))
-						return false;
-
-					origin = routeOrigin.Value;
-					route = found;
-					return true;
+					return ReconstructReversedPath(search.Graph, cell, PathCheckMaxCells);
 				}
 			}
 
-			return false;
+			return null;
 		}
 
 		static List<CPos> ReconstructReversedPath(IPathGraph graph, CPos destination, int maximumCells)
