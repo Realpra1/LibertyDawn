@@ -120,6 +120,14 @@ Policy Reviewer directory as `inputs/NARRATIVE.md`; do not use symlinks. Stage a
 short `inputs/TASK-CONTEXT.md` containing task identity, why, change category,
 in/out-of-scope behavior, and explicit balance authority. The
 launcher rejects analysis inputs outside these staged roots.
+Also stage the canonical policy scratchpad as the regular file
+`inputs/POLICY-SCRATCHPAD.md` while holding the shared capacity-one
+`policy-scratchpad` resource slot. Every successful policy role must freshly write
+both `POLICY-REVIEW.md` and a complete `POLICY-SCRATCHPAD.md` replacement. The
+launcher validates both as non-symlink regular UTF-8 files, limits the replacement
+to 3,000 Unicode characters, and atomically promotes it before publishing success.
+Keep the slot held through foreground completion; invalid output leaves the
+canonical scratchpad unchanged.
 Run the launcher with `--validate-cli` for a no-agent smoke against the installed
 Codex parser. This retains every constructed option, substitutes parser help only
 for the free-form prompt, and proves a legacy approval option is rejected. Use
