@@ -120,9 +120,11 @@ namespace OpenRA.Mods.Common.Traits
 			advancedBehaviorEnabled = enabled;
 			if (!enabled)
 			{
+				var releasedActors = Actors(reserved);
+				squadManager?.RetainFailsafeReleasedActors("CovertHarassmentBotModule", releasedActors);
 				if (Info.DebugLogging && reserved.Count > 0)
 					Debug("released squad: reason=failsafe-degraded actors={0}", string.Join(",",
-						Actors(reserved).Select(a => a.Info.Name + "#" + a.ActorID)));
+						releasedActors.Select(a => a.Info.Name + "#" + a.ActorID)));
 
 				ClearState("failsafe degraded");
 			}

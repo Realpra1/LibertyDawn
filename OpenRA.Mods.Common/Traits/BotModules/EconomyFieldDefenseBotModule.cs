@@ -199,10 +199,11 @@ namespace OpenRA.Mods.Common.Traits
 			advancedBehaviorEnabled = enabled;
 			if (!enabled)
 			{
+				var releasedActors = reserved.Select(world.GetActorById).Where(IsOwnedUsable).OrderBy(a => a.ActorID).ToArray();
+				squadManager?.RetainFailsafeReleasedActors("EconomyFieldDefenseBotModule", releasedActors);
 				if (Info.DebugLogging && reserved.Count > 0)
 					Debug("released all fields reason=failsafe-degraded actors={0}", string.Join(",",
-						reserved.Select(world.GetActorById).Where(IsOwnedUsable).OrderBy(a => a.ActorID)
-							.Select(a => a.Info.Name + "#" + a.ActorID)));
+						releasedActors.Select(a => a.Info.Name + "#" + a.ActorID)));
 
 				ClearState("failsafe degraded");
 			}

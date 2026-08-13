@@ -199,6 +199,20 @@ World:
 		"CNC-100 Covert Harassment Participation", covert_rules)
 	write_map(root / "mods/cnc/maps/Empire-Earth.oramap", args.output / "cnc100-field-defense.oramap",
 		"CNC-100 Economy Field Defense Participation", field_defense_rules)
+	write_map(root / "mods/cnc/maps/Empire-Earth.oramap", args.output / "cnc100-final-review-high-unit.oramap",
+		"CNC-100 Final Review High Unit Handoff", high_unit_rules.replace(
+			"\t\tGroundTargetDebugLogging: true\n\tStealthTankSquadBotModule:",
+			"\t\tGroundTargetDebugLogging: true\n\t\tFailsafeTestAdvancedWorkMilliseconds: 20\n"
+			"\t\tFailsafeTestAdvancedWorkFromTick: 60\n\t\tFailsafeTestAdvancedWorkUntilTick: 300\n"
+			"\tStealthTankSquadBotModule:").replace(
+			"\t\tFailsafeTestAdvancedWorkMilliseconds: 15", "\t\tFailsafeTestAdvancedWorkMilliseconds: 20"))
+	write_map(root / "mods/cnc/maps/island-duel.oramap", args.output / "cnc100-final-review-mixed.oramap",
+		"CNC-100 Final Review Mixed Handoff", mixed_rules.replace(
+			"\t\tFailsafeReconsiderInterval: 75\n\tStealthTankSquadBotModule:",
+			"\t\tFailsafeReconsiderInterval: 75\n\t\tFailsafeTestAdvancedWorkMilliseconds: 20\n"
+			"\t\tFailsafeTestAdvancedWorkFromTick: 60\n\t\tFailsafeTestAdvancedWorkUntilTick: 300\n"
+			"\tStealthTankSquadBotModule:").replace(
+			"\t\tFailsafeTestAdvancedWorkMilliseconds: 15", "\t\tFailsafeTestAdvancedWorkMilliseconds: 20"))
 
 
 if __name__ == "__main__":

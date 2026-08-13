@@ -155,6 +155,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly Dictionary<CPos, bool> resourceHazardCache = new Dictionary<CPos, bool>();
 		readonly SpecialistGroup[] groups;
 		IBot bot;
+		SquadManagerBotModule squadManager;
 		IBotTransportReservations[] transportReservations;
 		IResourceLayer resourceLayer;
 		DomainIndex domainIndex;
@@ -173,6 +174,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		protected override void Created(Actor self)
 		{
+			RefreshSquadManager();
 			transportReservations = self.Owner.PlayerActor.TraitsImplementing<IBotTransportReservations>().ToArray();
 			resourceLayer = world.WorldActor.TraitOrDefault<IResourceLayer>();
 			domainIndex = world.WorldActor.TraitOrDefault<DomainIndex>();
@@ -193,6 +195,12 @@ namespace OpenRA.Mods.Common.Traits
 		void ReleaseSpecialists(string reason)
 		{
 			var released = reserved.OrderBy(id => id).ToArray();
+			if (reason == "failsafe-degraded")
+			{
+				RefreshSquadManager();
+				squadManager?.RetainFailsafeReleasedActors(
+					$"StealthTankSquadBotModule/{Info.SquadLabel}", released.Select(player.World.GetActorById).Where(a => a != null));
+			}
 			reserved.Clear();
 			lastEligibleCount = -1;
 			foreach (var group in groups)
@@ -205,6 +213,13 @@ namespace OpenRA.Mods.Common.Traits
 			if (Info.DebugLogging)
 				Log.Write("debug", "AI stealth squads {0} [{1}] released: reason={2} count={3} actors={4}.",
 					Info.SquadLabel, player.PlayerName, reason, released.Length, string.Join(",", released));
+		}
+
+		void RefreshSquadManager()
+		{
+			if (squadManager == null || squadManager.IsTraitDisabled)
+				squadManager = player.PlayerActor.TraitsImplementing<SquadManagerBotModule>()
+					.FirstOrDefault(s => !s.IsTraitDisabled);
 		}
 
 		void IBotEnabled.BotEnabled(IBot enabledBot) { bot = enabledBot; }
