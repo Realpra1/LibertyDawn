@@ -54,6 +54,58 @@ namespace OpenRA.Mods.Common.Traits
 		}
 	}
 
+	public readonly struct EconomyDefenseDirtyAssignment
+	{
+		public readonly uint FieldId;
+		public readonly uint ActorId;
+
+		public EconomyDefenseDirtyAssignment(uint fieldId, uint actorId)
+		{
+			FieldId = fieldId;
+			ActorId = actorId;
+		}
+	}
+
+	/// <summary>
+	/// Deduplicates urgent field-defense validity work without polling world state.
+	/// Entries drain in actor-id order so damage callback order cannot affect orders.
+	/// </summary>
+	public sealed class EconomyFieldDefenseDirtyAssignments
+	{
+		readonly Dictionary<uint, HashSet<uint>> actorsByField = new Dictionary<uint, HashSet<uint>>();
+
+		public int Count => actorsByField.Values.Sum(actors => actors.Count);
+
+		public bool Enqueue(uint fieldId, uint actorId)
+		{
+			if (!actorsByField.TryGetValue(fieldId, out var actors))
+			{
+				actors = new HashSet<uint>();
+				actorsByField.Add(fieldId, actors);
+			}
+
+			return actors.Add(actorId);
+		}
+
+		public EconomyDefenseDirtyAssignment[] Drain()
+		{
+			var pending = Snapshot();
+			actorsByField.Clear();
+			return pending;
+		}
+
+		public EconomyDefenseDirtyAssignment[] Snapshot()
+		{
+			return actorsByField.OrderBy(pair => pair.Key)
+				.SelectMany(pair => pair.Value.OrderBy(actorId => actorId)
+					.Select(actorId => new EconomyDefenseDirtyAssignment(pair.Key, actorId))).ToArray();
+		}
+
+		public void RemoveField(uint fieldId) { actorsByField.Remove(fieldId); }
+
+		public void Clear() { actorsByField.Clear(); }
+	}
+
 	/// <summary>
 	/// Tracks the exact production queue and actor type reserved by economy SAM demand.
 	/// Actor type alone is insufficient because ordinary authored SAM production must keep
@@ -196,6 +248,12 @@ namespace OpenRA.Mods.Common.Traits
 		public static bool RequiresProjectedResourceSafety(bool isInfantry)
 		{
 			return isInfantry;
+		}
+
+		public static bool IsMateriallyNewUrgentTarget(CPos previous, CPos current, int deduplicationRadiusCells)
+		{
+			var radius = Math.Max(0, deduplicationRadiusCells);
+			return (current - previous).LengthSquared > radius * radius;
 		}
 
 		public static int RestoredScanTicks(int nextScanTick, int currentWorldTick, int scanInterval)

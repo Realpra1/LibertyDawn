@@ -73,7 +73,7 @@ Player:
 		TanksPerHarvester: 1
 		InfantryPerHarvester: 2
 		AntiAirPerHarvester: 1
-		ScanInterval: 25
+		ScanInterval: 1500
 		OrderInterval: 25
 		StationMinimumRadiusCells: 2
 		StationMaximumRadiusCells: 6

@@ -41,6 +41,7 @@ namespace OpenRA.Mods.Common.Traits
 		public readonly int RouteRetryTicks = 250;
 		public readonly int MaximumCandidatesPerRole = 48;
 		public readonly int MaximumOutstandingRequestsPerRole = 1;
+		public readonly bool LowFrequencyTriggerControl = true;
 		public readonly bool DebugLogging = false;
 
 		public override void RulesetLoaded(Ruleset rules, ActorInfo ai)
@@ -81,7 +82,7 @@ namespace OpenRA.Mods.Common.Traits
 	}
 
 	public sealed class EconomyFieldDefenseBotModule : ConditionalTrait<EconomyFieldDefenseBotModuleInfo>,
-		IBotEnabled, IBotTick, IBotUnitReservations, IGameSaveTraitData
+		IBotEnabled, IBotTick, IBotUnitReservations, IBotRespondToAttack, IGameSaveTraitData
 	{
 		const string ProductionRequestOwner = "EconomyFieldDefense";
 
@@ -139,6 +140,11 @@ namespace OpenRA.Mods.Common.Traits
 		readonly Dictionary<uint, CPos> lastUnsafeOccupancy = new Dictionary<uint, CPos>();
 		readonly Dictionary<uint, UnitStance> originalStances = new Dictionary<uint, UnitStance>();
 		readonly Dictionary<uint, string> lastSafetyStates = new Dictionary<uint, string>();
+		readonly EconomyFieldDefenseDirtyAssignments dirtyAssignments = new EconomyFieldDefenseDirtyAssignments();
+		readonly Dictionary<uint, string> dirtyReasons = new Dictionary<uint, string>();
+		readonly Dictionary<uint, CPos> dirtyEnemyTargets = new Dictionary<uint, CPos>();
+		readonly Dictionary<uint, CPos> lastUrgentTargets = new Dictionary<uint, CPos>();
+		readonly Dictionary<uint, int> lastUrgentOrderTicks = new Dictionary<uint, int>();
 		IBot bot;
 		IBotUnitReservations[] otherReservations;
 		IBotTransportReservations[] transportReservations;
@@ -154,6 +160,12 @@ namespace OpenRA.Mods.Common.Traits
 		HashSet<CPos> ownedMovementHazards = new HashSet<CPos>();
 		readonly Dictionary<uint, string> lastFieldCompositions = new Dictionary<uint, string>();
 		int scanTicks = 1;
+		int routineScans;
+		int dirtyEnqueued;
+		int dirtyDeduplicated;
+		int dirtyProcessed;
+		int dirtyNoOp;
+		int dirtyRecoveries;
 		string lastComposition;
 
 		public EconomyFieldDefenseBotModule(Actor self, EconomyFieldDefenseBotModuleInfo info)
@@ -188,9 +200,61 @@ namespace OpenRA.Mods.Common.Traits
 			return actor != null && reserved.Contains(actor.ActorID);
 		}
 
+		void IBotRespondToAttack.RespondToAttack(IBot enabledBot, Actor self, AttackInfo e)
+		{
+			if (!Info.LowFrequencyTriggerControl || IsTraitDisabled || player.WinState != WinState.Undefined || self == null ||
+				self.Owner != player || e.Damage.Value <= 0 || e.Attacker == null || e.Attacker == self ||
+				player.RelationshipWith(e.Attacker.Owner) != PlayerRelationship.Enemy)
+				return;
+
+			if (fields.ContainsKey(self.ActorID))
+			{
+				var field = fields[self.ActorID];
+				var detected = IsDetectedEnemy(e.Attacker);
+				foreach (var actorId in field.Tanks.Concat(field.Infantry).Concat(field.AntiAir).OrderBy(id => id))
+					MarkDirty(field.HarvesterId, actorId, "associated-harvester-attacked",
+						detected ? e.Attacker.Location : (CPos?)null);
+
+				Debug("associated harvester attack field={0} guard-wake-count={1} detected={2}", field.HarvesterId,
+					field.Tanks.Count + field.Infantry.Count + field.AntiAir.Count, detected);
+				return;
+			}
+
+			foreach (var field in fields.Values.OrderBy(field => field.HarvesterId))
+				if (IsAssigned(field, self.ActorID))
+				{
+					MarkDirty(field.HarvesterId, self.ActorID, "assigned-guard-attacked",
+						IsDetectedEnemy(e.Attacker) ? e.Attacker.Location : (CPos?)null);
+					return;
+				}
+		}
+
+		bool IsDetectedEnemy(Actor actor)
+		{
+			return IsOwnedUsableEnemy(actor) && player.Shroud.IsVisible(actor.Location) && actor.CanBeViewedByPlayer(player);
+		}
+
+		bool IsOwnedUsableEnemy(Actor actor)
+		{
+			return actor != null && actor.IsInWorld && !actor.IsDead &&
+				player.RelationshipWith(actor.Owner) == PlayerRelationship.Enemy;
+		}
+
 		void IBotTick.BotTick(IBot enabledBot)
 		{
-			if (IsTraitDisabled || player.WinState != WinState.Undefined || --scanTicks > 0)
+			if (IsTraitDisabled || player.WinState != WinState.Undefined)
+				return;
+
+			if (Info.LowFrequencyTriggerControl)
+			{
+				DetectCachedInvalidations();
+				if (--scanTicks > 0)
+				{
+					ProcessDirtyAssignments();
+					return;
+				}
+			}
+			else if (--scanTicks > 0)
 				return;
 
 			scanTicks = Info.ScanInterval;
@@ -200,6 +264,7 @@ namespace OpenRA.Mods.Common.Traits
 				return;
 			}
 
+			routineScans++;
 			RefreshSquadManager();
 			UpdateFields();
 			refineryTraffic = BuildRefineryTraffic();
@@ -210,6 +275,166 @@ namespace OpenRA.Mods.Common.Traits
 			UpdateProductionRequests();
 			UpdateOrders();
 			LogComposition();
+			dirtyAssignments.Clear();
+			dirtyReasons.Clear();
+			dirtyEnemyTargets.Clear();
+			Debug("routine scan={0} next={1} fields={2} dirty-enqueued={3} dirty-deduplicated={4}" +
+				" dirty-processed={5} dirty-noop={6} dirty-recoveries={7}", routineScans,
+				world.WorldTick + Info.ScanInterval, fields.Count, dirtyEnqueued, dirtyDeduplicated,
+				dirtyProcessed, dirtyNoOp, dirtyRecoveries);
+		}
+
+		void DetectCachedInvalidations()
+		{
+			foreach (var field in fields.Values.OrderBy(field => field.HarvesterId).ToArray())
+			{
+				var harvester = world.GetActorById(field.HarvesterId);
+				var station = harvester?.TraitOrDefault<IHarvesterFieldStation>();
+				if (!IsOwnedUsable(harvester) || station == null || !station.HasCommittedField ||
+					station.CommittedField != field.Station)
+					MarkDirty(field.HarvesterId, field.HarvesterId, "committed-field-invalidated");
+
+				foreach (var actorId in field.Tanks.Concat(field.Infantry).Concat(field.AntiAir).OrderBy(id => id))
+					if (!IsOwnedUsable(world.GetActorById(actorId)))
+						MarkDirty(field.HarvesterId, actorId, "assigned-guard-lost");
+			}
+		}
+
+		void MarkDirty(uint fieldId, uint actorId, string reason, CPos? detectedEnemy = null)
+		{
+			if (!dirtyAssignments.Enqueue(fieldId, actorId))
+			{
+				dirtyDeduplicated++;
+				return;
+			}
+
+			dirtyEnqueued++;
+			dirtyReasons[actorId] = reason;
+			if (detectedEnemy.HasValue)
+				dirtyEnemyTargets[actorId] = detectedEnemy.Value;
+			Debug("dirty enqueue field={0} actor={1} reason={2}", fieldId, actorId, reason);
+		}
+
+		void ProcessDirtyAssignments()
+		{
+			if (dirtyAssignments.Count == 0)
+				return;
+
+			if (!techTree.HasPrerequisites(Info.RequiredPrerequisites))
+			{
+				ClearState("economy capability unavailable");
+				return;
+			}
+
+			RefreshSquadManager();
+			foreach (var pending in dirtyAssignments.Drain())
+			{
+				dirtyProcessed++;
+				var reason = dirtyReasons.TryGetValue(pending.ActorId, out var dirtyReason) ?
+					dirtyReason : "cached-validity";
+				dirtyReasons.Remove(pending.ActorId);
+				var hasEnemyTarget = dirtyEnemyTargets.TryGetValue(pending.ActorId, out var enemyTarget);
+				dirtyEnemyTargets.Remove(pending.ActorId);
+				if (!fields.TryGetValue(pending.FieldId, out var field))
+					continue;
+
+				if (pending.ActorId == field.HarvesterId)
+				{
+					ProcessDirtyHarvester(field, reason);
+					continue;
+				}
+
+				ProcessDirtyGuard(field, pending.ActorId, reason, hasEnemyTarget ? enemyTarget : (CPos?)null);
+			}
+		}
+
+		void ProcessDirtyHarvester(FieldAssignment field, string reason)
+		{
+			var harvester = world.GetActorById(field.HarvesterId);
+			var station = harvester?.TraitOrDefault<IHarvesterFieldStation>();
+			if (!IsOwnedUsable(harvester) || station == null || !station.HasCommittedField)
+			{
+				dirtyRecoveries++;
+				RemoveField(field.HarvesterId, reason);
+				UpdateProductionRequests();
+				Debug("dirty validation field={0} actor={1} result=field-released reason={2}",
+					field.HarvesterId, field.HarvesterId, reason);
+				return;
+			}
+
+			if (field.Station == station.CommittedField)
+			{
+				dirtyNoOp++;
+				Debug("dirty validation field={0} actor={1} result=ordinary-targeting-no-order reason={2}",
+					field.HarvesterId, field.HarvesterId, reason);
+				return;
+			}
+
+			var oldStation = field.Station;
+			field.Station = station.CommittedField;
+			field.Destinations.Clear();
+			dirtyRecoveries++;
+			Debug("dirty validation field={0} actor={1} result=station-transition old={2} new={3} reason={4}",
+				field.HarvesterId, field.HarvesterId, oldStation, field.Station, reason);
+			RebalanceField(field);
+			PositionField(field);
+			UpdateProductionRequests();
+			LogComposition();
+		}
+
+		void ProcessDirtyGuard(FieldAssignment field, uint actorId, string reason, CPos? detectedEnemy)
+		{
+			var role = AssignedRole(field, actorId);
+			if (role == null)
+				return;
+
+			var actor = world.GetActorById(actorId);
+			var rejection = ClaimRejectionReason(actor, field.Station, false);
+			if (rejection != null)
+			{
+				dirtyRecoveries++;
+				ReleaseAssigned(field, actorId, rejection);
+				FillRole(field, role);
+				PositionField(field);
+				UpdateProductionRequests();
+				LogComposition();
+				Debug("dirty validation field={0} actor={1} result=replaced-or-stable-deficit reason={2}:{3}",
+					field.HarvesterId, actorId, reason, rejection);
+				return;
+			}
+
+			if (detectedEnemy.HasValue && HandleUrgentAttackMove(field, actor, detectedEnemy.Value, reason,
+				out var urgentOrderIssued))
+			{
+				if (urgentOrderIssued)
+					dirtyRecoveries++;
+				else
+					dirtyNoOp++;
+				return;
+			}
+
+			var ordersBefore = lastOrderTicks.TryGetValue(actorId, out var lastOrder) ? lastOrder : -1;
+			var destinationBefore = field.Destinations.TryGetValue(actorId, out var destination) ? destination : CPos.Zero;
+			var used = CachedDestinationsExcept(actorId);
+			PositionActor(field, actor, used, false);
+			var recovered = !IsAssigned(field, actorId) ||
+				(lastOrderTicks.TryGetValue(actorId, out var currentOrder) && currentOrder != ordersBefore) ||
+				(field.Destinations.TryGetValue(actorId, out var currentDestination) && currentDestination != destinationBefore);
+			if (recovered)
+			{
+				dirtyRecoveries++;
+				FillRole(field, role);
+				PositionField(field);
+				UpdateProductionRequests();
+				Debug("dirty validation field={0} actor={1} result=local-recovery reason={2}",
+					field.HarvesterId, actorId, reason);
+			}
+			else
+			{
+				dirtyNoOp++;
+				Debug("dirty validation field={0} actor={1} result=ordinary-targeting-no-order reason={2}",
+					field.HarvesterId, actorId, reason);
+			}
 		}
 
 		void RefreshSquadManager()
@@ -256,9 +481,12 @@ namespace OpenRA.Mods.Common.Traits
 				lastOrderTicks.Remove(id);
 				routeProgress.Remove(id);
 				routeRejectedUntil.Remove(id);
+				lastUrgentTargets.Remove(id);
+				lastUrgentOrderTicks.Remove(id);
 			}
 
 			fields.Remove(harvesterId);
+			dirtyAssignments.RemoveField(harvesterId);
 			lastFieldCompositions.Remove(harvesterId);
 			Debug("released field harvester={0} reason={1}", harvesterId, reason);
 		}
@@ -303,6 +531,58 @@ namespace OpenRA.Mods.Common.Traits
 				Fill(field, field.Infantry, Info.InfantryTypes, Info.InfantryPerHarvester);
 				Fill(field, field.AntiAir, Info.AntiAirTypes, Info.AntiAirPerHarvester);
 			}
+		}
+
+		void RebalanceField(FieldAssignment field)
+		{
+			var releases = Info.DebugLogging ? new List<ReleaseDiagnostic>() : null;
+			Prune(field, field.Tanks, Info.TankTypes, "tank", releases);
+			Prune(field, field.Infantry, Info.InfantryTypes, "infantry", releases);
+			Prune(field, field.AntiAir, Info.AntiAirTypes, "anti-air", releases);
+			Fill(field, field.Tanks, Info.TankTypes, Info.TanksPerHarvester);
+			Fill(field, field.Infantry, Info.InfantryTypes, Info.InfantryPerHarvester);
+			Fill(field, field.AntiAir, Info.AntiAirTypes, Info.AntiAirPerHarvester);
+		}
+
+		void FillRole(FieldAssignment field, string role)
+		{
+			if (role == "tank")
+				Fill(field, field.Tanks, Info.TankTypes, Info.TanksPerHarvester);
+			else if (role == "infantry")
+				Fill(field, field.Infantry, Info.InfantryTypes, Info.InfantryPerHarvester);
+			else
+				Fill(field, field.AntiAir, Info.AntiAirTypes, Info.AntiAirPerHarvester);
+		}
+
+		string AssignedRole(FieldAssignment field, uint actorId)
+		{
+			return field.Tanks.Contains(actorId) ? "tank" : field.Infantry.Contains(actorId) ?
+				"infantry" : field.AntiAir.Contains(actorId) ? "anti-air" : null;
+		}
+
+		bool IsAssigned(FieldAssignment field, uint actorId) { return AssignedRole(field, actorId) != null; }
+
+		void ReleaseAssigned(FieldAssignment field, uint actorId, string reason)
+		{
+			var actor = world.GetActorById(actorId);
+			if (actor != null)
+			{
+				Release(field, actor, reason);
+				return;
+			}
+
+			RestoreStance(actorId);
+			field.Tanks.Remove(actorId);
+			field.Infantry.Remove(actorId);
+			field.AntiAir.Remove(actorId);
+			field.Destinations.Remove(actorId);
+			reserved.Remove(actorId);
+			lastOrderTicks.Remove(actorId);
+			routeProgress.Remove(actorId);
+			routeRejectedUntil.Remove(actorId);
+			lastUrgentTargets.Remove(actorId);
+			lastUrgentOrderTicks.Remove(actorId);
+			Debug("released missing defender={0} field={1} reason={2}", actorId, field.HarvesterId, reason);
 		}
 
 		void Prune(FieldAssignment field, HashSet<uint> actors, HashSet<string> types, string role,
@@ -463,6 +743,74 @@ namespace OpenRA.Mods.Common.Traits
 			}
 		}
 
+		void PositionField(FieldAssignment field)
+		{
+			var used = CachedDestinationsExcept(0);
+			foreach (var actorId in field.Tanks.Concat(field.Infantry).Concat(field.AntiAir).OrderBy(id => id).ToArray())
+			{
+				var actor = world.GetActorById(actorId);
+				if (IsOwnedUsable(actor))
+					PositionActor(field, actor, used, false);
+			}
+		}
+
+		HashSet<CPos> CachedDestinationsExcept(uint actorId)
+		{
+			return fields.Values.SelectMany(field => field.Destinations)
+				.Where(pair => pair.Key != actorId).Select(pair => pair.Value).ToHashSet();
+		}
+
+		bool HandleUrgentAttackMove(FieldAssignment field, Actor actor, CPos enemyCell, string reason,
+			out bool orderIssued)
+		{
+			orderIssued = false;
+			if (lastUrgentTargets.TryGetValue(actor.ActorID, out var previousTarget) &&
+				!EconomyFieldDefensePolicy.IsMateriallyNewUrgentTarget(previousTarget, enemyCell, 2) &&
+				(!actor.IsIdle || (lastUrgentOrderTicks.TryGetValue(actor.ActorID, out var previousOrder) &&
+					world.WorldTick < previousOrder + Info.RouteStallTicks)))
+			{
+				Debug("urgent guard validation field={0} actor={1} result=deduplicated target={2} reason={3}",
+					field.HarvesterId, actor.ActorID, enemyCell, reason);
+				return true;
+			}
+
+			var leashSquared = Info.EngagementLeashCells * Info.EngagementLeashCells;
+			foreach (var destination in world.Map.FindTilesInAnnulus(enemyCell, 0, 2)
+				.Where(cell => (cell - field.Station).LengthSquared <= leashSquared && IsSafeCell(actor, cell))
+				.OrderBy(cell => (cell - enemyCell).LengthSquared)
+				.ThenBy(cell => (cell - actor.Location).LengthSquared)
+				.ThenBy(cell => cell.Y).ThenBy(cell => cell.X))
+			{
+				var mobile = actor.TraitOrDefault<Mobile>();
+				if (mobile == null || (actor.Location != destination &&
+					!mobile.CanEnterCell(destination, check: BlockedByActor.Immovable)) ||
+					!TryFindSafePath(actor, destination, out var path))
+					continue;
+
+				var autoTarget = actor.TraitOrDefault<AutoTarget>();
+				if (autoTarget != null && autoTarget.Stance != UnitStance.AttackAnything)
+					bot.QueueOrder(new Order("SetUnitStance", actor, false) { ExtraData = (uint)UnitStance.AttackAnything });
+
+				if (path.Count >= 2)
+					QueueRoute(actor, destination, path, true);
+				else
+					bot.QueueOrder(new Order("AttackMove", actor, Target.FromCell(world, destination), false));
+
+				lastUrgentTargets[actor.ActorID] = enemyCell;
+				lastUrgentOrderTicks[actor.ActorID] = world.WorldTick;
+				lastOrderTicks[actor.ActorID] = world.WorldTick;
+				orderIssued = true;
+				Debug("urgent guard validation field={0} actor={1} result=aggressive-attack-move" +
+					" enemy={2} destination={3} waypoints={4} reason={5}", field.HarvesterId,
+					actor.ActorID, enemyCell, destination, path.Count, reason);
+				return true;
+			}
+
+			Debug("urgent guard validation field={0} actor={1} result=no-safe-local-attack-cell" +
+				" enemy={2} reason={3}", field.HarvesterId, actor.ActorID, enemyCell, reason);
+			return true;
+		}
+
 		void OwnDefensiveStance(Actor actor)
 		{
 			var infantry = IsInfantry(actor);
@@ -597,84 +945,97 @@ namespace OpenRA.Mods.Common.Traits
 		void Position(FieldAssignment field, HashSet<uint> actorIds, HashSet<CPos> used, bool attackMove)
 		{
 			foreach (var actor in actorIds.Select(world.GetActorById).Where(IsOwnedUsable).OrderBy(a => a.ActorID).ToArray())
-			{
-				LogUnsafeOccupancy(actor, field);
-				var destinationChanged = false;
-				if (!field.Destinations.TryGetValue(actor.ActorID, out var destination) || used.Contains(destination) ||
-					!IsSafeCell(actor, destination) ||
-					(refineryTraffic.Contains(destination) && actor.Location != destination))
-				{
-					if (!TryFindDestination(actor, field.Station, used, out destination, out _))
-					{
-						Release(field, actor, "no-safe-route");
-						continue;
-					}
+				PositionActor(field, actor, used, attackMove);
+		}
 
-					field.Destinations[actor.ActorID] = destination;
-					routeProgress.Remove(actor.ActorID);
-					destinationChanged = true;
+		void PositionActor(FieldAssignment field, Actor actor, HashSet<CPos> used, bool attackMove)
+		{
+			LogUnsafeOccupancy(actor, field);
+			var destinationChanged = false;
+			if (!field.Destinations.TryGetValue(actor.ActorID, out var destination) || used.Contains(destination) ||
+					!IsSafeCell(actor, destination) ||
+					(refineryTraffic.Contains(destination) && actor.Location != destination) ||
+					!CanOccupyCachedDestination(actor, destination))
+			{
+				if (!TryFindDestination(actor, field.Station, used, out destination, out _))
+				{
+					Release(field, actor, "no-safe-route");
+					return;
 				}
 
-				used.Add(destination);
-				var distance = (actor.CenterPosition - world.Map.CenterOfCell(destination)).HorizontalLengthSquared;
-				var withinTolerance = EconomyFieldDefensePolicy.IsWithinFormation(actor.Location,
+				field.Destinations[actor.ActorID] = destination;
+				routeProgress.Remove(actor.ActorID);
+				destinationChanged = true;
+			}
+
+			used.Add(destination);
+			var distance = (actor.CenterPosition - world.Map.CenterOfCell(destination)).HorizontalLengthSquared;
+			var withinTolerance = EconomyFieldDefensePolicy.IsWithinFormation(actor.Location,
 					destination, distance, Info.FormationToleranceCells);
-				var outsideLeash = EconomyFieldDefensePolicy.ShouldReform(distance,
+			var outsideLeash = EconomyFieldDefensePolicy.ShouldReform(distance,
 					Info.FormationToleranceCells, Info.EngagementLeashCells);
-				var busyAttack = IsBusyAttacking(actor);
-				var reason = destinationChanged ? "new-destination" : actor.IsIdle ? "idle-retry" :
+			var busyAttack = IsBusyAttacking(actor);
+			var reason = destinationChanged ? "new-destination" : actor.IsIdle ? "idle-retry" :
 					busyAttack ? "pursuit-break" : "stalled-route";
 
-				if (routeProgress.TryGetValue(actor.ActorID, out var progress) && progress.EnRoute)
+			if (routeProgress.TryGetValue(actor.ActorID, out var progress) && progress.EnRoute)
+			{
+				if (distance < progress.BestDistanceSquared)
 				{
-					if (distance < progress.BestDistanceSquared)
-					{
-						progress.BestDistanceSquared = distance;
-						progress.LastProgressTick = world.WorldTick;
-					}
-
-					if (withinTolerance)
-					{
-						progress.EnRoute = false;
-						continue;
-					}
-
-					if (!busyAttack && world.WorldTick < progress.LastProgressTick + Info.RouteStallTicks)
-						continue;
+					progress.BestDistanceSquared = distance;
+					progress.LastProgressTick = world.WorldTick;
 				}
 
-				var needsMove = destinationChanged ? !withinTolerance : actor.IsIdle ? !withinTolerance : outsideLeash;
-				if (!needsMove ||
-					(lastOrderTicks.TryGetValue(actor.ActorID, out var last) && world.WorldTick < last + Info.OrderInterval))
-					continue;
-
-				if (!TryFindSafePath(actor, destination, out var path))
+				if (withinTolerance)
 				{
-					Release(field, actor, "route-invalidated");
-					continue;
+					progress.EnRoute = false;
+					return;
 				}
 
-				if (path.Count < 2)
-				{
-					if (routeProgress.TryGetValue(actor.ActorID, out var settled))
-						settled.EnRoute = false;
-					continue;
-				}
-
-				QueueRoute(actor, destination, path, attackMove);
-				lastOrderTicks[actor.ActorID] = world.WorldTick;
-				if (!routeProgress.TryGetValue(actor.ActorID, out progress))
-				{
-					progress = new RouteProgress();
-					routeProgress.Add(actor.ActorID, progress);
-				}
-
-				progress.BestDistanceSquared = distance;
-				progress.LastProgressTick = world.WorldTick;
-				progress.EnRoute = true;
-				Debug("reform defender={0} field={1} destination={2} waypoints={3} reason={4}", actor.ActorID,
-					field.HarvesterId, destination, path.Count, reason);
+				if (!busyAttack && world.WorldTick < progress.LastProgressTick + Info.RouteStallTicks)
+					return;
 			}
+
+			var needsMove = destinationChanged ? !withinTolerance : actor.IsIdle ? !withinTolerance : outsideLeash;
+			if (!needsMove ||
+					(lastOrderTicks.TryGetValue(actor.ActorID, out var last) && world.WorldTick < last + Info.OrderInterval))
+				return;
+
+			if (!TryFindSafePath(actor, destination, out var path))
+			{
+				Release(field, actor, "route-invalidated");
+				return;
+			}
+
+			if (path.Count < 2)
+			{
+				if (routeProgress.TryGetValue(actor.ActorID, out var settled))
+					settled.EnRoute = false;
+				return;
+			}
+
+			QueueRoute(actor, destination, path, attackMove);
+			lastOrderTicks[actor.ActorID] = world.WorldTick;
+			if (!routeProgress.TryGetValue(actor.ActorID, out progress))
+			{
+				progress = new RouteProgress();
+				routeProgress.Add(actor.ActorID, progress);
+			}
+
+			progress.BestDistanceSquared = distance;
+			progress.LastProgressTick = world.WorldTick;
+			progress.EnRoute = true;
+			Debug("reform defender={0} field={1} destination={2} waypoints={3} reason={4}", actor.ActorID,
+					field.HarvesterId, destination, path.Count, reason);
+		}
+
+		static bool CanOccupyCachedDestination(Actor actor, CPos destination)
+		{
+			if (actor.Location == destination)
+				return true;
+
+			var mobile = actor.TraitOrDefault<Mobile>();
+			return mobile != null && mobile.CanEnterCell(destination, check: BlockedByActor.Immovable);
 		}
 
 		void LogUnsafeOccupancy(Actor actor, FieldAssignment field)
@@ -790,6 +1151,8 @@ namespace OpenRA.Mods.Common.Traits
 			reserved.Remove(actor.ActorID);
 			lastOrderTicks.Remove(actor.ActorID);
 			routeProgress.Remove(actor.ActorID);
+			lastUrgentTargets.Remove(actor.ActorID);
+			lastUrgentOrderTicks.Remove(actor.ActorID);
 			if (reason == "no-safe-route" || reason == "route-invalidated")
 				routeRejectedUntil[actor.ActorID] = world.WorldTick + Info.RouteRetryTicks;
 
@@ -813,6 +1176,11 @@ namespace OpenRA.Mods.Common.Traits
 			lastUnsafeOccupancy.Clear();
 			originalStances.Clear();
 			lastSafetyStates.Clear();
+			dirtyAssignments.Clear();
+			dirtyReasons.Clear();
+			dirtyEnemyTargets.Clear();
+			lastUrgentTargets.Clear();
+			lastUrgentOrderTicks.Clear();
 			lastComposition = null;
 			lastFieldCompositions.Clear();
 		}
@@ -894,6 +1262,10 @@ namespace OpenRA.Mods.Common.Traits
 					new MiniYamlNode("Actor", FieldSaver.FormatValue(p.Key)),
 					new MiniYamlNode("RetryTick", FieldSaver.FormatValue(p.Value))
 				})).ToList();
+			var dirty = dirtyAssignments.Snapshot();
+			var dirtyEnemies = dirtyEnemyTargets.OrderBy(pair => pair.Key).ToArray();
+			var urgent = lastUrgentTargets.Where(pair => reserved.Contains(pair.Key))
+				.OrderBy(pair => pair.Key).ToArray();
 
 			return new List<MiniYamlNode>
 			{
@@ -904,7 +1276,22 @@ namespace OpenRA.Mods.Common.Traits
 				new MiniYamlNode("EconomyFieldDefenseStances", FieldSaver.FormatValue(stances.Select(p => (int)p.Value).ToArray())),
 				new MiniYamlNode("EconomyFieldDefenseFields", "", fieldNodes),
 				new MiniYamlNode("EconomyFieldDefenseRoutes", "", routes),
-				new MiniYamlNode("EconomyFieldDefenseRejectedRoutes", "", rejectedRoutes)
+				new MiniYamlNode("EconomyFieldDefenseRejectedRoutes", "", rejectedRoutes),
+				new MiniYamlNode("EconomyFieldDefenseDirtyFields",
+					FieldSaver.FormatValue(dirty.Select(item => item.FieldId).ToArray())),
+				new MiniYamlNode("EconomyFieldDefenseDirtyActors",
+					FieldSaver.FormatValue(dirty.Select(item => item.ActorId).ToArray())),
+				new MiniYamlNode("EconomyFieldDefenseDirtyEnemyActors",
+					FieldSaver.FormatValue(dirtyEnemies.Select(pair => pair.Key).ToArray())),
+				new MiniYamlNode("EconomyFieldDefenseDirtyEnemyCells",
+					FieldSaver.FormatValue(dirtyEnemies.Select(pair => pair.Value.Bits).ToArray())),
+				new MiniYamlNode("EconomyFieldDefenseUrgentActors",
+					FieldSaver.FormatValue(urgent.Select(pair => pair.Key).ToArray())),
+				new MiniYamlNode("EconomyFieldDefenseUrgentCells",
+					FieldSaver.FormatValue(urgent.Select(pair => pair.Value.Bits).ToArray())),
+				new MiniYamlNode("EconomyFieldDefenseUrgentTicks",
+					FieldSaver.FormatValue(urgent.Select(pair => lastUrgentOrderTicks.TryGetValue(pair.Key,
+						out var tick) ? tick : -1).ToArray()))
 			};
 		}
 
@@ -921,6 +1308,11 @@ namespace OpenRA.Mods.Common.Traits
 			lastUnsafeOccupancy.Clear();
 			originalStances.Clear();
 			lastSafetyStates.Clear();
+			dirtyAssignments.Clear();
+			dirtyReasons.Clear();
+			dirtyEnemyTargets.Clear();
+			lastUrgentTargets.Clear();
+			lastUrgentOrderTicks.Clear();
 			var nextScanNode = data.FirstOrDefault(n => n.Key == "EconomyFieldDefenseNextScanTick");
 			if (nextScanNode != null)
 			{
@@ -988,6 +1380,52 @@ namespace OpenRA.Mods.Common.Traits
 			}
 
 			RestoreRouteState(data);
+			RestoreDirtyAssignments(data);
+			RestoreUrgentAssignments(data);
+		}
+
+		void RestoreDirtyAssignments(List<MiniYamlNode> data)
+		{
+			var fieldsNode = data.FirstOrDefault(n => n.Key == "EconomyFieldDefenseDirtyFields");
+			var actorsNode = data.FirstOrDefault(n => n.Key == "EconomyFieldDefenseDirtyActors");
+			if (fieldsNode == null || actorsNode == null)
+				return;
+
+			var fieldIds = FieldLoader.GetValue<uint[]>(fieldsNode.Key, fieldsNode.Value.Value);
+			var actorIds = FieldLoader.GetValue<uint[]>(actorsNode.Key, actorsNode.Value.Value);
+			for (var i = 0; i < Math.Min(fieldIds.Length, actorIds.Length); i++)
+				if (fields.ContainsKey(fieldIds[i]))
+					dirtyAssignments.Enqueue(fieldIds[i], actorIds[i]);
+
+			var enemyActorsNode = data.FirstOrDefault(n => n.Key == "EconomyFieldDefenseDirtyEnemyActors");
+			var enemyCellsNode = data.FirstOrDefault(n => n.Key == "EconomyFieldDefenseDirtyEnemyCells");
+			if (enemyActorsNode == null || enemyCellsNode == null)
+				return;
+
+			var enemyActors = FieldLoader.GetValue<uint[]>(enemyActorsNode.Key, enemyActorsNode.Value.Value);
+			var enemyCells = FieldLoader.GetValue<int[]>(enemyCellsNode.Key, enemyCellsNode.Value.Value);
+			for (var i = 0; i < Math.Min(enemyActors.Length, enemyCells.Length); i++)
+				if (reserved.Contains(enemyActors[i]))
+					dirtyEnemyTargets[enemyActors[i]] = new CPos(enemyCells[i]);
+		}
+
+		void RestoreUrgentAssignments(List<MiniYamlNode> data)
+		{
+			var actorsNode = data.FirstOrDefault(n => n.Key == "EconomyFieldDefenseUrgentActors");
+			var cellsNode = data.FirstOrDefault(n => n.Key == "EconomyFieldDefenseUrgentCells");
+			var ticksNode = data.FirstOrDefault(n => n.Key == "EconomyFieldDefenseUrgentTicks");
+			if (actorsNode == null || cellsNode == null || ticksNode == null)
+				return;
+
+			var actors = FieldLoader.GetValue<uint[]>(actorsNode.Key, actorsNode.Value.Value);
+			var cells = FieldLoader.GetValue<int[]>(cellsNode.Key, cellsNode.Value.Value);
+			var ticks = FieldLoader.GetValue<int[]>(ticksNode.Key, ticksNode.Value.Value);
+			for (var i = 0; i < Math.Min(actors.Length, Math.Min(cells.Length, ticks.Length)); i++)
+				if (reserved.Contains(actors[i]) && ticks[i] >= 0 && ticks[i] <= world.WorldTick)
+				{
+					lastUrgentTargets[actors[i]] = new CPos(cells[i]);
+					lastUrgentOrderTicks[actors[i]] = ticks[i];
+				}
 		}
 
 		void RestoreRouteState(List<MiniYamlNode> data)

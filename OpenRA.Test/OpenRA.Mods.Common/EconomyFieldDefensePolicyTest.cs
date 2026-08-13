@@ -279,5 +279,49 @@ namespace OpenRA.Test
 			Assert.That(EconomyFieldDefensePolicy.RestoredScanTicks(
 				nextScanTick, currentWorldTick, scanInterval), Is.EqualTo(expected));
 		}
+
+		[Test]
+		public void DirtyAssignmentsDeduplicateAndDrainDeterministically()
+		{
+			var dirty = new EconomyFieldDefenseDirtyAssignments();
+			Assert.That(dirty.Enqueue(20, 8), Is.True);
+			Assert.That(dirty.Enqueue(10, 9), Is.True);
+			Assert.That(dirty.Enqueue(10, 7), Is.True);
+			Assert.That(dirty.Enqueue(10, 7), Is.False,
+				"Repeated harmless hits must not create repeated validity work.");
+
+			var pending = dirty.Drain();
+			Assert.That(pending.Select(item => (item.FieldId, item.ActorId)), Is.EqualTo(new[]
+			{
+				(10u, 7u), (10u, 9u), (20u, 8u)
+			}));
+			Assert.That(dirty.Count, Is.Zero);
+		}
+
+		[Test]
+		public void DirtyAssignmentSnapshotsPreservePendingSaveWork()
+		{
+			var beforeSave = new EconomyFieldDefenseDirtyAssignments();
+			beforeSave.Enqueue(10, 7);
+			beforeSave.Enqueue(20, 8);
+
+			var loaded = new EconomyFieldDefenseDirtyAssignments();
+			foreach (var item in beforeSave.Snapshot())
+				loaded.Enqueue(item.FieldId, item.ActorId);
+
+			Assert.That(loaded.Drain().Select(item => (item.FieldId, item.ActorId)),
+				Is.EqualTo(new[] { (10u, 7u), (20u, 8u) }));
+		}
+
+		[TestCase(10, 10, 10, 10, 2, false)]
+		[TestCase(10, 10, 12, 10, 2, false)]
+		[TestCase(10, 10, 13, 10, 2, true)]
+		[TestCase(10, 10, 10, 13, 2, true)]
+		public void UrgentAttackMovesRequireAMateriallyNewEnemyCell(
+			int previousX, int previousY, int currentX, int currentY, int radius, bool expected)
+		{
+			Assert.That(EconomyFieldDefensePolicy.IsMateriallyNewUrgentTarget(
+				new CPos(previousX, previousY), new CPos(currentX, currentY), radius), Is.EqualTo(expected));
+		}
 	}
 }
