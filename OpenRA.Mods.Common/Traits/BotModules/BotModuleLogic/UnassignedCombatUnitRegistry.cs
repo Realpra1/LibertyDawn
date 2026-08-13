@@ -13,6 +13,26 @@ using System.Linq;
 
 namespace OpenRA.Mods.Common.Traits.BotModules
 {
+	public enum UnassignedCombatFallbackDisposition
+	{
+		Unclaimed,
+		PreCodexAssault,
+		GenericFallback
+	}
+
+	public static class UnassignedCombatUnitRecruitmentPolicy
+	{
+		public static UnassignedCombatFallbackDisposition SelectFallback(bool advancedBehaviorEnabled,
+			bool preCodexAssaultAvailable, bool genericFallbackEligible)
+		{
+			if (!advancedBehaviorEnabled && preCodexAssaultAvailable)
+				return UnassignedCombatFallbackDisposition.PreCodexAssault;
+
+			return genericFallbackEligible ? UnassignedCombatFallbackDisposition.GenericFallback :
+				UnassignedCombatFallbackDisposition.Unclaimed;
+		}
+	}
+
 	public sealed class UnassignedCombatUnitRegistry
 	{
 		readonly SortedSet<uint> actorIds = new SortedSet<uint>();

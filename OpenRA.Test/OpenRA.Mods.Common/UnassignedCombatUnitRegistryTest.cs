@@ -52,5 +52,22 @@ namespace OpenRA.Test.Mods.Common
 				"The handoff registry must accept the actor before the former controller clears its reservation.");
 			Assert.That(registry.Remove(21), Is.True, "A new valid controller must atomically consume the handoff.");
 		}
+
+		[Test]
+		public void DisabledAdvancedSquadPrefersPreCodexAssaultOverGenericFallback()
+		{
+			Assert.That(UnassignedCombatUnitRecruitmentPolicy.SelectFallback(false, true, true),
+				Is.EqualTo(UnassignedCombatFallbackDisposition.PreCodexAssault));
+		}
+
+		[Test]
+		public void MissingCompatibleOwnerUsesGenericFallbackOnlyForAllowlistedDirectCombat()
+		{
+			Assert.That(UnassignedCombatUnitRecruitmentPolicy.SelectFallback(true, false, true),
+				Is.EqualTo(UnassignedCombatFallbackDisposition.GenericFallback));
+			Assert.That(UnassignedCombatUnitRecruitmentPolicy.SelectFallback(true, false, false),
+				Is.EqualTo(UnassignedCombatFallbackDisposition.Unclaimed),
+				"Unsupported artillery and specialist roles must remain available for a safe owner instead of charging.");
+		}
 	}
 }

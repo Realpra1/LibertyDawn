@@ -692,6 +692,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		void IBotTick.BotTick(IBot bot)
 		{
+			RecruitUnassignedCombatUnits(bot);
 			if (advancedBehaviorEnabled)
 			{
 				RunFailsafeTestPressure();
@@ -1097,6 +1098,177 @@ namespace OpenRA.Mods.Common.Traits
 				QueueFailsafeFallback(bot, group.Key, group.Value);
 		}
 
+		void RecruitUnassignedCombatUnits(IBot bot)
+		{
+			if (unassignedCombatUnits == null)
+				return;
+
+			var candidates = unassignedCombatUnits.UnassignedActors
+				.Where(a => !unitCannotBeOrdered(a) && !activeUnits.Contains(a) &&
+					!IsReservedForSpecialBehavior(a))
+				.OrderBy(a => a.ActorID).ToArray();
+			if (candidates.Length == 0)
+				return;
+
+			var adopted = new List<Actor>();
+			var adoptedGroundActors = new List<Actor>();
+			var legacyFallback = new List<Actor>();
+			var genericFallback = new List<Actor>();
+			foreach (var actor in candidates)
+			{
+				// A loaded squad may already own the actor before the registry has observed the claim.
+				if (Squads.Any(s => s.Units.Contains(actor)))
+				{
+					activeUnits.Add(actor);
+					adopted.Add(actor);
+					continue;
+				}
+
+				if (advancedBehaviorEnabled)
+				{
+					if (AdoptCurrentSquadUnit(bot, actor, adoptedGroundActors))
+					{
+						adopted.Add(actor);
+						continue;
+					}
+				}
+				var preCodexAssaultAvailable = !Info.ExcludeFromSquadsTypes.Contains(actor.Info.Name) &&
+					!Info.AirUnitsTypes.Contains(actor.Info.Name) && !Info.NavalUnitsTypes.Contains(actor.Info.Name) &&
+					actor.Info.HasTraitInfo<AttackBaseInfo>();
+				var genericFallbackEligible = AdvancedBotFallbackOwnership.IsEligibleForGenericFallback(
+					Info.FailsafeDirectCombatTypes, actor.Info.Name, actor.Info.HasTraitInfo<AttackBaseInfo>()) &&
+					!IsUnitProtectingBase(actor) && !IsUnitTemporarilyControlled(actor);
+				switch (UnassignedCombatUnitRecruitmentPolicy.SelectFallback(advancedBehaviorEnabled,
+					preCodexAssaultAvailable, genericFallbackEligible))
+				{
+					case UnassignedCombatFallbackDisposition.PreCodexAssault:
+						// GeneralAttack and Air are the disabled advanced paths. The closest pre-Codex
+						// owner for released ground combat is the ordinary assault squad.
+						legacyFallback.Add(actor);
+						continue;
+					case UnassignedCombatFallbackDisposition.GenericFallback:
+						genericFallback.Add(actor);
+						continue;
+				}
+
+				// There is no safe generic fallback for aircraft, naval units, or excluded
+				// specialists. Leave them registered for a compatible owner or specialist reclaim.
+			}
+
+			if (legacyFallback.Count > 0)
+				AdoptLegacyFallbackAssault(bot, legacyFallback, adopted);
+			if (genericFallback.Count > 0)
+				AdoptGenericFallback(bot, genericFallback, adopted);
+
+			if (adopted.Count == 0)
+				return;
+
+			unassignedCombatUnits.ClaimActors(adopted);
+			if (Info.GroundTargetDebugLogging && adopted.Count <= 32)
+				Log.Write("debug", "Squad registry recruitment [{0}]: owner=SquadManagerBotModule advanced={1} " +
+					"actors={2}.", Player.PlayerName, advancedBehaviorEnabled,
+					string.Join(",", adopted.OrderBy(a => a.ActorID).Select(a => a.Info.Name + "#" + a.ActorID)));
+		}
+
+		void AdoptGenericFallback(IBot bot, List<Actor> actors, List<Actor> adopted)
+		{
+			foreach (var actor in actors)
+			{
+				activeUnits.Add(actor);
+				adopted.Add(actor);
+			}
+
+			if (!IsPreferredEnemyUnit(fallbackTarget) || !IsNotHiddenUnit(fallbackTarget))
+				fallbackTarget = FindClosestEnemy(actors.Select(a => a.CenterPosition).Average());
+			if (fallbackTarget != null)
+				QueueFailsafeFallback(bot, "unassigned-registry", actors);
+		}
+
+		bool AdoptCurrentSquadUnit(IBot bot, Actor actor, List<Actor> adoptedGroundActors)
+		{
+			if (Info.ExcludeFromSquadsTypes.Contains(actor.Info.Name))
+				return false;
+
+			if (Info.AirUnitsTypes.Contains(actor.Info.Name))
+			{
+				var air = GetAirSquadWithRoom(bot, actor);
+				if (air == null)
+					return false;
+
+				air.Units.Add(actor);
+				if (air.Units.Count > 1)
+					air.MarkAirReinforcement(actor);
+			}
+			else if (Info.NavalUnitsTypes.Contains(actor.Info.Name))
+			{
+				var ships = GetSquadOfType(SquadType.Naval) ?? RegisterNewSquad(bot, SquadType.Naval);
+				ships.Units.Add(actor);
+			}
+			else if (Info.UseCohesiveGroundSquad)
+			{
+				adoptedGroundActors.Add(actor);
+				var ground = GetSquadOfType(SquadType.GeneralAttack);
+				if (ground == null)
+					unitsHangingAroundTheBase.Add(actor);
+				else
+				{
+					ground.Units.Add(actor);
+					ground.MarkGroundReinforcement(actor);
+				}
+			}
+			else
+			{
+				adoptedGroundActors.Add(actor);
+				var assault = Squads.FirstOrDefault(s => s.Type == SquadType.Assault && s.IsValid);
+				if (assault == null)
+					unitsHangingAroundTheBase.Add(actor);
+				else
+					assault.Units.Add(actor);
+			}
+
+			activeUnits.Add(actor);
+			return true;
+		}
+
+		void AdoptLegacyFallbackAssault(IBot bot, List<Actor> actors, List<Actor> adopted)
+		{
+			var capabilityChecked = actors.All(a => a.Info.HasTraitInfo<AttackBaseInfo>());
+			var assault = Squads.FirstOrDefault(s => s.Type == SquadType.Assault && s.IsValid);
+			var target = FindClosestEnemy(actors.Select(a => a.CenterPosition).Average());
+			if (assault == null)
+				assault = RegisterNewSquad(bot, SquadType.Assault, target);
+			else if (target != null)
+				assault.TargetActor = target;
+
+			foreach (var actor in actors)
+			{
+				assault.Units.Add(actor);
+				activeUnits.Add(actor);
+				adopted.Add(actor);
+			}
+
+			if (target == null)
+				return;
+
+			QueueAggressiveStance(bot, actors);
+			bot.QueueOrder(new Order("AttackMove", null, Target.FromCell(World, target.Location), false,
+				groupedActors: actors.ToArray()));
+			assault.FuzzyStateMachine.ChangeState(assault, new GroundUnitsAttackMoveState(), true);
+			if (Info.GroundTargetDebugLogging)
+				Log.Write("debug", "Squad registry fallback [{0}]: owner=SquadManagerBotModule source=pre-codex-assault " +
+					"accepted={1} actors={2} target={3}#{4} capability-checked={5} stance=AttackAnything " +
+					"order=AttackMove.", Player.PlayerName, actors.Count,
+					string.Join(",", actors.Select(a => a.Info.Name + "#" + a.ActorID)), target.Info.Name, target.ActorID,
+					capabilityChecked);
+		}
+
+		static void QueueAggressiveStance(IBot bot, IEnumerable<Actor> actors)
+		{
+			foreach (var actor in actors)
+				if (actor.TraitOrDefault<AutoTarget>() is AutoTarget autoTarget && autoTarget.Stance != UnitStance.AttackAnything)
+					bot.QueueOrder(new Order("SetUnitStance", actor, false) { ExtraData = (uint)UnitStance.AttackAnything });
+		}
+
 		void QueueFailsafeFallback(IBot bot, string source, IEnumerable<Actor> candidates)
 		{
 			var orderable = candidates.Where(a => !fallbackOrderedActors.Contains(a.ActorID) ||
@@ -1104,6 +1276,7 @@ namespace OpenRA.Mods.Common.Traits
 			if (orderable.Length == 0)
 				return;
 
+			QueueAggressiveStance(bot, orderable);
 			bot.QueueOrder(new Order("AttackMove", null, Target.FromCell(World, fallbackTarget.Location), false,
 				groupedActors: orderable));
 			foreach (var actor in orderable)
@@ -1135,48 +1308,8 @@ namespace OpenRA.Mods.Common.Traits
 			var adoptedGroundActors = new List<Actor>();
 			foreach (var a in newUnits)
 			{
-				if (Info.AirUnitsTypes.Contains(a.Info.Name))
-				{
-					var air = GetAirSquadWithRoom(bot, a);
-
-					// Every air squad is full and we may not start another. Leave the aircraft out of
-					// activeUnits so it stays at base and is picked up as soon as a slot frees up, rather
-					// than oversizing a harassment squad.
-					if (air == null)
-						continue;
-
-					air.Units.Add(a);
-					if (air.Units.Count > 1)
-						air.MarkAirReinforcement(a);
-				}
-				else if (Info.NavalUnitsTypes.Contains(a.Info.Name))
-				{
-					var ships = GetSquadOfType(SquadType.Naval);
-					if (ships == null)
-						ships = RegisterNewSquad(bot, SquadType.Naval);
-
-					ships.Units.Add(a);
-				}
-				else if (Info.UseCohesiveGroundSquad)
-				{
-					adoptedGroundActors.Add(a);
-					var ground = GetSquadOfType(SquadType.GeneralAttack);
-					if (ground == null)
-						unitsHangingAroundTheBase.Add(a);
-					else
-					{
-						ground.Units.Add(a);
-						ground.MarkGroundReinforcement(a);
-					}
-				}
-				else
-				{
-					adoptedGroundActors.Add(a);
-					unitsHangingAroundTheBase.Add(a);
-				}
-
-				activeUnits.Add(a);
-				unassignedCombatUnits?.ClaimActors(new[] { a });
+				if (AdoptCurrentSquadUnit(bot, a, adoptedGroundActors))
+					unassignedCombatUnits?.ClaimActors(new[] { a });
 			}
 
 			// Keep actor-level evidence bounded: oversized initial rosters are not useful handoff telemetry.
