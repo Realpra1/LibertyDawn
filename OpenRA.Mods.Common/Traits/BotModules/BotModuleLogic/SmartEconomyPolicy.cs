@@ -101,6 +101,12 @@ namespace OpenRA.Mods.Common.Traits
 			return (long)Math.Max(0, storedResources) * 100 >= (long)resourceCapacity * threshold;
 		}
 
+		public static bool WantsNeedBasedSilo(bool enabled, int storedResources, int resourceCapacity,
+			int thresholdPercent)
+		{
+			return enabled && StoragePressure(storedResources, resourceCapacity, thresholdPercent);
+		}
+
 		public static SmartEconomyRefineryDemand RefineryDemand(int liveHarvesters, int queuedHarvesters,
 			int requestedHarvesters, int liveRefineries, int queuedRefineries, int reservedRefineries,
 			int freeHarvestersPerPendingRefinery, int harvestersPerRefinery, int maximumParallelRefineries,

@@ -72,6 +72,14 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
+		public void NeedBasedSiloRequiresAnExplicitOptIn()
+		{
+			Assert.That(SmartEconomyPolicy.WantsNeedBasedSilo(false, 800, 1000, 80), Is.False);
+			Assert.That(SmartEconomyPolicy.WantsNeedBasedSilo(true, 799, 1000, 80), Is.False);
+			Assert.That(SmartEconomyPolicy.WantsNeedBasedSilo(true, 800, 1000, 80), Is.True);
+		}
+
+		[Test]
 		public void RefineryDemandCountsQueuesRequestsAndFreePendingHarvesters()
 		{
 			var demand = SmartEconomyPolicy.RefineryDemand(

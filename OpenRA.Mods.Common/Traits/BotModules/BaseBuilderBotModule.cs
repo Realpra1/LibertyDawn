@@ -834,8 +834,8 @@ namespace OpenRA.Mods.Common.Traits
 		internal bool SmartEconomyWantsEarlyVehicleProductionCapacity =>
 			smartEconomy?.WantsEarlyVehicleProductionCapacity ?? false;
 
-		internal bool SmartEconomyWantsSilo => SmartEconomyPolicy.StoragePressure(playerResources.Resources,
-			playerResources.ResourceCapacity, Info.SmartEconomyStorageThresholdPercent);
+		internal bool SmartEconomyWantsSilo => SmartEconomyPolicy.WantsNeedBasedSilo(Info.EnableOpeningPrefix,
+			playerResources.Resources, playerResources.ResourceCapacity, Info.SmartEconomyStorageThresholdPercent);
 
 		internal HashSet<string> NeedBasedSiloTypes => Info.SiloTypes;
 
