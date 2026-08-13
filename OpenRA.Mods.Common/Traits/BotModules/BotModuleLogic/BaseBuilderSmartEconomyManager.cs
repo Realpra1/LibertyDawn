@@ -88,6 +88,7 @@ namespace OpenRA.Mods.Common.Traits
 		int desiredVehicleFactories;
 		bool vehicleFactoryViable;
 		bool mcvRequestOutstanding;
+		bool hadUsableRefinery;
 		int mcvRequestExpiryTick;
 		int mcvRequestTargetAssets;
 		SmartEconomyPressure refineryPressure;
@@ -104,8 +105,10 @@ namespace OpenRA.Mods.Common.Traits
 			vehicleFactoryViable && liveVehicleFactories + queuedVehicleFactories + reservedVehicleFactories < desiredVehicleFactories;
 		public bool WantsSilo => RequestsReady && enabled && SmartEconomyPolicy.StoragePressure(playerResources.Resources,
 			playerResources.ResourceCapacity, baseBuilder.Info.SmartEconomyStorageThresholdPercent);
-		public bool SerializesMissingRefinery => RequestsReady && enabled &&
-			baseBuilder.CountActors(baseBuilder.SmartEconomyRefineryTypes) == 0;
+		public bool SerializesMissingRefinery => RequestsReady &&
+			SmartEconomyPolicy.NeedsSerializedRefineryRecovery(enabled, hadUsableRefinery,
+				baseBuilder.CountActors(baseBuilder.SmartEconomyRefineryTypes));
+		public bool HadUsableRefinery => hadUsableRefinery;
 		public bool ShouldReserveCashForRefinery { get; private set; }
 
 		public int NextScanTick => nextScanTick;
@@ -157,6 +160,8 @@ namespace OpenRA.Mods.Common.Traits
 			UpdateVehicleFactoryBuildState();
 			waitingHarvesters = CountWaitingHarvestersNearRefineries();
 			RefreshRefineryDemand(bot);
+			if (liveRefineries > 0)
+				hadUsableRefinery = true;
 			var capacityDeficitObserved = refineryDemand.Deficit > 0;
 			var congestionObserved = refineryPressure.Active ? waitingHarvesters > 0 :
 				waitingHarvesters >= Math.Max(1, baseBuilder.Info.SmartEconomyWaitingHarvesterThreshold);
@@ -295,8 +300,8 @@ namespace OpenRA.Mods.Common.Traits
 
 			var live = baseBuilder.CountActors(baseBuilder.SmartEconomyRefineryTypes);
 			var queuedQueueIds = QueuedRefineryQueueIds();
-			if (!SmartEconomyPolicy.NeedsSerializedFirstRefinery(enabled, live, queuedQueueIds.Count,
-				refineryReservations.Count))
+			if (!SmartEconomyPolicy.NeedsSerializedRefineryRecovery(enabled, hadUsableRefinery, live,
+				queuedQueueIds.Count, refineryReservations.Count))
 				return false;
 
 			var cost = queue.GetProductionCost(world.Map.Rules.Actors[type]);
@@ -306,6 +311,29 @@ namespace OpenRA.Mods.Common.Traits
 			RecalculateRefineryDemand();
 			baseBuilder.LogSmartEconomy(
 				"{0} reserved serialized missing refinery: type={1}, fact={2}, cost={3}; holding other Facts until one is live",
+				player, type, queue.Actor.ActorID, cost);
+			return true;
+		}
+
+		public bool TryReserveOpeningRefineryBuild(ProductionQueue queue, string type)
+		{
+			if (queue == null || queue.AllQueued().Any() || !baseBuilder.SmartEconomyRefineryTypes.Contains(type) ||
+				!baseBuilder.CanBuildAnotherSmartEconomyRefinery(type))
+				return false;
+
+			var live = baseBuilder.CountActors(baseBuilder.SmartEconomyRefineryTypes);
+			var queuedQueueIds = QueuedRefineryQueueIds();
+			if (!SmartEconomyPolicy.NeedsFirstRefineryCommitment(enabled, live, queuedQueueIds.Count,
+				refineryReservations.Count))
+				return false;
+
+			var cost = queue.GetProductionCost(world.Map.Rules.Actors[type]);
+			refineryReservations.Add(queue.Actor.ActorID, new RefineryReservation(queue.Actor.ActorID, type,
+				world.WorldTick + Math.Max(1, baseBuilder.Info.SmartEconomyRefineryBuildTimeout), 1, cost));
+			reservedRefineries++;
+			RecalculateRefineryDemand();
+			baseBuilder.LogSmartEconomy(
+				"{0} reserved protected opening refinery: type={1}, fact={2}, cost={3}",
 				player, type, queue.Actor.ActorID, cost);
 			return true;
 		}
@@ -609,7 +637,8 @@ namespace OpenRA.Mods.Common.Traits
 		public void LoadState(int savedNextScanTick, int savedNextMcvRequestTick, int savedNextProgressLogTick,
 			bool savedRefineryBuildOutstanding, int savedRefineryBuildExpiryTick, int savedRefineryBuildTargetCount,
 			bool savedMcvRequestOutstanding, int savedMcvRequestExpiryTick, int savedMcvRequestTargetAssets,
-			SmartEconomyPressure savedRefineryPressure, SmartEconomyPressure savedCashPressure)
+			SmartEconomyPressure savedRefineryPressure, SmartEconomyPressure savedCashPressure,
+			bool savedHadUsableRefinery)
 		{
 			postLoadResumeTick = SmartEconomyPolicy.PostLoadResumeTick(world.WorldTick,
 				baseBuilder.Info.SmartEconomyScanInterval);
@@ -626,6 +655,7 @@ namespace OpenRA.Mods.Common.Traits
 			mcvRequestTargetAssets = savedMcvRequestTargetAssets;
 			refineryPressure = savedRefineryPressure;
 			cashPressure = savedCashPressure;
+			hadUsableRefinery = savedHadUsableRefinery;
 			ShouldReserveCashForRefinery = false;
 			baseBuilder.LogSmartEconomy("{0} restored: deferring new economy requests until tick {1}",
 				player, postLoadResumeTick);

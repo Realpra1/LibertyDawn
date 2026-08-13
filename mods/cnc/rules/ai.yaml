@@ -715,6 +715,7 @@ Player:
 		McvFactoryTypes: weap,afld
 	BaseBuilderBotModule@cabal:
 		RequiresCondition: enable-cabal-ai
+		EnableOpeningPrefix: true
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: false
 		MaximumWallSegments: 24
@@ -812,6 +813,7 @@ Player:
 			harv: 8
 	BaseBuilderBotModule@watson:
 		RequiresCondition: enable-watson-ai
+		EnableOpeningPrefix: true
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: false
 		MaximumWallSegments: 24
@@ -909,6 +911,7 @@ Player:
 			harv: 8
     BaseBuilderBotModule@hal9001:
 		RequiresCondition: enable-hal9001-ai
+		EnableOpeningPrefix: true
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: false
 		MaximumWallSegments: 24
@@ -1008,6 +1011,7 @@ Player:
 			harv: 8
     BaseBuilderBotModule@brutalis:
 		RequiresCondition: enable-brutalis-ai || enable-wavemaker-ai
+		EnableOpeningPrefix: true
 		EnableSmartEconomy: true
 		EnableTiberiumFieldPolicy: true
 		TiberiumFieldTreeTypes: split2, split3, splitblue, splitred
@@ -1242,6 +1246,7 @@ Player:
             mcv: 3000
     BaseBuilderBotModule@viki:
 		RequiresCondition: enable-viki-ai
+		EnableOpeningPrefix: true
 		EnableSmartEconomy: true
 		SmartEconomyRefineryTypes: proc
 		SmartEconomyMcvTypes: mcv
@@ -1415,6 +1420,7 @@ Player:
             mcv: 1
     BaseBuilderBotModule@skynet:
 		RequiresCondition: enable-skynet-ai
+		EnableOpeningPrefix: true
 		EnableSmartEconomy: true
 		SmartEconomyRefineryTypes: proc
 		SmartEconomyMcvTypes: mcv
@@ -1764,6 +1770,7 @@ Player:
             mhq: 1
     BaseBuilderBotModule@ironreaper:
 		RequiresCondition: enable-ironreaper-ai
+		EnableOpeningPrefix: true
 		EnableSmartEconomy: true
 		EnableTiberiumFieldPolicy: true
 		TiberiumFieldTreeTypes: split2, split3, splitblue, splitred
@@ -2019,6 +2026,7 @@ Player:
             upgrade.recon3: 32000
     BaseBuilderBotModule@Easy:
 		RequiresCondition: enable-Easy-ai
+		EnableOpeningPrefix: true
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: false
 		MaximumWallSegments: 24
@@ -2165,6 +2173,7 @@ Player:
             rmbo: 2
     BaseBuilderBotModule@Easiest:
 		RequiresCondition: enable-Easiest-ai
+		EnableOpeningPrefix: true
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: false
 		MaximumWallSegments: 24

@@ -130,14 +130,25 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
-		public void SmartEconomySerializesOnlyTheMissingFirstRefinery()
+		public void SmartEconomySerializesOnlyPostEstablishmentRefineryRecovery()
 		{
-			Assert.That(SmartEconomyPolicy.NeedsSerializedFirstRefinery(true, 0, 0, 0), Is.True);
-			Assert.That(SmartEconomyPolicy.NeedsSerializedFirstRefinery(true, 0, 1, 0), Is.False);
-			Assert.That(SmartEconomyPolicy.NeedsSerializedFirstRefinery(true, 0, 0, 1), Is.False);
-			Assert.That(SmartEconomyPolicy.NeedsSerializedFirstRefinery(true, 1, 0, 0), Is.False);
-			Assert.That(SmartEconomyPolicy.NeedsSerializedFirstRefinery(false, 0, 0, 0), Is.False,
+			Assert.That(SmartEconomyPolicy.NeedsSerializedRefineryRecovery(true, false, 0), Is.False,
+				"An ordinary fresh start must remain inside the protected opening prefix.");
+			Assert.That(SmartEconomyPolicy.NeedsSerializedRefineryRecovery(true, true, 0), Is.True);
+			Assert.That(SmartEconomyPolicy.NeedsSerializedRefineryRecovery(true, true, 0, 1, 0), Is.False);
+			Assert.That(SmartEconomyPolicy.NeedsSerializedRefineryRecovery(true, true, 0, 0, 1), Is.False);
+			Assert.That(SmartEconomyPolicy.NeedsSerializedRefineryRecovery(true, true, 1), Is.False);
+			Assert.That(SmartEconomyPolicy.NeedsSerializedRefineryRecovery(false, true, 0), Is.False,
 				"Feature-disabled controls retain their legacy behavior.");
+		}
+
+		[Test]
+		public void OpeningCanOwnTheFirstRefineryWithoutClaimingRecovery()
+		{
+			Assert.That(SmartEconomyPolicy.NeedsFirstRefineryCommitment(true, 0, 0, 0), Is.True);
+			Assert.That(SmartEconomyPolicy.NeedsFirstRefineryCommitment(true, 0, 1, 0), Is.False);
+			Assert.That(SmartEconomyPolicy.NeedsFirstRefineryCommitment(true, 0, 0, 1), Is.False);
+			Assert.That(SmartEconomyPolicy.NeedsFirstRefineryCommitment(true, 1, 0, 0), Is.False);
 		}
 
 		[Test]

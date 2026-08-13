@@ -130,7 +130,14 @@ namespace OpenRA.Mods.Common.Traits
 			return Math.Max(0, Math.Max(0, refineryCost) - Math.Max(0, spendableCash));
 		}
 
-		public static bool NeedsSerializedFirstRefinery(bool enabled, int liveRefineries,
+		public static bool NeedsSerializedRefineryRecovery(bool enabled, bool hadUsableRefinery,
+			int liveRefineries, int queuedRefineries = 0, int reservedRefineries = 0)
+		{
+			return enabled && hadUsableRefinery && liveRefineries <= 0 &&
+				queuedRefineries <= 0 && reservedRefineries <= 0;
+		}
+
+		public static bool NeedsFirstRefineryCommitment(bool enabled, int liveRefineries,
 			int queuedRefineries, int reservedRefineries)
 		{
 			return enabled && liveRefineries <= 0 && queuedRefineries <= 0 && reservedRefineries <= 0;
