@@ -240,9 +240,9 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (info.AdvancedSquadFailsafeDebugLogging && decision.Transition != "healthy" && decision.Transition != "cooldown")
 			{
-				Log.Write("debug", "Advanced squad failsafe [{0}]: source={1} reliable={2} reason={3} ratio={4:0.000} " +
-					"window={5} total-ms={6:0.000} advanced-ms={7:0.000} module-ms={8} share={9:P1} threshold={10:P0} " +
-					"transition={11} module={12} offender={13} disabled={14}.", player.PlayerName,
+				Log.Write("debug", "Advanced squad failsafe [{0}]: tick={1} source={2} reliable={3} reason={4} ratio={5:0.000} " +
+					"window={6} total-ms={7:0.000} advanced-ms={8:0.000} module-ms={9} share={10:P1} threshold={11:P0} " +
+					"transition={12} module={13} offender={14} disabled={15}.", player.PlayerName, world.WorldTick,
 					pacing.Source, pacing.Reliable, decision.Reason, pacing.RealTimeRatio, info.AdvancedSquadSampleInterval,
 					decision.TotalMilliseconds, decision.AdvancedMilliseconds, advancedBreakdown, decision.Share,
 					info.AdvancedSquadCpuShare, decision.Transition, decision.Module ?? "none",

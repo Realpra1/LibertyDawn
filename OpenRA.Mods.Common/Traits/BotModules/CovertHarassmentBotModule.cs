@@ -55,7 +55,7 @@ namespace OpenRA.Mods.Common.Traits
 	}
 
 	public class CovertHarassmentBotModule : ConditionalTrait<CovertHarassmentBotModuleInfo>,
-		IBotEnabled, IBotTick, IBotUnitReservations, IGameSaveTraitData
+		IBotEnabled, IBotTick, IBotUnitReservations, IGameSaveTraitData, IAdvancedBotTick
 	{
 		readonly World world;
 		readonly Player player;
@@ -72,6 +72,7 @@ namespace OpenRA.Mods.Common.Traits
 		int scanTicks;
 		int lastOrderTick;
 		string lastComposition;
+		bool advancedBehaviorEnabled = true;
 
 		public CovertHarassmentBotModule(Actor self, CovertHarassmentBotModuleInfo info)
 			: base(info)
@@ -109,9 +110,32 @@ namespace OpenRA.Mods.Common.Traits
 			return actor != null && reserved.Contains(actor.ActorID);
 		}
 
+		string IAdvancedBotTick.FailsafeModuleId => "CovertHarassmentBotModule";
+
+		void IAdvancedBotTick.SetAdvancedBehaviorEnabled(bool enabled)
+		{
+			if (advancedBehaviorEnabled == enabled)
+				return;
+
+			advancedBehaviorEnabled = enabled;
+			if (!enabled)
+			{
+				if (Info.DebugLogging && reserved.Count > 0)
+					Debug("released squad: reason=failsafe-degraded actors={0}", string.Join(",",
+						Actors(reserved).Select(a => a.Info.Name + "#" + a.ActorID)));
+
+				ClearState("failsafe degraded");
+			}
+			else
+			{
+				scanTicks = 1;
+				Debug("enabled for recovery probe");
+			}
+		}
+
 		void IBotTick.BotTick(IBot enabledBot)
 		{
-			if (IsTraitDisabled || player.WinState != WinState.Undefined || --scanTicks > 0)
+			if (IsTraitDisabled || !advancedBehaviorEnabled || player.WinState != WinState.Undefined || --scanTicks > 0)
 				return;
 
 			scanTicks = Info.ScanInterval;

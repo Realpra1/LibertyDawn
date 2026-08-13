@@ -128,6 +128,36 @@ World:
 \t\tUpgrades: upgrade.covert1, upgrade.covert2, upgrade.covert3, upgrade.recon1, upgrade.recon2, upgrade.recon3, upgrade.economy1, upgrade.economy2, upgrade.economy3
 """
 
+	covert_rules = """Player:
+	ModularBot@IronReaper:
+		AdvancedSquadSampleInterval: 30
+		AdvancedSquadBreachSamples: 2
+		AdvancedSquadRecoverySamples: 2
+		AdvancedSquadOffenderPenaltySamples: 1
+	SquadManagerBotModule@ironreaper:
+		GroundTargetDebugLogging: true
+	CovertHarassmentBotModule:
+		DebugLogging: true
+
+World:
+	StartingUnits@cnc100covertnod:
+		Class: cnc100-covert
+		ClassName: CNC-100 covert harassment participation
+		Factions: nod
+		BaseActor: mcv
+		SupportActors: harv, harv, sharv, bike, bike, bike, bike, bike, bike, bggy, bggy, bggy, bggy, bggy, bggy, arty, arty, arty, arty, msam, msam, mtnk, mtnk, e1, e1, e3, e4
+		OuterSupportRadius: 14
+		Upgrades: upgrade.covert1, upgrade.covert2, upgrade.covert3, upgrade.recon1, upgrade.recon2, upgrade.recon3, upgrade.economy1, upgrade.economy2, upgrade.economy3
+	StartingUnits@cnc100covertgdi:
+		Class: cnc100-covert
+		ClassName: CNC-100 covert harassment participation
+		Factions: gdi
+		BaseActor: mcv
+		SupportActors: harv, harv, sharv, bike, bike, bike, bike, bike, bike, bggy, bggy, bggy, bggy, bggy, bggy, arty, arty, arty, arty, msam, msam, mtnk, mtnk, e1, e1, e3, e4
+		OuterSupportRadius: 14
+		Upgrades: upgrade.covert1, upgrade.covert2, upgrade.covert3, upgrade.recon1, upgrade.recon2, upgrade.recon3, upgrade.economy1, upgrade.economy2, upgrade.economy3
+"""
+
 	write_map(root / "mods/cnc/maps/Empire-Earth.oramap", args.output / "cnc100-high-unit.oramap",
 		"CNC-100 High Unit Failsafe", high_unit_rules)
 	write_map(root / "mods/cnc/maps/Empire-Earth.oramap", args.output / "cnc100-high-unit-failsafe-disabled.oramap",
@@ -135,6 +165,8 @@ World:
 			"\t\tAdvancedSquadSampleInterval: 40", "\t\tAdvancedSquadCpuFailsafe: false\n\t\tAdvancedSquadSampleInterval: 40"))
 	write_map(root / "mods/cnc/maps/island-duel.oramap", args.output / "cnc100-mixed-archipelago.oramap",
 		"CNC-100 Mixed Ownership Archipelago", mixed_rules)
+	write_map(root / "mods/cnc/maps/island-duel.oramap", args.output / "cnc100-covert-harassment.oramap",
+		"CNC-100 Covert Harassment Participation", covert_rules)
 
 
 if __name__ == "__main__":

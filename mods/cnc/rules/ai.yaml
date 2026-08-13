@@ -3,52 +3,52 @@ Player:
 		Name: Cabal
 		Type: cabal
 		AdvancedSquadCpuFailsafe: true
-		AdvancedSquadModules: SquadManagerBotModule, StealthTankSquadBotModule/stealth-tank, StealthTankSquadBotModule/chemical
+		AdvancedSquadModules: SquadManagerBotModule, StealthTankSquadBotModule/stealth-tank, StealthTankSquadBotModule/chemical, CovertHarassmentBotModule
 	ModularBot@Watson:
 		Name: Watson
 		Type: watson
 		AdvancedSquadCpuFailsafe: true
-		AdvancedSquadModules: SquadManagerBotModule, StealthTankSquadBotModule/stealth-tank, StealthTankSquadBotModule/chemical
+		AdvancedSquadModules: SquadManagerBotModule, StealthTankSquadBotModule/stealth-tank, StealthTankSquadBotModule/chemical, CovertHarassmentBotModule
 	ModularBot@HAL9001:
 		Name: HAL 9001
 		Type: hal9001
 		AdvancedSquadCpuFailsafe: true
-		AdvancedSquadModules: SquadManagerBotModule, StealthTankSquadBotModule/stealth-tank, StealthTankSquadBotModule/chemical
+		AdvancedSquadModules: SquadManagerBotModule, StealthTankSquadBotModule/stealth-tank, StealthTankSquadBotModule/chemical, CovertHarassmentBotModule
     ModularBot@Brutalis:
 		Name: Brutalis
 		Type: brutalis
 		AdvancedSquadCpuFailsafe: true
-		AdvancedSquadModules: SquadManagerBotModule, StealthTankSquadBotModule/stealth-tank, StealthTankSquadBotModule/chemical
+		AdvancedSquadModules: SquadManagerBotModule, StealthTankSquadBotModule/stealth-tank, StealthTankSquadBotModule/chemical, CovertHarassmentBotModule
     ModularBot@VIKI:
 		Name: VIKI
 		Type: viki
 		AdvancedSquadCpuFailsafe: true
-		AdvancedSquadModules: SquadManagerBotModule, StealthTankSquadBotModule/stealth-tank, StealthTankSquadBotModule/chemical
+		AdvancedSquadModules: SquadManagerBotModule, StealthTankSquadBotModule/stealth-tank, StealthTankSquadBotModule/chemical, CovertHarassmentBotModule
     ModularBot@SkyNet:
 		Name: SkyNet
 		Type: skynet
 		AdvancedSquadCpuFailsafe: true
-		AdvancedSquadModules: SquadManagerBotModule, StealthTankSquadBotModule/stealth-tank, StealthTankSquadBotModule/chemical
+		AdvancedSquadModules: SquadManagerBotModule, StealthTankSquadBotModule/stealth-tank, StealthTankSquadBotModule/chemical, CovertHarassmentBotModule
     ModularBot@IronReaper:
 		Name: IronReaper
 		Type: ironreaper
 		AdvancedSquadCpuFailsafe: true
-		AdvancedSquadModules: SquadManagerBotModule, StealthTankSquadBotModule/stealth-tank, StealthTankSquadBotModule/chemical
+		AdvancedSquadModules: SquadManagerBotModule, StealthTankSquadBotModule/stealth-tank, StealthTankSquadBotModule/chemical, CovertHarassmentBotModule
     ModularBot@WaveMaker:
 		Name: WaveMaker
 		Type: wavemaker
 		AdvancedSquadCpuFailsafe: true
-		AdvancedSquadModules: SquadManagerBotModule, StealthTankSquadBotModule/stealth-tank, StealthTankSquadBotModule/chemical
+		AdvancedSquadModules: SquadManagerBotModule, StealthTankSquadBotModule/stealth-tank, StealthTankSquadBotModule/chemical, CovertHarassmentBotModule
     ModularBot@Easy:
 		Name: Easy
 		Type: Easy
 		AdvancedSquadCpuFailsafe: true
-		AdvancedSquadModules: SquadManagerBotModule, StealthTankSquadBotModule/stealth-tank, StealthTankSquadBotModule/chemical
+		AdvancedSquadModules: SquadManagerBotModule, StealthTankSquadBotModule/stealth-tank, StealthTankSquadBotModule/chemical, CovertHarassmentBotModule
     ModularBot@Easiest:
 		Name: Easiest
 		Type: Easiest
 		AdvancedSquadCpuFailsafe: true
-		AdvancedSquadModules: SquadManagerBotModule, StealthTankSquadBotModule/stealth-tank, StealthTankSquadBotModule/chemical
+		AdvancedSquadModules: SquadManagerBotModule, StealthTankSquadBotModule/stealth-tank, StealthTankSquadBotModule/chemical, CovertHarassmentBotModule
 	GrantConditionOnBotOwner@cabal:
 		Condition: enable-cabal-ai
 		Bots: cabal
