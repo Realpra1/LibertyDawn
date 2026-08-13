@@ -16,6 +16,25 @@ namespace OpenRA.Test.Mods.Common
 	[TestFixture]
 	public sealed class StealthTankSquadPolicyTest
 	{
+		sealed class RepairInfluenceState
+		{
+			public readonly string Profile;
+			public readonly int Weight;
+			public object CachedFacts;
+
+			public RepairInfluenceState(string profile, int weight)
+			{
+				Profile = profile;
+				Weight = weight;
+			}
+
+			public string GetPrivateInfluence(object sharedFacts)
+			{
+				CachedFacts = sharedFacts;
+				return $"{Profile}:{Weight}";
+			}
+		}
+
 		[Test]
 		public void BothProfilesUseOneSharedControlImplementation()
 		{
@@ -122,6 +141,50 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
+		public void PartnerDeathRetainsLoneSpecialistOwnershipAndActiveGroup()
+		{
+			var selected = StealthTankSquadPolicy.SelectSpecialistIds(new uint[] { 11 },
+				new uint[] { 10, 11 }, true);
+
+			Assert.That(selected, Is.EqualTo(new uint[] { 11 }));
+			Assert.That(StealthTankSquadPolicy.GroupForIndex(0, selected.Length), Is.Zero);
+			Assert.That(StealthTankSquadPolicy.RepairDisposition(true, false, false, false),
+				Is.EqualTo(SpecialistRepairDisposition.Active));
+		}
+
+		[Test]
+		public void CompatibleReplacementReformsWithTheOwnedSurvivor()
+		{
+			var selected = StealthTankSquadPolicy.SelectSpecialistIds(new uint[] { 11, 12 },
+				new uint[] { 11 }, true);
+
+			Assert.That(selected, Is.EqualTo(new uint[] { 11, 12 }));
+			Assert.That(selected.Select(id => StealthTankSquadPolicy.GroupForIndex(
+				System.Array.IndexOf(selected, id), selected.Length)), Is.EqualTo(new[] { 0, 0 }));
+		}
+
+		[Test]
+		public void RestoredLoneOwnershipSurvivesSaveLoadRebalance()
+		{
+			var savedReservedIds = new uint[] { 11 };
+			var selected = StealthTankSquadPolicy.SelectSpecialistIds(new uint[] { 11 },
+				savedReservedIds, true);
+
+			Assert.That(selected, Is.EqualTo(savedReservedIds));
+		}
+
+		[Test]
+		public void ReformationCannotCreateOwnerlessOrDuplicateReservations()
+		{
+			var selected = StealthTankSquadPolicy.SelectSpecialistIds(
+				new uint[] { 12, 11, 12 }, new uint[] { 11, 11, 99 }, true);
+
+			Assert.That(selected, Is.EqualTo(new uint[] { 11, 12 }));
+			Assert.That(selected, Is.Unique);
+			Assert.That(selected, Has.None.EqualTo(99));
+		}
+
+		[Test]
 		public void LargeForceCreatesTwoHarassmentGroupsAndOneAttackGroup()
 		{
 			Assert.That(StealthTankSquadPolicy.GroupForIndex(0, 6), Is.EqualTo(0));
@@ -222,6 +285,42 @@ namespace OpenRA.Test.Mods.Common
 		{
 			Assert.That(StealthTankSquadPolicy.RepairDisposition(damaged, repairing,
 				fullyRepaired, reachableRepair), Is.EqualTo(expected));
+		}
+
+		[Test]
+		public void BothProfilesUseSharedRepairFactsWithPrivateInfluenceState()
+		{
+			var ownerThreatFacts = new object();
+			var stealth = new RepairInfluenceState("stealth-tank", 7);
+			var chemical = new RepairInfluenceState("chemical", 13);
+
+			var stealthInfluence = StealthTankSquadPolicy.ResolveRepairInfluence(
+				ownerThreatFacts, stealth.GetPrivateInfluence);
+			var chemicalInfluence = StealthTankSquadPolicy.ResolveRepairInfluence(
+				ownerThreatFacts, chemical.GetPrivateInfluence);
+
+			Assert.That(stealthInfluence, Is.EqualTo("stealth-tank:7"));
+			Assert.That(chemicalInfluence, Is.EqualTo("chemical:13"));
+			Assert.That(stealth.CachedFacts, Is.SameAs(ownerThreatFacts));
+			Assert.That(chemical.CachedFacts, Is.SameAs(ownerThreatFacts));
+			Assert.That(stealthInfluence, Is.Not.EqualTo(chemicalInfluence),
+				"Shared factual threats must not share profile weights or influence caches.");
+		}
+
+		[Test]
+		public void MissingSharedRepairFactsRetainsActiveNoRepairFallback()
+		{
+			var influenceBuilds = 0;
+			var influence = StealthTankSquadPolicy.ResolveRepairInfluence<object, string>(null, facts =>
+			{
+				influenceBuilds++;
+				return "unexpected";
+			});
+
+			Assert.That(influence, Is.Null);
+			Assert.That(influenceBuilds, Is.Zero);
+			Assert.That(StealthTankSquadPolicy.RepairDisposition(true, false, false,
+				influence != null), Is.EqualTo(SpecialistRepairDisposition.Active));
 		}
 
 		[Test]

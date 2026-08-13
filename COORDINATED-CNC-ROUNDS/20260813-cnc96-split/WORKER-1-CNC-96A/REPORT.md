@@ -2,12 +2,13 @@
 
 ## Status
 
-Cycles 1-10 implemented and checked. Cycle 10 proves detector-plus-armed Stop
+Cycles 1-11 implemented and checked. Cycle 10 proves detector-plus-armed Stop
 suppresses new fire after already-committed missiles, and proves a damaged member
 with no repair remains active/reserved through scripted death. Proposed status
-remains `First iteration - testing`: the exact two-game cap was exhausted with no
-surviving actor for the <=25 resume and with `ReserveOpeningPair` handing the
-intended repair actor to ordinary AI before repair/rejoin could be exercised.
+remains `First iteration - testing`. Cycle 11 fixes Terra's shared-view blocker,
+proves non-owner Chemical full-health repair, and proves lone-survivor/replacement
+specialist ownership. Explicit displaced route/order and combat rejoin remain
+unproved at the exact two-game cap.
 
 ## Task boundary
 
@@ -1108,3 +1109,54 @@ MiniYAML lint passed, focused policy tests remain 79/79, Lua syntax and diff che
 pass. At the exact two-game cap the result remains `First iteration - testing`:
 not ready for Terra final review/publication until a surviving <=25 resume and a
 reserved compatible repair/full-rejoin are both proved.
+
+## Cycle 11 — final-review fix
+
+`FindRepairRoute` now passes `strategicViewOwner.strategicView.Threats` through an
+explicit `ResolveRepairInfluence` seam, then calls the current profile's private
+`GetInfluenceMap`. Shared facts therefore enable both profiles without sharing
+Stealth/Chemical weights or the 4-cell/125-tick instance cache. Air code/output,
+75/25 cadences, 125-tick repair reevaluation, policy values, and balance are
+unchanged. Tests cover both profile labels with one shared fact object and distinct
+private cache/weights, plus null-fact active fallback.
+
+The pre-game user correction maps Air's `Squad.IsValid`,
+`AirFormationUnits(bootstrapIfEmpty:true)`, `MarkAirReinforcement` /
+`PromoteArrivedAirReinforcements`, and `Squad.Serialize/Deserialize`: an eligible
+owned survivor remains specialist-owned; deterministic rebalance retains owned
+IDs first and recruits compatible replacements; membership change still
+invalidates routes; `ReservedSpecialists` persists through game save. Focused
+tests cover partner death/active ownership, replacement reform, restored lone
+ownership, and no duplicate/ownerless reservation.
+
+Game A (`cycle11-chemical-repair`, seed 961101) reached tick1800 in 5.004s,
+exit0, no Air/exception/fatal/desync. The exact non-owner CTNK rose from 9000/25000
+to 10250 at tick126 and 25000 at tick1001 beside a live fix. No displaced route,
+queued Repair line, or post-full damage appeared, so the accurate result is
+full-health repair with combat rejoin unproved. Luna narrative/policy:
+`cycle11/reviews/game-a-narrator/NARRATIVE.md` and
+`cycle11/reviews/game-a-policy/POLICY-REVIEW.md` (`mixed/high`). Tick
+mean/p50/p95/p99/max was `0.496/0.223/0.691/5.206/1065.649ms`; two >=50ms events
+were startup.
+
+Game B (`cycle11-stealth-repair`, seed 961102) reached tick2200 in 6.005s,
+exit0, no Air/exception/fatal/desync. The exact 6000/15000 STNK damaged targets,
+survived partner death, and continued exact-object damage through tick740.
+Telemetry proved `total=1 reserved=1 groups=1/0/0 ordinary=0`, then after replacement
+`total=2 reserved=2 groups=2/0/0 ordinary=0`. Neither repair probe activated because
+VIKI's authored active SquadManager retains default zero `HealthRetreatThreshold`.
+Luna narrative/policy: `cycle11/reviews/game-b-narrator/NARRATIVE.md` and
+`cycle11/reviews/game-b-policy/POLICY-REVIEW.md` (ownership accepted; repair
+`insufficient/high`). Tick p50/p95/p99/max was `1/2/7/1054.289ms`; three >=50ms
+events were startup.
+
+Strict Release compilation/full CNC MiniYAML passed with zero warnings/errors;
+focused tests passed 85/85; both maps and Lua/JSON/ActorID/diff checks passed.
+Exactly two valid games ran. The final-review blocker is fixed; explicit route/order
+and combat rejoin remain evidence limits for fresh Terra rereview.
+
+Cumulative Sol-medium integration handoff: pre-spawn a reachable compatible Repair
+Facility for VIKI, place a Stealth specialist below an explicitly active authored
+retreat threshold, and prove Repair health increase, full repair, rejoin, and
+continued same-object action. Use a distinct no-repair active-fallback leg if the
+integration game budget permits; do not tune product balance to activate repair.

@@ -102,7 +102,7 @@ namespace OpenRA.Mods.Common.Traits
 	}
 
 	public class StealthTankSquadBotModule : ConditionalTrait<StealthTankSquadBotModuleInfo>,
-		IBotEnabled, IBotTick, IBotUnitReservations, IBotPerformanceIdentity
+		IBotEnabled, IBotTick, IBotUnitReservations, IBotPerformanceIdentity, IGameSaveTraitData
 	{
 		sealed class SpecialistGroup
 		{
@@ -536,7 +536,7 @@ namespace OpenRA.Mods.Common.Traits
 			foreach (var group in groups.Where(g => g.Units.Contains(unit)))
 				group.MembershipChanged = true;
 			if (Info.DebugLogging)
-				Log.Write("debug", "AI stealth repair {0} [{1}] {2}#{3}: {4}/{5} HP, moving by {6} waypoint(s) to compatible safe repair aura {7}#{8}.",
+				Log.Write("debug", "AI stealth repair {0} [{1}] {2}#{3}: {4}/{5} HP, moving by {6} waypoint(s) to compatible safe repair aura {7}#{8}; queued Repair order.",
 					Info.SquadLabel, player.PlayerName, unit.Info.Name, unit.ActorID, health.HP,
 					health.MaxHP, route.Count, facility.Info.Name, facility.ActorID);
 			return route.Count + 1;
@@ -547,11 +547,14 @@ namespace OpenRA.Mods.Common.Traits
 			facility = null;
 			var repairable = unit.Info.TraitInfoOrDefault<RepairableInfo>();
 			var mobile = unit.TraitOrDefault<Mobile>();
-			if (repairable == null || repairable.RepairActors.Count == 0 || mobile == null ||
-				strategicView.Threats == null)
+			if (repairable == null || repairable.RepairActors.Count == 0 || mobile == null)
 				return null;
 
-			var map = GetInfluenceMap(strategicView.Threats);
+			var map = StealthTankSquadPolicy.ResolveRepairInfluence(
+				strategicViewOwner.strategicView.Threats, threats => GetInfluenceMap(threats));
+			if (map == null)
+				return null;
+
 			List<CPos> bestRoute = null;
 			foreach (var candidate in world.ActorsHavingTrait<RepairsUnits>()
 				.Where(a => !a.IsDead && a.IsInWorld && a.Owner.IsAlliedWith(player) &&
@@ -661,9 +664,10 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			var previousGroups = groups.Select(g => g.Units.Select(a => a.ActorID).ToArray()).ToArray();
 			var eligible = world.Actors.Where(IsEligible).OrderBy(a => a.ActorID).ToList();
-			var desired = StealthTankSquadPolicy.SpecialistCount(eligible.Count, Info.ReserveOpeningPair);
-			var selected = eligible.Where(a => reserved.Contains(a.ActorID)).Take(desired).ToList();
-			selected.AddRange(eligible.Where(a => !reserved.Contains(a.ActorID)).Take(desired - selected.Count));
+			var selectedIds = StealthTankSquadPolicy.SelectSpecialistIds(
+				eligible.Select(a => a.ActorID), reserved, Info.ReserveOpeningPair);
+			var eligibleById = eligible.ToDictionary(a => a.ActorID);
+			var selected = selectedIds.Select(id => eligibleById[id]).ToList();
 
 			var previous = new HashSet<uint>(reserved);
 			reserved.Clear();
@@ -697,6 +701,31 @@ namespace OpenRA.Mods.Common.Traits
 					string.Join("/", groups.Select(g => g.Units.Count)), eligible.Count - reserved.Count);
 
 			lastEligibleCount = eligible.Count;
+		}
+
+		List<MiniYamlNode> IGameSaveTraitData.IssueTraitData(Actor self)
+		{
+			if (IsTraitDisabled)
+				return null;
+
+			return new List<MiniYamlNode>
+			{
+				new MiniYamlNode("ReservedSpecialists",
+					FieldSaver.FormatValue(reserved.OrderBy(id => id).ToArray()))
+			};
+		}
+
+		void IGameSaveTraitData.ResolveTraitData(Actor self, List<MiniYamlNode> data)
+		{
+			if (self.World.IsReplay)
+				return;
+
+			var reservedNode = data.FirstOrDefault(n => n.Key == "ReservedSpecialists");
+			if (reservedNode == null)
+				return;
+
+			reserved.Clear();
+			reserved.UnionWith(FieldLoader.GetValue<uint[]>(reservedNode.Key, reservedNode.Value.Value));
 		}
 
 		bool IsEnemyTarget(Actor actor)

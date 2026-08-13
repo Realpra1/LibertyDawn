@@ -7,6 +7,7 @@
 #endregion
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace OpenRA.Mods.Common.Traits
@@ -65,14 +66,30 @@ namespace OpenRA.Mods.Common.Traits
 
 		public static int SpecialistCount(int total, bool reserveOpeningPair = true)
 		{
+			return SpecialistCount(total, reserveOpeningPair, 0);
+		}
+
+		public static int SpecialistCount(int total, bool reserveOpeningPair, int retainedSpecialists)
+		{
 			if (total < 2)
-				return 0;
+				return total > 0 && retainedSpecialists > 0 ? 1 : 0;
 			if (!reserveOpeningPair)
 				return (total + 1) / 2;
 			if (total < 4)
 				return 2;
 
 			return total / 2;
+		}
+
+		public static uint[] SelectSpecialistIds(IEnumerable<uint> eligibleIds,
+			IEnumerable<uint> previouslyOwnedIds, bool reserveOpeningPair = true)
+		{
+			var eligible = eligibleIds.Distinct().OrderBy(id => id).ToArray();
+			var owned = new HashSet<uint>(previouslyOwnedIds);
+			var retained = eligible.Count(owned.Contains);
+			var desired = SpecialistCount(eligible.Length, reserveOpeningPair, retained);
+			return eligible.Where(owned.Contains).Concat(eligible.Where(id => !owned.Contains(id)))
+				.Take(desired).ToArray();
 		}
 
 		public static int GroupForIndex(int index, int specialistCount,
@@ -182,6 +199,16 @@ namespace OpenRA.Mods.Common.Traits
 			// No compatible reachable facility is never a parking state. A damaged
 			// specialist remains owned by, and active in, its combat squad.
 			return SpecialistRepairDisposition.Active;
+		}
+
+		public static TInfluence ResolveRepairInfluence<TFacts, TInfluence>(TFacts sharedThreatFacts,
+			Func<TFacts, TInfluence> getPrivateInfluence)
+			where TFacts : class
+			where TInfluence : class
+		{
+			// Threat facts belong to the elected shared-view owner. Their interpretation and
+			// cache belong to the profile that is currently evaluating its repair route.
+			return sharedThreatFacts == null ? null : getPrivateInfluence(sharedThreatFacts);
 		}
 
 		public static int BufferedRange(int rangeCells, int bufferCells)
