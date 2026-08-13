@@ -131,10 +131,12 @@ class ParallelLauncherTest(unittest.TestCase):
 
     def test_game_save_is_staged_in_the_isolated_server_save_directory(self):
         game_save = self.map("checkpoint.orasav", "save-data")
+        custom_map = self.map("checkpoint-map.oramap", "map-data")
         manifest = self.write_manifest([{
             "name": "load",
             "game_save": str(game_save),
             "exit_at_tick": 7000,
+            "support_maps": [str(custom_map)],
         }])
         _, specs = parallel.load_manifest(manifest, 10)
         output = self.root / "save-output"
@@ -148,6 +150,10 @@ class ParallelLauncherTest(unittest.TestCase):
             support / "Saves" / "cnc" / "test-version" / "input.orasav",
         )
         self.assertEqual(runtime_input.read_text(encoding="utf-8"), "save-data")
+        self.assertEqual(
+            (support / "maps" / "cnc" / "test-version" / custom_map.name).read_text(encoding="utf-8"),
+            "map-data",
+        )
         self.assertIn(f"Launch.GameSave={runtime_input}", command)
 
     def test_same_workloads_run_serially_and_concurrently(self):
