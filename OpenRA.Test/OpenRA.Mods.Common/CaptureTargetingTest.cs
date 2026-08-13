@@ -9,8 +9,10 @@
  */
 #endregion
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using NUnit.Framework;
 using OpenRA.Mods.Common.Traits;
 using OpenRA.Traits;
@@ -176,6 +178,41 @@ namespace OpenRA.Test.Mods.Common
 				assignedTick, savedWorldTick, 10), Is.True,
 				"Expected live activity remains authoritative regardless of assignment age.");
 		}
+
+		[Test]
+		public void CommandoOwnershipSaveRecordsRoundTripEveryLifecycleField()
+		{
+			var moduleType = typeof(CaptureManagerBotModule);
+			var confirmation = new MiniYamlNode("Confirmation", "", new List<MiniYamlNode>
+			{
+				new MiniYamlNode("Specialist", FieldSaver.FormatValue((uint)17)),
+				new MiniYamlNode("IdleSinceTick", FieldSaver.FormatValue(193))
+			});
+			var fallback = new MiniYamlNode("Fallback", "", new List<MiniYamlNode>
+			{
+				new MiniYamlNode("Specialist", FieldSaver.FormatValue((uint)23)),
+				new MiniYamlNode("Purpose", FieldSaver.FormatValue(1)),
+				new MiniYamlNode("Target", FieldSaver.FormatValue((uint)0)),
+				new MiniYamlNode("Destination", FieldSaver.FormatValue(new CPos(41, 29))),
+				new MiniYamlNode("AssignedTick", FieldSaver.FormatValue(200)),
+				new MiniYamlNode("ReconsiderTick", FieldSaver.FormatValue(325))
+			});
+
+			Assert.That(RoundTripPrivateSaveRecord(moduleType, "LoadCommandoConfirmation",
+				"SaveCommandoConfirmation", confirmation), Is.EqualTo(Serialize(confirmation)));
+			Assert.That(RoundTripPrivateSaveRecord(moduleType, "LoadCommandoFallback",
+				"SaveCommandoFallback", fallback), Is.EqualTo(Serialize(fallback)));
+		}
+
+		static string RoundTripPrivateSaveRecord(Type moduleType, string loadName, string saveName,
+			MiniYamlNode node)
+		{
+			var flags = BindingFlags.Static | BindingFlags.NonPublic;
+			var loaded = moduleType.GetMethod(loadName, flags).Invoke(null, new object[] { node });
+			return Serialize((MiniYamlNode)moduleType.GetMethod(saveName, flags).Invoke(null, new[] { loaded }));
+		}
+
+		static string Serialize(MiniYamlNode node) { return new List<MiniYamlNode> { node }.WriteToString(); }
 
 		[Test]
 		public void SharedReservationsRestoreBothIncumbentPurposesDeterministically()

@@ -200,6 +200,22 @@ namespace OpenRA.Mods.Common.Traits
 			public int MissingActivitySinceTick;
 		}
 
+		sealed class SavedCommandoConfirmation
+		{
+			public uint SpecialistId;
+			public int IdleSinceTick;
+		}
+
+		sealed class SavedCommandoFallback
+		{
+			public uint SpecialistId;
+			public CommandoFallbackPurpose Purpose;
+			public uint TargetId;
+			public CPos Destination;
+			public int AssignedTick;
+			public int ReconsiderTick;
+		}
+
 		enum CommandoFallbackPurpose
 		{
 			Combat,
@@ -1885,6 +1901,21 @@ namespace OpenRA.Mods.Common.Traits
 				new MiniYamlNode("CaptureManagerCaptureScanTicks", FieldSaver.FormatValue(minCaptureDelayTicks)),
 				new MiniYamlNode("CaptureManagerDemolitionScanTicks", FieldSaver.FormatValue(minDemolitionDelayTicks)),
 				new MiniYamlNode("CaptureManagerAssignments", "", assignments),
+				new MiniYamlNode("CaptureManagerCommandoConfirmations", "", demolitionIdleSince
+					.OrderBy(pair => pair.Key.ActorID).Select(pair => SaveCommandoConfirmation(
+						new SavedCommandoConfirmation { SpecialistId = pair.Key.ActorID, IdleSinceTick = pair.Value }))
+					.ToList()),
+				new MiniYamlNode("CaptureManagerCommandoFallbacks", "", commandoFallbacks
+					.OrderBy(pair => pair.Key.ActorID).Select(pair => SaveCommandoFallback(
+						new SavedCommandoFallback
+						{
+							SpecialistId = pair.Key.ActorID,
+							Purpose = pair.Value.Purpose,
+							TargetId = pair.Value.Target?.ActorID ?? 0,
+							Destination = pair.Value.Destination,
+							AssignedTick = pair.Value.AssignedTick,
+							ReconsiderTick = pair.Value.ReconsiderTick
+						})).ToList()),
 				new MiniYamlNode("CaptureManagerDeferredTargets", "", deferredTargets.OrderBy(pair => pair.Key.ActorID).Select(pair =>
 					new MiniYamlNode("DeferredTarget", "", new List<MiniYamlNode>
 					{
@@ -1913,6 +1944,28 @@ namespace OpenRA.Mods.Common.Traits
 			});
 		}
 
+		static MiniYamlNode SaveCommandoConfirmation(SavedCommandoConfirmation saved)
+		{
+			return new MiniYamlNode("Confirmation", "", new List<MiniYamlNode>
+			{
+				new MiniYamlNode("Specialist", FieldSaver.FormatValue(saved.SpecialistId)),
+				new MiniYamlNode("IdleSinceTick", FieldSaver.FormatValue(saved.IdleSinceTick))
+			});
+		}
+
+		static MiniYamlNode SaveCommandoFallback(SavedCommandoFallback saved)
+		{
+			return new MiniYamlNode("Fallback", "", new List<MiniYamlNode>
+			{
+				new MiniYamlNode("Specialist", FieldSaver.FormatValue(saved.SpecialistId)),
+				new MiniYamlNode("Purpose", FieldSaver.FormatValue((int)saved.Purpose)),
+				new MiniYamlNode("Target", FieldSaver.FormatValue(saved.TargetId)),
+				new MiniYamlNode("Destination", FieldSaver.FormatValue(saved.Destination)),
+				new MiniYamlNode("AssignedTick", FieldSaver.FormatValue(saved.AssignedTick)),
+				new MiniYamlNode("ReconsiderTick", FieldSaver.FormatValue(saved.ReconsiderTick))
+			});
+		}
+
 		void IGameSaveTraitData.ResolveTraitData(Actor self, List<MiniYamlNode> data)
 		{
 			if (self.World.IsReplay)
@@ -1920,6 +1973,8 @@ namespace OpenRA.Mods.Common.Traits
 
 			var savedAssignments = new List<SavedAssignment>();
 			var savedDeferredTargets = new List<MiniYamlNode>();
+			var savedCommandoConfirmations = new List<SavedCommandoConfirmation>();
+			var savedCommandoFallbacks = new List<SavedCommandoFallback>();
 			foreach (var node in data)
 				switch (node.Key)
 				{
@@ -1932,6 +1987,12 @@ namespace OpenRA.Mods.Common.Traits
 					case "CaptureManagerAssignments":
 						savedAssignments.AddRange(node.Value.Nodes.Select(LoadAssignment));
 						break;
+					case "CaptureManagerCommandoConfirmations":
+						savedCommandoConfirmations.AddRange(node.Value.Nodes.Select(LoadCommandoConfirmation));
+						break;
+					case "CaptureManagerCommandoFallbacks":
+						savedCommandoFallbacks.AddRange(node.Value.Nodes.Select(LoadCommandoFallback));
+						break;
 					case "CaptureManagerDeferredTargets":
 						savedDeferredTargets.AddRange(node.Value.Nodes);
 						break;
@@ -1939,6 +2000,29 @@ namespace OpenRA.Mods.Common.Traits
 
 			RestoreAssignments(savedAssignments);
 			RestoreDeferredTargets(savedDeferredTargets);
+			RestoreCommandoOwnership(savedCommandoFallbacks, savedCommandoConfirmations);
+		}
+
+		static SavedCommandoConfirmation LoadCommandoConfirmation(MiniYamlNode node)
+		{
+			return new SavedCommandoConfirmation
+			{
+				SpecialistId = LoadId(node, "Specialist"),
+				IdleSinceTick = LoadValue<int>(node, "IdleSinceTick")
+			};
+		}
+
+		static SavedCommandoFallback LoadCommandoFallback(MiniYamlNode node)
+		{
+			return new SavedCommandoFallback
+			{
+				SpecialistId = LoadId(node, "Specialist"),
+				Purpose = (CommandoFallbackPurpose)LoadValue<int>(node, "Purpose"),
+				TargetId = LoadId(node, "Target"),
+				Destination = LoadValue<CPos>(node, "Destination"),
+				AssignedTick = LoadValue<int>(node, "AssignedTick"),
+				ReconsiderTick = LoadValue<int>(node, "ReconsiderTick")
+			};
 		}
 
 		static SavedAssignment LoadAssignment(MiniYamlNode node)
@@ -2038,6 +2122,65 @@ namespace OpenRA.Mods.Common.Traits
 
 				deferredTargets[specialist] = new DeferredTarget(target, retryTick);
 			}
+		}
+
+		void RestoreCommandoOwnership(IEnumerable<SavedCommandoFallback> savedFallbacks,
+			IEnumerable<SavedCommandoConfirmation> savedConfirmations)
+		{
+			commandoFallbacks.Clear();
+			demolitionIdleSince.Clear();
+
+			foreach (var saved in savedFallbacks.OrderBy(saved => saved.SpecialistId)
+				.GroupBy(saved => saved.SpecialistId).Where(group => group.Count() == 1).Select(group => group.Single()))
+			{
+				var specialist = world.GetActorById(saved.SpecialistId);
+				var target = saved.TargetId == 0 ? null : world.GetActorById(saved.TargetId);
+				if (!IsValidRestoredCommandoFallback(specialist, target, saved))
+					continue;
+
+				commandoFallbacks.Add(specialist, new CommandoFallback(saved.Purpose, target,
+					saved.Destination, saved.AssignedTick, saved.ReconsiderTick));
+				Debug("restored commando {0}#{1} ownership=fallback purpose={2} target={3} " +
+					"destination={4} assigned={5} reconsider={6}", specialist.Info.Name, specialist.ActorID,
+					saved.Purpose, saved.TargetId, saved.Destination, saved.AssignedTick, saved.ReconsiderTick);
+			}
+
+			foreach (var saved in savedConfirmations.OrderBy(saved => saved.SpecialistId)
+				.GroupBy(saved => saved.SpecialistId).Where(group => group.Count() == 1).Select(group => group.Single()))
+			{
+				var specialist = world.GetActorById(saved.SpecialistId);
+				if (specialist == null || saved.IdleSinceTick > world.WorldTick || !IsUnownedIdleCommando(specialist))
+					continue;
+
+				demolitionIdleSince.Add(specialist, saved.IdleSinceTick);
+				Debug("restored commando {0}#{1} ownership=candidate-ownerless idle-since={2}",
+					specialist.Info.Name, specialist.ActorID, saved.IdleSinceTick);
+			}
+		}
+
+		bool IsValidRestoredCommandoFallback(Actor specialist, Actor target, SavedCommandoFallback saved)
+		{
+			if (specialist == null || saved.AssignedTick > world.WorldTick ||
+				!Enum.IsDefined(typeof(CommandoFallbackPurpose), saved.Purpose) ||
+				specialist.Owner != player || specialist.IsDead || !specialist.IsInWorld ||
+				unitCannotBeOrdered(specialist) || !Info.DemolitionActorTypes.Contains(specialist.Info.Name) ||
+				!specialist.Info.HasTraitInfo<DemolitionInfo>() || activeCapturers.ContainsKey(specialist) ||
+				activeDemolitionUnits.ContainsKey(specialist) ||
+				targetReservations.TryGetReservation(specialist.ActorID, out _, out _) ||
+				IsReservedForTransport(specialist) ||
+				(unitReservations != null && unitReservations.Any(r => r.IsUnitReserved(specialist))) ||
+				(temporaryUnitControls != null && temporaryUnitControls.Any(c => c.IsUnitTemporarilyControlled(specialist))))
+				return false;
+
+			if (saved.Purpose == CommandoFallbackPurpose.Combat)
+				return target != null && !target.IsDead && target.IsInWorld &&
+					player.RelationshipWith(target.Owner) == PlayerRelationship.Enemy &&
+					target.GetEnabledTargetTypes().Overlaps(InfantryTargetTypes) &&
+					StateBase.CanAttackTarget(specialist, target);
+
+			var mobile = specialist.TraitOrDefault<Mobile>();
+			return saved.TargetId == 0 && world.Map.Contains(saved.Destination) && mobile != null &&
+				mobile.CanStayInCell(saved.Destination);
 		}
 
 		static uint LoadId(MiniYamlNode node, string key)
