@@ -113,6 +113,14 @@ namespace OpenRA.Mods.Common.Traits
 			public int LastOrderTick;
 			public int LastNoTargetLogTick;
 			public int ConsecutiveNoSafeTargetScans;
+			public readonly Dictionary<uint, List<CPos>> RetainedRoutes = new Dictionary<uint, List<CPos>>();
+			public readonly Dictionary<uint, int> RetainedRouteIndices = new Dictionary<uint, int>();
+			public bool MembershipChanged;
+			public bool HasPlan;
+			public CPos PlannedTargetLocation;
+			public int LastProgressTick;
+			public long LastTargetDistanceSquared = long.MaxValue;
+			public int LastTargetHp = int.MaxValue;
 
 			public SpecialistGroup(int index) { Index = index; }
 		}
@@ -134,6 +142,13 @@ namespace OpenRA.Mods.Common.Traits
 			public bool WeaponIsEngaged;
 		}
 
+		sealed class StrategicView
+		{
+			public int Tick = int.MinValue;
+			public List<Actor> Enemies;
+			public List<Threat> Threats;
+		}
+
 		static readonly BitSet<TargetableType> TankTargetTypes = new BitSet<TargetableType>("Tank");
 		static readonly BitSet<TargetableType> GroundTargetTypes = new BitSet<TargetableType>("Ground");
 		static readonly BitSet<TargetableType> InfantryTargetTypes = new BitSet<TargetableType>("Infantry");
@@ -144,12 +159,18 @@ namespace OpenRA.Mods.Common.Traits
 		readonly HashSet<uint> reserved = new HashSet<uint>();
 		readonly Dictionary<CPos, bool> resourceHazardCache = new Dictionary<CPos, bool>();
 		readonly SpecialistGroup[] groups;
+		readonly StrategicView strategicView = new StrategicView();
 		IBot bot;
+		StealthTankSquadBotModule strategicViewOwner;
 		IBotTransportReservations[] transportReservations;
 		IResourceLayer resourceLayer;
 		DomainIndex domainIndex;
 		int scanTicks;
 		int lastEligibleCount = -1;
+		int scanPlanRetentions;
+		int scanPlanInvalidations;
+		int scanPathSearches;
+		int scanQueuedOrders;
 
 		public StealthTankSquadBotModule(Actor self, StealthTankSquadBotModuleInfo info)
 			: base(info)
@@ -162,6 +183,8 @@ namespace OpenRA.Mods.Common.Traits
 
 		protected override void Created(Actor self)
 		{
+			strategicViewOwner = player.PlayerActor.TraitsImplementing<StealthTankSquadBotModule>()
+				.FirstOrDefault() ?? this;
 			transportReservations = self.Owner.PlayerActor.TraitsImplementing<IBotTransportReservations>().ToArray();
 			resourceLayer = world.WorldActor.TraitOrDefault<IResourceLayer>();
 			domainIndex = world.WorldActor.TraitOrDefault<DomainIndex>();
@@ -183,6 +206,7 @@ namespace OpenRA.Mods.Common.Traits
 				group.Units.Clear();
 				group.Target = null;
 				group.ConsecutiveNoSafeTargetScans = 0;
+				ClearRetainedPlan(group);
 			}
 		}
 
@@ -207,13 +231,34 @@ namespace OpenRA.Mods.Common.Traits
 			if (reserved.Count == 0)
 				return;
 
-			var enemies = world.Actors.Where(IsEnemyTarget).OrderBy(a => a.ActorID).ToList();
-
-			// Build one shared threat snapshot per bot scan. Do not truncate by actor creation order:
-			// late-built detectors and defenses are at least as important as opening units.
-			var threats = enemies.Select(CreateThreat).Where(t => t != null).ToList();
+			scanPlanRetentions = 0;
+			scanPlanInvalidations = 0;
+			scanPathSearches = 0;
+			scanQueuedOrders = 0;
+			var view = strategicViewOwner.GetStrategicView(out var viewHit);
 			foreach (var group in groups)
-				UpdateGroup(group, enemies, threats);
+				UpdateGroup(group, view.Enemies, view.Threats);
+
+			if (Info.DebugLogging)
+				Log.Write("debug", "AI stealth performance {0} [{1}] tick={2}: view={3} enemies={4} threats={5} retained-plans={6} invalidated-plans={7} path-searches={8} queued-orders={9}.",
+					Info.SquadLabel, player.PlayerName, world.WorldTick, viewHit ? "hit" : "build",
+					view.Enemies.Count, view.Threats.Count, scanPlanRetentions, scanPlanInvalidations,
+					scanPathSearches, scanQueuedOrders);
+		}
+
+		StrategicView GetStrategicView(out bool cacheHit)
+		{
+			cacheHit = !StealthTankSquadPolicy.ShouldRefreshStrategicView(strategicView.Tick, world.WorldTick);
+			if (cacheHit)
+				return strategicView;
+
+			strategicView.Tick = world.WorldTick;
+			strategicView.Enemies = world.Actors.Where(IsEnemyTarget).OrderBy(a => a.ActorID).ToList();
+
+			// Share bounded facts, not positions, target types, profile scores, or risk judgments.
+			// Late-built detectors and defenses remain represented because the view is never truncated.
+			strategicView.Threats = strategicView.Enemies.Select(CreateThreat).Where(t => t != null).ToList();
+			return strategicView;
 		}
 
 		bool IsTransportReserved(Actor actor)
@@ -229,6 +274,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		void Rebalance()
 		{
+			var previousGroups = groups.Select(g => g.Units.Select(a => a.ActorID).ToArray()).ToArray();
 			var eligible = world.Actors.Where(IsEligible).OrderBy(a => a.ActorID).ToList();
 			var desired = StealthTankSquadPolicy.SpecialistCount(eligible.Count, Info.ReserveOpeningPair);
 			var selected = eligible.Where(a => reserved.Contains(a.ActorID)).Take(desired).ToList();
@@ -249,10 +295,16 @@ namespace OpenRA.Mods.Common.Traits
 					groups[groupIndex].Units.Add(selected[i]);
 			}
 
+			for (var i = 0; i < groups.Length; i++)
+				groups[i].MembershipChanged = !previousGroups[i].SequenceEqual(groups[i].Units.Select(a => a.ActorID));
+
 			foreach (var group in groups)
 				if (group.Target != null && (!group.Target.IsInWorld || group.Target.IsDead ||
 					player.RelationshipWith(group.Target.Owner) != PlayerRelationship.Enemy))
+				{
 					group.Target = null;
+					ClearRetainedPlan(group);
+				}
 
 			if (Info.DebugLogging && (eligible.Count != lastEligibleCount || !previous.SetEquals(reserved)))
 				Log.Write("debug", "AI stealth squads {0} [{1}]: total={2} reserved={3} groups={4} ordinary={5}.",
@@ -296,7 +348,11 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			group.Units.RemoveAll(a => !IsEligible(a) || !reserved.Contains(a.ActorID));
 			if (group.Units.Count == 0)
+			{
+				group.Target = null;
+				ClearRetainedPlan(group);
 				return;
+			}
 
 			var role = StealthTankSquadPolicy.RoleForGroup(group.Index,
 				Info.MaximumHarassmentGroups, Info.IncludeAttackGroup);
@@ -432,9 +488,11 @@ namespace OpenRA.Mods.Common.Traits
 				var abandonedTarget = group.Target != null;
 				group.Target = null;
 				group.TargetScore = 0;
+				ClearRetainedPlan(group);
 				if (abandonedTarget)
 				{
 					bot.QueueOrder(new Order("Stop", null, false, groupedActors: group.Units.ToArray()));
+					scanQueuedOrders++;
 					group.LastOrderTick = world.WorldTick;
 				}
 
@@ -446,12 +504,26 @@ namespace OpenRA.Mods.Common.Traits
 				group.ConsecutiveNoSafeTargetScans = 0;
 
 			var changed = selected != group.Target;
+			if (!changed && group.HasPlan)
+				ObserveProgress(group, selected, center);
+
+			var routeUnsafe = group.HasPlan && group.RetainedRoutes.Count > 0 &&
+				HasUnsafeRetainedRoute(group, selected, threats, ownRange);
+			var invalidation = StealthTankSquadPolicy.ClassifyPlanInvalidation(group.HasPlan,
+				changed, group.MembershipChanged, group.HasPlan && selected.Location != group.PlannedTargetLocation,
+				routeUnsafe, world.WorldTick, group.LastProgressTick, Info.OrderInterval);
 			group.Target = selected;
 			group.TargetScore = selectedScore;
-			if (!changed && world.WorldTick < group.LastOrderTick + Info.OrderInterval)
+			if (invalidation == StealthTankPlanInvalidation.None)
+			{
+				scanPlanRetentions++;
 				return;
+			}
+
+			scanPlanInvalidations++;
 
 			group.LastOrderTick = world.WorldTick;
+			ClearRetainedPlan(group);
 			var crush = Info.CrushInfantryTargets && role == StealthTankSquadRole.Harass &&
 				selected.GetEnabledTargetTypes().Overlaps(InfantryTargetTypes);
 			var routed = Info.AvoidResourceTypes.Count > 0 &&
@@ -463,12 +535,76 @@ namespace OpenRA.Mods.Common.Traits
 					groupedActors: group.Units.ToArray()) :
 					new Order("Attack", null, Target.FromActor(selected), false, groupedActors: group.Units.ToArray());
 				bot.QueueOrder(order);
+				scanQueuedOrders++;
 			}
+
+			BeginRetainedPlan(group, selected, center);
 
 			if (Info.DebugLogging)
 				Log.Write("debug", "AI stealth squad {0} [{1}:{2}] {3} target {4}#{5}: units={6} score={7} defended-value={8} order={9}.",
 					Info.SquadLabel, player.PlayerName, group.Index, role, selected.Info.Name, selected.ActorID, group.Units.Count,
 					selectedScore, selectedDanger, crush ? "crush" : routed ? "hazard-routed attack" : "attack");
+		}
+
+		void ClearRetainedPlan(SpecialistGroup group)
+		{
+			group.RetainedRoutes.Clear();
+			group.RetainedRouteIndices.Clear();
+			group.HasPlan = false;
+			group.LastTargetDistanceSquared = long.MaxValue;
+			group.LastTargetHp = int.MaxValue;
+		}
+
+		void BeginRetainedPlan(SpecialistGroup group, Actor target, WPos center)
+		{
+			group.HasPlan = true;
+			group.PlannedTargetLocation = target.Location;
+			group.LastProgressTick = world.WorldTick;
+			group.LastTargetDistanceSquared = (target.CenterPosition - center).HorizontalLengthSquared;
+			group.LastTargetHp = target.TraitOrDefault<IHealth>()?.HP ?? int.MaxValue;
+			group.MembershipChanged = false;
+		}
+
+		void ObserveProgress(SpecialistGroup group, Actor target, WPos center)
+		{
+			var distance = (target.CenterPosition - center).HorizontalLengthSquared;
+			var hp = target.TraitOrDefault<IHealth>()?.HP ?? int.MaxValue;
+			if (distance < group.LastTargetDistanceSquared || hp < group.LastTargetHp)
+				group.LastProgressTick = world.WorldTick;
+
+			group.LastTargetDistanceSquared = distance;
+			group.LastTargetHp = hp;
+		}
+
+		bool HasUnsafeRetainedRoute(SpecialistGroup group, Actor target, List<Threat> threats, int ownRange)
+		{
+			var lookahead = Math.Max(1, Info.HazardRouteWaypointSpacing * 3);
+			foreach (var unit in group.Units.Where(IsEligible))
+			{
+				if (!group.RetainedRoutes.TryGetValue(unit.ActorID, out var route) || route.Count == 0)
+					continue;
+
+				var start = group.RetainedRouteIndices.TryGetValue(unit.ActorID, out var retainedIndex) ?
+					Math.Min(retainedIndex, route.Count - 1) : 0;
+				var closest = start;
+				var closestDistance = (route[start] - unit.Location).LengthSquared;
+				for (var i = start + 1; i < route.Count; i++)
+				{
+					var distance = (route[i] - unit.Location).LengthSquared;
+					if (distance >= closestDistance)
+						break;
+
+					closest = i;
+					closestDistance = distance;
+				}
+
+				group.RetainedRouteIndices[unit.ActorID] = closest;
+				for (var i = closest; i < Math.Min(route.Count, closest + lookahead); i++)
+					if (IsResourceHazard(route[i]) || IsTransitThreatenedCell(route[i], target, threats, ownRange))
+						return true;
+			}
+
+			return false;
 		}
 
 		void WaitNearHarvesterField(SpecialistGroup group, IEnumerable<Actor> enemies,
@@ -502,6 +638,7 @@ namespace OpenRA.Mods.Common.Traits
 				group.LastOrderTick = world.WorldTick;
 				bot.QueueOrder(new Order("Move", null, Target.FromCell(world, cell), false,
 					groupedActors: group.Units.ToArray()));
+				scanQueuedOrders++;
 				if (Info.DebugLogging)
 					Log.Write("debug", "AI stealth squad {0} [{1}:{2}] waiting near harvester field at {3} from anchor {4}#{5}.",
 						Info.SquadLabel, player.PlayerName, group.Index, cell, anchor.Info.Name, anchor.ActorID);
@@ -524,16 +661,20 @@ namespace OpenRA.Mods.Common.Traits
 				if (path == null || path.Count == 0)
 				{
 					bot.QueueOrder(new Order("Stop", unit, false));
+					scanQueuedOrders++;
 					withheldUnits++;
 					continue;
 				}
 
 				path.Reverse();
+				group.RetainedRoutes[unit.ActorID] = path;
+				group.RetainedRouteIndices[unit.ActorID] = 0;
 				var queued = false;
 				for (var i = Math.Min(Info.HazardRouteWaypointSpacing, path.Count - 1);
 					i < path.Count; i += Info.HazardRouteWaypointSpacing)
 				{
 					bot.QueueOrder(new Order("Move", unit, Target.FromCell(world, path[i]), queued));
+					scanQueuedOrders++;
 					queued = true;
 					waypointCount++;
 				}
@@ -541,6 +682,7 @@ namespace OpenRA.Mods.Common.Traits
 				if (path.Count > 1 && (path.Count - 1) % Info.HazardRouteWaypointSpacing != 0)
 				{
 					bot.QueueOrder(new Order("Move", unit, Target.FromCell(world, path[path.Count - 1]), queued));
+					scanQueuedOrders++;
 					queued = true;
 					waypointCount++;
 				}
@@ -548,10 +690,17 @@ namespace OpenRA.Mods.Common.Traits
 				if (crush)
 				{
 					if (!queued)
+					{
 						bot.QueueOrder(new Order("Move", unit, Target.FromCell(world, target.Location), false));
+						scanQueuedOrders++;
+					}
 				}
 				else
+				{
 					bot.QueueOrder(new Order("Attack", unit, Target.FromActor(target), queued));
+					scanQueuedOrders++;
+				}
+
 				routedUnits++;
 			}
 
@@ -576,6 +725,7 @@ namespace OpenRA.Mods.Common.Traits
 		List<CPos> HazardAwarePath(Actor unit, Actor target, List<Threat> threats, int ownRange,
 			bool crush, bool allowDangerousEndpoint)
 		{
+			scanPathSearches++;
 			var mobile = unit.TraitOrDefault<Mobile>();
 			if (mobile == null)
 				return null;

@@ -6,6 +6,7 @@
  */
 #endregion
 
+using System.Linq;
 using NUnit.Framework;
 using OpenRA.Mods.Common.Traits;
 
@@ -14,6 +15,51 @@ namespace OpenRA.Test.Mods.Common
 	[TestFixture]
 	public sealed class StealthTankSquadPolicyTest
 	{
+		[Test]
+		public void BothProfilesUseOneSharedControlImplementation()
+		{
+			var profileSpecificImplementations = typeof(StealthTankSquadBotModule).Assembly.GetTypes()
+				.Where(t => t != typeof(StealthTankSquadBotModule) &&
+					typeof(StealthTankSquadBotModule).IsAssignableFrom(t)).ToArray();
+
+			Assert.That(profileSpecificImplementations, Is.Empty,
+				"Stealth and Chemical must remain configured instances of one control module.");
+		}
+
+		[TestCase("stealth-tank")]
+		[TestCase("chemical")]
+		public void BothProfilesUseTheSameLifecycleContract(string profile)
+		{
+			Assert.That(profile, Is.Not.Empty);
+			Assert.That(StealthTankSquadPolicy.ClassifyPlanInvalidation(true, false,
+				false, false, false, 149, 75, 75), Is.EqualTo(StealthTankPlanInvalidation.None));
+			Assert.That(StealthTankSquadPolicy.ClassifyPlanInvalidation(true, false,
+				false, false, true, 149, 75, 75), Is.EqualTo(StealthTankPlanInvalidation.RouteUnsafe));
+		}
+
+		[Test]
+		public void StrategicFactsAreSharedOnlyWithinOneWorldTick()
+		{
+			Assert.That(StealthTankSquadPolicy.ShouldRefreshStrategicView(75, 75), Is.False);
+			Assert.That(StealthTankSquadPolicy.ShouldRefreshStrategicView(75, 76), Is.True);
+		}
+
+		[TestCase(false, false, false, false, false, 75, 75, StealthTankPlanInvalidation.TargetChanged)]
+		[TestCase(true, true, false, false, false, 75, 75, StealthTankPlanInvalidation.TargetChanged)]
+		[TestCase(true, false, true, false, false, 75, 75, StealthTankPlanInvalidation.MembershipChanged)]
+		[TestCase(true, false, false, true, false, 75, 75, StealthTankPlanInvalidation.TargetMoved)]
+		[TestCase(true, false, false, false, true, 75, 75, StealthTankPlanInvalidation.RouteUnsafe)]
+		[TestCase(true, false, false, false, false, 149, 75, StealthTankPlanInvalidation.None)]
+		[TestCase(true, false, false, false, false, 150, 75, StealthTankPlanInvalidation.NoProgress)]
+		public void StablePlansRetryOnlyOnExplicitInvalidation(bool hasPlan, bool targetChanged,
+			bool membershipChanged, bool targetMoved, bool routeUnsafe, int currentTick,
+			int lastProgressTick, StealthTankPlanInvalidation expected)
+		{
+			Assert.That(StealthTankSquadPolicy.ClassifyPlanInvalidation(hasPlan, targetChanged,
+				membershipChanged, targetMoved, routeUnsafe, currentTick, lastProgressTick, 75),
+				Is.EqualTo(expected));
+		}
+
 		[TestCase(0, 0)]
 		[TestCase(1, 0)]
 		[TestCase(2, 2)]

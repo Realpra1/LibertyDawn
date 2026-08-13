@@ -12,9 +12,41 @@ using System.Linq;
 namespace OpenRA.Mods.Common.Traits
 {
 	public enum StealthTankSquadRole { Harass, Attack }
+	public enum StealthTankPlanInvalidation
+	{
+		None,
+		TargetChanged,
+		MembershipChanged,
+		TargetMoved,
+		RouteUnsafe,
+		NoProgress
+	}
 
 	public static class StealthTankSquadPolicy
 	{
+		public static bool ShouldRefreshStrategicView(int cachedTick, int currentTick)
+		{
+			return cachedTick != currentTick;
+		}
+
+		public static StealthTankPlanInvalidation ClassifyPlanInvalidation(bool hasPlan,
+			bool targetChanged, bool membershipChanged, bool targetMoved, bool routeUnsafe,
+			int currentTick, int lastProgressTick, int retryInterval)
+		{
+			if (!hasPlan || targetChanged)
+				return StealthTankPlanInvalidation.TargetChanged;
+			if (membershipChanged)
+				return StealthTankPlanInvalidation.MembershipChanged;
+			if (targetMoved)
+				return StealthTankPlanInvalidation.TargetMoved;
+			if (routeUnsafe)
+				return StealthTankPlanInvalidation.RouteUnsafe;
+			if (currentTick >= lastProgressTick + Math.Max(1, retryInterval))
+				return StealthTankPlanInvalidation.NoProgress;
+
+			return StealthTankPlanInvalidation.None;
+		}
+
 		public static int SpecialistCount(int total, bool reserveOpeningPair = true)
 		{
 			if (total < 2)
