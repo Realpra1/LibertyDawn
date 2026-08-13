@@ -158,6 +158,36 @@ World:
 		Upgrades: upgrade.covert1, upgrade.covert2, upgrade.covert3, upgrade.recon1, upgrade.recon2, upgrade.recon3, upgrade.economy1, upgrade.economy2, upgrade.economy3
 """
 
+	field_defense_rules = """Player:
+	ModularBot@IronReaper:
+		AdvancedSquadSampleInterval: 30
+		AdvancedSquadBreachSamples: 2
+		AdvancedSquadRecoverySamples: 2
+		AdvancedSquadOffenderPenaltySamples: 1
+	SquadManagerBotModule@ironreaper:
+		GroundTargetDebugLogging: true
+	EconomyFieldDefenseBotModule:
+		DebugLogging: true
+
+World:
+	StartingUnits@cnc100fieldnod:
+		Class: cnc100-field-defense
+		ClassName: CNC-100 economy field defense participation
+		Factions: nod
+		BaseActor: mcv
+		SupportActors: harv, harv, harv, harv, mtnk, mtnk, mtnk, mtnk, mtnk, mtnk, msam, msam, msam, msam, msam, msam, e1, e1, e1, e1, e1, e1, e1, e1, e1, e1, e1, e1, bggy, bike, arty, stnk
+		OuterSupportRadius: 14
+		Upgrades: upgrade.covert1, upgrade.covert2, upgrade.covert3, upgrade.recon1, upgrade.recon2, upgrade.recon3, upgrade.economy1, upgrade.economy2, upgrade.economy3
+	StartingUnits@cnc100fieldgdi:
+		Class: cnc100-field-defense
+		ClassName: CNC-100 economy field defense participation
+		Factions: gdi
+		BaseActor: mcv
+		SupportActors: harv, harv, harv, harv, mtnk, mtnk, mtnk, mtnk, mtnk, mtnk, msam, msam, msam, msam, msam, msam, e1, e1, e1, e1, e1, e1, e1, e1, e1, e1, e1, e1, jeep, htnk, mlrs, apc
+		OuterSupportRadius: 14
+		Upgrades: upgrade.covert1, upgrade.covert2, upgrade.covert3, upgrade.recon1, upgrade.recon2, upgrade.recon3, upgrade.economy1, upgrade.economy2, upgrade.economy3
+"""
+
 	write_map(root / "mods/cnc/maps/Empire-Earth.oramap", args.output / "cnc100-high-unit.oramap",
 		"CNC-100 High Unit Failsafe", high_unit_rules)
 	write_map(root / "mods/cnc/maps/Empire-Earth.oramap", args.output / "cnc100-high-unit-failsafe-disabled.oramap",
@@ -167,6 +197,8 @@ World:
 		"CNC-100 Mixed Ownership Archipelago", mixed_rules)
 	write_map(root / "mods/cnc/maps/island-duel.oramap", args.output / "cnc100-covert-harassment.oramap",
 		"CNC-100 Covert Harassment Participation", covert_rules)
+	write_map(root / "mods/cnc/maps/Empire-Earth.oramap", args.output / "cnc100-field-defense.oramap",
+		"CNC-100 Economy Field Defense Participation", field_defense_rules)
 
 
 if __name__ == "__main__":

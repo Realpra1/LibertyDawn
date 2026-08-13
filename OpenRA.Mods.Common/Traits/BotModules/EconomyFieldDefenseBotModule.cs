@@ -81,7 +81,7 @@ namespace OpenRA.Mods.Common.Traits
 	}
 
 	public sealed class EconomyFieldDefenseBotModule : ConditionalTrait<EconomyFieldDefenseBotModuleInfo>,
-		IBotEnabled, IBotTick, IBotUnitReservations, IGameSaveTraitData
+		IBotEnabled, IBotTick, IBotUnitReservations, IGameSaveTraitData, IAdvancedBotTick
 	{
 		const string ProductionRequestOwner = "EconomyFieldDefense";
 
@@ -153,6 +153,7 @@ namespace OpenRA.Mods.Common.Traits
 		HashSet<CPos> projectedResourceHazards = new HashSet<CPos>();
 		HashSet<CPos> ownedMovementHazards = new HashSet<CPos>();
 		readonly Dictionary<uint, string> lastFieldCompositions = new Dictionary<uint, string>();
+		bool advancedBehaviorEnabled = true;
 		int scanTicks = 1;
 		string lastComposition;
 
@@ -188,9 +189,33 @@ namespace OpenRA.Mods.Common.Traits
 			return actor != null && reserved.Contains(actor.ActorID);
 		}
 
+		string IAdvancedBotTick.FailsafeModuleId => "EconomyFieldDefenseBotModule";
+
+		void IAdvancedBotTick.SetAdvancedBehaviorEnabled(bool enabled)
+		{
+			if (advancedBehaviorEnabled == enabled)
+				return;
+
+			advancedBehaviorEnabled = enabled;
+			if (!enabled)
+			{
+				if (Info.DebugLogging && reserved.Count > 0)
+					Debug("released all fields reason=failsafe-degraded actors={0}", string.Join(",",
+						reserved.Select(world.GetActorById).Where(IsOwnedUsable).OrderBy(a => a.ActorID)
+							.Select(a => a.Info.Name + "#" + a.ActorID)));
+
+				ClearState("failsafe degraded");
+			}
+			else
+			{
+				scanTicks = 1;
+				Debug("enabled for recovery probe");
+			}
+		}
+
 		void IBotTick.BotTick(IBot enabledBot)
 		{
-			if (IsTraitDisabled || player.WinState != WinState.Undefined || --scanTicks > 0)
+			if (IsTraitDisabled || !advancedBehaviorEnabled || player.WinState != WinState.Undefined || --scanTicks > 0)
 				return;
 
 			scanTicks = Info.ScanInterval;
