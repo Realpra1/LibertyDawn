@@ -221,6 +221,11 @@ namespace OpenRA.Mods.Common.Traits
 				DemolitionApproachResponse.WithdrawOrHold;
 		}
 
+		public static bool ShouldRerouteHold(bool destinationThreatened, bool safeDestinationFound)
+		{
+			return destinationThreatened && safeDestinationFound;
+		}
+
 		public static bool CanPreemptDemolition(bool actionableCapture, bool plantedCharge)
 		{
 			return actionableCapture && !plantedCharge;

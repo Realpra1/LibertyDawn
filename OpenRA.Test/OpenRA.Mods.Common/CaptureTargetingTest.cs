@@ -363,6 +363,17 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[TestCase(false, false, false)]
+		[TestCase(false, true, false)]
+		[TestCase(true, false, false)]
+		[TestCase(true, true, true)]
+		public void HoldReroutesOnlyWhenItsDestinationBecomesThreatenedAndAnotherSafeCellExists(
+			bool destinationThreatened, bool safeDestinationFound, bool expected)
+		{
+			Assert.That(CaptureTargeting.ShouldRerouteHold(destinationThreatened, safeDestinationFound),
+				Is.EqualTo(expected));
+		}
+
+		[TestCase(false, false, false)]
 		[TestCase(true, true, false)]
 		[TestCase(true, false, true)]
 		public void CapturePreemptsOnlyReversibleDemolition(bool actionableCapture, bool plantedCharge,

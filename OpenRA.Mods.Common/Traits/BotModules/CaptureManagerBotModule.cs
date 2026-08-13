@@ -63,7 +63,7 @@ namespace OpenRA.Mods.Common.Traits
 		public readonly int DemolitionIdleConfirmationTicks = 10;
 
 		[Desc("Maximum distance for recovered demolition specialists to engage exposed infantry.")]
-		public readonly int DemolitionFallbackCombatRadiusCells = 8;
+		public readonly int DemolitionFallbackCombatRadiusCells = 10;
 
 		[Desc("Extra cells around hostile weapon range rejected by direct demolition approaches.")]
 		public readonly int DemolitionThreatBufferCells = 2;
@@ -1098,7 +1098,7 @@ namespace OpenRA.Mods.Common.Traits
 				.OrderByDescending(a => a.GetSellValue()).ThenBy(a => a.ActorID)
 				.Take(maximumCaptureTargetOptions).ToArray();
 			var threats = CommandoThreats();
-			ReconsiderCommandoHolds(targets, threats);
+			ReconsiderCommandoHolds(bot, targets, threats);
 
 			var demolitionUnits = world.Actors.Where(IsUnownedIdleCommando)
 				.OrderBy(unit => unit.ActorID).ToArray();
@@ -1339,7 +1339,7 @@ namespace OpenRA.Mods.Common.Traits
 					player.RelationshipWith(actor.Owner) == PlayerRelationship.Enemy &&
 					actor.GetEnabledTargetTypes().Overlaps(InfantryTargetTypes) &&
 					StateBase.CanAttackTarget(unit, actor) &&
-					IsFavorableDemolitionFight(unit, actor, RouteThreats(unit, actor, threats)))
+					IsFavorableDemolitionFight(unit, actor, FallbackCombatThreats(unit, actor, threats)))
 				.OrderBy(actor => DistanceSquared(unit, actor)).ThenBy(actor => actor.ActorID).FirstOrDefault();
 			if (combatTarget != null)
 			{
@@ -1369,6 +1369,18 @@ namespace OpenRA.Mods.Common.Traits
 			Debug("commando {0}#{1} transition=safe-hold destination={2} ownership=recovered " +
 				"reason=no-viable-demolition reconsider={3}", unit.Info.Name, unit.ActorID, holdCell.Value,
 				world.WorldTick + Math.Max(1, Info.DemolitionHoldReconsiderTicks));
+		}
+
+		CommandoThreat[] FallbackCombatThreats(Actor unit, Actor target, CommandoThreat[] threats)
+		{
+			var routeThreats = RouteThreats(unit, target, threats);
+			if (routeThreats.Any(threat => threat.Actor == target))
+				return routeThreats;
+
+			var range = target.TraitsImplementing<Armament>().Where(armament => !armament.IsTraitDisabled)
+				.Select(armament => armament.MaxRange().Length).DefaultIfEmpty(0).Max();
+			return range == 0 ? routeThreats : routeThreats.Append(new CommandoThreat(target, range))
+				.OrderBy(threat => threat.Actor.ActorID).ToArray();
 		}
 
 		CPos? FindSafeCommandoHoldCell(Actor unit, CommandoThreat[] threats)
@@ -1408,8 +1420,35 @@ namespace OpenRA.Mods.Common.Traits
 			return false;
 		}
 
-		void ReconsiderCommandoHolds(Actor[] targets, CommandoThreat[] threats)
+		void ReconsiderCommandoHolds(IBot bot, Actor[] targets, CommandoThreat[] threats)
 		{
+			foreach (var pair in commandoFallbacks.Where(pair =>
+				pair.Value.Purpose == CommandoFallbackPurpose.Hold &&
+				IsThreatenedCell(pair.Key, pair.Value.Destination, threats))
+				.OrderBy(pair => pair.Key.ActorID).ToArray())
+			{
+				var unit = pair.Key;
+				var previous = pair.Value;
+				var destination = FindSafeCommandoHoldCell(unit, threats);
+				if (destination == null && !IsThreatenedCell(unit, unit.Location, threats))
+					destination = unit.Location;
+
+				if (!CaptureTargeting.ShouldRerouteHold(destinationThreatened: true,
+					safeDestinationFound: destination != null))
+					continue;
+
+				var order = destination == unit.Location ? "Stop" : "Move";
+				bot.QueueOrder(destination == unit.Location ? new Order(order, unit, false) :
+					new Order(order, unit, Target.FromCell(world, destination.Value), false));
+				commandoFallbacks[unit] = new CommandoFallback(CommandoFallbackPurpose.Hold, null,
+					destination.Value, world.WorldTick,
+					world.WorldTick + Math.Max(1, Info.DemolitionHoldReconsiderTicks));
+				Debug("commando {0}#{1} transition=hold-reroute reason=destination-threatened " +
+					"old-destination={2} destination={3} reconsider={4}", unit.Info.Name, unit.ActorID,
+					previous.Destination, destination.Value,
+					world.WorldTick + Math.Max(1, Info.DemolitionHoldReconsiderTicks));
+			}
+
 			var due = commandoFallbacks.Where(pair => pair.Value.Purpose == CommandoFallbackPurpose.Hold &&
 				world.WorldTick >= pair.Value.ReconsiderTick && pair.Key.IsIdle)
 				.OrderBy(pair => pair.Key.ActorID).ToArray();

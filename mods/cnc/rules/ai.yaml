@@ -657,7 +657,7 @@ Player:
 		MinimumCaptureDelay: 125
 		MinimumDemolitionDelay: 375
 		DemolitionIdleConfirmationTicks: 10
-		DemolitionFallbackCombatRadiusCells: 8
+		DemolitionFallbackCombatRadiusCells: 10
 		DemolitionThreatBufferCells: 2
 		DemolitionRouteWaypointSpacing: 8
 		DemolitionHoldSearchRadiusCells: 6
