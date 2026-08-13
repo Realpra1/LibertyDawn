@@ -807,6 +807,16 @@ namespace OpenRA.Mods.Common.Traits
 				return true;
 			}
 
+			if (lastUrgentOrderTicks.TryGetValue(actor.ActorID, out var previousOrderTick) &&
+				!EconomyFieldDefensePolicy.UrgentOrderIntervalElapsed(
+					world.WorldTick, previousOrderTick, Info.OrderInterval))
+			{
+				Debug("urgent guard validation field={0} actor={1} result=rate-limited target={2}" +
+					" previous={3} retry={4} reason={5}", field.HarvesterId, actor.ActorID, enemyCell,
+					previousTarget, previousOrderTick + Info.OrderInterval, reason);
+				return true;
+			}
+
 			var autoTarget = actor.TraitOrDefault<AutoTarget>();
 			if (autoTarget != null && autoTarget.Stance != UnitStance.AttackAnything)
 				bot.QueueOrder(new Order("SetUnitStance", actor, false) { ExtraData = (uint)UnitStance.AttackAnything });

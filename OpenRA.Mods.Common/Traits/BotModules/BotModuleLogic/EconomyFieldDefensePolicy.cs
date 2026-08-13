@@ -256,6 +256,11 @@ namespace OpenRA.Mods.Common.Traits
 			return (current - previous).LengthSquared > radius * radius;
 		}
 
+		public static bool UrgentOrderIntervalElapsed(int currentTick, int lastOrderTick, int orderInterval)
+		{
+			return (long)currentTick - lastOrderTick >= Math.Max(1, orderInterval);
+		}
+
 		public static int RestoredScanTicks(int nextScanTick, int currentWorldTick, int scanInterval)
 		{
 			var interval = Math.Max(1, scanInterval);

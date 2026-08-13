@@ -323,5 +323,16 @@ namespace OpenRA.Test
 			Assert.That(EconomyFieldDefensePolicy.IsMateriallyNewUrgentTarget(
 				new CPos(previousX, previousY), new CPos(currentX, currentY), radius), Is.EqualTo(expected));
 		}
+
+		[TestCase(101, 100, 25, false)]
+		[TestCase(124, 100, 25, false)]
+		[TestCase(125, 100, 25, true)]
+		[TestCase(150, 100, 25, true)]
+		public void UrgentAttackMovesRespectConfiguredOrderInterval(
+			int currentTick, int lastOrderTick, int orderInterval, bool expected)
+		{
+			Assert.That(EconomyFieldDefensePolicy.UrgentOrderIntervalElapsed(
+				currentTick, lastOrderTick, orderInterval), Is.EqualTo(expected));
+		}
 	}
 }
