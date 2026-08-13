@@ -171,6 +171,7 @@ namespace OpenRA.Mods.Common.Traits
 		int scanPlanInvalidations;
 		int scanPathSearches;
 		int scanQueuedOrders;
+		int scanObservedTargetDamage;
 
 		public StealthTankSquadBotModule(Actor self, StealthTankSquadBotModuleInfo info)
 			: base(info)
@@ -222,10 +223,12 @@ namespace OpenRA.Mods.Common.Traits
 
 		void IBotTick.BotTick(IBot enabledBot)
 		{
-			if (IsTraitDisabled || --scanTicks > 0)
+			// IBotTick dispatches every tick, but the hot path is only this O(1) countdown.
+			// Enemy enumeration, scoring, safety checks, pathfinding and orders run on the
+			// configured strategic cadence below (75 ticks in the CNC rules).
+			if (IsTraitDisabled || !StealthTankSquadPolicy.ShouldRunStrategicScan(ref scanTicks, Info.ScanInterval))
 				return;
 
-			scanTicks = Info.ScanInterval;
 			resourceHazardCache.Clear();
 			Rebalance();
 			if (reserved.Count == 0)
@@ -235,15 +238,16 @@ namespace OpenRA.Mods.Common.Traits
 			scanPlanInvalidations = 0;
 			scanPathSearches = 0;
 			scanQueuedOrders = 0;
+			scanObservedTargetDamage = 0;
 			var view = strategicViewOwner.GetStrategicView(out var viewHit);
 			foreach (var group in groups)
 				UpdateGroup(group, view.Enemies, view.Threats);
 
 			if (Info.DebugLogging)
-				Log.Write("debug", "AI stealth performance {0} [{1}] tick={2}: view={3} enemies={4} threats={5} retained-plans={6} invalidated-plans={7} path-searches={8} queued-orders={9}.",
+				Log.Write("debug", "AI stealth performance {0} [{1}] tick={2}: view={3} enemies={4} threats={5} retained-plans={6} invalidated-plans={7} path-searches={8} queued-orders={9} observed-target-damage={10}.",
 					Info.SquadLabel, player.PlayerName, world.WorldTick, viewHit ? "hit" : "build",
 					view.Enemies.Count, view.Threats.Count, scanPlanRetentions, scanPlanInvalidations,
-					scanPathSearches, scanQueuedOrders);
+					scanPathSearches, scanQueuedOrders, scanObservedTargetDamage);
 		}
 
 		StrategicView GetStrategicView(out bool cacheHit)
@@ -569,6 +573,9 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			var distance = (target.CenterPosition - center).HorizontalLengthSquared;
 			var hp = target.TraitOrDefault<IHealth>()?.HP ?? int.MaxValue;
+			if (group.LastTargetHp != int.MaxValue && hp < group.LastTargetHp)
+				scanObservedTargetDamage += group.LastTargetHp - hp;
+
 			if (distance < group.LastTargetDistanceSquared || hp < group.LastTargetHp)
 				group.LastProgressTick = world.WorldTick;
 

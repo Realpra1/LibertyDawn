@@ -24,6 +24,15 @@ namespace OpenRA.Mods.Common.Traits
 
 	public static class StealthTankSquadPolicy
 	{
+		public static bool ShouldRunStrategicScan(ref int countdown, int interval)
+		{
+			if (--countdown > 0)
+				return false;
+
+			countdown = Math.Max(1, interval);
+			return true;
+		}
+
 		public static bool ShouldRefreshStrategicView(int cachedTick, int currentTick)
 		{
 			return cachedTick != currentTick;

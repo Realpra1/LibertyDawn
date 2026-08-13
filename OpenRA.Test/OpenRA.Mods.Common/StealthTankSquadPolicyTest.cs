@@ -38,6 +38,18 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
+		public void StrategicWorkRunsOnlyAtTheConfiguredCadence()
+		{
+			var countdown = 1;
+			var scanTicks = new System.Collections.Generic.List<int>();
+			for (var tick = 1; tick <= 225; tick++)
+				if (StealthTankSquadPolicy.ShouldRunStrategicScan(ref countdown, 75))
+					scanTicks.Add(tick);
+
+			Assert.That(scanTicks, Is.EqualTo(new[] { 1, 76, 151 }));
+		}
+
+		[Test]
 		public void StrategicFactsAreSharedOnlyWithinOneWorldTick()
 		{
 			Assert.That(StealthTankSquadPolicy.ShouldRefreshStrategicView(75, 75), Is.False);
