@@ -59,6 +59,8 @@ namespace OpenRA.Mods.Common.Traits
 
 	class Demolition : IIssueOrder, IResolveOrder, IOrderVoice
 	{
+		internal const uint AutonomousOrderMarker = 0x434E4334;
+
 		readonly DemolitionInfo info;
 
 		public Demolition(DemolitionInfo info)
@@ -86,13 +88,26 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (order.Target.Type == TargetType.Actor)
 			{
+				if (order.ExtraData == AutonomousOrderMarker &&
+					!info.TargetRelationships.HasRelationship(self.Owner.RelationshipWith(order.Target.Actor.Owner)))
+					return;
+
 				var demolishables = order.Target.Actor.TraitsImplementing<IDemolishable>();
 				if (!demolishables.Any(i => i.IsValidTarget(order.Target.Actor, self)))
 					return;
 			}
 
+			var safety = order.ExtraData == AutonomousOrderMarker ?
+				new DemolitionSafety(info.TargetRelationships) : null;
+			if (safety != null && order.Target.Type == TargetType.Actor)
+				DemolitionDebug.Write("AI autonomous C4 accepted at tick {0}: {1}#{2} -> {3}#{4}, " +
+					"target-owner={5}, relationship={6}", self.World.WorldTick, self.Info.Name, self.ActorID,
+					order.Target.Actor.Info.Name, order.Target.Actor.ActorID, order.Target.Actor.Owner.InternalName,
+					self.Owner.RelationshipWith(order.Target.Actor.Owner));
+
 			self.QueueActivity(order.Queued, new Demolish(self, order.Target, info.EnterBehaviour, info.DetonationDelay,
-				info.Flashes, info.FlashesDelay, info.FlashInterval, info.DamageTypes, info.TargetLineColor));
+				info.Flashes, info.FlashesDelay, info.FlashInterval, info.DamageTypes, info.TargetLineColor,
+				safety));
 
 			self.ShowTargetLines();
 		}

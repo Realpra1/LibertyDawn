@@ -36,13 +36,16 @@ namespace OpenRA.Mods.Common.Traits
 			public readonly int Token;
 			public int Delay;
 			public readonly BitSet<DamageType> DamageTypes;
+			public readonly DemolitionSafety Safety;
 
-			public DemolishAction(Actor saboteur, int delay, int token, BitSet<DamageType> damageTypes)
+			public DemolishAction(Actor saboteur, int delay, int token, BitSet<DamageType> damageTypes,
+				DemolitionSafety safety)
 			{
 				Saboteur = saboteur;
 				Delay = delay;
 				Token = token;
 				DamageTypes = damageTypes;
+				Safety = safety;
 			}
 		}
 
@@ -52,18 +55,24 @@ namespace OpenRA.Mods.Common.Traits
 		public Demolishable(DemolishableInfo info)
 			: base(info) { }
 
+		public bool HasPendingAutonomousDemolition(Actor saboteur)
+		{
+			return actions.Any(a => a.Saboteur == saboteur && a.Safety != null);
+		}
+
 		bool IDemolishable.IsValidTarget(Actor self, Actor saboteur)
 		{
 			return !IsTraitDisabled;
 		}
 
-		void IDemolishable.Demolish(Actor self, Actor saboteur, int delay, BitSet<DamageType> damageTypes)
+		void IDemolishable.Demolish(Actor self, Actor saboteur, int delay, BitSet<DamageType> damageTypes,
+			DemolitionSafety safety)
 		{
 			if (IsTraitDisabled)
 				return;
 
 			var token = self.GrantCondition(Info.Condition);
-			actions.Add(new DemolishAction(saboteur, delay, token, damageTypes));
+			actions.Add(new DemolishAction(saboteur, delay, token, damageTypes, safety));
 		}
 
 		void ITick.Tick(Actor self)
@@ -73,6 +82,18 @@ namespace OpenRA.Mods.Common.Traits
 
 			foreach (var a in actions)
 			{
+				if (a.Safety != null && !a.Safety.IsValid(self, a.Saboteur))
+				{
+					DemolitionDebug.Write("AI autonomous C4 disarmed at tick {0}: {1}#{2}, target-owner={3}, " +
+						"relationship={4}", self.World.WorldTick, self.Info.Name, self.ActorID,
+						self.Owner.InternalName, a.Saboteur.Owner.RelationshipWith(self.Owner));
+					if (a.Token != Actor.InvalidConditionToken)
+						self.RevokeCondition(a.Token);
+
+					removeActions.Add(a);
+					continue;
+				}
+
 				if (a.Delay-- <= 0)
 				{
 					var modifiers = self.TraitsImplementing<IDamageModifier>()
@@ -80,7 +101,14 @@ namespace OpenRA.Mods.Common.Traits
 						.Select(t => t.GetDamageModifier(self, null));
 
 					if (Util.ApplyPercentageModifiers(100, modifiers) > 0)
+					{
+						if (a.Safety != null)
+							DemolitionDebug.Write("AI autonomous C4 final action at tick {0}: {1}#{2}, target-owner={3}, " +
+								"relationship={4}", self.World.WorldTick, self.Info.Name, self.ActorID,
+								self.Owner.InternalName, a.Saboteur.Owner.RelationshipWith(self.Owner));
+
 						self.Kill(a.Saboteur, a.DamageTypes);
+					}
 					else if (a.Token != Actor.InvalidConditionToken)
 					{
 						self.RevokeCondition(a.Token);

@@ -173,12 +173,13 @@ namespace OpenRA.Mods.Common.Traits
 			return true;
 		}
 
-		void IDemolishable.Demolish(Actor self, Actor saboteur, int delay, BitSet<DamageType> damageTypes)
+		void IDemolishable.Demolish(Actor self, Actor saboteur, int delay, BitSet<DamageType> damageTypes,
+			DemolitionSafety safety)
 		{
 			// TODO: Handle using ITick
 			self.World.Add(new DelayedAction(delay, () =>
 			{
-				if (self.IsDead)
+				if (self.IsDead || (safety != null && !safety.IsValid(self, saboteur)))
 					return;
 
 				var modifiers = self.TraitsImplementing<IDamageModifier>()
