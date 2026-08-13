@@ -27,7 +27,7 @@ FACT:
 		Facing: 432
 	TransformsIntoMobile:
 		RequiresCondition: factundeploy
-		Locomotor: heavywheeled
+		Locomotor: mcvheavywheeled
 		RequiresForceMove: true
 	TransformsIntoPassenger:
 		RequiresCondition: factundeploy
