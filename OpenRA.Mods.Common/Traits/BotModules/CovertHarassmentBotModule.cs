@@ -182,7 +182,8 @@ namespace OpenRA.Mods.Common.Traits
 			var deadline = Stopwatch.GetTimestamp() +
 				(long)Info.FailsafeTestAdvancedWorkMilliseconds * Stopwatch.Frequency / 1000;
 			while (Stopwatch.GetTimestamp() < deadline)
-				;
+			{
+			}
 		}
 
 		void RefreshSquadManager()

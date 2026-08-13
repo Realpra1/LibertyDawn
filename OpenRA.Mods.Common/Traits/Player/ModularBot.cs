@@ -148,6 +148,7 @@ namespace OpenRA.Mods.Common.Traits
 						string.Join(",", info.AdvancedSquadModules), string.Join(",", advancedModules.Keys),
 						info.AdvancedSquadSampleInterval, info.AdvancedSquadLagTolerance, info.AdvancedSquadCpuShare);
 			}
+
 			foreach (var ibe in p.PlayerActor.TraitsImplementing<IBotEnabled>())
 				ibe.BotEnabled(this);
 		}

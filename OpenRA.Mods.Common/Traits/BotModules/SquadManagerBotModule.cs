@@ -711,7 +711,8 @@ namespace OpenRA.Mods.Common.Traits
 			var deadline = Stopwatch.GetTimestamp() +
 				(long)Info.FailsafeTestAdvancedWorkMilliseconds * Stopwatch.Frequency / 1000;
 			while (Stopwatch.GetTimestamp() < deadline)
-				;
+			{
+			}
 		}
 
 		string IAdvancedBotTick.FailsafeModuleId => "SquadManagerBotModule";
@@ -1072,6 +1073,7 @@ namespace OpenRA.Mods.Common.Traits
 						protection.Length, reserved.Length, temporary.Length,
 						string.Join(",", group.Value.Select(a => a.Info.Name + "#" + a.ActorID)));
 				}
+
 			var candidates = activeUnits.Where(a => !releasedActorIds.Contains(a.ActorID) && !unitCannotBeOrdered(a) &&
 				Info.FailsafeDirectCombatTypes.Contains(a.Info.Name) && a.Info.HasTraitInfo<AttackBaseInfo>() &&
 				!IsReservedForSpecialBehavior(a) && !IsUnitProtectingBase(a) && !IsUnitTemporarilyControlled(a))
@@ -1132,6 +1134,7 @@ namespace OpenRA.Mods.Common.Traits
 						continue;
 					}
 				}
+
 				var preCodexAssaultAvailable = !Info.ExcludeFromSquadsTypes.Contains(actor.Info.Name) &&
 					!Info.AirUnitsTypes.Contains(actor.Info.Name) && !Info.NavalUnitsTypes.Contains(actor.Info.Name) &&
 					actor.Info.HasTraitInfo<AttackBaseInfo>();
@@ -1642,6 +1645,7 @@ namespace OpenRA.Mods.Common.Traits
 					if (self.World.GetActorById(actorId) != null)
 						fallbackOrderedActors.Add(actorId);
 			}
+
 			var fallbackTargetActorsNode = data.FirstOrDefault(n => n.Key == "FallbackOrderTargetActors");
 			var fallbackTargetCellsNode = data.FirstOrDefault(n => n.Key == "FallbackOrderTargetCells");
 			if (fallbackTargetActorsNode != null && fallbackTargetCellsNode != null)
@@ -1653,6 +1657,7 @@ namespace OpenRA.Mods.Common.Traits
 					if (self.World.GetActorById(actorIds[i]) != null)
 						fallbackOrderTargets[actorIds[i]] = cells[i];
 			}
+
 			var fallbackReleasedSourcesNode = data.FirstOrDefault(n => n.Key == "FallbackReleasedSources");
 			var fallbackReleasedActorsNode = data.FirstOrDefault(n => n.Key == "FallbackReleasedActors");
 			if (fallbackReleasedSourcesNode != null && fallbackReleasedActorsNode != null)

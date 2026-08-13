@@ -91,6 +91,7 @@ namespace OpenRA.Mods.Common.Traits
 			if (nextAuditTick == 0)
 			{
 				var playerIndex = player.ClientIndex;
+
 				// Twenty deterministic buckets spread normal lobby clients without making the
 				// first consistency check wait almost a full interval in two-player games.
 				var playerCount = Math.Max(20, Math.Max(world.LobbyInfo.Clients.Count, playerIndex + 1));
@@ -106,6 +107,7 @@ namespace OpenRA.Mods.Common.Traits
 					owned.Count(a => a.Info.HasTraitInfo<AttackBaseInfo>()), owned.Count(a =>
 						a.Info.HasTraitInfo<MobileInfo>() || a.Info.HasTraitInfo<AircraftInfo>()), owned.Count(IsReserved));
 			}
+
 			foreach (var actor in world.Actors.OrderBy(a => a.ActorID))
 			{
 				maximumObservedActorId = Math.Max(maximumObservedActorId, actor.ActorID);
@@ -220,6 +222,7 @@ namespace OpenRA.Mods.Common.Traits
 			if (enabled)
 			{
 				registry.Forget(actor.ActorID);
+
 				// ActorAdded can run before trait initialization has completed. Reclassify at
 				// frame end so production and world additions enter the registry immediately
 				// with their final owner and capability traits.

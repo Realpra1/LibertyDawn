@@ -205,6 +205,7 @@ namespace OpenRA.Mods.Common.Traits
 				squadManager?.RetainFailsafeReleasedActors(
 					$"StealthTankSquadBotModule/{Info.SquadLabel}", releasedActors);
 			}
+
 			reserved.Clear();
 			lastEligibleCount = -1;
 			foreach (var group in groups)
@@ -291,7 +292,8 @@ namespace OpenRA.Mods.Common.Traits
 			var deadline = Stopwatch.GetTimestamp() +
 				(long)Info.FailsafeTestAdvancedWorkMilliseconds * Stopwatch.Frequency / 1000;
 			while (Stopwatch.GetTimestamp() < deadline)
-				;
+			{
+			}
 		}
 
 		bool IsTransportReserved(Actor actor)

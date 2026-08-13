@@ -96,6 +96,5 @@ namespace OpenRA.Mods.Common.Traits
 
 			return new AdaptiveUnitCapSample(true, ratio, EffectiveLimit, "recovering");
 		}
-
 	}
 }
