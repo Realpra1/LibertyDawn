@@ -7,6 +7,7 @@
 #endregion
 
 using System.Linq;
+using System.Reflection;
 using NUnit.Framework;
 using OpenRA.Mods.Common.Traits;
 
@@ -54,6 +55,30 @@ namespace OpenRA.Test.Mods.Common
 		{
 			Assert.That(StealthTankSquadPolicy.ShouldRefreshStrategicView(75, 75), Is.False);
 			Assert.That(StealthTankSquadPolicy.ShouldRefreshStrategicView(75, 76), Is.True);
+		}
+
+		[Test]
+		public void SpecialistInfluenceCacheMatchesAirLifetimeBoundary()
+		{
+			Assert.That(StealthTankSquadPolicy.ShouldRefreshInfluenceMap(int.MinValue, 1, 125), Is.True);
+			Assert.That(StealthTankSquadPolicy.ShouldRefreshInfluenceMap(1, 76, 125), Is.False);
+			Assert.That(StealthTankSquadPolicy.ShouldRefreshInfluenceMap(1, 125, 125), Is.False);
+			Assert.That(StealthTankSquadPolicy.ShouldRefreshInfluenceMap(1, 126, 125), Is.True);
+		}
+
+		[Test]
+		public void SpecialistInfluenceCacheIsInstanceOwnedAndCannotContaminateAirCache()
+		{
+			var specialistCache = typeof(StealthTankSquadBotModule).GetField("influenceMap",
+				BindingFlags.Instance | BindingFlags.NonPublic);
+			Assert.That(specialistCache, Is.Not.Null);
+			Assert.That(specialistCache.IsStatic, Is.False);
+
+			var airState = typeof(StealthTankSquadBotModule).Assembly.GetType(
+				"OpenRA.Mods.Common.Traits.BotModules.Squads.AirStateBase");
+			var airCaches = airState.GetField("InfluenceCaches", BindingFlags.Static | BindingFlags.NonPublic);
+			Assert.That(airCaches, Is.Not.Null);
+			Assert.That(specialistCache.FieldType, Is.Not.EqualTo(airCaches.FieldType));
 		}
 
 		[TestCase(false, false, false, false, false, 75, 75, StealthTankPlanInvalidation.TargetChanged)]

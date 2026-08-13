@@ -38,6 +38,11 @@ namespace OpenRA.Mods.Common.Traits
 			return cachedTick != currentTick;
 		}
 
+		public static bool ShouldRefreshInfluenceMap(int cachedTick, int currentTick, int interval)
+		{
+			return cachedTick == int.MinValue || currentTick - cachedTick >= Math.Max(1, interval);
+		}
+
 		public static StealthTankPlanInvalidation ClassifyPlanInvalidation(bool hasPlan,
 			bool targetChanged, bool membershipChanged, bool targetMoved, bool routeUnsafe,
 			int currentTick, int lastProgressTick, int retryInterval)

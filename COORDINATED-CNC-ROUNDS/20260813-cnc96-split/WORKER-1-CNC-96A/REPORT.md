@@ -2,12 +2,11 @@
 
 ## Status
 
-Cycles 1-2 implemented and checked. Cycle 2 ran two distinct adversarial full-engine
+Cycles 1-3 implemented and checked. Cycle 3 ran two distinct adversarial full-engine
 games and one fresh factual Luna narrative for each. Proposed status remains
 `First iteration - testing`, stopped at the required user manual-policy gate. The
-new reachable case demonstrates Stealth orders, target damage/destruction, survival,
-and recovery; direct Air attribution also exposes the remaining exact-ground-route
-cost without confusing Air squad calls with per-tick specialist dispatch samples.
+Air-shaped coarse routing removes the measured multi-second specialist hitch while
+the reachable case preserves orders, target damage/destruction, survival, and recovery.
 
 ## Task boundary
 
@@ -340,35 +339,119 @@ not count as games; the harness was repaired before the two authorized valid run
 - Game: `analysis/20260813-cnc96-split/worker-1-cnc-96a/games/cycle2-reachable-final/cycle2-reachable`
 - Narrative: `analysis/20260813-cnc96-split/worker-1-cnc-96a/commenters/cycle2-reachable/NARRATIVE.md`
 
-## Manual policy-review packet
+## Cycle 3 evidence
 
-No automated Match Policy Reviewer was launched. The user must decide before
-cycle 3:
+### Air-shaped coarse routing
 
-1. Does the guaranteed-hostile run resolve the earlier zero-order concern as a bad
-   fixture rather than accepted idling? The worker recommends yes: both sides acted
-   at the first possible 75-tick scan, damaged/destroyed both generations of targets,
-   recovered after target/member turnover, and retained all supplied specialists.
-2. May cycle 3 narrowly optimize the remaining initial/replan hazard-aware exact
-   ground-path workload using the same Air-shaped bounded/cache approach, while
-   preserving every target, threat/hazard rule, 75-tick cadence, group/candidate
-   bound, and shared Stealth/Chemical implementation? The worker recommends yes;
-   the multi-second saturation tails are concentrated exactly on those path events.
-3. Should specialist live-route safety remain on the current 75-tick full scan for
-   cycle 3, rather than adding an Air-like 25-tick safety path without evidence of
-   late danger response? The worker recommends preserving 75 ticks and testing a
-   moving-danger case before any cadence/policy change.
+The user authorized the narrow design after cycle 2's phase attribution:
+
+- Keep the existing 75-tick strategic scan and stable-plan invalidators. Ordinary
+  per-tick dispatch performs only two O(1) countdown checks.
+- Reuse `ThreatAwareRoutePlanner`, AirSquad's coarse A*/smoothing seam, but not
+  AirSquad's private air-only target/influence cache. Each configured specialist
+  trait owns a profile-isolated map; Air cache state and decisions remain separate.
+- Build one 4-cell coarse grid per profile on demand and retain it for 125 ticks,
+  matching Air's cache lifetime. The saturation grid is 51x51 (2,601 floats,
+  ~10.4KB/profile); the reachable grid is 44x44 (1,936, ~7.7KB/profile).
+- Select one reachable firing approach and one coarse route per formation; issue
+  grouped movement/attack orders. `DomainIndex` rejects disconnected approaches,
+  while the engine locomotor refines ordinary terrain, blockers, and Tiberium.
+- Run engagement-only local safety every 25 ticks: stop/invalidate an actively
+  fighting specialist exposed to a live detector or engaged-weapon envelope, and
+  keep Stealth Tanks from attacking on/adjacent to configured Blue Tiberium.
+- Keep the same Stealth/Chemical implementation and existing config-only actor,
+  priority, ignored-threat, and capability differences.
+
+No fine-cell threat raster, per-route threat/resource scan, or exact engine
+`PathSearch` remains. `AirStateBase.AirInfluenceCache` was not reused because it is
+private static state keyed by air profile/speed and contains air-only candidates,
+ammo, anti-air, and utility policy. The shared route-planner seam provides safe
+reuse without cross-profile contamination.
+
+The cycle-3 Luna review found that a future nonzero pending-explosion avoidance
+radius would otherwise lose its declared safety contract. Adopted correction:
+when and only when that radius is configured, pending explosions conservatively
+mark the bounded coarse grid and force one current-view build per strategic tick.
+Current CNC specialist configs leave the radius at zero. The review's request to
+restore Blue-Tiberium route-cell rejection was rejected because the user's explicit
+cycle-3 policy delegates travel avoidance to locomotor cost and limits Blue safety
+to engagement adjacency. This disposition preserves the user decision without
+ignoring the review's valid compatibility edge.
+
+### Final saturation game
+
+`cycle3-final-saturation4` ran SkyNet versus IronReaper, all modules, 331 mobile
+actors plus structures per side, Stealth/Chem formations, and active AirSquads to
+tick 900 in `25.027s`. It passed without fatal error, exception, or desync.
+
+| Direct identity | total / calls | average | worst | orders |
+|---|---:|---:|---:|---:|
+| Stealth strategy, both AIs | 222.997ms / 24 | 9.292ms | 48.911ms | 60 |
+| Chemical strategy, both AIs | 76.725ms / 24 | 3.197ms | 5.705ms | 6 |
+| all specialist local safety | 10.884ms / 144 | 0.076ms | 2.878ms | 29 stops |
+| Air strategy, all profiles | 1316.446ms / 84 | 15.672ms | 102.650ms | 186 |
+| Air local safety | 23.157ms / 144 | 0.161ms | 8.454ms | 0 |
+| Air coarse route (nested) | 532.668ms / 1773 | 0.300ms | 1.915ms | 0 |
+| Air influence build | 26.989ms / 13 | 2.076ms | 5.700ms | 0 |
+
+The four specialist outer modules consumed `314.425ms` over 3,600 per-tick
+dispatches (`0.349ms/game tick` across both AIs). Their explicitly measured
+strategy plus safety was `310.606ms`; remaining wrapper/dispatch overhead was
+`3.819ms`. Compared with cycle 2's two-AI Stealth strategy (`7790.150ms/24`),
+cycle-3 Stealth strategy fell `97.1%`. Candidate-by-threat tests are now the
+largest specialist phase (`202.413ms` across all profiles); coarse routing consumed
+`19.823ms`. Air route/build timing is nested in Air strategy and is not double-counted.
+
+Tick mean/p50/p95/p99/max were `23.513/12/49/203/1643.235ms`, with 42 ticks >=50ms.
+The maximum was startup/world work, not the former specialist planning boundary.
+Cycle 2's matched run recorded `31.606/11/57/227/6357.828ms` and 55 >=50ms ticks.
+
+- Game: `analysis/20260813-cnc96-split/worker-1-cnc-96a/games/cycle3-final-saturation4/cycle2-saturation`
+- Narrative: `analysis/20260813-cnc96-split/worker-1-cnc-96a/commenters/cycle3-final-saturation4/NARRATIVE.md`
+
+### Final reachable-action game
+
+`cycle3-final-reachable4` reached tick 750 in `6.008s`. The opening targets took
+first damage; opening-west died before tick 200 and opening-east was damaged. After
+member replacement and two late openings at tick 300, both late targets took damage
+and died before tick 500. Tick 700 still recorded 12 `stnk` plus 12 `ctnk` per side.
+The game passed without fatal error, exception, or desync.
+
+Specialist strategy consumed `72.294ms/40` heavy scans; local safety consumed
+`2.996ms/120` calls; outer modules consumed `78.053ms/3000` dispatches. Tick
+mean/p50/p95/p99/max were `3.589/2/4/19/1124.159ms`, with three startup events
+>=50ms. Stealth issued 66 orders and Chemical 20 while the script proved useful
+damage, target kills, turnover recovery, and survival.
+
+- Game: `analysis/20260813-cnc96-split/worker-1-cnc-96a/games/cycle3-final-reachable4/cycle2-reachable`
+- Narrative: `analysis/20260813-cnc96-split/worker-1-cnc-96a/commenters/cycle3-final-reachable4/NARRATIVE.md`
+
+### Checks
+
+- Protected `make all`: passed, 0 warnings/errors on final source.
+- Focused Stealth policy, Air target, and shared route tests: `52/52` passed.
+- `git diff --check`: passed.
+- Cycle-3 Luna review: one advisory concern, partially adopted as described above.
+
+## Cycle 3 manual policy-review packet
+
+No automated Match Policy Reviewer ran. The user must decide before cycle 4:
+
+1. Retain the one 125-tick profile-isolated coarse map and shared group route, with
+   exact ground refinement delegated to locomotion?
+2. Accept the 25-tick engagement-only detector/engaged-weapon and Blue-adjacency
+   stop/invalidation response?
+3. Should cycle 4 test all-defended weakest-blocker clearing plus explicit local
+   detector/Blue reactions, or optimize the remaining bounded candidate-by-threat
+   phase first? The worker recommends behavior evidence first.
 
 ## Known risks / next evidence if authorized
 
-- The reachable fixture proves aggregate squad damage/recovery and script target
-  destruction but still lacks stable per-specialist damage/kill identity.
-- Exact ground pathfinding and threat/resource checks per visited cell remain a
-  large first/replan tail; cycle 2 attributes but does not optimize this work.
-- Only SkyNet and IronReaper were exercised. Other bot personalities, transport/
-  crate reservation handoff, pending explosions, blocked topology, save/load,
-  repeated-control variability, paced final agreement, and cleanup of diagnostic
-  Air attribution remain required by the multi-cycle acceptance ladder.
-- The historical `8024fd2` tree was not mislabelled or backported; its known modern
-  launcher/IronReaper incompatibility remains inherited evidence rather than a
-  matched cycle-1 control.
+- Saturation behavior telemetry is less decisive than the scripted reachable case;
+  the all-dangerous hold is visible but not yet challenged by a safe weak blocker.
+- Only SkyNet and IronReaper were exercised in cycle 3. Other bot personalities,
+  explicit detector/Blue local response, pending explosion configuration, blocked
+  topology, transport/crate handoff, save/load, repeated controls, paced agreement,
+  final diagnostics cleanup, PR, and CI remain on the multi-cycle ladder.
+- The historical `8024fd2` tree remains incompatible and was not relabelled or
+  backported.
