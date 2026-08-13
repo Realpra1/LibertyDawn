@@ -24,18 +24,19 @@ when the dependency section directs it.
 - Task report: `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260807-bug-polish-02/workers/worker-5-cnc44/COORDINATED-CNC-ROUNDS/20260807-bug-polish-02/WORKER-5-CNC-44/REPORT.md`
 - Match-analysis directory: `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260807-bug-polish-02/analysis/worker-5-cnc44`
 - Liberty Dawn design reference: `.agents/references/LIBERTY-DAWN-DESIGN.md`
-- Full-engine game tests completed: `7` (2 invalid control harness runs with useful evidence, 1 valid control, 1 valid changed, 3 materially useful type/capture runs with invalid acceptance assertions)
+- Full-engine game tests completed: `14` (original 7; RC1 added 1 invalid and 1 valid type/capture run, 2 invalid occupancy harness runs plus 1 valid occupancy/contention run, and 1 manifest-mismatch plus 1 valid Rock-terrain run)
 - Terra cycle code reviews: `none yet; required after cycles 5/10/15/20 that occur`
-- Sol-xhigh policy escalation: `unused (requires at least 10 game tests; one maximum)`
+- Sol-xhigh policy escalation: `unused; no AI-policy issue after 14 counted games`
 - PR: `#85 — https://github.com/Realpra1/LibertyDawn/pull/85`
 
 ## Integrated repair assignment
 
-- Phase: `isolated implementation`
-- Current release branch/head: `not assigned`
-- Integration notes: `not assigned`
-- Repair branch: `not assigned`
-- Repair PR base: `not assigned`
+- Phase: `integrated testing`
+- Current release branch/head: `agent/cnc-20260807-bug-polish-02-release` / `ffb841b48750cc54b1862fb93101d3dce3a87a3f`
+- Integration notes: `COORDINATED-CNC-ROUNDS/20260807-bug-polish-02/INTEGRATION.md`
+- Repair branch: `agent/round-20260807-cnc44-rc1-repair`
+- Repair PR base: `agent/cnc-20260807-bug-polish-02-release`
+- Repair PR: `#91 — https://github.com/Realpra1/LibertyDawn/pull/91`
 - Integrated cycles used this RC: `0/3`
 - Integrated cycles used total: `0/12`
 
@@ -914,22 +915,23 @@ silently exceed the budget.
 | Cycle | Commit/change | Failure hypothesis and perturbation | Checks/games | Narrative/policy/cycle-code review | Failure/pass evidence | Decision/next harder test |
 |---|---|---|---|---|---|---|
 | 1 | Commit `396c8106d9`: opt-in `SpawnActorOnDeath.RequiresValidHuskCell`; standard `TRAN/HELI/ORCA.GroundHusk` rules and mappings; A10 unchanged | A post-impact spawn could see its own transient/deferred victims, miss terrain, include A10, mis-map a type, or produce an unusable restoration. Reused exact control map SHA-256 `72e5c7d3fad5bcc5aeda991a3a9dfc919d1418674e73d77cac9f4b2e723b43ac`, seed 44001; type ladder seed 44002 varied types, altitude, facing, terrain, capture, and normal AI adoption. | Release build pass; `make test` pass; focused NUnit 5/5 pass; `make check` pass; control run 004 and changed run 001 passed at tick 90. Type runs 002–004 reached tick 425 and were materially useful but invalid as full acceptance: run 002 proved Rock rejection; runs 003/004 proved 3/3 mapped captures but used late facing assertions after AI orders. Linux/Windows GitHub CI passed at product head `396c8106d9`. | Control narrative: `analysis/worker-5-cnc44/commentary/control-batch-01/NARRATIVE.md`. Matched-pair narrative: `analysis/worker-5-cnc44/commentary/cycle-01-pair/NARRATIVE.md`. Type/capture narrative: `analysis/worker-5-cnc44/commentary/cycle-01-type-capture/NARRATIVE.md`. Final Sol-high review: `analysis/worker-5-cnc44/final-review/REVIEW.md`, verdict `ready`, required fix `none`. Policy review not applicable. | Control: zero durable ORCA/A10. Changed empty Clear: one ORCA ground husk. Type run 004: exactly one TRAN/HELI/ORCA durable husk, zero A10, 3 Engineers consumed, exact restored type/owner/25% health, no ground husks left, and all 3 aircraft alive/moved. TRAN retained captured facing; HELI/ORCA facing remained unproven because normal air modules redirected them before the delayed check. No fatal/desync; run 002 safely rejected ORCA on Rock. | Keep cycle 1 implementation. Final review found no safe scoped product correction. Handoff `First iteration - testing`: capture-time HELI/ORCA facing, occupant/timing/contention/boundary, save/load, natural endurance, final regression, and CNC-62 combined ordering remain open. |
+| RC1 validation (no product cycle) | No tracked product/config/test change; exact integrated product/receipt `394ae5eead` / `ffb841b487`, worker assignment head `920eaa2e13` | RC1 integration or CNC-40 capture-credit changes could break mappings, capture-time facing, standard health, exact-cell all-actor eligibility, deferred removals, simultaneous contention, A10 exclusion, or allowed terrain. Seeds 44002–44004 exercised type/capture, occupancy/contention, and Rock rejection with ordinary SkyNet/Brutalis modules. | `make test` pass; focused NUnit 5/5 pass; `make check` and `make check-scripts` pass with Debug 0 warnings/errors. Seven RC1 games: type run 001 invalid late-facing oracle, corrected run 002 pass at tick 425; occupancy run 001 invalid missing map `ScriptTriggers`, run 002 useful but invalid due pre-existing `t17` in the intended adjacent cell, corrected run 003 pass at tick 140; terrain run 001 useful but invalid manifest cell/text mismatch, corrected run 002 pass at tick 150. | Factual narratives: `analysis/worker-5-cnc44/commentary/integrated-type-capture/NARRATIVE.md`, `integrated-occupancy/NARRATIVE.md`, and `integrated-terrain/NARRATIVE.md`; verified against staged logs. Policy review not applicable. No cycle review required because integrated product cycles remain 0. | Type/capture: 3/3 exact types, owners, 25% health, capture-time facing, consumed Engineers/husks, movement, A10 0. Occupancy: exact `1/0/1/0/1/1/0` oracle; four dead actors still in-world accepted, surviving tank rejected, adjacent tank ignored, deterministic same-frame TRAN winner blocked ORCA. Terrain: Rock rejected while valid TRAN/HELI created and A10 remained 0. No fatal/desync in valid runs. | Keep product unchanged; no RC1 repair warranted. Handoff remains `First iteration - testing` because CNC-62 has no branch/PR and the literal source-aircraft/combat crash, CNC-62 damage-before-decision ordering, save/load, map-edge/off-map, manager invalidation/competition, natural/stress endurance, and final regression remain unproven. |
 
 ## Handoff receipt
 
 - Proposed status: `First iteration - testing`
-- Final branch/head: `agent/round-20260807-cnc44-aircraft-husks`; product head `396c8106d9cec1c84ed0c2e44cd34ce0d0ef4772`, followed only by this handoff-metadata commit
-- PR and checks: `#85` (`https://github.com/Realpra1/LibertyDawn/pull/85`); Linux and Windows .NET 6.0 CI passed at product head; final metadata-only head rechecked before return
-- Cycles used: `1/20`
-- Acceptance evidence: matched clear-land ORCA control/current result; current type batch created/captured/restored 3/3 exact types at 25% health with all Engineers/husks consumed and successful movement, with A10 excluded
-- Adversarial evidence: safe Rock rejection and distinct altitude/facing/type/module-adoption perturbations; not complete acceptance because HELI/ORCA capture-time facing and the required occupant/contention/boundary portfolios remain open
+- Final branch/head: `agent/round-20260807-cnc44-rc1-repair`; validated integrated product/receipt `394ae5eeadfffbf58a9db7c1fac91960f5158cb6` / `ffb841b48750cc54b1862fb93101d3dce3a87a3f`, followed only by worker-assignment and handoff metadata; no product repair
+- PR and checks: source `#85` remains open with passed Linux/Windows checks; RC1 validation receipt is draft repair PR `#91` (`https://github.com/Realpra1/LibertyDawn/pull/91`). Local `make test`, focused NUnit 5/5, `make check`, and `make check-scripts` passed on the integrated code.
+- Cycles used: `1/20` isolated; `0/3` RC1 integrated and `0/12` integrated total
+- Acceptance evidence: integrated type/capture run 002 created/captured/restored 3/3 exact types at 25% health with captured facing, all Engineers/husks consumed, successful movement, normal air-module adoption, and A10 excluded
+- Adversarial evidence: integrated occupancy run 003 matched the exact empty/live/dead/mixed/adjacent/simultaneous/A10 oracle, including four dead-but-still-in-world occupants and a deterministic one-husk same-frame winner; integrated terrain run 002 safely rejected Rock while valid types created
 - Old-behavior control and comparative result: exact base `419bee2531`, map SHA-256 `72e5c7d...`, seed 44001; control `0` durable ORCA versus current `1`, both `0` durable A10
-- Match narratives and routine policy-review conclusions: three fresh factual Commenter narratives under `analysis/worker-5-cnc44/commentary/`; policy review not applicable for deterministic engine/config work
+- Match narratives and routine policy-review conclusions: six factual Commenter narratives under `analysis/worker-5-cnc44/commentary/`, including the three verified RC1 narratives; policy review not applicable for deterministic engine/config work
 - Terra cycle code reviews and dispositions: none required; only cycle 1 occurred
-- Sol-xhigh policy escalation (unused, or test count/path/conclusion): unused; no AI-policy issue and only 7 counted full-engine tests
-- Final regression: not run; CNC-62 is unavailable and directly completion-blocking
-- Error/warning and diagnostic-cleanup result: Release/Debug builds and checks passed with zero warnings/errors; no fatal/desync in judged current runs; retained diagnostics are one bounded debug record per opted-in transition
-- Performance/determinism result: event-driven O(k) exact-cell work, deterministic all-blocker decision and frame-end revalidation; short matched evidence showed no claimed regression, but stress/endurance measurement remains open
+- Sol-xhigh policy escalation (unused, or test count/path/conclusion): unused despite 14 counted games; no AI-policy issue exists
+- Final regression: not run; CNC-62 remains unavailable and directly completion-blocking
+- Error/warning and diagnostic-cleanup result: final Debug check passed with 0 warnings/errors; focused NUnit emitted only the already-recorded nonblocking CA1825 test-style warning; no fatal/desync in valid RC1 games; retained product diagnostics remain one bounded line per opted-in transition
+- Performance/determinism result: event-driven O(k) exact-cell work; RC1 same-frame ordering was deterministic and valid short runs reported 42.471, 27.966, and 14.991 ticks/s for materially different focused workloads. No matched stress/endurance regression claim is made.
 - Deferred work: none proposed outside the explicit completion evidence/dependency portfolio
-- Known failures/risks: CNC-62 damage-before-eligibility unverified; full occupant/removal, same-frame contention, map-edge/terrain, save/load, capture invalidation/manager contention, natural/stress endurance, three clean adversarial scenarios, HELI/ORCA capture-time facing, and fresh final regression remain
-- Relevant artifact paths: `analysis/worker-5-cnc44/baseline-control/`, `analysis/worker-5-cnc44/cycle-01/`, `analysis/worker-5-cnc44/commentary/`, and `analysis/worker-5-cnc44/final-review/REVIEW.md`
+- Known failures/risks: CNC-62 damage-before-eligibility and literal normal-combat source-aircraft crashes remain unverified; map-edge/off-map, save/load, capture invalidation/manager competition, natural/stress endurance, and fresh final regression remain
+- Relevant artifact paths: `analysis/worker-5-cnc44/integrated-rc1/`, `analysis/worker-5-cnc44/commentary/integrated-type-capture/`, `integrated-occupancy/`, `integrated-terrain/`, plus the original `baseline-control/`, `cycle-01/`, and `final-review/REVIEW.md`
