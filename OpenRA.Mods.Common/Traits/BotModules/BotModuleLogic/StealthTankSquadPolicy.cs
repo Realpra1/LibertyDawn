@@ -175,6 +175,27 @@ namespace OpenRA.Mods.Common.Traits
 				ownRangeCells > detectorRangeCells;
 		}
 
+		public static bool IsEngagementThreat(bool detectorExposure, bool armedCoverage,
+			bool engagedWeaponExposure)
+		{
+			// Firing reveals a Stealth Tank, so detection alone cannot punish an engagement.
+			// Keep the existing immediate response to a weapon that is already engaged, and
+			// otherwise require detector and ground-weapon coverage to overlap the firing cell.
+			return engagedWeaponExposure || (detectorExposure && armedCoverage);
+		}
+
+		public static bool ShouldResumeSuspendedEngagement(bool wasAlreadySuspended, bool hasValidTarget,
+			bool localThreatExposure, bool resourceHazard)
+		{
+			return wasAlreadySuspended && hasValidTarget && !localThreatExposure && !resourceHazard;
+		}
+
+		public static bool ShouldRetainActiveEngagement(bool hasValidTarget, bool isEngaged,
+			bool localThreatExposure, bool resourceHazard)
+		{
+			return hasValidTarget && isEngaged && !localThreatExposure && !resourceHazard;
+		}
+
 		public static int TransitThreatRange(int detectorRangeCells, int weaponRangeCells,
 			bool weaponIsEngaged, bool canKiteTarget)
 		{

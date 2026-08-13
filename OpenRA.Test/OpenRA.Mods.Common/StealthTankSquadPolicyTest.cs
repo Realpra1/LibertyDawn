@@ -226,6 +226,45 @@ namespace OpenRA.Test.Mods.Common
 				weaponRange, detectorRange, ownRange), Is.EqualTo(expected));
 		}
 
+		[TestCase(true, false, false, false, Description = "A lone unarmed detector cannot punish revealed fire.")]
+		[TestCase(true, true, false, true, Description = "A separate detector and armed support cover the firing cell.")]
+		[TestCase(true, true, true, true, Description = "One armed detector supplies both capabilities.")]
+		[TestCase(true, false, false, false, Description = "Removing the shooter immediately leaves detector-only coverage.")]
+		[TestCase(true, false, false, false, Description = "An ignored weapon is filtered before it can support a detector.")]
+		[TestCase(false, true, true, true, Description = "An already-engaged weapon remains an immediate threat without a detector.")]
+		public void EngagementSafetyRequiresArmedPunishmentForDetectorExposure(bool detectorExposure,
+			bool armedCoverage, bool engagedWeaponExposure, bool expected)
+		{
+			Assert.That(StealthTankSquadPolicy.IsEngagementThreat(detectorExposure,
+				armedCoverage, engagedWeaponExposure), Is.EqualTo(expected));
+		}
+
+		[TestCase(true, true, true, false, false)]
+		[TestCase(true, true, false, true, false)]
+		[TestCase(true, false, false, false, false)]
+		[TestCase(false, true, false, false, false,
+			Description = "A target first suspended by this safety check cannot resume in that same check.")]
+		[TestCase(true, true, false, false, true)]
+		public void SuspendedEngagementResumesOnlyAfterShooterOrHazardClears(bool wasAlreadySuspended,
+			bool hasValidTarget,
+			bool localThreatExposure, bool resourceHazard, bool expected)
+		{
+			Assert.That(StealthTankSquadPolicy.ShouldResumeSuspendedEngagement(wasAlreadySuspended, hasValidTarget,
+				localThreatExposure, resourceHazard), Is.EqualTo(expected));
+		}
+
+		[TestCase(true, true, false, false, true)]
+		[TestCase(true, true, true, false, false)]
+		[TestCase(true, true, false, true, false)]
+		[TestCase(true, false, false, false, false)]
+		[TestCase(false, true, false, false, false)]
+		public void StrategicApproachScanCannotTurnDetectorAloneIntoAnActiveEngagementVeto(
+			bool hasValidTarget, bool isEngaged, bool localThreatExposure, bool resourceHazard, bool expected)
+		{
+			Assert.That(StealthTankSquadPolicy.ShouldRetainActiveEngagement(hasValidTarget,
+				isEngaged, localThreatExposure, resourceHazard), Is.EqualTo(expected));
+		}
+
 		[TestCase(0, 7, false, false, 0)]
 		[TestCase(0, 7, true, false, 7)]
 		[TestCase(5, 7, false, false, 5)]

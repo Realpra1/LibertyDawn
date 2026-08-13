@@ -121,6 +121,7 @@ namespace OpenRA.Mods.Common.Traits
 			public int LastProgressTick;
 			public long LastTargetDistanceSquared = long.MaxValue;
 			public int LastTargetHp = int.MaxValue;
+			public Actor SuspendedEngagementTarget;
 
 			public SpecialistGroup(int index) { Index = index; }
 		}
@@ -244,6 +245,7 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				group.Units.Clear();
 				group.Target = null;
+				group.SuspendedEngagementTarget = null;
 				group.ConsecutiveNoSafeTargetScans = 0;
 				ClearRetainedPlan(group);
 			}
@@ -347,15 +349,23 @@ namespace OpenRA.Mods.Common.Traits
 			var detectorFound = false;
 			foreach (var group in groups)
 			{
+				var wasSuspended = group.SuspendedEngagementTarget != null;
 				var engaged = group.Units.Where(a => IsEligible(a) && a.CurrentActivity != null &&
 					a.CurrentActivity.ActivitiesImplementing<IActivityNotifyStanceChanged>().Any()).ToArray();
+				if (wasSuspended)
+					engaged = group.Units.Where(IsEligible).ToArray();
 				if (engaged.Length == 0)
 					continue;
 
+				var suspendedThreatRemains = false;
+				var suspendedResourceHazard = false;
 				foreach (var unit in engaged)
 				{
-					var localThreatExposure = HasLocalThreatExposure(unit, out var localThreat,
-						out var detectorExposure, out var weaponExposure);
+					var localThreatExposure = HasLocalThreatExposure(unit, out var detector,
+						out var detectorRange, out var armedSupport, out var armedRange,
+						out var engagedWeaponExposure);
+					var detectorExposure = detector != null;
+					var armedCoverage = armedSupport != null;
 					var blueAdjacent = Info.AvoidResourceTypes.Count > 0 && resourceLayer != null &&
 						world.Map.FindTilesInAnnulus(unit.Location, 0, 1).Any(c =>
 						{
@@ -365,14 +375,57 @@ namespace OpenRA.Mods.Common.Traits
 					if (!localThreatExposure && !blueAdjacent)
 						continue;
 
+					if (wasSuspended)
+					{
+						suspendedThreatRemains |= localThreatExposure;
+						suspendedResourceHazard |= blueAdjacent;
+						continue;
+					}
+
 					bot.QueueOrder(new Order("Stop", unit, false));
 					orders++;
 					detectorFound |= detectorExposure;
 					if (Info.DebugLogging)
-						Log.Write("debug", "AI stealth local safety {0} [{1}:{2}] stopped {3}#{4}: detector={5} engaged-weapon={6} blue-adjacent={7} threat={8}.",
+						Log.Write("debug", "AI stealth local safety {0} [{1}:{2}] stopped {3}#{4}: detector={5} armed-coverage={6} engaged-weapon={7} blue-adjacent={8} detector-source={9} detector-owner={10} detector-buffered-range={11} armed-source={12} armed-owner={13} armed-buffered-range={14}.",
 							Info.SquadLabel, player.PlayerName, group.Index, unit.Info.Name, unit.ActorID,
-							detectorExposure, weaponExposure, blueAdjacent, localThreat == null ? "none" :
-							localThreat.Info.Name + "#" + localThreat.ActorID);
+							detectorExposure, armedCoverage, engagedWeaponExposure, blueAdjacent,
+							detector == null ? "none" : detector.Info.Name + "#" + detector.ActorID,
+							detector == null ? "none" : detector.Owner.InternalName, detectorRange,
+							armedSupport == null ? "none" : armedSupport.Info.Name + "#" + armedSupport.ActorID,
+							armedSupport == null ? "none" : armedSupport.Owner.InternalName, armedRange);
+					if (detectorExposure && armedCoverage)
+					{
+						group.SuspendedEngagementTarget = group.Target;
+						ClearRetainedPlan(group);
+					}
+					else
+					{
+						group.Target = null;
+						ClearRetainedPlan(group);
+					}
+				}
+
+				var suspendedTarget = group.SuspendedEngagementTarget;
+				var validSuspendedTarget = IsEnemyTarget(suspendedTarget);
+				if (StealthTankSquadPolicy.ShouldResumeSuspendedEngagement(wasSuspended, validSuspendedTarget,
+					suspendedThreatRemains, suspendedResourceHazard))
+				{
+					var units = group.Units.Where(IsEligible).ToArray();
+					bot.QueueOrder(new Order("Attack", null, Target.FromActor(suspendedTarget), false,
+						groupedActors: units));
+					orders++;
+					group.Target = suspendedTarget;
+					group.SuspendedEngagementTarget = null;
+					BeginRetainedPlan(group, suspendedTarget,
+						units.Select(a => a.CenterPosition).Average());
+					if (Info.DebugLogging)
+						Log.Write("debug", "AI stealth local safety {0} [{1}:{2}] resumed target {3}#{4}: detector-only-or-clear=true units={5}.",
+							Info.SquadLabel, player.PlayerName, group.Index, suspendedTarget.Info.Name,
+							suspendedTarget.ActorID, units.Length);
+				}
+				else if (group.SuspendedEngagementTarget != null && !validSuspendedTarget)
+				{
+					group.SuspendedEngagementTarget = null;
 					group.Target = null;
 					ClearRetainedPlan(group);
 				}
@@ -390,36 +443,45 @@ namespace OpenRA.Mods.Common.Traits
 			return orders;
 		}
 
-		bool HasLocalThreatExposure(Actor unit, out Actor exposingThreat,
-			out bool detectorExposure, out bool weaponExposure)
+		bool HasLocalThreatExposure(Actor unit, out Actor detector, out int detectorRange,
+			out Actor armedSupport, out int armedRange, out bool engagedWeaponExposure)
 		{
-			exposingThreat = null;
-			detectorExposure = false;
-			weaponExposure = false;
+			detector = null;
+			detectorRange = 0;
+			armedSupport = null;
+			armedRange = 0;
+			engagedWeaponExposure = false;
 			foreach (var actor in world.FindActorsInCircle(unit.CenterPosition,
-				WDist.FromCells(LocalSafetySearchRadiusCells)).Where(IsEnemyTarget))
+				WDist.FromCells(LocalSafetySearchRadiusCells)).Where(IsEnemyTarget).OrderBy(a => a.ActorID))
 			{
 				var threat = CreateThreat(actor);
 				if (threat == null)
 					continue;
 
-				var detectorRange = StealthTankSquadPolicy.BufferedRange(threat.DetectorRangeCells,
+				var bufferedDetectorRange = StealthTankSquadPolicy.BufferedRange(threat.DetectorRangeCells,
 					Info.DetectorRangeBufferCells);
 				var ignoreWeapon = actor.GetEnabledTargetTypes().Overlaps(Info.IgnoredHarassmentWeaponThreatTypes);
 				var weaponRange = StealthTankSquadPolicy.BufferedRange(
-					ignoreWeapon || !threat.WeaponIsEngaged ? 0 : threat.WeaponRangeCells,
-					Info.ThreatRangeBufferCells);
+					ignoreWeapon ? 0 : threat.WeaponRangeCells, Info.ThreatRangeBufferCells);
 				var distance = (actor.CenterPosition - unit.CenterPosition).Length;
-				detectorExposure = detectorRange > 0 && distance <= detectorRange * 1024;
-				weaponExposure = weaponRange > 0 && distance <= weaponRange * 1024;
-				if (detectorExposure || weaponExposure)
+				if (detector == null && bufferedDetectorRange > 0 && distance <= bufferedDetectorRange * 1024)
 				{
-					exposingThreat = actor;
-					return true;
+					detector = actor;
+					detectorRange = bufferedDetectorRange;
 				}
+
+				if (armedSupport == null && weaponRange > 0 && distance <= weaponRange * 1024)
+				{
+					armedSupport = actor;
+					armedRange = weaponRange;
+				}
+
+				engagedWeaponExposure |= threat.WeaponIsEngaged && weaponRange > 0 &&
+					distance <= weaponRange * 1024;
 			}
 
-			return false;
+			return StealthTankSquadPolicy.IsEngagementThreat(detector != null,
+				armedSupport != null, engagedWeaponExposure);
 		}
 
 		static double Milliseconds(long ticks)
@@ -536,6 +598,38 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				group.Target = null;
 				ClearRetainedPlan(group);
+				return;
+			}
+
+			// Engagement-local safety owns this short hold and checks it every 25 ticks.
+			// Do not let the slower strategic approach scan replace the suspended target.
+			if (group.SuspendedEngagementTarget != null)
+				return;
+
+			var activeEngagement = group.Target != null && IsEnemyTarget(group.Target) &&
+				group.Units.Any(a => a.CurrentActivity != null &&
+					a.CurrentActivity.ActivitiesImplementing<IActivityNotifyStanceChanged>().Any());
+			var activeLocalThreat = false;
+			var activeResourceHazard = false;
+			if (activeEngagement)
+				foreach (var unit in group.Units.Where(IsEligible))
+				{
+					activeLocalThreat |= HasLocalThreatExposure(unit, out _, out _, out _, out _, out _);
+					activeResourceHazard |= Info.AvoidResourceTypes.Count > 0 && resourceLayer != null &&
+						world.Map.FindTilesInAnnulus(unit.Location, 0, 1).Any(c =>
+						{
+							var type = resourceLayer.GetResource(c).Type;
+							return type != null && Info.AvoidResourceTypes.Contains(type);
+						});
+				}
+
+			// Once firing has begun, the 25-tick engagement check owns local detector/support
+			// safety. Do not let the slower concealed-approach map turn a lone detector into
+			// an engagement veto; armed overlap and hazards still invalidate immediately.
+			if (StealthTankSquadPolicy.ShouldRetainActiveEngagement(activeEngagement,
+				activeEngagement, activeLocalThreat, activeResourceHazard))
+			{
+				scanPlanRetentions++;
 				return;
 			}
 

@@ -2,11 +2,11 @@
 
 ## Status
 
-Cycles 1-7 implemented and checked. Cycle 7 fixed and proved the unarmed
-self-detecting primary-target case, then exposed a corrected detector-engagement
-policy boundary after its second valid game. Proposed status remains
-`First iteration - testing`: Air-shaped coarse routing retains its measured
-performance improvement, but detector-only engagement veto remains too conservative.
+Cycles 1-8 implemented and checked. Cycle 8 proved detector-only engagement
+continuation and detector-plus-armed Stop attribution, then exposed and corrected
+two lifecycle boundaries. Proposed status remains `First iteration - testing`:
+the exact two-game cap was exhausted before the final active-engagement retention
+correction could receive full-engine proof.
 
 ## Task boundary
 
@@ -882,3 +882,101 @@ armed supporting defender, then remove or neutralize the shooter while the MHQ
 remains and prove reassessment/attack. Explicit SnipeTank/defender kill, other
 personalities, reservations/blocked routes, controls, paced agreement, save/load,
 final review, PR/CI, and diagnostic cleanup remain open.
+
+## Cycle 8 — armed-support-aware engagement safety
+
+The authorized Sol-medium cycle began from durable head `491c1a35939becc4fa9668ae94993bcacf5afc6d`.
+The narrow correction leaves the 75-tick strategic candidate/influence routing
+unchanged and changes only an already-firing engagement. Detector coverage at a
+specialist's current firing/escape cell is actionable only when non-ignored
+enemy ground-weapon coverage overlaps it; an already-engaged enemy weapon remains
+an immediate threat. A detector-plus-armed Stop retains the exact active target
+for bounded 25-tick reassessment. The final source also prevents the slower
+concealed-approach scan from discarding an already-active, valid, locally safe
+engagement under detector-only coverage. Blue/resource hazards and ordinary
+weapon Stops retain their prior semantics. Cycle 7's unarmed self-detecting
+target exception is unchanged.
+
+Focused tests cover lone detector false, detector plus non-engaged armed support
+true, one armed detector true, shooter removed false, already-engaged weapon true,
+ignored weapon false, no same-call resume, suspended-target release, and active
+engagement retention. Shared Stealth/Chem control, 4-cell/125-tick influence,
+75/25-tick cadences, stable plans, Air isolation, and all authored values remain.
+
+### Game A — combined coverage exposed same-call resume
+
+`cycle8-armed-recovery` (seed `960801`) reached tick 2100 in `6.008s`, exit 0,
+without fatal/exception/desync or Air identity. At first VIKI STNK damage tick
+227 the fixture placed Brutalis `mhq#52` and `mtnk#53` relative to the actual
+firing cell. Local safety named MHQ owner Multi1/buffered detector range 18 and
+MTNK owner Multi1/buffered ground range 7 and stopped both STNKs. The same
+safety invocation then immediately resumed the Harvester target and repeated;
+the tick-501 boundary recorded `damage-during-threat=true`. Removing only MTNK
+left MHQ alive but no later damage occurred. This valid engine game failed its
+behavior assertions and exposed the now-fixed requirement that an engagement
+must already have been suspended at invocation start before it can resume.
+
+- Artifact: `analysis/20260813-cnc96-split/worker-1-cnc-96a/cycle8/games/game-a/cycle8-armed-recovery`
+- Narrative/review: `cycle8/reviews/game-a-luna-narrator/NARRATIVE.md` and
+  `cycle8/reviews/game-a-luna-policy/POLICY-REVIEW.md`.
+- Review verdict: sensible intent, high-priority observed failure; require an
+  idempotent Stop and fresh fact transition before release. Adopted in the
+  same-call guard; generation-token telemetry is deferred.
+
+### Game B — core rule proved; strategic boundary exposed
+
+`cycle8-detector-then-armed` (seed `960802`) reached tick 1700 in `6.010s`,
+exit 0, without fatal/exception/desync or Air identity. VIKI STNK first damaged
+the Harvester at tick 213; a lone Brutalis MHQ was injected at the actual firing
+cell and a second attributable STNK hit followed at tick 224 while MHQ lived.
+At tick 601 a Brutalis MTNK covering the firing cell was injected; local safety
+stopped `stnk#32` with exact MHQ owner/range 18 and MTNK owner/range 7. No damage
+occurred under armed coverage. MTNK was removed at tick 676 while MHQ remained,
+but no resume or post-removal damage followed. Evidence showed that the slower
+strategic scan had already cleared the active target under detector-only coverage,
+so the armed Stop had no target to suspend. The final source narrowly retains an
+already-active valid engagement when the same 25-tick predicate says it is safe;
+pre-engagement approach routing still avoids MHQ coverage. The game cap prevented
+literal proof of that final repair.
+
+- Artifact: `analysis/20260813-cnc96-split/worker-1-cnc-96a/cycle8/games/game-b/cycle8-detector-then-armed`
+- Narrative/review: `cycle8/reviews/game-b-luna-narrator/NARRATIVE.md` and
+  `cycle8/reviews/game-b-luna-policy/POLICY-REVIEW.md`.
+- Review verdict: core exposure policy sensible and demonstrated; recovery is
+  a medium-high evidence gap. Adopted active-assignment preservation; explicit
+  assignment-generation telemetry remains advisory/deferred.
+
+### Target policy note and checks
+
+After shooter removal, current source resumes the exact
+`SuspendedEngagementTarget` (the intended Harvester), not the MHQ or a freshly
+ranked target. Normal pre-engagement selection chooses the highest-score safe
+candidate: STNK Harvester priority is 10000, with economic value, distance,
+25-percent incumbent bonus, and deterministic actor-ID tie. Only after 20
+all-defended scans does it consider the weakest three defender packages and
+choose highest unlocked target score; eligible clears are isolated non-detector
+infantry crushes or safely outrangeable non-detector tanks. Thus a lone MHQ is
+currently neither a normal harassment target nor a clearable detector. The user
+has directed cycle 9 to address that Air-AA-clearing mismatch; cycle 8 does not
+broaden into it.
+
+Protected strict Release solution build passed with zero warnings/errors; full
+CNC MiniYAML passed; focused policy suite passed 67/67; both custom maps and Lua
+passed preflight; `git diff --check` passed. Exactly two valid games were consumed.
+Both launcher summaries say failed solely because behavior assertions were
+missing; engine completion/integrity passed and the absent assertions are the
+recorded product evidence. No third game ran.
+
+Status remains `First iteration - testing`. The final active-engagement repair
+requires fresh full-engine proof before acceptance or Terra final review. Cycle 9
+must also implement the separately authorized safe lone-MHQ clearing policy,
+without weakening armed detector/support avoidance. AirSquad remains the lifecycle
+gold standard: that cycle must inspect and reuse safe-primary -> weakest-blocker ->
+reassess, unfavorable-flee, damaged-to-repair, and repaired-rejoin/return seams
+where they are safely common, while preserving Stealth capability distinctions,
+caches, and cadences. Repair must be opportunistic exactly like Air: when no
+compatible reachable repair exists, damaged Stealth/Chem remains active with
+bounded conservative hit-run/flee behavior until death, never parking, idling,
+leaving the squad, or waiting; it reevaluates if repair later appears. Cycle 9
+needs no-repair-active and repair/rejoin tests. Those broader changes are not
+part of cycle 8.
