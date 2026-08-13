@@ -17,3 +17,20 @@
   and no PR was created or updated: publication authority was not granted.
 - Continue from [INTEGRATION-SAFE-STATE.md](INTEGRATION-SAFE-STATE.md) for at
   most five Sol-medium focused integration cycles.
+
+## Integration cycle 1 complete
+
+- Candidate tested: `41bbdb4d6ce4999a5193d86d6d9cc72497722211`.
+- Exactly two distinct focused full-engine games completed with headless MAX,
+  ordinary enemy AIs, isolated support directories, and installed CNC content.
+- Game 1 passed all CNC-97 aircraft-husk recovery and CNC-98 VIKI gate assertions
+  at tick 2800.
+- Game 2 reached tick 10000 cleanly and demonstrated CNC-107 exact-route wall
+  deferral, legal individual placement, and preserved two-way access under enemy
+  construction pressure. Its preselected repair cell was never built and the
+  late crate removal lacked cause attribution, so neither is a concrete release
+  defect.
+- Separate fresh Luna narration and policy review completed for both games.
+- No source repair or balance change was made; combined checks passed.
+- Durable result: integration is **1 / 5**; continue with cycle 2. Publication,
+  push, PR update, and merge authority remain absent.
