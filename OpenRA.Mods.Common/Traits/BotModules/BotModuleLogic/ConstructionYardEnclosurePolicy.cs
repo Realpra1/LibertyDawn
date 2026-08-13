@@ -174,6 +174,96 @@ namespace OpenRA.Mods.Common.Traits
 			return Array.Empty<CPos>();
 		}
 
+		public static CPos[] OrderedLegalMissingCells(ConstructionYardEnclosurePlan plan,
+			CPos yardLocation, Func<CPos, bool> isPresent, Func<CPos, bool> isLegal)
+		{
+			if (plan == null || isPresent == null || isLegal == null || plan.WallCells.Length == 0)
+				return Array.Empty<CPos>();
+
+			var allPlanCells = plan.WallCells.Concat(plan.AccessCells).ToArray();
+			var left = allPlanCells.Min(c => c.X);
+			var right = allPlanCells.Max(c => c.X);
+			var top = allPlanCells.Min(c => c.Y);
+			var bottom = allPlanCells.Max(c => c.Y);
+
+			return plan.WallCells.Select((cell, index) => new { Cell = cell, Index = index })
+				.Where(candidate => !isPresent(candidate.Cell) && isLegal(candidate.Cell))
+				.OrderBy(candidate => !((candidate.Cell.X == left || candidate.Cell.X == right) &&
+					(candidate.Cell.Y == top || candidate.Cell.Y == bottom)))
+				.ThenBy(candidate => (candidate.Cell - yardLocation).LengthSquared)
+				.ThenBy(candidate => candidate.Index)
+				.ThenBy(candidate => candidate.Cell.X)
+				.ThenBy(candidate => candidate.Cell.Y)
+				.Select(candidate => candidate.Cell).ToArray();
+		}
+
+		/// <summary>
+		/// Validates the native pathfinder contract: paths are returned destination-to-source.
+		/// The predicates let the live planner reject dynamic blockers and the bound Fact footprint
+		/// without making this deterministic policy depend on World or actor state.
+		/// </summary>
+		public static bool IsExactReversedRoute(IEnumerable<CPos> route, CPos origin, CPos destination,
+			Func<CPos, bool> isBlocked, Func<CPos, bool> isFactFootprint)
+		{
+			if (route == null || isBlocked == null || isFactFootprint == null)
+				return false;
+
+			var cells = route.ToArray();
+			if (cells.Length < 2 || cells[0] != destination || cells[cells.Length - 1] != origin ||
+				cells.Distinct().Count() != cells.Length)
+				return false;
+
+			for (var i = 0; i < cells.Length; i++)
+			{
+				if (isBlocked(cells[i]) || isFactFootprint(cells[i]))
+					return false;
+
+				if (i == 0)
+					continue;
+
+				var step = cells[i] - cells[i - 1];
+				if (cells[i].Layer != cells[i - 1].Layer || step.LengthSquared < 1 || step.LengthSquared > 2)
+					return false;
+			}
+
+			return true;
+		}
+
+		public static bool TryFirstExactRoute(IEnumerable<CPos> accessCells, CPos yardLocation, CPos destination,
+			Func<CPos, bool> canEnter, Func<CPos, CPos, IEnumerable<CPos>> findRoute,
+			Func<CPos, bool> isBlocked, Func<CPos, bool> isFactFootprint,
+			out CPos origin, out CPos[] route)
+		{
+			origin = default;
+			route = null;
+			if (accessCells == null || canEnter == null || findRoute == null ||
+				isBlocked == null || isFactFootprint == null || !canEnter(destination))
+				return false;
+
+			foreach (var candidate in accessCells.Where(canEnter)
+				.OrderBy(c => (c - yardLocation).LengthSquared)
+				.ThenBy(c => c.X).ThenBy(c => c.Y))
+			{
+				var found = findRoute(candidate, destination)?.ToArray();
+				if (!IsExactReversedRoute(found, candidate, destination, isBlocked, isFactFootprint))
+					continue;
+
+				origin = candidate;
+				route = found;
+				return true;
+			}
+
+			return false;
+		}
+
+		public static string FirstAvailableType(IEnumerable<string> preferenceOrder, Func<string, bool> isAvailable)
+		{
+			if (preferenceOrder == null || isAvailable == null)
+				return null;
+
+			return preferenceOrder.FirstOrDefault(isAvailable);
+		}
+
 		public static bool Overlaps(ConstructionYardEnclosurePlan plan, IEnumerable<CPos> occupiedCells)
 		{
 			if (plan == null || occupiedCells == null)

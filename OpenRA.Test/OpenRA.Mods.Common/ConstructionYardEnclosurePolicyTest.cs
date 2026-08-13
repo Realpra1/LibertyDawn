@@ -85,6 +85,107 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
+		public void MissingDestinationsAreCornerFirstThenNearestWithStablePlanTies()
+		{
+			var plan = FactPlan();
+			var blockedCorner = new CPos(49, 49);
+			var present = new HashSet<CPos>(plan.WallCells.Where(c =>
+				c != blockedCorner && c != new CPos(53, 49) && c != new CPos(49, 53) &&
+				c != new CPos(50, 49) && c != new CPos(49, 50)));
+
+			var ordered = ConstructionYardEnclosurePolicy.OrderedLegalMissingCells(plan,
+				new CPos(50, 50), present.Contains, c => c != blockedCorner);
+
+			Assert.That(ordered, Is.EqualTo(new[]
+			{
+				new CPos(53, 49),
+				new CPos(49, 53),
+				new CPos(50, 49),
+				new CPos(49, 50)
+			}));
+			Assert.That(plan.WallCells, Does.Contain(blockedCorner),
+				"A temporary blocker must not mutate or remove the immutable destination.");
+		}
+
+		[Test]
+		public void ExactRouteValidationRejectsReversedOccupiedAndFactCrossingPaths()
+		{
+			var origin = new CPos(51, 53);
+			var destination = new CPos(53, 51);
+			var factCells = new HashSet<CPos>(new[] { new CPos(51, 52) });
+			var occupied = new HashSet<CPos>();
+			var exactReversedPath = new[]
+			{
+				destination, new CPos(53, 52), new CPos(52, 53), origin
+			};
+
+			Assert.That(ConstructionYardEnclosurePolicy.IsExactReversedRoute(exactReversedPath,
+				origin, destination, occupied.Contains, factCells.Contains), Is.True);
+			Assert.That(ConstructionYardEnclosurePolicy.IsExactReversedRoute(exactReversedPath.Reverse(),
+				origin, destination, occupied.Contains, factCells.Contains), Is.False);
+
+			occupied.Add(new CPos(52, 53));
+			Assert.That(ConstructionYardEnclosurePolicy.IsExactReversedRoute(exactReversedPath,
+				origin, destination, occupied.Contains, factCells.Contains), Is.False);
+			occupied.Clear();
+			factCells.Add(new CPos(53, 52));
+			Assert.That(ConstructionYardEnclosurePolicy.IsExactReversedRoute(exactReversedPath,
+				origin, destination, occupied.Contains, factCells.Contains), Is.False);
+		}
+
+		[Test]
+		public void ExactRouteValidationRejectsAPathThatBecomesBlockedBeforePlacement()
+		{
+			var origin = new CPos(51, 53);
+			var destination = new CPos(53, 51);
+			var route = new[]
+			{
+				destination, new CPos(53, 52), new CPos(52, 53), origin
+			};
+			var newlyBlocked = new HashSet<CPos> { new CPos(53, 52) };
+
+			Assert.That(ConstructionYardEnclosurePolicy.IsExactReversedRoute(route,
+				origin, destination, newlyBlocked.Contains, _ => false), Is.False,
+				"A route accepted at selection must be rejected if a live blocker arrives before placement.");
+		}
+
+		[Test]
+		public void ExactRouteFallsBackFromDisconnectedNearestAccessOrigin()
+		{
+			var access = new[] { new CPos(52, 53), new CPos(50, 53), new CPos(51, 53) };
+			var destination = new CPos(53, 51);
+			var attempted = new List<CPos>();
+			var alternateRoute = new[]
+			{
+				destination, new CPos(53, 52), new CPos(52, 53), new CPos(51, 53)
+			};
+
+			var found = ConstructionYardEnclosurePolicy.TryFirstExactRoute(access,
+				new CPos(50, 50), destination, _ => true,
+				(candidateOrigin, _) =>
+				{
+					attempted.Add(candidateOrigin);
+					return candidateOrigin == new CPos(51, 53) ? alternateRoute : null;
+				}, _ => false, _ => false, out var origin, out var route);
+
+			Assert.That(found, Is.True);
+			Assert.That(origin, Is.EqualTo(new CPos(51, 53)));
+			Assert.That(route, Is.EqualTo(alternateRoute));
+			Assert.That(attempted, Is.EqualTo(new[] { new CPos(50, 53), new CPos(51, 53) }),
+				"A disconnected nearest origin must not prevent deterministic fallback to another access cell.");
+		}
+
+		[Test]
+		public void WallPreferenceFallsBackWithoutInventingAnotherType()
+		{
+			var preference = new[] { "brik", "sbag", "cycl" };
+			Assert.That(ConstructionYardEnclosurePolicy.FirstAvailableType(preference,
+				type => type == "sbag" || type == "cycl"), Is.EqualTo("sbag"));
+			Assert.That(ConstructionYardEnclosurePolicy.FirstAvailableType(preference,
+				type => type == "wood"), Is.Null);
+		}
+
+		[Test]
 		public void ReservationOverlapUsesActualBuildingFootprintCells()
 		{
 			var plan = FactPlan();

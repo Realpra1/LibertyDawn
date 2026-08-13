@@ -185,7 +185,7 @@ an existing task require a new or revised spec before selection.
   select their ownership role but cannot select a filename or capacity:
 
   ```text
-  python3 scripts/with_resource_slots.py --lock-dir <absolute-round-lock-dir> \
+  python3 scripts/with_resource_slots.py --lock-dir <repository-root>/.agents/locks \
     --large-build-entry worker -- COMMAND...
   ```
 
@@ -198,7 +198,16 @@ an existing task require a new or revised spec before selection.
   then terminates and reaps persistent build servers before releasing. Do not use
   direct `flock` or generic `--resource large-build`.
 - Continue to use generic `scripts/with_resource_slots.py` reservations for game
-  batches; games retain independent capacity two.
+  batches; games retain independent capacity two. `game`, `large-build`, and
+  `policy-scratchpad` are registered repository-global resources. Every round and
+  worktree must pass the main repository's canonical `.agents/locks` directory;
+  the helper rejects alternate namespaces and caller-selected capacities before
+  opening a lock. Retained JSON is last-known metadata only; use `--status` for an
+  authoritative nonblocking flock snapshot of a registered resource.
+- Serialize every Policy Reviewer scratchpad staging, foreground role completion,
+  validation, and promotion with `--resource policy-scratchpad --capacity 1`
+  against that same canonical namespace. Do not background the protected role or
+  release the slot before promotion finishes.
 - A worker may reserve two game slots for a two-game comparison. Use the existing
   `launch-ai-parallel.py` inside the reservation.
 - Keep every game's support directory, logs, saves, replay, map artifact, port,
