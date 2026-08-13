@@ -770,6 +770,7 @@ namespace OpenRA.Mods.Common.Traits
 		void BeginObjectiveHandoff(Mission mission)
 		{
 			mission.Stage = MissionStage.Handoff;
+
 			// The unload/cargo transition can defer order delivery by a scan. Keep the strategic
 			// claim through that narrow gap, but never let a rejected CaptureActor strand it.
 			mission.DeadlineTick = world.WorldTick + Math.Max(Info.ScanInterval, Info.LandingReplanInterval) * 3;
