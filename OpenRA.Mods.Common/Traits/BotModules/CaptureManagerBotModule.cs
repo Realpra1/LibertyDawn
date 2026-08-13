@@ -239,6 +239,20 @@ namespace OpenRA.Mods.Common.Traits
 			}
 		}
 
+		readonly struct CommandoThreatRelevance
+		{
+			public readonly bool CoversOwnedHold;
+			public readonly bool CoversLane;
+			public readonly long DistanceSquared;
+
+			public CommandoThreatRelevance(bool coversOwnedHold, bool coversLane, long distanceSquared)
+			{
+				CoversOwnedHold = coversOwnedHold;
+				CoversLane = coversLane;
+				DistanceSquared = distanceSquared;
+			}
+		}
+
 		const int PendingOrderGraceTicks = 10;
 
 		readonly World world;
@@ -1097,7 +1111,7 @@ namespace OpenRA.Mods.Common.Traits
 				!targetReservations.IsReserved(a.ActorID))
 				.OrderByDescending(a => a.GetSellValue()).ThenBy(a => a.ActorID)
 				.Take(maximumCaptureTargetOptions).ToArray();
-			var threats = CommandoThreats();
+			var threats = CommandoThreats(targets);
 			ReconsiderCommandoHolds(bot, targets, threats);
 
 			var demolitionUnits = world.Actors.Where(IsUnownedIdleCommando)
@@ -1201,16 +1215,62 @@ namespace OpenRA.Mods.Common.Traits
 				IsReservedForTransport(actor));
 		}
 
-		CommandoThreat[] CommandoThreats()
+		CommandoThreat[] CommandoThreats(Actor[] targets)
 		{
+			var specialists = world.Actors.Where(actor => !actor.IsDead && actor.IsInWorld &&
+				actor.Owner == player && Info.DemolitionActorTypes.Contains(actor.Info.Name))
+				.OrderBy(actor => actor.ActorID).Take(maximumCaptureTargetOptions * 4).ToArray();
+			var buffer = WDist.FromCells(Math.Max(0, Info.DemolitionThreatBufferCells)).Length;
 			return world.Actors.Where(actor => !actor.IsDead && actor.IsInWorld &&
 				player.RelationshipWith(actor.Owner) == PlayerRelationship.Enemy)
 				.Select(actor => new CommandoThreat(actor, actor.TraitsImplementing<Armament>()
 					.Where(armament => !armament.IsTraitDisabled)
 					.Select(armament => armament.MaxRange().Length).DefaultIfEmpty(0).Max()))
 				.Where(threat => threat.Range > 0)
-				.OrderByDescending(threat => threat.Value).ThenBy(threat => threat.Actor.ActorID)
+				.Select(threat => new
+				{
+					Threat = threat,
+					Relevance = CommandoThreatCoverage(threat, specialists, targets, buffer)
+				})
+				.OrderByDescending(candidate => candidate.Relevance.CoversOwnedHold)
+				.ThenByDescending(candidate => candidate.Relevance.CoversLane)
+				.ThenBy(candidate => candidate.Relevance.DistanceSquared)
+				.ThenByDescending(candidate => candidate.Threat.Value)
+				.ThenBy(candidate => candidate.Threat.Actor.ActorID)
+				.Select(candidate => candidate.Threat)
 				.Take(maximumCaptureTargetOptions * 4).ToArray();
+		}
+
+		CommandoThreatRelevance CommandoThreatCoverage(CommandoThreat threat, Actor[] specialists, Actor[] targets,
+			int buffer)
+		{
+			var range = threat.Range + buffer;
+			var distanceSquared = long.MaxValue;
+			var coversLane = false;
+			foreach (var specialist in specialists)
+			{
+				var specialistDistance = (long)(threat.Actor.CenterPosition - specialist.CenterPosition).LengthSquared;
+				distanceSquared = Math.Min(distanceSquared, specialistDistance);
+				coversLane |= CaptureTargeting.ThreatCoverageMargin(specialistDistance, range) <= 0;
+				foreach (var target in targets)
+				{
+					var laneDistance = AirThreatGeometry.DistanceSquaredToSegment(threat.Actor.CenterPosition,
+						specialist.CenterPosition, target.CenterPosition);
+					distanceSquared = Math.Min(distanceSquared, laneDistance);
+					coversLane |= CaptureTargeting.ThreatCoverageMargin(laneDistance, range) <= 0;
+				}
+			}
+
+			var coversOwnedHold = false;
+			foreach (var pair in commandoFallbacks.Where(pair => pair.Value.Purpose == CommandoFallbackPurpose.Hold))
+			{
+				var holdDistance = AirThreatGeometry.DistanceSquaredToSegment(threat.Actor.CenterPosition,
+					pair.Key.CenterPosition, world.Map.CenterOfCell(pair.Value.Destination));
+				distanceSquared = Math.Min(distanceSquared, holdDistance);
+				coversOwnedHold |= CaptureTargeting.ThreatCoverageMargin(holdDistance, range) <= 0;
+			}
+
+			return new CommandoThreatRelevance(coversOwnedHold, coversLane, distanceSquared);
 		}
 
 		CommandoThreat[] RouteThreats(Actor specialist, Actor target, CommandoThreat[] threats)
@@ -1367,7 +1427,8 @@ namespace OpenRA.Mods.Common.Traits
 				holdCell.Value, world.WorldTick, world.WorldTick + Math.Max(1, Info.DemolitionHoldReconsiderTicks)));
 			demolitionIdleSince.Remove(unit);
 			Debug("commando {0}#{1} transition=safe-hold destination={2} ownership=recovered " +
-				"reason=no-viable-demolition reconsider={3}", unit.Info.Name, unit.ActorID, holdCell.Value,
+				"reason=no-viable-demolition threat={3} reconsider={4}", unit.Info.Name, unit.ActorID,
+				holdCell.Value, ThreatState(threats),
 				world.WorldTick + Math.Max(1, Info.DemolitionHoldReconsiderTicks));
 		}
 

@@ -226,6 +226,11 @@ namespace OpenRA.Mods.Common.Traits
 			return destinationThreatened && safeDestinationFound;
 		}
 
+		public static long ThreatCoverageMargin(long distanceSquared, int range)
+		{
+			return distanceSquared - (long)range * range;
+		}
+
 		public static bool CanPreemptDemolition(bool actionableCapture, bool plantedCharge)
 		{
 			return actionableCapture && !plantedCharge;

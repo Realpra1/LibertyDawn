@@ -373,6 +373,13 @@ namespace OpenRA.Test.Mods.Common
 				Is.EqualTo(expected));
 		}
 
+		[Test]
+		public void ThreatCoverageMarginPrioritizesLaneCoverageBeforeDistantValue()
+		{
+			Assert.That(CaptureTargeting.ThreatCoverageMargin(distanceSquared: 36, range: 7),
+				Is.LessThan(CaptureTargeting.ThreatCoverageMargin(distanceSquared: 400, range: 10)));
+		}
+
 		[TestCase(false, false, false)]
 		[TestCase(true, true, false)]
 		[TestCase(true, false, true)]
