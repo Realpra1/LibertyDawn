@@ -57,6 +57,7 @@ def main() -> None:
 \t\tBots: ironreaper, ironreaper-observer
 \tSquadManagerBotModule@ironreaper:
 \t\tGroundTargetDebugLogging: true
+\t\tFailsafeTestAdvancedWorkMilliseconds: 15
 
 World:
 \tStartingUnits@cnc100stressnod:
@@ -93,6 +94,7 @@ World:
 \tSquadManagerBotModule@ironreaper:
 \t\tGroundTargetDebugLogging: true
 \t\tFailsafeReconsiderInterval: 75
+\t\tFailsafeTestAdvancedWorkMilliseconds: 15
 
 World:
 \tStartingUnits@cnc100mixednod:

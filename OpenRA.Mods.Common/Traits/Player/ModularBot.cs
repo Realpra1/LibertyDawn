@@ -224,13 +224,17 @@ namespace OpenRA.Mods.Common.Traits
 				ApplyAdvancedModuleStates();
 
 			if (info.AdvancedSquadFailsafeDebugLogging && decision.Transition != "healthy" && decision.Transition != "cooldown")
+			{
+				var advancedBreakdown = string.Join(",", info.AdvancedSquadModules.Select(module =>
+					string.Format("{0}:{1:0.000}", module, advancedElapsed[module])));
 				Log.Write("debug", "Advanced squad failsafe [{0}]: source={1} reliable={2} reason={3} ratio={4:0.000} " +
-					"window={5} total-ms={6:0.000} advanced-ms={7:0.000} share={8:P1} threshold={9:P0} " +
-					"transition={10} module={11} offender={12} disabled={13}.", player.PlayerName,
+					"window={5} total-ms={6:0.000} advanced-ms={7:0.000} module-ms={8} share={9:P1} threshold={10:P0} " +
+					"transition={11} module={12} offender={13} disabled={14}.", player.PlayerName,
 					pacing.Source, pacing.Reliable, decision.Reason, pacing.RealTimeRatio, info.AdvancedSquadSampleInterval,
-					decision.TotalMilliseconds, decision.AdvancedMilliseconds, decision.Share,
+					decision.TotalMilliseconds, decision.AdvancedMilliseconds, advancedBreakdown, decision.Share,
 					info.AdvancedSquadCpuShare, decision.Transition, decision.Module ?? "none",
 					advancedFailsafe.Offender ?? "none", string.Join(",", advancedFailsafe.DisabledModules));
+			}
 		}
 
 		void ApplyAdvancedModuleStates()

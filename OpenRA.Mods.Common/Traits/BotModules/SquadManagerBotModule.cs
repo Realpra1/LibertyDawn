@@ -11,6 +11,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using OpenRA.Mods.Common.Traits.BotModules.Squads;
 using OpenRA.Primitives;
@@ -76,6 +77,9 @@ namespace OpenRA.Mods.Common.Traits
 
 		[Desc("Maximum ticks between degraded fallback reconsiderations. Unchanged active orders are not reissued.")]
 		public readonly int FailsafeReconsiderInterval = 75;
+
+		[Desc("Test-only unsynced advanced-work pressure in milliseconds. Leave at zero outside isolated failsafe evidence maps.")]
+		public readonly int FailsafeTestAdvancedWorkMilliseconds = 0;
 
 		[Desc("Actor types that are considered construction yards (base builders).")]
 		public readonly HashSet<string> ConstructionYardTypes = new HashSet<string>();
@@ -500,6 +504,8 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (FailsafeReconsiderInterval <= 0)
 				throw new YamlException("FailsafeReconsiderInterval must be greater than zero.");
+			if (FailsafeTestAdvancedWorkMilliseconds < 0)
+				throw new YamlException("FailsafeTestAdvancedWorkMilliseconds cannot be negative.");
 			if (FailsafeDirectCombatTypes.Any(t => ExcludeFromSquadsTypes.Contains(t) || AirUnitsTypes.Contains(t) || NavalUnitsTypes.Contains(t)))
 				throw new YamlException("FailsafeDirectCombatTypes cannot include excluded, air, or naval actor types.");
 			foreach (var actorName in FailsafeDirectCombatTypes)
@@ -677,9 +683,23 @@ namespace OpenRA.Mods.Common.Traits
 		void IBotTick.BotTick(IBot bot)
 		{
 			if (advancedBehaviorEnabled)
+			{
+				RunFailsafeTestPressure();
 				AssignRolesToIdleUnits(bot);
+			}
 			else
 				AssignRolesToIdleUnitsDegraded(bot);
+		}
+
+		void RunFailsafeTestPressure()
+		{
+			if (Info.FailsafeTestAdvancedWorkMilliseconds == 0)
+				return;
+
+			var deadline = Stopwatch.GetTimestamp() +
+				(long)Info.FailsafeTestAdvancedWorkMilliseconds * Stopwatch.Frequency / 1000;
+			while (Stopwatch.GetTimestamp() < deadline)
+				;
 		}
 
 		string IAdvancedBotTick.FailsafeModuleId => "SquadManagerBotModule";
