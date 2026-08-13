@@ -17,16 +17,34 @@ namespace OpenRA.Support
 	{
 		readonly string prefix;
 		readonly Dictionary<string, List<BenchmarkPoint>> samples = new Dictionary<string, List<BenchmarkPoint>>();
+		readonly PeriodicStallReport periodicStallReport = new PeriodicStallReport();
 
 		public Benchmark(string prefix)
 		{
 			this.prefix = prefix;
 		}
 
-		public void Tick(int localTick)
+		public void Tick(int localTick, World world)
 		{
 			foreach (var item in PerfHistory.Items)
 				samples.GetOrAdd(item.Key).Add(new BenchmarkPoint(localTick, item.Value.LastValue));
+
+			periodicStallReport.RecordTick(localTick, world);
+		}
+
+		public void Render(int renderFrame)
+		{
+			periodicStallReport.RecordRender(renderFrame);
+		}
+
+		public void BotModule(int tick, int playerIndex, string module, double milliseconds, int queuedOrders)
+		{
+			periodicStallReport.RecordModule(tick, playerIndex, module, milliseconds, queuedOrders);
+		}
+
+		public void LogicPhase(int tick, string phase, double milliseconds)
+		{
+			periodicStallReport.RecordLogicPhase(tick, phase, milliseconds);
 		}
 
 		class BenchmarkPoint
@@ -43,6 +61,7 @@ namespace OpenRA.Support
 
 		public void Write()
 		{
+			periodicStallReport.Write(prefix);
 			foreach (var sample in samples)
 			{
 				var name = sample.Key;

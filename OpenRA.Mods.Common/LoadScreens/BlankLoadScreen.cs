@@ -53,6 +53,8 @@ namespace OpenRA.Mods.Common.LoadScreens
 
 			if (Launch.Headless)
 				Game.ConfigureHeadlessAutomation();
+			else if (Launch.Paced)
+				Game.ConfigurePacedAutomation();
 
 			Ui.ResetAll();
 			Game.Settings.Save();

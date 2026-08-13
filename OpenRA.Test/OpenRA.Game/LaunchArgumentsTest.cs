@@ -80,11 +80,26 @@ namespace OpenRA.Test
 			Assert.That(launch.HeadlessValidationError(), Is.Null);
 		}
 
-		[TestCase("Launch.Headless=true", "Launch.Headless requires Launch.Map or Launch.GameSave.")]
+		[Test]
+		public void AcceptsPacedMapAutomation()
+		{
+			var launch = new LaunchArguments(new Arguments(
+				"Launch.Paced=true",
+				"Launch.Map=test.oramap",
+				"Launch.LobbyCommands=spectate;option gamespeed normal",
+				"Launch.ExitAtTick=5000"));
+
+			Assert.That(launch.Paced, Is.True);
+			Assert.That(launch.HeadlessValidationError(), Is.Null);
+		}
+
+		[TestCase("Launch.Headless=true", "Launch automation requires Launch.Map or Launch.GameSave.")]
 		[TestCase("Launch.Headless=true|Launch.Map=test.oramap|Launch.LobbyCommands=spectate;option gamespeed fastest", "Launch.Headless map games require 'option gamespeed max' in Launch.LobbyCommands.")]
-		[TestCase("Launch.Headless=true|Launch.Connect=localhost:1234|Launch.Map=test.oramap|Launch.LobbyCommands=option gamespeed max", "Launch.Headless supports local automated games only.")]
-		[TestCase("Launch.Headless=true|Launch.Replay=test.orarep", "Launch.Headless does not support replay playback.")]
-		[TestCase("Launch.ExitAtTick=5000|Launch.Map=test.oramap", "Launch.ExitAtTick requires Launch.Headless=true.")]
+		[TestCase("Launch.Headless=true|Launch.Connect=localhost:1234|Launch.Map=test.oramap|Launch.LobbyCommands=option gamespeed max", "Launch automation supports local automated games only.")]
+		[TestCase("Launch.Headless=true|Launch.Replay=test.orarep", "Launch automation does not support replay playback.")]
+		[TestCase("Launch.ExitAtTick=5000|Launch.Map=test.oramap", "Launch.ExitAtTick requires Launch.Headless=true or Launch.Paced=true.")]
+		[TestCase("Launch.Headless=true|Launch.Paced=true|Launch.Map=test.oramap|Launch.LobbyCommands=option gamespeed max", "Launch.Headless and Launch.Paced cannot both be enabled.")]
+		[TestCase("Launch.Paced=true|Launch.Map=test.oramap|Launch.LobbyCommands=option gamespeed max", "Launch.Paced map games require 'option gamespeed normal' in Launch.LobbyCommands.")]
 		public void RejectsInvalidHeadlessAutomation(string arguments, string expectedError)
 		{
 			var launch = new LaunchArguments(new Arguments(arguments.Split('|')));
