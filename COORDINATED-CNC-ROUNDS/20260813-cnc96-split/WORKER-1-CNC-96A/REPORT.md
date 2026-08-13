@@ -570,3 +570,120 @@ testing`. A cycle 5, only if the user authorizes it, should use the already prov
 reachable west/east coordinates, begin with engaged groups, and separately prove
 isolated-infantry crush, outside-range Medium Tank snipe, subsequent Harvester
 reassessment/damage, and Blue-adjacency Stop. It must not add a third cycle-4 game.
+
+## Cycle 5 — focused fixture proof at durable product head
+
+The user authorized one final primary Terra-medium cycle from durable head
+`edefb98bd9282e2fea8636705fe78daee56f3557`. The cycle retained product code and
+CNC authored configuration unchanged: the remaining question was literal runtime
+proof of the cycle-4 endpoint/range repair, not a basis for redesign. Before either
+game the cycle recorded the preservation/scenario table at
+`analysis/20260813-cnc96-split/worker-1-cnc-96a/cycle5/PRESERVATION-AND-SCENARIOS.md`.
+It explicitly preserved actor eligibility/grouping, config-only profile identity,
+target priorities/bounds, detector/weapon/resource meaning, 4-cell and 125-tick
+specialist routing, 75-tick strategy, engagement-only 25-tick safety, stable-plan
+invalidators, and Air's independent 6-cell output.
+
+Exactly two valid games ran. One attempted combined game failed at tick 0 because
+destroying inherited Neutral crates during `WorldLoaded` invoked a crate-removal
+callback against a destroyed world actor. It was corrected by stripping the custom
+map's actor block down to multiplayer spawns and is excluded from the count. No
+third valid game ran.
+
+### Game 1 — inherited ambient-target failure
+
+`cycle5-defenders` used Watson/Nod versus VIKI/GDI, all modules, seed `960501`,
+headless MAX, and the previously proved `38,21` / `138,151` target cells. It reached
+tick 3200 in `9.008s`, exit code 0, with no fatal/exception/desync marker. The
+harness result was a behavior failure: inherited Creeps-owned `arco#183` remained
+on the source map, outranked the deliberately defended package, and both two-tank
+groups selected it at every sampled scan. Each bot performed `43` route searches
+and queued `43` Stop/order batches, always `routed=0`, `withheld=2`, and never
+recorded target damage. Both scripted Harvesters, `e1`, and `mtnk` remained at full
+health through tick 3151. The `avoided-resources=BlueTiberium` string is the route's
+configured avoidance label; the artifact does not identify the actual zero-route
+cause.
+
+Direct performance stayed bounded despite the invalid fixture. Across 6,400
+Stealth outer dispatches the two bots used `239.124ms`; strategy consumed
+`231.692ms/86` calls and local safety `2.673ms/256`. The tick distribution was
+mean/p50/p95/p99/max `1.773/1/3/9/1272.077ms`; only three startup ticks were at
+least 50ms and the worst tick after tick 3 was `31.423ms`.
+
+- Artifact: `analysis/20260813-cnc96-split/worker-1-cnc-96a/games/cycle5-defenders/cycle5-defenders`
+- Fresh Luna narrative: `analysis/20260813-cnc96-split/worker-1-cnc-96a/commenters/cycle5-defenders/NARRATIVE.md`
+
+The narrative correctly marks the missing combat/kill/reassessment evidence. Its
+causal wording that the configured Blue label was the cause of withholding is not
+supported by the log; the factual worker conclusion remains that ambient target
+selection plus an unknown zero-route cause invalidated this behavioral probe.
+
+### Game 2 — partial combined proof
+
+The corrected `cycle5-combined-retry1` map contained only multiplayer spawns before
+Lua created west `harv@38,21` + `e1@37,21`, east `harv@138,151` +
+`mtnk@137,151`, and two separate `vice` targets for Chemical. SkyNet/Nod versus
+IronReaper/GDI, all modules, seed `960502`, headless MAX, reached tick 3200 in
+`8.011s`, exit code 0, with no fatal/exception/desync marker.
+
+The west sequence proves useful specialist target recovery and live detector
+response, but not the named clearing action. The scripted `e1` first took damage at
+tick 551 and died at 576; no `by CrushInfantry` log exists, so the exact attacker
+and crush action remain unknown. SkyNet's two Stealth Tanks then routed to the
+Creeps-owned Harvester. A Stealth-sourced damage callback fired at tick 817 when the
+target had `378868/500000` HP and injected `mhq#64`; at the next recorded local
+safety boundary (tick 826) both `stnk#32/#33` stopped with `detector=True`,
+`engaged-weapon=False`, and `blue-adjacent=False`. The target later died at tick
+1130. Chemical also stopped when physically inside the detector envelope. That is
+shared-control threat safety, so the fixture's initial forbidden-Chemical assertion
+was overstrict rather than evidence of cross-profile target/cache contamination.
+
+The east sequence failed the requested proof. Through tick 2101 the `mtnk` and
+Harvester stayed at full health. Late Air was injected at tick 2601. At tick 2817
+both east actors first recorded damage, but the tank still survived at
+`44727/45000` and the Harvester at `266080/500000` by tick 3151. There was no
+`SnipeTank` selection/kill and no Stealth-sourced callback, so no Blue seeder was
+injected and no `blue-adjacent=True` response could occur. Direct Air evidence is
+present despite the harness expecting the wrong literal `AI air strategy` string:
+Apache/Orca selected and attacked `vice#57`, Generic Air selected `harv#55`, and
+the periodic attribution records independent profile identities.
+
+| Direct identity | total / calls | average | worst | orders |
+|---|---:|---:|---:|---:|
+| Stealth strategy, both AIs | 71.099ms / 86 | 0.827ms | 28.829ms | 4 |
+| Stealth local safety | 2.650ms / 256 | 0.010ms | 1.380ms | 2 |
+| Chemical strategy, both AIs | 27.635ms / 86 | 0.321ms | 8.987ms | 74 |
+| Chemical local safety | 2.015ms / 256 | 0.008ms | 1.627ms | 3 |
+| Air strategy, all profiles | 255.590ms / 51 | 5.012ms | 71.622ms | 24 |
+| Air local safety | 12.770ms / 88 | 0.145ms | 11.789ms | 0 |
+
+The four specialist outer modules consumed `111.154ms` across 12,800 per-tick
+dispatches. The tick distribution was mean/p50/p95/p99/max
+`1.432/1/3/10/1071.437ms`, with six ticks at least 50ms. Three were after startup;
+the worst post-tick-3 tick was `72.910ms` at tick 2686. Runtime at tick 3200 was
+about `618MB` working set, `1.511GB` cumulative managed allocation, and GC counts
+`169/56/13`. Air attribution is correctly denominated and independent; its 51
+strategy calls are not compared as if equal to 86 specialist scans.
+
+- Artifact: `analysis/20260813-cnc96-split/worker-1-cnc-96a/games/cycle5-combined-retry1/cycle5-engagement`
+- Fresh Luna narrative: `analysis/20260813-cnc96-split/worker-1-cnc-96a/commenters/cycle5-combined/NARRATIVE.md`
+
+### Checks, disposition, and manual gate
+
+- Protected CNC compile/map lint: passed, zero warnings/errors.
+- Focused `StealthTankSquadPolicyTest`: `52/52` passed.
+- Both cycle-5 map archives passed CNC MiniYAML validation; Lua passed syntax
+  checking before launch.
+- No product/config file changed. No automated Match Policy Reviewer ran. Each
+  valid game received its own fresh Luna-medium factual narrator.
+
+Proposed status remains `First iteration - testing`. Cycle 5 materially extends
+behavior evidence with Stealth-sourced Harvester damage/destruction, detector
+trigger-to-Stop response, active distinct Chemical work, and isolated Air
+strategy/local-safety attribution. It still does not prove explicit occupied
+`CrushInfantry`, outside-range `SnipeTank` and subsequent east Stealth Harvester
+reassessment, or Blue adjacency. The parent has separately authorized routing a
+fresh Sol-medium cycle 6 after this durable commit; this worker stops here and does
+not begin that cycle. The subsequent acceptance fixture must use ordinary VIKI
+versus Brutalis with no Air units or Air injection, because Air counters Stealth
+and confounds behavioral attribution.
