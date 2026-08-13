@@ -7,8 +7,10 @@
 - Candidate head before integration cycle 1: `41bbdb4d6ce4999a5193d86d6d9cc72497722211`.
 - Candidate head before integration cycle 2:
   `3e89d5ad5b3f8df5f3e819aeb15266573c2a03e4`.
-- Current candidate: this branch's HEAD after the cycle-2 receipt commit; no source
-  repair was required in either cycle.
+- Candidate head before integration cycle 3:
+  `1ace5799d507db0ec9b5103ec95c9714930b4036`.
+- Current candidate: this branch's HEAD after the cycle-3 receipt commit; no source
+  repair was required in cycles 1 through 3.
 - Target: `bleed`; this branch must remain a draft cumulative PR and must never
   merge `bleed` directly.
 - Publication authority: **not granted**. Do not push this branch or create/update
@@ -47,7 +49,7 @@ was performed.
 
 ## Five-cycle integration handoff
 
-Integration cycle count is **2 / 5**. Each cycle must
+Integration cycle count is **3 / 5**. Each cycle must
 use the current candidate head, a fresh Sol-medium focused integration worker,
 two distinct full-engine adversarial CNC scenarios, isolated support/content,
 fresh per-game commentary and policy review, and combined static checks after any
@@ -58,7 +60,7 @@ world tick 1.
 | --- | --- | --- |
 | 1 | CNC-97 transport/capture handoff alongside VIKI and enclosure behavior | complete: two valid games; no source repair |
 | 2 | CNC-98 construction-state transition and crate/region release under concurrent construction | complete: crate/husk pass; CNC-107 fixture inconclusive |
-| 3 | CNC-107 pending wall route/reload and access preservation alongside ordinary AI pressure | pending |
+| 3 | CNC-107 pending wall route/reload and access preservation alongside ordinary AI pressure | complete: exact connected and hostile task fixtures passed; no source repair |
 | 4 | Cross-task resource/order contention, target loss/recovery, and save/reload | pending |
 | 5 | Matched full-regression control and final release review | pending |
 
@@ -134,3 +136,39 @@ cycle counter. Stop after cycle 5 and retain only the safest proven subset.
 - Cycle 2 is consumed exactly once. Cycle 3 must use CNC-107's already-passing
   task fixture or another previously proven route geometry; do not reuse the
   invalid `19,33 -> 19,32 -> 18,31` assumption.
+
+## Integration cycle 3 receipt
+
+- Tested exact candidate: `1ace5799d507db0ec9b5103ec95c9714930b4036`.
+- Reused byte-identical CNC-107 cycle-5 fixtures and their proven canonical
+  launcher setup; no new Fact geometry was authored. Connected fixture SHA-256:
+  `c1f7adf44808a495e56770e89c838db4625ef3a3991ce66c3c2fe6b21d8ab7e1`;
+  hostile fixture SHA-256:
+  `ae40d1588763fb26aed40fe3f3b48e73ef2c1894f0cdf285222071ff30c7926e`.
+  Both used installed content from
+  `/root/github/LibertyDawn/.build/cnc33a/runtime-content`, Skynet versus
+  Brutalis, all ordinary modules, 6000 starting cash, MAX speed, and a 120-second
+  launcher timeout.
+- Exactly two focused full-engine games ran. Connected asymmetric-origin game
+  `round04-c3-connected-final-inventory`, seed `10761`, passed at tick 7600,
+  exit 0, in 15.019 seconds: route origin `(27,31)`, wall confirmation, and the
+  required final-under-pressure inventory were all observed. Hostile sole-route
+  game `round04-c3-hostile-corner-first-terminal`, seed `10762`, passed at tick
+  7600, exit 0, in 19.026 seconds: pre/post-corner probes, the confirmed corner
+  wall at `(28,19)`, bounded no-route final state, and the expected save artifact
+  were present. Neither game logged a fatal error, exception, or desync.
+- No CNC-97/98 fixture additions were made because they would have altered the
+  proven wall geometry. Separate fresh Luna narration and policy review completed
+  for each game. The connected review found the bounded CNC-107 reproduction
+  sufficient while withholding broader policy judgment; the hostile review found
+  the bounded terminal behavior mostly sensible and treated retry/power concerns
+  as later-scenario hypotheses, not release defects.
+- The required post-game Luna code review returned `verdict: clear`, with no
+  advisory concern and no requested source repair. Its sole remaining finding was
+  an advisory evidence risk: matched old-control and broader cross-task contention
+  remain for later cycles. Disposition: continue with planned later-cycle coverage;
+  do not change source or balance in cycle 3.
+- Post-game checks passed: `git diff --check origin/bleed...HEAD`, `make check`
+  (Debug, 0 warnings, 0 errors, interface checks), and Release `OpenRA.Test`.
+- Cycle 3 is consumed exactly once. No source or balance change was made; proceed
+  to cycle 4 without rerunning either fixture.

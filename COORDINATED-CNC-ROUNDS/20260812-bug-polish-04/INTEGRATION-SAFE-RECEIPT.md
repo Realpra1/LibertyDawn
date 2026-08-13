@@ -52,3 +52,25 @@
 - Durable result: integration is **2 / 5**. Cycle 3 should reuse CNC-107's proven
   task fixture/geometry. Publication, push, PR update, and merge authority remain
   absent.
+
+## Integration cycle 3 complete
+
+- Candidate tested: `1ace5799d507db0ec9b5103ec95c9714930b4036`.
+- Exactly two focused full-engine games used byte-identical copies of CNC-107's
+  proven cycle-5 connected and hostile fixtures, their canonical launcher setup,
+  ordinary Skynet/Brutalis AIs with all modules, and installed CNC content.
+- The connected asymmetric-origin game passed at tick 7600 (15.019 seconds),
+  proving the `(27,31)` route, wall confirmation, and final-under-pressure
+  inventory. The hostile sole-route game passed at tick 7600 (19.026 seconds),
+  proving the corner-first probes and placement at `(28,19)`, bounded no-route
+  terminal, and save creation. Both exited 0 without fatal/desync signals.
+- Separate fresh Luna narration and policy review completed for both games. No
+  CNC-97/98 assertion was added because preserving the exact proven wall fixture
+  took precedence.
+- The cycle-3 Luna code review was clear. Its one advisory evidence-risk finding
+  (matched control and broader contention remain untested) was dispositioned to
+  later planned cycles; it requested no repair.
+- No source repair or balance change was made; combined diff, Debug/interface,
+  and Release test checks passed.
+- Durable result: integration is **3 / 5**. Proceed to cycle 4. Publication,
+  push, PR update, and merge authority remain absent.
