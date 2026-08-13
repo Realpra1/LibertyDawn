@@ -26,11 +26,19 @@ logs = support / "Logs"
 logs.mkdir(parents=True, exist_ok=True)
 source = pathlib.Path(arguments["Launch.Map"]).read_text(encoding="utf-8")
 exit_tick = int(arguments.get("Launch.ExitAtTick", "5000"))
-time.sleep(0.15)
 debug = logs / "debug.log"
 if source == "fail":
     debug.write_text("Fatal error from fake launcher\n", encoding="utf-8")
     raise SystemExit(7)
+if source.startswith("sequence:"):
+    (logs / "fake-tick_time.csv").write_text("tick,time [ms]\n", encoding="utf-8")
+    for line in source.splitlines()[1:]:
+        with debug.open("a", encoding="utf-8") as stream:
+            stream.write(line + "\n")
+        time.sleep(0.04)
+    time.sleep(1)
+    raise SystemExit(0)
+time.sleep(0.15)
 debug.write_text(
     "Headless MAX automation enabled\n"
     "Headless MAX automation started map 'Fake Map' with bots: Fake: bot=viki.\n"
@@ -85,6 +93,122 @@ class ParallelLauncherTest(unittest.TestCase):
         ])
         with self.assertRaisesRegex(parallel.ConfigurationError, "gamespeed max"):
             parallel.load_manifest(non_max, 10)
+
+    def test_validates_opt_in_readiness_contract(self):
+        game_map = self.map("map.oramap")
+        ordinary = self.write_manifest([{
+            "name": "ordinary", "map": str(game_map),
+            "lobby_commands": "option gamespeed max",
+        }])
+        _, specs = parallel.load_manifest(ordinary, 10)
+        self.assertIsNone(specs[0].readiness)
+
+        invalid = self.write_manifest([{
+            "name": "invalid", "map": str(game_map),
+            "lobby_commands": "option gamespeed max", "timeout_seconds": 1,
+            "readiness": {
+                "actor_log_patterns": ["ACTOR"],
+                "build_log_patterns": ["BUILD"],
+                "ready_log_pattern": "READY",
+                "timeout_seconds": 1,
+            },
+        }])
+        with self.assertRaisesRegex(parallel.ConfigurationError, "below timeout_seconds"):
+            parallel.load_manifest(invalid, 10)
+
+        self.assertEqual(parallel.maximum_world_tick("fixture evidence tick=1251"), 1251)
+
+    def test_readiness_accepts_ordered_evidence_then_marker(self):
+        result, summary = self.run_readiness_sequence(
+            "valid", [
+                "Headless MAX automation enabled", "Headless MAX automation started map 'Fixture' with bots: Multi0: bot=viki.",
+                "MAX game speed enabled at world tick 0.", "MAX progress: world=1",
+                "CNC89 ACTOR label=scout id=17 type=e1 owner=Multi0 location=32,40 tick=1",
+                "CNC89 BUILD producer=yard id=21 queue=Building item=nuke state=queued tick=1",
+                "CNC89 READY tick=1",
+                "MAX progress: world=5", "Headless MAX automation reached configured exit at world tick 5; exiting.",
+            ]
+        )
+        self.assertEqual(result["readiness"]["state"], "ready")
+        self.assertEqual(result["readiness"]["ready_marker_count"], 1)
+        self.assertGreater(result["valid_world_ticks"], 0)
+        self.assertGreater(summary["valid_world_ticks"], 0)
+
+    def test_premature_marker_is_permanent_failure_with_zero_credit(self):
+        result, summary = self.run_readiness_sequence(
+            "premature", [
+                "MAX progress: world=1", "CNC89 ACTOR label=scout id=17 type=e1 owner=Multi0 location=32,40 tick=1",
+                "CNC89 READY tick=1",
+                "CNC89 BUILD producer=yard id=21 queue=Building item=nuke state=queued tick=2",
+            ]
+        )
+        self.assertEqual(result["readiness"]["state"], "failed")
+        self.assertIn("before all authoritative evidence", result["readiness"]["reason"])
+        self.assertEqual(result["valid_world_ticks"], 0)
+        self.assertEqual(summary["valid_world_ticks"], 0)
+        self.assertLess(result["duration_seconds"], 0.8)
+
+    def test_build_without_actor_is_named_as_missing_actor_evidence(self):
+        result, _ = self.run_readiness_sequence(
+            "missing-actor", [
+                "MAX progress: world=1",
+                "CNC89 BUILD producer=yard id=21 queue=Building item=nuke state=queued tick=1",
+                "CNC89 READY tick=1",
+            ]
+        )
+        self.assertEqual(result["readiness"]["state"], "failed")
+        self.assertTrue(result["readiness"]["missing_actor_patterns"])
+        self.assertFalse(result["readiness"]["missing_build_patterns"])
+
+    def test_duplicate_ready_marker_fails_and_missing_marker_times_out(self):
+        duplicate, _ = self.run_readiness_sequence(
+            "duplicate-ready", [
+                "MAX progress: world=1", "CNC89 ACTOR label=scout id=17 type=e1 owner=Multi0 location=32,40 tick=1",
+                "CNC89 BUILD producer=yard id=21 queue=Building item=nuke state=queued tick=1",
+                "CNC89 READY tick=1 CNC89 READY tick=2",
+            ]
+        )
+        self.assertIn("more than once", duplicate["readiness"]["reason"])
+
+        missing, _ = self.run_readiness_sequence(
+            "missing-ready", [
+                "MAX progress: world=1", "CNC89 ACTOR label=scout id=17 type=e1 owner=Multi0 location=32,40 tick=1",
+                "CNC89 BUILD producer=yard id=21 queue=Building item=nuke state=queued tick=1",
+            ]
+        )
+        self.assertIn("setup exceeded", missing["readiness"]["reason"])
+        self.assertEqual(missing["readiness"]["ready_marker_count"], 0)
+        self.assertEqual(missing["valid_world_ticks"], 0)
+
+        fatal, _ = self.run_readiness_sequence("fatal-before-ready", ["Fatal Lua Error: fixture broke"])
+        self.assertEqual(fatal["readiness"]["reason"], "fatal/crash/desync signal before readiness")
+        self.assertIn("fatal/crash/desync signal present", fatal["reasons"])
+
+    def run_readiness_sequence(self, name, lines):
+        game_map = self.map(f"{name}.oramap", "sequence:\n" + "\n".join(lines))
+        manifest = self.write_manifest([{
+            "name": name,
+            "map": str(game_map),
+            "lobby_commands": "option gamespeed max",
+            "timeout_seconds": 2,
+            "exit_at_tick": 5,
+            "minimum_world_tick": 1,
+            "readiness": {
+                "actor_log_patterns": [r"CNC89 ACTOR label=scout id=\d+ type=e1 owner=Multi0 location=32,40 tick=\d+"],
+                "build_log_patterns": [r"CNC89 BUILD producer=yard id=\d+ queue=Building item=nuke state=queued tick=\d+"],
+                "ready_log_pattern": r"CNC89 READY tick=\d+",
+                "timeout_seconds": 0.8,
+                "maximum_world_tick": 10,
+            },
+        }])
+        output = self.root / f"readiness-{name}"
+        parallel.main([
+            "--manifest", str(manifest), "--output", str(output), "--jobs", "1",
+            "--launcher", str(self.launcher), "--content", str(self.content), "--no-xvfb",
+            "--poll-interval", "0.01", "--progress-interval", "1",
+        ])
+        summary = json.loads((output / "batch-summary.json").read_text(encoding="utf-8"))
+        return summary["runs"][0], summary
 
     def test_failed_child_does_not_hide_or_stop_healthy_sibling(self):
         passing_map = self.map("passing.oramap")
