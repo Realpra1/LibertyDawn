@@ -1153,7 +1153,7 @@ namespace OpenRA
 			automatedExitTick = -1;
 			Log.Write("debug", "{0} automation reached configured exit at world tick {1}; exiting.",
 				IsHeadlessAutomation ? "Headless MAX" : "Paced rendered", world.WorldTick);
-			FinishBenchmark();
+			FinishBenchmark(false);
 		}
 
 		static void TryAutomatedSave(World world)
@@ -1222,16 +1222,18 @@ namespace OpenRA
 			CreateAndStartLocalServer(map.Uid, orders, randomSeed);
 		}
 
-		public static void FinishBenchmark()
+		public static void FinishBenchmark() { FinishBenchmark(true); }
+
+		static void FinishBenchmark(bool naturalGameOver)
 		{
 			if (automatedExitRequested || (benchmark == null && !IsHeadlessAutomation && !IsPacedAutomation))
 				return;
 
 			automatedExitRequested = true;
 			benchmark?.Write();
-			if (IsHeadlessAutomation)
+			if (naturalGameOver && IsHeadlessAutomation)
 				Log.Write("debug", "Headless MAX automation reached natural game over; exiting.");
-			else if (IsPacedAutomation)
+			else if (naturalGameOver && IsPacedAutomation)
 				Log.Write("debug", "Paced rendered automation reached natural game over; exiting.");
 
 			Exit();

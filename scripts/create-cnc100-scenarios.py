@@ -58,7 +58,13 @@ def main() -> None:
 \t\tBots: ironreaper, ironreaper-observer
 \tSquadManagerBotModule@ironreaper:
 \t\tGroundTargetDebugLogging: true
+\tStealthTankSquadBotModule:
+\t\tDebugLogging: true
 \t\tFailsafeTestAdvancedWorkMilliseconds: 15
+\t\tFailsafeTestAdvancedWorkFromTick: 80
+\t\tFailsafeTestAdvancedWorkUntilTick: 280
+\tStealthTankSquadBotModule@chemical:
+\t\tDebugLogging: true
 
 World:
 \tStartingUnits@cnc100stressnod:
@@ -100,6 +106,8 @@ World:
 \tStealthTankSquadBotModule@chemical:
 \t\tDebugLogging: true
 \t\tFailsafeTestAdvancedWorkMilliseconds: 15
+\t\tFailsafeTestAdvancedWorkFromTick: 60
+\t\tFailsafeTestAdvancedWorkUntilTick: 300
 
 World:
 \tStartingUnits@cnc100mixednod:
@@ -107,7 +115,7 @@ World:
 \t\tClassName: CNC-100 mixed-owner blocked topology
 \t\tFactions: nod
 \t\tBaseActor: mcv
-\t\tSupportActors: harv, sharv, harv, e6, rmbo, truck, tran, heli, stnk, arty, msam, e1, e1, e3, e4, bggy, bike, ltnk, ftnk
+\t\tSupportActors: harv, sharv, harv, e6, rmbo, truck, tran, heli, stnk, stnk, stnk, stnk, ctnk, ctnk, ctnk, ctnk, arty, msam, e1, e1, e3, e4, bggy, bike, ltnk, ftnk
 \t\tOuterSupportRadius: 16
 \t\tUpgrades: upgrade.covert1, upgrade.covert2, upgrade.covert3, upgrade.recon1, upgrade.recon2, upgrade.recon3, upgrade.economy1, upgrade.economy2, upgrade.economy3
 \tStartingUnits@cnc100mixedgdi:
@@ -115,7 +123,7 @@ World:
 \t\tClassName: CNC-100 mixed-owner blocked topology
 \t\tFactions: gdi
 \t\tBaseActor: mcv
-\t\tSupportActors: harv, sharv, harv, e6, rmbo, truck, tran, orca, mlrs, msam, e1, e1, e3, e4, jeep, mtnk, htnk, apc
+\t\tSupportActors: harv, sharv, harv, e6, rmbo, truck, tran, orca, stnk, stnk, stnk, stnk, ctnk, ctnk, ctnk, ctnk, mlrs, msam, e1, e1, e3, e4, jeep, mtnk, htnk, apc
 \t\tOuterSupportRadius: 16
 \t\tUpgrades: upgrade.covert1, upgrade.covert2, upgrade.covert3, upgrade.recon1, upgrade.recon2, upgrade.recon3, upgrade.economy1, upgrade.economy2, upgrade.economy3
 """

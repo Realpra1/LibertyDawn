@@ -94,7 +94,48 @@ namespace OpenRA.Test
 			Assert.That(controller.Update(Healthy, 100, quiet).Transition, Is.EqualTo("cooldown"));
 			Assert.That(controller.Update(Healthy, 100, quiet).Transition, Is.EqualTo("enabled-probe"));
 			Assert.That(controller.DisabledModules, Is.Empty);
+			Assert.That(controller.Update(Healthy, 100, quiet).Transition, Is.EqualTo("probe-pending"));
+			var recovered = controller.Update(Healthy, 100, quiet);
+			Assert.That(recovered.Transition, Is.EqualTo("recovered"));
+			Assert.That(recovered.Module, Is.EqualTo("first"));
 			Assert.That(controller.Update(Healthy, 100, quiet).Transition, Is.EqualTo("healthy"));
+		}
+
+		[Test]
+		public void RecoveryProbeRequiresReliableHealthyConfirmation()
+		{
+			var controller = Create("advanced");
+			var pressure = new Dictionary<string, double> { { "advanced", 75 } };
+			var quiet = new Dictionary<string, double> { { "advanced", 0 } };
+			controller.Update(Slow, 100, pressure);
+			controller.Update(Slow, 100, pressure);
+			controller.Update(Healthy, 100, quiet);
+			controller.Update(Healthy, 100, quiet);
+			controller.Update(Healthy, 100, quiet);
+
+			Assert.That(controller.Update(Maximum, 100, quiet).Transition, Is.EqualTo("probe-pending"));
+			Assert.That(controller.Update(Healthy, 100, quiet).Transition, Is.EqualTo("probe-pending"));
+			Assert.That(controller.Update(Healthy, 100, quiet).Transition, Is.EqualTo("recovered"));
+			Assert.That(controller.IsEnabled("advanced"), Is.True);
+		}
+
+		[Test]
+		public void GlobalLagDoesNotReshedAProbeThatIsNotTheDominantModule()
+		{
+			var controller = Create("advanced", "other");
+			var pressure = new Dictionary<string, double> { { "advanced", 75 }, { "other", 5 } };
+			var quiet = new Dictionary<string, double> { { "advanced", 0 }, { "other", 0 } };
+			controller.Update(Slow, 100, pressure);
+			controller.Update(Slow, 100, pressure);
+			controller.Update(Healthy, 100, quiet);
+			controller.Update(Healthy, 100, quiet);
+			controller.Update(Healthy, 100, quiet);
+
+			var otherPressure = new Dictionary<string, double> { { "advanced", 5 }, { "other", 75 } };
+			Assert.That(controller.Update(Slow, 100, otherPressure).Transition, Is.EqualTo("probe-pending"));
+			Assert.That(controller.IsEnabled("advanced"), Is.True);
+			Assert.That(controller.Update(Healthy, 100, quiet).Transition, Is.EqualTo("probe-pending"));
+			Assert.That(controller.Update(Healthy, 100, quiet).Transition, Is.EqualTo("recovered"));
 		}
 
 		[Test]

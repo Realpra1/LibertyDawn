@@ -1069,6 +1069,7 @@ namespace OpenRA.Mods.Common.Traits
 					!IsReservedForSpecialBehavior(a) &&
 					!activeUnits.Contains(a));
 
+			var adoptedGroundActors = new List<Actor>();
 			foreach (var a in newUnits)
 			{
 				if (Info.AirUnitsTypes.Contains(a.Info.Name))
@@ -1095,6 +1096,7 @@ namespace OpenRA.Mods.Common.Traits
 				}
 				else if (Info.UseCohesiveGroundSquad)
 				{
+					adoptedGroundActors.Add(a);
 					var ground = GetSquadOfType(SquadType.GeneralAttack);
 					if (ground == null)
 						unitsHangingAroundTheBase.Add(a);
@@ -1105,10 +1107,19 @@ namespace OpenRA.Mods.Common.Traits
 					}
 				}
 				else
+				{
+					adoptedGroundActors.Add(a);
 					unitsHangingAroundTheBase.Add(a);
+				}
 
 				activeUnits.Add(a);
 			}
+
+			// Keep actor-level evidence bounded: oversized initial rosters are not useful handoff telemetry.
+			if (Info.GroundTargetDebugLogging && adoptedGroundActors.Count > 0 && adoptedGroundActors.Count <= 32)
+				Log.Write("debug", "Squad ordinary adoption [{0}]: owner=SquadManagerBotModule actors={1}.",
+					Player.PlayerName, string.Join(",", adoptedGroundActors
+						.OrderBy(a => a.ActorID).Select(a => a.Info.Name + "#" + a.ActorID)));
 
 			// Notifying here rather than inside the loop, should be fine and saves a bunch of notification calls
 			foreach (var n in notifyIdleBaseUnits)

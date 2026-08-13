@@ -105,6 +105,12 @@ namespace OpenRA.Mods.Common.Traits
 				healthySamples = 0;
 				if (recoveryProbe != null)
 				{
+					var dominant = enabledTimes.Where(kv => kv.Value > 0).OrderByDescending(kv => kv.Value)
+						.ThenBy(kv => Array.IndexOf(moduleOrder, kv.Key)).Select(kv => kv.Key).FirstOrDefault();
+					if (!string.Equals(dominant, recoveryProbe, StringComparison.Ordinal))
+						return new AdvancedBotFailsafeDecision("probe-pending", recoveryProbe, reason,
+							advancedMilliseconds, totalMilliseconds);
+
 					disabled.Add(recoveryProbe);
 					var failedProbe = recoveryProbe;
 					offender = failedProbe;
@@ -127,7 +133,26 @@ namespace OpenRA.Mods.Common.Traits
 			}
 
 			breachSamples = 0;
-			recoveryProbe = null;
+			if (recoveryProbe != null)
+			{
+				if (!pacing.Reliable)
+				{
+					healthySamples = 0;
+					return new AdvancedBotFailsafeDecision("probe-pending", recoveryProbe, reason,
+						advancedMilliseconds, totalMilliseconds);
+				}
+
+				if (++healthySamples < recoverySamplesRequired)
+					return new AdvancedBotFailsafeDecision("probe-pending", recoveryProbe, reason,
+						advancedMilliseconds, totalMilliseconds);
+
+				var recovered = recoveryProbe;
+				recoveryProbe = null;
+				healthySamples = 0;
+				return new AdvancedBotFailsafeDecision("recovered", recovered, reason,
+					advancedMilliseconds, totalMilliseconds);
+			}
+
 			if (disabled.Count == 0)
 			{
 				healthySamples = 0;
