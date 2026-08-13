@@ -10,21 +10,51 @@ when the dependency section directs it.
 
 - Worker: `worker-5-cnc-51`
 - Task: `CNC-51 — Transport-helicopter unload recovery and threat-safe landing`
-- Status: `Specified`
+- Status: `Complete - testing`
 - Common base branch/SHA: `agent/cnc38-early-viki-infantry-rush` / `09ccdac3c1ecb5134a4751f2bcbd8a7970dfe6bf`
 - Task branch: `agent/round-20260806-cnc51-transport-unload`
 - Intended PR base: `agent/cnc38-early-viki-infantry-rush`
 - Cycle budget: `20` isolated code-change cycles
-- Cycles used: `0`
+- Cycles used: `14`
 - Game/build lock directory: `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260806-bug-polish-01/locks`
 - Game capacity: `2`
 - Large-build capacity: `1`
 - Task report: `/root/github/LibertyDawn/COORDINATED-CNC-ROUNDS/20260806-bug-polish-01/WORKER-5-CNC-51/REPORT.md`
 - Match-analysis directory: `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260806-bug-polish-01/analysis/worker-5-cnc-51`
 - Liberty Dawn design reference: `.agents/references/LIBERTY-DAWN-DESIGN.md`
-- Full-engine game tests completed: `0`
+- Full-engine game tests completed: `51`
+- Game-run summary: runs 02-06 invalid fixture; run 07 discovery; run 08 blocker
+  correction; run 09 negative control; run 10 accepted pinned-base failure
+  reproduction; run 11 cycle-1 changed smoke pass; runs 12-13 invalid stationary-
+  threat boundary placements; run 14 direct-threat pass; runs 15-16 invalid
+  assault fixtures; run 17 helicopter-assault pass; run 18 heavy-drop diagnostic-
+  assertion failure with clean physical outcome; run 19 heavy-drop pass; run 20
+  covered-transition failure; run 21 transition physical pass with diagnostic-
+  assertion failure; run 22 covered-transition pass; run 23 invalid all-covered
+  late-threat fixture; run 24 post-success fixture-observer failure; run 25 late-
+  threat replan pass with post-handoff carrier loss; run 26 carrier-recovery and
+  reuse pass; run 27 invalid grouped-intent literal fixture; run 28 two-of-three
+  sequential fixture; run 29 three-of-three physical exit with mission-2 bounded
+  safe recovery; run 30 invalid objective-dependent moving-threat placement; run
+  31 invalid late-threat timing after useful unload; runs 32-33 live-replan
+  physical passes with queued fixture retirement failure; run 34 clean literal
+  three-rescue live-replan pass; runs 35-36 invalid narrow pickup placement, with
+  run 36 proving rate-limited diagnostics; run 37 clean Archipelago mixed-vehicle
+  pass; run 38 natural endurance pass without observable transport activation;
+  run 39 clean observed natural match with two emergent rescues; run 40 pinned-
+  base natural control; run 41 clean Release natural matched changed game; run 42
+  clean final literal regression; runs 43-45 covered-assembly fallback exposed
+  unsafe post-release disposition and an unrelated immediate rescue confounder;
+  run 46 clean covered-assembly fallback recovery and idle survival; run 47 clean
+  post-fix Archipelago mixed-vehicle regression; run 48 clean post-fix live-threat
+  replan, carrier recovery, and ordinary reuse; run 49 clean fresh-process final
+  literal three-rescue regression; run 50 clean post-fix Release natural match;
+  run 51 clean aircraft-closing-envelope review regression; run 52 strict literal
+  harness invalid because mission 3 selected a different real squad objective and
+  completed after the tick-2000 assertion, although all three useful physical
+  handoffs released safely by tick 3500.
 - Sol-xhigh policy escalation: `unused (requires at least 10 game tests; one maximum)`
-- PR: `none`
+- PR: `https://github.com/Realpra1/LibertyDawn/pull/81`
 
 ## Integrated repair assignment
 
@@ -927,23 +957,584 @@ silently exceed the budget.
 
 ## Cycle journal
 
+Pre-cycle control evidence: pinned-base run 02 loaded the intended Empire Earth4
+fixture, CNC, Cabal/SkyNet bots, MAX/headless automation, and advanced to tick
+4200 with benchmark/replay artifacts. It was invalid because the original
+friendly `mtnk` blocker was recruited and moved from `28,20` to `28,19`; the
+passenger reached the requested cell, so the rescue path did not activate. The
+fixture was corrected without product code by using the ordinary manager-excluded
+mobile `truck`. Evidence:
+`AUTONOMOUS-CNC-LOGS/cnc51-control/pinned-control-run-02/`.
+
+Pinned-base run 03 exposed that `truck` is crushable by the moving Medium Tank;
+the blocker died by the first tick-500 status sample and the fixture's dead-actor
+location probe caused a Lua error. No product code changed. The blocker was
+restored to a non-crushable `mtnk`, with only that fixture blocker kept stopped so
+ordinary squad recruitment cannot move it. Evidence:
+`AUTONOMOUS-CNC-LOGS/cnc51-control/pinned-control-run-03/`.
+
+Pinned-base run 04 proved that a scripted `Stop` does not suppress the engine's
+friendly-mobile nudge: the live blocker again moved to `28,19` and the passenger
+occupied `28,20`. The corrected fixture grants only the blocker the engine-owned
+`Mobile.ImmovableCondition`; passenger/carrier and all managers remain ordinary.
+Evidence: `AUTONOMOUS-CNC-LOGS/cnc51-control/pinned-control-run-04/`.
+
+Pinned-base run 05 held the condition-backed blocker at `28,20`, but the
+passenger stopped at `27,20`; the manager correctly ignores blocked intent already
+inside its four-cell destination tolerance. The corrected connected-map fixture
+adds a small wall enclosure so `CompleteDestinationBlocked` occurs outside that
+tolerance. Evidence:
+`AUTONOMOUS-CNC-LOGS/cnc51-control/pinned-control-run-05/`.
+
+Pinned-base run 06 proved the enclosure (`23,20` versus `32,20`) but exposed that
+Lua `Actor.Move` bypasses `Mobile.ResolveOrder` and therefore never records the
+move intent rescue detection consumes. The corrected discovery fixture reduces
+the real Cabal squad threshold to one so the normal squad manager issues the
+grouped `AttackMove`; no product code changed. Evidence:
+`AUTONOMOUS-CNC-LOGS/cnc51-control/pinned-control-run-06/`.
+
+Pinned-base discovery run 07 used Cabal's real grouped order and confirmed
+destination `33,30`, mission 1 (`tran 554`/`mtnk 553`), physical load, blocker-free
+unload, resumed movement, and release. The final control now creates an immovable-
+condition friendly `harv` at exact `33,30` only after physical load. Evidence:
+`AUTONOMOUS-CNC-LOGS/cnc51-control/pinned-control-run-07/`.
+
+Pinned-base run 08 proved `ImmovableCondition` blocks nudge but not a Harvester's
+own manager-issued movement; the blocker left `33,30`. The condition now also
+drives `Mobile.PauseOnCondition`, retaining a live mobile actor-map blocker while
+preventing self movement. Evidence:
+`AUTONOMOUS-CNC-LOGS/cnc51-control/pinned-control-run-08/`.
+
+Pinned-base negative control run 09 kept the requested blocker at `33,30`, yet
+the old AI unloaded because it commits within four cells and its current unload
+cell was `30,30`. The final reproduction preserves `33,30` occupancy and adds a
+second paused mobile at actual `30,30`, leaving adjacent fallback cells clear.
+Evidence: `AUTONOMOUS-CNC-LOGS/cnc51-control/pinned-control-run-09/`.
+
+Pinned-base control run 10 reproduced the precise failure at SHA
+`09ccdac3c1ecb5134a4751f2bcbd8a7970dfe6bf`, seed `510051`, and fixture checksum
+`72931e7603be21ce21c09a3a7bcece5836e1cf6f0ffcc31214af4f96a6526854`.
+Cabal confirmed bot-owned route failure to `33,30`, created mission 1 for
+`tran 554`/`mtnk 553`, and physically loaded cargo. Paused friendly mobiles stayed
+at current unload cell `30,30` and requested cell `33,30`; cargo remained aboard
+at ticks 1000/2000 with the carrier at `33,30`. The mission logged timeout while
+loaded and only physically exited during return-to-base recovery after the
+original deadline. This identifies the control branch as permissive targetless
+landing search selecting an occupied current cell, followed by strict `Land`
+holding, rather than requested-cell occupancy alone. Evidence:
+`AUTONOMOUS-CNC-LOGS/cnc51-control/pinned-control-run-10/`.
+
+Late-threat run 23 proved the revision-1 carrier was invalidated while the loaded
+helicopter was in flight, but the fixture's Mammoth placed directly on that cell
+covered the complete bounded assault search. The manager correctly held, then
+returned all three passengers to the safe assembly region. This is not evidence
+of alternate-route behavior, so the fixture was narrowed to a shorter-range bike
+approaching from the north; no product code changed after the run. Evidence:
+`AUTONOMOUS-CNC-LOGS/cnc51-control/changed-cycle-07-run-23/`.
+
+Late-threat run 24 narrowed the new threat to a bike at `53,1`. Snapshot 525
+rejected revision-1 carrier `53,7` for `BikeRockets`, selected revision-2 carrier
+`55,8` with three distinct exits, immediately issued its two-waypoint replacement
+route, and physically handed off all three passengers. The artifact is invalid as
+a clean game because the bike then destroyed the carrier and the fixture's
+tick-1000 observer read the dead actor's `Location`, causing a fatal Lua error.
+The next cycle changes only the observer to represent a dead carrier safely.
+Evidence: `AUTONOMOUS-CNC-LOGS/cnc51-control/changed-cycle-07-run-24/`.
+
+Late-threat run 25 repeated seed `510056` with map SHA
+`75cf809324dbecdabaa3382518b1816f6a008765eb5f04ebdb21fec2c802076d`.
+It cleanly reached tick 2200 at 168.981 ticks/s: revision 1 at `53,7` was
+invalidated in flight by the tick-500 bike, snapshot 525 selected revision 2 at
+`55,8`, immediately routed two replacement waypoints, and handed off all three
+passengers. All three remained in world at the planned cells through tick 2000.
+The empty carrier died before tick 1000, however, after the assault mission had
+already released it and generic staging routed it away; later rescue scans had no
+healthy empty transport and emitted repeated diagnostics. Evidence:
+`AUTONOMOUS-CNC-LOGS/cnc51-control/changed-cycle-08-run-25/`.
+
+Carrier-recovery run 26 repeated the identical seed and map after retaining the
+assault mission through an empty-carrier return. The handoff log recorded the
+authoritative passenger IDs/cells, then the planner selected assembly carrier cell
+`28,30` at snapshot 675 with five threats and routed four waypoints. The carrier
+was alive at `31,30` with cargo zero at tick 1000, reached `28,30`, and only then
+released its mission/claims. It was subsequently reused to load and safely recover
+the blocked APC before tick 2000. The unavailable-transport diagnostic emitted
+only the first rate-limited pair during contention. Run 26 passed at tick 2200,
+156.933 ticks/s, with replay/benchmarks. Evidence:
+`AUTONOMOUS-CNC-LOGS/cnc51-control/changed-cycle-09-run-26/`.
+
+Literal-contention discovery run 27 spawned all three enclosed tanks together.
+The real Cabal squad manager grouped them and only the leader retained the move
+intent consumed by rescue detection: mission 1 loaded, selected occupied-cell
+fallback `32,20`/exit `33,19`, physically handed off, and released, while the
+other two tanks reached their enclosure walls without producing independent
+rescue missions. This is invalid as a three-rescue scenario. The fixture will
+spawn each subsequent rescue only after the prior passenger loads so each receives
+an independent normal squad order; no product code changed. Evidence:
+`AUTONOMOUS-CNC-LOGS/cnc51-control/changed-cycle-10-run-27/`.
+
+Literal-contention run 28 sequenced the second tank after the first physical load,
+which produced independent normal route failure and mission 2. Missions 1 and 2
+both planned distinct useful exits, physically handed off, and released without
+timeout. The transport manager legitimately reused carrier 1; because the load
+callback was attached to the carrier rather than resolved from the entered
+passenger, it attributed passenger 2 to rescue 1, did not spawn rescue 3, and did
+not create the second requested-cell blocker. This remains a fixture failure, not
+a product failure. Cycle 11 will resolve load identity from the passenger, delay
+idle staging so each nearby carrier participates, and spawn the moving Mammoth
+after mission 2 has an initial plan. Evidence:
+`AUTONOMOUS-CNC-LOGS/cnc51-control/changed-cycle-10-run-28/`.
+
+Literal-contention run 29 corrected passenger identity and exercised all three
+ordinary rescue missions. Missions 1 and 3 made useful exact handoffs, including
+the map-edge exit at `1,80`; mission 2 selected revision 1 at `32,50`, then the
+late moving Mammoth invalidated it and caused immediate replacement routes for
+revisions 2 and 3. The fixture left that Mammoth permanently covering the entire
+bounded useful region, so the manager truthfully held and then completed its
+bounded safe-recovery unload at `13,7`. All three passengers physically exited,
+but this is not literal acceptance because mission 2 did not resume its original
+objective. The next fixture-only iteration retains the mandatory live replan and
+then removes the crossing threat, leaving a useful zero-threat alternative.
+Evidence: `AUTONOMOUS-CNC-LOGS/cnc51-control/changed-cycle-11-run-29/`.
+
+Literal-contention run 30 physically completed three useful rescues, but the real
+squad manager selected `51,8` rather than the fixture's nearby `33,50` objective
+for mission 2. The fixed Mammoth crossed `33,50`, retired, and never invalidated
+mission 2's revision-1 plan at `51,8`. The batch regex was therefore too weak and
+the apparent pass is rejected. The next fixture-only iteration places the Mammoth
+relative to the loaded carrier late in its route and explicitly requires a
+Mammoth-named plan revision before useful handoff. Evidence:
+`AUTONOMOUS-CNC-LOGS/cnc51-control/changed-cycle-11-run-30-valid/`.
+
+Literal-contention run 31 restored mission 2's nearby objective and all three
+passengers physically exited usefully, but the carrier completed its exact unload
+before the relative Mammoth appeared. The late spawn then killed the already
+handed-off passenger, so the tick-3500 survival assertion also failed. This is a
+fixture timing failure rather than a stale-unload product failure. The next
+fixture-only run returns to the proven post-plan 100-tick timing and covers both
+ordinary objective clusters observed in runs 29-31, then retires both mobile
+threats after revalidation. Evidence:
+`AUTONOMOUS-CNC-LOGS/cnc51-control/changed-cycle-11-run-31/`.
+
+Literal-contention run 32 finally forced the objective-independent live replan:
+mission 2 revision 1 at `51,8` was rejected for Mammoth `638` weapon
+`120mmDual`, revision 2 selected `49,4`/exit `48,4`, and a five-waypoint route
+immediately replaced the stale route. After further moving-threat pressure the
+mission used another safe connected exact plan at `53,2`/exit `54,2`; missions
+1-3 all physically exited, reported useful handoffs, and their passengers were
+alive in world at tick 2000. This is not yet a clean artifact because Lua
+`Destroy()` queued behind the alternate Mammoth's bot movement, so the asserted
+retirement was not immediate, and the tick-3500 assertion rejected mission 1's
+ordinary post-handoff combat death. The fixture will stop both threats before
+destroying them and will assert survival at the completed tick-2000 handoff
+horizon. Evidence: `AUTONOMOUS-CNC-LOGS/cnc51-control/changed-cycle-11-run-32/`.
+
+Literal-contention run 33 repeated the nearby-objective branch with stronger
+revision evidence: mission 2 routed revisions 2 and 3 away from both Mammoth
+weapon profiles, held rather than using a subsequently covered plan, then
+reacquired the original useful `32,50`/`33,49` plan after the threat window. All
+three physical useful handoffs completed. `Stop()` still did not make queued
+`Destroy()` authoritative against new bot orders; the alternate Mammoth survived,
+moved into rescue 1's post-handoff area, and killed its carrier/passenger before
+tick 2000. The final fixture repair uses immediate health `Kill()` for both
+temporary threats. Evidence:
+`AUTONOMOUS-CNC-LOGS/cnc51-control/changed-cycle-11-run-33/`.
+
+Literal-contention run 34 passed at tick 5200 in 28.049 seconds
+(185.323 valid ticks/s), seed `510057`, map SHA
+`34f96775d113714607fbcb97977fd7b586d4af002c6f119d29a0b906a685c8f9`.
+All three normal rescue missions loaded independently after persistent route
+failure and physically handed off at useful exact exits, including map-edge
+`1,80`. Mission 2 revision 1 (`32,50`/`33,49`) was invalidated by Mammoth
+`638`/`120mmDual`; revisions 2 and 3 immediately issued replacement routes,
+then the carrier held while the region remained covered. After both moving
+threats were authoritatively dead, it reacquired the connected original region
+and completed. At tick 2000 all three passengers and carriers were alive, cargo
+was zero, and passengers had resumed movement. No timeout, safe-recovery, fatal,
+or desync pattern occurred. The isolated factual narrative confirms the narrow
+behavioral pass while correctly withholding a winner/control comparison. Evidence:
+`AUTONOMOUS-CNC-LOGS/cnc51-control/changed-cycle-11-run-34/` and
+`analysis/worker-5-cnc-51/cycle-11-literal-comment/NARRATIVE.md`.
+
+Archipelago run 35 used the real map and ordinary IronReaper/Skynet bots, but the
+selected lower-left pickup island exposed only one of four distinct
+Mammoth-passable pickup cells. No wave was created, so this is invalid vehicle
+unload evidence. It also exposed a real diagnostic defect: unchanged
+`rejected wave assembly` and later `no undefended drop site` messages repeated on
+every review interval. Cycle 12 rate-limits unchanged pre-wave heavy-drop
+diagnostics with the configured eight-scan bound and moves the fixture to a wider
+spawn landmass plus a unique undefended enemy helipad on the opposite edge.
+Evidence: `AUTONOMOUS-CNC-LOGS/cnc51-control/changed-cycle-11-run-35-archipelago/`.
+
+Post-fix Archipelago run 36 moved the pickup near spawn 1 but still found only
+one of four distinct Mammoth-passable pickup cells, so it remains invalid unload
+evidence. The product fix behaved as intended: the identical assembly diagnostic
+appeared only 12 times across tick 7000 instead of on every 75-tick review, with
+new occurrences separated by the configured eight-scan window. The next
+fixture-only iteration uses four guaranteed multiplayer-spawn land areas as
+independent pickup regions and adds transient friendly harvester occupancy around
+the unique edge-island helipad target. Evidence:
+`AUTONOMOUS-CNC-LOGS/cnc51-control/changed-cycle-12-run-36-archipelago/`.
+
+Archipelago run 37 passed at tick 7000 in 25.024 seconds (279.672 valid
+ticks/s), seed `510058`, map SHA
+`cf425f8cdb77e1df9f7a21982e65210af82adbd4841c25e552c5518d876e9e8a`.
+Four simultaneous mixed passengers (`htnk,mtnk,htnk,mtnk`) on four guaranteed
+land regions received distinct pickup cells, loaded 4/4, and received distinct
+edge-island carrier/exit plans at `159,159`/`158,158`, `156,159`/`155,158`,
+`159,156`/`158,155`, and `156,156`/`155,155`. Routes used 4/4/7/5
+threat-aware waypoints. All four physically exited, the heavy handoff adopted
+4/4, and the isolated helipad fell from 60000 to 26600 HP by tick 2000 and was
+dead by tick 3500. All four carriers/passengers remained alive with zero cargo.
+The released carriers then performed three ordinary follow-on rescue load/exits,
+showing reservation release and competing-manager reuse. No abort, safe return,
+hold, travel failure, fatal, or desync occurred. Evidence:
+`AUTONOMOUS-CNC-LOGS/cnc51-control/changed-cycle-12-run-37-archipelago/`.
+
+Ordinary-endurance run 38 is predeclared on the stock connected two-player
+Badland Ridges map with default resources, unmodified starts, and ordinary
+IronReaper/Skynet bots. Hypothesis: shared plan snapshots or released claims can
+create false transport work, idle assets, or material MAX slowdown during a full
+economy/combat progression. The only changed dimension from an ordinary match is
+diagnostic collection. Failure is crash/desync, transport diagnostic flood,
+stalled ordinary production/combat, leaked mission state, timeout, or no natural
+outcome; task paths that arise must complete or terminate honestly. Pass requires
+a natural result, normal opening/economy/combat progress, bounded transport work,
+and throughput within the accepted control bound. Seed `510059`, opposing distant
+starts, normal cash, normal modules, and `gamespeed max` are pinned before launch.
+
+Run 38 reached natural game over at tick 35000 in 183.169 seconds (191.077
+ticks/s), with stock-map SHA
+`7311ef9aa55fe0c5968ec6f411590a33c6665783c816c1f9fe79c73dd49246d8`,
+normal IronReaper/Skynet progression, and no crash/desync/fatal pattern. It is a
+clean ordinary endurance result but not task acceptance because default-disabled
+manager diagnostics made transport activation unobservable. Run 39 preserves the
+same stock actors, terrain, resources, starts, bots, and normal modules, changing
+only `TransportManagerBotModule.DebugLogging` through a packaged rules override.
+It pins seed `510060`, package SHA
+`a131db97ce1f5471baeed9bc7d323e41e6b51eceb39f431b85a57d36d8656190`,
+and requires an enabled heavy-drop diagnostic plus at least one transport-manager
+diagnostic before accepting the natural outcome. Evidence:
+`AUTONOMOUS-CNC-LOGS/cnc51-control/changed-cycle-12-run-38-natural/`.
+
+Run 39 passed naturally with SkyNet defeating IronReaper (replay metadata final
+tick 39350) in 145.147 seconds at 241.125 reported ticks/s. It produced two
+emergent ordinary rescues without preloaded actors: `e1` mission 1 chose
+`94,21`/exit `94,22` at snapshot 19050 and physically handed off usefully;
+`ftnk` mission 2 chose `96,96`/exit `95,96` at snapshot 32700 and did likewise.
+Both released promptly, and the carriers returned to ordinary threat-routed
+staging. There was no timeout, claim leak, unsafe hold, crash, fatal, or desync.
+Run 40 is the exact-SHA `09ccdac3...` isolated control using the identical
+package, seed, bots, starts, options, and diagnostic-only override. Its failure
+signals are control launch drift, missing natural result, or an inconclusive
+throughput comparison; its behavioral output will be compared without requiring
+the old controller to emit changed-only exact-plan diagnostics. Evidence:
+`AUTONOMOUS-CNC-LOGS/cnc51-control/changed-cycle-12-run-39-natural-observed/`.
+
+Pinned-base run 40 loaded the identical package/seed/options from detached SHA
+`09ccdac3...`, naturally produced the same SkyNet-over-IronReaper outcome at replay
+tick 31340, and created one late light-tank rescue before game over. The old
+controller did not record a physical completion. Its 516.642 reported ticks/s is
+not a valid comparison to run 39's 241.125 because run 39 used a Debug build while
+the isolated control used Release; differing final ticks also make whole-run
+throughput secondary. Run 41 will rebuild the changed tree in Release and repeat
+the identical seed/package. Acceptance requires no greater than 10% Release
+throughput regression after accounting for its longer natural simulation, plus
+the changed exact physical outcomes. Evidence:
+`AUTONOMOUS-CNC-LOGS/cnc51-control/pinned-control-run-40-natural-observed/`.
+
+Release run 41 passed naturally with the same SkyNet-over-IronReaper outcome at
+replay tick 77614 and 550.807 reported ticks/s, 6.6% above the pinned control's
+516.642 ticks/s rather than regressing. Two late emergent SkyNet rescues loaded
+under a live SAM-covered objective. Each held safely, then used the bounded
+timeout branch to select a threat-routed safe recovery plan, physically exited
+with cargo zero, and released; neither falsely claimed useful objective recovery.
+IronReaper separately made bounded transport requests for stranded units. There
+was no crash, desync, claim leak, unchanged retry, or unsafe unload. The different
+natural duration is ordinary bot nondeterminism, so strategic parity is the shared
+winner while throughput is judged by the reported Release rate and benchmark
+artifacts. Evidence:
+`AUTONOMOUS-CNC-LOGS/cnc51-control/changed-cycle-12-run-41-natural-release/`.
+
+Final-regression run 42 is predeclared as a fresh-process rerun of the strongest
+literal three-rescue artifact, seed `510057`, map SHA
+`34f96775d113714607fbcb97977fd7b586d4af002c6f119d29a0b906a685c8f9`.
+It retains three independent normal rescues, dense mobile and structure exit
+contention, map-edge objective `3,80`, blockers arriving only after departure, an
+MSAM on the direct approach, and moving Mammoths that must invalidate mission 2's
+live route. Failure is fewer than 3/3 physical useful exits, an unchanged plan,
+unsafe recovery/timeout, stale route continuation, leaked cargo/claims, dead
+passenger at the tick-2000 outcome horizon, or missing normal-module evidence.
+Pass requires the configured strategic/threat route logs, live revision 2 or
+later, all three recorded objectives resumed, physical cargo-zero handoffs, and
+clean tick-5200 termination.
+
+Final-regression run 42 passed at tick 5200 in 17.019 seconds (305.456 valid
+ticks/s) from a fresh process with the pinned map checksum. Missions 1-3 loaded
+independently and physically handed off 3/3 with useful-rescue outcomes and cargo
+zero. Mission 2 revision 1 at `32,50`/`33,49` was invalidated by live Mammoth
+`120mmDual`; revisions 2 and 3 issued replacement threat-aware routes, then the
+carrier held when no plan remained safe. After both temporary threats died it
+reacquired the original connected objective region and completed. Mission 3 used
+the bounded map-edge carrier/exit pair `2,80`/`1,80`. At tick 2000 all three
+passengers were in world and moving from their handoffs; all three reservations
+had released. No task timeout, safe recovery, fatal, or desync occurred. Ordinary
+modules later reused carriers for additional emergent rescues, confirming release.
+Evidence:
+`AUTONOMOUS-CNC-LOGS/cnc51-control/changed-cycle-12-run-42-final-literal/`.
+
+Carrier-recovery run 43 is predeclared on the proven late-threat helicopter
+assault, with one new post-handoff perturbation: a fixed MSAM covers the complete
+radius around the original `28,30` assembly cell only after all three passengers
+physically exit. Map SHA
+`55ea4a45ad22500c20dc59f269c97668b486f202bde6c929a345e4f45c412707`,
+seed `510061`, normal VIKI/SkyNet modules. Failure is an assembly-directed stale
+route, unsafe landing in coverage, carrier death, reservation retained through
+tick 2000, or the hard terminal timeout. Pass requires an explicit safe hold, a
+current-position threat-screened fallback after the 300-tick bound, carrier
+arrival/release, and cargo-zero survival.
+
+Run 43 exercised the intended bounded branch but failed the survival signal. The
+post-handoff MSAM rejected the entire assembly search, the carrier held for 300
+ticks, and the current-position fallback selected the exact handoff cell `55,8`.
+It released at tick ~1000 but was dead by tick 2000. Although snapshot safety was
+true at selection time, releasing in the active enemy objective region was not an
+operational recovery. Cycle 13 therefore changes fallback search from the handoff
+cell to a bounded staging center beyond the assembly region, opposite the hostile
+arrival vector; run 44 must retain the same blocker and prove survival/release.
+Evidence:
+`AUTONOMOUS-CNC-LOGS/cnc51-control/changed-cycle-13-run-43-carrier-fallback/`.
+
+Run 44 routed six threat-aware waypoints to the far-side fallback `20,38` and
+released there, proving the revised fallback geometry. It still failed survival:
+the newly released carrier was immediately claimed by the fixture's already-
+blocked APC rescue, damaged en route to that pickup, released, and dead by tick
+2000. The initial attribution to ordinary base restaging was incorrect. The next
+repair still records the released fallback as the carrier's valid idle staging
+cell: idle service leaves an undamaged carrier there while it remains at that
+cell, while it remains unreserved and available to any real rescue/assault, and
+the marker clears after another mission moves it. Evidence:
+`AUTONOMOUS-CNC-LOGS/cnc51-control/changed-cycle-13-run-44-carrier-fallback/`.
+
+Run 45 proved the safe-idle marker did suppress ordinary base restaging, but the
+same fixture-created blocked APC immediately claimed the carrier for rescue
+mission 2. That mission routed toward pickup, observed damage before boarding,
+released, and the carrier died before tick 2000. This is not evidence that the
+fallback marker failed, and excluding marked carriers would violate required
+ordinary reuse. The fixture will retire or unblock that unrelated passenger after
+the assault handoff so the next identical fallback run can observe idle survival
+without disabling normal AI modules. Evidence:
+`AUTONOMOUS-CNC-LOGS/cnc51-control/changed-cycle-13-run-45-carrier-fallback/`.
+
+Run 46 is predeclared with fixture SHA
+`561079bace9ffacf6fd2cce889e62c041cb43710e99ef3fcf979daa7eae7d30c`,
+the same seed `510061`, threats, recovery blocker, normal VIKI/SkyNet modules, and
+fallback survival assertions. The fixture-only correction destroys the enclosed
+APC after it has already forced the real assault selection and after all assault
+passengers exit, preventing that artificial trigger asset from starting an
+unrelated second rescue during the post-release observation. Pass requires the
+far-side fallback, honest release, no base restaging, and the idle unreserved
+carrier alive with cargo zero at tick 2000.
+
+Run 46 passed at tick 2600 in 13.013 seconds (199.742 valid ticks/s). The covered
+assembly search named live MSAM `Patriot` coverage, held for the configured 300
+ticks, selected the far-side `20,38` fallback, routed six threat-aware waypoints,
+arrived at `21,38`, and released. Idle service left the unreserved carrier at its
+recorded safe cell: it was alive at `20,38` with cargo zero at tick 2000. All 3/3
+passengers remained in world at their useful handoff cells, and there was no
+terminal timeout, base-restaging order, fatal, or desync. Evidence:
+`AUTONOMOUS-CNC-LOGS/cnc51-control/changed-cycle-13-run-46-carrier-fallback/`.
+
+Post-fix adversarial run 47 is predeclared as the unchanged Archipelago mixed-
+vehicle package SHA
+`cf425f8cdb77e1df9f7a21982e65210af82adbd4841c25e552c5518d876e9e8a`,
+seed `510058`, normal IronReaper/SkyNet modules. It must load, route, physically
+exit, and adopt all four simultaneous Mammoth/Medium-Tank passengers at distinct
+connected plans, damage the edge-island target, retain cargo zero through tick
+5000, and produce no hold, safe return, abort, fatal, or desync.
+
+Run 47 passed at tick 7000 in 20.022 seconds (349.544 valid ticks/s). Wave 1
+loaded all four mixed Mammoth/Medium-Tank pairs concurrently, claimed four
+distinct carrier/exit plans on the connected target island, routed all four,
+physically exited 4/4, adopted 4/4 into the assault, damaged and then killed the
+target, and retained cargo zero through tick 5000. There was no wave hold, safe
+return, abort, fatal, or desync; later ordinary rescue missions also reused the
+released carriers. Evidence:
+`AUTONOMOUS-CNC-LOGS/cnc51-control/changed-cycle-13-run-47-archipelago/`.
+
+Post-fix adversarial run 48 is predeclared as the unchanged late-threat package
+SHA `75cf809324dbecdabaa3382518b1816f6a008765eb5f04ebdb21fec2c802076d`,
+seed `510056`, normal VIKI/SkyNet modules. It must invalidate revision 1 after the
+tick-500 bike arrives, route and physically complete revision 2 for all 3/3
+passengers, recover the empty carrier to the still-safe assembly region, release
+it for ordinary reuse, and retain carrier/passenger survival at tick 1000 without
+withdrawal, timeout, fatal, or desync.
+
+Run 48 passed at tick 2200 in 12.013 seconds (183.075 valid ticks/s). The tick-500
+bike invalidated revision 1 at `53,7`; revision 2 replaced the active route with
+two threat-aware waypoints to `55,8` and physically handed off 3/3 passengers.
+The empty carrier then routed four waypoints to the safe assembly `28,30`,
+released, and was reused by ordinary rescue mission 2. Carrier and all passengers
+were alive with cargo zero at tick 1000; there was no assault withdrawal, timeout,
+fatal, or desync. Evidence:
+`AUTONOMOUS-CNC-LOGS/cnc51-control/changed-cycle-13-run-48-late-threat/`.
+
+Final-regression run 49 is predeclared from a fresh process using the unchanged
+literal package SHA
+`34f96775d113714607fbcb97977fd7b586d4af002c6f119d29a0b906a685c8f9`,
+seed `510057`, and normal CABAL/SkyNet modules. It retains three independent
+rescues, dense mobile/structure contention, map-edge objective `3,80`, blockers
+arriving only after departure, an MSAM direct-approach screen, and moving Mammoths
+that must invalidate mission 2. Pass requires 3/3 useful physical handoffs,
+revision 2 or later after exact weapon rejection, all claims released, cargo zero
+and all passengers alive at tick 2000, and no task timeout, safe recovery, fatal,
+or desync through tick 5200.
+
+Final-regression run 49 passed at tick 5200 in 18.016 seconds (288.576 valid
+ticks/s). Missions 1-3 independently loaded and physically completed 3/3 useful
+handoffs with cargo zero. Mission 2 revision 1 at `32,50` was invalidated by live
+Mammoth `120mmDual`; revisions 2 and 3 replaced the active route, then the mission
+reacquired its useful objective region after both threats retired. Mission 3 used
+the bounded map-edge carrier/exit `2,80`/`1,80`. At tick 2000 all three passengers
+were alive in world and all mission reservations had released. There was no task
+timeout, safe recovery, fatal, or desync. Evidence:
+`AUTONOMOUS-CNC-LOGS/cnc51-control/changed-cycle-13-run-49-final-literal/`.
+
+Post-fix natural run 50 is predeclared on the unchanged connected Badland Ridges
+diagnostic package SHA
+`a131db97ce1f5471baeed9bc7d323e41e6b51eceb39f431b85a57d36d8656190`,
+seed `510060`, normal IronReaper/SkyNet modules, and the clean Release build. It
+must reach a natural outcome after observable ordinary transport activation with
+no crash/desync/unchanged hold spam. Strategic parity is judged against the prior
+SkyNet win; reported MAX rate must not regress more than 10% from the exact-SHA
+control's 516.642 ticks/s, with transport outcomes assessed from physical exits,
+honest recovery/terminal logs, and released claims rather than activation alone.
+
+Post-fix natural run 50 passed naturally in 80.075 seconds at 561.949 reported
+ticks/s, 8.8% above the pinned exact-SHA control's 516.642 rather than regressing.
+Replay metadata records final tick 48198 and the same strategic outcome as the
+control/prior changed match: SkyNet won and IronReaper lost. Normal production,
+ground infantry-assault missions, idle helicopter staging, and both bots' economy
+and combat continued. IronReaper's ordinary rescue mission 3 selected `73,96`/
+`74,95`, routed seven threat-aware waypoints, physically handed off its passenger
+at `74,95` with cargo zero and a useful-rescue outcome, then released all claims.
+There was no crash, desync, unchanged hold spam, or dishonest transport success.
+Evidence:
+`AUTONOMOUS-CNC-LOGS/cnc51-control/changed-cycle-13-run-50-natural-release/`.
+
+Review-response run 51 is predeclared on the connected occupied-cell fixture with
+one enabled enemy Apache at `47,30`. Its `HeliAGGun` has range 4096 and the
+configured buffer is 1024; speed 160 over the 75-tick revalidation interval makes
+the corrected effective envelope 17120. The first fallback is 15 cells away,
+outside static range-plus-buffer but inside that closing envelope. Failure is a
+static-only acceptance, missing exact aircraft/weapon/range rejection, unsafe
+carrier or exit, retained cargo, withdrawal, timeout, fatal, or desync. Pass
+requires an alternate exact plan, physical useful handoff, and release under
+ordinary Cabal/SkyNet modules.
+
+Run 51 passed to tick 4200 in 22.046 seconds (190.468 valid ticks/s), seed
+`510062`, fixture SHA
+`ae6cc567ccc07c321b02e6ef79d99c9eb82e7f53e729620bd1d68602bb33889a`.
+The snapshot named `heli 559`/`HeliAGGun` at effective range 17120, rejected the
+first fallback, then replaced two later cells as the aircraft moved. Mission 1
+committed carrier `29,30`/exit `29,29`, physically handed off the Medium Tank
+usefully, and released. There was no withdrawal, timeout, fatal, or desync.
+Evidence:
+`AUTONOMOUS-CNC-LOGS/cnc51-control/changed-cycle-14-run-51-aircraft-threat-final/`,
+`analysis/worker-5-cnc-51/cycle-14-aircraft-comment/NARRATIVE.md`, and
+`analysis/worker-5-cnc-51/cycle-14-aircraft-policy/POLICY-REVIEW.md`.
+
+Supplementary exact-head run 52 repeated the literal fixture. It reached tick
+5200 cleanly and all original three missions physically completed useful handoffs
+and released by tick 3500, including mission 2's live Mammoth revision. It is
+invalid as a replacement literal acceptance artifact: mission 3's real squad
+objective was `51,8` rather than the fixture-declared edge `4,80`, and its unload
+finished after the fixture's tick-2000 assertion. No timeout or safe-recovery
+outcome occurred. The mismatch is retained as an evidence-integrity limitation;
+run 49 remains the clean literal acceptance artifact. The Policy Reviewer's
+fixed-cutoff admission proposal is not adopted because production missions own
+real mission deadlines, not a test exit horizon. Evidence:
+`AUTONOMOUS-CNC-LOGS/cnc51-control/changed-cycle-14-run-52-final-literal/`,
+`analysis/worker-5-cnc-51/cycle-14-literal-comment/NARRATIVE.md`, and
+`analysis/worker-5-cnc-51/cycle-14-literal-policy/POLICY-REVIEW.md`.
+
 | Cycle | Commit/change | Failure hypothesis and perturbation | Checks/games | Narrative/policy review | Failure/pass evidence | Decision/next harder test |
 |---|---|---|---|---|---|---|
+| 1 | Shared live threat snapshot, deterministic exact carrier/exit plan, atomic cell claims, targeted exact unload, rescue integration | Old targetless unload selects the occupied current cell; the changed bot must choose a distinct landable/useful exit plan and unload before timeout in the identical fixture. | Release build 0 warnings/errors; 11 focused transport/route tests pass; `make check check-scripts` pass; run 11 passed at tick 4200 with replay/benchmark. Changed throughput 299.652 versus control 322.7 ticks/s (about -7.1%, below 10% threshold). | `cycle-01-pair-comment/NARRATIVE.md`; `cycle-01-pair-policy/POLICY-REVIEW.md`: mostly sensible/medium, materially better in this scenario. Adopt explicit useful-region success and threat/exit hardening; reviewer hash uncertainty is resolved by worker SHA evidence, not by editing the isolated narrative. | Identical seed `510051` and map SHA `72931e7603be21ce21c09a3a7bcece5836e1cf6f0ffcc31214af4f96a6526854`: changed selected carrier `32,30`, exit `33,29`, physically exited and released before tick 1000 with both blockers fixed; control retained cargo through tick 3500 and timed out. Evidence: `AUTONOMOUS-CNC-LOGS/cnc51-control/changed-cycle-01-run-11/`. | Harden multi-passenger exact exits and all-armor threat capture, then test a direct-side live threat before manager adoption. |
+| 2 | Stable multi-passenger exact-exit order encoding, all-armor snapshot capture, replanned-descent routing, explicit useful-rescue versus safe-recovery handoff, bounded first-threat diagnostic | A weapon irrelevant to Light armor may still threaten a Heavy passenger exit; stale descent must route to a replacement, and exact multi-passenger exits must survive order serialization. Direct-side live weapons must reject covered cells without forcing withdrawal. | 12 focused tests pass; `make check check-scripts` and Release build pass with 0 warnings/errors. Runs 12-13 reached tick 4200 but were invalid because paused threats were just outside stationary effective range. Run 14 passed at tick 4200, 299.609 ticks/s, with replay/benchmarks. | `cycle-02-batch-comment/NARRATIVE.md`; `cycle-02-batch-policy/POLICY-REVIEW.md`: mostly sensible/medium. Adopt full-sequence and all-threat boundary tests; retain threat-specific assertion. No escalation: no persistent unresolved policy problem. | Threat fixture SHA `b43cfce150dc50c401ec4a5c0aa3f32aa16f6481c967bd7e60f0a489c8a3c05c`: snapshot found 3 weapons; Mammoth `561`/`MammothMissiles` rejected carrier `32,30` at effective range 8192; planner chose carrier `32,29`/exit `31,30`, physically handed off and released before tick 1000 without withdrawal. Evidence: `AUTONOMOUS-CNC-LOGS/cnc51-control/changed-cycle-02-run-14/`. | Adopt the proven exact multi-exit seam in helicopter infantry assault, keep ground APC unchanged, then exercise cohesion/handoff under a live threat. |
+| 3 | Helicopter-only infantry assault adopts shared multi-exit planner, exact unload, grouped attack handoff, and safe damage/timeout return; ground APC path unchanged. Multi-stage handoff retains all physically delivered survivors after a partial-plan revalidation. | Old helicopter assault unloads targetlessly and treats any damage as permission to unload in place. A loaded wave must instead select complete safe exits, route/revalidate, hand off as a grouped attack, or return to its safe assembly region. | 14 focused transport/route tests pass; `make check check-scripts` and Release build pass with 0 warnings/errors. Runs 15-16 invalid fixture iterations; run 17 passed at tick 2200 with replay/benchmarks, 183.106 ticks/s. | `cycle-03-assault-comment/NARRATIVE.md`; `cycle-03-assault-policy/POLICY-REVIEW.md`: insufficient strategic-outcome evidence/high confidence, while calling the survival-first route/drop decision sensible. Adopt post-drop effect evidence in later games; the suggested APC retry-policy expansion is not adopted because it is fixture-created rescue behavior outside this helicopter-assault change. | Seed `510053`, map SHA `d60536d6fa921b1f3517456fa45e53af8260a52b07afb44aaa824e1aad152ea3`: Mammoth missiles rejected `52,7`; plan chose carrier `53,7`, exits `52,6;53,6;54,7`, used four waypoints, physically exited 3/3, issued grouped target handoff, and released with cargo zero. Evidence: `AUTONOMOUS-CNC-LOGS/cnc51-control/changed-cycle-03-run-17/`. | Adopt the shared planner in heavy-drop aircraft while preserving concurrent pickup and explicit Mammoth squad handoff; instrument post-drop target effect in its Archipelago adversarial game. |
+| 4 | Heavy drop uses snapshot-screened strategic selection, an atomically claimed non-overlapping exact plan set, threat-aware routes, exact exits, safe return, and the preserved Mammoth squad-adoption handoff. | Ten-style concurrent carriers sharing one wave ID must not overwrite claims, select a wrong-island/covered formation, targetlessly unload, or lose the CNC-25 handoff. The first eight-pair connected stress adds combined threats and measured post-drop target effect. | 33 focused transport/route/heavy tests pass; `make check check-scripts` and Release build pass with 0 warnings/errors after removing one obsolete import. Run 18 reached tick 7000 and failed only the diagnostic assertion; run 19 passed at tick 7000 with replay/benchmarks, 303.955 ticks/s. | `cycle-04-heavy-comment/NARRATIVE.md`; `cycle-04-heavy-policy/POLICY-REVIEW.md`: insufficient full-match strategy evidence/high confidence, but disciplined 8/8 delivery, threat rejection, target kill, and carrier recovery made tactical sense. Adopt separate truthful strategic-versus-exact rejection telemetry and future matched/natural outcome evidence; reject any requirement to fabricate a local rejection after strategic screening already chose a clear sector. | Seed `510054`, map SHA `838cd383bffb7b1ec56f04a7eef200ce4241455b30404562d63fa2d33db265a6`: strategic screening rejected `44,8` for MSAM `Patriot` effective range 10240 and selected `60,1`; 8/8 loaded concurrently, received eight distinct carrier/exit plans and routes, physically exited, and were adopted 8/8. The target fell from 210000 to 153800 HP by tick 1000 and was destroyed by tick 2000. Evidence: `AUTONOMOUS-CNC-LOGS/cnc51-control/changed-cycle-04-run-18/` and `changed-cycle-04-run-19/`. | Use a no-safe-site transition to test invalidation, bounded hold/recovery, and claim release; later add matched control/natural outcome rather than treating a factory kill as the strategic verdict. |
+| 5 | Retain rescue recovery objectives across failed plans, add bounded safe current-position fallback planning for rescue/assault return, and treat stopped `FlyIdle` helicopters as retry-idle. | A covered site that later opens must not remain stuck in a stopped aircraft activity; failed recovery must not forget its assembly/base objective and drift back toward the unsafe original destination. | 33 focused tests and `make check check-scripts`/Release build pass. Run 20 exposed `FlyIdle` route starvation; run 21 reached tick 2200 and passed every physical transition assertion but failed the initial hold-reason regex. | `cycle-05-transition-comment/NARRATIVE.md`; `cycle-05-transition-policy/POLICY-REVIEW.md`: insufficient broad evidence/high confidence, but run-21's safe transition made sense and bounded route/commit progress is required. The implemented `FlyIdle` fix converts selected plans into immediate routes; retain mission timeout/current-position fallback as the broader bound. Adopt separate truthful blocker-versus-threat diagnostic categories. | Run 21 held 3 cargo while covered, observed the tick-400 MSAM removal, selected carrier `53,7`/three exits at snapshot 450, routed four waypoints, physically exited 3/3, handed off, and released before tick 1000. The only failed assertion was that the hold's single reason named a weapon: it truthfully named the first blocked target cell even though later candidates were weapon-covered. Evidence: `AUTONOMOUS-CNC-LOGS/cnc51-control/changed-cycle-05-run-20/` and `changed-cycle-05-run-21/`. | Prefer the first threat rejection over a non-threat first candidate when a complete plan fails, then rerun for a clean transition artifact. |
+| 6 | Failed bounded searches report the first concrete threat rejection when present, otherwise the truthful terrain/blocker/connectivity reason. | The all-covered hold must identify the applicable threat/weapon rather than only the occupied objective cell, while the newly opened route must still execute rather than merely log a plan. | 33 focused tests and Release build pass with 0 warnings/errors. Run 22 passed at tick 2200, 183.071 ticks/s, with replay/benchmarks. | `cycle-06-transition-comment/NARRATIVE.md`; `cycle-06-transition-policy/POLICY-REVIEW.md`: mostly sensible/medium. Survival-first hold and prompt exploitation of the opening fit VIKI; adopt post-handoff target/casualty evidence and a late re-cover test, but do not infer match-level improvement from the focused run. | Seed `510055`, map SHA `495c0addb4aabb97bda4875a587578aa93af1dd6ead98179df7d679b6b73e066`: hold named MSAM `559`/`Patriot` effective range 10240; after tick-400 removal snapshot 450 selected carrier `53,7`/three exits, routed four waypoints, physically exited 3/3, handed off, and released before tick 1000. Clean post-fix adversarial scenario 1. Evidence: `AUTONOMOUS-CNC-LOGS/cnc51-control/changed-cycle-06-run-22/`. | Exercise moving/late threat invalidation with a stale plan canceled and a safe alternate route. |
+| 7 | Track the last routed plan revision for rescue and helicopter assault, immediately replace stale in-flight routes, reject empty routes while away from the carrier, and diagnose the exact revalidation reason. | A threat arriving after departure must invalidate revision 1 and cause revision 2 to cancel/replace the old route while the aircraft is still moving; a failed replacement must hold or recover rather than continue stale. | 33 focused tests pass. Run 23 was invalid because a late Mammoth covered the complete search. Run 24 exercised revision 1 to revision 2 and physical 3/3 handoff, but a post-success dead-carrier observer caused fatal Lua. | Pending a clean artifact. | Run 24 selected revision 1 at `53,7`; bike arrival at tick 500 caused snapshot 525 to report `replannedBecause=planned carrier cell covered by bike 565 weapon BikeRockets`, select revision 2 at `55,8`, and immediately log a two-waypoint revision-2 route before exact commit and 3/3 handoff. Evidence: `changed-cycle-07-run-23/` and `changed-cycle-07-run-24/`. | Begin cycle 8 with an observer-only repair, rerun the identical late-threat fixture, and require post-handoff survival/casualty state without Lua failure. |
+| 8 | Observer-only dead-actor handling produced a clean late-threat artifact without changing the revision behavior. | The identical seed and geometry must prove the in-flight cancellation/handoff and reveal post-handoff passenger/carrier state instead of terminating in fixture Lua. | Run 25 passed at tick 2200, 168.981 ticks/s; 33 focused tests pass. | `cycle-08-late-threat-comment/NARRATIVE.md`; `cycle-08-late-threat-policy/POLICY-REVIEW.md`: conditional tactical pass/medium. The replan and 3/3 handoff are sound, but carrier disposition is a separate operational outcome and match-level success remains unknown. | Revision 2 used `55,8`/three exits and all passengers remained in world through tick 2000. The empty carrier died before tick 1000, and a later blocked APC had no healthy empty carrier. Evidence: `changed-cycle-08-run-25/`. | Keep the assault reservation through a carrier-only threat-screened return, record authoritative post-handoff cells, rate-limit unavailable-transport diagnostics, and repeat the same seed. |
+| 9 | Add carrier-only threat-screened recovery plans, retain the assault reservation through safe return, record authoritative handoff cells, and rate-limit persistent blocked/no-carrier diagnostics. | The same late-threat handoff must preserve and release the empty carrier at a verified safe assembly cell, then make it available to the waiting APC rescue instead of losing fleet capacity. | 33 focused tests pass. Run 26 passed at tick 2200, 156.933 ticks/s, with replay/benchmarks. | `cycle-09-carrier-recovery-comment/NARRATIVE.md`; `cycle-09-carrier-recovery-policy/POLICY-REVIEW.md`: conditional tactical pass/medium. Carrier recovery and reuse are sound; the later APC safe recovery preserved life but did not complete its original objective, so match-level success remains unproven. | Seed `510056`, map SHA `75cf809324dbecdabaa3382518b1816f6a008765eb5f04ebdb21fec2c802076d`: exact 3/3 handoff at revision 2; carrier recovery chose `28,30`, routed four waypoints, was alive at tick 1000, released at assembly, and was reused for the APC recovery. Evidence: `changed-cycle-09-run-26/`. | Exercise literal multi-rescue contention with a moving Mammoth and map-edge/structure/mobile exit pressure. |
+| 10 | No product change; construct the literal three-rescue fixture with normal squad-owned movement intent, dense occupancy, a structure, map edge, post-load blockers, MSAM, and moving Mammoth. | Simultaneous passengers may share only one squad intent; sequential passengers must independently activate without losing blocker/threat timing or starving a carrier. | Run 27 completed only mission 1; run 28 completed missions 1 and 2. Both were invalid as three-rescue evidence. | Not material for isolated review. | Run 27 exposed grouped leader-only intent. Run 28 proved sequential spawning produces a second normal mission but exposed carrier-bound callback attribution and idle staging. Evidence: `changed-cycle-10-run-27/`, `changed-cycle-10-run-28/`. | Cycle 11 uses passenger-resolved load identity, sequential third spawn, delayed staging, and post-plan moving Mammoth timing; require 3/3 before further hardening. |
+| 11 | No product change; correct passenger-bound fixture callbacks and stage moving Mammoths after mission 2's initial plan. | All three real squads must trigger independently; a late Mammoth must invalidate an in-flight plan without permitting stale unload, while map-edge/blocker contention remains live. | Run 34 passed at tick 5200, 185.323 ticks/s, after runs 29-33 established fixture timing/objective/retirement bounds. | `cycle-11-literal-comment/NARRATIVE.md`; `cycle-11-literal-policy/POLICY-REVIEW.md`: insufficient match-level evidence/high confidence, but the wait/replan/complete sequence is locally survival-first and no transport blunder is proven. Retain it; test persistent threat bounds and paired strategic outcome before broader claims. | Seed `510057`, SHA `34f96775...`: 3/3 useful physical handoffs; mission 2 routed revisions 2/3 for `120mmDual`/`MammothMissiles`, held under continuing coverage, then reacquired its useful exact region after both threats died. All passengers/carriers alive with zero cargo at tick 2000. Evidence: `changed-cycle-11-run-34/`. | Exercise Archipelago connected-island vehicle unload and an ordinary natural match; capture winner/economy/end-state telemetry and retain the already-proven bounded persistent-threat recovery rather than changing policy from this narrow review. |
+| 12 | Rate-limit unchanged heavy-drop pre-wave blockage diagnostics using the shared configured scan bound; relocate the Archipelago fixture to guaranteed spawn land areas and a unique undefended edge-island target. | A geometrically plausible island setup can fail before boarding, and an unchanged failure can spam every 75 ticks; mixed Mammoth/Medium-Tank pairs still need distinct pickup/exit cells and connected target-island handoff. | Release build 0 warnings/errors; 35 focused tests pass. Runs 35-36 invalid with only 1/4 pickup cells; run 36 proved eight-scan diagnostic limiting. Run 37 passed at tick 7000, 279.672 ticks/s. Natural runs 39/41 physically completed ordinary rescues; run 41 reached natural outcome at 550.807 ticks/s versus pinned control 516.642. Final literal run 42 passed 3/3 at tick 5200, 305.456 ticks/s. | Archipelago: `cycle-12-archipelago-comment/NARRATIVE.md` and `cycle-12-archipelago-policy/POLICY-REVIEW.md`, mostly sensible/medium. Natural pair: `cycle-12-natural-pair-comment/NARRATIVE.md` and `cycle-12-natural-pair-policy/POLICY-REVIEW.md`, mixed/medium; it judges the two SAM-avoiding physical recoveries locally effective but correctly withholds match-level causality because opening rolls diverged. Final literal: `cycle-12-final-literal-comment/NARRATIVE.md` and `cycle-12-final-literal-policy/POLICY-REVIEW.md`, mostly sensible/medium, with no demonstrated transport-policy blunder. Production retry/APC advice is unrelated scope. A fixed-horizon admission rule is rejected because the fixed exit belongs to the test harness, mission 5 had no cargo before cutoff, and ordinary missions already have tested timeout/recovery bounds. | Run 37 loaded/exited/adopted 4/4 and killed the connected target. Release run 41 safely terminated two SAM-covered emergent rescues, retained the control's SkyNet win, and exceeded control throughput by 6.6%. Run 42 completed 3/3 useful handoffs after live replans. Evidence: `changed-cycle-12-run-37-archipelago/`, `pinned-control-run-40-natural-observed/`, `changed-cycle-12-run-41-natural-release/`, `changed-cycle-12-run-42-final-literal/`. | Release/full verification and publication; do not expand into fixture-horizon, production-request, or APC-composition policy. |
+| 13 | Empty assault-carrier recovery gains bounded far-side safe fallback, a hard reservation deadline, and released-fallback idle staging; heavy safe return re-enters timeout-governed travel and attempts an atomic far-side plan set when assembly cells disappear. | A permanently covered assembly could reserve an empty carrier forever; releasing at the handoff cell or immediately restaging into the covered base could kill it. Heavy return invoked from unloading could also remain outside timeout-governed travel. | Release build 0 warnings/errors; 35/35 focused and 442/442 full tests pass; `make check check-scripts` passes. Runs 43-45 exposed fallback/disposition and fixture-reuse confounders. Post-fix runs 46-48 passed covered recovery, Archipelago mixed vehicles, and late-threat recovery/reuse; final literal run 49 passed; Release natural run 50 passed. | `cycle-13-final-batch-comment/NARRATIVE.md`; `cycle-13-final-batch-policy/POLICY-REVIEW.md`: mixed/medium. It endorses safe replan/recovery as sound survival-first policy but does not infer match-level improvement. Harvester/MCV production recovery and undersized ground-APC assault advice are deferred as separate ownership/scope. | Run 46 held under MSAM coverage, routed six waypoints to `20,38`, released, and remained alive/cargo-zero at tick 2000. Run 47 exited/adopted 4/4 mixed vehicles and killed the target. Run 48 replanned 3/3 then recovered/reused the carrier. Run 49 completed 3/3 useful rescues with live Mammoth revisions and edge exit `1,80`. Run 50 naturally completed a useful rescue, retained the SkyNet win, and ran at 561.949 ticks/s (+8.8% versus pinned control). | Publish scoped branch/PR, wait Linux/Windows checks, obtain isolated code review, and respond at most once to material findings. |
+| 14 | Review response commit `cb6a05d5a3`: include enabled `Aircraft.MovementSpeed` alongside ground-mobile speed in the one-replan closing margin; add overflow-bounded pure envelope logic and a carrier/exit boundary regression. | The isolated reviewer found that a live enemy aircraft just outside static weapon-plus-buffer range could close before the next snapshot while receiving zero movement margin. | 82/82 focused transport/air-threat/route tests, 443/443 full Release tests, `make check check-scripts`, `make test`, and Release builds all pass with 0 warnings/errors. Run 51 cleanly exercises the aircraft branch. Run 52 is a strict harness invalid with three eventual safe handoffs. Linux and Windows CI pass on exact product head. | PR review `pr-81-review/PR-REVIEW.md`: `ready with one fix`; applied exactly. Run 51 comment/policy: mostly sensible/medium. Run 52 comment/policy: strict assertion invalid and mixed/medium. Another aircraft old-control pair and fixture-cutoff admission are rejected as unnecessary/broader scope because the task already retains pinned/matched controls and production mission deadlines are not test horizons. | Run 51 proved `HeliAGGun` static 5120 versus corrected dynamic 17120, named the aircraft rejection, replanned twice, physically unloaded usefully, and released. Run 52 preserved safe bounded behavior but missed the artificial tick-2000 pattern after mission 3 selected a different objective; it is not promoted over clean run 49. | Handoff `Complete - testing`: publish report/state only, retain run-52 fixture limitation and no additional product cycle. |
 
 ## Handoff receipt
 
-- Proposed status:
-- Final branch/head:
-- PR and checks:
-- Cycles used:
-- Acceptance evidence:
-- Adversarial evidence:
-- Old-behavior control and comparative result:
-- Match narratives and routine policy-review conclusions:
-- Sol-xhigh policy escalation (unused, or test count/path/conclusion):
-- Final regression:
-- Error/warning and diagnostic-cleanup result:
-- Performance/determinism result:
-- Deferred work:
-- Known failures/risks:
-- Relevant artifact paths:
+- Proposed status: `Complete - testing`
+- Final branch/head: `agent/round-20260806-cnc51-transport-unload` / reviewed
+  product head `cb6a05d5a302b2f1db2f32d2f72f684005a18611`; the handoff-state
+  commit is documentation-only.
+- PR and checks: `https://github.com/Realpra1/LibertyDawn/pull/81`, mergeable to
+  `agent/cnc38-early-viki-infantry-rush`; Linux (.NET 6.0) passed in 2m06s and
+  Windows (.NET 6.0) passed in 3m35s on exact product head `cb6a05d5a3`.
+- Cycles used: `14/20`, including the single permitted review-response cycle.
+- Acceptance evidence: clean run 49 completed the literal three-rescue scenario
+  3/3 with dense contention, edge exit `1,80`, live Mammoth replans, useful
+  physical handoffs, and exact claim release; run 11 decisively fixed the pinned
+  occupied-cell failure.
+- Adversarial evidence: post-recovery-fix runs 46-48 cover no-safe assembly/far-
+  side recovery, Archipelago mixed-vehicle connectivity/adoption, and live-threat
+  replan plus carrier reuse. Review-response run 51 adds the enabled enemy-aircraft
+  ground-weapon closing envelope.
+- Old-behavior control and comparative result: exact pinned SHA `09ccdac3...`
+  retained cargo through tick 3500 and timed out where changed run 11 completed
+  before tick 1000; changed was -7.1%, inside the performance bound. Exact-base
+  natural run 40 and changed Release run 50 both produced a SkyNet win; changed
+  ran at 561.949 versus 516.642 ticks/s (+8.8%).
+- Match narratives and routine policy-review conclusions: cycle 13 `mixed` /
+  `medium`, cycle-14 aircraft `mostly sensible` / `medium`, and cycle-14 literal
+  `mixed` / `medium`. Reviews endorse survival-first threat replan/recovery but do
+  not infer match-level win causality. Fixed-horizon admission, unavailable-
+  harvester recovery, and ground-APC package policy are rejected/deferred to their
+  owning scopes.
+- Sol-xhigh policy escalation (unused, or test count/path/conclusion): unused.
+- Final regression: clean fresh run 49 remains literal acceptance. Supplementary
+  exact-head run 52 is explicitly invalid as a replacement artifact because the
+  real squad selected objective `51,8` instead of fixture edge `4,80` and mission
+  3 completed after tick 2000; all three still handed off usefully and released by
+  tick 3500 with no timeout/safe recovery. The reviewer-required affected-path
+  regression is clean run 51.
+- Error/warning and diagnostic-cleanup result: 82/82 focused and 443/443 full
+  Release tests pass; `make check`, `make check-scripts`, `make test`, and Release
+  compilation pass with zero warnings/errors. Debug diagnostics remain gated and
+  unchanged failures are rate-limited; no temporary per-tick product tracing is
+  committed.
+- Performance/determinism result: stable actor/passenger/cell ordering, atomic
+  claims, bounded 75-tick snapshot reuse and 128 candidates. Matched performance
+  is within bound; run 51 reached 190.468 ticks/s.
+- Deferred work: save/load persistence; adaptive unavailable harvester/MCV
+  production recovery; ground-APC assault composition; richer replay economy/
+  casualty causality; deterministic literal-fixture objective binding.
+- Known failures/risks: low-frequency heavy multi-carrier far-side terminal
+  fallback lacks a dedicated physical branch game but is atomic/bounded and the
+  normal Archipelago path passes. Run 52 documents literal fixture objective/
+  cutoff instability; do not convert the artificial test horizon into production
+  admission policy. No known unsafe aircraft-margin, cargo-retention, claim-leak,
+  compilation, or CI failure remains.
+- Relevant artifact paths: task report
+  `/root/github/LibertyDawn/COORDINATED-CNC-ROUNDS/20260806-bug-polish-01/WORKER-5-CNC-51/REPORT.md`;
+  isolated PR review `analysis/worker-5-cnc-51/pr-81-review/PR-REVIEW.md`;
+  run roots `changed-cycle-13-run-46-carrier-fallback`,
+  `changed-cycle-13-run-47-archipelago`, `changed-cycle-13-run-48-late-threat`,
+  `changed-cycle-13-run-49-final-literal`,
+  `changed-cycle-13-run-50-natural-release`,
+  `changed-cycle-14-run-51-aircraft-threat-final`, and
+  `changed-cycle-14-run-52-final-literal` under
+  `AUTONOMOUS-CNC-LOGS/cnc51-control/`.
