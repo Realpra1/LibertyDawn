@@ -74,3 +74,19 @@
   and Release test checks passed.
 - Durable result: integration is **3 / 5**. Proceed to cycle 4. Publication,
   push, PR update, and merge authority remain absent.
+
+## Integration cycle 4 complete
+
+- Candidate tested: `a735f2afed3b63e88c7c04677a00593c1102bc4a`.
+- Exactly two valid full-engine games reached tick 7600/exit 0 within 16 seconds.
+  The matched control was inconclusive because its map override failed to disable
+  enclosure behavior. The contention run preserved and passed CNC-107 geometry,
+  but authored water rejected the ORCA ground husk and ordinary combat removed
+  the gated crate; CNC-97/98 contention therefore remained inconclusive.
+- Separate fresh Luna narration and policy review completed for each game. Both
+  reviews classified the evidence as insufficient and found no basis for product
+  or balance repair.
+- Combined checks passed; no source or balance change was made.
+- Durable result: integration is **4 / 5**. Cycle 5 must use proven per-task
+  fixtures/toggles and final regression, not novel combined topology. Publication,
+  push, PR update, and merge authority remain absent.

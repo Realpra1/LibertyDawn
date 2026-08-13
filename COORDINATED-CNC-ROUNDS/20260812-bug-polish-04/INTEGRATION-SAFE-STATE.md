@@ -9,8 +9,10 @@
   `3e89d5ad5b3f8df5f3e819aeb15266573c2a03e4`.
 - Candidate head before integration cycle 3:
   `1ace5799d507db0ec9b5103ec95c9714930b4036`.
-- Current candidate: this branch's HEAD after the cycle-3 receipt commit; no source
-  repair was required in cycles 1 through 3.
+- Candidate head before integration cycle 4:
+  `a735f2afed3b63e88c7c04677a00593c1102bc4a`.
+- Current candidate: this branch's HEAD after the cycle-4 receipt commit; no source
+  repair was required in cycles 1 through 4.
 - Target: `bleed`; this branch must remain a draft cumulative PR and must never
   merge `bleed` directly.
 - Publication authority: **not granted**. Do not push this branch or create/update
@@ -49,7 +51,7 @@ was performed.
 
 ## Five-cycle integration handoff
 
-Integration cycle count is **3 / 5**. Each cycle must
+Integration cycle count is **4 / 5**. Each cycle must
 use the current candidate head, a fresh Sol-medium focused integration worker,
 two distinct full-engine adversarial CNC scenarios, isolated support/content,
 fresh per-game commentary and policy review, and combined static checks after any
@@ -61,7 +63,7 @@ world tick 1.
 | 1 | CNC-97 transport/capture handoff alongside VIKI and enclosure behavior | complete: two valid games; no source repair |
 | 2 | CNC-98 construction-state transition and crate/region release under concurrent construction | complete: crate/husk pass; CNC-107 fixture inconclusive |
 | 3 | CNC-107 pending wall route/reload and access preservation alongside ordinary AI pressure | complete: exact connected and hostile task fixtures passed; no source repair |
-| 4 | Cross-task resource/order contention, target loss/recovery, and save/reload | pending |
+| 4 | Cross-task resource/order contention, target loss/recovery, and save/reload | complete: two valid games exposed fixture failures; no source repair |
 | 5 | Matched full-regression control and final release review | pending |
 
 If any repair is needed, create an owning task-scoped repair branch from the
@@ -172,3 +174,34 @@ cycle counter. Stop after cycle 5 and retain only the safest proven subset.
   (Debug, 0 warnings, 0 errors, interface checks), and Release `OpenRA.Test`.
 - Cycle 3 is consumed exactly once. No source or balance change was made; proceed
   to cycle 4 without rerunning either fixture.
+
+## Integration cycle 4 receipt
+
+- Tested exact candidate: `a735f2afed3b63e88c7c04677a00593c1102bc4a`.
+  Exactly two distinct focused full-engine games ran through the canonical
+  launcher with installed CNC content; both reached tick 7600, exit 0, within 16
+  seconds, without fatal, exception, or desync signals. No replacement game ran.
+- Matched feature-disabled comparison, seed `10761`, retained cycle 3's proven
+  connected geometry, actors, lobby, and seed. It reached tick 7600 in 13.018
+  seconds, but the attempted empty-list map override did not disable the inherited
+  enclosure wall types: planning, placement, and confirmation remained active.
+  The comparison is invalid/inconclusive due to fixture configuration, not a
+  concrete product defect.
+- Contention game, seed `40402`, retained the exact connected CNC-107 wall actors
+  and cells while adding VIKI construction/gate and CNC-97 recovery actors on the
+  opposite side. It reached tick 7600 in 15.023 seconds and saved at tick 200.
+  CNC-107 reproduced its `(27,31)` routed placements, confirmations, and final
+  inventory; VIKI repeatedly logged `has-mcv=True`, `crates-allowed=False`, and
+  `regions-allowed=False`. The authored ORCA crash cell `(42,43)` was water, so
+  death-spawn rejected the ground husk and no recovery handoff could occur.
+  Ordinary combat removed the gated crate at tick 2965 without collector
+  assignment. These are fixture/evidence failures, not CNC-97/98 source defects.
+- Separate fresh Luna narration and policy review completed for both games. Both
+  policy reviews returned `insufficient evidence` with high confidence, agreeing
+  that neither invalid toggle nor unspawned/destroyed objective supports a product
+  or balance change.
+- No source or balance repair was made. Combined `git diff --check`, `make check`
+  (Debug, 0 warnings/errors and interface checks), and Release `OpenRA.Test`
+  passed.
+- Cycle 4 is consumed exactly once. Cycle 5 must use proven per-task fixtures and
+  toggles plus final regression; do not author another combined topology.
