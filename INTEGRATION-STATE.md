@@ -103,3 +103,21 @@ ownership and module-handoff behavior as integration acceptance requirements.
 Game B judged save-load continuity mostly sensible with medium confidence. Their
 matched-control and richer combat/board telemetry recommendations are future
 policy-quality work, not a literal integration gap or release blocker.
+
+## Final advisory review disposition
+
+A fresh Terra integrated-candidate advisory review reported one concern: the CNC
+economy field-defense `ScanInterval` differs from the cumulative base (1,500
+versus 25). The concern is rejected as merge/integration drift. Git provenance
+shows exact included task-history commit `82bc63f661` (`Add low-frequency triggered
+field defense`) owns the 1,500-tick value and the accompanying per-tick cached
+invalidation/attack-trigger path. Restoring 25 would undo the accepted task's core
+low-frequency behavior rather than preserve balance. Integration itself introduced
+no new timing value. Cycle-2 fixtures explicitly overrode the interval to 25 only
+to force bounded literal field-assignment evidence; ordinary 1,500-tick strategic
+quality remains task evidence/policy territory, not a newly reproduced combined
+defect. Therefore this advisory does not require cycle 3.
+
+The same Terra review role received one bounded reconsideration with that omitted
+provenance and returned `clear`, `advisory concern: none`: no integration-
+introduced release-safety defect remains.

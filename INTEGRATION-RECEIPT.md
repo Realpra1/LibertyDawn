@@ -120,3 +120,16 @@ are not counted. Luna recommendations for matched strategic controls, temporary
 field-protection visibility, and richer board/combat traces are deferred policy-
 quality work. They do not contradict the demonstrated ownership continuity or
 identify a concrete combined product defect. No cycle-2 product code was changed.
+
+## Final advisory review receipt
+
+A fresh `gpt-5.6-terra` medium integrated-candidate review is stored locally at
+`analysis/20260813-ten-task-playtest/release-review/RELEASE-REVIEW.md`. Its sole
+advisory identified the 25-to-1,500 field-defense scan interval difference. The
+line is owned by included task commit `82bc63f661afa98a55cea9fa3fddf992d93c909e`
+and is coupled to that task's low-frequency triggered-control implementation; it
+is not a merge resolution or integration-cycle change. The advisory is rejected
+as a request to undo reviewed task behavior. The bounded Terra reconsideration at
+`analysis/20260813-ten-task-playtest/release-review/RECONSIDERED-REVIEW.md`
+returned `clear` with no remaining advisory concern. No product repair or cycle 3
+follows.
