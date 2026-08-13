@@ -33,7 +33,8 @@ other worker specs.
    mode above.
    Route any large build, full test/check suite, equivalent `dotnet`/`msbuild`
    suite, or packaging build through the coordinator helper's protected
-   `--large-build-entry reviewer` mode with the round's absolute lock directory.
+   `--large-build-entry reviewer` mode with the main repository's canonical
+   `.agents/locks` directory.
    Never reconstruct a lock filename/capacity or invoke direct `flock`.
 2. Verify observable requirements and forbidden behavior before style. Look for
    hidden queue/order contention, save/load or replay-state omissions, nondeterminism,
