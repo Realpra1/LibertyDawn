@@ -34,3 +34,21 @@
 - No source repair or balance change was made; combined checks passed.
 - Durable result: integration is **1 / 5**; continue with cycle 2. Publication,
   push, PR update, and merge authority remain absent.
+
+## Integration cycle 2 complete
+
+- Candidate tested: `3e89d5ad5b3f8df5f3e819aeb15266573c2a03e4`.
+- Exactly two valid focused full-engine games completed after two world-tick-0
+  Lua fixture failures were repaired without consuming the cycle.
+- The attributed crate/husk game passed: unique `e1` assignment and exact-cell
+  collection were proven, construction restoration gated the second crate and
+  region exploration, and concurrent CNC-97 ORCA-husk recovery completed.
+- The wall game proved safe non-placement but not reconstruction: its authored
+  route crossed the Fact footprint, leaving the legal target `routed=0` after
+  unblock. This is an integration-fixture error and inconclusive CNC-107 evidence,
+  not a concrete source defect.
+- Separate fresh Luna narration and policy review completed for both games.
+- No source repair or balance change was made; combined checks passed.
+- Durable result: integration is **2 / 5**. Cycle 3 should reuse CNC-107's proven
+  task fixture/geometry. Publication, push, PR update, and merge authority remain
+  absent.

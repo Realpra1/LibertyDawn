@@ -5,8 +5,10 @@
 - Release branch: `agent/cnc-20260812-bug-polish-04-release`.
 - Base used: `origin/bleed` at `06c243f3c329f52ba3216725b0bb21f8fc763030`.
 - Candidate head before integration cycle 1: `41bbdb4d6ce4999a5193d86d6d9cc72497722211`.
-- Current candidate: this branch's HEAD after the cycle-1 receipt commit; no source
-  repair was required.
+- Candidate head before integration cycle 2:
+  `3e89d5ad5b3f8df5f3e819aeb15266573c2a03e4`.
+- Current candidate: this branch's HEAD after the cycle-2 receipt commit; no source
+  repair was required in either cycle.
 - Target: `bleed`; this branch must remain a draft cumulative PR and must never
   merge `bleed` directly.
 - Publication authority: **not granted**. Do not push this branch or create/update
@@ -45,7 +47,7 @@ was performed.
 
 ## Five-cycle integration handoff
 
-Integration cycle count is **1 / 5**. Each cycle must
+Integration cycle count is **2 / 5**. Each cycle must
 use the current candidate head, a fresh Sol-medium focused integration worker,
 two distinct full-engine adversarial CNC scenarios, isolated support/content,
 fresh per-game commentary and policy review, and combined static checks after any
@@ -55,7 +57,7 @@ world tick 1.
 | Cycle | Focus | Status |
 | --- | --- | --- |
 | 1 | CNC-97 transport/capture handoff alongside VIKI and enclosure behavior | complete: two valid games; no source repair |
-| 2 | CNC-98 construction-state transition and crate/region release under concurrent construction | pending |
+| 2 | CNC-98 construction-state transition and crate/region release under concurrent construction | complete: crate/husk pass; CNC-107 fixture inconclusive |
 | 3 | CNC-107 pending wall route/reload and access preservation alongside ordinary AI pressure | pending |
 | 4 | Cross-task resource/order contention, target loss/recovery, and save/reload | pending |
 | 5 | Matched full-regression control and final release review | pending |
@@ -96,3 +98,39 @@ cycle counter. Stop after cycle 5 and retain only the safest proven subset.
   `dotnet test OpenRA.Test/OpenRA.Test.csproj -c Release --no-restore`.
 - Conclusion: safe to continue to cycle 2. Cycle 1 is consumed exactly once; do
   not rerun or reinterpret the harness assertion as a third game.
+
+## Integration cycle 2 receipt
+
+- Tested exact candidate: `3e89d5ad5b3f8df5f3e819aeb15266573c2a03e4`.
+- Two initial launches stopped at world tick 0 because the fixtures referenced a
+  Lua-only `ActorID` property; they were repaired and did not consume games or the
+  cycle. Installed content and the canonical isolated launcher were retained.
+- Exactly two valid full-engine games then ran with ordinary AIs and all normal
+  modules. No additional game was run after their evidence was known.
+- Wall game, `Round04 C2 Attributed Fact Wall Reconstruction`, seed `40201`:
+  Brutalis/Iron Reaper/Easiest reached tick 4000, exit 0, in 9.017 seconds with no
+  fatal/desync signal. The initial labeled wall was created and removed, and the
+  temporary blocker was created and removed. The fixture's claimed route
+  `19,33 -> 19,32 -> 18,31` crossed the Fact footprint at `19,32`; the planner
+  correctly kept `18,31=legal` separate from `routed=0`, issued no illegal
+  placement, and did not reconstruct. This is inconclusive fixture evidence, not
+  a CNC-107 source defect or reconstruction proof.
+- Crate/husk game, `Round04 C2 Attributed Crate and Husk Recovery`, seed `40202`:
+  VIKI/Brutalis reached tick 2800, exit 0, in 7.012 seconds and passed every
+  assertion. Unique collector `e1#11` was assigned to labeled crate
+  `scrate#14`; removal at cell `27,22` was attributed to that collector. After a
+  Fact and second labeled crate appeared, VIKI logged `has-mcv=True`,
+  `crates-allowed=False`, `regions-allowed=False`, made no scout assignment, and
+  left the gated crate present. Concurrent CNC-97 transport handoff restored the
+  owned ORCA husk alive, issued a post-restore order, and did not time out.
+- Fresh Luna narration and policy review completed separately for both games.
+  Wall review found only an invalid fixture route assumption. Crate/husk review
+  judged the bounded combined policy mostly sensible, with whole-match impact
+  outside this evidence.
+- No concrete integration defect was established, so no source or balance change
+  was made.
+- Post-game checks passed: `git diff --check origin/bleed...HEAD`, `make check`
+  (Debug, 0 warnings, 0 errors, interface checks), and Release `OpenRA.Test`.
+- Cycle 2 is consumed exactly once. Cycle 3 must use CNC-107's already-passing
+  task fixture or another previously proven route geometry; do not reuse the
+  invalid `19,33 -> 19,32 -> 18,31` assumption.
