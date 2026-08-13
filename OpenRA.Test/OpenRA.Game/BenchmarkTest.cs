@@ -106,6 +106,55 @@ namespace OpenRA.Test
 			Assert.DoesNotThrow(() => benchmark.Write());
 		}
 
+		[TestCase(TestName = "Benchmark surfaces writer open failures without retrying outside its file factory")]
+		public void SurfacesWriterOpenFailure()
+		{
+			var attempts = 0;
+			var benchmark = new Benchmark("run-", filename =>
+			{
+				attempts++;
+				throw new IOException("Expected open failure.");
+			}, 4);
+
+			RecordValue("tick_time", 1);
+			var error = Assert.Throws<IOException>(() => benchmark.Tick(1));
+			Assert.That(error.Message, Is.EqualTo("Expected open failure."));
+			Assert.That(attempts, Is.EqualTo(1));
+		}
+
+		[TestCase(TestName = "Benchmark finalizes a writer when its initial header fails")]
+		public void FinalizesWriterAfterHeaderFailure()
+		{
+			var writer = new RecordingWriter { ThrowOnWriteLineCall = 1 };
+			var benchmark = new Benchmark("run-", filename => writer, 4);
+
+			RecordValue("tick_time", 1);
+			Assert.Throws<IOException>(() => benchmark.Tick(1));
+			Assert.That(writer.DisposeCount, Is.EqualTo(1));
+		}
+
+		[TestCase(TestName = "Benchmark surfaces row and incremental flush failures")]
+		public void SurfacesMidWriteFailures()
+		{
+			var writers = new Dictionary<string, RecordingWriter>();
+			var benchmark = new Benchmark("run-", filename => writers[filename] = new RecordingWriter(), 2);
+
+			RecordValue("tick_time", 1);
+			benchmark.Tick(1);
+			var writer = writers["run-tick_time.csv"];
+			writer.ThrowOnWriteLineCall = writer.WriteLineCount + 1;
+			RecordValue("tick_time", 2);
+			Assert.Throws<IOException>(() => benchmark.Tick(2));
+
+			writer.ThrowOnWriteLineCall = null;
+			writer.ThrowOnFlush = true;
+			RecordValue("tick_time", 3);
+			Assert.Throws<IOException>(() => benchmark.Tick(3));
+			writer.ThrowOnFlush = false;
+			Assert.DoesNotThrow(() => benchmark.Write());
+			Assert.That(writer.DisposeCount, Is.EqualTo(1));
+		}
+
 		static void RecordValue(string channel, double value)
 		{
 			PerfHistory.Increment(channel, value);
@@ -115,6 +164,9 @@ namespace OpenRA.Test
 		sealed class RecordingWriter : StringWriter
 		{
 			public bool ThrowOnDispose { get; set; }
+			public bool ThrowOnFlush { get; set; }
+			public int? ThrowOnWriteLineCall { get; set; }
+			public int WriteLineCount { get; private set; }
 			public int FlushCount { get; private set; }
 			public int DisposeCount { get; private set; }
 			public string Text => ToString().Replace("\r\n", "\n");
@@ -122,7 +174,19 @@ namespace OpenRA.Test
 			public override void Flush()
 			{
 				FlushCount++;
+				if (ThrowOnFlush)
+					throw new IOException("Expected flush failure.");
+
 				base.Flush();
+			}
+
+			public override void WriteLine(string value)
+			{
+				WriteLineCount++;
+				if (ThrowOnWriteLineCall == WriteLineCount)
+					throw new IOException("Expected write failure.");
+
+				base.WriteLine(value);
 			}
 
 			protected override void Dispose(bool disposing)

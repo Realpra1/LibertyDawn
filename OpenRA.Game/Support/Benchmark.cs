@@ -50,7 +50,24 @@ namespace OpenRA.Support
 
 		BenchmarkChannel CreateChannel(string name)
 		{
-			return new BenchmarkChannel(writerFactory($"{prefix}{name}.csv"), flushInterval);
+			var writer = writerFactory($"{prefix}{name}.csv");
+			try
+			{
+				return new BenchmarkChannel(writer, flushInterval);
+			}
+			catch (Exception error)
+			{
+				try
+				{
+					writer.Dispose();
+				}
+				catch (Exception disposeError)
+				{
+					throw new AggregateException(error, disposeError);
+				}
+
+				throw;
+			}
 		}
 
 		static TextWriter CreateWriter(string filename)
@@ -58,6 +75,7 @@ namespace OpenRA.Support
 			var path = Path.Combine(Platform.SupportDir, "Logs");
 			Directory.CreateDirectory(path);
 
+			IOException error = null;
 			for (var i = 0; i < CreateFileMaxRetryCount; i++)
 			{
 				var candidate = Path.Combine(path, i > 0 ? $"{filename}.{i}" : filename);
@@ -65,10 +83,13 @@ namespace OpenRA.Support
 				{
 					return File.CreateText(candidate);
 				}
-				catch (IOException) { }
+				catch (IOException e)
+				{
+					error = e;
+				}
 			}
 
-			throw new ApplicationException($"Error creating benchmark file \"{filename}\"");
+			throw new ApplicationException($"Error creating benchmark file \"{filename}\"", error);
 		}
 
 		public void Write()
