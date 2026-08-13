@@ -62,6 +62,7 @@ class RunSpec:
     forbidden_log_patterns: list[str]
     expected_artifacts: list[str]
     extra_args: list[str]
+    support_maps: list[Path]
 
 
 @dataclass
@@ -223,6 +224,13 @@ def load_manifest(path: Path, default_timeout: float) -> tuple[dict[str, Any], l
             if argument.startswith(ISOLATED_ARGUMENTS):
                 raise ConfigurationError(f"Run '{name}' cannot override isolated argument '{argument}'.")
 
+        support_maps = []
+        for support_map in string_list("support_maps"):
+            path = resolve_path(support_map, base)
+            if not path.is_file():
+                raise ConfigurationError(f"Run '{name}' support map does not exist: {path}")
+            support_maps.append(path)
+
         specs.append(RunSpec(
             name=name,
             source_path=source_path,
@@ -238,6 +246,7 @@ def load_manifest(path: Path, default_timeout: float) -> tuple[dict[str, Any], l
             forbidden_log_patterns=forbidden_log_patterns,
             expected_artifacts=expected_artifacts,
             extra_args=extra_args,
+            support_maps=support_maps,
         ))
 
         if specs[-1].seed is not None and not isinstance(specs[-1].seed, int):
@@ -274,6 +283,14 @@ def prepare_run(
     runtime_dir.mkdir()
     (support_dir / "Content").symlink_to(content, target_is_directory=True)
     create_settings(support_dir / "settings.yaml", settings_template)
+
+    if spec.support_maps:
+        if mod_version is None:
+            raise ConfigurationError("A CNC mod version is required to stage support maps.")
+        maps_dir = support_dir / "maps" / "cnc" / mod_version
+        maps_dir.mkdir(parents=True)
+        for support_map in spec.support_maps:
+            shutil.copy2(support_map, maps_dir / support_map.name)
 
     if spec.source_kind == "map":
         runtime_input = runtime_dir / "input.oramap"

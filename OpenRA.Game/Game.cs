@@ -679,6 +679,8 @@ namespace OpenRA
 							TryAutomatedSave(world);
 
 						PerfHistory.Tick();
+						if (ReferenceEquals(orderManager, OrderManager))
+							benchmark?.Tick(orderManager.LocalFrameNumber);
 					}
 
 					// Wait until we have done our first world Tick before TickRendering
@@ -686,7 +688,6 @@ namespace OpenRA
 						Sync.RunUnsynced(world, () => world.TickRender(worldRenderer));
 				}
 
-				benchmark?.Tick(LocalTick);
 				if (worldTicked && ReferenceEquals(orderManager, OrderManager))
 					TryAutomatedExit(world);
 			}
