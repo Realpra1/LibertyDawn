@@ -107,6 +107,12 @@ namespace OpenRA.Mods.Common.Traits
 			return enabled && StoragePressure(storedResources, resourceCapacity, thresholdPercent);
 		}
 
+		public static bool CanClaimNeedBasedSiloQueue(bool storagePressure, bool queueHasProduction,
+			bool siloActionable, bool siloAlreadyCommitted)
+		{
+			return storagePressure && !queueHasProduction && siloActionable && !siloAlreadyCommitted;
+		}
+
 		public static SmartEconomyRefineryDemand RefineryDemand(int liveHarvesters, int queuedHarvesters,
 			int requestedHarvesters, int liveRefineries, int queuedRefineries, int reservedRefineries,
 			int freeHarvestersPerPendingRefinery, int harvestersPerRefinery, int maximumParallelRefineries,

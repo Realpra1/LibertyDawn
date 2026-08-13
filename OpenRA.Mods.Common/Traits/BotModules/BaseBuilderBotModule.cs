@@ -896,12 +896,11 @@ namespace OpenRA.Mods.Common.Traits
 
 		internal bool TryReserveNeedBasedSilo(ProductionQueue queue, string type)
 		{
-			if (queue == null || queue.AllQueued().Any() || !SmartEconomyWantsSilo ||
-				!NeedBasedSiloTypes.Contains(type))
-				return false;
-
 			RefreshSiloBuildReservation();
-			if (siloBuildReservation != null || CountQueuedOrPendingActors(NeedBasedSiloTypes) > 0)
+			var alreadyCommitted = siloBuildReservation != null ||
+				CountQueuedOrPendingActors(NeedBasedSiloTypes) > 0;
+			if (!SmartEconomyPolicy.CanClaimNeedBasedSiloQueue(SmartEconomyWantsSilo,
+				queue == null || queue.AllQueued().Any(), NeedBasedSiloTypes.Contains(type), alreadyCommitted))
 				return false;
 
 			siloBuildReservation = new SiloBuildReservation

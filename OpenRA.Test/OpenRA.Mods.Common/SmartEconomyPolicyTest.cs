@@ -80,6 +80,20 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
+		public void NeedBasedSiloClaimsOnlyAnActionableFreeUnownedQueueBoundary()
+		{
+			Assert.That(SmartEconomyPolicy.CanClaimNeedBasedSiloQueue(true, false, true, false), Is.True);
+			Assert.That(SmartEconomyPolicy.CanClaimNeedBasedSiloQueue(false, false, true, false), Is.False,
+				"No-pressure construction must retain ordinary tower selection.");
+			Assert.That(SmartEconomyPolicy.CanClaimNeedBasedSiloQueue(true, true, true, false), Is.False,
+				"Pressure must not cancel or displace production that already owns the queue.");
+			Assert.That(SmartEconomyPolicy.CanClaimNeedBasedSiloQueue(true, false, false, false), Is.False,
+				"An unavailable or unaffordable Silo must not create a phantom commitment.");
+			Assert.That(SmartEconomyPolicy.CanClaimNeedBasedSiloQueue(true, false, true, true), Is.False,
+				"Parallel Facts must not duplicate one unresolved Silo commitment.");
+		}
+
+		[Test]
 		public void RefineryDemandCountsQueuesRequestsAndFreePendingHarvesters()
 		{
 			var demand = SmartEconomyPolicy.RefineryDemand(
