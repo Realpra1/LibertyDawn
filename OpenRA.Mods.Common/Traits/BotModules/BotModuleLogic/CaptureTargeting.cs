@@ -179,8 +179,96 @@ namespace OpenRA.Mods.Common.Traits
 		}
 	}
 
+	public readonly struct DemolitionAllocation
+	{
+		public readonly int Unit;
+		public readonly int Target;
+
+		public DemolitionAllocation(int unit, int target)
+		{
+			Unit = unit;
+			Target = target;
+		}
+	}
+
+	public enum DemolitionApproachResponse
+	{
+		Direct,
+		FightThrough,
+		RouteAround,
+		WithdrawOrHold
+	}
+
 	public static class CaptureTargeting
 	{
+		public static bool ConfirmedOwnerless(int firstObservedTick, int worldTick, int graceTicks,
+			bool idle, bool hasActivity, bool reserved, bool transportOwned)
+		{
+			return idle && !hasActivity && !reserved && !transportOwned &&
+				worldTick - firstObservedTick >= System.Math.Max(1, graceTicks);
+		}
+
+		public static DemolitionApproachResponse DemolitionApproach(
+			bool directRouteThreatened, bool favorableFight, bool safeAlternateRoute)
+		{
+			if (!directRouteThreatened)
+				return DemolitionApproachResponse.Direct;
+
+			if (favorableFight)
+				return DemolitionApproachResponse.FightThrough;
+
+			return safeAlternateRoute ? DemolitionApproachResponse.RouteAround :
+				DemolitionApproachResponse.WithdrawOrHold;
+		}
+
+		public static bool ShouldRerouteHold(bool destinationThreatened, bool safeDestinationFound)
+		{
+			return destinationThreatened && safeDestinationFound;
+		}
+
+		public static long ThreatCoverageMargin(long distanceSquared, int range)
+		{
+			return distanceSquared - (long)range * range;
+		}
+
+		public static bool CanPreemptDemolition(bool actionableCapture, bool plantedCharge)
+		{
+			return actionableCapture && !plantedCharge;
+		}
+
+		public static IReadOnlyList<DemolitionAllocation> TargetFirstDemolitionAllocation(
+			long[,] distances, bool[,] viable)
+		{
+			if (distances == null || viable == null || distances.GetLength(0) != viable.GetLength(0) ||
+				distances.GetLength(1) != viable.GetLength(1))
+				throw new System.ArgumentException("Distance and viability matrices must have matching dimensions.");
+
+			var units = distances.GetLength(0);
+			var targets = distances.GetLength(1);
+			var assignedUnits = new HashSet<int>();
+			var result = new List<DemolitionAllocation>();
+			for (var target = 0; target < targets; target++)
+			{
+				var bestUnit = -1;
+				for (var unit = 0; unit < units; unit++)
+				{
+					if (assignedUnits.Contains(unit) || !viable[unit, target])
+						continue;
+
+					if (bestUnit < 0 || distances[unit, target] < distances[bestUnit, target])
+						bestUnit = unit;
+				}
+
+				if (bestUnit < 0)
+					continue;
+
+				assignedUnits.Add(bestUnit);
+				result.Add(new DemolitionAllocation(bestUnit, target));
+			}
+
+			return result;
+		}
+
 		public static bool IsCapabilityScopedOwnedRestorationCandidate(bool sameOwner, bool hasHusk,
 			bool isBuilding, bool hasValidTransform, bool hasMatchingCapture)
 		{

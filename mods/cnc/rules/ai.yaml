@@ -656,6 +656,12 @@ Player:
 		DemolitionActorTypes: rmbo
 		MinimumCaptureDelay: 125
 		MinimumDemolitionDelay: 375
+		DemolitionIdleConfirmationTicks: 10
+		DemolitionFallbackCombatRadiusCells: 10
+		DemolitionThreatBufferCells: 2
+		DemolitionRouteWaypointSpacing: 8
+		DemolitionHoldSearchRadiusCells: 6
+		DemolitionHoldReconsiderTicks: 125
 		MaximumCaptureTargetOptions: 15
 		CaptureDistanceBias: 10
 		CaptureRetargetImprovement: 25

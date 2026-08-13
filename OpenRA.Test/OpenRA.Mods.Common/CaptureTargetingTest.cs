@@ -9,8 +9,10 @@
  */
 #endregion
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using NUnit.Framework;
 using OpenRA.Mods.Common.Traits;
 using OpenRA.Traits;
@@ -178,6 +180,41 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
+		public void CommandoOwnershipSaveRecordsRoundTripEveryLifecycleField()
+		{
+			var moduleType = typeof(CaptureManagerBotModule);
+			var confirmation = new MiniYamlNode("Confirmation", "", new List<MiniYamlNode>
+			{
+				new MiniYamlNode("Specialist", FieldSaver.FormatValue((uint)17)),
+				new MiniYamlNode("IdleSinceTick", FieldSaver.FormatValue(193))
+			});
+			var fallback = new MiniYamlNode("Fallback", "", new List<MiniYamlNode>
+			{
+				new MiniYamlNode("Specialist", FieldSaver.FormatValue((uint)23)),
+				new MiniYamlNode("Purpose", FieldSaver.FormatValue(1)),
+				new MiniYamlNode("Target", FieldSaver.FormatValue((uint)0)),
+				new MiniYamlNode("Destination", FieldSaver.FormatValue(new CPos(41, 29))),
+				new MiniYamlNode("AssignedTick", FieldSaver.FormatValue(200)),
+				new MiniYamlNode("ReconsiderTick", FieldSaver.FormatValue(325))
+			});
+
+			Assert.That(RoundTripPrivateSaveRecord(moduleType, "LoadCommandoConfirmation",
+				"SaveCommandoConfirmation", confirmation), Is.EqualTo(Serialize(confirmation)));
+			Assert.That(RoundTripPrivateSaveRecord(moduleType, "LoadCommandoFallback",
+				"SaveCommandoFallback", fallback), Is.EqualTo(Serialize(fallback)));
+		}
+
+		static string RoundTripPrivateSaveRecord(Type moduleType, string loadName, string saveName,
+			MiniYamlNode node)
+		{
+			var flags = BindingFlags.Static | BindingFlags.NonPublic;
+			var loaded = moduleType.GetMethod(loadName, flags).Invoke(null, new object[] { node });
+			return Serialize((MiniYamlNode)moduleType.GetMethod(saveName, flags).Invoke(null, new[] { loaded }));
+		}
+
+		static string Serialize(MiniYamlNode node) { return new List<MiniYamlNode> { node }.WriteToString(); }
+
+		[Test]
 		public void SharedReservationsRestoreBothIncumbentPurposesDeterministically()
 		{
 			var captureFirst = new SpecialistTargetReservations();
@@ -286,6 +323,108 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(allocation.FirstTarget, Is.EqualTo(0));
 			Assert.That(allocation.SecondTarget, Is.EqualTo(1));
 			Assert.That(allocation.Score, Is.EqualTo(200));
+		}
+
+		[Test]
+		public void DemolitionAllocationIsTargetFirstAndChoosesNearestViableSpecialist()
+		{
+			var distances = new long[,]
+			{
+				{ 900, 4 },
+				{ 9, 100 },
+				{ 1, 1 }
+			};
+			var viable = new bool[,]
+			{
+				{ true, true },
+				{ true, true },
+				{ false, true }
+			};
+
+			var allocation = CaptureTargeting.TargetFirstDemolitionAllocation(distances, viable);
+
+			Assert.That(allocation.Select(pair => pair.Target), Is.EqualTo(new[] { 0, 1 }));
+			Assert.That(allocation.Select(pair => pair.Unit), Is.EqualTo(new[] { 1, 2 }),
+				"The lower-ID far specialist must not consume the target before the nearer viable specialist.");
+		}
+
+		[Test]
+		public void DemolitionAllocationUsesStableUnitTieAndLeavesSurplusUnassigned()
+		{
+			var distances = new long[,]
+			{
+				{ 25 },
+				{ 25 },
+				{ 4 }
+			};
+			var viable = new bool[,]
+			{
+				{ true },
+				{ true },
+				{ false }
+			};
+
+			var allocation = CaptureTargeting.TargetFirstDemolitionAllocation(distances, viable);
+
+			Assert.That(allocation.Count, Is.EqualTo(1));
+			Assert.That(allocation[0].Unit, Is.EqualTo(0));
+			Assert.That(allocation[0].Target, Is.EqualTo(0));
+		}
+
+		[Test]
+		public void OwnerlessConfirmationRequiresAStableIdleUnreservedGrace()
+		{
+			Assert.That(CaptureTargeting.ConfirmedOwnerless(100, 109, 10,
+				idle: true, hasActivity: false, reserved: false, transportOwned: false), Is.False);
+			Assert.That(CaptureTargeting.ConfirmedOwnerless(100, 110, 10,
+				idle: true, hasActivity: false, reserved: false, transportOwned: false), Is.True);
+			Assert.That(CaptureTargeting.ConfirmedOwnerless(100, 120, 10,
+				idle: false, hasActivity: false, reserved: false, transportOwned: false), Is.False);
+			Assert.That(CaptureTargeting.ConfirmedOwnerless(100, 120, 10,
+				idle: true, hasActivity: true, reserved: false, transportOwned: false), Is.False);
+			Assert.That(CaptureTargeting.ConfirmedOwnerless(100, 120, 10,
+				idle: true, hasActivity: false, reserved: true, transportOwned: false), Is.False);
+			Assert.That(CaptureTargeting.ConfirmedOwnerless(100, 120, 10,
+				idle: true, hasActivity: false, reserved: false, transportOwned: true), Is.False);
+		}
+
+		[TestCase(false, false, false, DemolitionApproachResponse.Direct)]
+		[TestCase(true, true, false, DemolitionApproachResponse.FightThrough)]
+		[TestCase(true, false, true, DemolitionApproachResponse.RouteAround)]
+		[TestCase(true, false, false, DemolitionApproachResponse.WithdrawOrHold)]
+		public void DemolitionApproachHasExplicitThreatStateExits(bool threatened, bool favorableFight,
+			bool alternateRoute, DemolitionApproachResponse expected)
+		{
+			Assert.That(CaptureTargeting.DemolitionApproach(threatened, favorableFight, alternateRoute),
+				Is.EqualTo(expected));
+		}
+
+		[TestCase(false, false, false)]
+		[TestCase(false, true, false)]
+		[TestCase(true, false, false)]
+		[TestCase(true, true, true)]
+		public void HoldReroutesOnlyWhenItsDestinationBecomesThreatenedAndAnotherSafeCellExists(
+			bool destinationThreatened, bool safeDestinationFound, bool expected)
+		{
+			Assert.That(CaptureTargeting.ShouldRerouteHold(destinationThreatened, safeDestinationFound),
+				Is.EqualTo(expected));
+		}
+
+		[Test]
+		public void ThreatCoverageMarginPrioritizesLaneCoverageBeforeDistantValue()
+		{
+			Assert.That(CaptureTargeting.ThreatCoverageMargin(distanceSquared: 36, range: 7),
+				Is.LessThan(CaptureTargeting.ThreatCoverageMargin(distanceSquared: 400, range: 10)));
+		}
+
+		[TestCase(false, false, false)]
+		[TestCase(true, true, false)]
+		[TestCase(true, false, true)]
+		public void CapturePreemptsOnlyReversibleDemolition(bool actionableCapture, bool plantedCharge,
+			bool expected)
+		{
+			Assert.That(CaptureTargeting.CanPreemptDemolition(actionableCapture, plantedCharge),
+				Is.EqualTo(expected));
 		}
 	}
 }
