@@ -184,6 +184,34 @@ class ParallelLauncherTest(unittest.TestCase):
         self.assertEqual(fatal["readiness"]["reason"], "fatal/crash/desync signal before readiness")
         self.assertIn("fatal/crash/desync signal present", fatal["reasons"])
 
+    def test_fatal_signal_before_ready_wins_within_one_poll_snapshot(self):
+        fatal_first, _ = self.run_readiness_sequence(
+            "fatal-then-ready", [
+                "MAX progress: world=1 Fatal Lua Error: fixture broke "
+                "CNC89 ACTOR label=scout id=17 type=e1 owner=Multi0 location=32,40 tick=1 "
+                "CNC89 BUILD producer=yard id=21 queue=Building item=nuke state=queued tick=1 "
+                "CNC89 READY tick=1",
+            ]
+        )
+        self.assertEqual(fatal_first["readiness"]["state"], "failed")
+        self.assertEqual(
+            fatal_first["readiness"]["reason"],
+            "fatal/crash/desync signal before readiness",
+        )
+        self.assertEqual(fatal_first["valid_world_ticks"], 0)
+
+        ready_first, _ = self.run_readiness_sequence(
+            "ready-then-fatal", [
+                "MAX progress: world=1 "
+                "CNC89 ACTOR label=scout id=17 type=e1 owner=Multi0 location=32,40 tick=1 "
+                "CNC89 BUILD producer=yard id=21 queue=Building item=nuke state=queued tick=1 "
+                "CNC89 READY tick=1 Fatal Lua Error: later endurance failure",
+            ]
+        )
+        self.assertEqual(ready_first["readiness"]["state"], "ready")
+        self.assertIn("fatal/crash/desync signal present", ready_first["reasons"])
+        self.assertEqual(ready_first["valid_world_ticks"], 0)
+
     def run_readiness_sequence(self, name, lines):
         game_map = self.map(f"{name}.oramap", "sequence:\n" + "\n".join(lines))
         manifest = self.write_manifest([{

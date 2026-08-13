@@ -55,6 +55,21 @@ class ArchipelagoReadinessFixtureTest(unittest.TestCase):
         self.assertIn("CNC89 READY", script)
         self.assertNotIn("CNC89 BUILD", script)
 
+    def test_fatal_fixture_fails_after_world_progress_but_before_readiness(self):
+        entries = fixtures.fixture_entries(
+            REPO_ROOT / "mods/cnc/maps/archipelago",
+            REPO_ROOT / "tests/fixtures/cnc89",
+            "fatal",
+        )
+        script = entries["cnc89-fatal.lua"].decode("utf-8")
+        self.assertIn("CNC89 ACTOR", script)
+        self.assertIn("Trigger.AfterDelay(1250", script)
+        self.assertIn(
+            "error(\"CNC89 deliberate fatal before readiness tick=\" .. DateTime.GameTime)",
+            script,
+        )
+        self.assertNotIn("CNC89 READY", script)
+
 
 if __name__ == "__main__":
     unittest.main()

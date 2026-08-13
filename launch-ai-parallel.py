@@ -429,6 +429,7 @@ def update_readiness(run: ActiveRun, text: str, now: float) -> None:
     actor_matches = {pattern: re.search(pattern, text, re.MULTILINE) for pattern in spec.actor_log_patterns}
     build_matches = {pattern: re.search(pattern, text, re.MULTILINE) for pattern in spec.build_log_patterns}
     ready_matches = list(re.finditer(spec.ready_log_pattern, text, re.MULTILINE))
+    fatal_match = FATAL_PATTERN.search(text)
     run.readiness_observed_actor = [pattern for pattern, match in actor_matches.items() if match]
     run.readiness_observed_build = [pattern for pattern, match in build_matches.items() if match]
     run.readiness_marker_count = len(ready_matches)
@@ -437,7 +438,10 @@ def update_readiness(run: ActiveRun, text: str, now: float) -> None:
     if ready_matches:
         first_ready = ready_matches[0].start()
         evidence_matches = list(actor_matches.values()) + list(build_matches.values())
-        if any(match is None or match.start() > first_ready for match in evidence_matches):
+        if fatal_match is not None and fatal_match.start() < first_ready:
+            run.readiness_state = "failed"
+            run.readiness_reason = "fatal/crash/desync signal before readiness"
+        elif any(match is None or match.start() > first_ready for match in evidence_matches):
             run.readiness_state = "failed"
             run.readiness_reason = "ready marker observed before all authoritative evidence"
         elif len(ready_matches) != 1:
@@ -448,7 +452,7 @@ def update_readiness(run: ActiveRun, text: str, now: float) -> None:
             run.readiness_tick = run.last_tick
             run.readiness_seconds = elapsed
             return
-    elif FATAL_PATTERN.search(text):
+    elif fatal_match is not None:
         run.readiness_state = "failed"
         run.readiness_reason = "fatal/crash/desync signal before readiness"
     elif spec.maximum_world_tick is not None and run.last_tick > spec.maximum_world_tick:
