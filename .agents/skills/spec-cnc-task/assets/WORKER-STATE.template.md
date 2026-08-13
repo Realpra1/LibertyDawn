@@ -18,7 +18,7 @@ when the dependency section directs it.
 - Intended PR base: `{{PR_BASE}}`
 - Cycle budget: `20` isolated code-change cycles
 - Cycles used: `0`
-- Game/build lock directory: `{{ABSOLUTE_LOCK_DIRECTORY}}`
+- Global resource lock directory: `{{REPOSITORY_ROOT}}/.agents/locks`
 - Game capacity: `2`
 - Large-build capacity: `1`
 - Task report: `{{TASK_REPORT_PATH}}`
@@ -358,7 +358,7 @@ Wrap shared resources with:
 
 ```text
 python3 .agents/skills/coordinate-cnc-development/scripts/with_resource_slots.py \
-  --lock-dir {{ABSOLUTE_LOCK_DIRECTORY}} --resource game --capacity 2 --slots 1 -- COMMAND...
+  --lock-dir {{REPOSITORY_ROOT}}/.agents/locks --resource game --capacity 2 --slots 1 -- COMMAND...
 ```
 
 Reserve two game slots when using a two-game `launch-ai-parallel.py` batch. Poll
@@ -371,7 +371,7 @@ making useful progress; stop it when evidence is sufficient or progress stalls.
 
 Route every large build, full `make test`/`make check`, equivalent full
 `dotnet`/`msbuild` suite, and packaging build through the same helper with
-`--large-build-entry worker` and the absolute lock directory above. This protected
+`--large-build-entry worker` and the canonical global lock directory above. This protected
 entry owns canonical capacity one; do not supply `--resource large-build`, a
 capacity, a lock filename, an alias, or direct `flock`.
 
