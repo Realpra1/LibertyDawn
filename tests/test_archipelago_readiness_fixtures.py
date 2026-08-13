@@ -82,6 +82,18 @@ class ArchipelagoReadinessFixtureTest(unittest.TestCase):
         self.assertEqual(script.count("CNC89 READY"), 2)
         self.assertIn("Trigger.AfterDelay(1250", script)
 
+    def test_missing_actor_fixture_queues_build_before_ready_without_actor_evidence(self):
+        entries = fixtures.fixture_entries(
+            REPO_ROOT / "mods/cnc/maps/archipelago",
+            REPO_ROOT / "tests/fixtures/cnc89",
+            "missing-actor",
+        )
+        script = entries["cnc89-missing-actor.lua"].decode("utf-8")
+        self.assertIn("CNC89 BUILD", script)
+        self.assertIn("CNC89 READY", script)
+        self.assertNotIn("CNC89 ACTOR", script)
+        self.assertIn("Trigger.AfterDelay(1250", script)
+
 
 if __name__ == "__main__":
     unittest.main()

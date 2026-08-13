@@ -19,11 +19,11 @@ from pathlib import Path
 from typing import Any
 
 
-MAX_TICK_PATTERNS = (
+ENGINE_TICK_PATTERNS = (
     re.compile(r"MAX progress: world=(\d+)"),
     re.compile(r"world tick (\d+)", re.IGNORECASE),
-    re.compile(r"\btick=(\d+)\b"),
 )
+READINESS_TICK_PATTERN = re.compile(r"\btick=(\d+)\b")
 HEADLESS_MARKER = "Headless MAX automation enabled"
 MAX_MARKER = "MAX game speed enabled"
 STARTED_MARKER = "Headless MAX automation started map"
@@ -415,8 +415,9 @@ def read_evidence(run: ActiveRun) -> tuple[str, list[Path]]:
     return "\n".join(chunks), paths
 
 
-def maximum_world_tick(text: str) -> int:
-    ticks = [int(match.group(1)) for pattern in MAX_TICK_PATTERNS for match in pattern.finditer(text)]
+def maximum_world_tick(text: str, include_readiness: bool = False) -> int:
+    patterns = ENGINE_TICK_PATTERNS + ((READINESS_TICK_PATTERN,) if include_readiness else ())
+    ticks = [int(match.group(1)) for pattern in patterns for match in pattern.finditer(text)]
     return max(ticks, default=0)
 
 
@@ -502,7 +503,7 @@ def finalize_readiness(run: ActiveRun, text: str) -> None:
     if run.readiness_marker_count != 1:
         run.readiness_state = "failed"
         run.readiness_reason = "ready marker observed more than once"
-        run.readiness_tick = maximum_world_tick(text)
+        run.readiness_tick = maximum_world_tick(text, include_readiness=True)
         run.readiness_seconds = time.monotonic() - run.started_monotonic
 
 
@@ -530,7 +531,8 @@ def finalize_run(run: ActiveRun) -> dict[str, Any]:
     run.console_file.close()
     text, log_paths = read_evidence(run)
     finalize_readiness(run, text)
-    tick = maximum_world_tick(text)
+    tick = maximum_world_tick(text, include_readiness=run.spec.readiness is not None)
+    engine_tick = maximum_world_tick(text)
     duration = time.monotonic() - run.started_monotonic
     required = {
         pattern: re.search(pattern, text, re.MULTILINE) is not None
@@ -569,8 +571,8 @@ def finalize_run(run: ActiveRun) -> dict[str, Any]:
             "configured exit marker missing"
             if run.spec.exit_at_tick is not None else "natural game-over marker missing"
         )
-    if tick < run.spec.minimum_world_tick:
-        reasons.append(f"world tick {tick} below required {run.spec.minimum_world_tick}")
+    if engine_tick < run.spec.minimum_world_tick:
+        reasons.append(f"world tick {engine_tick} below required {run.spec.minimum_world_tick}")
     if not benchmark_files:
         reasons.append("benchmark output missing")
     if any(not matched for matched in required.values()):
@@ -589,6 +591,7 @@ def finalize_run(run: ActiveRun) -> dict[str, Any]:
         "exit_code": exit_code,
         "duration_seconds": round(duration, 3),
         "maximum_world_tick": tick,
+        "maximum_engine_world_tick": engine_tick,
         "valid_world_ticks": tick if not reasons else 0,
         "started_utc": run.started_utc,
         "finished_utc": datetime.now(timezone.utc).isoformat(),
@@ -738,7 +741,9 @@ def run_batch(
             now = time.monotonic()
             for run in list(state.active):
                 text, _ = read_evidence(run)
-                run.last_tick = maximum_world_tick(text)
+                run.last_tick = maximum_world_tick(
+                    text, include_readiness=run.spec.readiness is not None
+                )
                 update_readiness(run, text, now)
                 if run.process.poll() is None and run.readiness_state == "failed":
                     terminate_process(run)

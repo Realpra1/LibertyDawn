@@ -116,7 +116,11 @@ class ParallelLauncherTest(unittest.TestCase):
         with self.assertRaisesRegex(parallel.ConfigurationError, "below timeout_seconds"):
             parallel.load_manifest(invalid, 10)
 
-        self.assertEqual(parallel.maximum_world_tick("fixture evidence tick=1251"), 1251)
+        self.assertEqual(parallel.maximum_world_tick("fixture evidence tick=1251"), 0)
+        self.assertEqual(
+            parallel.maximum_world_tick("fixture evidence tick=1251", include_readiness=True),
+            1251,
+        )
 
     def test_readiness_accepts_ordered_evidence_then_marker(self):
         result, summary = self.run_readiness_sequence(
@@ -216,7 +220,26 @@ class ParallelLauncherTest(unittest.TestCase):
         self.assertIn("fatal/crash/desync signal present", ready_first["reasons"])
         self.assertEqual(ready_first["valid_world_ticks"], 0)
 
-    def run_readiness_sequence(self, name, lines):
+    def test_readiness_telemetry_does_not_satisfy_engine_progress_gate(self):
+        result, _ = self.run_readiness_sequence(
+            "telemetry-is-not-progress", [
+                "Headless MAX automation enabled",
+                "Headless MAX automation started map 'Fixture' with bots: Multi0: bot=viki.",
+                "MAX game speed enabled at world tick 0.",
+                "CNC89 ACTOR label=scout id=17 type=e1 owner=Multi0 location=32,40 tick=9",
+                "CNC89 BUILD producer=yard id=21 queue=Building item=nuke state=queued tick=9",
+                "CNC89 READY tick=9",
+                "Headless MAX automation reached configured exit at world tick 5; exiting.",
+            ],
+            minimum_world_tick=10,
+        )
+        self.assertEqual(result["readiness"]["state"], "ready")
+        self.assertEqual(result["maximum_world_tick"], 9)
+        self.assertEqual(result["maximum_engine_world_tick"], 5)
+        self.assertIn("world tick 5 below required 10", result["reasons"])
+        self.assertEqual(result["valid_world_ticks"], 0)
+
+    def run_readiness_sequence(self, name, lines, minimum_world_tick=1):
         game_map = self.map(f"{name}.oramap", "sequence:\n" + "\n".join(lines))
         manifest = self.write_manifest([{
             "name": name,
@@ -224,7 +247,7 @@ class ParallelLauncherTest(unittest.TestCase):
             "lobby_commands": "option gamespeed max",
             "timeout_seconds": 2,
             "exit_at_tick": 5,
-            "minimum_world_tick": 1,
+            "minimum_world_tick": minimum_world_tick,
             "readiness": {
                 "actor_log_patterns": [r"CNC89 ACTOR label=scout id=\d+ type=e1 owner=Multi0 location=32,40 tick=\d+"],
                 "build_log_patterns": [r"CNC89 BUILD producer=yard id=\d+ queue=Building item=nuke state=queued tick=\d+"],
