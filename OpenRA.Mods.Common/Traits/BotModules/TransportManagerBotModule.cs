@@ -141,9 +141,10 @@ namespace OpenRA.Mods.Common.Traits
 	}
 
 	public class TransportManagerBotModule : ConditionalTrait<TransportManagerBotModuleInfo>,
-		IBotEnabled, IBotTick, IBotTransportReservations, IBotUnitReservations, IBotRespondToAttack
+		IBotEnabled, IBotTick, IBotTransportReservations, IBotUnitReservations,
+		IBotTransportObjectiveService, IBotRespondToAttack
 	{
-		enum MissionStage { Gathering, Travelling, Unloading }
+		enum MissionStage { Gathering, Travelling, Unloading, Handoff }
 
 		sealed class Mission
 		{
@@ -151,10 +152,12 @@ namespace OpenRA.Mods.Common.Traits
 			public readonly Actor Transport;
 			public readonly Actor Passenger;
 			public readonly CPos Destination;
+			public readonly Actor Objective;
 			public readonly int CreatedTick;
 			public int DeadlineTick;
 			public MissionStage Stage;
 			public int LastOrderTick;
+			public bool CaptureHandoffQueued;
 			public int PlanFailureTick;
 			public int LastRoutedPlanRevision;
 			public TransportUnloadPlan UnloadPlan;
@@ -172,6 +175,12 @@ namespace OpenRA.Mods.Common.Traits
 				CreatedTick = LastOrderTick = tick;
 				DeadlineTick = deadlineTick;
 			}
+
+			public Mission(int id, Actor transport, Actor passenger, Actor objective, int tick, int deadlineTick)
+				: this(id, transport, passenger, objective.Location, tick, deadlineTick)
+			{
+				Objective = objective;
+			}
 		}
 
 		sealed class BlockedObservation
@@ -183,6 +192,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly World world;
 		readonly Player player;
 		readonly TransportMissionCoordinator coordinator;
+		readonly TransportObjectiveTimeoutLedger timedOutObjectives = new TransportObjectiveTimeoutLedger();
 		readonly TransportUnloadPlanner unloadPlanner;
 		readonly List<Mission> missions = new List<Mission>();
 		readonly Dictionary<uint, BlockedObservation> blocked = new Dictionary<uint, BlockedObservation>();
@@ -204,9 +214,10 @@ namespace OpenRA.Mods.Common.Traits
 			coordinator = new TransportMissionCoordinator(info.MaximumActiveMissions);
 			unloadPlanner = new TransportUnloadPlanner(world, player, info, coordinator);
 			infantryAssault = new InfantryAssaultTransportManager(world, player, info, coordinator, unloadPlanner,
-				IssueRoutedMove, RequestTransportHelicopter, IsReservedForOtherBehavior, RememberSafeIdleStaging);
+				IssueRoutedMove, RequestTransportHelicopter, actor => IsReservedForOtherBehavior(actor), RememberSafeIdleStaging);
 			heavyDrop = new HeavyDropTransportManager(world, player, info, coordinator, unloadPlanner,
-				IssueRoutedMove, RequestTransportHelicopter, () => squadManager, IsReservedForOtherBehavior,
+				IssueRoutedMove, RequestTransportHelicopter, () => squadManager,
+				actor => IsReservedForOtherBehavior(actor),
 				RememberSafeIdleStaging);
 		}
 
@@ -241,10 +252,104 @@ namespace OpenRA.Mods.Common.Traits
 			return actor != null && coordinator.IsReserved(actor.ActorID);
 		}
 
-		bool IsReservedForOtherBehavior(Actor actor)
+		bool IBotTransportObjectiveService.CanTransportTo(
+			Actor passenger, Actor objective, IBotUnitReservations reservationOwner)
+		{
+			var available = TryPrepareObjectiveTransport(passenger, objective, reservationOwner,
+				out _, out _, out _, out var rejection);
+			if (!available)
+				Debug("objective transport unavailable passenger={0} objective={1}: {2}",
+					passenger, objective, rejection);
+
+			return available;
+		}
+
+		bool IBotTransportObjectiveService.TryRequestTransport(
+			Actor passenger, Actor objective, IBotUnitReservations reservationOwner)
+		{
+			if (passenger == null || reservationOwner == null || !reservationOwner.IsUnitReserved(passenger) ||
+				objective == null || objective.IsDead || !objective.IsInWorld ||
+				missions.Any(existing => existing.Passenger == passenger))
+				return false;
+
+			timedOutObjectives.Clear(passenger.ActorID);
+
+			if (!TryPrepareObjectiveTransport(passenger, objective, reservationOwner,
+				out var transport, out var pickupRoute, out _, out var rejection))
+			{
+				Debug("objective transport rejected passenger={0} objective={1}: {2}",
+					passenger, objective, rejection);
+				return false;
+			}
+
+			var missionId = coordinator.TryReserve(new[] { transport.ActorID, passenger.ActorID });
+			if (missionId == 0 || !unloadPlanner.TryPlan(missionId, transport, new[] { passenger }, objective.Location,
+				Info.LandingSearchRadiusCells, Info.LandingUsefulnessRadiusCells, 1,
+				out var unloadPlan, out rejection))
+			{
+				if (missionId != 0)
+					coordinator.Release(missionId);
+
+				Debug("objective transport reservation rejected passenger={0} objective={1}: {2}",
+					passenger, objective, rejection);
+				return false;
+			}
+
+			var distanceCells = Math.Abs(transport.Location.X - passenger.Location.X) +
+				Math.Abs(transport.Location.Y - passenger.Location.Y) +
+				Math.Abs(passenger.Location.X - objective.Location.X) + Math.Abs(passenger.Location.Y - objective.Location.Y);
+			var speed = transport.Info.TraitInfoOrDefault<AircraftInfo>()?.Speed ?? 1;
+			var travelAllowance = (int)Math.Min(int.MaxValue,
+				distanceCells * 1024L * 3 / Math.Max(1, speed) + 1000);
+			var mission = new Mission(missionId, transport, passenger, objective, world.WorldTick,
+				world.WorldTick + Math.Max(Info.MissionTimeoutTicks, travelAllowance))
+			{
+				UnloadPlan = unloadPlan
+			};
+			missions.Add(mission);
+			IssueRoutedMove(transport, passenger.Location, pickupRoute);
+			Debug("created objective mission {0}: transport={1} passenger={2} objective={3} " +
+				"carrier={4} exit={5}", missionId, transport, passenger, objective,
+				unloadPlan.CarrierCell, unloadPlan.ExitCells[0]);
+			return true;
+		}
+
+		bool IBotTransportObjectiveService.IsTransporting(Actor passenger)
+		{
+			return passenger != null && missions.Any(mission => mission.Passenger == passenger);
+		}
+
+		bool IBotTransportObjectiveService.TryConsumeTimedOutObjective(Actor passenger, Actor objective)
+		{
+			return passenger != null && objective != null &&
+				timedOutObjectives.TryConsume(passenger.ActorID, objective.ActorID);
+		}
+
+		void IBotTransportObjectiveService.CancelTransport(Actor passenger)
+		{
+			for (var i = missions.Count - 1; i >= 0; i--)
+			{
+				var mission = missions[i];
+				if (mission.Passenger != passenger)
+					continue;
+
+				var cargo = mission.Transport.TraitOrDefault<Cargo>();
+				if (cargo != null && cargo.Passengers.Any(actor => actor == passenger))
+					RecoverTimedOutCargo(mission, "objective canceled");
+				else
+				{
+					if (bot != null && IsUsable(mission.Transport))
+						bot.QueueOrder(new Order("Stop", mission.Transport, false));
+
+					FinishMission(i, "objective canceled before pickup");
+				}
+			}
+		}
+
+		bool IsReservedForOtherBehavior(Actor actor, IBotUnitReservations ignoredReservation = null)
 		{
 			return actor != null && otherUnitReservations != null &&
-				otherUnitReservations.Any(r => r.IsUnitReserved(actor));
+				otherUnitReservations.Any(r => !ReferenceEquals(r, ignoredReservation) && r.IsUnitReserved(actor));
 		}
 
 		void IBotRespondToAttack.RespondToAttack(IBot enabledBot, Actor self, AttackInfo e)
@@ -325,7 +430,9 @@ namespace OpenRA.Mods.Common.Traits
 
 				if (!mission.Returning && world.WorldTick > mission.DeadlineTick)
 				{
-					if (cargo.IsEmpty())
+					if (mission.Stage == MissionStage.Handoff)
+						FinishMission(i, "capture handoff timed out");
+					else if (cargo.IsEmpty())
 						FinishMission(i, "timed out before pickup");
 					else
 						RecoverTimedOutCargo(mission);
@@ -343,15 +450,21 @@ namespace OpenRA.Mods.Common.Traits
 					AdvanceGathering(mission, cargo, i);
 				else if (mission.Stage == MissionStage.Travelling)
 					AdvanceTravel(mission);
-				else if (cargo.IsEmpty())
+				else if (cargo.IsEmpty() && mission.Stage != MissionStage.Handoff)
 				{
-					Debug("mission {0} physical handoff: passenger={1} cell={2} cargo=0 objective={3} outcome={4}",
-						mission.Id, mission.Passenger, mission.Passenger.Location, mission.Destination,
+					Debug("mission {0} physical handoff tick={1}: passenger={2} cell={3} cargo=0 objective={4} outcome={5}",
+						mission.Id, world.WorldTick, mission.Passenger, mission.Passenger.Location, mission.Destination,
 						mission.Returning ? "safe-recovery" : "useful-rescue");
-					bot.QueueOrder(new Order("Move", mission.Passenger,
-						Target.FromCell(world, mission.Destination), false));
-					FinishMission(i, mission.Returning ? "safe recovery unload complete" : "rescue complete");
+					if (mission.Objective == null)
+					{
+						QueueObjectiveHandoff(mission);
+						FinishMission(i, mission.Returning ? "safe recovery unload complete" : "rescue complete");
+					}
+					else
+						BeginObjectiveHandoff(mission);
 				}
+				else if (mission.Stage == MissionStage.Handoff)
+					AdvanceObjectiveHandoff(mission, i);
 				else if (!EnsureUnloadPlan(mission, mission.UnloadPlan?.Objective ??
 					mission.RecoveryObjective ?? mission.Destination, out var reason))
 					HandlePlanFailure(mission, reason);
@@ -577,8 +690,7 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				Debug("mission {0} physical handoff after terminal recovery: passenger={1} cell={2} cargo=0 objective={3}",
 					mission.Id, mission.Passenger, mission.Passenger.Location, mission.Destination);
-				bot.QueueOrder(new Order("Move", mission.Passenger,
-					Target.FromCell(world, mission.Destination), false));
+				QueueObjectiveHandoff(mission);
 				FinishMission(index, "terminal safe recovery unload complete");
 				return;
 			}
@@ -643,6 +755,70 @@ namespace OpenRA.Mods.Common.Traits
 			}
 		}
 
+		void QueueObjectiveHandoff(Mission mission)
+		{
+			if (mission.Objective != null && !mission.Objective.IsDead && mission.Objective.IsInWorld)
+			{
+				bot.QueueOrder(new Order("CaptureActor", mission.Passenger, Target.FromActor(mission.Objective), false));
+				Debug("mission {0} handed off capture tick={1} passenger={2} target={3}",
+					mission.Id, world.WorldTick, mission.Passenger, mission.Objective);
+			}
+			else
+				bot.QueueOrder(new Order("Move", mission.Passenger, Target.FromCell(world, mission.Destination), false));
+		}
+
+		void BeginObjectiveHandoff(Mission mission)
+		{
+			mission.Stage = MissionStage.Handoff;
+
+			// The unload/cargo transition can defer order delivery by a scan. Keep the strategic
+			// claim through that narrow gap, but never let a rejected CaptureActor strand it.
+			mission.DeadlineTick = world.WorldTick + Math.Max(Info.ScanInterval, Info.LandingReplanInterval) * 3;
+			Debug("mission {0} capture handoff began at tick {1}: deadline={2} passenger={3} target={4}",
+				mission.Id, world.WorldTick, mission.DeadlineTick, mission.Passenger, mission.Objective);
+		}
+
+		void AdvanceObjectiveHandoff(Mission mission, int index)
+		{
+			if (mission.Objective == null || mission.Objective.IsDead || !mission.Objective.IsInWorld)
+			{
+				FinishMission(index, "objective removed after unload");
+				return;
+			}
+
+			var passenger = mission.Passenger.TraitOrDefault<Passenger>();
+			if (!mission.Passenger.IsInWorld || passenger?.Transport != null || HasRideTransportActivity(mission.Passenger))
+				return;
+
+			if (!mission.CaptureHandoffQueued)
+			{
+				QueueObjectiveHandoff(mission);
+				mission.CaptureHandoffQueued = true;
+				Debug("mission {0} capture handoff queued at tick {1}: passenger={2} target={3}",
+					mission.Id, world.WorldTick, mission.Passenger, mission.Objective);
+				return;
+			}
+
+			if (!HasCaptureActivity(mission.Passenger))
+				return;
+
+			Debug("mission {0} capture handoff active at tick {1}: passenger={2} target={3}",
+				mission.Id, world.WorldTick, mission.Passenger, mission.Objective);
+			FinishMission(index, "capture handoff active");
+		}
+
+		static bool HasRideTransportActivity(Actor actor)
+		{
+			return actor.CurrentActivity != null && actor.CurrentActivity
+				.ActivitiesImplementing<Activities.RideTransport>().Any();
+		}
+
+		static bool HasCaptureActivity(Actor actor)
+		{
+			return actor.CurrentActivity != null && actor.CurrentActivity
+				.ActivitiesImplementing<Activities.CaptureActor>().Any();
+		}
+
 		void ParkTerminalPlan(Mission mission, string reason)
 		{
 			bot.QueueOrder(new Order("Stop", mission.Transport, false));
@@ -668,6 +844,45 @@ namespace OpenRA.Mods.Common.Traits
 			mission.UnloadPlan = replacement;
 			mission.PlanFailureTick = 0;
 			return true;
+		}
+
+		bool TryPrepareObjectiveTransport(Actor passenger, Actor objective,
+			IBotUnitReservations reservationOwner, out Actor transport, out List<CPos> pickupRoute,
+			out TransportUnloadPlan unloadPlan, out string rejection)
+		{
+			transport = null;
+			pickupRoute = null;
+			unloadPlan = null;
+			rejection = "transport service is unavailable";
+			if (bot == null || !IsUsable(passenger) || objective == null || objective.IsDead || !objective.IsInWorld ||
+				passenger.TraitOrDefault<Passenger>()?.Transport != null ||
+				coordinator.MissionCount >= Info.MaximumActiveMissions)
+				return false;
+
+			RefreshSquadManager();
+			transport = FindAvailableTransport(passenger, reservationOwner);
+			if (transport == null)
+			{
+				rejection = "no existing compatible healthy empty transport";
+				return false;
+			}
+
+			if (AirStateBase.SafeIndependentAirThreatAt(squadManager, passenger.Location) > 0)
+			{
+				rejection = "pickup cell is covered by anti-air threat";
+				return false;
+			}
+
+			pickupRoute = AirStateBase.SafeIndependentAirRoute(squadManager, transport, passenger.Location);
+			if (pickupRoute == null)
+			{
+				rejection = "no bounded pickup route";
+				return false;
+			}
+
+			return unloadPlanner.TryPlanWithoutClaim(0, transport, new[] { passenger }, objective.Location,
+				Info.LandingSearchRadiusCells, Info.LandingUsefulnessRadiusCells, 1, Array.Empty<CPos>(),
+				out unloadPlan, out rejection);
 		}
 
 		bool TryCreateRescueMission()
@@ -739,11 +954,12 @@ namespace OpenRA.Mods.Common.Traits
 			return false;
 		}
 
-		Actor FindAvailableTransport(Actor passenger)
+		Actor FindAvailableTransport(Actor passenger, IBotUnitReservations ignoredReservation = null)
 		{
 			return world.Actors.Where(a => IsUsable(a) && a.Owner == player &&
 				Info.TransportHelicopterTypes.Contains(a.Info.Name) && !coordinator.IsReserved(a.ActorID) &&
 				!IsReservedForOtherBehavior(a) &&
+				!IsReservedForOtherBehavior(passenger, ignoredReservation) &&
 				a.TraitOrDefault<Cargo>()?.IsEmpty() == true && !NeedsRepair(a) &&
 				a.Trait<Cargo>().HasSpace(passenger.Trait<Passenger>().Info.Weight))
 				.OrderBy(a => (a.Location - passenger.Location).LengthSquared).ThenBy(a => a.ActorID).FirstOrDefault();
@@ -832,6 +1048,11 @@ namespace OpenRA.Mods.Common.Traits
 		void IssueRoutedMove(Actor transport, CPos destination, Order finalOrder = null)
 		{
 			var route = AirStateBase.SafeIndependentAirRoute(squadManager, transport, destination) ?? new List<CPos>();
+			IssueRoutedMove(transport, destination, route, finalOrder);
+		}
+
+		void IssueRoutedMove(Actor transport, CPos destination, List<CPos> route, Order finalOrder = null)
+		{
 			Debug("routed {0} to {1} via {2} threat-aware waypoint(s)", transport, destination, route.Count);
 			var queued = false;
 			foreach (var waypoint in route)
@@ -882,6 +1103,9 @@ namespace OpenRA.Mods.Common.Traits
 		void FinishMission(int index, string reason)
 		{
 			var mission = missions[index];
+			if (reason == "capture handoff timed out" && mission.Objective != null)
+				timedOutObjectives.Record(mission.Passenger.ActorID, mission.Objective.ActorID);
+
 			coordinator.Release(mission.Id);
 			missions.RemoveAt(index);
 			Debug("released mission {0}: {1}", mission.Id, reason);

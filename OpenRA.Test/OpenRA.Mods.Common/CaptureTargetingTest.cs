@@ -21,6 +21,23 @@ namespace OpenRA.Test.Mods.Common
 	public class CaptureTargetingTest
 	{
 		[Test]
+		public void OwnedRestorationExceptionRequiresTheCompleteNonBuildingCapabilityContract()
+		{
+			Assert.That(CaptureTargeting.IsCapabilityScopedOwnedRestorationCandidate(
+				true, true, false, true, true), Is.True);
+			Assert.That(CaptureTargeting.IsCapabilityScopedOwnedRestorationCandidate(
+				false, true, false, true, true), Is.False, "Other owners stay under configured relationships.");
+			Assert.That(CaptureTargeting.IsCapabilityScopedOwnedRestorationCandidate(
+				true, true, true, true, true), Is.False, "Owned buildings are never exposed.");
+			Assert.That(CaptureTargeting.IsCapabilityScopedOwnedRestorationCandidate(
+				true, false, false, true, true), Is.False, "A transform alone is not a husk contract.");
+			Assert.That(CaptureTargeting.IsCapabilityScopedOwnedRestorationCandidate(
+				true, true, false, false, true), Is.False, "A husk without a valid transform is not restorable.");
+			Assert.That(CaptureTargeting.IsCapabilityScopedOwnedRestorationCandidate(
+				true, true, false, true, false), Is.False, "The Engineer must match an enabled capture contract.");
+		}
+
+		[Test]
 		public void RecoveredActorMakesHuskEconomicallyValuable()
 		{
 			Assert.That(CaptureTargeting.EconomicValue(0, 1500), Is.EqualTo(1500));

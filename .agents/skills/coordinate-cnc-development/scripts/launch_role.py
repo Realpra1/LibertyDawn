@@ -8,8 +8,10 @@ import json
 import os
 import pathlib
 import shutil
+import stat
 import subprocess
 import sys
+import tempfile
 from datetime import datetime, timezone
 
 
@@ -28,6 +30,8 @@ ROLES = {
 }
 
 POLICY_ROLES = {"policy-reviewer", "policy-speccer", "policy-escalation"}
+POLICY_OUTPUTS = ("POLICY-REVIEW.md", "POLICY-SCRATCHPAD.md")
+POLICY_SCRATCHPAD_LIMIT = 3000
 
 
 def _resolved_path(value: object, field: str) -> pathlib.Path:
@@ -113,6 +117,18 @@ def validate_analysis_job(args: argparse.Namespace) -> None:
             "Policy Reviewer narrative must be the staged input "
             f"{expected_narrative}"
         )
+    scratchpad = output_dir / "inputs" / "POLICY-SCRATCHPAD.md"
+    try:
+        _, scratchpad_text = _read_regular_utf8(
+            scratchpad, "Policy Reviewer staged scratchpad"
+        )
+    except PolicyOutputError as error:
+        raise SystemExit(str(error)) from error
+    if len(scratchpad_text) > POLICY_SCRATCHPAD_LIMIT:
+        raise SystemExit(
+            f"Policy Reviewer staged scratchpad exceeds {POLICY_SCRATCHPAD_LIMIT} "
+            "Unicode characters"
+        )
 
 
 def parse_args() -> argparse.Namespace:
@@ -130,6 +146,108 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--supervised", action="store_true", help=argparse.SUPPRESS)
     return parser.parse_args()
+
+
+class PolicyOutputError(RuntimeError):
+    """A successful Policy Reviewer child did not satisfy its output contract."""
+
+
+def _read_regular_utf8(path: pathlib.Path, label: str) -> tuple[bytes, str]:
+    try:
+        mode = path.lstat().st_mode
+    except OSError as error:
+        raise PolicyOutputError(f"{label} is missing or unreadable: {error}") from error
+    if not stat.S_ISREG(mode):
+        raise PolicyOutputError(f"{label} must be a non-symlink regular file: {path}")
+    try:
+        raw = path.read_bytes()
+    except OSError as error:
+        raise PolicyOutputError(f"{label} is unreadable: {error}") from error
+    try:
+        return raw, raw.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise PolicyOutputError(f"{label} must be valid UTF-8: {error}") from error
+
+
+def prepare_policy_outputs(output_dir: pathlib.Path) -> list[str]:
+    """Archive prior exact outputs so they cannot satisfy a new attempt."""
+    archived = []
+    attempt = f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')}-{os.getpid()}"
+    for name in POLICY_OUTPUTS:
+        path = output_dir / name
+        try:
+            path.lstat()
+        except FileNotFoundError:
+            continue
+        except OSError as error:
+            raise PolicyOutputError(f"cannot inspect stale {name}: {error}") from error
+        archive = output_dir / f".{name}.previous-{attempt}"
+        try:
+            path.replace(archive)
+        except OSError as error:
+            raise PolicyOutputError(f"cannot archive stale {name}: {error}") from error
+        archived.append(str(archive))
+    return archived
+
+
+def validate_and_promote_policy_outputs(
+    output_dir: pathlib.Path, canonical: pathlib.Path
+) -> dict:
+    """Validate both generated outputs, then atomically replace the canonical."""
+    review_path = output_dir / "POLICY-REVIEW.md"
+    scratchpad_path = output_dir / "POLICY-SCRATCHPAD.md"
+    review_raw, _ = _read_regular_utf8(review_path, "Policy Reviewer review")
+    scratchpad_raw, scratchpad_text = _read_regular_utf8(
+        scratchpad_path, "Policy Reviewer scratchpad replacement"
+    )
+    if len(scratchpad_text) > POLICY_SCRATCHPAD_LIMIT:
+        raise PolicyOutputError(
+            "Policy Reviewer scratchpad replacement exceeds "
+            f"{POLICY_SCRATCHPAD_LIMIT} Unicode characters"
+        )
+
+    try:
+        canonical_parent = canonical.resolve(strict=False).parent
+        canonical_mode = canonical.lstat().st_mode
+    except OSError as error:
+        raise PolicyOutputError(f"canonical policy scratchpad is unavailable: {error}") from error
+    if not stat.S_ISREG(canonical_mode):
+        raise PolicyOutputError(
+            f"canonical policy scratchpad must be a non-symlink regular file: {canonical}"
+        )
+
+    temporary: pathlib.Path | None = None
+    try:
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=f".{canonical.name}.", suffix=".tmp", dir=canonical_parent
+        )
+        temporary = pathlib.Path(temporary_name)
+        os.fchmod(descriptor, stat.S_IMODE(canonical_mode))
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(scratchpad_raw)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, canonical)
+        temporary = None
+    except OSError as error:
+        raise PolicyOutputError(
+            f"failed to atomically promote Policy Reviewer scratchpad: {error}"
+        ) from error
+    finally:
+        if temporary is not None:
+            try:
+                temporary.unlink()
+            except FileNotFoundError:
+                pass
+            except OSError:
+                pass
+
+    return {
+        "review_bytes": len(review_raw),
+        "scratchpad_bytes": len(scratchpad_raw),
+        "scratchpad_characters": len(scratchpad_text),
+        "canonical_scratchpad": str(canonical),
+    }
 
 
 def build_command(args: argparse.Namespace) -> tuple[list[str], str]:
@@ -295,6 +413,12 @@ def main() -> int:
     validate_analysis_job(args)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     policy = runtime_policy(args)
+    canonical_scratchpad = (
+        args.worktree.resolve()
+        / ".agents"
+        / "references"
+        / "LIBERTY-DAWN-POLICY-SCRATCHPAD.md"
+    )
     command, prompt = build_command(args)
     metadata = {
         "role": args.role,
@@ -334,6 +458,13 @@ def main() -> int:
         return 0
 
     if args.background:
+        if args.role in POLICY_ROLES:
+            print(
+                "Policy Reviewer roles require foreground launch so the caller's "
+                "policy-scratchpad lock covers validation and promotion",
+                file=sys.stderr,
+            )
+            return 64
         supervisor_command = [
             sys.executable,
             str(pathlib.Path(__file__).resolve()),
@@ -373,6 +504,19 @@ def main() -> int:
         print(supervisor.pid)
         return 0
 
+    if args.role in POLICY_ROLES:
+        try:
+            metadata["archived_policy_outputs"] = prepare_policy_outputs(
+                args.output_dir
+            )
+        except PolicyOutputError as error:
+            metadata["status"] = "failed"
+            metadata["contract_error"] = str(error)
+            metadata["completed_utc"] = datetime.now(timezone.utc).isoformat()
+            write_json(args.output_dir / "process.json", metadata)
+            print(f"Policy Reviewer output preparation failed: {error}", file=sys.stderr)
+            return 65
+
     event_log = args.output_dir / "events.jsonl"
     with event_log.open("wb") as output:
         process = subprocess.Popen(command, stdout=output, stderr=subprocess.STDOUT)
@@ -383,8 +527,21 @@ def main() -> int:
         write_json(args.output_dir / "process.json", metadata)
         return_code = process.wait()
 
-    metadata["exit_code"] = return_code
+    metadata["child_exit_code"] = return_code
     metadata["completed_utc"] = datetime.now(timezone.utc).isoformat()
+    if return_code == 0 and args.role in POLICY_ROLES:
+        try:
+            metadata["policy_output_contract"] = validate_and_promote_policy_outputs(
+                args.output_dir, canonical_scratchpad
+            )
+        except PolicyOutputError as error:
+            metadata["exit_code"] = 65
+            metadata["status"] = "failed"
+            metadata["contract_error"] = str(error)
+            write_json(args.output_dir / "process.json", metadata)
+            print(f"Policy Reviewer output contract failed: {error}", file=sys.stderr)
+            return 65
+    metadata["exit_code"] = return_code
     metadata["status"] = "complete" if return_code == 0 else "failed"
     write_json(args.output_dir / "process.json", metadata)
     return return_code

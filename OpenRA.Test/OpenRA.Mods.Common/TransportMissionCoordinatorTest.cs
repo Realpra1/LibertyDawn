@@ -98,5 +98,21 @@ namespace OpenRA.Test
 			Assert.That(coordinator.IsReserved(10), Is.False);
 			Assert.That(coordinator.IsReserved(20), Is.False);
 		}
+
+		[Test]
+		public void TimedOutObjectiveIsConsumedOnceByItsExactPassengerAndTarget()
+		{
+			var timeouts = new TransportObjectiveTimeoutLedger();
+			timeouts.Record(10, 20);
+
+			Assert.That(timeouts.TryConsume(10, 21), Is.False, "An unrelated objective must not release a capture claim.");
+			Assert.That(timeouts.TryConsume(11, 20), Is.False, "An unrelated specialist must not consume the timeout.");
+			Assert.That(timeouts.TryConsume(10, 20), Is.True);
+			Assert.That(timeouts.TryConsume(10, 20), Is.False, "The timeout only defers one retry window.");
+
+			timeouts.Record(10, 20);
+			timeouts.Clear(10);
+			Assert.That(timeouts.TryConsume(10, 20), Is.False, "A fresh transport request clears obsolete timeout state.");
+		}
 	}
 }
