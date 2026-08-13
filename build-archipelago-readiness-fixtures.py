@@ -63,7 +63,7 @@ def main() -> None:
     )
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
-    for variant in ("valid", "premature", "fatal"):
+    for variant in ("valid", "premature", "fatal", "duplicate"):
         build_fixture(
             args.stock_map.resolve(), args.fixture_source.resolve(),
             args.output.resolve() / f"archipelago-cnc89-{variant}.oramap", variant,

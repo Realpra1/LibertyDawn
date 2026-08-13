@@ -165,10 +165,14 @@ class ParallelLauncherTest(unittest.TestCase):
             "duplicate-ready", [
                 "MAX progress: world=1", "CNC89 ACTOR label=scout id=17 type=e1 owner=Multi0 location=32,40 tick=1",
                 "CNC89 BUILD producer=yard id=21 queue=Building item=nuke state=queued tick=1",
-                "CNC89 READY tick=1 CNC89 READY tick=2",
+                "CNC89 READY tick=1", "MAX progress: world=2", "CNC89 READY tick=2",
+                "MAX progress: world=5", "Headless MAX automation reached configured exit at world tick 5; exiting.",
             ]
         )
         self.assertIn("more than once", duplicate["readiness"]["reason"])
+        self.assertEqual(duplicate["readiness"]["ready_marker_count"], 2)
+        self.assertEqual(duplicate["readiness"]["maximum_world_tick"], 5)
+        self.assertEqual(duplicate["valid_world_ticks"], 0)
 
         missing, _ = self.run_readiness_sequence(
             "missing-ready", [

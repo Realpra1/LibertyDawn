@@ -493,6 +493,19 @@ def readiness_summary(run: ActiveRun) -> dict[str, Any]:
     }
 
 
+def finalize_readiness(run: ActiveRun, text: str) -> None:
+    spec = run.spec.readiness
+    if spec is None or run.readiness_state != "ready":
+        return
+
+    run.readiness_marker_count = len(list(re.finditer(spec.ready_log_pattern, text, re.MULTILINE)))
+    if run.readiness_marker_count != 1:
+        run.readiness_state = "failed"
+        run.readiness_reason = "ready marker observed more than once"
+        run.readiness_tick = maximum_world_tick(text)
+        run.readiness_seconds = time.monotonic() - run.started_monotonic
+
+
 def terminate_process(run: ActiveRun, grace_seconds: float = 10) -> None:
     if run.process.poll() is not None:
         return
@@ -516,6 +529,7 @@ def relative_files(root: Path, pattern: str) -> list[str]:
 def finalize_run(run: ActiveRun) -> dict[str, Any]:
     run.console_file.close()
     text, log_paths = read_evidence(run)
+    finalize_readiness(run, text)
     tick = maximum_world_tick(text)
     duration = time.monotonic() - run.started_monotonic
     required = {

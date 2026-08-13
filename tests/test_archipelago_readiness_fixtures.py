@@ -70,6 +70,18 @@ class ArchipelagoReadinessFixtureTest(unittest.TestCase):
         )
         self.assertNotIn("CNC89 READY", script)
 
+    def test_duplicate_fixture_emits_ordered_ready_then_delayed_duplicate(self):
+        entries = fixtures.fixture_entries(
+            REPO_ROOT / "mods/cnc/maps/archipelago",
+            REPO_ROOT / "tests/fixtures/cnc89",
+            "duplicate",
+        )
+        script = entries["cnc89-duplicate.lua"].decode("utf-8")
+        self.assertIn("CNC89 ACTOR", script)
+        self.assertIn("CNC89 BUILD", script)
+        self.assertEqual(script.count("CNC89 READY"), 2)
+        self.assertIn("Trigger.AfterDelay(1250", script)
+
 
 if __name__ == "__main__":
     unittest.main()
