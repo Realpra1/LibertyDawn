@@ -62,7 +62,8 @@ namespace OpenRA.Mods.Common.Traits
 		public override object Create(ActorInitializer init) { return new CaptureManagerBotModule(init.Self, this); }
 	}
 
-	public class CaptureManagerBotModule : ConditionalTrait<CaptureManagerBotModuleInfo>, IBotTick, IGameSaveTraitData
+	public class CaptureManagerBotModule : ConditionalTrait<CaptureManagerBotModuleInfo>,
+		IBotTick, IBotUnitReservations, IGameSaveTraitData
 	{
 		readonly struct CaptureCandidate
 		{
@@ -186,6 +187,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly Predicate<Actor> unitCannotBeOrdered;
 		readonly int maximumCaptureTargetOptions;
 		IBotTransportReservations[] transportReservations;
+		IBotTransportObjectiveService[] transportServices;
 		DomainIndex domainIndex;
 		int minCaptureDelayTicks;
 		int minDemolitionDelayTicks;
@@ -222,7 +224,14 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			domainIndex = world.WorldActor.TraitOrDefault<DomainIndex>();
 			transportReservations = self.Owner.PlayerActor.TraitsImplementing<IBotTransportReservations>().ToArray();
+			transportServices = self.Owner.PlayerActor.TraitsImplementing<IBotTransportObjectiveService>().ToArray();
 			base.Created(self);
+		}
+
+		bool IBotUnitReservations.IsUnitReserved(Actor actor)
+		{
+			return actor != null && (activeCapturers.ContainsKey(actor) || activeDemolitionUnits.ContainsKey(actor) ||
+				targetReservations.TryGetReservation(actor.ActorID, out _, out _));
 		}
 
 		protected override void TraitEnabled(Actor self)
@@ -300,10 +309,16 @@ namespace OpenRA.Mods.Common.Traits
 			if (capturers.Length == 0)
 				return;
 
-			var targetOptions = world.Players.Where(p => !p.Spectating
+			var relationshipTargets = world.Players.Where(p => !p.Spectating
 					&& Info.CapturableRelationships.HasRelationship(player.RelationshipWith(p)))
 				.SelectMany(p => Info.CheckCaptureTargetsForVisibility
 					? GetVisibleActorsBelongingToPlayer(p) : GetActorsThatCanBeOrderedByPlayer(p));
+			var ownedRestorableTargets = GetActorsThatCanBeOrderedByPlayer(player)
+				.Where(target => (!Info.CheckCaptureTargetsForVisibility || target.CanBeViewedByPlayer(player)) &&
+					capturers.Any(capturer => IsOwnedRestorableHuskTarget(target, capturer)));
+			var targetOptions = relationshipTargets.Concat(ownedRestorableTargets)
+				.GroupBy(target => target.ActorID).Select(group => group.First())
+				.OrderBy(target => target.ActorID).ToArray();
 
 			var capturableTargetOptions = targetOptions
 				.Where(target => !targetReservations.IsReservedForOtherPurpose(
@@ -400,7 +415,17 @@ namespace OpenRA.Mods.Common.Traits
 					continue;
 				}
 
-				bot.QueueOrder(new Order("CaptureActor", capturer.Actor, Target.FromActor(target.Actor), false));
+				var transported = !HasReachableCaptureApproach(capturer.Actor, target.Actor);
+				if (transported && !TryRequestCaptureTransport(capturer.Actor, target.Actor))
+				{
+					targetReservations.Release(capturer.Actor.ActorID);
+					Debug("capture {0}#{1} -> {2}#{3} released: existing transport plan became unavailable",
+						capturer.Actor.Info.Name, capturer.Actor.ActorID, target.Actor.Info.Name, target.Actor.ActorID);
+					continue;
+				}
+
+				if (!transported)
+					bot.QueueOrder(new Order("CaptureActor", capturer.Actor, Target.FromActor(target.Actor), false));
 				AIUtils.BotDebug("AI ({0}): Ordered {1} to capture {2}", player.ClientIndex, capturer.Actor, target.Actor);
 				Debug("{0} {1}#{2} -> {3}#{4}: value={5}, distance-cells={6:0.0}, score={7:0.0}, " +
 					"building={8}, health={9}/{10}{11}", action,
@@ -694,13 +719,73 @@ namespace OpenRA.Mods.Common.Traits
 
 		bool CanCapture(TraitPair<CaptureManager> capturer, Actor target)
 		{
-			return CanCaptureByRules(capturer, target) && HasReachableCaptureApproach(capturer.Actor, target);
+			return CanCaptureByRules(capturer, target) && (HasReachableCaptureApproach(capturer.Actor, target) ||
+				IsCaptureTransportActive(capturer.Actor) || CanUseExistingTransport(capturer, target));
 		}
 
 		static bool CanCaptureByRules(TraitPair<CaptureManager> capturer, Actor target)
 		{
 			var captureManager = target.TraitOrDefault<CaptureManager>();
 			return captureManager != null && captureManager.CanBeTargetedBy(target, capturer.Actor, capturer.Trait);
+		}
+
+		bool IsOwnedRestorableHuskTarget(Actor target, TraitPair<CaptureManager> capturer)
+		{
+			if (target == null || target.IsDead || !target.IsInWorld)
+				return false;
+
+			var transformInfo = target.Info.TraitInfoOrDefault<TransformOnCaptureInfo>();
+			var transform = target.TraitOrDefault<TransformOnCapture>();
+			var targetManager = target.TraitOrDefault<CaptureManager>();
+			var hasValidTransform = transformInfo != null && transform != null &&
+				!string.IsNullOrEmpty(transformInfo.IntoActor) && world.Map.Rules.Actors.ContainsKey(transformInfo.IntoActor);
+			var hasMatchingCapture = hasValidTransform && targetManager != null &&
+				capturer.Actor.TraitsImplementing<Captures>().Any(captures =>
+					targetManager.CanBeTargetedBy(target, capturer.Actor, captures) &&
+					transform.HandlesCaptureTypes(captures.Info.CaptureTypes));
+
+			return CaptureTargeting.IsCapabilityScopedOwnedRestorationCandidate(target.Owner == player,
+				target.Info.HasTraitInfo<HuskInfo>(), target.Info.HasTraitInfo<BuildingInfo>(),
+				hasValidTransform, hasMatchingCapture);
+		}
+
+		bool IsOwnedRestorableHuskTarget(Actor target, Actor capturer)
+		{
+			var manager = capturer?.TraitOrDefault<CaptureManager>();
+			return manager != null && IsOwnedRestorableHuskTarget(target,
+				new TraitPair<CaptureManager>(capturer, manager));
+		}
+
+		bool CanUseExistingTransport(TraitPair<CaptureManager> capturer, Actor target)
+		{
+			return IsOwnedRestorableHuskTarget(target, capturer) && transportServices != null &&
+				transportServices.Any(service => service.CanTransportTo(capturer.Actor, target, this));
+		}
+
+		bool TryRequestCaptureTransport(Actor capturer, Actor target)
+		{
+			return transportServices != null && transportServices.Any(service =>
+				service.TryRequestTransport(capturer, target, this));
+		}
+
+		bool IsCaptureTransportActive(Actor capturer)
+		{
+			return transportServices != null && transportServices.Any(service => service.IsTransporting(capturer));
+		}
+
+		bool ConsumeTimedOutCaptureTransport(Actor capturer, Actor target)
+		{
+			return transportServices != null && transportServices.Any(service =>
+				service.TryConsumeTimedOutObjective(capturer, target));
+		}
+
+		void CancelCaptureTransport(Actor capturer)
+		{
+			if (transportServices == null)
+				return;
+
+			foreach (var service in transportServices)
+				service.CancelTransport(capturer);
 		}
 
 		bool HasReachableCaptureApproach(Actor capturer, Actor target)
@@ -979,16 +1064,25 @@ namespace OpenRA.Mods.Common.Traits
 			if (target.IsDead || !target.IsInWorld)
 				return "target-removed";
 
-			if (target.Owner == player)
-				return purpose == SpecialistAssignmentPurpose.Capture ? "captured" : "sabotaged";
-
-			if (unitCannotBeOrdered(specialist))
+			var captureTransportActive = purpose == SpecialistAssignmentPurpose.Capture &&
+				IsCaptureTransportActive(specialist);
+			if (unitCannotBeOrdered(specialist) && !captureTransportActive)
 				return "specialist-lost";
 
-			if (IsReservedForTransport(specialist))
+			// Cargo is briefly removed from the world while an unload frame-end task completes.
+			// The active objective transport remains the exact reservation owner during that handoff.
+			if (!specialist.IsInWorld && captureTransportActive)
+				return null;
+
+			var ownedRestoration = purpose == SpecialistAssignmentPurpose.Capture &&
+				IsOwnedRestorableHuskTarget(target, specialist);
+			if (target.Owner == player && !ownedRestoration)
+				return purpose == SpecialistAssignmentPurpose.Capture ? "captured" : "sabotaged";
+
+			if (IsReservedForTransport(specialist) && !captureTransportActive)
 				return "transport-owned";
 
-			if (!HasValidRelationship(target, purpose))
+			if (!HasValidRelationship(target, purpose, specialist))
 				return "relationship-invalid";
 
 			if (!targetReservations.Matches(specialist.ActorID, target.ActorID, purpose,
@@ -997,6 +1091,9 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (purpose == SpecialistAssignmentPurpose.Capture)
 			{
+				if (ConsumeTimedOutCaptureTransport(specialist, target))
+					return "transport-handoff-timeout";
+
 				var captureManager = specialist.TraitOrDefault<CaptureManager>();
 				if (captureManager == null || !CanCaptureByRules(
 					new TraitPair<CaptureManager>(specialist, captureManager), target))
@@ -1006,8 +1103,14 @@ namespace OpenRA.Mods.Common.Traits
 				if (assignment.MaximumClaimants != expectedClaimants)
 					return "pair-state-changed";
 
-				if (!HasReachableCaptureApproach(specialist, target))
+				if (!HasReachableCaptureApproach(specialist, target) && !captureTransportActive)
 					return "unreachable-approach";
+
+				if (captureTransportActive)
+				{
+					assignment.ObserveProgress(specialist, world.WorldTick);
+					return null;
+				}
 			}
 
 			var expectedActivity = HasExpectedActivity(specialist, purpose) ||
@@ -1039,7 +1142,8 @@ namespace OpenRA.Mods.Common.Traits
 			var target = pair.Value.Target;
 			var targetRemoved = target.IsDead || !target.IsInWorld;
 			var targetHealth = targetRemoved ? 0 : target.TraitOrDefault<IHealth>()?.HP ?? 0;
-			var relationshipInvalid = !targetRemoved && !HasValidRelationship(target, purpose);
+			var relationshipInvalid = !targetRemoved && !unitCannotBeOrdered(pair.Key) &&
+				!HasValidRelationship(target, purpose, pair.Key);
 			var nonProgressing = world.WorldTick - pair.Value.LastProgressTick > StalledAssignmentTicks(purpose);
 			result = result ?? (targetRemoved ? "target-removed" :
 				target.Owner == player ? "captured" :
@@ -1053,6 +1157,16 @@ namespace OpenRA.Mods.Common.Traits
 				deferredTargets[pair.Key] = new DeferredTarget(target,
 					world.WorldTick + StalledAssignmentTicks(purpose));
 			}
+			else if (result == "transport-handoff-timeout")
+			{
+				// The same unloaded Engineer has already spent its bounded objective handoff.
+				// Keep it available for other work, but do not recreate an identical stalled order
+				// until this exact live target disappears.
+				deferredTargets[pair.Key] = new DeferredTarget(target, int.MaxValue);
+			}
+
+			if (purpose == SpecialistAssignmentPurpose.Capture)
+				CancelCaptureTransport(pair.Key);
 
 			if (stopSpecialist && !unitCannotBeOrdered(pair.Key))
 				bot.QueueOrder(new Order("Stop", pair.Key, false));
@@ -1127,14 +1241,15 @@ namespace OpenRA.Mods.Common.Traits
 			return false;
 		}
 
-		bool HasValidRelationship(Actor target, SpecialistAssignmentPurpose purpose)
+		bool HasValidRelationship(Actor target, SpecialistAssignmentPurpose purpose, Actor specialist = null)
 		{
 			if (target.IsDead || !target.IsInWorld)
 				return false;
 
 			var relationship = player.RelationshipWith(target.Owner);
 			return purpose == SpecialistAssignmentPurpose.Capture ?
-				Info.CapturableRelationships.HasRelationship(relationship) :
+				Info.CapturableRelationships.HasRelationship(relationship) ||
+					IsOwnedRestorableHuskTarget(target, specialist) :
 				relationship == PlayerRelationship.Enemy;
 		}
 
@@ -1282,7 +1397,7 @@ namespace OpenRA.Mods.Common.Traits
 		bool IsValidRestoredAssignment(Actor specialist, Actor target, SavedAssignment saved)
 		{
 			if (specialist == null || target == null || unitCannotBeOrdered(specialist) ||
-				!HasValidRelationship(target, saved.Purpose))
+				!HasValidRelationship(target, saved.Purpose, specialist))
 				return false;
 
 			var expectedActivity = CaptureTargeting.ShouldRestoreAssignmentActivity(

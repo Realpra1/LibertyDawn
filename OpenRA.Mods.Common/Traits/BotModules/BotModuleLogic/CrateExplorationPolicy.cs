@@ -15,6 +15,11 @@ namespace OpenRA.Mods.Common.Traits
 {
 	public static class CrateExplorationPolicy
 	{
+		public static bool CanCollectCrates(bool requireMissingMcv, bool hasMcv)
+		{
+			return !requireMissingMcv || !hasMcv;
+		}
+
 		public static bool IsEmergency(int spendableCash, bool hasMcv, int cashThreshold)
 		{
 			return spendableCash <= cashThreshold || !hasMcv;
