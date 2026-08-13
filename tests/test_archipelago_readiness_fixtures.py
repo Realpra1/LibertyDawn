@@ -94,6 +94,17 @@ class ArchipelagoReadinessFixtureTest(unittest.TestCase):
         self.assertNotIn("CNC89 ACTOR", script)
         self.assertIn("Trigger.AfterDelay(1250", script)
 
+    def test_missing_ready_fixture_emits_both_evidence_classes_without_marker(self):
+        entries = fixtures.fixture_entries(
+            REPO_ROOT / "mods/cnc/maps/archipelago",
+            REPO_ROOT / "tests/fixtures/cnc89",
+            "missing-ready",
+        )
+        script = entries["cnc89-missing-ready.lua"].decode("utf-8")
+        self.assertIn("CNC89 ACTOR", script)
+        self.assertIn("CNC89 BUILD", script)
+        self.assertNotIn("CNC89 READY", script)
+
 
 if __name__ == "__main__":
     unittest.main()
