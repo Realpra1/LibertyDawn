@@ -11,7 +11,9 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using OpenRA.Mods.Common.Traits.BotModules;
 using OpenRA.Mods.Common.Traits.BotModules.Squads;
 using OpenRA.Primitives;
 using OpenRA.Traits;
@@ -69,6 +71,20 @@ namespace OpenRA.Mods.Common.Traits
 
 		[Desc("Actor types that should generally be excluded from attack squads.")]
 		public readonly HashSet<string> ExcludeFromSquadsTypes = new HashSet<string>();
+
+		[Desc("Direct-combat actor types this module may affirmatively retain under its bounded degraded fallback.",
+			"Aircraft, transports, artillery, stealth, capture, economy, and support actors must not be listed.")]
+		public readonly HashSet<string> FailsafeDirectCombatTypes = new HashSet<string>();
+
+		[Desc("Maximum ticks between degraded fallback reconsiderations. Unchanged active orders are not reissued.")]
+		public readonly int FailsafeReconsiderInterval = 75;
+
+		[Desc("Test-only unsynced advanced-work pressure in milliseconds. Leave at zero outside isolated failsafe evidence maps.")]
+		public readonly int FailsafeTestAdvancedWorkMilliseconds = 0;
+		[Desc("First world tick for test-only advanced-work pressure.")]
+		public readonly int FailsafeTestAdvancedWorkFromTick = 0;
+		[Desc("Exclusive final world tick for test-only advanced-work pressure. Zero leaves it unbounded.")]
+		public readonly int FailsafeTestAdvancedWorkUntilTick = 0;
 
 		[Desc("Actor types that are considered construction yards (base builders).")]
 		public readonly HashSet<string> ConstructionYardTypes = new HashSet<string>();
@@ -491,6 +507,18 @@ namespace OpenRA.Mods.Common.Traits
 				GroundAirMarkedAaBonus < 0 || GroundAirMarkedAaDuration < 0)
 				throw new YamlException("Ground strategic penalties, percentages, and air-mark values are invalid.");
 
+			if (FailsafeReconsiderInterval <= 0)
+				throw new YamlException("FailsafeReconsiderInterval must be greater than zero.");
+			if (FailsafeTestAdvancedWorkMilliseconds < 0 || FailsafeTestAdvancedWorkFromTick < 0 ||
+				FailsafeTestAdvancedWorkUntilTick < 0 || (FailsafeTestAdvancedWorkUntilTick > 0 &&
+					FailsafeTestAdvancedWorkUntilTick <= FailsafeTestAdvancedWorkFromTick))
+				throw new YamlException("Failsafe test pressure and tick bounds must be non-negative and valid.");
+			if (FailsafeDirectCombatTypes.Any(t => ExcludeFromSquadsTypes.Contains(t) || AirUnitsTypes.Contains(t) || NavalUnitsTypes.Contains(t)))
+				throw new YamlException("FailsafeDirectCombatTypes cannot include excluded, air, or naval actor types.");
+			foreach (var actorName in FailsafeDirectCombatTypes)
+				if (!rules.Actors.TryGetValue(actorName, out var actor) || !actor.HasTraitInfo<AttackBaseInfo>())
+					throw new YamlException($"FailsafeDirectCombatTypes actor '{actorName}' must exist and have an attack trait.");
+
 			foreach (var actorName in AirPassiveRepairActors)
 			{
 				if (!rules.Actors.TryGetValue(actorName, out var actor) ||
@@ -504,7 +532,7 @@ namespace OpenRA.Mods.Common.Traits
 	}
 
 	public class SquadManagerBotModule : ConditionalTrait<SquadManagerBotModuleInfo>, IBotEnabled, IBotTick, IBotRespondToAttack,
-		IBotPositionsUpdated, INotifyKilled, INotifyAppliedDamage, IGameSaveTraitData
+		IBotPositionsUpdated, INotifyKilled, INotifyAppliedDamage, IGameSaveTraitData, IAdvancedBotTick
 	{
 		public CPos GetRandomBaseCenter()
 		{
@@ -535,6 +563,7 @@ namespace OpenRA.Mods.Common.Traits
 		IBotTransportReservations[] transportReservations;
 		IBotUnitReservations[] unitReservations;
 		IBotTemporaryUnitControl[] temporaryUnitControls;
+		IUnassignedCombatUnitRegistry unassignedCombatUnits;
 
 		CPos initialBaseCenter;
 
@@ -544,6 +573,12 @@ namespace OpenRA.Mods.Common.Traits
 		int minAttackForceDelayTicks;
 		int airSafetyTicks;
 		int adaptiveAirRiskTicks;
+		bool advancedBehaviorEnabled = true;
+		int fallbackReconsiderTicks;
+		Actor fallbackTarget;
+		readonly HashSet<uint> fallbackOrderedActors = new HashSet<uint>();
+		readonly Dictionary<uint, CPos> fallbackOrderTargets = new Dictionary<uint, CPos>();
+		readonly AdvancedBotFallbackOwnership releasedFallbackOwnership = new AdvancedBotFallbackOwnership();
 
 		public SquadManagerBotModule(Actor self, SquadManagerBotModuleInfo info)
 			: base(info)
@@ -628,6 +663,7 @@ namespace OpenRA.Mods.Common.Traits
 			transportReservations = self.Owner.PlayerActor.TraitsImplementing<IBotTransportReservations>().ToArray();
 			unitReservations = self.Owner.PlayerActor.TraitsImplementing<IBotUnitReservations>().ToArray();
 			temporaryUnitControls = self.Owner.PlayerActor.TraitsImplementing<IBotTemporaryUnitControl>().ToArray();
+			unassignedCombatUnits = self.Owner.PlayerActor.TraitOrDefault<IUnassignedCombatUnitRegistry>();
 		}
 
 		protected override void TraitEnabled(Actor self)
@@ -656,7 +692,62 @@ namespace OpenRA.Mods.Common.Traits
 
 		void IBotTick.BotTick(IBot bot)
 		{
-			AssignRolesToIdleUnits(bot);
+			RecruitUnassignedCombatUnits(bot);
+			if (advancedBehaviorEnabled)
+			{
+				RunFailsafeTestPressure();
+				AssignRolesToIdleUnits(bot);
+			}
+			else
+				AssignRolesToIdleUnitsDegraded(bot);
+		}
+
+		void RunFailsafeTestPressure()
+		{
+			if (Info.FailsafeTestAdvancedWorkMilliseconds == 0 || World.WorldTick < Info.FailsafeTestAdvancedWorkFromTick ||
+				(Info.FailsafeTestAdvancedWorkUntilTick > 0 && World.WorldTick >= Info.FailsafeTestAdvancedWorkUntilTick))
+				return;
+
+			var deadline = Stopwatch.GetTimestamp() +
+				(long)Info.FailsafeTestAdvancedWorkMilliseconds * Stopwatch.Frequency / 1000;
+			while (Stopwatch.GetTimestamp() < deadline)
+			{
+			}
+		}
+
+		string IAdvancedBotTick.FailsafeModuleId => "SquadManagerBotModule";
+
+		void IAdvancedBotTick.SetAdvancedBehaviorEnabled(bool enabled)
+		{
+			if (advancedBehaviorEnabled == enabled)
+				return;
+
+			advancedBehaviorEnabled = enabled;
+			fallbackReconsiderTicks = 0;
+			fallbackTarget = null;
+			fallbackOrderedActors.Clear();
+			fallbackOrderTargets.Clear();
+			if (enabled && Info.GroundTargetDebugLogging)
+			{
+				var retained = releasedFallbackOwnership.Groups.SelectMany(g => g.Value)
+					.Select(World.GetActorById).Where(a => !unitCannotBeOrdered(a)).OrderBy(a => a.ActorID).ToArray();
+				if (retained.Length > 0)
+					Log.Write("debug", "Squad failsafe handoff [{0}]: owner=SquadManagerBotModule state=ordinary-manager " +
+						"actors={1}.", Player.PlayerName,
+						string.Join(",", retained.Select(a => a.Info.Name + "#" + a.ActorID)));
+			}
+		}
+
+		internal void RetainFailsafeReleasedActors(string source, IEnumerable<Actor> actors)
+		{
+			var released = actors.Where(a => !unitCannotBeOrdered(a)).OrderBy(a => a.ActorID).ToArray();
+			unassignedCombatUnits?.RegisterReleasedActors(released);
+			releasedFallbackOwnership.Retain(source, released.Select(a => a.ActorID));
+			fallbackReconsiderTicks = 0;
+			if (Info.GroundTargetDebugLogging && released.Length > 0)
+				Log.Write("debug", "Squad failsafe handoff [{0}]: owner=SquadManagerBotModule source={1} retained={2} " +
+					"actors={3}.", Player.PlayerName, source, released.Length,
+					string.Join(",", released.Select(a => a.Info.Name + "#" + a.ActorID)));
 		}
 
 		internal Actor FindClosestEnemy(WPos pos)
@@ -828,6 +919,7 @@ namespace OpenRA.Mods.Common.Traits
 			unitsHangingAroundTheBase.RemoveAll(units.Contains);
 			activeUnits.RemoveAll(units.Contains);
 			activeUnits.AddRange(units);
+			unassignedCombatUnits?.ClaimActors(units);
 
 			var target = IsPreferredEnemyUnit(preferredTarget) ? preferredTarget :
 				FindClosestEnemy(units.Select(a => a.CenterPosition).Average());
@@ -860,6 +952,7 @@ namespace OpenRA.Mods.Common.Traits
 			activeUnits.RemoveAll(units.Contains);
 			unitsHangingAroundTheBase.AddRange(units);
 			activeUnits.AddRange(units);
+			unassignedCombatUnits?.ClaimActors(units);
 			foreach (var n in notifyIdleBaseUnits)
 				n.UpdatedIdleBaseUnits(unitsHangingAroundTheBase);
 
@@ -919,6 +1012,289 @@ namespace OpenRA.Mods.Common.Traits
 			}
 		}
 
+		void AssignRolesToIdleUnitsDegraded(IBot bot)
+		{
+			CleanSquads();
+			activeUnits.RemoveAll(unitCannotBeOrdered);
+			activeUnits.RemoveAll(IsReservedForSpecialBehavior);
+			unitsHangingAroundTheBase.RemoveAll(unitCannotBeOrdered);
+			unitsHangingAroundTheBase.RemoveAll(IsReservedForSpecialBehavior);
+
+			if (--rushTicks <= 0)
+			{
+				rushTicks = Info.RushInterval;
+				TryToRushAttack(bot);
+			}
+
+			if (--attackForceTicks <= 0)
+			{
+				attackForceTicks = Info.AttackForceInterval;
+				foreach (var squad in Squads)
+					if (squad.Type != SquadType.GeneralAttack && squad.Type != SquadType.Air)
+						squad.Update();
+			}
+
+			if (--assignRolesTicks <= 0)
+			{
+				assignRolesTicks = Info.AssignRolesInterval;
+				FindNewUnits(bot);
+			}
+
+			if (--minAttackForceDelayTicks <= 0)
+			{
+				minAttackForceDelayTicks = Info.MinimumAttackForceDelay;
+				CreateAttackForce(bot);
+			}
+
+			foreach (var n in notifyIdleBaseUnits)
+				n.UpdatedIdleBaseUnits(unitsHangingAroundTheBase);
+
+			if (--fallbackReconsiderTicks > 0)
+				return;
+			fallbackReconsiderTicks = Info.FailsafeReconsiderInterval;
+
+			var retainedGroups = releasedFallbackOwnership.Groups.Select(g => new KeyValuePair<string, Actor[]>(g.Key,
+				g.Value.Select(World.GetActorById).Where(a => !unitCannotBeOrdered(a)).OrderBy(a => a.ActorID).ToArray())).ToArray();
+			var releasedGroups = retainedGroups.Select(g => new KeyValuePair<string, Actor[]>(g.Key,
+				g.Value.Where(a => AdvancedBotFallbackOwnership.IsEligibleForGenericFallback(Info.FailsafeDirectCombatTypes,
+					a.Info.Name, a.Info.HasTraitInfo<AttackBaseInfo>()) && !IsReservedForSpecialBehavior(a) &&
+					!IsUnitProtectingBase(a) && !IsUnitTemporarilyControlled(a)).ToArray())).Where(g => g.Value.Length > 0).ToArray();
+			var releasedActorIds = new HashSet<uint>(releasedGroups.SelectMany(g => g.Value).Select(a => a.ActorID));
+			if (Info.GroundTargetDebugLogging)
+				foreach (var group in retainedGroups.Where(g => g.Value.Length > 0))
+				{
+					var fallback = group.Value.Where(a => releasedActorIds.Contains(a.ActorID)).ToArray();
+					var protection = group.Value.Where(IsUnitProtectingBase).ToArray();
+					var reserved = group.Value.Where(a => !protection.Contains(a) && IsReservedForSpecialBehavior(a)).ToArray();
+					var temporary = group.Value.Where(a => !protection.Contains(a) && !reserved.Contains(a) &&
+						IsUnitTemporarilyControlled(a)).ToArray();
+					Log.Write("debug", "Squad failsafe released control [{0}]: source={1} fallback={2} protection={3} " +
+						"reserved={4} temporary={5} actors={6}.", Player.PlayerName, group.Key, fallback.Length,
+						protection.Length, reserved.Length, temporary.Length,
+						string.Join(",", group.Value.Select(a => a.Info.Name + "#" + a.ActorID)));
+				}
+
+			var candidates = activeUnits.Where(a => !releasedActorIds.Contains(a.ActorID) && !unitCannotBeOrdered(a) &&
+				Info.FailsafeDirectCombatTypes.Contains(a.Info.Name) && a.Info.HasTraitInfo<AttackBaseInfo>() &&
+				!IsReservedForSpecialBehavior(a) && !IsUnitProtectingBase(a) && !IsUnitTemporarilyControlled(a))
+				.OrderBy(a => a.ActorID).ToList();
+			var controlledActors = candidates.Concat(releasedGroups.SelectMany(g => g.Value)).ToArray();
+			fallbackOrderedActors.RemoveWhere(id => controlledActors.All(a => a.ActorID != id));
+			foreach (var id in fallbackOrderTargets.Keys.Where(id => controlledActors.All(a => a.ActorID != id)).ToList())
+				fallbackOrderTargets.Remove(id);
+			if (controlledActors.Length == 0)
+				return;
+
+			if (!IsPreferredEnemyUnit(fallbackTarget) || !IsNotHiddenUnit(fallbackTarget))
+			{
+				fallbackTarget = FindClosestEnemy(controlledActors.Select(a => a.CenterPosition).Average());
+				fallbackOrderedActors.Clear();
+				fallbackOrderTargets.Clear();
+			}
+
+			if (fallbackTarget == null)
+				return;
+
+			QueueFailsafeFallback(bot, "ordinary-direct", candidates);
+			foreach (var group in releasedGroups)
+				QueueFailsafeFallback(bot, group.Key, group.Value);
+		}
+
+		void RecruitUnassignedCombatUnits(IBot bot)
+		{
+			if (unassignedCombatUnits == null)
+				return;
+
+			var candidates = unassignedCombatUnits.UnassignedActors
+				.Where(a => !unitCannotBeOrdered(a) && !activeUnits.Contains(a) &&
+					!IsReservedForSpecialBehavior(a))
+				.OrderBy(a => a.ActorID).ToArray();
+			if (candidates.Length == 0)
+				return;
+
+			var adopted = new List<Actor>();
+			var adoptedGroundActors = new List<Actor>();
+			var legacyFallback = new List<Actor>();
+			var genericFallback = new List<Actor>();
+			foreach (var actor in candidates)
+			{
+				// A loaded squad may already own the actor before the registry has observed the claim.
+				if (Squads.Any(s => s.Units.Contains(actor)))
+				{
+					activeUnits.Add(actor);
+					adopted.Add(actor);
+					continue;
+				}
+
+				if (advancedBehaviorEnabled)
+				{
+					if (AdoptCurrentSquadUnit(bot, actor, adoptedGroundActors))
+					{
+						adopted.Add(actor);
+						continue;
+					}
+				}
+
+				var preCodexAssaultAvailable = !Info.ExcludeFromSquadsTypes.Contains(actor.Info.Name) &&
+					!Info.AirUnitsTypes.Contains(actor.Info.Name) && !Info.NavalUnitsTypes.Contains(actor.Info.Name) &&
+					actor.Info.HasTraitInfo<AttackBaseInfo>();
+				var genericFallbackEligible = AdvancedBotFallbackOwnership.IsEligibleForGenericFallback(
+					Info.FailsafeDirectCombatTypes, actor.Info.Name, actor.Info.HasTraitInfo<AttackBaseInfo>()) &&
+					!IsUnitProtectingBase(actor) && !IsUnitTemporarilyControlled(actor);
+				switch (UnassignedCombatUnitRecruitmentPolicy.SelectFallback(advancedBehaviorEnabled,
+					preCodexAssaultAvailable, genericFallbackEligible))
+				{
+					case UnassignedCombatFallbackDisposition.PreCodexAssault:
+						// GeneralAttack and Air are the disabled advanced paths. The closest pre-Codex
+						// owner for released ground combat is the ordinary assault squad.
+						legacyFallback.Add(actor);
+						continue;
+					case UnassignedCombatFallbackDisposition.GenericFallback:
+						genericFallback.Add(actor);
+						continue;
+				}
+
+				// There is no safe generic fallback for aircraft, naval units, or excluded
+				// specialists. Leave them registered for a compatible owner or specialist reclaim.
+			}
+
+			if (legacyFallback.Count > 0)
+				AdoptLegacyFallbackAssault(bot, legacyFallback, adopted);
+			if (genericFallback.Count > 0)
+				AdoptGenericFallback(bot, genericFallback, adopted);
+
+			if (adopted.Count == 0)
+				return;
+
+			unassignedCombatUnits.ClaimActors(adopted);
+			if (Info.GroundTargetDebugLogging && adopted.Count <= 32)
+				Log.Write("debug", "Squad registry recruitment [{0}]: owner=SquadManagerBotModule advanced={1} " +
+					"actors={2}.", Player.PlayerName, advancedBehaviorEnabled,
+					string.Join(",", adopted.OrderBy(a => a.ActorID).Select(a => a.Info.Name + "#" + a.ActorID)));
+		}
+
+		void AdoptGenericFallback(IBot bot, List<Actor> actors, List<Actor> adopted)
+		{
+			foreach (var actor in actors)
+			{
+				activeUnits.Add(actor);
+				adopted.Add(actor);
+			}
+
+			if (!IsPreferredEnemyUnit(fallbackTarget) || !IsNotHiddenUnit(fallbackTarget))
+				fallbackTarget = FindClosestEnemy(actors.Select(a => a.CenterPosition).Average());
+			if (fallbackTarget != null)
+				QueueFailsafeFallback(bot, "unassigned-registry", actors);
+		}
+
+		bool AdoptCurrentSquadUnit(IBot bot, Actor actor, List<Actor> adoptedGroundActors)
+		{
+			if (Info.ExcludeFromSquadsTypes.Contains(actor.Info.Name))
+				return false;
+
+			if (Info.AirUnitsTypes.Contains(actor.Info.Name))
+			{
+				var air = GetAirSquadWithRoom(bot, actor);
+				if (air == null)
+					return false;
+
+				air.Units.Add(actor);
+				if (air.Units.Count > 1)
+					air.MarkAirReinforcement(actor);
+			}
+			else if (Info.NavalUnitsTypes.Contains(actor.Info.Name))
+			{
+				var ships = GetSquadOfType(SquadType.Naval) ?? RegisterNewSquad(bot, SquadType.Naval);
+				ships.Units.Add(actor);
+			}
+			else if (Info.UseCohesiveGroundSquad)
+			{
+				adoptedGroundActors.Add(actor);
+				var ground = GetSquadOfType(SquadType.GeneralAttack);
+				if (ground == null)
+					unitsHangingAroundTheBase.Add(actor);
+				else
+				{
+					ground.Units.Add(actor);
+					ground.MarkGroundReinforcement(actor);
+				}
+			}
+			else
+			{
+				adoptedGroundActors.Add(actor);
+				var assault = Squads.FirstOrDefault(s => s.Type == SquadType.Assault && s.IsValid);
+				if (assault == null)
+					unitsHangingAroundTheBase.Add(actor);
+				else
+					assault.Units.Add(actor);
+			}
+
+			activeUnits.Add(actor);
+			return true;
+		}
+
+		void AdoptLegacyFallbackAssault(IBot bot, List<Actor> actors, List<Actor> adopted)
+		{
+			var capabilityChecked = actors.All(a => a.Info.HasTraitInfo<AttackBaseInfo>());
+			var assault = Squads.FirstOrDefault(s => s.Type == SquadType.Assault && s.IsValid);
+			var target = FindClosestEnemy(actors.Select(a => a.CenterPosition).Average());
+			if (assault == null)
+				assault = RegisterNewSquad(bot, SquadType.Assault, target);
+			else if (target != null)
+				assault.TargetActor = target;
+
+			foreach (var actor in actors)
+			{
+				assault.Units.Add(actor);
+				activeUnits.Add(actor);
+				adopted.Add(actor);
+			}
+
+			if (target == null)
+				return;
+
+			QueueAggressiveStance(bot, actors);
+			bot.QueueOrder(new Order("AttackMove", null, Target.FromCell(World, target.Location), false,
+				groupedActors: actors.ToArray()));
+			assault.FuzzyStateMachine.ChangeState(assault, new GroundUnitsAttackMoveState(), true);
+			if (Info.GroundTargetDebugLogging)
+				Log.Write("debug", "Squad registry fallback [{0}]: owner=SquadManagerBotModule source=pre-codex-assault " +
+					"accepted={1} actors={2} target={3}#{4} capability-checked={5} stance=AttackAnything " +
+					"order=AttackMove.", Player.PlayerName, actors.Count,
+					string.Join(",", actors.Select(a => a.Info.Name + "#" + a.ActorID)), target.Info.Name, target.ActorID,
+					capabilityChecked);
+		}
+
+		static void QueueAggressiveStance(IBot bot, IEnumerable<Actor> actors)
+		{
+			foreach (var actor in actors)
+				if (actor.TraitOrDefault<AutoTarget>() is AutoTarget autoTarget && autoTarget.Stance != UnitStance.AttackAnything)
+					bot.QueueOrder(new Order("SetUnitStance", actor, false) { ExtraData = (uint)UnitStance.AttackAnything });
+		}
+
+		void QueueFailsafeFallback(IBot bot, string source, IEnumerable<Actor> candidates)
+		{
+			var orderable = candidates.Where(a => !fallbackOrderedActors.Contains(a.ActorID) ||
+				!fallbackOrderTargets.TryGetValue(a.ActorID, out var target) || target != fallbackTarget.Location).ToArray();
+			if (orderable.Length == 0)
+				return;
+
+			QueueAggressiveStance(bot, orderable);
+			bot.QueueOrder(new Order("AttackMove", null, Target.FromCell(World, fallbackTarget.Location), false,
+				groupedActors: orderable));
+			foreach (var actor in orderable)
+			{
+				fallbackOrderedActors.Add(actor.ActorID);
+				fallbackOrderTargets[actor.ActorID] = fallbackTarget.Location;
+			}
+
+			if (Info.GroundTargetDebugLogging)
+				Log.Write("debug", "Squad failsafe fallback [{0}]: owner=SquadManagerBotModule source={1} accepted={2} " +
+					"actors={3} target={4}#{5} order=AttackMove cadence={6}.", Player.PlayerName, source, orderable.Length,
+					string.Join(",", orderable.Select(a => a.Info.Name + "#" + a.ActorID)), fallbackTarget.Info.Name,
+					fallbackTarget.ActorID, Info.FailsafeReconsiderInterval);
+		}
+
 		void FindNewUnits(IBot bot)
 		{
 			// activeUnits is bookkeeping, not proof of squad membership. Recover any live aircraft whose
@@ -932,46 +1308,18 @@ namespace OpenRA.Mods.Common.Traits
 					!IsReservedForSpecialBehavior(a) &&
 					!activeUnits.Contains(a));
 
+			var adoptedGroundActors = new List<Actor>();
 			foreach (var a in newUnits)
 			{
-				if (Info.AirUnitsTypes.Contains(a.Info.Name))
-				{
-					var air = GetAirSquadWithRoom(bot, a);
-
-					// Every air squad is full and we may not start another. Leave the aircraft out of
-					// activeUnits so it stays at base and is picked up as soon as a slot frees up, rather
-					// than oversizing a harassment squad.
-					if (air == null)
-						continue;
-
-					air.Units.Add(a);
-					if (air.Units.Count > 1)
-						air.MarkAirReinforcement(a);
-				}
-				else if (Info.NavalUnitsTypes.Contains(a.Info.Name))
-				{
-					var ships = GetSquadOfType(SquadType.Naval);
-					if (ships == null)
-						ships = RegisterNewSquad(bot, SquadType.Naval);
-
-					ships.Units.Add(a);
-				}
-				else if (Info.UseCohesiveGroundSquad)
-				{
-					var ground = GetSquadOfType(SquadType.GeneralAttack);
-					if (ground == null)
-						unitsHangingAroundTheBase.Add(a);
-					else
-					{
-						ground.Units.Add(a);
-						ground.MarkGroundReinforcement(a);
-					}
-				}
-				else
-					unitsHangingAroundTheBase.Add(a);
-
-				activeUnits.Add(a);
+				if (AdoptCurrentSquadUnit(bot, a, adoptedGroundActors))
+					unassignedCombatUnits?.ClaimActors(new[] { a });
 			}
+
+			// Keep actor-level evidence bounded: oversized initial rosters are not useful handoff telemetry.
+			if (Info.GroundTargetDebugLogging && adoptedGroundActors.Count > 0 && adoptedGroundActors.Count <= 32)
+				Log.Write("debug", "Squad ordinary adoption [{0}]: owner=SquadManagerBotModule actors={1}.",
+					Player.PlayerName, string.Join(",", adoptedGroundActors
+						.OrderBy(a => a.ActorID).Select(a => a.Info.Name + "#" + a.ActorID)));
 
 			// Notifying here rather than inside the loop, should be fine and saves a bunch of notification calls
 			foreach (var n in notifyIdleBaseUnits)
@@ -1195,6 +1543,7 @@ namespace OpenRA.Mods.Common.Traits
 			if (IsTraitDisabled)
 				return null;
 
+			var releasedFallback = releasedFallbackOwnership.Export();
 			return new List<MiniYamlNode>()
 			{
 				new MiniYamlNode("Squads", "", Squads.Select(s => new MiniYamlNode("Squad", s.Serialize())).ToList()),
@@ -1212,6 +1561,14 @@ namespace OpenRA.Mods.Common.Traits
 				new MiniYamlNode("AttackForceTicks", FieldSaver.FormatValue(attackForceTicks)),
 				new MiniYamlNode("MinAttackForceDelayTicks", FieldSaver.FormatValue(minAttackForceDelayTicks)),
 				new MiniYamlNode("AdaptiveAirRiskTicks", FieldSaver.FormatValue(adaptiveAirRiskTicks)),
+				new MiniYamlNode("AdvancedBehaviorEnabled", FieldSaver.FormatValue(advancedBehaviorEnabled)),
+				new MiniYamlNode("FallbackReconsiderTicks", FieldSaver.FormatValue(fallbackReconsiderTicks)),
+				new MiniYamlNode("FallbackTarget", FieldSaver.FormatValue(fallbackTarget?.ActorID ?? 0)),
+				new MiniYamlNode("FallbackOrderedActors", FieldSaver.FormatValue(fallbackOrderedActors.ToArray())),
+				new MiniYamlNode("FallbackOrderTargetActors", FieldSaver.FormatValue(fallbackOrderTargets.Keys.ToArray())),
+				new MiniYamlNode("FallbackOrderTargetCells", FieldSaver.FormatValue(fallbackOrderTargets.Values.ToArray())),
+				new MiniYamlNode("FallbackReleasedSources", FieldSaver.FormatValue(releasedFallback.Sources)),
+				new MiniYamlNode("FallbackReleasedActors", FieldSaver.FormatValue(releasedFallback.ActorIds)),
 				new MiniYamlNode("AdaptiveAirRisk", "", adaptiveAirRisk.OrderBy(e => e.Key).Select(e =>
 				{
 					var state = e.Value.ExportState();
@@ -1270,6 +1627,43 @@ namespace OpenRA.Mods.Common.Traits
 			var adaptiveAirRiskTicksNode = data.FirstOrDefault(n => n.Key == "AdaptiveAirRiskTicks");
 			if (adaptiveAirRiskTicksNode != null)
 				adaptiveAirRiskTicks = FieldLoader.GetValue<int>("AdaptiveAirRiskTicks", adaptiveAirRiskTicksNode.Value.Value);
+
+			var advancedBehaviorNode = data.FirstOrDefault(n => n.Key == "AdvancedBehaviorEnabled");
+			if (advancedBehaviorNode != null)
+				advancedBehaviorEnabled = FieldLoader.GetValue<bool>("AdvancedBehaviorEnabled", advancedBehaviorNode.Value.Value);
+			var fallbackTicksNode = data.FirstOrDefault(n => n.Key == "FallbackReconsiderTicks");
+			if (fallbackTicksNode != null)
+				fallbackReconsiderTicks = FieldLoader.GetValue<int>("FallbackReconsiderTicks", fallbackTicksNode.Value.Value);
+			var fallbackTargetNode = data.FirstOrDefault(n => n.Key == "FallbackTarget");
+			if (fallbackTargetNode != null)
+				fallbackTarget = self.World.GetActorById(FieldLoader.GetValue<uint>("FallbackTarget", fallbackTargetNode.Value.Value));
+			var fallbackActorsNode = data.FirstOrDefault(n => n.Key == "FallbackOrderedActors");
+			if (fallbackActorsNode != null)
+			{
+				fallbackOrderedActors.Clear();
+				foreach (var actorId in FieldLoader.GetValue<uint[]>("FallbackOrderedActors", fallbackActorsNode.Value.Value))
+					if (self.World.GetActorById(actorId) != null)
+						fallbackOrderedActors.Add(actorId);
+			}
+
+			var fallbackTargetActorsNode = data.FirstOrDefault(n => n.Key == "FallbackOrderTargetActors");
+			var fallbackTargetCellsNode = data.FirstOrDefault(n => n.Key == "FallbackOrderTargetCells");
+			if (fallbackTargetActorsNode != null && fallbackTargetCellsNode != null)
+			{
+				var actorIds = FieldLoader.GetValue<uint[]>("FallbackOrderTargetActors", fallbackTargetActorsNode.Value.Value);
+				var cells = FieldLoader.GetValue<CPos[]>("FallbackOrderTargetCells", fallbackTargetCellsNode.Value.Value);
+				fallbackOrderTargets.Clear();
+				for (var i = 0; i < Math.Min(actorIds.Length, cells.Length); i++)
+					if (self.World.GetActorById(actorIds[i]) != null)
+						fallbackOrderTargets[actorIds[i]] = cells[i];
+			}
+
+			var fallbackReleasedSourcesNode = data.FirstOrDefault(n => n.Key == "FallbackReleasedSources");
+			var fallbackReleasedActorsNode = data.FirstOrDefault(n => n.Key == "FallbackReleasedActors");
+			if (fallbackReleasedSourcesNode != null && fallbackReleasedActorsNode != null)
+				releasedFallbackOwnership.Import(
+					FieldLoader.GetValue<string[]>("FallbackReleasedSources", fallbackReleasedSourcesNode.Value.Value),
+					FieldLoader.GetValue<uint[]>("FallbackReleasedActors", fallbackReleasedActorsNode.Value.Value));
 
 			var adaptiveAirRiskNode = data.FirstOrDefault(n => n.Key == "AdaptiveAirRisk");
 			if (adaptiveAirRiskNode != null)

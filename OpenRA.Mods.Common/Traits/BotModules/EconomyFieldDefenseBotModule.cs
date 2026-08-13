@@ -82,7 +82,7 @@ namespace OpenRA.Mods.Common.Traits
 	}
 
 	public sealed class EconomyFieldDefenseBotModule : ConditionalTrait<EconomyFieldDefenseBotModuleInfo>,
-		IBotEnabled, IBotTick, IBotUnitReservations, IBotRespondToAttack, IGameSaveTraitData
+		IBotEnabled, IBotTick, IBotUnitReservations, IBotRespondToAttack, IGameSaveTraitData, IAdvancedBotTick
 	{
 		const string ProductionRequestOwner = "EconomyFieldDefense";
 
@@ -148,6 +148,7 @@ namespace OpenRA.Mods.Common.Traits
 		IBot bot;
 		IBotUnitReservations[] otherReservations;
 		IBotTransportReservations[] transportReservations;
+		IUnassignedCombatUnitRegistry unassignedCombatUnits;
 		SquadManagerBotModule squadManager;
 		DomainIndex domainIndex;
 		IResourceLayer resourceLayer;
@@ -159,6 +160,7 @@ namespace OpenRA.Mods.Common.Traits
 		HashSet<CPos> projectedResourceHazards = new HashSet<CPos>();
 		HashSet<CPos> ownedMovementHazards = new HashSet<CPos>();
 		readonly Dictionary<uint, string> lastFieldCompositions = new Dictionary<uint, string>();
+		bool advancedBehaviorEnabled = true;
 		int scanTicks = 1;
 		int routineScans;
 		int dirtyEnqueued;
@@ -185,6 +187,7 @@ namespace OpenRA.Mods.Common.Traits
 			otherReservations = player.PlayerActor.TraitsImplementing<IBotUnitReservations>()
 				.Where(r => !ReferenceEquals(r, this)).ToArray();
 			transportReservations = player.PlayerActor.TraitsImplementing<IBotTransportReservations>().ToArray();
+			unassignedCombatUnits = player.PlayerActor.TraitOrDefault<IUnassignedCombatUnitRegistry>();
 			RefreshSquadManager();
 			base.Created(self);
 		}
@@ -240,9 +243,34 @@ namespace OpenRA.Mods.Common.Traits
 				player.RelationshipWith(actor.Owner) == PlayerRelationship.Enemy;
 		}
 
+		string IAdvancedBotTick.FailsafeModuleId => "EconomyFieldDefenseBotModule";
+
+		void IAdvancedBotTick.SetAdvancedBehaviorEnabled(bool enabled)
+		{
+			if (advancedBehaviorEnabled == enabled)
+				return;
+
+			advancedBehaviorEnabled = enabled;
+			if (!enabled)
+			{
+				var releasedActors = reserved.Select(world.GetActorById).Where(IsOwnedUsable).OrderBy(a => a.ActorID).ToArray();
+				squadManager?.RetainFailsafeReleasedActors("EconomyFieldDefenseBotModule", releasedActors);
+				if (Info.DebugLogging && reserved.Count > 0)
+					Debug("released all fields reason=failsafe-degraded actors={0}", string.Join(",",
+						releasedActors.Select(a => a.Info.Name + "#" + a.ActorID)));
+
+				ClearState("failsafe degraded");
+			}
+			else
+			{
+				scanTicks = 1;
+				Debug("enabled for recovery probe");
+			}
+		}
+
 		void IBotTick.BotTick(IBot enabledBot)
 		{
-			if (IsTraitDisabled || player.WinState != WinState.Undefined)
+			if (IsTraitDisabled || !advancedBehaviorEnabled || player.WinState != WinState.Undefined)
 				return;
 
 			if (Info.LowFrequencyTriggerControl)
@@ -476,6 +504,9 @@ namespace OpenRA.Mods.Common.Traits
 
 			foreach (var id in field.Tanks.Concat(field.Infantry).Concat(field.AntiAir).ToArray())
 			{
+				var actor = world.GetActorById(id);
+				if (actor != null)
+					unassignedCombatUnits?.RegisterReleasedActors(new[] { actor });
 				RestoreStance(id);
 				reserved.Remove(id);
 				lastOrderTicks.Remove(id);
@@ -531,6 +562,8 @@ namespace OpenRA.Mods.Common.Traits
 				Fill(field, field.Infantry, Info.InfantryTypes, Info.InfantryPerHarvester);
 				Fill(field, field.AntiAir, Info.AntiAirTypes, Info.AntiAirPerHarvester);
 			}
+
+			unassignedCombatUnits?.ClaimActors(reserved.Select(world.GetActorById).Where(a => a != null));
 		}
 
 		void RebalanceField(FieldAssignment field)
@@ -596,6 +629,8 @@ namespace OpenRA.Mods.Common.Traits
 				if (reason != null)
 				{
 					var actorType = actor?.Info.Name ?? "missing";
+					if (actor != null)
+						unassignedCombatUnits?.RegisterReleasedActors(new[] { actor });
 					RestoreStance(id);
 					actors.Remove(id);
 					field.Destinations.Remove(id);
@@ -765,49 +800,27 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			orderIssued = false;
 			if (lastUrgentTargets.TryGetValue(actor.ActorID, out var previousTarget) &&
-				!EconomyFieldDefensePolicy.IsMateriallyNewUrgentTarget(previousTarget, enemyCell, 2) &&
-				(!actor.IsIdle || (lastUrgentOrderTicks.TryGetValue(actor.ActorID, out var previousOrder) &&
-					world.WorldTick < previousOrder + Info.RouteStallTicks)))
+				!EconomyFieldDefensePolicy.IsMateriallyNewUrgentTarget(previousTarget, enemyCell, 2))
 			{
 				Debug("urgent guard validation field={0} actor={1} result=deduplicated target={2} reason={3}",
 					field.HarvesterId, actor.ActorID, enemyCell, reason);
 				return true;
 			}
 
-			var leashSquared = Info.EngagementLeashCells * Info.EngagementLeashCells;
-			foreach (var destination in world.Map.FindTilesInAnnulus(enemyCell, 0, 2)
-				.Where(cell => (cell - field.Station).LengthSquared <= leashSquared && IsSafeCell(actor, cell))
-				.OrderBy(cell => (cell - enemyCell).LengthSquared)
-				.ThenBy(cell => (cell - actor.Location).LengthSquared)
-				.ThenBy(cell => cell.Y).ThenBy(cell => cell.X))
-			{
-				var mobile = actor.TraitOrDefault<Mobile>();
-				if (mobile == null || (actor.Location != destination &&
-					!mobile.CanEnterCell(destination, check: BlockedByActor.Immovable)) ||
-					!TryFindSafePath(actor, destination, out var path))
-					continue;
+			var autoTarget = actor.TraitOrDefault<AutoTarget>();
+			if (autoTarget != null && autoTarget.Stance != UnitStance.AttackAnything)
+				bot.QueueOrder(new Order("SetUnitStance", actor, false) { ExtraData = (uint)UnitStance.AttackAnything });
 
-				var autoTarget = actor.TraitOrDefault<AutoTarget>();
-				if (autoTarget != null && autoTarget.Stance != UnitStance.AttackAnything)
-					bot.QueueOrder(new Order("SetUnitStance", actor, false) { ExtraData = (uint)UnitStance.AttackAnything });
-
-				if (path.Count >= 2)
-					QueueRoute(actor, destination, path, true);
-				else
-					bot.QueueOrder(new Order("AttackMove", actor, Target.FromCell(world, destination), false));
-
-				lastUrgentTargets[actor.ActorID] = enemyCell;
-				lastUrgentOrderTicks[actor.ActorID] = world.WorldTick;
-				lastOrderTicks[actor.ActorID] = world.WorldTick;
-				orderIssued = true;
-				Debug("urgent guard validation field={0} actor={1} result=aggressive-attack-move" +
-					" enemy={2} destination={3} waypoints={4} reason={5}", field.HarvesterId,
-					actor.ActorID, enemyCell, destination, path.Count, reason);
-				return true;
-			}
-
-			Debug("urgent guard validation field={0} actor={1} result=no-safe-local-attack-cell" +
-				" enemy={2} reason={3}", field.HarvesterId, actor.ActorID, enemyCell, reason);
+			// The engine's AttackMove and locomotor own path selection and combat. The field-defense
+			// module only points a reacting guard at the detected nearby threat; it must not perform
+			// another safety search or reject the reaction because the target cell is occupied/blocked.
+			bot.QueueOrder(new Order("AttackMove", actor, Target.FromCell(world, enemyCell), false));
+			lastUrgentTargets[actor.ActorID] = enemyCell;
+			lastUrgentOrderTicks[actor.ActorID] = world.WorldTick;
+			lastOrderTicks[actor.ActorID] = world.WorldTick;
+			orderIssued = true;
+			Debug("urgent guard validation field={0} actor={1} result=aggressive-attack-move" +
+				" enemy={2} destination={2} reason={3}", field.HarvesterId, actor.ActorID, enemyCell, reason);
 			return true;
 		}
 
@@ -1143,6 +1156,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		void Release(FieldAssignment field, Actor actor, string reason)
 		{
+			unassignedCombatUnits?.RegisterReleasedActors(new[] { actor });
 			RestoreStance(actor.ActorID);
 			field.Tanks.Remove(actor.ActorID);
 			field.Infantry.Remove(actor.ActorID);
@@ -1161,6 +1175,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		void ClearState(string reason)
 		{
+			unassignedCombatUnits?.RegisterReleasedActors(reserved.Select(world.GetActorById).Where(a => a != null));
 			CancelProductionRequests(reason);
 			foreach (var id in originalStances.Keys.ToArray())
 				RestoreStance(id);
@@ -1378,6 +1393,8 @@ namespace OpenRA.Mods.Common.Traits
 				reserved.UnionWith(field.Infantry);
 				reserved.UnionWith(field.AntiAir);
 			}
+
+			unassignedCombatUnits?.ClaimActors(reserved.Select(world.GetActorById).Where(a => a != null));
 
 			RestoreRouteState(data);
 			RestoreDirtyAssignments(data);
