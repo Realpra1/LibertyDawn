@@ -200,12 +200,28 @@ namespace OpenRA.Test.Mods.Common
 		[TestCase(false, true, true, 3, 8, 5, 0, 3, SpecialistDefenderClearAction.SnipeTank)]
 		[TestCase(false, true, true, 3, 7, 5, 0, 3, SpecialistDefenderClearAction.None)]
 		[TestCase(false, true, true, 3, 8, 5, 2, 3, SpecialistDefenderClearAction.None)]
+		[TestCase(false, false, true, 1, 8, 0, 16, 3, SpecialistDefenderClearAction.AttackUnarmedDetector,
+			Description = "MHQ is Ground/Vehicle, not Structure or Tank; detector capability owns this fallback.")]
+		[TestCase(false, false, true, 2, 8, 0, 16, 3, SpecialistDefenderClearAction.None)]
+		[TestCase(false, false, true, 1, 8, 5, 16, 3, SpecialistDefenderClearAction.None)]
 		public void DefenderClearingRequiresAnExplicitSafeCapability(bool infantry, bool tank, bool canCrush,
 			int packageCount, int ownRange, int weaponRange, int detectorRange, int kiteMargin,
 			SpecialistDefenderClearAction expected)
 		{
 			Assert.That(StealthTankSquadPolicy.DefenderClearAction(infantry, tank, canCrush,
 				packageCount, ownRange, weaponRange, detectorRange, kiteMargin), Is.EqualTo(expected));
+		}
+
+		[TestCase(true, false, false, false, SpecialistRepairDisposition.Active,
+			Description = "No repair path leaves a damaged member active until death.")]
+		[TestCase(true, false, false, true, SpecialistRepairDisposition.Repair)]
+		[TestCase(false, true, true, true, SpecialistRepairDisposition.Rejoin)]
+		[TestCase(false, false, false, true, SpecialistRepairDisposition.Active)]
+		public void RepairIsOpportunisticAndNeverAnIndefiniteWait(bool damaged,
+			bool repairing, bool fullyRepaired, bool reachableRepair, SpecialistRepairDisposition expected)
+		{
+			Assert.That(StealthTankSquadPolicy.RepairDisposition(damaged, repairing,
+				fullyRepaired, reachableRepair), Is.EqualTo(expected));
 		}
 
 		[Test]

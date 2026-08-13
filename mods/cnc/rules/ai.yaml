@@ -334,7 +334,8 @@ Player:
 		AvoidResourceTypes: BlueTiberium
 		PendingResourceExplosionAvoidanceRadius: 1
 		HazardRouteWaypointSpacing: 4
-		DefenderClearFallbackScans: 20
+		# Match AirSquad's three strategic scans of patience before a safe blocker clear.
+		DefenderClearFallbackScans: 3
 		DefenderClearValueRatio: 1
 		DefenderClearWeakestCandidates: 3
 		HarassmentTargetPriorities:

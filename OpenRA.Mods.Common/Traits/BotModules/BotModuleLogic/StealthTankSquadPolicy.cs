@@ -12,7 +12,8 @@ using System.Linq;
 namespace OpenRA.Mods.Common.Traits
 {
 	public enum StealthTankSquadRole { Harass, Attack }
-	public enum SpecialistDefenderClearAction { None, CrushInfantry, SnipeTank }
+	public enum SpecialistDefenderClearAction { None, CrushInfantry, SnipeTank, AttackUnarmedDetector }
+	public enum SpecialistRepairDisposition { Active, Repair, Rejoin }
 	public enum StealthTankPlanInvalidation
 	{
 		None,
@@ -160,7 +161,27 @@ namespace OpenRA.Mods.Common.Traits
 				ownRangeCells >= defenderWeaponRangeCells + Math.Max(0, safetyMarginCells))
 				return SpecialistDefenderClearAction.SnipeTank;
 
+			// A lone detector cannot punish revealed fire. Keep this deliberately narrower
+			// than ordinary structure targeting: it is only a fallback blocker capability,
+			// and any overlapping armed defender makes packageDefenderCount greater than one.
+			if (packageDefenderCount == 1 && defenderWeaponRangeCells <= 0 &&
+				defenderDetectorRangeCells > 0 && ownRangeCells > 0)
+				return SpecialistDefenderClearAction.AttackUnarmedDetector;
+
 			return SpecialistDefenderClearAction.None;
+		}
+
+		public static SpecialistRepairDisposition RepairDisposition(bool damagedBelowThreshold,
+			bool isRepairing, bool fullyRepaired, bool hasCompatibleReachableRepair)
+		{
+			if (isRepairing && fullyRepaired)
+				return SpecialistRepairDisposition.Rejoin;
+			if (damagedBelowThreshold && hasCompatibleReachableRepair)
+				return SpecialistRepairDisposition.Repair;
+
+			// No compatible reachable facility is never a parking state. A damaged
+			// specialist remains owned by, and active in, its combat squad.
+			return SpecialistRepairDisposition.Active;
 		}
 
 		public static int BufferedRange(int rangeCells, int bufferCells)

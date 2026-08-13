@@ -980,3 +980,68 @@ bounded conservative hit-run/flee behavior until death, never parking, idling,
 leaving the squad, or waiting; it reevaluates if repair later appears. Cycle 9
 needs no-repair-active and repair/rejoin tests. Those broader changes are not
 part of cycle 8.
+
+## Cycle 9 — Air lifecycle mapping and MHQ blocker clear
+
+Cycle 9 began from clean durable head `eb152455fba93a4de521fa735eccba45fb6e271e`.
+AirSquad's reusable seams are safe undefended targets before AA clearing; three
+no-undefended scans in CNC before weakest relevant AA clearing; protected-primary
+reassessment; 25-tick local flee; individual repair; repaired reinforcement
+rejoin; and active fallback when no compatible facility exists. Air's private
+caches and occupied/AA-covered-pad parking were not copied.
+
+Specialists retain shared facts, profile-private 4-cell/125-tick influence, 75/25
+cadences, ground domain/resource safety, and exact suspended targets. Safe primary
+targets remain the strict first tier. After three all-defended scans, the weakest
+fallback may attack an isolated unarmed detector using a one-operation influence
+map that ignores only that target; separate armed coverage remains unsafe.
+Per-member repair uses the existing 0.5 threshold and requires a compatible allied
+`fix`, safe reachable cell, and threat-free coarse route. Full health rejoins the
+same group. No route leaves the member reserved and combat-active, with 125-tick
+reevaluation. Focused tests cover active/repair/rejoin; engine repair proof is
+deferred to preserve the two required games.
+
+### Game A — exact assignment recovery, ambiguous shot timing
+
+`cycle9-armed-recovery` (seed `960901`) reached tick 1800 in `6.005s`, exit 0,
+without Air, exception, fatal, or desync. Lone MHQ allowed attributable VIKI STNK
+damage. With an added MTNK, safety stopped both STNKs and named `mhq#39` / Multi1 /
+buffered 18 and `mtnk#42` / Multi1 / buffered 7. Shooter removal at tick 676 left
+MHQ alive and the same safety boundary resumed exact `harv#38`. This proves the
+cycle-8 assignment-lifecycle repair.
+
+The fixture marked `damage-under-armed=true`, but supplies neither the shot tick
+nor whether an already-fired missile landed after Stop, so it is not enough to
+assign a product cause. First attributable post-removal damage was tick 743 (+67),
+not the requested <=25, although the resume order itself was immediate. The next
+cycle must distinguish pending projectile/order latency from local-safety cadence
+before changing product code. The fresh Luna policy verdict is `FAIL` / high under
+the literal fixture contract and recommends per-shot/order/assignment timing.
+Tick mean/p50/p95/p99/max was `0.678/0.251/1.381/5.996/1025.134ms`; only three
+>=50ms events were startup.
+
+- Artifact: `analysis/20260813-cnc96-split/worker-1-cnc-96a/cycle9/games/game-a/cycle9-armed-recovery`
+- Narrative/review: `cycle9/reviews/game-a-luna-narrator/NARRATIVE.md` and
+  `cycle9/reviews/game-a-luna-policy/POLICY-REVIEW.md`
+
+### Game B — isolated unarmed MHQ clear
+
+`cycle9-mhq-clear` (seed `960902`) reached tick 1900 in `5.004s`, exit 0, with
+all assertions true. After exactly three all-defended scans, VIKI selected
+`mhq#33` by `AttackUnarmedDetector` while retaining protected `harv#32`. STNKs
+damaged the MHQ at tick 254 and killed it at 278. The next strategic scan at 301
+reassessed and routed to exact `harv#32`; damage occurred at tick 376 and the
+Harvester ultimately died. Luna returns bounded `PASS` / moderate-high confidence.
+Tick mean/p50/p95/p99/max was `0.514/0.212/1.227/5.329/1034.717ms`; only three
+>=50ms events were startup.
+
+- Artifact: `analysis/20260813-cnc96-split/worker-1-cnc-96a/cycle9/games/game-b/cycle9-mhq-clear`
+- Narrative/review: `cycle9/reviews/game-b-luna-narrator/NARRATIVE.md` and
+  `cycle9/reviews/game-b-luna-policy/POLICY-REVIEW.md`
+
+Protected Release build passed with zero warnings/errors; full CNC MiniYAML lint
+passed; focused suite passed `79/79`; Lua syntax, ActorID absence, JSON, launcher
+preflight, and `git diff --check` passed. Exactly two valid games ran. Proposed
+status remains `First iteration - testing`: blocker ordering passes and exact
+assignment release is proved, but shot/damage timing needs one narrow diagnostic
+cycle before Terra final review; repair behavior still lacks engine evidence.
