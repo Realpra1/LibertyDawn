@@ -687,3 +687,91 @@ fresh Sol-medium cycle 6 after this durable commit; this worker stops here and d
 not begin that cycle. The subsequent acceptance fixture must use ordinary VIKI
 versus Brutalis with no Air units or Air injection, because Air counters Stealth
 and confounds behavioral attribution.
+
+## Cycle 6 — isolated no-Air acceptance and concrete detector defect
+
+The authorized exceptional Sol-medium cycle retained product/config at durable
+head `f30f976d4e6a4ba15c9fab1da60ec754997a0d04`. Both games used ordinary
+VIKI/Nod versus Brutalis/GDI, all normal modules, headless MAX, purged map actors,
+proven reachable cells, and no aircraft. The preservation/scenario contract is
+`analysis/20260813-cnc96-split/worker-1-cnc-96a/cycle6/PRESERVATION-AND-SCENARIOS.md`.
+Exactly two valid games ran. One Game-B attempt failed at tick 0 because a Lua
+damage callback referenced an unsupported actor property; it was corrected to
+log attacker type, owner, and location and is excluded from the count.
+
+### Game A — target-local detector classification defect
+
+`cycle6-snipe` (seed `960601`) reached tick 2800 in `6.007s`, exit 0, without
+fatal/exception/desync markers. Two VIKI Stealth Tanks faced Brutalis
+`mtnk@37,21` and protected `harv@38,21`. Recon3 gave ordinary Brutalis vehicles
+short detection. Across 38 scans VIKI repeatedly rejected `harv#50` with itself
+as blocker and issued 0 routes/orders/damage; tank/Harvester remained
+`45000/45000` and `500000/500000`. No SnipeTank or reassessment occurred.
+
+Authoritative user review identifies a concrete product defect: an unarmed
+primary target's own 1-cell `DetectCloaked` does not defend it when a reachable
+Stealth firing approach lies outside detection. A next cycle must make
+target-local detection capability/range-aware while preserving avoidance of
+separate armed/dedicated detectors and detector coverage of the firing approach.
+No code change was permitted after this cycle's game/review boundary.
+
+VIKI Stealth outer/strategy/local cost was `47.056ms/2800`, `42.150ms/38`, and
+`1.939ms/112`, with 0 orders. Unique tick mean/p50/p95/p99/max was
+`1.008/0.313/1.184/4.387/1030.273ms`; post-tick-3 max was `44.109ms` at tick
+2523. Runtime ended near `621MB`, `1.326GB` allocated, GC `147/51/13`.
+
+- Artifact: `analysis/20260813-cnc96-split/worker-1-cnc-96a/games/cycle6-snipe/cycle6-snipe`
+- Narrative: `analysis/20260813-cnc96-split/worker-1-cnc-96a/cycle6/reviews/game-a-narrator/NARRATIVE.md`
+- Policy: `analysis/20260813-cnc96-split/worker-1-cnc-96a/cycle6/reviews/game-a-policy/POLICY-REVIEW.md` (`insufficient evidence`, high)
+
+The narrative correctly reports zero action but could not identify the rejection
+rule from its isolated inputs. The review correctly blocks literal acceptance;
+the user's concrete range/capability ruling resolves its remaining causal doubt.
+
+### Game B — Blue pass, detector isolation gap
+
+`cycle6-safety` retry 1 (seed `960602`) reached tick 2200 in `7.009s`, exit 0,
+without fatal/exception/desync markers. At tick 121 exact callback attribution
+proved `source=stnk source-owner=Multi0` damage to Brutalis `harv#43`
+(`483000/500000`); Blue was injected adjacent to the attacker. By the next logged
+25-tick local-safety boundary `stnk#29` stopped with `detector=False`,
+`engaged-weapon=False`, `blue-adjacent=True`; both tanks continued showing Blue.
+This proves the requested Blue-adjacent engagement safety without Air.
+
+At tick 901 a fresh VIKI pair and separate Brutalis Harvester began the detector
+phase. At tick 1168 exact VIKI Stealth damage reduced it to `483000/500000`, then
+a Brutalis MHQ was injected three cells away. Destroying the `splitblue` actor had
+not removed already-seeded resource, however: fresh `stnk#48/#49` were already
+stopping for Blue and continued with that reason. `detector=True` never appeared,
+so detector reaction is not independently proved. Final target HP was
+`466000/500000`. Cycle 5 retains an uncontaminated detector regression.
+
+VIKI Stealth outer/strategy/local was `92.587ms/2200`, `83.848ms/30` with 28
+orders, and `5.862ms/88` with 27 orders. Unique tick mean/p50/p95/p99/max was
+`1.498/0.311/3.093/14.325/1028.129ms`; post-tick-3 max was `32.882ms` at tick
+1390. Runtime ended near `615MB`, `1.528GB` allocated, GC `170/66/13`. The
+75-tick strategy, 25-tick engagement safety, 4-cell grid, 125-tick cache, shared
+Stealth/Chem implementation, stable plans, and no-Air isolation remained intact.
+
+- Artifact: `analysis/20260813-cnc96-split/worker-1-cnc-96a/games/cycle6-safety-retry1/cycle6-safety`
+- Narrative: `analysis/20260813-cnc96-split/worker-1-cnc-96a/cycle6/reviews/game-b-narrator/NARRATIVE.md`
+- Policy: `analysis/20260813-cnc96-split/worker-1-cnc-96a/cycle6/reviews/game-b-policy/POLICY-REVIEW.md` (`insufficient evidence`, high)
+
+The narrative correctly records engagement and Blue Stops, but its claim that the
+detector outcome was proved is too strong: the boolean proves injection after
+engagement, not detector-attributed reaction. The reviewer correctly requires
+explicit detector identity. Its separate-Chemical suggestion is advisory only;
+Chemical is explicitly not required to react to Blue and shared-path/config
+isolation is already covered elsewhere.
+
+### Checks and disposition
+
+- Protected CNC Release build and full CNC MiniYAML/map lint: passed, 0 warnings/errors.
+- Focused `StealthTankSquadPolicyTest`: 52/52; Lua syntax and `git diff --check`: passed.
+- No product/config changed. Each valid game received a fresh Luna factual narrator and fresh isolated Luna policy reviewer as explicitly required.
+
+Status remains `First iteration - testing`. Cycle 6 proves Blue-adjacent reaction
+and identifies the exact range/capability detector defect. The next cycle must
+narrowly correct it and prove outside-range SnipeTank, defender kill, and
+Harvester reassessment while retaining dedicated-detector safety; it must also
+isolate detector regression from residual Blue.
