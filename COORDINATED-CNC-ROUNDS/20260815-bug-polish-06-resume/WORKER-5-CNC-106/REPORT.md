@@ -45,3 +45,37 @@ Raw artifacts remain outside Git at
 Cycle 2 should rerun only corrected, normally powered versions of those two
 scenarios and require activation, exact cancellation/refund resolution, selected
 completion, and ordinary post-release progress.
+
+## Cycle 2 — powered activation scenarios
+
+Only the temporary full-engine harness changed: each map received an additional
+advanced power plant, and cash grants were delayed from 15/35 seconds to 25/45
+seconds so the 250-tick no-progress window could mature before funding. No product
+or focused-test source changed.
+
+Both authorized ordinary-`brutalis` CNC games exited normally at bounded tick
+3000 in about 9 seconds without a fatal Lua error or desync.
+
+The zero-refinery prerequisite case passed all required runtime markers. Recovery
+activated exactly once at tick 601 and retained the partial `proc` front. At tick
+626 it resolved exactly two displaced cancellations in one event, with
+`expected-refund=186` and `earned-delta=186`. The selected refinery visibly
+completed and recovery released at tick 1426 with one refinery and its free
+harvester. At tick 1476 four ordinary queues logged post-release paid progress;
+two ordinary queues then logged completions by tick 1601.
+
+The existing-refinery case remained a non-acceptance scenario, but for a narrower
+harness reason rather than power or premature scheduled funding. Its pre-existing
+harvester generated intermittent paid progress: stall evidence reached 200 ticks
+at tick 551, then fresh income prevented the required 250-tick threshold. Recovery
+correctly did not cancel healthy progressing work, and ordinary production later
+reached at least five live harvesters. The next harness-only cycle may remove that
+initial harvester while retaining the existing refinery, partial queued harvester,
+normal power, delayed grants, and viable unloading path.
+
+Raw Cycle 2 artifacts remain outside Git at
+`/tmp/cnc106-cycle2.qJgaoP/results/`. The relevant evidence is:
+
+- `zero-refinery-prerequisite/support/Logs/debug.log`
+- `existing-refinery-contention/support/Logs/debug.log`
+- per-run `summary.json`, plus `batch-summary.json` and `batch-summary.tsv`

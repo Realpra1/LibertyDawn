@@ -5,8 +5,8 @@
 - Task: `CNC-106 — General queue-stall prevention and smart-economy serialization`
 - Base: `4f806e742bd12145d2a601cc9ff71c3a0b141a13` (PR117 head)
 - Branch: `agent/round-20260815-cnc106-queue-stall`
-- Status: `Cycle 1 complete — product port committed; powered scenario evidence pending`
-- Cycle: `2`
+- Status: `Cycle 2 complete — zero-refinery acceptance passed; existing-refinery income isolation pending`
+- Cycle: `3`
 - PR: `none`
 
 ## Smallest literal contract
@@ -80,13 +80,38 @@ Git. Do not edit the task sheet or coordinator state, merge a PR, or push `bleed
   `existing-refinery-contention/support/Logs/debug.log`; zero-refinery evidence
   is in `zero-refinery-prerequisite/support/Logs/debug.log`.
 
+## Cycle 2 durable outcome
+
+- No product or focused-test code changed. The temporary maps received one
+  additional `nuk2` each, and scheduled grants moved from 15/35 seconds to 25/45
+  seconds. These harness artifacts remain outside Git.
+- Both authorized ordinary-`brutalis` CNC games exited normally at bounded tick
+  3000 in about 9 seconds, with no fatal Lua error or desync.
+- The zero-refinery prerequisite case passed every required marker. It activated
+  once at tick 601 on `proc`, resolved exactly two displaced cancellations once at
+  tick 626 (`expected-refund=186`, `earned-delta=186`), completed and released the
+  refinery at tick 1426 with its free harvester/unloading path, then logged paid
+  progress across ordinary parallel queues from tick 1476 and two ordinary queue
+  completions by tick 1601.
+- The existing-refinery case correctly did not activate. Power stayed normal, but
+  its pre-existing harvester supplied small paid deltas throughout the intended
+  stall; evidence reached only 200 ticks at tick 551 before new income prevented
+  the 250-tick threshold. It later made healthy ordinary progress to at least five
+  harvesters. This is a remaining scenario-isolation defect, not a product failure.
+- Raw artifacts (outside Git): `/tmp/cnc106-cycle2.qJgaoP/results/`. Relevant logs
+  are `zero-refinery-prerequisite/support/Logs/debug.log` and
+  `existing-refinery-contention/support/Logs/debug.log`; concise runner results are
+  in `batch-summary.json` and `batch-summary.tsv`.
+
 ## Next authorized cycle
 
-Cycle 2 may correct only the temporary full-engine harness by supplying normal
-power from the first observation and withholding scheduled funds until after the
-activation window. Run at most two custom games: the same existing-refinery
-partial-harvester contention case and the same zero-refinery prerequisite case.
-Require actual activation, one-time cancellation/refund, selected completion,
-and ordinary parallel post-release progress. Add only still-missing small focused
-checks needed by the contract. Do not add the excluded threat exception or alter
-authored balance/config values.
+Cycle 3 may correct only the remaining temporary existing-refinery harness defect:
+remove its pre-existing income-producing harvester while retaining the refinery,
+partial queued harvester, normal power, delayed grants, and viable unloading path.
+Run at most that one custom existing-refinery game; the zero-refinery prerequisite
+case already passed and must not be rerun without a product change. Require actual
+activation, exactly one cancellation-resolution event with refund evidence,
+selected harvester completion, and ordinary parallel post-release progress. If it
+passes, run no extra game and prepare the task handoff from the already-tested
+product commit. Do not change product code, add the excluded threat exception, or
+alter authored balance/config values.
