@@ -240,7 +240,7 @@ namespace OpenRA.Test
 		}
 
 		[Test]
-		public void ShouldEngageUsesSafetyFactorAndMinimumEnemyShare()
+		public void ShouldEngageUsesSafetyFactorWithoutAnEnemyNumberFloor()
 		{
 			var tenOurs = new[]
 			{
@@ -271,9 +271,28 @@ namespace OpenRA.Test
 				new GeneralizedCombatThreatCalculator.GroupTypeCount("x", 20, 100)
 			};
 			Assert.That(GeneralizedCombatThreatCalculator.ShouldEngageMixedGroups(oneOur, twentyTheirs,
+				(ourType, theirType) => 0), Is.True);
+		}
+
+		[Test]
+		public void ShouldEngageRequiresFiveTimesOmittedEnemyEconomicMass()
+		{
+			var ours = new[]
+			{
+				new GeneralizedCombatThreatCalculator.GroupTypeCount("ours", 4, 100)
+			};
+			var theirs = new[]
+			{
+				new GeneralizedCombatThreatCalculator.GroupTypeCount("large", 10, 100),
+				new GeneralizedCombatThreatCalculator.GroupTypeCount("medium", 8, 100),
+				new GeneralizedCombatThreatCalculator.GroupTypeCount("small", 6, 100),
+				new GeneralizedCombatThreatCalculator.GroupTypeCount("hidden-counter", 1, 100)
+			};
+
+			Assert.That(GeneralizedCombatThreatCalculator.ShouldEngageMixedGroups(ours, theirs,
 				(ourType, theirType) => 0.0001), Is.False);
-			Assert.That(GeneralizedCombatThreatCalculator.ShouldEngageMixedGroups(tenOurs, twentyTheirs,
-				(ourType, theirType) => 0.0001), Is.True);
+			Assert.That(GeneralizedCombatThreatCalculator.ShouldEngageMixedGroups(ours, theirs,
+				(ourType, theirType) => 0.0001, omittedEconomicMassFactor: 4), Is.True);
 		}
 	}
 }

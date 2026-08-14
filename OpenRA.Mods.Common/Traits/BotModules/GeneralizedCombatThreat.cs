@@ -227,12 +227,12 @@ namespace OpenRA.Mods.Common.Traits
 
 		/// <summary>
 		/// Applies a caller-adjustable engagement policy to the raw mixed-group crossover.
-		/// The minimum percentage is a floor on our unit count relative to theirs, not an
-		/// adjustment to the cached matchup ratings.
+		/// A separate economic-mass floor covers enemy types omitted from the three-type
+		/// comparison. Neither policy changes the cached matchup ratings.
 		/// </summary>
 		public bool ShouldEngageMixedGroups(IEnumerable<GroupTypeCount> ourGroup,
 			IEnumerable<GroupTypeCount> theirGroup, double safetyFactor = 1.5,
-			double minimumEngagePercentage = 0.1)
+			double omittedEconomicMassFactor = 5)
 		{
 			bool IsCachedCombatType(GroupTypeCount type)
 			{
@@ -246,18 +246,18 @@ namespace OpenRA.Mods.Common.Traits
 						throw new InvalidOperationException($"No cached matchup exists for {ourType}/{theirType}.");
 
 					return threat.DefenderThreatInAttackerEquivalents;
-				}, safetyFactor, minimumEngagePercentage);
+				}, safetyFactor, omittedEconomicMassFactor);
 		}
 
 		public static bool ShouldEngageMixedGroups(IEnumerable<GroupTypeCount> ourGroup,
 			IEnumerable<GroupTypeCount> theirGroup, Func<string, string, double> theirThreatToUs,
-			double safetyFactor = 1.5, double minimumEngagePercentage = 0.1)
+			double safetyFactor = 1.5, double omittedEconomicMassFactor = 5)
 		{
 			if (!double.IsFinite(safetyFactor) || safetyFactor < 0)
 				throw new ArgumentOutOfRangeException(nameof(safetyFactor));
 
-			if (!double.IsFinite(minimumEngagePercentage) || minimumEngagePercentage < 0)
-				throw new ArgumentOutOfRangeException(nameof(minimumEngagePercentage));
+			if (!double.IsFinite(omittedEconomicMassFactor) || omittedEconomicMassFactor < 0)
+				throw new ArgumentOutOfRangeException(nameof(omittedEconomicMassFactor));
 
 			var ours = NormalizeTypes(ourGroup);
 			var theirs = NormalizeTypes(theirGroup);
@@ -267,8 +267,16 @@ namespace OpenRA.Mods.Common.Traits
 			var crossover = EstimateMixedGroupCrossover(ours, theirs, theirThreatToUs);
 			var ourCount = ours.Sum(t => (long)t.Count);
 			var theirCount = theirs.Sum(t => (long)t.Count);
-			var requiredRatio = Math.Max(crossover * safetyFactor, minimumEngagePercentage);
-			return ourCount >= theirCount * requiredRatio;
+			var requiredRatio = crossover * safetyFactor;
+			if (ourCount < theirCount * requiredRatio)
+				return false;
+
+			var representedEnemyTypes = new HashSet<string>(RepresentativeTypes(theirs).Select(t => t.ActorType),
+				StringComparer.OrdinalIgnoreCase);
+			var omittedEnemyEconomicMass = theirs.Where(t => !representedEnemyTypes.Contains(t.ActorType))
+				.Sum(t => t.EconomicMass);
+			var ourEconomicMass = ours.Sum(t => t.EconomicMass);
+			return ourEconomicMass >= omittedEconomicMassFactor * omittedEnemyEconomicMass;
 		}
 
 		public static double EstimateMixedGroupCrossover(IEnumerable<GroupTypeCount> ourGroup,
