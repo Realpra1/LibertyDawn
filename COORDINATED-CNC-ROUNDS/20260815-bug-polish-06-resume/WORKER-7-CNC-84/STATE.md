@@ -10,7 +10,7 @@
 - PR base: `4f806e742bd12145d2a601cc9ff71c3a0b141a13`
 - Cycle: `1` (fresh)
 - Balance: frozen
-- PR: none
+- PR: `#118` — https://github.com/Realpra1/LibertyDawn/pull/118
 
 ## Cycle 1 result
 
