@@ -84,5 +84,10 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			return !outcomeActorCompleted && state == QueueStallRecoverySelectedFrontState.CompletedAwaitingExit;
 		}
+
+		public static bool ShouldPauseOrdinaryProduction(bool active, bool awaitingSelectedExit)
+		{
+			return active || awaitingSelectedExit;
+		}
 	}
 }

@@ -121,3 +121,59 @@ Raw Cycle 3 artifacts remain outside Git at
 Cycle 3 completes the assigned full-engine acceptance action. The implementation
 and focused checks remain product/test commit `77d229b12d`; this report/state
 update is the durable review handoff.
+
+## Cycle 4 — final-review exit-block repair
+
+The sole final-review finding is resolved. The queue-stall manager now exposes a
+single ordinary-production gate that is true while recovery is actively paying
+the selected item or while that completed item remains `Done` and exit-blocked.
+`BaseBuilderBotModule.QueueStallRecoveryActive` uses that gate, so both adaptive
+unit production and empty building queues remain paused until the selected actor
+visibly enters the world. Selection, cancellation, refund, balance/config values,
+completed queue-item preservation, and the existing save-state representation
+are unchanged.
+
+A focused four-state regression covers active recovery, active plus exit wait,
+exit wait alone, and fully released state. This specifically proves the recovered
+integration boundary: a `Done` selected item still pauses ordinary production,
+and the pause ends only when neither recovery state remains.
+
+### Verification
+
+- Focused `SmartEconomyPolicyTest`: 49 passed, 0 failed.
+- `make test`: passed; Release build 0 warnings/errors; CNC MiniYAML passed.
+- `git diff --check`: passed before handoff.
+
+Exactly two distinct custom full-engine CNC games used fresh seeds and the two
+accepted existing-Refinery maps from Cycle 3, each with all normal modules, an
+ordinary Brutalis AI, a tick-3000 bound, and a 120-second cap. A preliminary
+support-directory bootstrap invocation entered content setup but never started a
+game or world and produced zero ticks; it is not a scenario run. After adding the
+required runtime-content link, only the following two games ran:
+
+- `exit-block-no-starting-harvester`: no starting income-producing Harvester.
+- `exit-block-lost-before-unload`: the starting Harvester transitioned from one
+  live actor at ticks 1/51 to zero at tick 301, before its first unload.
+
+Both games accumulated exactly 250 ticks without paid progress and activated
+once at tick 601 on the partial Harvester. At tick 626, all three displaced
+cancellation groups resolved once with `unresolved=0`; `expected-refund=306`
+matched `earned-delta=306`. The protected Harvester made continuous progress,
+entered `Done`/exit blocking at tick 1201 while zero Harvesters were live, and
+released at tick 1226 only when one Harvester was visibly live with the existing
+Refinery/unloading path intact. No ordinary paid progress appeared before release.
+Multi-queue infantry, defence, building, vehicle, and refinery progress appeared
+from tick 1301 onward; two ordinary queues completed by tick 1351 in the first
+game and tick 1376 in the second. Both games reached tick 3000 without fatal Lua
+errors or desyncs.
+
+Separate Luna narration and policy review were performed for each game. Each
+narrator confirmed the stall, one-time refund, exit-block interval, visible
+completion, post-release progress, and clean tick-3000 exit. Each policy reviewer
+found the behavior consistent with Liberty Dawn's economy/survival design and
+frozen balance, with no duplicate refund, free resources, or abnormal production
+advantage.
+
+Raw Cycle 4 artifacts remain outside Git at
+`/tmp/cnc106-cycle4.GQQzY1/results/`; the exact markers are in each scenario's
+`support/Logs/debug.log`, and timing evidence is in the benchmark CSVs.

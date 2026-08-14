@@ -5,8 +5,8 @@
 - Task: `CNC-106 — General queue-stall prevention and smart-economy serialization`
 - Base: `4f806e742bd12145d2a601cc9ff71c3a0b141a13` (PR117 head)
 - Branch: `agent/round-20260815-cnc106-queue-stall`
-- Status: `Blocked at review handoff — coordinator authorization required for repair cycle`
-- Cycle: `3`
+- Status: `Cycle 4 complete — final-review repair ready for handoff`
+- Cycle: `4`
 - PR: `none`
 
 ## Smallest literal contract
@@ -151,26 +151,38 @@ zero-refinery case remains evidence but does not replace either required scenari
 
 ## Handoff status
 
-The assigned Cycle 3 acceptance action is complete. No further development or
-game cycle is authorized by this state; return to the coordinator for review/PR
-handoff using product/test commit `77d229b12d` plus this durable evidence update.
-
-The review handoff has now been returned. `REVIEW.md` reports one required fix:
-preserve the recovery ownership/gate while the selected item is `Done` but still
-exit-blocked, with a focused regression proving ordinary production remains
-paused until the selected actor exits. This state does not authorize that product
-or test change, so no repair or additional game was performed. The coordinator
-must authorize a repair cycle before implementation resumes.
+Cycle 4 used the coordinator authorization in `CNC106-CYCLE4-AUTHORIZATION.md`
+to resolve the sole final-review finding. No further product, test, or game cycle
+is authorized. Return this completed repair and evidence to the coordinator for
+final review/PR handoff.
 
 ## Current handoff action
 
-- Reconfirmed on 2026-08-15 that Cycle 3 is complete and the returned review fix
-  is not authorized by this state.
-- Reconfirmed again from branch head `da8d0fe06e` on the resumed worker
-  invocation; the branch remains blocked pending coordinator authorization and
-  no repair cycle was started.
-- Performed no product/test edits, focused checks, builds, or full-engine games.
-- Product/test commit remains `77d229b12d`; Cycle 3 evidence remains at
-  `/tmp/cnc106-cycle3.4tnUP0/results/`.
-- Returned blocked to the coordinator to authorize a repair cycle for the
-  selected-item `Done`/exit-blocked ownership and gate regression.
+- Final-review finding disposition: **resolved**. The production-facing recovery
+  gate now covers both active selected work and `Done` work awaiting actor exit.
+  The selected completed queue item and existing save-state representation remain
+  unchanged; ordinary unit production and empty building queues remain paused
+  until the selected outcome actor is live.
+- Focused `SmartEconomyPolicyTest`: 49/49 passed, including a new four-state
+  regression proving the ordinary-production gate remains asserted through the
+  selected-item exit block and releases only after both recovery states clear.
+- `make test`: passed; Release build had 0 warnings/errors and CNC MiniYAML
+  validation passed. `git diff --check` passed before handoff.
+- Exactly two distinct custom full-engine CNC games ran with ordinary `brutalis`
+  AI modules, fresh seeds, tick-3000 bounds, and 120-second caps. A preliminary
+  content-bootstrap invocation started no game/world and produced no ticks; after
+  correcting that harness-only setup, no additional game scenarios were run.
+- Both games activated once at tick 601 after 250 ticks without paid progress,
+  resolved the displaced cancellations once at tick 626 (`expected-refund=306`,
+  `earned-delta=306`), entered `Done`/exit blocking at tick 1201 with zero live
+  Harvesters, and released at tick 1226 only after one Harvester was live beside
+  the retained Refinery. Ordinary multi-queue paid progress began afterward at
+  tick 1301, with two ordinary completions by ticks 1351 and 1376 respectively.
+- Separate Luna narration and policy review ran for each game. Both narrations
+  confirmed the required sequence, tick-3000 completion, and no fatal Lua error
+  or desync. Both policy reviews judged the bounded recovery compatible with the
+  Liberty Dawn design and frozen balance, with no duplicate refund, free progress,
+  or abnormal production advantage.
+- Raw Cycle 4 artifacts remain outside Git at
+  `/tmp/cnc106-cycle4.GQQzY1/results/`. Detailed evidence is in each scenario's
+  `support/Logs/debug.log` and benchmark CSVs.

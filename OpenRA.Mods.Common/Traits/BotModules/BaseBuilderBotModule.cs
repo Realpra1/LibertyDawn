@@ -829,7 +829,7 @@ namespace OpenRA.Mods.Common.Traits
 		internal bool OpeningOwnsMcvProduction => Info.EnableOpeningPolicy && !openingCompletionLogged &&
 			!string.IsNullOrEmpty(Info.OpeningMcvType) && OpeningMcvsBuilt < Info.OpeningMcvCount;
 
-		internal bool QueueStallRecoveryActive => queueStallRecovery?.Active ?? false;
+		internal bool QueueStallRecoveryActive => queueStallRecovery?.BlocksOrdinaryProduction ?? false;
 
 		internal bool SmartEconomyWantsRefinery => smartEconomy?.WantsRefinery ?? false;
 

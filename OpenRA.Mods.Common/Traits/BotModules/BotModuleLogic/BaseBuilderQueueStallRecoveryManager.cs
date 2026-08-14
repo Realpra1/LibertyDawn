@@ -87,6 +87,8 @@ namespace OpenRA.Mods.Common.Traits
 		bool awaitingSelectedExit;
 
 		public bool Active { get; private set; }
+		public bool BlocksOrdinaryProduction =>
+			QueueStallRecoveryPolicy.ShouldPauseOrdinaryProduction(Active, awaitingSelectedExit);
 
 		public BaseBuilderQueueStallRecoveryManager(BaseBuilderBotModule baseBuilder, Player player,
 			PowerManager playerPower)
@@ -109,7 +111,7 @@ namespace OpenRA.Mods.Common.Traits
 			var elapsed = Math.Max(1, baseBuilder.Info.QueueStallRecoveryScanInterval);
 			nextScanTick = world.WorldTick + elapsed;
 
-			if (Active || awaitingSelectedExit)
+			if (BlocksOrdinaryProduction)
 			{
 				UpdateActiveRecovery();
 				return;

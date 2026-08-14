@@ -90,6 +90,17 @@ namespace OpenRA.Test.Mods.Common
 				Is.EqualTo(expected));
 		}
 
+		[TestCase(true, false, true)]
+		[TestCase(true, true, true)]
+		[TestCase(false, true, true)]
+		[TestCase(false, false, false)]
+		public void QueueStallDoneExitBlockedFrontPausesOrdinaryProductionUntilActorExits(
+			bool active, bool awaitingSelectedExit, bool expected)
+		{
+			Assert.That(QueueStallRecoveryPolicy.ShouldPauseOrdinaryProduction(active, awaitingSelectedExit),
+				Is.EqualTo(expected));
+		}
+
 		[Test]
 		public void PostLoadSettlementDelaysOneSamplerWithoutOverflow()
 		{
