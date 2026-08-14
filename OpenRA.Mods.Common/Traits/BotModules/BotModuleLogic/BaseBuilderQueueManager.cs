@@ -133,6 +133,7 @@ namespace OpenRA.Mods.Common.Traits
 		bool TickQueue(IBot bot, ProductionQueue queue)
 		{
 			var currentBuilding = queue.AllQueued().FirstOrDefault();
+			baseBuilder.ObserveBusyRadarRecoveryQueue(queue, currentBuilding);
 			if (currentBuilding != null)
 			{
 				var priorityRecoveryActive = baseBuilder.OpeningActive ||
@@ -231,6 +232,7 @@ namespace OpenRA.Mods.Common.Traits
 
 				if (location == null)
 				{
+					baseBuilder.RadarRecoveryPlacementFailed(queue, currentBuilding.Item);
 					if (fieldPlacement)
 						baseBuilder.TiberiumFieldManager.PlacementFailed("reserved site became illegal before placement");
 
@@ -323,9 +325,12 @@ namespace OpenRA.Mods.Common.Traits
 			// This gets used quite a bit, so let's cache it here
 			var power = GetProducibleBuilding(baseBuilder.Info.PowerTypes, buildableThings,
 				a => a.TraitInfos<PowerInfo>().Where(i => i.EnabledByDefault).Sum(p => p.Amount));
+			var essentialPowerBlocked = playerPower != null && playerPower.ExcessPower < minimumExcessPower;
+			baseBuilder.ObserveRadarRecoveryQueueChoice(queue, buildableThings, essentialPowerBlocked,
+				baseBuilder.SmartEconomySerializesMissingRefinery);
 
 			// First priority is to get out of a low power situation
-			if (playerPower != null && playerPower.ExcessPower < minimumExcessPower)
+			if (essentialPowerBlocked)
 			{
 				if (power != null && power.TraitInfos<PowerInfo>().Where(i => i.EnabledByDefault).Sum(p => p.Amount) > 0)
 				{
@@ -400,6 +405,34 @@ namespace OpenRA.Mods.Common.Traits
 				return opening;
 			}
 
+			// CNC-101's actionable storage-pressure commitment owns this boundary before
+			// radar recovery. Reserve its compatible queue globally before an independent
+			// Building queue can issue radar first in the same decision window.
+			var reservedSilo = baseBuilder.RadarRecoveryStoragePressureSilo(queue, minimumExcessPower);
+			if (reservedSilo != null)
+			{
+				AIUtils.BotDebug("{0} decided to build {1}: reserved storage-pressure commitment",
+					queue.Actor.Owner, DisplayName(reservedSilo.Name));
+				return reservedSilo;
+			}
+
+			if (!baseBuilder.RadarRecoveryStoragePressureOwnsSelection &&
+				playerResources.Resources > 0.8 * playerResources.ResourceCapacity)
+			{
+				var silo = GetProducibleBuilding(baseBuilder.Info.SiloTypes, buildableThings);
+				if (silo != null && HasSufficientPowerForActor(silo))
+				{
+					AIUtils.BotDebug("{0} decided to build {1}: Priority override (silo)", queue.Actor.Owner, DisplayName(silo.Name));
+					return silo;
+				}
+
+				if (power != null && silo != null && !HasSufficientPowerForActor(silo))
+				{
+					AIUtils.BotDebug("{0} decided to build {1}: Priority override (would be low power)", queue.Actor.Owner, DisplayName(power.Name));
+					return power;
+				}
+			}
+
 			// Defense queues are independent from the ordered building queue. Give their first
 			// build to the configured opening-defense preference instead of the shuffled fallback.
 			var firstTower = PreferredOpeningFirstTower(buildableThings);
@@ -416,6 +449,36 @@ namespace OpenRA.Mods.Common.Traits
 				}
 
 				return null;
+			}
+
+			if (baseBuilder.RadarRecoveryStoragePressureBlocksRadar)
+				return null;
+
+			// Once an established radar capability is genuinely absent, its globally
+			// serialized replacement owns the next idle discretionary building choice.
+			// Low power, a missing unloading refinery, and already-owned opening/tower work
+			// above remain authoritative blockers.
+			var radarRecovery = baseBuilder.RadarRecoveryBuilding(buildableThings);
+			if (radarRecovery != null)
+			{
+				if (!HasSufficientPowerForActor(radarRecovery))
+				{
+					if (power != null)
+					{
+						AIUtils.BotDebug("{0} decided to build {1}: radar recovery requires power",
+							queue.Actor.Owner, DisplayName(power.Name));
+						return power;
+					}
+
+					return null;
+				}
+
+				if (baseBuilder.TryReserveRadarRecovery(queue, radarRecovery.Name))
+				{
+					AIUtils.BotDebug("{0} decided to build {1}: lost radar recovery",
+						queue.Actor.Owner, DisplayName(radarRecovery.Name));
+					return radarRecovery;
+				}
 			}
 
 			// Once the authored opening and power prerequisites are satisfied, an uncovered
@@ -529,23 +592,6 @@ namespace OpenRA.Mods.Common.Traits
 				}
 
 				if (power != null && navalproduction != null && !HasSufficientPowerForActor(navalproduction))
-				{
-					AIUtils.BotDebug("{0} decided to build {1}: Priority override (would be low power)", queue.Actor.Owner, DisplayName(power.Name));
-					return power;
-				}
-			}
-
-			// Create some head room for resource storage if we really need it
-			if (playerResources.Resources > 0.8 * playerResources.ResourceCapacity)
-			{
-				var silo = GetProducibleBuilding(baseBuilder.Info.SiloTypes, buildableThings);
-				if (silo != null && HasSufficientPowerForActor(silo))
-				{
-					AIUtils.BotDebug("{0} decided to build {1}: Priority override (silo)", queue.Actor.Owner, DisplayName(silo.Name));
-					return silo;
-				}
-
-				if (power != null && silo != null && !HasSufficientPowerForActor(silo))
 				{
 					AIUtils.BotDebug("{0} decided to build {1}: Priority override (would be low power)", queue.Actor.Owner, DisplayName(power.Name));
 					return power;

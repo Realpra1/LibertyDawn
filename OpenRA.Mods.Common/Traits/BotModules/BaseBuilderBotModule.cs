@@ -11,6 +11,7 @@
 
 using System.Collections.Generic;
 using System.Linq;
+using OpenRA.Mods.Common.Traits.Radar;
 using OpenRA.Primitives;
 using OpenRA.Traits;
 
@@ -96,6 +97,18 @@ namespace OpenRA.Mods.Common.Traits
 
 		[Desc("Write opening goal, request, completion, and stall diagnostics to debug.log.")]
 		public readonly bool OpeningDebugLogging = false;
+
+		[Desc("Ordered radar-capable buildings used to replace a radar after one was established and lost.")]
+		public readonly string[] RadarRecoveryTypes = System.Array.Empty<string>();
+
+		[Desc("Ticks to retain a same-tick global radar recovery reservation before retrying an idle queue.")]
+		public readonly int RadarRecoveryReservationTimeout = 250;
+
+		[Desc("Ticks between bounded live-provider and commitment observations.")]
+		public readonly int RadarRecoveryScanInterval = 25;
+
+		[Desc("Write bounded radar establishment, reservation, and release transitions to debug.log.")]
+		public readonly bool RadarRecoveryDebugLogging = false;
 
 		[Desc("Owned repair-building types that should scale with the repairable aircraft fleet.")]
 		public readonly HashSet<string> AirRepairBuildingTypes = new HashSet<string>();
@@ -460,6 +473,18 @@ namespace OpenRA.Mods.Common.Traits
 		public override void RulesetLoaded(Ruleset rules, ActorInfo ai)
 		{
 			base.RulesetLoaded(rules, ai);
+			if (RadarRecoveryTypes.Length > 0)
+			{
+				if (RadarRecoveryReservationTimeout <= 0 || RadarRecoveryScanInterval <= 0 ||
+					RadarRecoveryTypes.Distinct(System.StringComparer.Ordinal).Count() != RadarRecoveryTypes.Length)
+					throw new YamlException("Radar recovery types must be unique and use positive reservation and scan intervals.");
+
+				foreach (var actorType in RadarRecoveryTypes)
+					if (!rules.Actors.TryGetValue(actorType, out var actor) ||
+						actor.TraitInfoOrDefault<BuildingInfo>() == null || !actor.HasTraitInfo<ProvidesRadarInfo>())
+						throw new YamlException($"Radar recovery actor '{actorType}' must be a building with ProvidesRadar.");
+			}
+
 			if (EnableDefenseClusterPolicy)
 			{
 				if (DefenseClusterTowerTypes.Length == 0 || DefenseClusterRepairFacilityTypes.Length == 0 ||
@@ -606,6 +631,8 @@ namespace OpenRA.Mods.Common.Traits
 			new Dictionary<uint, AirRepairBuildingReservation>();
 		BaseBuilderSmartEconomyManager smartEconomy;
 		BaseBuilderEconomyDefenseSamPlanner economyDefenseSam;
+		BaseBuilderRadarRecoveryManager radarRecovery;
+		BaseBuilderRadarStoragePressureManager radarStoragePressure;
 
 		readonly List<BaseBuilderQueueManager> builders = new List<BaseBuilderQueueManager>();
 		UnitBuilderBotModule[] unitBuilders;
@@ -638,6 +665,11 @@ namespace OpenRA.Mods.Common.Traits
 			if (Info.EconomyDefenseSamTypes.Count > 0)
 				economyDefenseSam = new BaseBuilderEconomyDefenseSamPlanner(this, player, playerPower,
 					playerResources, techTree);
+			if (Info.RadarRecoveryTypes.Length > 0)
+			{
+				radarRecovery = new BaseBuilderRadarRecoveryManager(this, player);
+				radarStoragePressure = new BaseBuilderRadarStoragePressureManager(this, player);
+			}
 		}
 
 		internal ActorInfo EconomyDefenseSamBuilding(ProductionQueue queue, IEnumerable<ActorInfo> buildables)
@@ -681,6 +713,43 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			return unitBuilders.Where(u => !u.IsTraitDisabled)
 				.Select(u => u.ProductionBuildingDemand(building)).DefaultIfEmpty(0).Max();
+		}
+
+		internal ActorInfo RadarRecoveryBuilding(IEnumerable<ActorInfo> buildables)
+		{
+			return radarRecovery?.Candidate(buildables);
+		}
+
+		internal bool RadarRecoveryNeeded => radarRecovery?.NeedsRecovery == true;
+
+		internal ActorInfo RadarRecoveryStoragePressureSilo(ProductionQueue queue, int minimumExcessPower)
+		{
+			return radarStoragePressure?.Candidate(queue, minimumExcessPower);
+		}
+
+		internal bool RadarRecoveryStoragePressureOwnsSelection => radarStoragePressure?.OwnsSelection == true;
+
+		internal bool RadarRecoveryStoragePressureBlocksRadar => radarStoragePressure?.BlocksRadar == true;
+
+		internal void ObserveRadarRecoveryQueueChoice(ProductionQueue queue, IEnumerable<ActorInfo> buildables,
+			bool essentialPowerBlocked, bool essentialRefineryBlocked)
+		{
+			radarRecovery?.ObserveQueueChoice(queue, buildables, essentialPowerBlocked, essentialRefineryBlocked);
+		}
+
+		internal void ObserveBusyRadarRecoveryQueue(ProductionQueue queue, ProductionItem currentBuilding)
+		{
+			radarRecovery?.ObserveBusyQueue(queue, currentBuilding);
+		}
+
+		internal void RadarRecoveryPlacementFailed(ProductionQueue queue, string actorType)
+		{
+			radarRecovery?.PlacementFailed(queue, actorType);
+		}
+
+		internal bool TryReserveRadarRecovery(ProductionQueue queue, string actorType)
+		{
+			return radarRecovery?.TryReserve(queue, actorType) ?? false;
 		}
 
 		internal ActorInfo AirRepairCapacityBuilding(IEnumerable<ActorInfo> buildables)
@@ -780,6 +849,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		void IBotTick.BotTick(IBot bot)
 		{
+			radarRecovery?.Update();
 			WallPlanner?.Tick(bot);
 			UpdateOpening(bot);
 			smartEconomy?.Tick(bot);
@@ -1289,6 +1359,18 @@ namespace OpenRA.Mods.Common.Traits
 				new MiniYamlNode("CompletedOpeningGoals", FieldSaver.FormatValue(loggedCompletedOpeningGoals.ToArray())),
 				new MiniYamlNode("SkippedOpeningGoals", FieldSaver.FormatValue(skippedOpeningGoals.ToArray())),
 				new MiniYamlNode("OpeningCompletionLogged", FieldSaver.FormatValue(openingCompletionLogged)),
+				new MiniYamlNode("RadarRecoveryEverEstablished", FieldSaver.FormatValue(radarRecovery?.EverEstablished ?? false)),
+				new MiniYamlNode("RadarRecoveryReservationQueueActorId", FieldSaver.FormatValue(radarRecovery?.ReservationQueueActorId ?? 0)),
+				new MiniYamlNode("RadarRecoveryReservationQueueType", FieldSaver.FormatValue(radarRecovery?.ReservationQueueType ?? "")),
+				new MiniYamlNode("RadarRecoveryReservationActorType", FieldSaver.FormatValue(radarRecovery?.ReservationActorType ?? "")),
+				new MiniYamlNode("RadarRecoveryReservationTick", FieldSaver.FormatValue(radarRecovery?.ReservationTick ?? 0)),
+				new MiniYamlNode("RadarRecoveryReservationCommitmentObserved", FieldSaver.FormatValue(radarRecovery?.ReservationCommitmentObserved ?? false)),
+				new MiniYamlNode("RadarStorageReservationQueueActorId", FieldSaver.FormatValue(radarStoragePressure?.ReservationQueueActorId ?? 0)),
+				new MiniYamlNode("RadarStorageReservationQueueType", FieldSaver.FormatValue(radarStoragePressure?.ReservationQueueType ?? "")),
+				new MiniYamlNode("RadarStorageReservationActorType", FieldSaver.FormatValue(radarStoragePressure?.ReservationActorType ?? "")),
+				new MiniYamlNode("RadarStorageReservationTick", FieldSaver.FormatValue(radarStoragePressure?.ReservationTick ?? 0)),
+				new MiniYamlNode("RadarStorageReservationTargetCount", FieldSaver.FormatValue(radarStoragePressure?.TargetCount ?? 0)),
+				new MiniYamlNode("RadarStorageOrderIssuedTick", FieldSaver.FormatValue(radarStoragePressure?.OrderIssuedTick ?? -1)),
 				new MiniYamlNode("NextOpeningSoldierRequestTick", FieldSaver.FormatValue(nextOpeningSoldierRequestTick)),
 				new MiniYamlNode("NextOpeningHarvesterRequestTick", FieldSaver.FormatValue(nextOpeningHarvesterRequestTick)),
 				new MiniYamlNode("NextOpeningDefenseUnlockRequestTick", FieldSaver.FormatValue(nextOpeningDefenseUnlockRequestTick)),
@@ -1379,6 +1461,37 @@ namespace OpenRA.Mods.Common.Traits
 			var completionNode = data.FirstOrDefault(n => n.Key == "OpeningCompletionLogged");
 			if (completionNode != null)
 				openingCompletionLogged = FieldLoader.GetValue<bool>("OpeningCompletionLogged", completionNode.Value.Value);
+
+			var radarEstablishedNode = data.FirstOrDefault(n => n.Key == "RadarRecoveryEverEstablished");
+			var radarQueueNode = data.FirstOrDefault(n => n.Key == "RadarRecoveryReservationQueueActorId");
+			var radarQueueTypeNode = data.FirstOrDefault(n => n.Key == "RadarRecoveryReservationQueueType");
+			var radarTypeNode = data.FirstOrDefault(n => n.Key == "RadarRecoveryReservationActorType");
+			var radarTickNode = data.FirstOrDefault(n => n.Key == "RadarRecoveryReservationTick");
+			var radarCommitmentObservedNode = data.FirstOrDefault(n => n.Key == "RadarRecoveryReservationCommitmentObserved");
+			if (radarRecovery != null && radarEstablishedNode != null)
+				radarRecovery.LoadState(
+					FieldLoader.GetValue<bool>("RadarRecoveryEverEstablished", radarEstablishedNode.Value.Value),
+					radarQueueNode != null ? FieldLoader.GetValue<uint>("RadarRecoveryReservationQueueActorId", radarQueueNode.Value.Value) : 0,
+					radarQueueTypeNode != null ? FieldLoader.GetValue<string>("RadarRecoveryReservationQueueType", radarQueueTypeNode.Value.Value) : "",
+					radarTypeNode != null ? FieldLoader.GetValue<string>("RadarRecoveryReservationActorType", radarTypeNode.Value.Value) : "",
+					radarTickNode != null ? FieldLoader.GetValue<int>("RadarRecoveryReservationTick", radarTickNode.Value.Value) : 0,
+					radarCommitmentObservedNode != null && FieldLoader.GetValue<bool>(
+						"RadarRecoveryReservationCommitmentObserved", radarCommitmentObservedNode.Value.Value));
+
+			var radarStorageQueueNode = data.FirstOrDefault(n => n.Key == "RadarStorageReservationQueueActorId");
+			var radarStorageQueueTypeNode = data.FirstOrDefault(n => n.Key == "RadarStorageReservationQueueType");
+			var radarStorageTypeNode = data.FirstOrDefault(n => n.Key == "RadarStorageReservationActorType");
+			var radarStorageTickNode = data.FirstOrDefault(n => n.Key == "RadarStorageReservationTick");
+			var radarStorageTargetNode = data.FirstOrDefault(n => n.Key == "RadarStorageReservationTargetCount");
+			var radarStorageIssuedNode = data.FirstOrDefault(n => n.Key == "RadarStorageOrderIssuedTick");
+			if (radarStoragePressure != null && radarStorageQueueNode != null)
+				radarStoragePressure.LoadState(
+					FieldLoader.GetValue<uint>("RadarStorageReservationQueueActorId", radarStorageQueueNode.Value.Value),
+					radarStorageQueueTypeNode != null ? FieldLoader.GetValue<string>("RadarStorageReservationQueueType", radarStorageQueueTypeNode.Value.Value) : "",
+					radarStorageTypeNode != null ? FieldLoader.GetValue<string>("RadarStorageReservationActorType", radarStorageTypeNode.Value.Value) : "",
+					radarStorageTickNode != null ? FieldLoader.GetValue<int>("RadarStorageReservationTick", radarStorageTickNode.Value.Value) : 0,
+					radarStorageTargetNode != null ? FieldLoader.GetValue<int>("RadarStorageReservationTargetCount", radarStorageTargetNode.Value.Value) : 0,
+					radarStorageIssuedNode != null ? FieldLoader.GetValue<int>("RadarStorageOrderIssuedTick", radarStorageIssuedNode.Value.Value) : -1);
 
 			var soldierRequestNode = data.FirstOrDefault(n => n.Key == "NextOpeningSoldierRequestTick");
 			if (soldierRequestNode != null)

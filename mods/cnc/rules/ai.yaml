@@ -730,6 +730,7 @@ Player:
 		ConstructionYardTypes: fact
 		RefineryTypes: proc
 		PowerTypes: nuke, nuk2
+		RadarRecoveryTypes: hq
 		BarracksTypes: pyle, hand
 		VehiclesFactoryTypes: weap, afld
 		ProductionTypes: pyle, hand, weap, afld, hpad, hq
@@ -827,6 +828,7 @@ Player:
 		ConstructionYardTypes: fact
 		RefineryTypes: proc
 		PowerTypes: nuke,nuk2
+		RadarRecoveryTypes: hq
 		BarracksTypes: pyle,hand
 		VehiclesFactoryTypes: weap,afld
 		ProductionTypes: pyle,hand,weap,afld,hpad, hq
@@ -924,6 +926,7 @@ Player:
 		ConstructionYardTypes: fact
 		RefineryTypes: proc
 		PowerTypes: nuke,nuk2
+		RadarRecoveryTypes: hq
 		BarracksTypes: pyle,hand
 		VehiclesFactoryTypes: weap,afld
 		ProductionTypes: pyle,hand,weap,afld,hpad, hq
@@ -1080,6 +1083,7 @@ Player:
 		ConstructionYardTypes: fact
 		RefineryTypes: proc, resonator
 		PowerTypes: nuke,nuk2
+		RadarRecoveryTypes: hq
 		BarracksTypes: pyle,hand
 		VehiclesFactoryTypes: weap,afld
 		ProductionTypes: pyle,hand,weap,afld,hpad,hq
@@ -1279,6 +1283,7 @@ Player:
 		ConstructionYardTypes: fact
 		RefineryTypes: proc
 		PowerTypes: nuke,nuk2
+		RadarRecoveryTypes: hq
 		BarracksTypes: pyle,hand
 		VehiclesFactoryTypes: weap,afld
 		ProductionTypes: pyle,hand,weap,afld,hpad,hq
@@ -1460,6 +1465,7 @@ Player:
 		ConstructionYardTypes: fact
 		RefineryTypes: proc
 		PowerTypes: nuke,nuk2
+		RadarRecoveryTypes: hq
 		BarracksTypes: pyle,hand
 		VehiclesFactoryTypes: weap,afld
 		ProductionTypes: pyle,hand,weap,afld,hpad,hq
@@ -1832,6 +1838,7 @@ Player:
 		ConstructionYardTypes: fact
 		RefineryTypes: proc, resonator
 		PowerTypes: nuke, nuk2
+		RadarRecoveryTypes: hq
         PlaceAsDefenses: nuke, hand, pyle, weap, afld, proc, fix
         PlaceAsDefenseChance: 33
 		BarracksTypes: pyle,hand
@@ -2035,6 +2042,7 @@ Player:
 		ConstructionYardTypes: fact
 		RefineryTypes: proc
 		PowerTypes: nuke,nuk2
+		RadarRecoveryTypes: hq
 		BarracksTypes: pyle,hand
 		VehiclesFactoryTypes: weap,afld
 		ProductionTypes: pyle,hand,weap,afld,hpad,hq
@@ -2181,6 +2189,7 @@ Player:
 		ConstructionYardTypes: fact
 		RefineryTypes: proc
 		PowerTypes: nuke,nuk2
+		RadarRecoveryTypes: hq
 		BarracksTypes: pyle,hand
 		VehiclesFactoryTypes: weap,afld
 		ProductionTypes: pyle,hand,weap,afld,hpad,hq
