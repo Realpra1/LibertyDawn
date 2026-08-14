@@ -98,7 +98,7 @@ namespace OpenRA.Test
 			var range = GeneralizedCombatThreatCalculator.EffectiveRangeCells(11, 1,
 				160 / 1024d, 54 / 1024d, 1.33203125, false, false, 3);
 
-			Assert.That(range, Is.EqualTo(3.9460185).Within(0.0001));
+			Assert.That(range, Is.EqualTo(3.9467593).Within(0.0001));
 		}
 
 		[Test]
@@ -119,6 +119,14 @@ namespace OpenRA.Test
 				Is.EqualTo(3d / 35).Within(0.000001));
 			Assert.That(GeneralizedCombatThreatCalculator.EffectiveRangeFactor(0, 3), Is.Zero);
 			Assert.That(GeneralizedCombatThreatCalculator.EffectiveRangeFactor(4, 0), Is.Zero);
+		}
+
+		[Test]
+		public void RangeFactorScalesEachRawExchangeScoreExactlyOnce()
+		{
+			Assert.That(GeneralizedCombatThreatCalculator.RangeAdjustedThreatEquivalent(4, 2, 3, 35),
+				Is.EqualTo(2 * 3d / 35).Within(0.000001));
+			Assert.That(GeneralizedCombatThreatCalculator.RangeAdjustedThreatEquivalent(4, 2, 0, 3), Is.Zero);
 		}
 	}
 }

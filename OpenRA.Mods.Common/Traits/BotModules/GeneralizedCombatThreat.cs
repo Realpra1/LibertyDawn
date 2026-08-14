@@ -83,6 +83,7 @@ namespace OpenRA.Mods.Common.Traits
 			public double DamagePerTick { get; internal set; }
 			public double RangeMultiplier { get; internal set; } = 1;
 			public double EffectiveDamagePerTick => DamagePerTick * RangeMultiplier;
+			public double RawKillRate => DefenderHitPoints > 0 ? DamagePerTick / DefenderHitPoints : 0;
 			public double KillRate => DefenderHitPoints > 0 ? EffectiveDamagePerTick / DefenderHitPoints : 0;
 			public IReadOnlyList<SplashZone> SplashZones { get; internal set; } = Array.Empty<SplashZone>();
 		}
@@ -250,8 +251,10 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				Forward = forward,
 				Reverse = reverse,
-				DefenderThreatInAttackerEquivalents = ThreatEquivalent(reverse.KillRate, forward.KillRate),
-				AttackerThreatInDefenderEquivalents = ThreatEquivalent(forward.KillRate, reverse.KillRate)
+				DefenderThreatInAttackerEquivalents = RangeAdjustedThreatEquivalent(
+					reverse.RawKillRate, forward.RawKillRate, reverse.RangeCells, forward.NominalRangeCells),
+				AttackerThreatInDefenderEquivalents = RangeAdjustedThreatEquivalent(
+					forward.RawKillRate, reverse.RawKillRate, forward.RangeCells, reverse.NominalRangeCells)
 			};
 		}
 
@@ -266,6 +269,13 @@ namespace OpenRA.Mods.Common.Traits
 		public static double EffectiveRangeFactor(double enemyEffectiveRangeCells, double ownBaseRangeCells)
 		{
 			return ownBaseRangeCells > 0 ? enemyEffectiveRangeCells / ownBaseRangeCells : 0;
+		}
+
+		public static double RangeAdjustedThreatEquivalent(double incomingRawKillRate, double outgoingRawKillRate,
+			double enemyEffectiveRangeCells, double ownBaseRangeCells)
+		{
+			var rangeFactor = EffectiveRangeFactor(enemyEffectiveRangeCells, ownBaseRangeCells);
+			return rangeFactor > 0 ? ThreatEquivalent(incomingRawKillRate, outgoingRawKillRate) * rangeFactor : 0;
 		}
 
 		public static double SumDefenderThreatInAttackerEquivalents(IEnumerable<PairThreat> matchups)
@@ -400,12 +410,6 @@ namespace OpenRA.Mods.Common.Traits
 			var hitChanceAverage = raw > 0 ? weightedHitChance / raw : 0;
 			var splashAverage = raw > 0 ? weightedSplash / raw : 0;
 			var multiplierAverage = raw > 0 ? weightedMultiplier / raw : 0;
-			if (movementLimitedRangeCells <= 0)
-			{
-				effective = 0;
-				multiplierAverage = 0;
-			}
-
 			var burst = Math.Max(1, weapon.Burst);
 			var burstDelay = weapon.BurstDelays.Length == 0 ? 0 :
 				Enumerable.Range(0, Math.Max(0, burst - 1)).Sum(i => weapon.BurstDelays[Math.Min(i, weapon.BurstDelays.Length - 1)]);
