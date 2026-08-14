@@ -97,6 +97,7 @@ namespace OpenRA.Mods.Common.Traits
 			public double DamagePerTick { get; internal set; }
 			public double DefenderHealingPerTick { get; internal set; }
 			public double TimeToKillTicks { get; internal set; }
+			public IReadOnlyList<HealingProfile> DefenderHealingProfiles { get; internal set; } = Array.Empty<HealingProfile>();
 			public double RangeMultiplier { get; internal set; } = 1;
 			public double EffectiveDamagePerTick => DamagePerTick * RangeMultiplier;
 			public double RawKillRate { get; internal set; }
@@ -112,6 +113,30 @@ namespace OpenRA.Mods.Common.Traits
 			public double DefenderVeterancyFactor { get; internal set; } = 1;
 			public double DefenderThreatInAttackerEquivalents { get; internal set; }
 			public double AttackerThreatInDefenderEquivalents { get; internal set; }
+		}
+
+		public sealed class GroupThreat
+		{
+			public GroupThreat(int unitCount, double defenderThreatToGroup, double groupThreatToDefender)
+			{
+				UnitCount = unitCount;
+				DefenderThreatToGroup = defenderThreatToGroup;
+				GroupThreatToDefender = groupThreatToDefender;
+			}
+
+			public int UnitCount { get; internal set; }
+			public double DefenderThreatToGroup { get; internal set; }
+			public double GroupThreatToDefender { get; internal set; }
+			public bool CrossesOver => DefenderThreatToGroup <= 1 && GroupThreatToDefender >= 1;
+		}
+
+		public sealed class CrossoverResult
+		{
+			public bool Found { get; internal set; }
+			public int UnitCount { get; internal set; }
+			public int InitialEstimate { get; internal set; }
+			public int Evaluations { get; internal set; }
+			public GroupThreat Threat { get; internal set; }
 		}
 
 		readonly Dictionary<(string Attacker, string Defender), PairThreat> cache;
@@ -214,6 +239,115 @@ namespace OpenRA.Mods.Common.Traits
 		public static double ScaleCachedExchange(double baseline, double subjectFactor, double opponentFactor)
 		{
 			return Math.Min(MaximumThreatRating, baseline * subjectFactor / opponentFactor);
+		}
+
+		public static CrossoverResult FindCrossover(double baseGroupThreatRating,
+			Func<int, GroupThreat> evaluate, int maximumUnitCount = 10000)
+		{
+			if (evaluate == null)
+				throw new ArgumentNullException(nameof(evaluate));
+
+			if (maximumUnitCount < 1)
+				throw new ArgumentOutOfRangeException(nameof(maximumUnitCount));
+
+			var estimate = baseGroupThreatRating > 0 && !double.IsInfinity(baseGroupThreatRating) ?
+				(int)Math.Ceiling(Math.Sqrt(1 / baseGroupThreatRating)) : 1;
+			estimate = estimate.Clamp(1, maximumUnitCount);
+			var evaluations = 0;
+			GroupThreat Evaluate(int candidateCount)
+			{
+				evaluations++;
+				return evaluate(candidateCount);
+			}
+
+			var count = estimate;
+			var threat = Evaluate(count);
+			if (threat.CrossesOver)
+			{
+				while (count > 1)
+				{
+					var previous = Evaluate(count - 1);
+					if (!previous.CrossesOver)
+						break;
+
+					count--;
+					threat = previous;
+				}
+
+				return new CrossoverResult
+				{
+					Found = true,
+					UnitCount = count,
+					InitialEstimate = estimate,
+					Evaluations = evaluations,
+					Threat = threat
+				};
+			}
+
+			while (count < maximumUnitCount)
+			{
+				threat = Evaluate(++count);
+				if (threat.CrossesOver)
+					return new CrossoverResult
+					{
+						Found = true,
+						UnitCount = count,
+						InitialEstimate = estimate,
+						Evaluations = evaluations,
+						Threat = threat
+					};
+			}
+
+			return new CrossoverResult
+			{
+				Found = false,
+				UnitCount = maximumUnitCount,
+				InitialEstimate = estimate,
+				Evaluations = evaluations,
+				Threat = threat
+			};
+		}
+
+		public CrossoverResult CalculateCrossover(PairThreat pair, int maximumUnitCount = 10000)
+		{
+			if (pair == null)
+				throw new ArgumentNullException(nameof(pair));
+
+			return FindCrossover(pair.AttackerThreatInDefenderEquivalents,
+				count => CalculateGroupThreat(pair, count), maximumUnitCount);
+		}
+
+		public static GroupThreat CalculateGroupThreat(PairThreat pair, int unitCount)
+		{
+			if (pair == null)
+				throw new ArgumentNullException(nameof(pair));
+
+			if (unitCount < 1)
+				throw new ArgumentOutOfRangeException(nameof(unitCount));
+
+			var forward = pair.Forward;
+			var reverse = pair.Reverse;
+			var defenderTimeToKill = HealingAdjustedTimeToKill(forward.DefenderHitPoints,
+				forward.DamagePerTick * unitCount, forward.DefenderHealingProfiles);
+			var groupHealing = reverse.DefenderHealingProfiles.Select(h => new HealingProfile(
+				h.HealingPerTick * unitCount, h.StartsBelowHitPoints * unitCount));
+			var groupTimeToKill = HealingAdjustedTimeToKill(reverse.DefenderHitPoints * (double)unitCount,
+				reverse.DamagePerTick, groupHealing);
+			var groupKillRate = KillRate(defenderTimeToKill);
+			var defenderKillRate = KillRate(groupTimeToKill);
+			var defenderThreat = RangeAdjustedThreatEquivalent(defenderKillRate, groupKillRate,
+				reverse.RangeCells, forward.NominalRangeCells);
+			var groupThreat = RangeAdjustedThreatEquivalent(groupKillRate, defenderKillRate,
+				forward.RangeCells, reverse.NominalRangeCells);
+
+			return new GroupThreat(unitCount,
+				ScaleCachedExchange(defenderThreat, pair.DefenderVeterancyFactor, pair.AttackerVeterancyFactor),
+				ScaleCachedExchange(groupThreat, pair.AttackerVeterancyFactor, pair.DefenderVeterancyFactor));
+		}
+
+		static double KillRate(double timeToKill)
+		{
+			return timeToKill > 0 && !double.IsPositiveInfinity(timeToKill) ? 1 / timeToKill : 0;
 		}
 
 		public IEnumerable<PairThreat> OrderedPairs()
@@ -387,7 +521,8 @@ namespace OpenRA.Mods.Common.Traits
 				DamagePerTick = totalDpt,
 				DefenderHealingPerTick = healing.Sum(h => h.HealingPerTick),
 				TimeToKillTicks = timeToKill,
-				RawKillRate = timeToKill > 0 && !double.IsPositiveInfinity(timeToKill) ? 1 / timeToKill : 0,
+				DefenderHealingProfiles = healing,
+				RawKillRate = KillRate(timeToKill),
 				SplashZones = applicable.SelectMany(a => a.SplashZones).ToArray()
 			};
 		}

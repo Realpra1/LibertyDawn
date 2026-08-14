@@ -161,5 +161,19 @@ namespace OpenRA.Test
 
 			Assert.That(types.SetEquals(new BitSet<TargetableType>("Air")), Is.True);
 		}
+
+		[Test]
+		public void CrossoverEstimateFindsRifleGuardTowerBoundaryInConstantEvaluations()
+		{
+			const double rifleThreatToTower = 1d / 2100;
+			var result = GeneralizedCombatThreatCalculator.FindCrossover(rifleThreatToTower, count =>
+				new GeneralizedCombatThreatCalculator.GroupThreat(count,
+					2100d / (count * count), rifleThreatToTower * count * count));
+
+			Assert.That(result.Found, Is.True);
+			Assert.That(result.InitialEstimate, Is.EqualTo(46));
+			Assert.That(result.UnitCount, Is.EqualTo(46));
+			Assert.That(result.Evaluations, Is.EqualTo(2));
+		}
 	}
 }
