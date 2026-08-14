@@ -24,7 +24,8 @@ namespace OpenRA.Mods.Common.Traits
 	public sealed class GeneralizedCombatThreatCalculator
 	{
 		public const double MaximumThreatRating = 200;
-		public const int MixedGroupRepresentativeTypes = 3;
+		public const int MixedGroupLookupBudget = 9;
+		public const int MixedGroupMaximumAttackerTypes = 3;
 
 		public readonly struct GroupTypeCount
 		{
@@ -204,8 +205,8 @@ namespace OpenRA.Mods.Common.Traits
 
 		/// <summary>
 		/// Estimates the multiplier needed for our mixed group to cross over against theirs.
-		/// Each side is represented by its three largest economic masses, requiring at most
-		/// nine immutable-cache lookups. The result is policy-free: callers own any margin.
+		/// The largest economic masses are selected under a fixed nine-lookup budget: up to
+		/// 1x9, 2x4, or 3x3 types. The result is policy-free: callers own any margin.
 		/// </summary>
 		public double EstimateMixedGroupCrossover(IEnumerable<GroupTypeCount> ourGroup,
 			IEnumerable<GroupTypeCount> theirGroup)
@@ -271,7 +272,10 @@ namespace OpenRA.Mods.Common.Traits
 			if (ourCount < theirCount * requiredRatio)
 				return false;
 
-			var representedEnemyTypes = new HashSet<string>(RepresentativeTypes(theirs).Select(t => t.ActorType),
+			var ourRepresentatives = RepresentativeTypes(ours, MixedGroupMaximumAttackerTypes);
+			var enemyRepresentativeLimit = MixedGroupLookupBudget / ourRepresentatives.Length;
+			var representedEnemyTypes = new HashSet<string>(
+				RepresentativeTypes(theirs, enemyRepresentativeLimit).Select(t => t.ActorType),
 				StringComparer.OrdinalIgnoreCase);
 			var omittedEnemyEconomicMass = theirs.Where(t => !representedEnemyTypes.Contains(t.ActorType))
 				.Sum(t => t.EconomicMass);
@@ -291,13 +295,16 @@ namespace OpenRA.Mods.Common.Traits
 			if (theirThreatToUs == null)
 				throw new ArgumentNullException(nameof(theirThreatToUs));
 
-			var ours = RepresentativeTypes(ourGroup);
-			var theirs = RepresentativeTypes(theirGroup);
-			if (theirs.Length == 0)
+			var normalizedTheirs = NormalizeTypes(theirGroup);
+			if (normalizedTheirs.Length == 0)
 				return 0;
 
+			var ours = RepresentativeTypes(ourGroup, MixedGroupMaximumAttackerTypes);
 			if (ours.Length == 0)
 				return double.PositiveInfinity;
+
+			var enemyRepresentativeLimit = MixedGroupLookupBudget / ours.Length;
+			var theirs = RepresentativeTypes(normalizedTheirs, enemyRepresentativeLimit);
 
 			var weightedThreat = 0d;
 			var totalWeight = 0d;
@@ -313,12 +320,12 @@ namespace OpenRA.Mods.Common.Traits
 			return Math.Sqrt(Math.Max(0, theirGroupThreat));
 		}
 
-		static GroupTypeCount[] RepresentativeTypes(IEnumerable<GroupTypeCount> group)
+		static GroupTypeCount[] RepresentativeTypes(IEnumerable<GroupTypeCount> group, int maximumTypes)
 		{
 			return NormalizeTypes(group)
 				.OrderByDescending(t => t.EconomicMass)
 				.ThenBy(t => t.ActorType, StringComparer.Ordinal)
-				.Take(MixedGroupRepresentativeTypes).ToArray();
+				.Take(maximumTypes).ToArray();
 		}
 
 		static GroupTypeCount[] NormalizeTypes(IEnumerable<GroupTypeCount> group)

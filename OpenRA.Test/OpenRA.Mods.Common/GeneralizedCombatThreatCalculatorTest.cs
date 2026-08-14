@@ -2,6 +2,7 @@
 /* Copyright 2007-2021 The OpenRA Developers (see AUTHORS) */
 #endregion
 
+using System.Linq;
 using NUnit.Framework;
 using OpenRA.Mods.Common.Traits;
 using OpenRA.Primitives;
@@ -240,6 +241,40 @@ namespace OpenRA.Test
 		}
 
 		[Test]
+		public void MixedGroupCrossoverAdaptsEnemyTypesToNineLookupBudget()
+		{
+			var twoOurs = new[]
+			{
+				new GeneralizedCombatThreatCalculator.GroupTypeCount("a", 2, 100),
+				new GeneralizedCombatThreatCalculator.GroupTypeCount("b", 1, 100)
+			};
+			var fiveTheirs = new[]
+			{
+				new GeneralizedCombatThreatCalculator.GroupTypeCount("v", 5, 100),
+				new GeneralizedCombatThreatCalculator.GroupTypeCount("w", 4, 100),
+				new GeneralizedCombatThreatCalculator.GroupTypeCount("x", 3, 100),
+				new GeneralizedCombatThreatCalculator.GroupTypeCount("y", 2, 100),
+				new GeneralizedCombatThreatCalculator.GroupTypeCount("z", 1, 100)
+			};
+			var lookups = 0;
+			GeneralizedCombatThreatCalculator.EstimateMixedGroupCrossover(twoOurs, fiveTheirs,
+				(ourType, theirType) => { lookups++; return 1; });
+			Assert.That(lookups, Is.EqualTo(8));
+
+			var oneOur = new[]
+			{
+				new GeneralizedCombatThreatCalculator.GroupTypeCount("a", 1, 100)
+			};
+			var tenTheirs = System.Linq.Enumerable.Range(0, 10)
+				.Select(i => new GeneralizedCombatThreatCalculator.GroupTypeCount("enemy-" + i, 10 - i, 100))
+				.ToArray();
+			lookups = 0;
+			GeneralizedCombatThreatCalculator.EstimateMixedGroupCrossover(oneOur, tenTheirs,
+				(ourType, theirType) => { lookups++; return 1; });
+			Assert.That(lookups, Is.EqualTo(9));
+		}
+
+		[Test]
 		public void ShouldEngageUsesSafetyFactorWithoutAnEnemyNumberFloor()
 		{
 			var tenOurs = new[]
@@ -279,7 +314,9 @@ namespace OpenRA.Test
 		{
 			var ours = new[]
 			{
-				new GeneralizedCombatThreatCalculator.GroupTypeCount("ours", 4, 100)
+				new GeneralizedCombatThreatCalculator.GroupTypeCount("ours-a", 2, 100),
+				new GeneralizedCombatThreatCalculator.GroupTypeCount("ours-b", 1, 100),
+				new GeneralizedCombatThreatCalculator.GroupTypeCount("ours-c", 1, 100)
 			};
 			var theirs = new[]
 			{
@@ -293,6 +330,33 @@ namespace OpenRA.Test
 				(ourType, theirType) => 0.0001), Is.False);
 			Assert.That(GeneralizedCombatThreatCalculator.ShouldEngageMixedGroups(ours, theirs,
 				(ourType, theirType) => 0.0001, omittedEconomicMassFactor: 4), Is.True);
+		}
+
+		[Test]
+		public void OneTypeAttackerIncludesGuardTowerFourthEnemyType()
+		{
+			var ours = new[]
+			{
+				new GeneralizedCombatThreatCalculator.GroupTypeCount("e1", 102, 120)
+			};
+			var theirs = new[]
+			{
+				new GeneralizedCombatThreatCalculator.GroupTypeCount("e3", 8, 250),
+				new GeneralizedCombatThreatCalculator.GroupTypeCount("bike", 4, 500),
+				new GeneralizedCombatThreatCalculator.GroupTypeCount("mtnk", 3, 800),
+				new GeneralizedCombatThreatCalculator.GroupTypeCount("gtwr", 1, 600)
+			};
+			var ratings = new System.Collections.Generic.Dictionary<string, double>
+			{
+				{ "e3", 0.127273 }, { "bike", 3.428571 }, { "mtnk", 85.25 }, { "gtwr", 200 }
+			};
+			var lookups = 0;
+
+			var engage = GeneralizedCombatThreatCalculator.ShouldEngageMixedGroups(ours, theirs,
+				(ourType, theirType) => { lookups++; return ratings[theirType]; });
+
+			Assert.That(lookups, Is.EqualTo(4));
+			Assert.That(engage, Is.False);
 		}
 	}
 }
