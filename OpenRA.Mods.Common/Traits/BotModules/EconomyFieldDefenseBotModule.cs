@@ -403,9 +403,25 @@ namespace OpenRA.Mods.Common.Traits
 		void QueueAttackMove(IEnumerable<Actor> actors, CPos destination)
 		{
 			var group = actors.Where(IsOwnedUsable).OrderBy(a => a.ActorID).ToArray();
-			if (bot != null && group.Length > 0)
-				bot.QueueOrder(new Order("AttackMove", null, Target.FromCell(world, destination), false,
-					groupedActors: group));
+			if (bot == null || group.Length == 0)
+				return;
+
+			var stanceChanges = 0;
+			foreach (var actor in group)
+				if (actor.TraitOrDefault<AutoTarget>() is AutoTarget autoTarget &&
+					EconomyFieldDefensePolicy.RequiresAggressiveStance(autoTarget.Stance))
+				{
+					bot.QueueOrder(new Order("SetUnitStance", actor, false)
+					{
+						ExtraData = (uint)UnitStance.AttackAnything
+					});
+					stanceChanges++;
+				}
+
+			bot.QueueOrder(new Order("AttackMove", null, Target.FromCell(world, destination), false,
+				groupedActors: group));
+			Debug("order=AttackMove stance=AttackAnything destination={0} guards={1} stance-changes={2}",
+				destination, group.Length, stanceChanges);
 		}
 
 		bool IsOwnedHarvester(Actor actor)

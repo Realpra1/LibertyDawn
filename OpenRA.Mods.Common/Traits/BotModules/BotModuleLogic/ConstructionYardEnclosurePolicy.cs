@@ -112,15 +112,15 @@ namespace OpenRA.Mods.Common.Traits
 			var sideWidth = right - left + 1;
 			var gateWidth = accessWidth.Clamp(1, Math.Max(1, sideWidth - 2));
 			var gateStart = left + (sideWidth - gateWidth) / 2;
-			var gateEnd = gateStart + gateWidth - 1;
 
+			// These are virtual path-probe origins outside the enclosure, not an entrance.
+			// Facts do not produce moving units, so the completed wall must be a full ring.
 			var access = Enumerable.Range(gateStart, gateWidth)
-				.Select(x => new CPos(x, bottom)).ToArray();
+				.Select(x => new CPos(x, bottom + 1)).ToArray();
 			var segments = new List<CPos[]>();
 			AddSegment(segments, Enumerable.Range(left, sideWidth).Select(x => new CPos(x, top)));
 			AddSegment(segments, Range(top + 1, bottom - 1).Select(y => new CPos(right, y)));
-			AddSegment(segments, ReverseRange(gateEnd + 1, right).Select(x => new CPos(x, bottom)));
-			AddSegment(segments, ReverseRange(left, gateStart - 1).Select(x => new CPos(x, bottom)));
+			AddSegment(segments, ReverseRange(left, right).Select(x => new CPos(x, bottom)));
 			AddSegment(segments, ReverseRange(top + 1, bottom - 1).Select(y => new CPos(left, y)));
 
 			return new ConstructionYardEnclosurePlan(segments.SelectMany(s => s).ToArray(), access,
@@ -180,21 +180,45 @@ namespace OpenRA.Mods.Common.Traits
 			if (plan == null || isPresent == null || isLegal == null || plan.WallCells.Length == 0)
 				return Array.Empty<CPos>();
 
-			var allPlanCells = plan.WallCells.Concat(plan.AccessCells).ToArray();
-			var left = allPlanCells.Min(c => c.X);
-			var right = allPlanCells.Max(c => c.X);
-			var top = allPlanCells.Min(c => c.Y);
-			var bottom = allPlanCells.Max(c => c.Y);
+			var left = plan.WallCells.Min(c => c.X);
+			var right = plan.WallCells.Max(c => c.X);
+			var top = plan.WallCells.Min(c => c.Y);
+			var bottom = plan.WallCells.Max(c => c.Y);
+			var present = plan.WallCells.Where(isPresent).ToArray();
 
 			return plan.WallCells.Select((cell, index) => new { Cell = cell, Index = index })
 				.Where(candidate => !isPresent(candidate.Cell) && isLegal(candidate.Cell))
-				.OrderBy(candidate => !((candidate.Cell.X == left || candidate.Cell.X == right) &&
+
+				// Spread paid anchors as far apart as possible.  LineBuild can then fill the legal
+				// cells between them for free instead of stacking the next paid segment beside the
+				// last one.  With no walls yet the corner/stable-plan ordering remains deterministic.
+				.OrderByDescending(candidate => present.Length == 0 ? 0 :
+					present.Min(wall => (candidate.Cell - wall).LengthSquared))
+				.ThenBy(candidate => !((candidate.Cell.X == left || candidate.Cell.X == right) &&
 					(candidate.Cell.Y == top || candidate.Cell.Y == bottom)))
-				.ThenBy(candidate => (candidate.Cell - yardLocation).LengthSquared)
 				.ThenBy(candidate => candidate.Index)
 				.ThenBy(candidate => candidate.Cell.X)
 				.ThenBy(candidate => candidate.Cell.Y)
 				.Select(candidate => candidate.Cell).ToArray();
+		}
+
+		public static bool IsSafeLineBuildConnection(ConstructionYardEnclosurePlan plan,
+			CPos first, CPos second)
+		{
+			if (plan == null || first.Layer != second.Layer ||
+				(first.X != second.X && first.Y != second.Y))
+				return false;
+
+			var step = new CVec(Math.Sign(second.X - first.X), Math.Sign(second.Y - first.Y));
+			var cell = first;
+			while (true)
+			{
+				if (!plan.WallCells.Contains(cell))
+					return false;
+				if (cell == second)
+					return true;
+				cell += step;
+			}
 		}
 
 		/// <summary>

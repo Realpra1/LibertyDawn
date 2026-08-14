@@ -548,7 +548,8 @@ namespace OpenRA.Mods.Common.Traits
 	}
 
 	public class BaseBuilderBotModule : ConditionalTrait<BaseBuilderBotModuleInfo>, IGameSaveTraitData,
-		IBotTick, IBotPositionsUpdated, IBotRespondToAttack, IBotRequestPauseUnitProduction
+		IBotTick, IBotPositionsUpdated, IBotRespondToAttack, IBotRequestPauseUnitProduction,
+		IBotTemporaryUnitControl
 	{
 		const int OpeningRadarGoal = 5;
 		const int OpeningDefenseGoal = 8;
@@ -779,7 +780,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		void IBotTick.BotTick(IBot bot)
 		{
-			WallPlanner?.Tick();
+			WallPlanner?.Tick(bot);
 			UpdateOpening(bot);
 			smartEconomy?.Tick(bot);
 			TiberiumFieldManager?.Tick();
@@ -797,6 +798,11 @@ namespace OpenRA.Mods.Common.Traits
 			else
 				foreach (var b in builders)
 					b.Tick(bot);
+		}
+
+		bool IBotTemporaryUnitControl.IsUnitTemporarilyControlled(Actor actor)
+		{
+			return !IsTraitDisabled && WallPlanner != null && WallPlanner.IsUnitTemporarilyControlled(actor);
 		}
 
 		internal bool OpeningActive => Info.EnableOpeningPolicy && !openingCompletionLogged && !OpeningComplete;

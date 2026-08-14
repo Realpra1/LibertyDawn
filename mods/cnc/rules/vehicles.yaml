@@ -801,7 +801,7 @@ MLRS:
 		Voice: Attack
     AutoTarget:
 		InitialStance: AttackAnything
-		InitialStanceAI: ReturnFire
+		InitialStanceAI: AttackAnything
 	WithSpriteTurret:
 	Explodes:
 		Weapon: UnitExplodeMech

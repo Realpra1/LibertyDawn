@@ -15,6 +15,15 @@ namespace OpenRA.Test
 	[TestFixture]
 	public sealed class EconomyFieldDefensePolicyTest
 	{
+		[TestCase(UnitStance.HoldFire, true)]
+		[TestCase(UnitStance.ReturnFire, true)]
+		[TestCase(UnitStance.Defend, true)]
+		[TestCase(UnitStance.AttackAnything, false)]
+		public void GuardAttackMovesUpgradeToAggressiveStance(UnitStance stance, bool expected)
+		{
+			Assert.That(EconomyFieldDefensePolicy.RequiresAggressiveStance(stance), Is.EqualTo(expected));
+		}
+
 		[Test]
 		public void AttackCallbackRejectsIncompleteOrHarmlessPayloads()
 		{

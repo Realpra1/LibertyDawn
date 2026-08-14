@@ -105,6 +105,11 @@ namespace OpenRA.Mods.Common.Traits
 	/// <summary>World-independent transition and demand rules for economy field defense.</summary>
 	public static class EconomyFieldDefensePolicy
 	{
+		public static bool RequiresAggressiveStance(UnitStance stance)
+		{
+			return stance != UnitStance.AttackAnything;
+		}
+
 		public static bool HasActionableAttack(AttackInfo attack)
 		{
 			return attack?.Damage != null && attack.Damage.Value > 0 && attack.Attacker != null;

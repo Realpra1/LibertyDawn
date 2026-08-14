@@ -6,52 +6,52 @@ Player:
 		Name: Cabal
 		Type: cabal
 		AdvancedSquadCpuFailsafe: true
-		AdvancedSquadModules: SquadManagerBotModule, StealthTankSquadBotModule/stealth-tank, StealthTankSquadBotModule/chemical, CovertHarassmentBotModule, EconomyFieldDefenseBotModule
+		AdvancedSquadModules: SquadManagerBotModule, StealthTankSquadBotModule/stealth-tank, StealthTankSquadBotModule/chemical, EconomyFieldDefenseBotModule
 	ModularBot@Watson:
 		Name: Watson
 		Type: watson
 		AdvancedSquadCpuFailsafe: true
-		AdvancedSquadModules: SquadManagerBotModule, StealthTankSquadBotModule/stealth-tank, StealthTankSquadBotModule/chemical, CovertHarassmentBotModule, EconomyFieldDefenseBotModule
+		AdvancedSquadModules: SquadManagerBotModule, StealthTankSquadBotModule/stealth-tank, StealthTankSquadBotModule/chemical, EconomyFieldDefenseBotModule
 	ModularBot@HAL9001:
 		Name: HAL 9001
 		Type: hal9001
 		AdvancedSquadCpuFailsafe: true
-		AdvancedSquadModules: SquadManagerBotModule, StealthTankSquadBotModule/stealth-tank, StealthTankSquadBotModule/chemical, CovertHarassmentBotModule, EconomyFieldDefenseBotModule
+		AdvancedSquadModules: SquadManagerBotModule, StealthTankSquadBotModule/stealth-tank, StealthTankSquadBotModule/chemical, EconomyFieldDefenseBotModule
     ModularBot@Brutalis:
 		Name: Brutalis
 		Type: brutalis
 		AdvancedSquadCpuFailsafe: true
-		AdvancedSquadModules: SquadManagerBotModule, StealthTankSquadBotModule/stealth-tank, StealthTankSquadBotModule/chemical, CovertHarassmentBotModule, EconomyFieldDefenseBotModule
+		AdvancedSquadModules: SquadManagerBotModule, StealthTankSquadBotModule/stealth-tank, StealthTankSquadBotModule/chemical, EconomyFieldDefenseBotModule
     ModularBot@VIKI:
 		Name: VIKI
 		Type: viki
 		AdvancedSquadCpuFailsafe: true
-		AdvancedSquadModules: SquadManagerBotModule, StealthTankSquadBotModule/stealth-tank, StealthTankSquadBotModule/chemical, CovertHarassmentBotModule, EconomyFieldDefenseBotModule
+		AdvancedSquadModules: SquadManagerBotModule, StealthTankSquadBotModule/stealth-tank, StealthTankSquadBotModule/chemical, EconomyFieldDefenseBotModule
     ModularBot@SkyNet:
 		Name: SkyNet
 		Type: skynet
 		AdvancedSquadCpuFailsafe: true
-		AdvancedSquadModules: SquadManagerBotModule, StealthTankSquadBotModule/stealth-tank, StealthTankSquadBotModule/chemical, CovertHarassmentBotModule, EconomyFieldDefenseBotModule
+		AdvancedSquadModules: SquadManagerBotModule, StealthTankSquadBotModule/stealth-tank, StealthTankSquadBotModule/chemical, EconomyFieldDefenseBotModule
     ModularBot@IronReaper:
 		Name: IronReaper
 		Type: ironreaper
 		AdvancedSquadCpuFailsafe: true
-		AdvancedSquadModules: SquadManagerBotModule, StealthTankSquadBotModule/stealth-tank, StealthTankSquadBotModule/chemical, CovertHarassmentBotModule, EconomyFieldDefenseBotModule
+		AdvancedSquadModules: SquadManagerBotModule, StealthTankSquadBotModule/stealth-tank, StealthTankSquadBotModule/chemical, EconomyFieldDefenseBotModule
     ModularBot@WaveMaker:
 		Name: WaveMaker
 		Type: wavemaker
 		AdvancedSquadCpuFailsafe: true
-		AdvancedSquadModules: SquadManagerBotModule, StealthTankSquadBotModule/stealth-tank, StealthTankSquadBotModule/chemical, CovertHarassmentBotModule, EconomyFieldDefenseBotModule
+		AdvancedSquadModules: SquadManagerBotModule, StealthTankSquadBotModule/stealth-tank, StealthTankSquadBotModule/chemical, EconomyFieldDefenseBotModule
     ModularBot@Easy:
 		Name: Easy
 		Type: Easy
 		AdvancedSquadCpuFailsafe: true
-		AdvancedSquadModules: SquadManagerBotModule, StealthTankSquadBotModule/stealth-tank, StealthTankSquadBotModule/chemical, CovertHarassmentBotModule, EconomyFieldDefenseBotModule
+		AdvancedSquadModules: SquadManagerBotModule, StealthTankSquadBotModule/stealth-tank, StealthTankSquadBotModule/chemical, EconomyFieldDefenseBotModule
     ModularBot@Easiest:
 		Name: Easiest
 		Type: Easiest
 		AdvancedSquadCpuFailsafe: true
-		AdvancedSquadModules: SquadManagerBotModule, StealthTankSquadBotModule/stealth-tank, StealthTankSquadBotModule/chemical, CovertHarassmentBotModule, EconomyFieldDefenseBotModule
+		AdvancedSquadModules: SquadManagerBotModule, StealthTankSquadBotModule/stealth-tank, StealthTankSquadBotModule/chemical, EconomyFieldDefenseBotModule
 	GrantConditionOnBotOwner@cabal:
 		Condition: enable-cabal-ai
 		Bots: cabal
@@ -99,7 +99,9 @@ Player:
 		ReinforcementIntervalSeconds: 10
 		DebugLogging: false
 	EconomyArtilleryBotModule:
-		RequiresCondition: enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai
+		# Hotfix: disabled until this specialized squad has been human-tested.
+		# Unreserved artillery is handled by the ordinary SquadManager assault path.
+		RequiresCondition: enable-brutalis-ai && !enable-brutalis-ai
 		RequiredPrerequisites: upgrade.economy2
 		ArtilleryTypes: mlrs
 		AntiAirTypes: msam
@@ -137,7 +139,9 @@ Player:
 		DecisionLogInterval: 750
 		DebugLogging: true
 	EconomyTankHarassmentBotModule:
-		RequiresCondition: enable-brutalis-ai || enable-ironreaper-ai
+		# Disabled with the other unreviewed specialized ground controllers.
+		# Eligible unreserved units return to the ordinary aggressive assault path.
+		RequiresCondition: enable-brutalis-ai && !enable-brutalis-ai
 		RequiredPrerequisites: upgrade.economy3
 		TankTypes: mtnk
 		TargetPriorities:
@@ -160,7 +164,8 @@ Player:
 		MaximumTargetCandidates: 48
 		DebugLogging: true
 	EconomyMammothCrushBotModule:
-		RequiresCondition: enable-brutalis-ai || enable-ironreaper-ai
+		# Disabled with the other unreviewed specialized ground controllers.
+		RequiresCondition: enable-brutalis-ai && !enable-brutalis-ai
 		RequiredPrerequisites: upgrade.economy3
 		MammothTypes: htnk
 		InfantryTypes: e1, e2, e3, e4, e5, e6, rmbo
@@ -183,7 +188,8 @@ Player:
 		MaximumTargetCandidates: 32
 		DebugLogging: true
 	CovertHarassmentBotModule:
-		RequiresCondition: enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai
+		# Disabled with the other unreviewed specialized ground controllers.
+		RequiresCondition: enable-brutalis-ai && !enable-brutalis-ai
 		RequiredPrerequisites: upgrade.covert1
 		CoreTypes: bike, bggy
 		SupportTypes: arty
@@ -218,7 +224,8 @@ Player:
 		MaximumTargetCandidates: 48
 		DebugLogging: false
 	EarlyInfantryRushBotModule:
-		RequiresCondition: enable-viki-ai
+		# Disabled with the other unreviewed specialized ground controllers.
+		RequiresCondition: enable-brutalis-ai && !enable-brutalis-ai
 		RequiredPrerequisites: upgrade.covert1
 		GrenadierType: e2
 		ChemicalType: e5
@@ -759,7 +766,7 @@ Player:
 		RequiresCondition: enable-cabal-ai
 		SquadSize: 15
 		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck, tran
-		FailsafeDirectCombatTypes: e1, e2, e3, e4, e5, bggy, bike, jeep, ltnk, mtnk, ftnk, htnk
+		FailsafeDirectCombatTypes: e1, e2, e3, e4, e5, bggy, bike, jeep, ltnk, mtnk, ftnk, htnk, arty, mlrs, msam, ctnk, stnk, apc
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
@@ -856,7 +863,7 @@ Player:
 		RequiresCondition: enable-watson-ai
 		SquadSize: 15
 		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck, tran
-		FailsafeDirectCombatTypes: e1, e2, e3, e4, e5, bggy, bike, jeep, ltnk, mtnk, ftnk, htnk
+		FailsafeDirectCombatTypes: e1, e2, e3, e4, e5, bggy, bike, jeep, ltnk, mtnk, ftnk, htnk, arty, mlrs, msam, ctnk, stnk, apc
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
@@ -953,7 +960,7 @@ Player:
 		RequiresCondition: enable-hal9001-ai
 		SquadSize: 8
 		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck, tran
-		FailsafeDirectCombatTypes: e1, e2, e3, e4, e5, bggy, bike, jeep, ltnk, mtnk, ftnk, htnk
+		FailsafeDirectCombatTypes: e1, e2, e3, e4, e5, bggy, bike, jeep, ltnk, mtnk, ftnk, htnk, arty, mlrs, msam, ctnk, stnk, apc
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
@@ -1131,10 +1138,10 @@ Player:
 		RequiresCondition: enable-brutalis-ai
 		SquadSize: 20
 		UseStrategicGroundTargeting: true
-		UseCohesiveGroundSquad: true
+		UseCohesiveGroundSquad: false
 		GroundTargetDebugLogging: false
 		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck, tran
-		FailsafeDirectCombatTypes: e1, e2, e3, e4, e5, bggy, bike, jeep, ltnk, mtnk, ftnk, htnk
+		FailsafeDirectCombatTypes: e1, e2, e3, e4, e5, bggy, bike, jeep, ltnk, mtnk, ftnk, htnk, arty, mlrs, msam, ctnk, stnk, apc
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
@@ -1142,7 +1149,7 @@ Player:
 		RequiresCondition: enable-wavemaker-ai
 		SquadSize: 120
 		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck, tran
-		FailsafeDirectCombatTypes: e1, e2, e3, e4, e5, bggy, bike, jeep, ltnk, mtnk, ftnk, htnk
+		FailsafeDirectCombatTypes: e1, e2, e3, e4, e5, bggy, bike, jeep, ltnk, mtnk, ftnk, htnk, arty, mlrs, msam, ctnk, stnk, apc
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
@@ -1331,10 +1338,10 @@ Player:
 		RequiresCondition: enable-viki-ai
 		SquadSize: 30
 		UseStrategicGroundTargeting: true
-		UseCohesiveGroundSquad: true
+		UseCohesiveGroundSquad: false
 		GroundTargetDebugLogging: false
 		ExcludeFromSquadsTypes: harv, sharv, mcv, a10, e6, rmbo, truck, tran
-		FailsafeDirectCombatTypes: e1, e2, e3, e4, e5, bggy, bike, jeep, ltnk, mtnk, ftnk, htnk
+		FailsafeDirectCombatTypes: e1, e2, e3, e4, e5, bggy, bike, jeep, ltnk, mtnk, ftnk, htnk, arty, mlrs, msam, ctnk, stnk, apc
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
@@ -1541,10 +1548,10 @@ Player:
 		SquadSize: 10
 		AttackForceInterval: 50
 		UseStrategicGroundTargeting: true
-		UseCohesiveGroundSquad: true
+		UseCohesiveGroundSquad: false
 		GroundTargetDebugLogging: false
 		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck, tran
-		FailsafeDirectCombatTypes: e1, e2, e3, e4, e5, bggy, bike, jeep, ltnk, mtnk, ftnk, htnk
+		FailsafeDirectCombatTypes: e1, e2, e3, e4, e5, bggy, bike, jeep, ltnk, mtnk, ftnk, htnk, arty, mlrs, msam, ctnk, stnk, apc
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
@@ -1904,11 +1911,11 @@ Player:
 		RequiresCondition: enable-ironreaper-ai
 		SquadSize: 20
 		UseStrategicGroundTargeting: true
-		UseCohesiveGroundSquad: true
+		UseCohesiveGroundSquad: false
 		GroundTargetDebugLogging: false
         MaxBaseRadius: 49
 		ExcludeFromSquadsTypes: harv, sharv, mcv, a10, e6, rmbo, truck, tran
-		FailsafeDirectCombatTypes: e1, e2, e3, e4, e5, bggy, bike, jeep, ltnk, mtnk, ftnk, htnk
+		FailsafeDirectCombatTypes: e1, e2, e3, e4, e5, bggy, bike, jeep, ltnk, mtnk, ftnk, htnk, arty, mlrs, msam, ctnk, stnk, apc
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
@@ -2085,7 +2092,7 @@ Player:
 		RequiresCondition: enable-Easy-ai
 		SquadSize: 4
 		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck, tran
-		FailsafeDirectCombatTypes: e1, e2, e3, e4, e5, bggy, bike, jeep, ltnk, mtnk, ftnk, htnk
+		FailsafeDirectCombatTypes: e1, e2, e3, e4, e5, bggy, bike, jeep, ltnk, mtnk, ftnk, htnk, arty, mlrs, msam, ctnk, stnk, apc
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
@@ -2232,7 +2239,7 @@ Player:
 		RequiresCondition: enable-Easiest-ai
 		SquadSize: 3
 		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck, tran
-		FailsafeDirectCombatTypes: e1, e2, e3, e4, e5, bggy, bike, jeep, ltnk, mtnk, ftnk, htnk
+		FailsafeDirectCombatTypes: e1, e2, e3, e4, e5, bggy, bike, jeep, ltnk, mtnk, ftnk, htnk, arty, mlrs, msam, ctnk, stnk, apc
 		ConstructionYardTypes: fact
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
