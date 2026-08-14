@@ -310,9 +310,8 @@ namespace OpenRA.Mods.Common.Traits
 		static DirectionalThreat CalculateDirection(ActorInfo attacker, ActorInfo defender)
 		{
 			var hp = defender.TraitInfo<IHealthInfo>().MaxHP;
-			var targetTypes = default(BitSet<TargetableType>);
-			foreach (var targetable in defender.TraitInfos<ITargetableInfo>())
-				targetTypes = targetTypes.Union(targetable.GetTargetTypes());
+			var targetTypes = CachedTargetTypes(defender.HasTraitInfo<AircraftInfo>(),
+				defender.TraitInfos<ITargetableInfo>().Select(t => t.GetTargetTypes()));
 			var armor = defender.TraitInfos<ArmorInfo>().Select(a => a.Type).FirstOrDefault(a => a != null);
 			var hitRadius = defender.TraitInfos<HitShapeInfo>()
 				.Select(h => Cells(h.Type.OuterRadius)).DefaultIfEmpty(0.5).Max();
@@ -325,7 +324,7 @@ namespace OpenRA.Mods.Common.Traits
 				.Where(a => a.WeaponInfo != null && a.WeaponInfo.IsValidTarget(targetTypes))
 				.Select(a => CalculateArmament(a, armor, hitRadius, a.ModifiedRange,
 					Array.Empty<int>(), Array.Empty<int>(), Array.Empty<int>(), null, null,
-					targetSpeed, targetEngagementRange))
+					targetSpeed, targetEngagementRange, targetTypes))
 				.ToArray();
 
 			return CombineDirections(attacker.Name, defender.Name, hp, armor, hitRadius, applicable, healing);
@@ -354,7 +353,7 @@ namespace OpenRA.Mods.Common.Traits
 					.All(p => p.CurrentAmmoCount >= a.Info.AmmoUsage))
 				.Select(a => CalculateArmament(a.Info, armor, hitRadius, a.MaxRange(),
 					firepowerModifiers, reloadModifiers, inaccuracyModifiers, attacker, defender,
-					targetSpeed, targetEngagementRange))
+					targetSpeed, targetEngagementRange, targetTypes))
 				.ToArray();
 
 			return CombineDirections(attacker.Info.Name, defender.Info.Name, hp, armor, hitRadius, applicable, healing);
@@ -446,10 +445,13 @@ namespace OpenRA.Mods.Common.Traits
 
 		static DirectionalThreat CalculateArmament(ArmamentInfo armament, string armor, double hitRadius,
 			WDist effectiveRange, int[] firepowerModifiers, int[] reloadModifiers, int[] inaccuracyModifiers,
-			Actor attacker, Actor defender, double targetSpeedCellsPerTick, double targetEngagementRangeCells)
+			Actor attacker, Actor defender, double targetSpeedCellsPerTick, double targetEngagementRangeCells,
+			BitSet<TargetableType> targetTypes)
 		{
 			var weapon = armament.WeaponInfo;
-			var rangeZones = weapon.Warheads.OfType<SpreadDamageWarhead>().SelectMany(SplashZones).ToArray();
+			var damagingWarheads = weapon.Warheads.OfType<DamageWarhead>()
+				.Where(w => w.Damage > 0 && WarheadTargets(w, targetTypes)).ToArray();
+			var rangeZones = damagingWarheads.OfType<SpreadDamageWarhead>().SelectMany(SplashZones).ToArray();
 			var splashRadius = rangeZones.Where(z => z.WeightedAffectedCells > 0)
 				.Select(z => z.OuterRadiusCells).DefaultIfEmpty(0).Max();
 			var effectiveHitRadius = Math.Max(hitRadius, splashRadius);
@@ -462,7 +464,6 @@ namespace OpenRA.Mods.Common.Traits
 			effectiveRange = new WDist((int)(movementLimitedRangeCells * 1024));
 			var inaccuracy = weapon.TargetActorCenter && weapon.Projectile is InstantHitInfo ? 0 :
 				ProjectileInaccuracyCells(weapon.Projectile, effectiveRange, inaccuracyModifiers);
-			var damagingWarheads = weapon.Warheads.OfType<DamageWarhead>().Where(w => w.Damage > 0).ToArray();
 			var raw = 0d;
 			var effective = 0d;
 			var weightedHitChance = 0d;
@@ -512,6 +513,24 @@ namespace OpenRA.Mods.Common.Traits
 				DamagePerTick = effective * burst / cycle,
 				SplashZones = allZones
 			};
+		}
+
+		public static BitSet<TargetableType> CachedTargetTypes(bool isAircraft,
+			IEnumerable<BitSet<TargetableType>> configuredTargetTypes)
+		{
+			if (isAircraft)
+				return new BitSet<TargetableType>("Air");
+
+			var targetTypes = default(BitSet<TargetableType>);
+			foreach (var configured in configuredTargetTypes)
+				targetTypes = targetTypes.Union(configured);
+
+			return targetTypes;
+		}
+
+		static bool WarheadTargets(Warhead warhead, BitSet<TargetableType> targetTypes)
+		{
+			return warhead.ValidTargets.Overlaps(targetTypes) && !warhead.InvalidTargets.Overlaps(targetTypes);
 		}
 
 		static double Weighted(IEnumerable<DirectionalThreat> values, Func<DirectionalThreat, double> selector, double weight)

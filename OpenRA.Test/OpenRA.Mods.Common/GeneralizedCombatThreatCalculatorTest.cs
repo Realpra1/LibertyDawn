@@ -4,6 +4,8 @@
 
 using NUnit.Framework;
 using OpenRA.Mods.Common.Traits;
+using OpenRA.Primitives;
+using OpenRA.Traits;
 
 namespace OpenRA.Test
 {
@@ -146,6 +148,18 @@ namespace OpenRA.Test
 				Is.EqualTo(15));
 			Assert.That(GeneralizedCombatThreatCalculator.HealingAdjustedTimeToKill(100, 5, belowHalf),
 				Is.EqualTo(double.PositiveInfinity));
+		}
+
+		[Test]
+		public void CachedAircraftUseAirborneTargetTypeInsteadOfConditionalGroundUnion()
+		{
+			var types = GeneralizedCombatThreatCalculator.CachedTargetTypes(true, new[]
+			{
+				new BitSet<TargetableType>("Ground", "Vehicle"),
+				new BitSet<TargetableType>("Air")
+			});
+
+			Assert.That(types.SetEquals(new BitSet<TargetableType>("Air")), Is.True);
 		}
 	}
 }
