@@ -23,6 +23,8 @@ namespace OpenRA.Mods.Common.Traits
 	/// </summary>
 	public sealed class GeneralizedCombatThreatCalculator
 	{
+		public const double MaximumThreatRating = 200;
+
 		public readonly struct SplashZone
 		{
 			public readonly double InnerRadiusCells;
@@ -197,7 +199,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		public static double ScaleCachedExchange(double baseline, double subjectFactor, double opponentFactor)
 		{
-			return baseline * subjectFactor / opponentFactor;
+			return Math.Min(MaximumThreatRating, baseline * subjectFactor / opponentFactor);
 		}
 
 		public IEnumerable<PairThreat> OrderedPairs()
@@ -263,7 +265,8 @@ namespace OpenRA.Mods.Common.Traits
 			if (incomingKillRate <= 0)
 				return 0;
 
-			return outgoingKillRate > 0 ? incomingKillRate / outgoingKillRate : double.PositiveInfinity;
+			return outgoingKillRate > 0 ?
+				Math.Min(MaximumThreatRating, incomingKillRate / outgoingKillRate) : MaximumThreatRating;
 		}
 
 		public static double EffectiveRangeFactor(double enemyEffectiveRangeCells, double ownBaseRangeCells)
@@ -274,8 +277,15 @@ namespace OpenRA.Mods.Common.Traits
 		public static double RangeAdjustedThreatEquivalent(double incomingRawKillRate, double outgoingRawKillRate,
 			double enemyEffectiveRangeCells, double ownBaseRangeCells)
 		{
+			if (incomingRawKillRate <= 0)
+				return 0;
+
+			if (ownBaseRangeCells <= 0)
+				return MaximumThreatRating;
+
 			var rangeFactor = EffectiveRangeFactor(enemyEffectiveRangeCells, ownBaseRangeCells);
-			return rangeFactor > 0 ? ThreatEquivalent(incomingRawKillRate, outgoingRawKillRate) * rangeFactor : 0;
+			return rangeFactor > 0 ? Math.Min(MaximumThreatRating,
+				ThreatEquivalent(incomingRawKillRate, outgoingRawKillRate) * rangeFactor) : 0;
 		}
 
 		public static double SumDefenderThreatInAttackerEquivalents(IEnumerable<PairThreat> matchups)

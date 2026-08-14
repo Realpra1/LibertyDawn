@@ -54,12 +54,15 @@ namespace OpenRA.Test
 		}
 
 		[Test]
-		public void ThreatEquivalentHandlesDefenselessAndMutuallyHarmlessActors()
+		public void ThreatEquivalentCapsDefenselessActorsAndHandlesMutuallyHarmlessActors()
 		{
 			Assert.That(GeneralizedCombatThreatCalculator.ThreatEquivalent(0, 0), Is.Zero);
 			Assert.That(GeneralizedCombatThreatCalculator.ThreatEquivalent(0, 2), Is.Zero);
-			Assert.That(GeneralizedCombatThreatCalculator.ThreatEquivalent(2, 0), Is.EqualTo(double.PositiveInfinity));
+			Assert.That(GeneralizedCombatThreatCalculator.ThreatEquivalent(2, 0),
+				Is.EqualTo(GeneralizedCombatThreatCalculator.MaximumThreatRating));
 			Assert.That(GeneralizedCombatThreatCalculator.ThreatEquivalent(2, 4), Is.EqualTo(0.5));
+			Assert.That(GeneralizedCombatThreatCalculator.ThreatEquivalent(500, 1),
+				Is.EqualTo(GeneralizedCombatThreatCalculator.MaximumThreatRating));
 		}
 
 		[Test]
@@ -127,6 +130,8 @@ namespace OpenRA.Test
 			Assert.That(GeneralizedCombatThreatCalculator.RangeAdjustedThreatEquivalent(4, 2, 3, 35),
 				Is.EqualTo(2 * 3d / 35).Within(0.000001));
 			Assert.That(GeneralizedCombatThreatCalculator.RangeAdjustedThreatEquivalent(4, 2, 0, 3), Is.Zero);
+			Assert.That(GeneralizedCombatThreatCalculator.RangeAdjustedThreatEquivalent(4, 0, 3, 0),
+				Is.EqualTo(GeneralizedCombatThreatCalculator.MaximumThreatRating));
 		}
 	}
 }
