@@ -76,6 +76,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		// established formation center home or inflate its strategic strength before they arrive.
 		internal readonly HashSet<uint> GroundReinforcements = new HashSet<uint>();
 		internal int GroundNextTargetReviewTick;
+		internal int GroundNextOrderTick;
 		WPos groundLastFormationCenter;
 		bool hasGroundFormationCenter;
 		bool groundHoldingForReinforcements;
@@ -116,6 +117,14 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		{
 			if (IsValid)
 			{
+				if (IsOrdinaryGroundSquad)
+				{
+					if (World.WorldTick < GroundNextOrderTick)
+						return;
+
+					DeferGroundOrders();
+				}
+
 				if (Type == SquadType.GeneralAttack)
 				{
 					UpdateGroundReinforcements();
@@ -128,6 +137,17 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				else
 					FuzzyStateMachine.Update(this);
 			}
+		}
+
+		bool IsOrdinaryGroundSquad => Type == SquadType.Assault || Type == SquadType.Rush ||
+			Type == SquadType.GeneralAttack;
+
+		internal void DeferGroundOrders()
+		{
+			// A newly recruited unit receives its own immediate AttackMove, but must not keep
+			// postponing the established squad's next decision while production remains active.
+			if (GroundNextOrderTick <= World.WorldTick)
+				GroundNextOrderTick = World.WorldTick + SquadManager.Info.GroundOrderIntervalTicks(World.Timestep);
 		}
 
 		/// <summary>

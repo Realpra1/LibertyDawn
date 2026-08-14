@@ -12,6 +12,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
+using OpenRA.Mods.Common.Traits;
 using OpenRA.Mods.Common.Traits.BotModules;
 
 namespace OpenRA.Test.Mods.Common
@@ -19,6 +20,15 @@ namespace OpenRA.Test.Mods.Common
 	[TestFixture]
 	public sealed class AdvancedBotFallbackOwnershipTest
 	{
+		[TestCase(40, 250)]
+		[TestCase(35, 286)]
+		[TestCase(20, 500)]
+		public void OrdinaryGroundOrderCadenceUsesSimulationSeconds(int timestep, int expectedTicks)
+		{
+			var info = new SquadManagerBotModuleInfo();
+			Assert.That(info.GroundOrderIntervalTicks(timestep), Is.EqualTo(expectedTicks));
+		}
+
 		[Test]
 		public void SimultaneousSpecialistReleaseRetainsEveryActorByCohesiveOwner()
 		{
