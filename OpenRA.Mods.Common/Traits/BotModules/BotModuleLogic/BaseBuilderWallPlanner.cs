@@ -91,6 +91,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly HashSet<CPos> observedEnclosureWalls = new HashSet<CPos>();
 		readonly Dictionary<CPos, int> issuedEnclosureCells = new Dictionary<CPos, int>();
 		readonly Dictionary<uint, int> nextEnclosureQueueLogTicks = new Dictionary<uint, int>();
+		readonly Dictionary<uint, int> temporarilyMovedUnits = new Dictionary<uint, int>();
 		readonly ConstructionYardEnclosureBuildOwnership<ProductionQueue> enclosureBuildOwnership =
 			new ConstructionYardEnclosureBuildOwnership<ProductionQueue>();
 		ConstructionYardEnclosurePlan enclosurePlan;
@@ -140,9 +141,17 @@ namespace OpenRA.Mods.Common.Traits
 			return clusterWallCells.Contains(cell);
 		}
 
-		public void Tick()
+		public void Tick(IBot bot)
 		{
 			EnsureEnclosureState();
+			ReleaseClearedUnits();
+			if (EnclosureActive && world.WorldTick >= nextEnclosureScanTick)
+				MoveFriendlyEnclosureBlockers(bot);
+		}
+
+		public bool IsUnitTemporarilyControlled(Actor actor)
+		{
+			return actor != null && temporarilyMovedUnits.ContainsKey(actor.ActorID);
 		}
 
 		public bool OverlapsConstructionYardEnclosure(CPos location, BuildingInfo buildingInfo)
@@ -272,7 +281,7 @@ namespace OpenRA.Mods.Common.Traits
 				useLineBuild = !pendingIndividualWallCells.Remove(cell.Value);
 				if (pendingPurpose == PendingWallPurpose.Enclosure)
 				{
-					useLineBuild = false;
+					useLineBuild = CanSafelyLineBuildEnclosure(cell.Value, actorType);
 					issuedEnclosureCells[cell.Value] = world.WorldTick;
 					LogEnclosure("{0} tick={1} issued PlaceBuilding yard={2}/{3}@{4} wall={5} cell={6} repair={7}.",
 						player, world.WorldTick, enclosureYardActorId, enclosureYardType, enclosureYardLocation,
@@ -325,9 +334,9 @@ namespace OpenRA.Mods.Common.Traits
 
 		void DropStaleAnchors(ActorInfo wallInfo, BuildingInfo bi)
 		{
-			// Anchors are planned before the wall is ordered, so the world may have moved on. Enclosure
-			// cells additionally need their exact ordinary route when they are consumed: an intervening
-			// actor or wall must defer this attempt instead of issuing a now-unreachable placement.
+			// Anchors are planned before the wall is ordered, so the world may have moved on. Wall
+			// construction does not require a mobile actor route: friendly mobile blockers are moved
+			// aside separately and every otherwise-valid perimeter cell remains eligible.
 			while (pendingAnchors.Count > 0 && !CanUsePendingAnchor(pendingAnchors[0], wallInfo, bi))
 			{
 				if (pendingPurpose == PendingWallPurpose.Enclosure && Info.ConstructionYardEnclosureDebugLogging)
@@ -346,10 +355,7 @@ namespace OpenRA.Mods.Common.Traits
 			if (!CanAnchorAt(cell, wallInfo, bi))
 				return false;
 
-			if (pendingPurpose != PendingWallPurpose.Enclosure)
-				return true;
-
-			return TryFindExactEnclosureRoute(cell, out _, out _);
+			return true;
 		}
 
 		void ClearPendingAnchors()
@@ -385,6 +391,115 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			return world.CanPlaceBuilding(cell, wallInfo, bi, null)
 				&& bi.IsCloseEnoughToBase(world, player, wallInfo, cell);
+		}
+
+		bool CanSafelyLineBuildEnclosure(CPos cell, string actorType)
+		{
+			if (enclosurePlan == null || !world.Map.Rules.Actors.TryGetValue(actorType, out var wallInfo))
+				return false;
+
+			var lineBuild = wallInfo.TraitInfoOrDefault<LineBuildInfo>();
+			var building = wallInfo.TraitInfoOrDefault<BuildingInfo>();
+			if (lineBuild == null || building == null)
+				return false;
+
+			var connected = false;
+			var directions = new[] { new CVec(1, 0), new CVec(0, 1), new CVec(-1, 0), new CVec(0, -1) };
+			foreach (var direction in directions)
+			{
+				for (var distance = 1; distance < lineBuild.Range; distance++)
+				{
+					var candidate = cell + distance * direction;
+					if (world.IsCellBuildable(candidate, wallInfo, building) || !player.Shroud.IsExplored(candidate))
+						continue;
+
+					var connector = world.ActorMap.GetActorsAt(candidate).FirstOrDefault(a =>
+						a.Owner == player && a.IsInWorld && !a.IsDead &&
+						a.Info.TraitInfos<LineBuildNodeInfo>().Any(info =>
+							info.Types.Overlaps(lineBuild.NodeTypes) && info.Connections.Contains(direction)));
+					if (connector == null)
+						break;
+
+					// Never let the engine connect to an unrelated wall or extend beyond the closed
+					// perimeter. Every generated segment must be an intended, currently legal cell.
+					if (!ConstructionYardEnclosurePolicy.IsSafeLineBuildConnection(
+						enclosurePlan, cell, candidate))
+						return false;
+
+					for (var i = 1; i < distance; i++)
+					{
+						var intermediate = cell + i * direction;
+						if (!world.CanPlaceBuilding(intermediate, wallInfo, building, null))
+							return false;
+					}
+					connected = true;
+					break;
+				}
+			}
+
+			return connected;
+		}
+
+		void ReleaseClearedUnits()
+		{
+			foreach (var actorId in temporarilyMovedUnits.Keys.ToArray())
+			{
+				var actor = world.GetActorById(actorId);
+				if (actor == null || actor.Owner != player || !actor.IsInWorld || actor.IsDead ||
+					world.WorldTick >= temporarilyMovedUnits[actorId] || !IsEnclosureProtectedCell(actor.Location))
+					temporarilyMovedUnits.Remove(actorId);
+			}
+		}
+
+		void MoveFriendlyEnclosureBlockers(IBot bot)
+		{
+			if (bot == null || enclosurePlan == null)
+				return;
+
+			var blockers = enclosurePlan.WallCells.Concat(enclosurePlan.AccessCells)
+				.SelectMany(world.ActorMap.GetActorsAt)
+				.Where(a => a.Owner == player && a.IsInWorld && !a.IsDead &&
+					a.Info.TraitInfoOrDefault<BuildingInfo>() == null &&
+					a.TraitOrDefault<Mobile>() != null && !temporarilyMovedUnits.ContainsKey(a.ActorID))
+				.Distinct().OrderBy(a => a.ActorID).ToArray();
+			foreach (var actor in blockers)
+			{
+				var destination = FindTemporaryClearCell(actor);
+				if (destination == null)
+					continue;
+
+				temporarilyMovedUnits[actor.ActorID] = world.WorldTick + 75;
+				bot.QueueOrder(new Order("Move", actor, Target.FromCell(world, destination.Value), false));
+				LogEnclosure("{0} tick={1} temporarily cleared blocker={2}#{3} from={4} to={5}; squad ownership retained.",
+					player, world.WorldTick, actor.Info.Name, actor.ActorID, actor.Location, destination.Value);
+			}
+		}
+
+		CPos? FindTemporaryClearCell(Actor actor)
+		{
+			var mobile = actor.TraitOrDefault<Mobile>();
+			if (mobile == null)
+				return null;
+
+			for (var radius = 1; radius <= 6; radius++)
+			{
+				var candidates = world.Map.FindTilesInAnnulus(actor.Location, radius - 1, radius)
+					.Where(c => !IsEnclosureProtectedCell(c) && !IsFactFootprintCell(c) &&
+						!world.ActorMap.GetActorsAt(c).Any(a => a.IsInWorld && !a.IsDead) &&
+						mobile.CanEnterCell(c, check: BlockedByActor.Immovable))
+					.OrderByDescending(c => (c - enclosureYardLocation).LengthSquared)
+					.ThenBy(c => c.X).ThenBy(c => c.Y).ToArray();
+				if (candidates.Length > 0)
+					return candidates[0];
+			}
+
+			return null;
+		}
+
+		bool IsEnclosureProtectedCell(CPos cell)
+		{
+			return enclosurePlan != null &&
+				(enclosurePlan.WallCells.Contains(cell) || enclosurePlan.AccessCells.Contains(cell));
 		}
 
 		string DescribeEnclosureCell(CPos cell, ActorInfo wallInfo, BuildingInfo bi)
@@ -656,23 +771,15 @@ namespace OpenRA.Mods.Common.Traits
 
 			var candidates = ConstructionYardEnclosurePolicy.OrderedLegalMissingCells(enclosurePlan,
 				enclosureYardLocation, HasOwnWall, c => CanAnchorAt(c, wallInfo, wallBuildingInfo));
-			CPos? destination = null;
-			CPos routeOrigin = default;
-			List<CPos> route = null;
-			foreach (var candidate in candidates)
-				if (TryFindExactEnclosureRoute(candidate, out routeOrigin, out route))
-				{
-					destination = candidate;
-					break;
-				}
+			var destination = candidates.Cast<CPos?>().FirstOrDefault();
 
 			if (destination == null)
 			{
 				nextEnclosureScanTick = NextEnclosureScanTick();
 				var missingCells = enclosurePlan.WallCells.Where(c => !HasOwnWall(c)).ToArray();
-				LogEnclosure("{0} tick={1} pending yard={2}@{3}: missing={4} legal={5} routed=0 access={6}.",
+				LogEnclosure("{0} tick={1} pending yard={2}@{3}: missing={4} legal={5}.",
 					player, world.WorldTick, enclosureYardActorId, enclosureYardLocation,
-					missingCells.Length, candidates.Length, string.Join(",", enclosurePlan.AccessCells));
+					missingCells.Length, candidates.Length);
 				if (Info.ConstructionYardEnclosureDebugLogging)
 					LogEnclosure("{0} tick={1} pending-cell-status yard={2}@{3}: {4}.",
 						player, world.WorldTick, enclosureYardActorId, enclosureYardLocation,
@@ -684,11 +791,10 @@ namespace OpenRA.Mods.Common.Traits
 			pendingAnchors.Add(destination.Value);
 			pendingWallType = wallInfo.Name;
 			pendingPurpose = PendingWallPurpose.Enclosure;
-			LogEnclosure("{0} tick={1} planned yard={2}/{3}@{4} wall={5} cell={6} rank={7}/{8} route={9}->{10} path-cells={11} repair={12}.",
+			LogEnclosure("{0} tick={1} planned yard={2}/{3}@{4} wall={5} cell={6} rank={7}/{8} repair={9}.",
 				player, world.WorldTick, enclosureYardActorId, enclosureYardType, enclosureYardLocation,
 				wallInfo.Name, destination.Value, Array.IndexOf(candidates, destination.Value) + 1,
-				candidates.Length, routeOrigin, destination.Value, route.Count,
-				observedEnclosureWalls.Contains(destination.Value));
+				candidates.Length, observedEnclosureWalls.Contains(destination.Value));
 			return true;
 		}
 

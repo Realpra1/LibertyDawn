@@ -265,7 +265,8 @@ namespace OpenRA.Mods.Common.Traits
 			var targetDirection = "fallback";
 			if (Info.PreferRallyBelowConstructionYard)
 			{
-				for (var distance = 1; distance <= Math.Max(1, Info.MaximumRallyDistance) && target == null; distance++)
+				// Keep the first infantry clear of the Fact's lower enclosure corners and wall.
+				for (var distance = 2; distance <= Math.Max(2, Info.MaximumRallyDistance) && target == null; distance++)
 				{
 					target = OpeningGarrisonLogic.CellsBelowBuilding(yard.Location, yardInfo.Dimensions, distance)
 						.Where(IsLegalRallyCell).Select(c => (CPos?)c).FirstOrDefault();

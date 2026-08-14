@@ -29,15 +29,17 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
-		public void FactPlanHasStableThreeCellSouthAccess()
+		public void FactPlanIsAClosedRingWithStableExternalSouthProbeOrigins()
 		{
 			var plan = FactPlan();
 			Assert.That(plan.AccessCells, Is.EqualTo(new[]
 			{
-				new CPos(50, 53), new CPos(51, 53), new CPos(52, 53)
+				new CPos(50, 54), new CPos(51, 54), new CPos(52, 54)
 			}));
-			Assert.That(plan.WallCells, Has.Length.EqualTo(13));
+			Assert.That(plan.WallCells, Has.Length.EqualTo(16));
 			Assert.That(plan.WallCells.Intersect(plan.AccessCells), Is.Empty);
+			Assert.That(new[] { new CPos(50, 53), new CPos(51, 53), new CPos(52, 53) },
+				Is.SubsetOf(plan.WallCells));
 			Assert.That(plan.WallCells.Distinct().Count(), Is.EqualTo(plan.WallCells.Length));
 			Assert.That(ConstructionYardEnclosurePolicy.CreatePlan(
 				new CPos(50, 50), new CVec(3, 3), 1, 3).WallCells, Is.EqualTo(plan.WallCells));
@@ -85,7 +87,7 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
-		public void MissingDestinationsAreCornerFirstThenNearestWithStablePlanTies()
+		public void MissingDestinationsMaximizeDistanceFromExistingWallsWithStableCornerTies()
 		{
 			var plan = FactPlan();
 			var blockedCorner = new CPos(49, 49);
@@ -105,6 +107,42 @@ namespace OpenRA.Test.Mods.Common
 			}));
 			Assert.That(plan.WallCells, Does.Contain(blockedCorner),
 				"A temporary blocker must not mutate or remove the immutable destination.");
+		}
+
+		[Test]
+		public void LowerCornerWallsCauseFarthestOppositeEdgeCellsToBeSelectedFirst()
+		{
+			var plan = FactPlan();
+			var present = new HashSet<CPos>
+			{
+				new CPos(49, 53),
+				new CPos(53, 53)
+			};
+
+			var ordered = ConstructionYardEnclosurePolicy.OrderedLegalMissingCells(plan,
+				new CPos(50, 50), present.Contains, _ => true);
+
+			Assert.That(ordered.Take(2), Is.EqualTo(new[]
+			{
+				new CPos(51, 49),
+				new CPos(50, 49)
+			}), "The planner must select the cells farthest from both lower anchors, not stack above them.");
+		}
+
+		[Test]
+		public void LineBuildMayFillEverySideButNeverLeaveTheEnclosurePlan()
+		{
+			var plan = FactPlan();
+
+			Assert.That(ConstructionYardEnclosurePolicy.IsSafeLineBuildConnection(plan,
+				new CPos(49, 49), new CPos(53, 49)), Is.True);
+			Assert.That(ConstructionYardEnclosurePolicy.IsSafeLineBuildConnection(plan,
+				new CPos(49, 49), new CPos(49, 53)), Is.True);
+			Assert.That(ConstructionYardEnclosurePolicy.IsSafeLineBuildConnection(plan,
+				new CPos(49, 53), new CPos(53, 53)), Is.True,
+				"The southern wall must close completely.");
+			Assert.That(ConstructionYardEnclosurePolicy.IsSafeLineBuildConnection(plan,
+				new CPos(49, 54), new CPos(53, 54)), Is.False);
 		}
 
 		[Test]
