@@ -379,6 +379,11 @@ namespace OpenRA.Mods.Common.Traits
 			// TickQueue, while unavailable or unaffordable goals still yield normally.
 			if (ShouldHoldOptionalConstructionForFirstRefinery())
 			{
+				// Another queue already owns the protected goal. Hold this idle queue without
+				// repeatedly re-running and logging a reservation attempt that cannot succeed.
+				if (baseBuilder.HasProtectedOpeningRefineryCommitment)
+					return null;
+
 				var protectedRefinery = baseBuilder.OpeningBuilding(buildableThings);
 				if (protectedRefinery != null && baseBuilder.SmartEconomyRefineryTypes.Contains(protectedRefinery.Name) &&
 					baseBuilder.TryReserveSmartEconomyOpeningRefinery(queue, protectedRefinery.Name))
