@@ -79,3 +79,45 @@ Raw Cycle 2 artifacts remain outside Git at
 - `zero-refinery-prerequisite/support/Logs/debug.log`
 - `existing-refinery-contention/support/Logs/debug.log`
 - per-run `summary.json`, plus `batch-summary.json` and `batch-summary.tsv`
+
+## Cycle 3 — existing-refinery acceptance
+
+No product or focused-test source changed. The two temporary scenarios retained
+the existing Refinery, usable dock, normal power, partial Harvester queue, and
+ordinary Brutalis modules. Their map-local Refinery free-Harvester spawn was
+suppressed to isolate income. The first scenario began with no Harvester. The
+second began with one explicit Harvester, recorded it at ticks 1 and 51, then
+recorded zero live Harvesters at tick 301 after the script destroyed it at the
+first second, before any unload.
+
+Both authorized full-engine games passed and exited normally at bounded tick 3000
+without a fatal Lua error or desync. `existing-refinery-no-starting-harvester`
+finished in 21.054 seconds and `starting-harvester-lost-before-unload` in 18.046
+seconds.
+
+Both scenarios produced the same acceptance sequence:
+
+- Exactly 250 ticks of no-paid-progress evidence activated recovery once at tick
+  601, selecting the partial `514:Vehicle.GDI:harv` front with 991/1100 remaining.
+- Exactly one cancellation-resolution event followed at tick 626. It resolved
+  all three displaced entries with `unresolved=0`; `expected-refund=306` exactly
+  matched `earned-delta=306`, preserving refund ownership while the selected front
+  spent 31 credits.
+- The protected Harvester then made continuous paid progress, reached the
+  completed/exit wait at tick 1201, and released at tick 1226 with
+  `completed=True`, one live Harvester, and one live Refinery/unloading path.
+- Ordinary work resumed immediately: infantry paid progress appeared at tick
+  1276, then building, defence, vehicle, and the additional building queue all
+  logged paid progress by tick 1301. Defence and infantry queues visibly completed
+  by tick 1401, satisfying ordinary parallel progress after recovery exit.
+
+Raw Cycle 3 artifacts remain outside Git at
+`/tmp/cnc106-cycle3.4tnUP0/results/`. The concise evidence is in
+`batch-summary.json` and `batch-summary.tsv`; exact runtime markers are in:
+
+- `existing-refinery-no-starting-harvester/support/Logs/debug.log`
+- `starting-harvester-lost-before-unload/support/Logs/debug.log`
+
+Cycle 3 completes the assigned full-engine acceptance action. The implementation
+and focused checks remain product/test commit `77d229b12d`; this report/state
+update is the durable review handoff.

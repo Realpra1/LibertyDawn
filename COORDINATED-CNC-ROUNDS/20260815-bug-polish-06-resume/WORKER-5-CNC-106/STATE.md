@@ -5,7 +5,7 @@
 - Task: `CNC-106 — General queue-stall prevention and smart-economy serialization`
 - Base: `4f806e742bd12145d2a601cc9ff71c3a0b141a13` (PR117 head)
 - Branch: `agent/round-20260815-cnc106-queue-stall`
-- Status: `Cycle 2 complete — zero-refinery acceptance passed; existing-refinery income isolation pending`
+- Status: `Cycle 3 complete — full-engine acceptance passed; ready for review handoff`
 - Cycle: `3`
 - PR: `none`
 
@@ -103,15 +103,54 @@ Git. Do not edit the task sheet or coordinator state, merge a PR, or push `bleed
   `existing-refinery-contention/support/Logs/debug.log`; concise runner results are
   in `batch-summary.json` and `batch-summary.tsv`.
 
-## Next authorized cycle
+## Cycle 3 authorized action
 
-Cycle 3 may correct only the remaining temporary existing-refinery harness defect:
-remove its pre-existing income-producing harvester while retaining the refinery,
-partial queued harvester, normal power, delayed grants, and viable unloading path.
-Run at most that one custom existing-refinery game; the zero-refinery prerequisite
-case already passed and must not be rerun without a product change. Require actual
-activation, exactly one cancellation-resolution event with refund evidence,
-selected harvester completion, and ordinary parallel post-release progress. If it
-passes, run no extra game and prepare the task handoff from the already-tested
-product commit. Do not change product code, add the excluded threat exception, or
-alter authored balance/config values.
+Preserve the required two distinct custom full-engine scenarios, each capped at
+120 seconds, with all normal modules and an ordinary CNC AI enabled. Do not change
+product code unless a concrete literal defect is found; do not add the excluded
+threat exception or alter authored balance/config values.
+
+- Scenario A — existing Refinery, no income-producing starting Harvester: retain
+  the Refinery, force genuine shared-queue stall/partial-queue contention under
+  normal power, and prove bounded recovery, one protected harvester/refinery
+  commitment, visible completion, and ordinary parallel progress after exit.
+- Scenario B — existing Refinery with a starting Harvester: cause that Harvester
+  to be lost before its first unload, prove the transition into the same bounded
+  recovery path, then prove selected completion and ordinary parallel progress
+  after recovery exit.
+
+Record actual paid-progress stall, one-time cancellation/refund ownership, viable
+unloading, recovery transition, completion, and resumed parallel work. The prior
+zero-refinery case remains evidence but does not replace either required scenario.
+
+## Cycle 3 durable outcome
+
+- No product or focused-test source changed. Both temporary maps retained the
+  existing Refinery and normal power while suppressing only the map-local free
+  Refinery Harvester spawn. Scenario A had no starting Harvester; Scenario B kept
+  the explicit starting Harvester through the tick-1 observation and destroyed it
+  at the first scripted second, before any unload. The Refinery and dock remained
+  available to the recovery-built Harvester in both cases.
+- Both authorized ordinary-`brutalis` full-engine CNC games passed and exited
+  normally at bounded tick 3000 in 21.054 and 18.046 seconds. There was no fatal
+  Lua error or desync.
+- Each scenario accumulated exactly 250 ticks of no-paid-progress evidence and
+  activated exactly once at tick 601 on the partial `harv` front. Each had exactly
+  one cancellation-resolution event at tick 626 with `entries=3`, `unresolved=0`,
+  `expected-refund=306`, and `earned-delta=306`.
+- Each protected Harvester made continuous selected progress, entered the
+  completed/exit wait at tick 1201, and released at tick 1226 with
+  `completed=True`, one live Harvester, and one live Refinery. Ordinary parallel
+  paid progress resumed across infantry, building, defence, and vehicle queues by
+  tick 1301; two ordinary queue completions were recorded by tick 1401.
+- Scenario B explicitly recorded the lifecycle transition from one live Harvester
+  at ticks 1/51 to zero at tick 301 before entering the same recovery path.
+- Raw artifacts (outside Git): `/tmp/cnc106-cycle3.4tnUP0/results/`. Concise
+  results are in `batch-summary.json` and `batch-summary.tsv`; detailed evidence
+  is in each scenario's `support/Logs/debug.log`.
+
+## Handoff status
+
+The assigned Cycle 3 acceptance action is complete. No further development or
+game cycle is authorized by this state; return to the coordinator for review/PR
+handoff using product/test commit `77d229b12d` plus this durable evidence update.
