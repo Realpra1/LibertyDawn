@@ -322,6 +322,22 @@ namespace OpenRA.Mods.Common.Traits
 				queue.GetProductionCost(actorInfo);
 		}
 
+		bool ShouldHoldOptionalConstructionForFirstRefinery()
+		{
+			if (!baseBuilder.ProtectedOpeningRefineryGoalActive)
+				return false;
+
+			var committed = baseBuilder.HasProtectedOpeningRefineryCommitment;
+			var actionable = baseBuilder.Info.BuildingQueues.Concat(baseBuilder.Info.DefenseQueues)
+				.SelectMany(q => AIUtils.FindQueues(player, q))
+				.Where(q => !q.AllQueued().Any())
+				.Any(q => q.BuildableItems().Any(a =>
+					baseBuilder.SmartEconomyRefineryTypes.Contains(a.Name) &&
+					HasSufficientPowerForActor(a) && HasSufficientFundsForActor(q, a)));
+			return OpeningPolicyLogic.HoldOptionalConstructionForFirstRefinery(true,
+				baseBuilder.CountActors(baseBuilder.SmartEconomyRefineryTypes), committed, actionable);
+		}
+
 		ActorInfo ChooseBuildingToBuild(ProductionQueue queue)
 		{
 			var buildableThings = queue.BuildableItems();
@@ -352,6 +368,24 @@ namespace OpenRA.Mods.Common.Traits
 					AIUtils.BotDebug("{0} decided to build {1}: serialized missing-refinery recovery",
 						queue.Actor.Owner, DisplayName(refinery.Name));
 					return refinery;
+				}
+
+				return null;
+			}
+
+			// The ordinary opening has not recovered until its first Refinery is live.
+			// Let an actionable compatible queue claim that goal, then keep idle construction
+			// queues from consuming its remaining production cash. Busy work is left alone by
+			// TickQueue, while unavailable or unaffordable goals still yield normally.
+			if (ShouldHoldOptionalConstructionForFirstRefinery())
+			{
+				var protectedRefinery = baseBuilder.OpeningBuilding(buildableThings);
+				if (protectedRefinery != null && baseBuilder.SmartEconomyRefineryTypes.Contains(protectedRefinery.Name) &&
+					baseBuilder.TryReserveSmartEconomyOpeningRefinery(queue, protectedRefinery.Name))
+				{
+					AIUtils.BotDebug("{0} decided to build {1}: protected opening economy",
+						queue.Actor.Owner, DisplayName(protectedRefinery.Name));
+					return protectedRefinery;
 				}
 
 				return null;

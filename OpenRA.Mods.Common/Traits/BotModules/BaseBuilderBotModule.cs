@@ -972,6 +972,28 @@ namespace OpenRA.Mods.Common.Traits
 			return openingStructureReservations.Keys.Any(i => i >= 0 && i < goals.Count && goals[i].Contains(type));
 		}
 
+		internal bool IsProtectedOpeningRefinery(string type)
+		{
+			return OpeningActive && SmartEconomyRefineryTypes.Contains(type);
+		}
+
+		internal bool ProtectedOpeningRefineryGoalActive
+		{
+			get
+			{
+				if (!OpeningActive)
+					return false;
+
+				var completed = CompletedOpeningStructureGoals(OpeningStructureGoals);
+				return completed.Contains(OpeningRefineryGoal - 2) &&
+					completed.Contains(OpeningRefineryGoal - 1) && !completed.Contains(OpeningRefineryGoal);
+			}
+		}
+
+		internal bool HasProtectedOpeningRefineryCommitment =>
+			CountQueuedOrPendingActors(SmartEconomyRefineryTypes) > 0 ||
+			SmartEconomyRefineryTypes.Any(IsOpeningStructureReserved);
+
 		string[] RequiredOpeningTypes(string[] advancedTypes, HashSet<string> commonTypes)
 		{
 			if (!Info.EnableOpeningPrefix && !Info.EnableOpeningPolicy)

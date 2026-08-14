@@ -17,6 +17,12 @@ namespace OpenRA.Mods.Common.Traits
 {
 	public static class OpeningPolicyLogic
 	{
+		public static bool HoldOptionalConstructionForFirstRefinery(bool refineryGoalActive,
+			int liveRefineries, bool refineryCommitted, bool refineryActionable)
+		{
+			return refineryGoalActive && liveRefineries <= 0 && (refineryCommitted || refineryActionable);
+		}
+
 		public static bool RequiredPrefixComplete(IReadOnlyCollection<int> completedGoals, int prefixGoalCount)
 		{
 			if (completedGoals == null || prefixGoalCount <= 0)
