@@ -9,54 +9,174 @@
  */
 #endregion
 
+using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Runtime.ExceptionServices;
 
 namespace OpenRA.Support
 {
 	class Benchmark
 	{
+		const int FlushInterval = 256;
+		const int CreateFileMaxRetryCount = 128;
+
 		readonly string prefix;
-		readonly Dictionary<string, List<BenchmarkPoint>> samples = new Dictionary<string, List<BenchmarkPoint>>();
+		readonly int flushInterval;
+		readonly Func<string, TextWriter> writerFactory;
+		readonly Dictionary<string, BenchmarkChannel> channels = new Dictionary<string, BenchmarkChannel>();
+		readonly PeriodicStallReport periodicStallReport = new PeriodicStallReport();
+		int? lastTick;
+		bool finished;
 
 		public Benchmark(string prefix)
+			: this(prefix, CreateWriter, FlushInterval) { }
+
+		internal Benchmark(string prefix, Func<string, TextWriter> writerFactory, int flushInterval)
 		{
 			this.prefix = prefix;
+			this.writerFactory = writerFactory ?? throw new ArgumentNullException(nameof(writerFactory));
+			this.flushInterval = flushInterval > 0 ? flushInterval : throw new ArgumentOutOfRangeException(nameof(flushInterval));
 		}
 
-		public void Tick(int localTick)
+		public void Tick(int localTick, World world = null)
 		{
+			if (finished || lastTick == localTick)
+				return;
+
+			lastTick = localTick;
 			foreach (var item in PerfHistory.Items)
-				samples.GetOrAdd(item.Key).Add(new BenchmarkPoint(localTick, item.Value.LastValue));
+				channels.GetOrAdd(item.Key, CreateChannel).Write(localTick, item.Value.LastValue);
+
+			if (world != null)
+				periodicStallReport.RecordTick(localTick, world);
 		}
 
-		class BenchmarkPoint
+		public void Render(int renderFrame)
 		{
-			public int Tick { get; private set; }
-			public double Value { get; private set; }
+			periodicStallReport.RecordRender(renderFrame);
+		}
 
-			public BenchmarkPoint(int tick, double value)
+		public void BotModule(int tick, int playerIndex, string module, double milliseconds, int queuedOrders)
+		{
+			periodicStallReport.RecordModule(tick, playerIndex, module, milliseconds, queuedOrders);
+		}
+
+		public void LogicPhase(int tick, string phase, double milliseconds)
+		{
+			periodicStallReport.RecordLogicPhase(tick, phase, milliseconds);
+		}
+
+		BenchmarkChannel CreateChannel(string name)
+		{
+			var writer = writerFactory($"{prefix}{name}.csv");
+			try
 			{
-				Tick = tick;
-				Value = value;
+				return new BenchmarkChannel(writer, flushInterval);
 			}
+			catch (Exception error)
+			{
+				try
+				{
+					writer.Dispose();
+				}
+				catch (Exception disposeError)
+				{
+					throw new AggregateException(error, disposeError);
+				}
+
+				throw;
+			}
+		}
+
+		static TextWriter CreateWriter(string filename)
+		{
+			var path = Path.Combine(Platform.SupportDir, "Logs");
+			Directory.CreateDirectory(path);
+
+			IOException error = null;
+			for (var i = 0; i < CreateFileMaxRetryCount; i++)
+			{
+				var candidate = Path.Combine(path, i > 0 ? $"{filename}.{i}" : filename);
+				try
+				{
+					return File.CreateText(candidate);
+				}
+				catch (IOException e)
+				{
+					error = e;
+				}
+			}
+
+			throw new ApplicationException($"Error creating benchmark file \"{filename}\"", error);
 		}
 
 		public void Write()
 		{
-			foreach (var sample in samples)
-			{
-				var name = sample.Key;
-				Log.AddChannel(name, $"{prefix}{name}.csv");
-				Log.Write(name, "tick,time [ms]");
+			if (finished)
+				return;
 
-				foreach (var point in sample.Value)
-					Log.Write(name, $"{point.Tick},{point.Value}");
+			periodicStallReport.Write(prefix);
+			finished = true;
+			Exception error = null;
+			foreach (var channel in channels.Values)
+			{
+				try
+				{
+					channel.Finish();
+				}
+				catch (Exception e)
+				{
+					if (error == null)
+						error = e;
+				}
 			}
+
+			if (error != null)
+				ExceptionDispatchInfo.Capture(error).Throw();
 		}
 
 		public void Reset()
 		{
-			samples.Clear();
+			Write();
+			channels.Clear();
+			lastTick = null;
+			finished = false;
+		}
+
+		sealed class BenchmarkChannel
+		{
+			readonly TextWriter writer;
+			readonly int flushInterval;
+			int bufferedRows;
+			bool finished;
+
+			public BenchmarkChannel(TextWriter writer, int flushInterval)
+			{
+				this.writer = writer;
+				this.flushInterval = flushInterval;
+				writer.WriteLine("tick,time [ms]");
+				writer.Flush();
+			}
+
+			public void Write(int tick, double value)
+			{
+				writer.WriteLine($"{tick},{value}");
+				if (++bufferedRows < flushInterval)
+					return;
+
+				writer.Flush();
+				bufferedRows = 0;
+			}
+
+			public void Finish()
+			{
+				if (finished)
+					return;
+
+				finished = true;
+				writer.Dispose();
+			}
 		}
 	}
 }

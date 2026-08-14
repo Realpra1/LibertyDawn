@@ -19,6 +19,11 @@ from datetime import datetime, timezone
 LARGE_BUILD_ENTRY_ROLES = ("worker", "reviewer", "integrator")
 LARGE_BUILD_RESOURCE = "large-build"
 LARGE_BUILD_CAPACITY = 1
+GLOBAL_RESOURCE_CAPACITIES = {
+    "game": 2,
+    LARGE_BUILD_RESOURCE: LARGE_BUILD_CAPACITY,
+    "policy-scratchpad": 1,
+}
 POLL_INTERVAL_SECONDS = 0.05
 DESCENDANT_GRACE_SECONDS = 1.0
 DESCENDANT_TERMINATE_SECONDS = 2.0
@@ -34,6 +39,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--capacity", type=int)
     parser.add_argument("--slots", type=int, default=1)
     parser.add_argument("--timeout", type=float, default=3600)
+    parser.add_argument(
+        "--status",
+        action="store_true",
+        help="probe registered resource slots without running a command",
+    )
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     if args.command and args.command[0] == "--":
@@ -55,11 +65,60 @@ def parse_args() -> argparse.Namespace:
         )
     if args.capacity < 1 or args.slots < 1 or args.slots > args.capacity:
         parser.error("require 1 <= slots <= capacity")
-    if not args.command:
+    if not args.command and not args.status:
         parser.error("a command is required after --")
+    if args.command and args.status:
+        parser.error("--status does not accept a command")
     if not args.resource.replace("-", "").replace("_", "").isalnum():
         parser.error("resource must contain only letters, digits, '-' or '_'")
     return args
+
+
+def repository_global_lock_dir() -> pathlib.Path:
+    """Return the one lock namespace shared by this repository's worktrees."""
+    checkout = pathlib.Path(__file__).resolve().parents[4]
+    try:
+        completed = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(checkout),
+                "rev-parse",
+                "--path-format=absolute",
+                "--git-common-dir",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=True,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        raise RuntimeError(f"cannot resolve repository-global lock namespace: {error}") from error
+    common_git_dir = pathlib.Path(completed.stdout.strip()).resolve()
+    return common_git_dir.parent / ".agents" / "locks"
+
+
+def enforce_resource_policy(args: argparse.Namespace) -> pathlib.Path:
+    """Validate registered global resource ownership before any lock is opened."""
+    requested = args.lock_dir.expanduser().resolve()
+    registered_capacity = GLOBAL_RESOURCE_CAPACITIES.get(args.resource)
+    if registered_capacity is None:
+        if not args.lock_dir.is_absolute():
+            raise RuntimeError("local resource --lock-dir must be absolute")
+        return requested
+
+    canonical = repository_global_lock_dir().resolve()
+    if requested != canonical:
+        raise RuntimeError(
+            f"registered global resource {args.resource!r} requires canonical "
+            f"--lock-dir {canonical}; rejected conflicting namespace {requested}"
+        )
+    if args.capacity != registered_capacity:
+        raise RuntimeError(
+            f"registered global resource {args.resource!r} owns capacity "
+            f"{registered_capacity}; rejected caller capacity {args.capacity}"
+        )
+    return canonical
 
 
 def emit(event: str, **fields: object) -> None:
@@ -107,6 +166,36 @@ def try_acquire(paths: list[pathlib.Path], count: int):
         fcntl.flock(handle, fcntl.LOCK_UN)
         handle.close()
     return []
+
+
+def inspect_paths(resource: str, capacity: int, paths: list[pathlib.Path]) -> int:
+    """Report kernel flock state; file contents are explicitly historical only."""
+    for index, path in enumerate(paths, start=1):
+        handle = path.open("a+", encoding="utf-8")
+        handle.seek(0)
+        metadata = handle.read()
+        try:
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            availability = "contended"
+        else:
+            availability = "available"
+            fcntl.flock(handle, fcntl.LOCK_UN)
+        stat_result = os.fstat(handle.fileno())
+        handle.close()
+        emit(
+            "status",
+            resource=resource,
+            capacity=capacity,
+            slot=index,
+            path=str(path),
+            device=stat_result.st_dev,
+            inode=stat_result.st_ino,
+            availability=availability,
+            metadata_classification="last-known",
+            last_known_metadata=metadata.rstrip("\n"),
+        )
+    return 0
 
 
 def enable_subreaper() -> None:
@@ -297,6 +386,7 @@ def run_supervised_tree(
 def main() -> int:
     args = parse_args()
     try:
+        args.lock_dir = enforce_resource_policy(args)
         args.lock_dir.mkdir(parents=True, exist_ok=True)
         reject_mixed_large_build_namespace(args)
     except (OSError, RuntimeError) as error:
@@ -306,6 +396,13 @@ def main() -> int:
         args.lock_dir / f"{args.resource}-{index}.lock"
         for index in range(1, args.capacity + 1)
     ]
+    if args.status:
+        try:
+            return inspect_paths(args.resource, args.capacity, paths)
+        except OSError as error:
+            emit("rejected", resource=args.resource, reason=str(error))
+            print(f"Resource status rejected: {error}", file=sys.stderr)
+            return 73
     deadline = time.monotonic() + args.timeout
     held = []
     entry_role = args.large_build_entry or args.resource

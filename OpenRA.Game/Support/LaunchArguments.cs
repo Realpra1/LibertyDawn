@@ -33,6 +33,9 @@ namespace OpenRA
 		[Desc("Run an automated local MAX game without showing or rendering the game window.")]
 		public bool Headless;
 
+		[Desc("Run an automated local game with the normal rendering and presentation path enabled.")]
+		public bool Paced;
+
 		[Desc("Automatically start playing the given map.")]
 		public string Map;
 
@@ -115,24 +118,31 @@ namespace OpenRA
 
 		public string HeadlessValidationError()
 		{
-			if (ExitAtTick >= 0 && !Headless)
-				return "Launch.ExitAtTick requires Launch.Headless=true.";
+			if (ExitAtTick >= 0 && !Headless && !Paced)
+				return "Launch.ExitAtTick requires Launch.Headless=true or Launch.Paced=true.";
 
-			if (!Headless)
+			if (Headless && Paced)
+				return "Launch.Headless and Launch.Paced cannot both be enabled.";
+
+			if (!Headless && !Paced)
 				return null;
 
 			if (!string.IsNullOrEmpty(Connect) || !string.IsNullOrEmpty(URI))
-				return "Launch.Headless supports local automated games only.";
+				return "Launch automation supports local automated games only.";
 
 			if (!string.IsNullOrEmpty(Replay))
-				return "Launch.Headless does not support replay playback.";
+				return "Launch automation does not support replay playback.";
 
 			if (string.IsNullOrEmpty(Map) && string.IsNullOrEmpty(GameSave))
-				return "Launch.Headless requires Launch.Map or Launch.GameSave.";
+				return "Launch automation requires Launch.Map or Launch.GameSave.";
 
-			if (!string.IsNullOrEmpty(Map) && !GetLobbyCommands().Any(c =>
+			if (Headless && !string.IsNullOrEmpty(Map) && !GetLobbyCommands().Any(c =>
 				c.Equals("option gamespeed max", StringComparison.OrdinalIgnoreCase)))
 				return "Launch.Headless map games require 'option gamespeed max' in Launch.LobbyCommands.";
+
+			if (Paced && !string.IsNullOrEmpty(Map) && !GetLobbyCommands().Any(c =>
+				c.Equals("option gamespeed normal", StringComparison.OrdinalIgnoreCase)))
+				return "Launch.Paced map games require 'option gamespeed normal' in Launch.LobbyCommands.";
 
 			return null;
 		}

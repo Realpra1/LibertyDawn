@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run one to three isolated Linux headless MAX games from a JSON manifest."""
+"""Run one to three isolated Linux headless MAX or paced rendered games from a JSON manifest."""
 
 from __future__ import annotations
 
@@ -19,17 +19,19 @@ from pathlib import Path
 from typing import Any
 
 
-MAX_TICK_PATTERNS = (
+ENGINE_TICK_PATTERNS = (
     re.compile(r"MAX progress: world=(\d+)"),
     re.compile(r"world tick (\d+)", re.IGNORECASE),
 )
+READINESS_TICK_PATTERN = re.compile(r"\btick=(\d+)\b")
 HEADLESS_MARKER = "Headless MAX automation enabled"
+PACED_MARKER = "Paced rendered automation enabled"
 MAX_MARKER = "MAX game speed enabled"
 STARTED_MARKER = "Headless MAX automation started map"
 NATURAL_MARKER = "Headless MAX automation reached natural game over"
 BOUNDED_MARKER = "Headless MAX automation reached configured exit"
 FATAL_PATTERN = re.compile(
-    r"unhandled exception|fatal error|desync detected|exception of type", re.IGNORECASE
+    r"unhandled exception|fatal (?:lua )?error|desync detected|exception of type", re.IGNORECASE
 )
 SAFE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 ISOLATED_ARGUMENTS = (
@@ -38,6 +40,7 @@ ISOLATED_ARGUMENTS = (
     "Launch.ExitAtTick=",
     "Launch.GameSave=",
     "Launch.Headless=",
+    "Launch.Paced=",
     "Launch.Map=",
 )
 
@@ -46,11 +49,21 @@ class ConfigurationError(ValueError):
     pass
 
 
+@dataclass(frozen=True)
+class ReadinessSpec:
+    actor_log_patterns: list[str]
+    build_log_patterns: list[str]
+    ready_log_pattern: str
+    timeout_seconds: float
+    maximum_world_tick: int | None
+
+
 @dataclass
 class RunSpec:
     name: str
     source_path: Path
     source_kind: str
+    mode: str
     seed: int | None
     lobby_commands: str | None
     exit_at_tick: int | None
@@ -62,6 +75,8 @@ class RunSpec:
     forbidden_log_patterns: list[str]
     expected_artifacts: list[str]
     extra_args: list[str]
+    support_maps: list[Path]
+    readiness: ReadinessSpec | None
 
 
 @dataclass
@@ -79,6 +94,13 @@ class ActiveRun:
     last_tick: int = 0
     timed_out: bool = False
     interrupted: bool = False
+    readiness_state: str = "not-configured"
+    readiness_reason: str | None = None
+    readiness_observed_actor: list[str] = field(default_factory=list)
+    readiness_observed_build: list[str] = field(default_factory=list)
+    readiness_marker_count: int = 0
+    readiness_tick: int | None = None
+    readiness_seconds: float | None = None
 
 
 @dataclass
@@ -172,12 +194,17 @@ def load_manifest(path: Path, default_timeout: float) -> tuple[dict[str, Any], l
         if not source_path.is_file():
             raise ConfigurationError(f"Run '{name}' input does not exist: {source_path}")
 
+        mode = config.get("mode", "headless")
+        if mode not in ("headless", "paced"):
+            raise ConfigurationError(f"Run '{name}' mode must be 'headless' or 'paced'.")
+
         lobby_commands = config.get("lobby_commands")
         if source_kind == "map":
+            expected_speed = "max" if mode == "headless" else "normal"
             if not isinstance(lobby_commands, str) or not re.search(
-                r"(?:^|;)\s*option gamespeed max\s*(?:;|$)", lobby_commands, re.IGNORECASE
+                rf"(?:^|;)\s*option gamespeed {expected_speed}\s*(?:;|$)", lobby_commands, re.IGNORECASE
             ):
-                raise ConfigurationError(f"Run '{name}' map lobby_commands must select gamespeed max.")
+                raise ConfigurationError(f"Run '{name}' map lobby_commands must select gamespeed {expected_speed}.")
             if "\n" in lobby_commands or "\r" in lobby_commands:
                 raise ConfigurationError(f"Run '{name}' lobby_commands must not contain newlines.")
         elif lobby_commands is not None:
@@ -223,10 +250,69 @@ def load_manifest(path: Path, default_timeout: float) -> tuple[dict[str, Any], l
             if argument.startswith(ISOLATED_ARGUMENTS):
                 raise ConfigurationError(f"Run '{name}' cannot override isolated argument '{argument}'.")
 
+        support_maps = []
+        for support_map in string_list("support_maps"):
+            path = resolve_path(support_map, base)
+            if not path.is_file():
+                raise ConfigurationError(f"Run '{name}' support map does not exist: {path}")
+            support_maps.append(path)
+
+        readiness = None
+        readiness_config = config.get("readiness")
+        if readiness_config is not None:
+            if not isinstance(readiness_config, dict):
+                raise ConfigurationError(f"Run '{name}' readiness must be an object.")
+
+            def readiness_patterns(key: str) -> list[str]:
+                value = readiness_config.get(key)
+                if not isinstance(value, list) or not 0 < len(value) <= 16 or not all(
+                    isinstance(item, str) and item for item in value
+                ):
+                    raise ConfigurationError(
+                        f"Run '{name}' readiness {key} must contain 1 to 16 non-empty patterns."
+                    )
+                return value
+
+            actor_patterns = readiness_patterns("actor_log_patterns")
+            build_patterns = readiness_patterns("build_log_patterns")
+            ready_pattern = readiness_config.get("ready_log_pattern")
+            if not isinstance(ready_pattern, str) or not ready_pattern:
+                raise ConfigurationError(
+                    f"Run '{name}' readiness ready_log_pattern must be a non-empty string."
+                )
+            readiness_timeout = readiness_config.get("timeout_seconds")
+            if not isinstance(readiness_timeout, (int, float)) or not 0 < readiness_timeout < timeout_seconds:
+                raise ConfigurationError(
+                    f"Run '{name}' readiness timeout_seconds must be positive and below timeout_seconds."
+                )
+            readiness_tick = readiness_config.get("maximum_world_tick")
+            if readiness_tick is not None and (
+                not isinstance(readiness_tick, int) or readiness_tick < 1
+            ):
+                raise ConfigurationError(
+                    f"Run '{name}' readiness maximum_world_tick must be a positive integer."
+                )
+            for pattern in actor_patterns + build_patterns + [ready_pattern]:
+                try:
+                    re.compile(pattern)
+                except re.error as ex:
+                    raise ConfigurationError(
+                        f"Run '{name}' has an invalid readiness pattern '{pattern}': {ex}"
+                    ) from ex
+            if len(set(actor_patterns + build_patterns + [ready_pattern])) != (
+                len(actor_patterns) + len(build_patterns) + 1
+            ):
+                raise ConfigurationError(f"Run '{name}' readiness patterns must be distinct.")
+            readiness = ReadinessSpec(
+                actor_patterns, build_patterns, ready_pattern,
+                float(readiness_timeout), readiness_tick,
+            )
+
         specs.append(RunSpec(
             name=name,
             source_path=source_path,
             source_kind=source_kind,
+            mode=mode,
             seed=config.get("seed"),
             lobby_commands=lobby_commands,
             exit_at_tick=exit_at_tick,
@@ -238,6 +324,8 @@ def load_manifest(path: Path, default_timeout: float) -> tuple[dict[str, Any], l
             forbidden_log_patterns=forbidden_log_patterns,
             expected_artifacts=expected_artifacts,
             extra_args=extra_args,
+            support_maps=support_maps,
+            readiness=readiness,
         ))
 
         if specs[-1].seed is not None and not isinstance(specs[-1].seed, int):
@@ -275,6 +363,14 @@ def prepare_run(
     (support_dir / "Content").symlink_to(content, target_is_directory=True)
     create_settings(support_dir / "settings.yaml", settings_template)
 
+    if spec.support_maps:
+        if mod_version is None:
+            raise ConfigurationError("A CNC mod version is required to stage support maps.")
+        maps_dir = support_dir / "maps" / "cnc" / mod_version
+        maps_dir.mkdir(parents=True)
+        for support_map in spec.support_maps:
+            shutil.copy2(support_map, maps_dir / support_map.name)
+
     if spec.source_kind == "map":
         runtime_input = runtime_dir / "input.oramap"
         shutil.copy2(spec.source_path, runtime_input)
@@ -292,7 +388,7 @@ def prepare_run(
         str(launcher),
         f"Engine.SupportDir={support_dir}",
         "Debug.BotDebug=true",
-        "Launch.Headless=true",
+        f"Launch.{'Headless' if spec.mode == 'headless' else 'Paced'}=true",
         f"Launch.Benchmark={spec.name}-",
     ))
     if spec.source_kind == "map":
@@ -328,9 +424,96 @@ def read_evidence(run: ActiveRun) -> tuple[str, list[Path]]:
     return "\n".join(chunks), paths
 
 
-def maximum_world_tick(text: str) -> int:
-    ticks = [int(match.group(1)) for pattern in MAX_TICK_PATTERNS for match in pattern.finditer(text)]
+def maximum_world_tick(text: str, include_readiness: bool = False) -> int:
+    patterns = ENGINE_TICK_PATTERNS + ((READINESS_TICK_PATTERN,) if include_readiness else ())
+    ticks = [int(match.group(1)) for pattern in patterns for match in pattern.finditer(text)]
     return max(ticks, default=0)
+
+
+def update_readiness(run: ActiveRun, text: str, now: float) -> None:
+    spec = run.spec.readiness
+    if spec is None or run.readiness_state in ("ready", "failed"):
+        return
+
+    run.readiness_state = "pending"
+    actor_matches = {pattern: re.search(pattern, text, re.MULTILINE) for pattern in spec.actor_log_patterns}
+    build_matches = {pattern: re.search(pattern, text, re.MULTILINE) for pattern in spec.build_log_patterns}
+    ready_matches = list(re.finditer(spec.ready_log_pattern, text, re.MULTILINE))
+    fatal_match = FATAL_PATTERN.search(text)
+    run.readiness_observed_actor = [pattern for pattern, match in actor_matches.items() if match]
+    run.readiness_observed_build = [pattern for pattern, match in build_matches.items() if match]
+    run.readiness_marker_count = len(ready_matches)
+    elapsed = now - run.started_monotonic
+
+    if ready_matches:
+        first_ready = ready_matches[0].start()
+        evidence_matches = list(actor_matches.values()) + list(build_matches.values())
+        if fatal_match is not None and fatal_match.start() < first_ready:
+            run.readiness_state = "failed"
+            run.readiness_reason = "fatal/crash/desync signal before readiness"
+        elif any(match is None or match.start() > first_ready for match in evidence_matches):
+            run.readiness_state = "failed"
+            run.readiness_reason = "ready marker observed before all authoritative evidence"
+        elif len(ready_matches) != 1:
+            run.readiness_state = "failed"
+            run.readiness_reason = "ready marker observed more than once"
+        else:
+            run.readiness_state = "ready"
+            run.readiness_tick = run.last_tick
+            run.readiness_seconds = elapsed
+            return
+    elif fatal_match is not None:
+        run.readiness_state = "failed"
+        run.readiness_reason = "fatal/crash/desync signal before readiness"
+    elif spec.maximum_world_tick is not None and run.last_tick > spec.maximum_world_tick:
+        run.readiness_state = "failed"
+        run.readiness_reason = f"setup exceeded world tick {spec.maximum_world_tick}"
+    elif elapsed > spec.timeout_seconds:
+        run.readiness_state = "failed"
+        run.readiness_reason = f"setup exceeded {spec.timeout_seconds:g} seconds"
+
+    if run.readiness_state == "failed":
+        run.readiness_tick = run.last_tick
+        run.readiness_seconds = elapsed
+
+
+def readiness_summary(run: ActiveRun) -> dict[str, Any]:
+    spec = run.spec.readiness
+    if spec is None:
+        return {"configured": False, "state": "not-configured"}
+
+    return {
+        "configured": True,
+        "state": run.readiness_state,
+        "reason": run.readiness_reason,
+        "observed_actor_patterns": run.readiness_observed_actor,
+        "missing_actor_patterns": [
+            pattern for pattern in spec.actor_log_patterns
+            if pattern not in run.readiness_observed_actor
+        ],
+        "observed_build_patterns": run.readiness_observed_build,
+        "missing_build_patterns": [
+            pattern for pattern in spec.build_log_patterns
+            if pattern not in run.readiness_observed_build
+        ],
+        "ready_marker_count": run.readiness_marker_count,
+        "maximum_world_tick": run.readiness_tick,
+        "duration_seconds": round(run.readiness_seconds, 3)
+        if run.readiness_seconds is not None else None,
+    }
+
+
+def finalize_readiness(run: ActiveRun, text: str) -> None:
+    spec = run.spec.readiness
+    if spec is None or run.readiness_state != "ready":
+        return
+
+    run.readiness_marker_count = len(list(re.finditer(spec.ready_log_pattern, text, re.MULTILINE)))
+    if run.readiness_marker_count != 1:
+        run.readiness_state = "failed"
+        run.readiness_reason = "ready marker observed more than once"
+        run.readiness_tick = maximum_world_tick(text, include_readiness=True)
+        run.readiness_seconds = time.monotonic() - run.started_monotonic
 
 
 def terminate_process(run: ActiveRun, grace_seconds: float = 10) -> None:
@@ -356,7 +539,9 @@ def relative_files(root: Path, pattern: str) -> list[str]:
 def finalize_run(run: ActiveRun) -> dict[str, Any]:
     run.console_file.close()
     text, log_paths = read_evidence(run)
-    tick = maximum_world_tick(text)
+    finalize_readiness(run, text)
+    tick = maximum_world_tick(text, include_readiness=run.spec.readiness is not None)
+    engine_tick = maximum_world_tick(text)
     duration = time.monotonic() - run.started_monotonic
     required = {
         pattern: re.search(pattern, text, re.MULTILINE) is not None
@@ -374,26 +559,39 @@ def finalize_run(run: ActiveRun) -> dict[str, Any]:
 
     reasons = []
     exit_code = run.process.returncode
+    if run.spec.readiness is not None and run.readiness_state != "ready":
+        reason = run.readiness_reason or "process exited before readiness"
+        reasons.append(f"setup failed: {reason}")
     if run.interrupted:
         reasons.append("batch interrupted")
     if run.timed_out:
         reasons.append("timeout")
     if exit_code != 0:
         reasons.append(f"exit code {exit_code}")
-    if HEADLESS_MARKER not in text:
-        reasons.append("headless activation marker missing")
-    if MAX_MARKER not in text:
-        reasons.append("MAX activation marker missing")
-    if STARTED_MARKER not in text:
+    if run.spec.mode == "headless":
+        if HEADLESS_MARKER not in text:
+            reasons.append("headless activation marker missing")
+        if MAX_MARKER not in text:
+            reasons.append("MAX activation marker missing")
+    elif PACED_MARKER not in text:
+        reasons.append("paced activation marker missing")
+    started_marker = STARTED_MARKER if run.spec.mode == "headless" else "Paced rendered automation started map"
+    if started_marker not in text:
         reasons.append("actual map/bot start marker missing")
-    exit_marker = BOUNDED_MARKER if run.spec.exit_at_tick is not None else NATURAL_MARKER
+    if run.spec.mode == "paced":
+        exit_marker = (
+            "Paced rendered automation reached configured exit"
+            if run.spec.exit_at_tick is not None else "Paced rendered automation reached natural game over"
+        )
+    else:
+        exit_marker = BOUNDED_MARKER if run.spec.exit_at_tick is not None else NATURAL_MARKER
     if exit_marker not in text:
         reasons.append(
             "configured exit marker missing"
             if run.spec.exit_at_tick is not None else "natural game-over marker missing"
         )
-    if tick < run.spec.minimum_world_tick:
-        reasons.append(f"world tick {tick} below required {run.spec.minimum_world_tick}")
+    if engine_tick < run.spec.minimum_world_tick:
+        reasons.append(f"world tick {engine_tick} below required {run.spec.minimum_world_tick}")
     if not benchmark_files:
         reasons.append("benchmark output missing")
     if any(not matched for matched in required.values()):
@@ -412,10 +610,13 @@ def finalize_run(run: ActiveRun) -> dict[str, Any]:
         "exit_code": exit_code,
         "duration_seconds": round(duration, 3),
         "maximum_world_tick": tick,
+        "maximum_engine_world_tick": engine_tick,
+        "valid_world_ticks": tick if not reasons else 0,
         "started_utc": run.started_utc,
         "finished_utc": datetime.now(timezone.utc).isoformat(),
         "display_start": run.display_start,
         "network_endpoint": "engine-assigned ephemeral loopback",
+        "mode": run.spec.mode,
         "source_copy": str(run.runtime_input),
         "support_directory": str(run.support_dir),
         "logs": [str(path.relative_to(run.run_dir)) for path in log_paths if path.exists()],
@@ -425,6 +626,7 @@ def finalize_run(run: ActiveRun) -> dict[str, Any]:
         "required_log_patterns": required,
         "forbidden_log_patterns": forbidden,
         "expected_artifacts": artifacts,
+        "readiness": readiness_summary(run),
     }
     (run.run_dir / "summary.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     return result
@@ -473,7 +675,7 @@ def write_batch_summary(
     interrupted: bool,
 ) -> None:
     duration = time.monotonic() - started
-    valid_ticks = sum(result["maximum_world_tick"] for result in results if result["status"] == "passed")
+    valid_ticks = sum(result.get("valid_world_ticks", 0) for result in results)
     summary = {
         "status": "passed"
         if results and all(result["status"] == "passed" for result in results) and not interrupted
@@ -559,7 +761,12 @@ def run_batch(
             now = time.monotonic()
             for run in list(state.active):
                 text, _ = read_evidence(run)
-                run.last_tick = maximum_world_tick(text)
+                run.last_tick = maximum_world_tick(
+                    text, include_readiness=run.spec.readiness is not None
+                )
+                update_readiness(run, text, now)
+                if run.process.poll() is None and run.readiness_state == "failed":
+                    terminate_process(run)
                 if run.process.poll() is None and now - run.started_monotonic > run.spec.timeout_seconds:
                     run.timed_out = True
                     terminate_process(run)

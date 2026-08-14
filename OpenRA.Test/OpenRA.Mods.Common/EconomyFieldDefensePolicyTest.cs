@@ -279,5 +279,92 @@ namespace OpenRA.Test
 			Assert.That(EconomyFieldDefensePolicy.RestoredScanTicks(
 				nextScanTick, currentWorldTick, scanInterval), Is.EqualTo(expected));
 		}
+
+		[Test]
+		public void DirtyAssignmentsDeduplicateAndDrainDeterministically()
+		{
+			var dirty = new EconomyFieldDefenseDirtyAssignments();
+			Assert.That(dirty.Enqueue(20, 8), Is.True);
+			Assert.That(dirty.Enqueue(10, 9), Is.True);
+			Assert.That(dirty.Enqueue(10, 7), Is.True);
+			Assert.That(dirty.Enqueue(10, 7), Is.False,
+				"Repeated harmless hits must not create repeated validity work.");
+
+			var pending = dirty.Drain();
+			Assert.That(pending.Select(item => (item.FieldId, item.ActorId)), Is.EqualTo(new[]
+			{
+				(10u, 7u), (10u, 9u), (20u, 8u)
+			}));
+			Assert.That(dirty.Count, Is.Zero);
+		}
+
+		[Test]
+		public void DirtyAssignmentSnapshotsPreservePendingSaveWork()
+		{
+			var beforeSave = new EconomyFieldDefenseDirtyAssignments();
+			beforeSave.Enqueue(10, 7);
+			beforeSave.Enqueue(20, 8);
+
+			var loaded = new EconomyFieldDefenseDirtyAssignments();
+			foreach (var item in beforeSave.Snapshot())
+				loaded.Enqueue(item.FieldId, item.ActorId);
+
+			Assert.That(loaded.Drain().Select(item => (item.FieldId, item.ActorId)),
+				Is.EqualTo(new[] { (10u, 7u), (20u, 8u) }));
+		}
+
+		[Test]
+		public void DetectedDuplicateUpgradesTargetlessPendingDirtyEvent()
+		{
+			var dirty = new EconomyFieldDefenseDirtyAssignments();
+			var reasons = new Dictionary<uint, string>();
+			var enemyTargets = new Dictionary<uint, CPos>();
+			Assert.That(dirty.Enqueue(10, 7), Is.True);
+			reasons[7] = "assigned-guard-attacked";
+
+			Assert.That(dirty.Enqueue(10, 7), Is.False,
+				"The actionable callback must merge into the existing deterministic queue entry.");
+			Assert.That(EconomyFieldDefensePolicy.MergeDetectedDirtyEvent(7,
+				"associated-harvester-attacked", new CPos(20, 21), reasons, enemyTargets), Is.True);
+			Assert.That(reasons[7], Is.EqualTo("associated-harvester-attacked"));
+			Assert.That(enemyTargets[7], Is.EqualTo(new CPos(20, 21)));
+			Assert.That(dirty.Drain().Select(item => (item.FieldId, item.ActorId)),
+				Is.EqualTo(new[] { (10u, 7u) }),
+				"Upgrading the target must not enqueue duplicate validity work.");
+		}
+
+		[Test]
+		public void TargetlessDuplicateDoesNotErasePendingDetectedEvent()
+		{
+			var reasons = new Dictionary<uint, string> { { 7, "associated-harvester-attacked" } };
+			var enemyTargets = new Dictionary<uint, CPos> { { 7, new CPos(20, 21) } };
+
+			Assert.That(EconomyFieldDefensePolicy.MergeDetectedDirtyEvent(7,
+				"assigned-guard-attacked", null, reasons, enemyTargets), Is.False);
+			Assert.That(reasons[7], Is.EqualTo("associated-harvester-attacked"));
+			Assert.That(enemyTargets[7], Is.EqualTo(new CPos(20, 21)));
+		}
+
+		[TestCase(10, 10, 10, 10, 2, false)]
+		[TestCase(10, 10, 12, 10, 2, false)]
+		[TestCase(10, 10, 13, 10, 2, true)]
+		[TestCase(10, 10, 10, 13, 2, true)]
+		public void UrgentAttackMovesRequireAMateriallyNewEnemyCell(
+			int previousX, int previousY, int currentX, int currentY, int radius, bool expected)
+		{
+			Assert.That(EconomyFieldDefensePolicy.IsMateriallyNewUrgentTarget(
+				new CPos(previousX, previousY), new CPos(currentX, currentY), radius), Is.EqualTo(expected));
+		}
+
+		[TestCase(101, 100, 25, false)]
+		[TestCase(124, 100, 25, false)]
+		[TestCase(125, 100, 25, true)]
+		[TestCase(150, 100, 25, true)]
+		public void UrgentAttackMovesRespectConfiguredOrderInterval(
+			int currentTick, int lastOrderTick, int orderInterval, bool expected)
+		{
+			Assert.That(EconomyFieldDefensePolicy.UrgentOrderIntervalElapsed(
+				currentTick, lastOrderTick, orderInterval), Is.EqualTo(expected));
+		}
 	}
 }

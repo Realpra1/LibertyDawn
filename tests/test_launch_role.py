@@ -44,8 +44,14 @@ class LaunchRoleTest(unittest.TestCase):
         elif role in launch_role.POLICY_ROLES:
             task_context = inputs / "TASK-CONTEXT.md"
             narrative = inputs / "NARRATIVE.md"
+            scratchpad = inputs / "POLICY-SCRATCHPAD.md"
             task_context.write_text("Task CNC-87\n", encoding="utf-8")
             narrative.write_text("Factual narrative\n", encoding="utf-8")
+            shutil.copyfile(
+                REPO_ROOT
+                / ".agents/references/LIBERTY-DAWN-POLICY-SCRATCHPAD.md",
+                scratchpad,
+            )
             job = {
                 "design_reference": str(
                     REPO_ROOT / ".agents/references/LIBERTY-DAWN-DESIGN.md"
@@ -169,7 +175,7 @@ class LaunchRoleTest(unittest.TestCase):
         fake.chmod(0o755)
         return fake_bin
 
-    def test_foreground_fake_exit_and_background_supervision_metadata(self):
+    def test_foreground_fake_exit_and_policy_background_rejection(self):
         failed_args = self.make_args("commenter")
         environment = dict(__import__("os").environ)
         environment["PATH"] = f"{self.make_fake_codex(7)}:{environment['PATH']}"
@@ -197,14 +203,39 @@ class LaunchRoleTest(unittest.TestCase):
         self.assertEqual(failed_process["status"], "failed")
         self.assertEqual(failed_process["exit_code"], 7)
 
-        background_args = self.make_args("policy-reviewer")
+        policy_args = self.make_args("policy-reviewer")
+        blocked = subprocess.run(
+            [
+                sys.executable,
+                str(LAUNCHER_PATH),
+                "--role",
+                "policy-reviewer",
+                "--worktree",
+                str(REPO_ROOT),
+                "--job-file",
+                str(policy_args.job_file),
+                "--output-dir",
+                str(policy_args.output_dir),
+                "--background",
+            ],
+            env=environment,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(blocked.returncode, 64)
+        self.assertIn("require foreground launch", blocked.stderr)
+        self.assertFalse((policy_args.output_dir / "supervisor.json").exists())
+
+    def test_background_supervision_metadata(self):
+        background_args = self.make_args("commenter")
+        environment = dict(__import__("os").environ)
         environment["PATH"] = f"{self.make_fake_codex(0)}:{environment['PATH']}"
         launched = subprocess.run(
             [
                 sys.executable,
                 str(LAUNCHER_PATH),
                 "--role",
-                "policy-reviewer",
+                "commenter",
                 "--worktree",
                 str(REPO_ROOT),
                 "--job-file",
@@ -239,7 +270,7 @@ class LaunchRoleTest(unittest.TestCase):
         self.assertEqual(value["output_dir"], str(background_args.output_dir))
         self.assertTrue(value["supervised"])
         self.assertEqual(value["supervisor_pid"], supervisor["pid"])
-        self.assertEqual(supervisor["role"], "policy-reviewer")
+        self.assertEqual(supervisor["role"], "commenter")
         self.assertEqual(supervisor["model"], "gpt-5.6-terra")
         self.assertEqual(supervisor["reasoning_effort"], "medium")
         self.assertEqual(supervisor["sandbox"], "workspace-write")

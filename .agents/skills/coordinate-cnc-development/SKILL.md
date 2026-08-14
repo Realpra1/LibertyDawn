@@ -120,6 +120,14 @@ Policy Reviewer directory as `inputs/NARRATIVE.md`; do not use symlinks. Stage a
 short `inputs/TASK-CONTEXT.md` containing task identity, why, change category,
 in/out-of-scope behavior, and explicit balance authority. The
 launcher rejects analysis inputs outside these staged roots.
+Also stage the canonical policy scratchpad as the regular file
+`inputs/POLICY-SCRATCHPAD.md` while holding the shared capacity-one
+`policy-scratchpad` resource slot. Every successful policy role must freshly write
+both `POLICY-REVIEW.md` and a complete `POLICY-SCRATCHPAD.md` replacement. The
+launcher validates both as non-symlink regular UTF-8 files, limits the replacement
+to 3,000 Unicode characters, and atomically promotes it before publishing success.
+Keep the slot held through foreground completion; invalid output leaves the
+canonical scratchpad unchanged.
 Run the launcher with `--validate-cli` for a no-agent smoke against the installed
 Codex parser. This retains every constructed option, substitutes parser help only
 for the free-form prompt, and proves a legacy approval option is rejected. Use
@@ -185,7 +193,7 @@ an existing task require a new or revised spec before selection.
   select their ownership role but cannot select a filename or capacity:
 
   ```text
-  python3 scripts/with_resource_slots.py --lock-dir <absolute-round-lock-dir> \
+  python3 scripts/with_resource_slots.py --lock-dir <repository-root>/.agents/locks \
     --large-build-entry worker -- COMMAND...
   ```
 
@@ -198,7 +206,16 @@ an existing task require a new or revised spec before selection.
   then terminates and reaps persistent build servers before releasing. Do not use
   direct `flock` or generic `--resource large-build`.
 - Continue to use generic `scripts/with_resource_slots.py` reservations for game
-  batches; games retain independent capacity two.
+  batches; games retain independent capacity two. `game`, `large-build`, and
+  `policy-scratchpad` are registered repository-global resources. Every round and
+  worktree must pass the main repository's canonical `.agents/locks` directory;
+  the helper rejects alternate namespaces and caller-selected capacities before
+  opening a lock. Retained JSON is last-known metadata only; use `--status` for an
+  authoritative nonblocking flock snapshot of a registered resource.
+- Serialize every Policy Reviewer scratchpad staging, foreground role completion,
+  validation, and promotion with `--resource policy-scratchpad --capacity 1`
+  against that same canonical namespace. Do not background the protected role or
+  release the slot before promotion finishes.
 - A worker may reserve two game slots for a two-game comparison. Use the existing
   `launch-ai-parallel.py` inside the reservation.
 - Keep every game's support directory, logs, saves, replay, map artifact, port,

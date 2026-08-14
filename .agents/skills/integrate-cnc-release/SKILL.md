@@ -24,7 +24,8 @@ a merge conflict or integrated failure requires it.
 5. Run strict build/unit/static checks and inspect the combined diff. Route every
    large build, full test/check suite, equivalent `dotnet`/`msbuild` suite, and
    packaging build through the coordinator helper's protected
-   `--large-build-entry integrator` mode with the round's absolute lock directory;
+   `--large-build-entry integrator` mode with the main repository's canonical
+   `.agents/locks` directory;
    never reconstruct a lock filename/capacity or invoke direct `flock`. Push the
    stable release branch and open one draft release PR targeting `bleed`. Keep
    source PRs open. Every later RC updates this same branch and PR.
@@ -106,7 +107,8 @@ the safest proven subset/result and report unresolved tasks as first iteration.
   feature MAX cannot prove. Reject sole reliance on reloaded states.
 - Use `with_resource_slots.py --large-build-entry integrator` for the global
   capacity-one build slot, generic capacity-two `game` reservations for games,
-  and isolated MAX-game support directories.
+  the main repository's canonical `.agents/locks` namespace for both, and isolated
+  MAX-game support directories.
 - Record release heads, merge order, conflicts, tests, repairs, exclusions,
   old-control comparisons, and remaining risks in the integration state.
 - Send final structured receipts to the Task Maker. Promote the draft release PR

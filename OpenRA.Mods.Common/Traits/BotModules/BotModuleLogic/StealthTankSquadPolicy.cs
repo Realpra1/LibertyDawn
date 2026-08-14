@@ -7,24 +7,89 @@
 #endregion
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace OpenRA.Mods.Common.Traits
 {
 	public enum StealthTankSquadRole { Harass, Attack }
+	public enum SpecialistDefenderClearAction { None, CrushInfantry, SnipeTank, AttackUnarmedDetector }
+	public enum SpecialistRepairDisposition { Active, Repair, Rejoin }
+	public enum StealthTankPlanInvalidation
+	{
+		None,
+		TargetChanged,
+		MembershipChanged,
+		TargetMoved,
+		RouteUnsafe,
+		NoProgress
+	}
 
 	public static class StealthTankSquadPolicy
 	{
+		public static bool ShouldRunStrategicScan(ref int countdown, int interval)
+		{
+			if (--countdown > 0)
+				return false;
+
+			countdown = Math.Max(1, interval);
+			return true;
+		}
+
+		public static bool ShouldRefreshStrategicView(int cachedTick, int currentTick)
+		{
+			return cachedTick != currentTick;
+		}
+
+		public static bool ShouldRefreshInfluenceMap(int cachedTick, int currentTick, int interval)
+		{
+			return cachedTick == int.MinValue || currentTick - cachedTick >= Math.Max(1, interval);
+		}
+
+		public static StealthTankPlanInvalidation ClassifyPlanInvalidation(bool hasPlan,
+			bool targetChanged, bool membershipChanged, bool targetMoved, bool routeUnsafe,
+			int currentTick, int lastProgressTick, int retryInterval)
+		{
+			if (!hasPlan || targetChanged)
+				return StealthTankPlanInvalidation.TargetChanged;
+			if (membershipChanged)
+				return StealthTankPlanInvalidation.MembershipChanged;
+			if (targetMoved)
+				return StealthTankPlanInvalidation.TargetMoved;
+			if (routeUnsafe)
+				return StealthTankPlanInvalidation.RouteUnsafe;
+			if (currentTick >= lastProgressTick + Math.Max(1, retryInterval))
+				return StealthTankPlanInvalidation.NoProgress;
+
+			return StealthTankPlanInvalidation.None;
+		}
+
 		public static int SpecialistCount(int total, bool reserveOpeningPair = true)
 		{
+			return SpecialistCount(total, reserveOpeningPair, 0);
+		}
+
+		public static int SpecialistCount(int total, bool reserveOpeningPair, int retainedSpecialists)
+		{
 			if (total < 2)
-				return 0;
+				return total > 0 && retainedSpecialists > 0 ? 1 : 0;
 			if (!reserveOpeningPair)
 				return (total + 1) / 2;
 			if (total < 4)
 				return 2;
 
 			return total / 2;
+		}
+
+		public static uint[] SelectSpecialistIds(IEnumerable<uint> eligibleIds,
+			IEnumerable<uint> previouslyOwnedIds, bool reserveOpeningPair = true)
+		{
+			var eligible = eligibleIds.Distinct().OrderBy(id => id).ToArray();
+			var owned = new HashSet<uint>(previouslyOwnedIds);
+			var retained = eligible.Count(owned.Contains);
+			var desired = SpecialistCount(eligible.Length, reserveOpeningPair, retained);
+			return eligible.Where(owned.Contains).Concat(eligible.Where(id => !owned.Contains(id)))
+				.Take(desired).ToArray();
 		}
 
 		public static int GroupForIndex(int index, int specialistCount,
@@ -102,9 +167,81 @@ namespace OpenRA.Mods.Common.Traits
 				.First();
 		}
 
+		public static SpecialistDefenderClearAction DefenderClearAction(bool isInfantry, bool isTank,
+			bool canCrushInfantry, int packageDefenderCount, int ownRangeCells,
+			int defenderWeaponRangeCells, int defenderDetectorRangeCells, int safetyMarginCells)
+		{
+			if (isInfantry && canCrushInfantry && packageDefenderCount == 1 && defenderDetectorRangeCells <= 0)
+				return SpecialistDefenderClearAction.CrushInfantry;
+
+			if (isTank && defenderWeaponRangeCells > 0 && defenderDetectorRangeCells <= 0 &&
+				ownRangeCells >= defenderWeaponRangeCells + Math.Max(0, safetyMarginCells))
+				return SpecialistDefenderClearAction.SnipeTank;
+
+			// A lone detector cannot punish revealed fire. Keep this deliberately narrower
+			// than ordinary structure targeting: it is only a fallback blocker capability,
+			// and any overlapping armed defender makes packageDefenderCount greater than one.
+			if (packageDefenderCount == 1 && defenderWeaponRangeCells <= 0 &&
+				defenderDetectorRangeCells > 0 && ownRangeCells > 0)
+				return SpecialistDefenderClearAction.AttackUnarmedDetector;
+
+			return SpecialistDefenderClearAction.None;
+		}
+
+		public static SpecialistRepairDisposition RepairDisposition(bool damagedBelowThreshold,
+			bool isRepairing, bool fullyRepaired, bool hasCompatibleReachableRepair)
+		{
+			if (isRepairing && fullyRepaired)
+				return SpecialistRepairDisposition.Rejoin;
+			if (damagedBelowThreshold && hasCompatibleReachableRepair)
+				return SpecialistRepairDisposition.Repair;
+
+			// No compatible reachable facility is never a parking state. A damaged
+			// specialist remains owned by, and active in, its combat squad.
+			return SpecialistRepairDisposition.Active;
+		}
+
+		public static TInfluence ResolveRepairInfluence<TFacts, TInfluence>(TFacts sharedThreatFacts,
+			Func<TFacts, TInfluence> getPrivateInfluence)
+			where TFacts : class
+			where TInfluence : class
+		{
+			// Threat facts belong to the elected shared-view owner. Their interpretation and
+			// cache belong to the profile that is currently evaluating its repair route.
+			return sharedThreatFacts == null ? null : getPrivateInfluence(sharedThreatFacts);
+		}
+
 		public static int BufferedRange(int rangeCells, int bufferCells)
 		{
 			return rangeCells > 0 ? rangeCells + Math.Max(0, bufferCells) : 0;
+		}
+
+		public static bool CanOutrangeTargetDetector(bool threatIsTarget, int weaponRangeCells,
+			int detectorRangeCells, int ownRangeCells)
+		{
+			return threatIsTarget && weaponRangeCells <= 0 && detectorRangeCells > 0 &&
+				ownRangeCells > detectorRangeCells;
+		}
+
+		public static bool IsEngagementThreat(bool detectorExposure, bool armedCoverage,
+			bool engagedWeaponExposure)
+		{
+			// Firing reveals a Stealth Tank, so detection alone cannot punish an engagement.
+			// Keep the existing immediate response to a weapon that is already engaged, and
+			// otherwise require detector and ground-weapon coverage to overlap the firing cell.
+			return engagedWeaponExposure || (detectorExposure && armedCoverage);
+		}
+
+		public static bool ShouldResumeSuspendedEngagement(bool wasAlreadySuspended, bool hasValidTarget,
+			bool localThreatExposure, bool resourceHazard)
+		{
+			return wasAlreadySuspended && hasValidTarget && !localThreatExposure && !resourceHazard;
+		}
+
+		public static bool ShouldRetainActiveEngagement(bool hasValidTarget, bool isEngaged,
+			bool localThreatExposure, bool resourceHazard)
+		{
+			return hasValidTarget && isEngaged && !localThreatExposure && !resourceHazard;
 		}
 
 		public static int TransitThreatRange(int detectorRangeCells, int weaponRangeCells,
