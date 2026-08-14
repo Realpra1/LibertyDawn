@@ -1,8 +1,8 @@
 # CNC-106 Final Review
 
-Verdict: response ready for independent re-review
+Verdict: READY for cumulative integration
 
-## Required fix
+## Original required fix (resolved)
 
 **High — provide the required independent Terra review trail for both Cycle 4
 AI-policy games.** The handoff records a Luna narration and Luna policy review
@@ -46,3 +46,34 @@ the exact 306-credit expected refund in both games. The handoff also now limits
 its lifecycle claim to the observed live-Harvester transitions. No product,
 balance, configuration, or additional-game change is justified by these evidence
 limits. A fresh independent final verdict is requested against this response.
+
+## Fresh Terra final re-review
+
+- Reviewed commit: `507c41e38a1548ba2efe1e826a030ab0b3cfd197`
+- Final verdict: **READY for cumulative integration**
+- Required fix: `none`
+
+The former final-review blocker is resolved.  The handoff now contains one fresh,
+role-bounded factual narration and one fresh policy review for each Cycle 4
+ordinary-AI game.  Both narratives independently record the bounded tick-3000
+run, tick-601 no-paid-progress activation, one cancellation-resolution event at
+tick 626 with zero unresolved and the stated refund amount, tick-1201 exit wait,
+tick-1226 release only after one live Harvester, subsequent ordinary queue
+progress/completions, and no fatal Lua/desync marker.  They deliberately limit
+their claims where actor-level unload/loss evidence is absent.
+
+Both policy reviews assess the observed recovery as compatible with the frozen
+economy/survival design and label their only recommendation `advisory`:
+distinguish activation cancellation attempts from tracked resolution entries and
+add lifecycle markers when a fixture needs them.  The STATE/REPORT explicitly
+disposition both recommendations as accepted documentation limits, not product,
+policy, balance, configuration, or additional-game work.  That disposition is
+appropriate: the evidence establishes neither a duplicate refund nor premature
+release.
+
+The current diff preserves the selected item through active and Done/awaiting-exit
+states, serializes that bounded state, and exposes one ordinary-production gate
+to both base and unit production.  The focused four-state gate regression, the
+recorded `49/49` focused tests, Release build/MiniYAML checks, diff check, and the
+two full-engine results support `Complete - testing`.  No new concrete
+release-safety or task-contract defect was found.
