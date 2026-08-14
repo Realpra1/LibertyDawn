@@ -213,5 +213,67 @@ namespace OpenRA.Test
 			Assert.That(lookups, Is.EqualTo(9));
 			Assert.That(crossover, Is.EqualTo(System.Math.Sqrt(558d / 156)).Within(0.000001));
 		}
+
+		[Test]
+		public void MixedGroupCrossoverSupportsFewerThanThreeTypes()
+		{
+			var ours = new[]
+			{
+				new GeneralizedCombatThreatCalculator.GroupTypeCount("a", 2, 100)
+			};
+			var theirs = new[]
+			{
+				new GeneralizedCombatThreatCalculator.GroupTypeCount("x", 3, 100),
+				new GeneralizedCombatThreatCalculator.GroupTypeCount("y", 1, 100)
+			};
+			var lookups = 0;
+
+			var crossover = GeneralizedCombatThreatCalculator.EstimateMixedGroupCrossover(ours, theirs,
+				(ourType, theirType) =>
+				{
+					lookups++;
+					return theirType == "x" ? 4 : 1;
+				});
+
+			Assert.That(lookups, Is.EqualTo(2));
+			Assert.That(crossover, Is.EqualTo(System.Math.Sqrt(13d / 4)).Within(0.000001));
+		}
+
+		[Test]
+		public void ShouldEngageUsesSafetyFactorAndMinimumEnemyShare()
+		{
+			var tenOurs = new[]
+			{
+				new GeneralizedCombatThreatCalculator.GroupTypeCount("a", 10, 100)
+			};
+			var fifteenOurs = new[]
+			{
+				new GeneralizedCombatThreatCalculator.GroupTypeCount("a", 15, 100)
+			};
+			var tenTheirs = new[]
+			{
+				new GeneralizedCombatThreatCalculator.GroupTypeCount("x", 10, 100)
+			};
+
+			Assert.That(GeneralizedCombatThreatCalculator.ShouldEngageMixedGroups(tenOurs, tenTheirs,
+				(ourType, theirType) => 1), Is.False);
+			Assert.That(GeneralizedCombatThreatCalculator.ShouldEngageMixedGroups(fifteenOurs, tenTheirs,
+				(ourType, theirType) => 1), Is.True);
+			Assert.That(GeneralizedCombatThreatCalculator.ShouldEngageMixedGroups(tenOurs, tenTheirs,
+				(ourType, theirType) => 1, safetyFactor: 1), Is.True);
+
+			var oneOur = new[]
+			{
+				new GeneralizedCombatThreatCalculator.GroupTypeCount("a", 1, 100)
+			};
+			var twentyTheirs = new[]
+			{
+				new GeneralizedCombatThreatCalculator.GroupTypeCount("x", 20, 100)
+			};
+			Assert.That(GeneralizedCombatThreatCalculator.ShouldEngageMixedGroups(oneOur, twentyTheirs,
+				(ourType, theirType) => 0.0001), Is.False);
+			Assert.That(GeneralizedCombatThreatCalculator.ShouldEngageMixedGroups(tenOurs, twentyTheirs,
+				(ourType, theirType) => 0.0001), Is.True);
+		}
 	}
 }

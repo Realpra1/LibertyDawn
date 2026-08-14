@@ -225,6 +225,52 @@ namespace OpenRA.Mods.Common.Traits
 				});
 		}
 
+		/// <summary>
+		/// Applies a caller-adjustable engagement policy to the raw mixed-group crossover.
+		/// The minimum percentage is a floor on our unit count relative to theirs, not an
+		/// adjustment to the cached matchup ratings.
+		/// </summary>
+		public bool ShouldEngageMixedGroups(IEnumerable<GroupTypeCount> ourGroup,
+			IEnumerable<GroupTypeCount> theirGroup, double safetyFactor = 1.5,
+			double minimumEngagePercentage = 0.1)
+		{
+			bool IsCachedCombatType(GroupTypeCount type)
+			{
+				return type.ActorType != null && cache.ContainsKey(CanonicalKey(type.ActorType, type.ActorType));
+			}
+
+			return ShouldEngageMixedGroups(ourGroup.Where(IsCachedCombatType), theirGroup.Where(IsCachedCombatType),
+				(ourType, theirType) =>
+				{
+					if (!TryGet(ourType, theirType, out var threat))
+						throw new InvalidOperationException($"No cached matchup exists for {ourType}/{theirType}.");
+
+					return threat.DefenderThreatInAttackerEquivalents;
+				}, safetyFactor, minimumEngagePercentage);
+		}
+
+		public static bool ShouldEngageMixedGroups(IEnumerable<GroupTypeCount> ourGroup,
+			IEnumerable<GroupTypeCount> theirGroup, Func<string, string, double> theirThreatToUs,
+			double safetyFactor = 1.5, double minimumEngagePercentage = 0.1)
+		{
+			if (!double.IsFinite(safetyFactor) || safetyFactor < 0)
+				throw new ArgumentOutOfRangeException(nameof(safetyFactor));
+
+			if (!double.IsFinite(minimumEngagePercentage) || minimumEngagePercentage < 0)
+				throw new ArgumentOutOfRangeException(nameof(minimumEngagePercentage));
+
+			var ours = NormalizeTypes(ourGroup);
+			var theirs = NormalizeTypes(theirGroup);
+			if (ours.Length == 0 || theirs.Length == 0)
+				return false;
+
+			var crossover = EstimateMixedGroupCrossover(ours, theirs, theirThreatToUs);
+			var ourCount = ours.Sum(t => (long)t.Count);
+			var theirCount = theirs.Sum(t => (long)t.Count);
+			var requiredRatio = Math.Max(crossover * safetyFactor, minimumEngagePercentage);
+			return ourCount >= theirCount * requiredRatio;
+		}
+
 		public static double EstimateMixedGroupCrossover(IEnumerable<GroupTypeCount> ourGroup,
 			IEnumerable<GroupTypeCount> theirGroup, Func<string, string, double> theirThreatToUs)
 		{
@@ -261,13 +307,21 @@ namespace OpenRA.Mods.Common.Traits
 
 		static GroupTypeCount[] RepresentativeTypes(IEnumerable<GroupTypeCount> group)
 		{
-			return group.Where(t => t.ActorType != null && t.Count > 0)
-				.GroupBy(t => t.ActorType, StringComparer.OrdinalIgnoreCase)
-				.Select(types => new GroupTypeCount(types.Key, types.Sum(t => t.Count),
-					types.Select(t => t.EconomicValue).DefaultIfEmpty(0).Max()))
+			return NormalizeTypes(group)
 				.OrderByDescending(t => t.EconomicMass)
 				.ThenBy(t => t.ActorType, StringComparer.Ordinal)
 				.Take(MixedGroupRepresentativeTypes).ToArray();
+		}
+
+		static GroupTypeCount[] NormalizeTypes(IEnumerable<GroupTypeCount> group)
+		{
+			if (group == null)
+				throw new ArgumentNullException(nameof(group));
+
+			return group.Where(t => t.ActorType != null && t.Count > 0)
+				.GroupBy(t => t.ActorType, StringComparer.OrdinalIgnoreCase)
+				.Select(types => new GroupTypeCount(types.Key, types.Sum(t => t.Count),
+					types.Select(t => t.EconomicValue).DefaultIfEmpty(0).Max())).ToArray();
 		}
 
 		/// <summary>
