@@ -335,10 +335,6 @@ namespace OpenRA.Test
 		[Test]
 		public void OneTypeAttackerIncludesGuardTowerFourthEnemyType()
 		{
-			var ours = new[]
-			{
-				new GeneralizedCombatThreatCalculator.GroupTypeCount("e1", 102, 120)
-			};
 			var theirs = new[]
 			{
 				new GeneralizedCombatThreatCalculator.GroupTypeCount("e3", 8, 250),
@@ -351,12 +347,13 @@ namespace OpenRA.Test
 				{ "e3", 0.127273 }, { "bike", 3.428571 }, { "mtnk", 85.25 }, { "gtwr", 200 }
 			};
 			var lookups = 0;
-
-			var engage = GeneralizedCombatThreatCalculator.ShouldEngageMixedGroups(ours, theirs,
+			bool EngageWithRifles(int count) => GeneralizedCombatThreatCalculator.ShouldEngageMixedGroups(
+				new[] { new GeneralizedCombatThreatCalculator.GroupTypeCount("e1", count, 120) }, theirs,
 				(ourType, theirType) => { lookups++; return ratings[theirType]; });
 
-			Assert.That(lookups, Is.EqualTo(4));
-			Assert.That(engage, Is.False);
+			Assert.That(EngageWithRifles(130), Is.False);
+			Assert.That(EngageWithRifles(131), Is.True);
+			Assert.That(lookups, Is.EqualTo(8));
 		}
 	}
 }
