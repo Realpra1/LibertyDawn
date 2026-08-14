@@ -5,7 +5,7 @@
 - Task: `CNC-106 — General queue-stall prevention and smart-economy serialization`
 - Base: `4f806e742bd12145d2a601cc9ff71c3a0b141a13` (PR117 head)
 - Branch: `agent/round-20260815-cnc106-queue-stall`
-- Status: `Cycle 3 complete — full-engine acceptance passed; ready for review handoff`
+- Status: `Review handoff returned — one required fix awaits an authorized repair cycle`
 - Cycle: `3`
 - PR: `none`
 
@@ -154,3 +154,10 @@ zero-refinery case remains evidence but does not replace either required scenari
 The assigned Cycle 3 acceptance action is complete. No further development or
 game cycle is authorized by this state; return to the coordinator for review/PR
 handoff using product/test commit `77d229b12d` plus this durable evidence update.
+
+The review handoff has now been returned. `REVIEW.md` reports one required fix:
+preserve the recovery ownership/gate while the selected item is `Done` but still
+exit-blocked, with a focused regression proving ordinary production remains
+paused until the selected actor exits. This state does not authorize that product
+or test change, so no repair or additional game was performed. The coordinator
+must authorize a repair cycle before implementation resumes.
