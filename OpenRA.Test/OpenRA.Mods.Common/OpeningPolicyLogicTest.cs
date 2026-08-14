@@ -29,6 +29,16 @@ namespace OpenRA.Test.Mods.Common
 		};
 
 		[Test]
+		public void AdvancedUnitMilestonesWaitForTheRequiredStructurePrefix()
+		{
+			Assert.That(OpeningPolicyLogic.RequiredPrefixComplete(new[] { 0, 1 }, 3), Is.False);
+			Assert.That(OpeningPolicyLogic.RequiredPrefixComplete(new[] { 0, 1, 3 }, 3), Is.False);
+			Assert.That(OpeningPolicyLogic.RequiredPrefixComplete(new[] { 0, 1, 2 }, 3), Is.True);
+			Assert.That(OpeningPolicyLogic.RequiredPrefixComplete(new[] { 0, 1, 2, 4 }, 3), Is.True);
+			Assert.That(OpeningPolicyLogic.RequiredPrefixComplete(null, 3), Is.False);
+		}
+
+		[Test]
 		public void PicksPreferredAlternativeFromFirstBuildableGoal()
 		{
 			var goal = OpeningPolicyLogic.FirstBuildableGoal(

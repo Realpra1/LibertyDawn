@@ -17,6 +17,14 @@ namespace OpenRA.Mods.Common.Traits
 {
 	public static class OpeningPolicyLogic
 	{
+		public static bool RequiredPrefixComplete(IReadOnlyCollection<int> completedGoals, int prefixGoalCount)
+		{
+			if (completedGoals == null || prefixGoalCount <= 0)
+				return false;
+
+			return Enumerable.Range(0, prefixGoalCount).All(completedGoals.Contains);
+		}
+
 		public static int FirstBuildableGoal(
 			IReadOnlyList<string[]> orderedGoals,
 			IReadOnlyCollection<int> completedGoals,

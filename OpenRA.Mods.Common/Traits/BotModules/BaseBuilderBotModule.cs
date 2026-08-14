@@ -554,6 +554,7 @@ namespace OpenRA.Mods.Common.Traits
 		IBotTick, IBotPositionsUpdated, IBotRespondToAttack, IBotRequestPauseUnitProduction,
 		IBotTemporaryUnitControl
 	{
+		const int OpeningRefineryGoal = 2;
 		const int OpeningRadarGoal = 5;
 		const int OpeningDefenseGoal = 8;
 
@@ -1083,12 +1084,20 @@ namespace OpenRA.Mods.Common.Traits
 					OpeningMcvsBuilt, Info.OpeningMcvCount);
 			}
 
-			if (Info.EnableOpeningPolicy && Info.OpeningSoldierTypes.Length > 0 && OpeningSoldiersBuilt < Info.OpeningSoldierCount &&
+			// Advanced unit milestones follow the shared structure prefix. External unit
+			// requests bypass the ordinary unit-production pause, so issuing soldiers here
+			// before the first Refinery is usable can consume the last construction funds
+			// and strand the protected economy opening.
+			var requiredPrefixComplete = OpeningPolicyLogic.RequiredPrefixComplete(
+				CompletedOpeningStructureGoals(OpeningStructureGoals), OpeningRefineryGoal + 1);
+			if (Info.EnableOpeningPolicy && requiredPrefixComplete &&
+				Info.OpeningSoldierTypes.Length > 0 && OpeningSoldiersBuilt < Info.OpeningSoldierCount &&
 				world.WorldTick >= nextOpeningSoldierRequestTick &&
 				RequestFirstAvailable(bot, Info.OpeningSoldierTypes, "opening soldiers"))
 				nextOpeningSoldierRequestTick = world.WorldTick + System.Math.Max(1, Info.OpeningUnitRequestCooldown);
 
-			if (Info.EnableOpeningPolicy && Info.OpeningHarvesterTypes.Length > 0 && OpeningCommittedHarvesters < Info.OpeningHarvesterCount &&
+			if (Info.EnableOpeningPolicy && requiredPrefixComplete &&
+				Info.OpeningHarvesterTypes.Length > 0 && OpeningCommittedHarvesters < Info.OpeningHarvesterCount &&
 				world.WorldTick >= nextOpeningHarvesterRequestTick &&
 				RequestFirstAvailable(bot, Info.OpeningHarvesterTypes, "opening harvesters"))
 				nextOpeningHarvesterRequestTick = world.WorldTick + System.Math.Max(1, Info.OpeningUnitRequestCooldown);
@@ -1100,7 +1109,7 @@ namespace OpenRA.Mods.Common.Traits
 				RequestFirstAvailable(bot, Info.OpeningDefenseUnlockTypes, "opening defense unlock"))
 				nextOpeningDefenseUnlockRequestTick = world.WorldTick + System.Math.Max(1, Info.OpeningUnitRequestCooldown);
 
-			if (Info.EnableOpeningPolicy && !string.IsNullOrEmpty(Info.OpeningMcvType) &&
+			if (Info.EnableOpeningPolicy && requiredPrefixComplete && !string.IsNullOrEmpty(Info.OpeningMcvType) &&
 				OpeningCommittedHarvesters >= Info.OpeningHarvesterCount &&
 				OpeningMcvsBuilt < Info.OpeningMcvCount &&
 				!openingMcvRequestOutstanding && !HasLiveActor(Info.OpeningMcvType) &&
