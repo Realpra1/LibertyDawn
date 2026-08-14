@@ -175,5 +175,43 @@ namespace OpenRA.Test
 			Assert.That(result.UnitCount, Is.EqualTo(46));
 			Assert.That(result.Evaluations, Is.EqualTo(2));
 		}
+
+		[Test]
+		public void MixedGroupCrossoverUsesTopEconomicMassAndNineCountWeightedLookups()
+		{
+			var ours = new[]
+			{
+				new GeneralizedCombatThreatCalculator.GroupTypeCount("a", 10, 100),
+				new GeneralizedCombatThreatCalculator.GroupTypeCount("b", 2, 200),
+				new GeneralizedCombatThreatCalculator.GroupTypeCount("c", 1, 300),
+				new GeneralizedCombatThreatCalculator.GroupTypeCount("ignored-ours", 100, 1)
+			};
+			var theirs = new[]
+			{
+				new GeneralizedCombatThreatCalculator.GroupTypeCount("x", 5, 100),
+				new GeneralizedCombatThreatCalculator.GroupTypeCount("y", 3, 100),
+				new GeneralizedCombatThreatCalculator.GroupTypeCount("z", 1, 200),
+				new GeneralizedCombatThreatCalculator.GroupTypeCount("ignored-theirs", 100, 1)
+			};
+			var ourFactors = new System.Collections.Generic.Dictionary<string, double>
+			{
+				{ "a", 1 }, { "b", 2 }, { "c", 4 }
+			};
+			var theirFactors = new System.Collections.Generic.Dictionary<string, double>
+			{
+				{ "x", 4 }, { "y", 1 }, { "z", 0.25 }
+			};
+			var lookups = 0;
+
+			var crossover = GeneralizedCombatThreatCalculator.EstimateMixedGroupCrossover(ours, theirs,
+				(ourType, theirType) =>
+				{
+					lookups++;
+					return ourFactors[ourType] * theirFactors[theirType];
+				});
+
+			Assert.That(lookups, Is.EqualTo(9));
+			Assert.That(crossover, Is.EqualTo(System.Math.Sqrt(558d / 156)).Within(0.000001));
+		}
 	}
 }

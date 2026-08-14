@@ -24,6 +24,23 @@ namespace OpenRA.Mods.Common.Traits
 	public sealed class GeneralizedCombatThreatCalculator
 	{
 		public const double MaximumThreatRating = 200;
+		public const int MixedGroupRepresentativeTypes = 3;
+
+		public readonly struct GroupTypeCount
+		{
+			public readonly string ActorType;
+			public readonly int Count;
+			public readonly int EconomicValue;
+
+			public GroupTypeCount(string actorType, int count, int economicValue)
+			{
+				ActorType = actorType?.ToLowerInvariant();
+				Count = count;
+				EconomicValue = economicValue;
+			}
+
+			public long EconomicMass => Count * (long)Math.Max(0, EconomicValue);
+		}
 
 		public readonly struct SplashZone
 		{
@@ -183,6 +200,74 @@ namespace OpenRA.Mods.Common.Traits
 
 			threat = Reverse(canonical);
 			return true;
+		}
+
+		/// <summary>
+		/// Estimates the multiplier needed for our mixed group to cross over against theirs.
+		/// Each side is represented by its three largest economic masses, requiring at most
+		/// nine immutable-cache lookups. The result is policy-free: callers own any margin.
+		/// </summary>
+		public double EstimateMixedGroupCrossover(IEnumerable<GroupTypeCount> ourGroup,
+			IEnumerable<GroupTypeCount> theirGroup)
+		{
+			bool IsCachedCombatType(GroupTypeCount type)
+			{
+				return type.ActorType != null && cache.ContainsKey(CanonicalKey(type.ActorType, type.ActorType));
+			}
+
+			return EstimateMixedGroupCrossover(ourGroup.Where(IsCachedCombatType), theirGroup.Where(IsCachedCombatType),
+				(ourType, theirType) =>
+				{
+					if (!TryGet(ourType, theirType, out var threat))
+						throw new InvalidOperationException($"No cached matchup exists for {ourType}/{theirType}.");
+
+					return threat.DefenderThreatInAttackerEquivalents;
+				});
+		}
+
+		public static double EstimateMixedGroupCrossover(IEnumerable<GroupTypeCount> ourGroup,
+			IEnumerable<GroupTypeCount> theirGroup, Func<string, string, double> theirThreatToUs)
+		{
+			if (ourGroup == null)
+				throw new ArgumentNullException(nameof(ourGroup));
+
+			if (theirGroup == null)
+				throw new ArgumentNullException(nameof(theirGroup));
+
+			if (theirThreatToUs == null)
+				throw new ArgumentNullException(nameof(theirThreatToUs));
+
+			var ours = RepresentativeTypes(ourGroup);
+			var theirs = RepresentativeTypes(theirGroup);
+			if (theirs.Length == 0)
+				return 0;
+
+			if (ours.Length == 0)
+				return double.PositiveInfinity;
+
+			var weightedThreat = 0d;
+			var totalWeight = 0d;
+			foreach (var ourType in ours)
+				foreach (var theirType in theirs)
+				{
+					var weight = (double)ourType.Count * theirType.Count;
+					weightedThreat += weight * theirThreatToUs(ourType.ActorType, theirType.ActorType);
+					totalWeight += weight;
+				}
+
+			var theirGroupThreat = totalWeight > 0 ? weightedThreat / totalWeight : 0;
+			return Math.Sqrt(Math.Max(0, theirGroupThreat));
+		}
+
+		static GroupTypeCount[] RepresentativeTypes(IEnumerable<GroupTypeCount> group)
+		{
+			return group.Where(t => t.ActorType != null && t.Count > 0)
+				.GroupBy(t => t.ActorType, StringComparer.OrdinalIgnoreCase)
+				.Select(types => new GroupTypeCount(types.Key, types.Sum(t => t.Count),
+					types.Select(t => t.EconomicValue).DefaultIfEmpty(0).Max()))
+				.OrderByDescending(t => t.EconomicMass)
+				.ThenBy(t => t.ActorType, StringComparer.Ordinal)
+				.Take(MixedGroupRepresentativeTypes).ToArray();
 		}
 
 		/// <summary>
