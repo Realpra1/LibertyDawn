@@ -4,13 +4,13 @@
 
 - Worker: `WORKER-2`
 - Task: `CNC-101 — Build-order protection and silo timing`
-- Status: `cycle 1 complete; Scenario B fixture-invalid, ready for cycle 2`
+- Status: `cycle 2 complete; Scenario B fixture-invalid, ready for cycle 3`
 - Base: `4f806e742bd12145d2a601cc9ff71c3a0b141a13`
 - Task branch: `agent/round-20260815-cnc101-build-order-silo`
 - PR base: `4f806e742bd12145d2a601cc9ff71c3a0b141a13`
 - Balance: frozen; no costs, production values, prerequisites, power, storage,
   thresholds, delays, or other tuning changes
-- Cycle: `2/20`
+- Cycle: `3/20`
 - PR: none
 
 ## Literal scope
@@ -81,17 +81,44 @@ ownership against the PR117 base before retaining a commit.
   `.worktrees/coordinated-cnc/20260815-bug-polish-06-resume/analysis/worker-2-cnc101/cycle-01/`
   outside Git.
 
+## Cycle 2 durable result
+
+- Product head remains `56984ae1933e4a953dd09b9fadb086ba5e0d326e`;
+  no product or balance file changed.
+- Release build passed with zero warnings/errors. Focused
+  `OpeningGarrisonLogicTest|OpeningPolicyLogicTest|SmartEconomyPolicyTest` passed
+  42/42. CNC and both custom-map YAML validation plus `git diff --check` passed.
+- Scenario A passed at tick 9000/exit 0 in 23.053 seconds. Ordinary SkyNet/GDI
+  and Brutalis/Nod again completed Power -> Barracks/Hand -> Refinery, produced
+  emergency and optional useful infantry, established Harvester income, and
+  continued production. SkyNet fell to 2 cash before the scripted tick-750 cash
+  release, then completed its protected Refinery without an idle-income dead zone.
+- Scenario B reached tick 7000/exit 0 in 22.048 seconds without crash, fatal Lua,
+  unhandled exception, or desync. Live storage correctly reached 150 before setup.
+  At tick 2 the scripted `gtwr` request returned true, but the immediate same-tick
+  `IsProducing` check returned false because the accepted production order had not
+  become observable yet. The harness emitted its explicit failure and stopped
+  before applying scripted pressure. Later natural harvesting produced exactly
+  one Silo reservation and completion per side, but this is not evidence for the
+  free/busy boundary, tower preservation, or preferred-tower resumption. No
+  product defect is inferred.
+- Raw maps, manifest, logs, replay, benchmarks, and launcher summaries remain at
+  `.worktrees/coordinated-cnc/20260815-bug-polish-06-resume/analysis/worker-2-cnc101/cycle-02/`
+  outside Git.
+
 ## Next authorized cycle
 
-Cycle 2 must retain the current product unless new evidence identifies a product
-defect. Repair the Scenario B harness so the scripted Defence-queue tower is
-observably producing before pressure is applied and pressure is set only after
-live storage reports capacity 150. Exercise one free side and one busy side,
-requiring tower completion, one later Silo only while pressure remains, capacity
-relief, preferred-tower resumption, and no duplicate/phantom commitment. Run the
-required distinct Scenario A control in the same two-game cycle and repeat the
-focused/build/YAML/diff checks. Do not spend a product-change cycle on the missing
-Lua callback alone.
+Cycle 3 must retain the current product unless new evidence identifies a product
+defect. Repair Scenario B by separating request acceptance from observation:
+after live storage reports capacity 150, issue the scripted busy-side `gtwr`, then
+poll from a later tick until the Defence queue reports producing before applying
+pressure to either side. Keep a bounded explicit failure if production never
+becomes visible. Exercise one free side and one busy side, requiring tower
+completion, one later Silo only while pressure remains, capacity relief,
+preferred-tower resumption, and no duplicate/phantom commitment. Run the required
+distinct Scenario A control in the same two-game cycle and repeat the
+focused/build/YAML/diff checks. Do not change product code for the same-tick Lua
+observation issue.
 
 ## Handoff
 
