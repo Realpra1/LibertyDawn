@@ -26,6 +26,17 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
+		public void ProviderAddedAndLostBetweenScansStillStartsRecovery()
+		{
+			var everEstablished = RadarRecoveryPolicy.RecordProviderEstablishment(false, false);
+			Assert.That(everEstablished, Is.False, "An unrelated actor must not establish radar.");
+
+			everEstablished = RadarRecoveryPolicy.RecordProviderEstablishment(everEstablished, true);
+			Assert.That(RadarRecoveryPolicy.NeedsRecovery(true, everEstablished, false, false), Is.True,
+				"The provider lifecycle event must survive a loss before the next provider scan.");
+		}
+
+		[Test]
 		public void LiveProviderOrGlobalCommitmentSuppressesDuplicates()
 		{
 			Assert.That(RadarRecoveryPolicy.NeedsRecovery(true, true, true, false), Is.False,

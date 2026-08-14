@@ -34,6 +34,11 @@ namespace OpenRA.Mods.Common.Traits
 			return configured && everEstablished && !hasLiveProvider && !hasCommitment;
 		}
 
+		public static bool RecordProviderEstablishment(bool everEstablished, bool ownedProviderAdded)
+		{
+			return everEstablished || ownedProviderAdded;
+		}
+
 		public static bool ReservationExpired(int reservedTick, int currentTick, int timeout)
 		{
 			return currentTick - reservedTick >= Math.Max(1, timeout);
@@ -124,6 +129,18 @@ namespace OpenRA.Mods.Common.Traits
 			world = player.World;
 			playerPower = player.PlayerActor.TraitOrDefault<PowerManager>();
 			playerResources = player.PlayerActor.TraitOrDefault<PlayerResources>();
+			world.ActorAdded += ActorAdded;
+		}
+
+		void ActorAdded(Actor actor)
+		{
+			// ActorAdded is the bounded lifecycle event that closes the gap between
+			// periodic observations. ActorInfo is available even when trait instance
+			// initialization has not completed yet.
+			var ownedProviderAdded = actor.Owner == player &&
+				actor.Info.TraitInfoOrDefault<ProvidesRadarInfo>() != null;
+			everEstablished = RadarRecoveryPolicy.RecordProviderEstablishment(
+				everEstablished, ownedProviderAdded);
 		}
 
 		public bool EverEstablished => everEstablished;

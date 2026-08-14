@@ -5,8 +5,8 @@
 - Task: `CNC-103 — Universal radar rebuild recovery`
 - Base: `4f806e742bd12145d2a601cc9ff71c3a0b141a13` (PR117 head)
 - Branch: `agent/round-20260815-cnc103-radar-recovery`
-- Status: `Cycle 1 complete — PR117 port implemented and tested; publication handoff pending`
-- Cycle: `1`
+- Status: `Cycle 2 complete — lifecycle gap fixed and tested; publication/reviewer handoff pending`
+- Cycle: `2`
 - PR: `none`
 
 ## Smallest literal contract
@@ -54,6 +54,20 @@ wholesale-merge old state, report, journal, or unrelated cumulative commits.
 Report concise evidence and artifact paths. Keep raw logs/replays/saves outside
 Git. Do not edit the task sheet or coordinator state, merge a PR, or push `bleed`.
 
+## Final-review disposition and cycle-2 authorization
+
+- Verdict: `advisory concern`.
+- Accepted literal gap: established radar is inferred only by periodic queue-choice
+  snapshots; a provider that completes and is destroyed between snapshots is not
+  durably recorded as previously established, so recovery can be skipped.
+- Authorized cycle-2 fix: record establishment from the provider lifecycle or an
+  equivalent bounded event, and add one focused regression covering loss between
+  queue-choice snapshots. Make no broader radar redesign.
+- If product code changes, run at most two simple custom full-engine scenarios,
+  each capped at 120 seconds, in addition to the focused regression. Otherwise
+  do not add scenarios.
+- Advisory path: `OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/BaseBuilderRadarRecoveryManager.cs:152`.
+
 ## Cycle 1 outcome
 
 - Selectively ported the ten CNC-103 product/test refinements from the prior task
@@ -81,6 +95,29 @@ Git. Do not edit the task sheet or coordinator state, merge a PR, or push `bleed
   desync marker.
 - Raw artifacts:
   `/root/github/LibertyDawn/COORDINATED-CNC-ROUNDS/20260815-bug-polish-06-resume/outputs/worker-3-cnc103/cycle-01/game/`.
+- Proposed disposition is superseded by the authorized cycle-2 lifecycle fix;
+  after that narrow fix and evidence, return to publication/reviewer handoff.
+
+## Cycle 2 outcome
+
+- Accepted and fixed the final-review lifecycle gap without changing radar queue,
+  priority, power, configuration, or balance policy. The recovery manager now
+  records an owned `ProvidesRadar` actor from the bounded `World.ActorAdded`
+  lifecycle event, so establishment remains durable if that provider is destroyed
+  before the next periodic or queue-choice scan.
+- Added a focused regression that models an unrelated actor, provider addition,
+  and provider loss entirely between scans; recovery becomes required only after
+  the provider lifecycle event.
+- Locked `make check`: pass, zero warnings/errors.
+- Locked focused NUnit run: pass, 17/17 `RadarRecoveryPolicyTest` cases. The build
+  emitted four pre-existing analyzer warnings in unrelated test files.
+- Full-engine `active-radar-queue-capture`: pass through tick 8000. The AI lost
+  established radar under critical power, released the first exact queue after
+  capture, retried exactly once on the second queue, restored powered radar, and
+  completed a downstream HQ-dependent actor. All required markers matched; no
+  duplicate, lifecycle, setup, fatal, nuclear-strike, or desync marker appeared.
+- Raw artifacts:
+  `/root/github/LibertyDawn/COORDINATED-CNC-ROUNDS/20260815-bug-polish-06-resume/outputs/worker-3-cnc103/cycle-02/game/`.
 - Proposed disposition: `Complete - testing`. Next authorized action is the
   publication/reviewer handoff; do not start another isolated product cycle from
   this state without coordinator direction.
