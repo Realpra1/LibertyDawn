@@ -133,5 +133,19 @@ namespace OpenRA.Test
 			Assert.That(GeneralizedCombatThreatCalculator.RangeAdjustedThreatEquivalent(4, 0, 3, 0),
 				Is.EqualTo(GeneralizedCombatThreatCalculator.MaximumThreatRating));
 		}
+
+		[Test]
+		public void HealingAdjustedTimeToKillHandlesContinuousAndThresholdHealing()
+		{
+			var continuous = new[] { new GeneralizedCombatThreatCalculator.HealingProfile(2, 100) };
+			Assert.That(GeneralizedCombatThreatCalculator.HealingAdjustedTimeToKill(100, 10, continuous),
+				Is.EqualTo(12.5));
+
+			var belowHalf = new[] { new GeneralizedCombatThreatCalculator.HealingProfile(5, 50) };
+			Assert.That(GeneralizedCombatThreatCalculator.HealingAdjustedTimeToKill(100, 10, belowHalf),
+				Is.EqualTo(15));
+			Assert.That(GeneralizedCombatThreatCalculator.HealingAdjustedTimeToKill(100, 5, belowHalf),
+				Is.EqualTo(double.PositiveInfinity));
+		}
 	}
 }

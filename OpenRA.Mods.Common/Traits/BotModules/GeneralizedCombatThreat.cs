@@ -63,6 +63,18 @@ namespace OpenRA.Mods.Common.Traits
 			}
 		}
 
+		public readonly struct HealingProfile
+		{
+			public readonly double HealingPerTick;
+			public readonly double StartsBelowHitPoints;
+
+			public HealingProfile(double healingPerTick, double startsBelowHitPoints)
+			{
+				HealingPerTick = healingPerTick;
+				StartsBelowHitPoints = startsBelowHitPoints;
+			}
+		}
+
 		public sealed class DirectionalThreat
 		{
 			public string Attacker { get; internal set; }
@@ -83,10 +95,12 @@ namespace OpenRA.Mods.Common.Traits
 			public double DamagePerCycle { get; internal set; }
 			public double CycleTicks { get; internal set; }
 			public double DamagePerTick { get; internal set; }
+			public double DefenderHealingPerTick { get; internal set; }
+			public double TimeToKillTicks { get; internal set; }
 			public double RangeMultiplier { get; internal set; } = 1;
 			public double EffectiveDamagePerTick => DamagePerTick * RangeMultiplier;
-			public double RawKillRate => DefenderHitPoints > 0 ? DamagePerTick / DefenderHitPoints : 0;
-			public double KillRate => DefenderHitPoints > 0 ? EffectiveDamagePerTick / DefenderHitPoints : 0;
+			public double RawKillRate { get; internal set; }
+			public double KillRate => RawKillRate * RangeMultiplier;
 			public IReadOnlyList<SplashZone> SplashZones { get; internal set; } = Array.Empty<SplashZone>();
 		}
 
@@ -305,6 +319,7 @@ namespace OpenRA.Mods.Common.Traits
 			var targetSpeed = MovementSpeedCellsPerTick(defender);
 			var targetEngagementRange = defender.TraitInfos<ArmamentInfo>()
 				.Where(a => a.WeaponInfo != null).Select(a => Cells(a.ModifiedRange)).DefaultIfEmpty(0).Max();
+			var healing = HealingProfiles(defender, hp);
 
 			var applicable = attacker.TraitInfos<ArmamentInfo>()
 				.Where(a => a.WeaponInfo != null && a.WeaponInfo.IsValidTarget(targetTypes))
@@ -313,7 +328,7 @@ namespace OpenRA.Mods.Common.Traits
 					targetSpeed, targetEngagementRange))
 				.ToArray();
 
-			return CombineDirections(attacker.Name, defender.Name, hp, armor, hitRadius, applicable);
+			return CombineDirections(attacker.Name, defender.Name, hp, armor, hitRadius, applicable, healing);
 		}
 
 		static DirectionalThreat CalculateLiveDirection(Actor attacker, Actor defender)
@@ -328,6 +343,7 @@ namespace OpenRA.Mods.Common.Traits
 			var targetSpeed = MovementSpeedCellsPerTick(defender);
 			var targetEngagementRange = defender.TraitsImplementing<Armament>()
 				.Where(a => !a.IsTraitDisabled && !a.IsTraitPaused).Select(a => Cells(a.MaxRange())).DefaultIfEmpty(0).Max();
+			var healing = HealingProfiles(defender);
 			var firepowerModifiers = attacker.TraitsImplementing<IFirepowerModifier>().Select(m => m.GetFirepowerModifier()).ToArray();
 			var reloadModifiers = attacker.TraitsImplementing<IReloadModifier>().Select(m => m.GetReloadModifier()).ToArray();
 			var inaccuracyModifiers = attacker.TraitsImplementing<IInaccuracyModifier>().Select(m => m.GetInaccuracyModifier()).ToArray();
@@ -341,14 +357,15 @@ namespace OpenRA.Mods.Common.Traits
 					targetSpeed, targetEngagementRange))
 				.ToArray();
 
-			return CombineDirections(attacker.Info.Name, defender.Info.Name, hp, armor, hitRadius, applicable);
+			return CombineDirections(attacker.Info.Name, defender.Info.Name, hp, armor, hitRadius, applicable, healing);
 		}
 
 		static DirectionalThreat CombineDirections(string attacker, string defender, int hp, string armor,
-			double hitRadius, DirectionalThreat[] applicable)
+			double hitRadius, DirectionalThreat[] applicable, HealingProfile[] healing)
 		{
 			var totalDpt = applicable.Sum(a => a.DamagePerTick);
 			var weight = applicable.Sum(a => a.DamagePerCycle);
+			var timeToKill = HealingAdjustedTimeToKill(hp, totalDpt, healing);
 			return new DirectionalThreat
 			{
 				Attacker = attacker,
@@ -369,8 +386,62 @@ namespace OpenRA.Mods.Common.Traits
 				DamagePerCycle = applicable.Sum(a => a.DamagePerCycle),
 				CycleTicks = Weighted(applicable, a => a.CycleTicks, weight),
 				DamagePerTick = totalDpt,
+				DefenderHealingPerTick = healing.Sum(h => h.HealingPerTick),
+				TimeToKillTicks = timeToKill,
+				RawKillRate = timeToKill > 0 && !double.IsPositiveInfinity(timeToKill) ? 1 / timeToKill : 0,
 				SplashZones = applicable.SelectMany(a => a.SplashZones).ToArray()
 			};
+		}
+
+		static HealingProfile[] HealingProfiles(ActorInfo actor, int maximumHitPoints)
+		{
+			return actor.TraitInfos<ChangesHealthInfo>()
+				.Where(h => h.RequiresCondition == null && h.DamageCooldown == 0 && h.Delay > 0)
+				.Select(h => CreateHealingProfile(h, maximumHitPoints)).Where(h => h.HealingPerTick > 0).ToArray();
+		}
+
+		static HealingProfile[] HealingProfiles(Actor actor)
+		{
+			var health = actor.Trait<IHealth>();
+			return actor.TraitsImplementing<ChangesHealth>()
+				.Where(h => !h.IsTraitDisabled && h.Info.DamageCooldown == 0 && h.Info.Delay > 0)
+				.Select(h => CreateHealingProfile(h.Info, health.MaxHP)).Where(h => h.HealingPerTick > 0).ToArray();
+		}
+
+		static HealingProfile CreateHealingProfile(ChangesHealthInfo info, int maximumHitPoints)
+		{
+			var healingPerStep = info.Step + info.PercentageStep * (long)maximumHitPoints / 100d;
+			return new HealingProfile(Math.Max(0, healingPerStep / info.Delay),
+				maximumHitPoints * info.StartIfBelow.Clamp(0, 100) / 100d);
+		}
+
+		public static double HealingAdjustedTimeToKill(double currentHitPoints, double damagePerTick,
+			IEnumerable<HealingProfile> healingProfiles)
+		{
+			if (currentHitPoints <= 0)
+				return 0;
+
+			if (damagePerTick <= 0)
+				return double.PositiveInfinity;
+
+			var profiles = healingProfiles.Where(h => h.HealingPerTick > 0).ToArray();
+			var boundaries = profiles.Select(h => h.StartsBelowHitPoints.Clamp(0, currentHitPoints))
+				.Append(currentHitPoints).Append(0).Distinct().OrderByDescending(h => h).ToArray();
+			var elapsed = 0d;
+			for (var i = 0; i < boundaries.Length - 1; i++)
+			{
+				var upper = boundaries[i];
+				var lower = boundaries[i + 1];
+				var midpoint = (upper + lower) / 2;
+				var healingPerTick = profiles.Where(h => midpoint < h.StartsBelowHitPoints).Sum(h => h.HealingPerTick);
+				var netDamagePerTick = damagePerTick - healingPerTick;
+				if (netDamagePerTick <= 0)
+					return double.PositiveInfinity;
+
+				elapsed += (upper - lower) / netDamagePerTick;
+			}
+
+			return elapsed;
 		}
 
 		static DirectionalThreat CalculateArmament(ArmamentInfo armament, string armor, double hitRadius,
