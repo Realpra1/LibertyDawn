@@ -33,13 +33,33 @@ namespace OpenRA.Test
 		{
 			var assignments = new Dictionary<uint, uint> { { 11, 50 }, { 12, 60 } };
 			var repairing = new HashSet<uint> { 11, 12 };
+			var waiting = new HashSet<uint>();
 
-			Assert.That(AirThreatGeometry.HasOtherRepairAssignment(assignments, repairing, 13, 50), Is.True);
-			Assert.That(AirThreatGeometry.HasOtherRepairAssignment(assignments, repairing, 11, 50), Is.False);
+			Assert.That(AirThreatGeometry.HasOtherRepairAssignment(assignments, repairing, waiting, 13, 50), Is.True);
+			Assert.That(AirThreatGeometry.HasOtherRepairAssignment(assignments, repairing, waiting, 11, 50), Is.False);
+
+			// A damaged aircraft holding near an occupied pad is queued, but does not own its capacity.
+			waiting.Add(11);
+			Assert.That(AirThreatGeometry.HasOtherRepairAssignment(assignments, repairing, waiting, 13, 50), Is.False);
 
 			// Stale assignments from aircraft that are no longer repairing do not block the facility.
+			waiting.Clear();
 			repairing.Remove(11);
-			Assert.That(AirThreatGeometry.HasOtherRepairAssignment(assignments, repairing, 13, 50), Is.False);
+			Assert.That(AirThreatGeometry.HasOtherRepairAssignment(assignments, repairing, waiting, 13, 50), Is.False);
+		}
+
+		[TestCase(TestName = "Repair queue dispatches ready aircraft by longest wait")]
+		public void RepairQueueDispatchesReadyAircraftByLongestWait()
+		{
+			var waitingSince = new Dictionary<uint, int> { { 11, 300 }, { 12, 200 }, { 13, 100 } };
+
+			// The oldest aircraft is still incoming, so it cannot reserve capacity over local waiters.
+			var ready = new[] { 11u, 12u };
+			Assert.That(AirThreatGeometry.IsOldestReadyRepairWaiter(waitingSince, ready, 11), Is.False);
+			Assert.That(AirThreatGeometry.IsOldestReadyRepairWaiter(waitingSince, ready, 12), Is.True);
+
+			ready = new[] { 11u, 13u };
+			Assert.That(AirThreatGeometry.IsOldestReadyRepairWaiter(waitingSince, ready, 13), Is.True);
 		}
 
 		[TestCase(TestName = "Distance to a segment uses the perpendicular when the foot is inside it")]

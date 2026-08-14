@@ -2087,6 +2087,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			{
 				owner.AirUnitsRepairing.Remove(a.ActorID);
 				owner.AirRepairTargets.Remove(a.ActorID);
+				owner.AirRepairWaiting.Remove(a.ActorID);
+				owner.AirRepairWaitingSince.Remove(a.ActorID);
 				owner.AirRepairUnavailable.Remove(a.ActorID);
 				if (owner.Units.Count == 1)
 					owner.JoinAirFormation(a);
@@ -2122,7 +2124,15 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					float.MaxValue : RepairDestinationDanger(repairTarget.CenterPosition, threats);
 				if (targetDanger <= 0)
 				{
-					if (!a.IsIdle)
+					var waitingForPad = owner.AirRepairWaiting.Contains(a.ActorID);
+					if (waitingForPad && (!IsReadyRepairWaiter(owner, a, repairTarget) ||
+						!Reservable.IsAvailableFor(repairTarget, a)))
+						return true;
+
+					// A different squad may have replaced this aircraft's engine reservation after
+					// both selected the same apparently free pad in one bot tick. Do not preserve
+					// that stale non-idle Repair order: requeue it through the shared claim owner.
+					if (!waitingForPad && !a.IsIdle && Reservable.IsAvailableFor(repairTarget, a))
 						return true;
 
 					if (passiveRange > WDist.Zero &&
@@ -2133,7 +2143,11 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				previousRepairTarget = targetEligible ? repairTarget : null;
 				previousTargetDanger = targetDanger;
 				if (!targetEligible)
+				{
 					owner.AirRepairTargets.Remove(a.ActorID);
+					owner.AirRepairWaiting.Remove(a.ActorID);
+					owner.AirRepairWaitingSince.Remove(a.ActorID);
+				}
 
 				if (owner.SquadManager.Info.AirTargetDebugLogging && !targetEligible)
 					Log.Write("debug", "Air repair [{0}] {1}#{2}: previous destination {3} became {4}; replanning.",
@@ -2143,6 +2157,10 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			}
 
 			var recovery = FindSafestRepairBuilding(owner, a, repairable, threats, requireAvailable: true);
+			if (recovery.Building != null && owner.AirRepairWaiting.Contains(a.ActorID) &&
+				!IsOldestReadyRepairWaiter(owner, a, recovery.Building))
+				recovery = new AirRepairPlan();
+
 			if (recovery.Building != null)
 			{
 				var passiveRange = PassiveRepairRange(owner, recovery.Building);
@@ -2167,7 +2185,10 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			if (waitingAt.Building != null)
 			{
 				QueueRecoveryRoute(owner, a, waitingAt.Route, waitingAt.Building, repairAtEnd: false);
-				owner.MarkAirRepairing(a, waitingAt.Building);
+
+				// This is a holding destination, not a pad claim. Keeping it out of the claim set
+				// lets exactly one waiter reserve the pad after the current repair completes.
+				owner.MarkAirRepairWaiting(a, waitingAt.Building);
 				if (owner.SquadManager.Info.AirTargetDebugLogging)
 					Log.Write("debug", "Air repair [{0}] {1}#{2}: {3}/{4} HP, all pads occupied; safe wait route ({5} waypoints) to {6}#{7}.",
 						owner.AirProfile, a.Info.Name, a.ActorID, health.HP, health.MaxHP,
@@ -2201,12 +2222,14 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 							compromisedTarget?.Info.Name ?? "facility", compromisedTarget?.ActorID ?? 0);
 				}
 
-				owner.MarkAirRepairing(a, compromisedTarget);
+				owner.MarkAirRepairWaiting(a, compromisedTarget);
 				return true;
 			}
 
 			owner.AirUnitsRepairing.Remove(a.ActorID);
 			owner.AirRepairTargets.Remove(a.ActorID);
+			owner.AirRepairWaiting.Remove(a.ActorID);
+			owner.AirRepairWaitingSince.Remove(a.ActorID);
 			if (owner.Units.Count == 1)
 				owner.JoinAirFormation(a);
 
@@ -2286,8 +2309,13 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 				if (owned && requireAvailable)
 				{
-					var assignedToOther = AirThreatGeometry.HasOtherRepairAssignment(owner.AirRepairTargets,
-						owner.AirUnitsRepairing, aircraft.ActorID, b.ActorID);
+					var airSquads = owner.SquadManager.Squads.Where(s => s.Type == SquadType.Air).ToList();
+					var assignments = airSquads.SelectMany(s => s.AirRepairTargets)
+						.ToDictionary(a => a.Key, a => a.Value);
+					var repairing = new HashSet<uint>(airSquads.SelectMany(s => s.AirUnitsRepairing));
+					var waiting = new HashSet<uint>(airSquads.SelectMany(s => s.AirRepairWaiting));
+					var assignedToOther = AirThreatGeometry.HasOtherRepairAssignment(assignments,
+						repairing, waiting, aircraft.ActorID, b.ActorID);
 					if (assignedToOther || !Reservable.IsAvailableFor(b, aircraft))
 						continue;
 				}
@@ -2356,6 +2384,24 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				CandidateCount = candidates.Count,
 				RejectedByAa = rejectedByAa,
 			};
+		}
+
+		static bool IsOldestReadyRepairWaiter(Squad owner, Actor aircraft, Actor facility)
+		{
+			var airSquads = owner.SquadManager.Squads.Where(s => s.Type == SquadType.Air).ToList();
+			var waitingSince = airSquads.SelectMany(s => s.AirRepairWaitingSince)
+				.ToDictionary(a => a.Key, a => a.Value);
+			var ready = airSquads.SelectMany(s => s.Units)
+				.Where(unit => waitingSince.ContainsKey(unit.ActorID) && IsReadyRepairWaiter(owner, unit, facility) &&
+					unit.Info.TraitInfoOrDefault<RepairableInfo>()?.RepairActors.Contains(facility.Info.Name) == true)
+				.Select(unit => unit.ActorID);
+			return AirThreatGeometry.IsOldestReadyRepairWaiter(waitingSince, ready, aircraft.ActorID);
+		}
+
+		static bool IsReadyRepairWaiter(Squad owner, Actor aircraft, Actor facility)
+		{
+			var readyRange = WDist.FromCells(owner.SquadManager.Info.AirInfluenceCellSize * 2);
+			return (aircraft.CenterPosition - facility.CenterPosition).HorizontalLength <= readyRange.Length;
 		}
 
 		static float[] BuildRepairDangerGrid(Squad owner,
