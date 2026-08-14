@@ -188,6 +188,7 @@ namespace OpenRA.Mods.Common.Traits
 
 			return plan.WallCells.Select((cell, index) => new { Cell = cell, Index = index })
 				.Where(candidate => !isPresent(candidate.Cell) && isLegal(candidate.Cell))
+
 				// Spread paid anchors as far apart as possible.  LineBuild can then fill the legal
 				// cells between them for free instead of stacking the next paid segment beside the
 				// last one.  With no walls yet the corner/stable-plan ordering remains deterministic.

@@ -432,6 +432,7 @@ namespace OpenRA.Mods.Common.Traits
 						if (!world.CanPlaceBuilding(intermediate, wallInfo, building, null))
 							return false;
 					}
+
 					connected = true;
 					break;
 				}
