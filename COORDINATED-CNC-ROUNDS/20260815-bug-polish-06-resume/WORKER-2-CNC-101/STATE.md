@@ -4,13 +4,13 @@
 
 - Worker: `WORKER-2`
 - Task: `CNC-101 — Build-order protection and silo timing`
-- Status: `cycle 3 complete; Scenario B fixture-invalid, ready for cycle 4`
+- Status: `cycle 4 complete; Scenario B fixture-invalid, ready for cycle 5`
 - Base: `4f806e742bd12145d2a601cc9ff71c3a0b141a13`
 - Task branch: `agent/round-20260815-cnc101-build-order-silo`
 - PR base: `4f806e742bd12145d2a601cc9ff71c3a0b141a13`
 - Balance: frozen; no costs, production values, prerequisites, power, storage,
   thresholds, delays, or other tuning changes
-- Cycle: `4/20`
+- Cycle: `5/20`
 - PR: none
 
 ## Literal scope
@@ -141,21 +141,56 @@ ownership against the PR117 base before retaining a commit.
   `.worktrees/coordinated-cnc/20260815-bug-polish-06-resume/analysis/worker-2-cnc101/cycle-03/`
   outside Git.
 
+## Cycle 4 durable result
+
+- Product head remains `56984ae1933e4a953dd09b9fadb086ba5e0d326e`;
+  no product or balance file changed.
+- Release build passed with zero warnings/errors. Focused
+  `OpeningGarrisonLogicTest|OpeningPolicyLogicTest|SmartEconomyPolicyTest` passed
+  42/42. CNC and both cycle-4 custom-map YAML validation, Lua syntax, manifest
+  JSON validation, and `git diff --check` passed.
+- Scenario A passed at tick 9000/exit 0 in 56.181 seconds. Ordinary SkyNet/GDI
+  and Brutalis/Nod again completed Power -> Barracks/Hand -> Refinery, produced
+  emergency and optional useful infantry, and established Harvester income.
+  SkyNet fell to 1 cash after the scripted tick-750 release and still completed
+  its protected Refinery without an opening idle/income dead zone.
+- Scenario B reached tick 7000/exit 0 in 43.145 seconds without crash, fatal Lua,
+  unhandled exception, or desync. It proved the funded live Defence queue idle at
+  tick 2 and waited one more tick, but creating `upgrade.recon2` did not make the
+  prerequisite visible to `HasPrerequisites` in that same callback. The harness
+  emitted its explicit prerequisite-not-live failure before issuing the scripted
+  `gtwr`; therefore no exact busy-tower boundary was exercised.
+- Post-failure normal SkyNet behavior later reserved and placed one `obli` per
+  side, followed by one naturally pressured Silo per side and capacity relief.
+  This is not evidence for the scripted free/busy boundary or a product defect.
+- One launcher preflight was rejected before creating output or launching a game
+  because a nonexistent remembered content path was supplied. The unchanged
+  two-game manifest then ran once with the resolved runtime-content parent. The
+  preflight is infrastructure-invalid and not game evidence.
+- Raw maps, manifest, logs, replay, benchmarks, launcher summaries, and the
+  rejected preflight context remain at
+  `.worktrees/coordinated-cnc/20260815-bug-polish-06-resume/analysis/worker-2-cnc101/cycle-04/`
+  outside Git.
+
 ## Next authorized cycle
 
-Cycle 4 must retain the current product unless new exact-item evidence identifies
-a product defect. Repair Scenario B so a compatible Defence queue is confirmed
-idle after the created base and cash are live, wait at least one additional tick,
-then issue the scripted busy-side `gtwr`. Treat `IsProducing("gtwr")` only as queue
-occupancy, not item identity: enable first-tower diagnostics and reject the
-fixture if SkyNet independently reserves another tower before the scripted request
-is established. Require the scripted callback and a live `gtwr` actor before
-calling the busy boundary proved; do not infer cancellation from a compatible
-`obli` commitment. Exercise one free side and one genuinely busy side, requiring
-tower completion, one later Silo only while pressure remains, capacity relief,
-preferred-tower resumption, and no duplicate/phantom commitment. Run the distinct
-Scenario A control in the same two-game cycle and repeat the focused/build/YAML/
-Lua/diff checks. Do not change product code for Lua queue-observation ambiguity.
+Cycle 5 must retain the current product unless new exact-item evidence identifies
+a product defect. Repair only the Scenario B prerequisite sequencing. Confirm the
+compatible Defence queue idle after the created base and 10000 cash are live,
+then temporarily make the busy side unable to afford a tower while the scripted
+`upgrade.recon2` propagates. Poll `HasPrerequisites` and queue/tower absence across
+at least one later tick. In the first callback where the prerequisite is live,
+restore 10000 cash and issue the scripted `gtwr` before normal bot selection can
+claim the queue. Keep the free side unable to preempt pressure until the busy
+request is established. Treat `IsProducing("gtwr")` only as occupancy, inspect
+first-tower diagnostics after the run, and reject any competing SkyNet tower
+reservation before establishment. Require the scripted callback plus a live
+`gtwr` before proving the busy boundary. Exercise one free side and one genuinely
+busy side, requiring tower completion, one later Silo only while pressure remains,
+capacity relief, preferred-tower resumption, and no duplicate/phantom commitment.
+Run the distinct Scenario A control in the same two-game cycle and repeat the
+focused/build/YAML/Lua/diff checks. Do not change product code for Lua prerequisite
+propagation or queue-observation ambiguity.
 
 ## Handoff
 
