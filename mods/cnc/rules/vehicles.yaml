@@ -76,8 +76,6 @@ HARV:
 		EmptyCondition: no-tiberium
         UnstableCondition: unstable-tiberium
 		UnstableResource: RedTiberium
-	HarvesterFieldStation:
-		DebugLogging: true
 	Mobile:
 		Speed: 90
 	Health:
@@ -172,8 +170,6 @@ SHARV:
 		EmptyCondition: no-tiberium
         UnstableCondition: unstable-tiberium
 		UnstableResource: RedTiberium
-	HarvesterFieldStation:
-		DebugLogging: true
 	Mobile:
 		Speed: 90
 	Health:
@@ -630,10 +626,6 @@ MTNK:
 	Inherits@EXPERIENCE: ^GainsExperience
 	Inherits@CLOAK: ^AcceptsCloakCrate
 	Inherits@AUTOTARGET: ^AutoTargetGroundAssaultMove
-	MoveAlongPath:
-		AvoidResourceTypes: Tiberium, BlueTiberium, RedTiberium
-		MaximumPathCells: 96
-		ResourceSafetyMarginCells: 2
 	Valued:
 		Cost: 800
 	Tooltip:
@@ -829,10 +821,6 @@ MSAM:
 	Inherits@EXPERIENCE: ^GainsExperience
 	Inherits@CLOAK: ^AcceptsCloakCrate
 	Inherits@AUTOTARGET: ^AutoTargetAir
-	MoveAlongPath:
-		AvoidResourceTypes: Tiberium, BlueTiberium, RedTiberium
-		MaximumPathCells: 96
-		ResourceSafetyMarginCells: 2
 	Valued:
 		Cost: 600
 	Tooltip:

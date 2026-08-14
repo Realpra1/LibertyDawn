@@ -265,14 +265,6 @@ namespace OpenRA.Mods.Common.Traits
 		void UnloadAborted(Actor self, Actor refinery);
 	}
 
-	public interface IHarvesterFieldStation
-	{
-		bool HasPendingField { get; }
-		CPos PendingField { get; }
-		bool HasCommittedField { get; }
-		CPos CommittedField { get; }
-	}
-
 	[RequireExplicitImplementation]
 	public interface INotifyUnload
 	{

@@ -309,6 +309,13 @@ path when graphics/input are irrelevant. Prove the current run loaded the intend
 map, bots, actors, options, activated headless MAX, advanced ticks, flushed logs,
 replay/benchmark evidence where configured, and produced the final outcome. A
 passive fixture or manager-only simulation is not sole proof.
+Game evidence must come from custom scenarios using production rules,
+configuration, and AI behavior. A test fixture does not count as game evidence.
+Do not override trait values or scan cadences, inject test-only hooks/actors,
+preassign internal state, or script the behavior being tested. A custom scenario
+may pre-place ordinary actors/resources and apply external pressure, damage,
+losses, or timing events; the production AI must still discover the situation,
+make the decision, and perform the behavior itself.
 Use focused setup maps to accelerate reproduction, but before acceptance run a
 fully enabled scenario containing every relevant ordinary module. Headless MAX
 never replaces required graphical, rendering, input, lobby, or platform checks.
