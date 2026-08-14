@@ -72,8 +72,8 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Actor types that should generally be excluded from attack squads.")]
 		public readonly HashSet<string> ExcludeFromSquadsTypes = new HashSet<string>();
 
-		[Desc("Direct-combat actor types this module may affirmatively retain under its bounded degraded fallback.",
-			"Aircraft, transports, artillery, stealth, capture, economy, and support actors must not be listed.")]
+		[Desc("Ground-combat actor types this module may retain under its bounded aggressive AttackMove fallback.",
+			"Active reservations still take priority, so approved specialist squads keep their members.")]
 		public readonly HashSet<string> FailsafeDirectCombatTypes = new HashSet<string>();
 
 		[Desc("Maximum ticks between degraded fallback reconsiderations. Unchanged active orders are not reissued.")]
@@ -1223,10 +1223,24 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				adoptedGroundActors.Add(actor);
 				var assault = Squads.FirstOrDefault(s => s.Type == SquadType.Assault && s.IsValid);
+				var target = FindClosestEnemy(actor.CenterPosition);
 				if (assault == null)
-					unitsHangingAroundTheBase.Add(actor);
-				else
-					assault.Units.Add(actor);
+					assault = RegisterNewSquad(bot, SquadType.Assault, target);
+				else if (target != null)
+					assault.TargetActor = target;
+
+				assault.Units.Add(actor);
+				if (target != null)
+				{
+					QueueAggressiveStance(bot, new[] { actor });
+					bot.QueueOrder(new Order("AttackMove", actor,
+						Target.FromCell(World, target.Location), false));
+					assault.FuzzyStateMachine.ChangeState(assault, new GroundUnitsAttackMoveState(), true);
+					if (Info.GroundTargetDebugLogging)
+						Log.Write("debug", "Squad immediate pre-Codex adoption [{0}]: actor={1}#{2} " +
+							"target={3}#{4} stance=AttackAnything order=AttackMove.", Player.PlayerName,
+							actor.Info.Name, actor.ActorID, target.Info.Name, target.ActorID);
+				}
 			}
 
 			activeUnits.Add(actor);
