@@ -5,7 +5,7 @@
 - Task: `CNC-106 — General queue-stall prevention and smart-economy serialization`
 - Base: `4f806e742bd12145d2a601cc9ff71c3a0b141a13` (PR117 head)
 - Branch: `agent/round-20260815-cnc106-queue-stall`
-- Status: `Review handoff returned — one required fix awaits an authorized repair cycle`
+- Status: `Blocked at review handoff — coordinator authorization required for repair cycle`
 - Cycle: `3`
 - PR: `none`
 
@@ -161,3 +161,13 @@ exit-blocked, with a focused regression proving ordinary production remains
 paused until the selected actor exits. This state does not authorize that product
 or test change, so no repair or additional game was performed. The coordinator
 must authorize a repair cycle before implementation resumes.
+
+## Current handoff action
+
+- Reconfirmed on 2026-08-15 that Cycle 3 is complete and the returned review fix
+  is not authorized by this state.
+- Performed no product/test edits, focused checks, builds, or full-engine games.
+- Product/test commit remains `77d229b12d`; Cycle 3 evidence remains at
+  `/tmp/cnc106-cycle3.4tnUP0/results/`.
+- Returned blocked to the coordinator to authorize a repair cycle for the
+  selected-item `Done`/exit-blocked ownership and gate regression.
