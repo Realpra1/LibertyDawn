@@ -42,6 +42,7 @@ namespace OpenRA.Mods.Common.Traits
 			public int DeferredUntilTick;
 			public int PlannedTick;
 			public int LastQueueOfferTick;
+			public int ReadyPlacementDeadlineTick;
 			public int NextWaitingLogTick;
 			public int NextProgressCheckTick;
 			public int NoProgressDeferralCount;
@@ -166,9 +167,10 @@ namespace OpenRA.Mods.Common.Traits
 					activeRedEnclosures.Add(enclosure.TreeActorId, enclosure);
 				}
 
-				Log("{0} tick={1} load-restored project={2} active-enclosures={3} next-scan={4}",
+				Log("{0} tick={1} load-restored project={2} active-enclosures={3} next-scan={4} ready-placement-deadline={5}",
 					player, world.WorldTick, project?.TreeActorId ?? 0,
-					activeRedEnclosures.Count, nextScanTick);
+					activeRedEnclosures.Count, nextScanTick,
+					project?.ReadyPlacementDeadlineTick ?? 0);
 			}
 			catch (Exception ex)
 			{
@@ -500,10 +502,13 @@ namespace OpenRA.Mods.Common.Traits
 			return wall;
 		}
 
-		public bool TryGetPlacement(uint queueActorId, string actorType, out CPos? location, out bool lineBuild)
+		public bool TryGetPlacement(uint queueActorId, string actorType, out CPos? location,
+			out bool lineBuild, out bool retainReady, out bool simpleFallback)
 		{
 			location = null;
 			lineBuild = false;
+			retainReady = false;
+			simpleFallback = false;
 			if (!enabled || project == null || project.QueueActorId != queueActorId ||
 				project.ActiveActorType != actorType ||
 				(project.Phase != ProjectPhase.Reserved && project.Phase != ProjectPhase.Producing))
@@ -563,17 +568,46 @@ namespace OpenRA.Mods.Common.Traits
 
 			var actorInfo = world.Map.Rules.Actors[actorType];
 			var buildingInfo = actorInfo.TraitInfoOrDefault<BuildingInfo>();
-			if (buildingInfo != null && IsLegalResonatorSite(project.ResonatorLocation, actorInfo, buildingInfo,
-				world.GetActorById(project.TreeActorId)))
+			var previousReadyDeadline = project.ReadyPlacementDeadlineTick;
+			project.ReadyPlacementDeadlineTick = TiberiumFieldPolicy.ReadyPlacementDeadline(
+				world.WorldTick, project.ReadyPlacementDeadlineTick, true,
+				baseBuilder.Info.TiberiumFieldReadyPlacementFallbackDelay);
+			if (previousReadyDeadline == 0)
+				Log("{0} tick={1} resonator-ready-placement-timer-start tree={2}/{3}@{4} " +
+					"resonator={5} fancy-site={6} fallback-deadline={7} delay={8}",
+					player, world.WorldTick, project.TreeActorId, project.TreeType,
+					project.TreeLocation, project.ResonatorType, project.ResonatorLocation,
+					project.ReadyPlacementDeadlineTick,
+					baseBuilder.Info.TiberiumFieldReadyPlacementFallbackDelay);
+			retainReady = true;
+			var fancyLegal = buildingInfo != null && IsLegalResonatorSite(project.ResonatorLocation,
+				actorInfo, buildingInfo, world.GetActorById(project.TreeActorId));
+			if (fancyLegal)
 				location = project.ResonatorLocation;
+			else if (TiberiumFieldPolicy.UseSimplePlacementFallback(false, world.WorldTick,
+				project.ReadyPlacementDeadlineTick))
+				simpleFallback = true;
 
 			return true;
 		}
 
-		public void PlacementOrdered()
+		public void PlacementOrdered(bool simpleFallback = false, CPos? orderedLocation = null,
+			bool friendlySamCoverage = false)
 		{
 			if (project == null)
 				return;
+
+			if (simpleFallback)
+			{
+				Log("{0} tick={1} resonator-simple-fallback-order tree={2}/{3}@{4} " +
+					"resonator={5}@{6} ready-deadline={7} fancy-placement=blocked " +
+					"sam-covered={8} project-released=true",
+					player, world.WorldTick, project.TreeActorId, project.TreeType,
+					project.TreeLocation, project.ResonatorType, orderedLocation,
+					project.ReadyPlacementDeadlineTick, friendlySamCoverage);
+				project = null;
+				return;
+			}
 
 			if (baseBuilder.Info.TiberiumFieldPowerTypes.Contains(project.ActiveActorType))
 			{
@@ -1420,6 +1454,7 @@ namespace OpenRA.Mods.Common.Traits
 			project.ActiveActorType = null;
 			project.RedTargetCell = null;
 			project.ExtensionTargetCell = null;
+			project.ReadyPlacementDeadlineTick = 0;
 			project.Phase = extensionWork ? ProjectPhase.PlanningExtension :
 				enclosureWork ? ProjectPhase.PlanningEnclosure : ProjectPhase.Planned;
 			if (project.RetryCount >= Math.Max(1, baseBuilder.Info.TiberiumFieldMaximumRetries))
@@ -1470,6 +1505,7 @@ namespace OpenRA.Mods.Common.Traits
 				SaveValue("DeferredUntilTick", value.DeferredUntilTick),
 				SaveValue("PlannedTick", value.PlannedTick),
 				SaveValue("LastQueueOfferTick", value.LastQueueOfferTick),
+				SaveValue("ReadyPlacementDeadlineTick", value.ReadyPlacementDeadlineTick),
 				SaveValue("NextWaitingLogTick", value.NextWaitingLogTick),
 				SaveValue("NextProgressCheckTick", value.NextProgressCheckTick),
 				SaveValue("NoProgressDeferralCount", value.NoProgressDeferralCount),
@@ -1532,6 +1568,7 @@ namespace OpenRA.Mods.Common.Traits
 				DeferredUntilTick = ReadValue<int>(nodes, "DeferredUntilTick"),
 				PlannedTick = ReadValue<int>(nodes, "PlannedTick"),
 				LastQueueOfferTick = ReadValue<int>(nodes, "LastQueueOfferTick"),
+				ReadyPlacementDeadlineTick = ReadValue(nodes, "ReadyPlacementDeadlineTick", 0),
 				NextWaitingLogTick = ReadValue<int>(nodes, "NextWaitingLogTick"),
 				NextProgressCheckTick = ReadValue(nodes, "NextProgressCheckTick",
 					TiberiumFieldPolicy.NextDeadline(world.WorldTick,

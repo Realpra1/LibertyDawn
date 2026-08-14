@@ -172,6 +172,8 @@ namespace OpenRA.Mods.Common.Traits
 				CPos? location = null;
 				string orderString = "PlaceBuilding";
 				var fieldPlacement = false;
+				var retainReadyFieldBuilding = false;
+				var simpleFieldFallback = false;
 
 				// Check if Building is a plug for other Building
 				var actorInfo = world.Map.Rules.Actors[currentBuilding.Item];
@@ -189,11 +191,15 @@ namespace OpenRA.Mods.Common.Traits
 				}
 				else if (baseBuilder.TiberiumFieldManager != null &&
 					baseBuilder.TiberiumFieldManager.TryGetPlacement(
-						queue.Actor.ActorID, actorInfo.Name, out location, out var fieldLineBuild))
+						queue.Actor.ActorID, actorInfo.Name, out location, out var fieldLineBuild,
+						out retainReadyFieldBuilding, out simpleFieldFallback))
 				{
 					fieldPlacement = true;
 					if (fieldLineBuild)
 						orderString = "LineBuild";
+					if (simpleFieldFallback)
+						location = ChooseBuildLocation(currentBuilding.Item, true,
+							BuildingType.Refinery, true);
 				}
 				else if (baseBuilder.DefenseClusterManager?.OwnsPlacement(queue, actorInfo.Name) == true)
 				{
@@ -231,6 +237,12 @@ namespace OpenRA.Mods.Common.Traits
 
 				if (location == null)
 				{
+					if (retainReadyFieldBuilding)
+					{
+						AIUtils.BotDebug($"{player} is retaining ready {DisplayName(currentBuilding.Item)} while waiting for a field placement");
+						return true;
+					}
+
 					if (fieldPlacement)
 						baseBuilder.TiberiumFieldManager.PlacementFailed("reserved site became illegal before placement");
 
@@ -259,7 +271,8 @@ namespace OpenRA.Mods.Common.Traits
 						SuppressVisualFeedback = true
 					});
 					if (fieldPlacement)
-						baseBuilder.TiberiumFieldManager.PlacementOrdered();
+						baseBuilder.TiberiumFieldManager.PlacementOrdered(simpleFieldFallback,
+							location, simpleFieldFallback && HasFriendlySamCoverage(location.Value));
 
 					return true;
 				}
@@ -669,7 +682,8 @@ namespace OpenRA.Mods.Common.Traits
 			return (int)Math.Round(adapted);
 		}
 
-		CPos? ChooseBuildLocation(string actorType, bool distanceToBaseIsImportant, BuildingType type)
+		CPos? ChooseBuildLocation(string actorType, bool distanceToBaseIsImportant,
+			BuildingType type, bool preferSamCoverage = false)
 		{
 			var actorInfo = world.Map.Rules.Actors[actorType];
 			var bi = actorInfo.TraitInfoOrDefault<BuildingInfo>();
@@ -691,6 +705,7 @@ namespace OpenRA.Mods.Common.Traits
 					cells = candidateCells.Shuffle(world.LocalRandom);
 
 				CPos? reservedFallback = null;
+				CPos? unreservedFallback = null;
 				var legalCandidates = 0;
 				foreach (var cell in cells)
 				{
@@ -703,6 +718,13 @@ namespace OpenRA.Mods.Common.Traits
 					legalCandidates++;
 					if (!baseBuilder.WallPlanner.OverlapsConstructionYardEnclosure(cell, bi))
 					{
+						if (preferSamCoverage && !HasFriendlySamCoverage(cell))
+						{
+							if (unreservedFallback == null)
+								unreservedFallback = cell;
+							continue;
+						}
+
 						if (reservedFallback != null)
 							baseBuilder.WallPlanner.LogReservationDecision(actorType,
 								reservedFallback.Value, cell, false);
@@ -734,7 +756,7 @@ namespace OpenRA.Mods.Common.Traits
 					baseBuilder.WallPlanner.LogReservationDecision(actorType,
 						reservedFallback.Value, reservedFallback.Value, true);
 
-				return reservedFallback;
+				return unreservedFallback ?? reservedFallback;
 			};
 
 			var baseCenter = baseBuilder.GetRandomBaseCenter();
@@ -779,6 +801,22 @@ namespace OpenRA.Mods.Common.Traits
 
 			// Can't find a build location
 			return null;
+		}
+
+		bool HasFriendlySamCoverage(CPos cell)
+		{
+			foreach (var sam in world.Actors.Where(a => a.Owner == player && a.IsInWorld && !a.IsDead &&
+				baseBuilder.Info.EconomyDefenseSamTypes.Contains(a.Info.Name)))
+			{
+				var range = sam.TraitsImplementing<Armament>()
+					.Where(a => !a.IsTraitDisabled && !a.IsTraitPaused)
+					.Select(a => a.MaxRange().Length).DefaultIfEmpty(0).Max();
+				var radius = Math.Max(0, range / 1024 - baseBuilder.Info.EconomyDefenseSamCoverageMarginCells);
+				if (radius > 0 && (sam.Location - cell).LengthSquared <= radius * radius)
+					return true;
+			}
+
+			return false;
 		}
 	}
 }
