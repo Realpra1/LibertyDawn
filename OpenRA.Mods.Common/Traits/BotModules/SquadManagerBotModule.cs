@@ -110,6 +110,19 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Delay (in ticks) between updating squads.")]
 		public readonly int AttackForceInterval = 75;
 
+		[Desc("Minimum simulation seconds between ordinary ground-squad planning/order updates.",
+			"Air and approved specialist squads use their own independent cadences.")]
+		public readonly int GroundOrderIntervalSeconds = 10;
+
+		public int GroundOrderIntervalTicks(int timestep)
+		{
+			if (GroundOrderIntervalSeconds <= 0)
+				return 1;
+
+			return (int)Math.Min(int.MaxValue,
+				((long)GroundOrderIntervalSeconds * 1000 + Math.Max(1, timestep) - 1) / Math.Max(1, timestep));
+		}
+
 		[Desc("Minimum delay (in ticks) between creating squads.")]
 		public readonly int MinimumAttackForceDelay = 0;
 
@@ -1235,6 +1248,7 @@ namespace OpenRA.Mods.Common.Traits
 					QueueAggressiveStance(bot, new[] { actor });
 					bot.QueueOrder(new Order("AttackMove", actor,
 						Target.FromCell(World, target.Location), false));
+					assault.DeferGroundOrders();
 					assault.FuzzyStateMachine.ChangeState(assault, new GroundUnitsAttackMoveState(), true);
 					if (Info.GroundTargetDebugLogging)
 						Log.Write("debug", "Squad immediate pre-Codex adoption [{0}]: actor={1}#{2} " +
