@@ -91,5 +91,34 @@ namespace OpenRA.Test
 			Assert.That(GeneralizedCombatThreatCalculator.ScaleCachedExchange(4, 1.25, 2.44),
 				Is.EqualTo(4 * 1.25 / 2.44).Within(0.000001));
 		}
+
+		[Test]
+		public void EffectiveRangeFindsProjectileFlightAndTargetDisplacementIntersection()
+		{
+			var range = GeneralizedCombatThreatCalculator.EffectiveRangeCells(11, 1,
+				160 / 1024d, 54 / 1024d, 1.33203125, false, false, 3);
+
+			Assert.That(range, Is.EqualTo(3.9460185).Within(0.0001));
+		}
+
+		[Test]
+		public void EffectiveRangeHonorsInstantHomingAndMinimumRangeCases()
+		{
+			Assert.That(GeneralizedCombatThreatCalculator.EffectiveRangeCells(3, 0,
+				0, 70 / 1024d, 0.5, true, false, 11), Is.EqualTo(3));
+			Assert.That(GeneralizedCombatThreatCalculator.EffectiveRangeCells(10, 2,
+				50 / 1024d, 100 / 1024d, 0.5, false, true, 4), Is.EqualTo(4));
+			Assert.That(GeneralizedCombatThreatCalculator.EffectiveRangeCells(35, 4,
+				50 / 1024d, 100 / 1024d, 0.5, false, false, 3), Is.Zero);
+		}
+
+		[Test]
+		public void EachRangeFactorUsesEnemyEffectiveRangeOverOwnBaseRangeIndependently()
+		{
+			Assert.That(GeneralizedCombatThreatCalculator.EffectiveRangeFactor(3, 35),
+				Is.EqualTo(3d / 35).Within(0.000001));
+			Assert.That(GeneralizedCombatThreatCalculator.EffectiveRangeFactor(0, 3), Is.Zero);
+			Assert.That(GeneralizedCombatThreatCalculator.EffectiveRangeFactor(4, 0), Is.Zero);
+		}
 	}
 }
