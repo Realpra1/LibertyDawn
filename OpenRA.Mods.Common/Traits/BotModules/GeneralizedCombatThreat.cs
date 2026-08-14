@@ -10,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using OpenRA.GameRules;
+using OpenRA.Mods.Common.Projectiles;
 using OpenRA.Mods.Common.Warheads;
 using OpenRA.Primitives;
 using OpenRA.Traits;
@@ -339,7 +340,7 @@ namespace OpenRA.Mods.Common.Traits
 			Actor attacker, Actor defender)
 		{
 			var weapon = armament.WeaponInfo;
-			var inaccuracy = weapon.TargetActorCenter ? 0 :
+			var inaccuracy = weapon.TargetActorCenter && weapon.Projectile is InstantHitInfo ? 0 :
 				ProjectileInaccuracyCells(weapon.Projectile, effectiveRange, inaccuracyModifiers);
 			var damagingWarheads = weapon.Warheads.OfType<DamageWarhead>().Where(w => w.Damage > 0).ToArray();
 			var raw = 0d;
