@@ -26,11 +26,10 @@ namespace OpenRA.Mods.Common.UtilityCommands
 				throw new InvalidOperationException($"No cached armed matchup exists for {attacker}/{defender}.");
 
 			var result = calculator.CalculateCrossover(pair, maximum);
-			Console.WriteLine("attacker\tdefender\tfound\tinitial_estimate\tcrossover_units\trecommended_plus_10_percent\tevaluations\t" +
+			Console.WriteLine("attacker\tdefender\tfound\tinitial_estimate\tcrossover_units\tevaluations\t" +
 				"defender_threat_to_group\tgroup_threat_to_defender");
 			Console.WriteLine(string.Join("\t", attacker, defender, result.Found, result.InitialEstimate,
-				result.UnitCount, GeneralizedCombatThreatCalculator.AddUnitCountSafetyMargin(result.UnitCount),
-				result.Evaluations, F(result.Threat.DefenderThreatToGroup),
+				result.UnitCount, result.Evaluations, F(result.Threat.DefenderThreatToGroup),
 				F(result.Threat.GroupThreatToDefender)));
 		}
 

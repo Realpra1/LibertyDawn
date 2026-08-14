@@ -175,14 +175,5 @@ namespace OpenRA.Test
 			Assert.That(result.UnitCount, Is.EqualTo(46));
 			Assert.That(result.Evaluations, Is.EqualTo(2));
 		}
-
-		[TestCase(46, 51)]
-		[TestCase(9, 10)]
-		[TestCase(4, 5)]
-		public void TenPercentSafetyMarginRoundsUpToWholeUnits(int crossover, int recommended)
-		{
-			Assert.That(GeneralizedCombatThreatCalculator.AddUnitCountSafetyMargin(crossover),
-				Is.EqualTo(recommended));
-		}
 	}
 }

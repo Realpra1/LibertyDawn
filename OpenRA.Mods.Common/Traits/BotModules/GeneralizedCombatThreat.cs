@@ -241,17 +241,6 @@ namespace OpenRA.Mods.Common.Traits
 			return Math.Min(MaximumThreatRating, baseline * subjectFactor / opponentFactor);
 		}
 
-		public static int AddUnitCountSafetyMargin(int crossoverUnitCount, double safetyMargin = 0.10)
-		{
-			if (crossoverUnitCount < 1)
-				throw new ArgumentOutOfRangeException(nameof(crossoverUnitCount));
-
-			if (safetyMargin < 0)
-				throw new ArgumentOutOfRangeException(nameof(safetyMargin));
-
-			return (int)Math.Ceiling(crossoverUnitCount * (1 + safetyMargin));
-		}
-
 		public static CrossoverResult FindCrossover(double baseGroupThreatRating,
 			Func<int, GroupThreat> evaluate, int maximumUnitCount = 10000)
 		{
