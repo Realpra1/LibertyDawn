@@ -31,8 +31,12 @@ namespace OpenRA.Test.Mods.Common
 		public void FullWaveLeavesImmediatelyButPartialWaveWaitsForTimeout()
 		{
 			Assert.That(HeavyDropPolicy.ReadyToTravel(10, 10, 8, 1, 3000), Is.True);
+			Assert.That(HeavyDropPolicy.ReadyToTravel(9, 9, 8, 1, 3000), Is.True,
+				"Nine loaded survivors must continue after a carrier pair is discarded.");
 			Assert.That(HeavyDropPolicy.ReadyToTravel(8, 10, 8, 2999, 3000), Is.False);
 			Assert.That(HeavyDropPolicy.ReadyToTravel(8, 10, 8, 3000, 3000), Is.True);
+			Assert.That(HeavyDropPolicy.ReadyToTravel(8, 9, 8, 3000, 3000), Is.True,
+				"Eight loaded survivors must continue at timeout after either side of a pair is invalidated.");
 			Assert.That(HeavyDropPolicy.ReadyToTravel(7, 10, 8, 3000, 3000), Is.False);
 		}
 

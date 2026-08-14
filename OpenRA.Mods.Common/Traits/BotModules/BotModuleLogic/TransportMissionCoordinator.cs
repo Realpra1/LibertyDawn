@@ -129,5 +129,17 @@ namespace OpenRA.Mods.Common.Traits
 			missionActors.Remove(missionId);
 			parkedMissionActors.Remove(missionId);
 		}
+
+		/// <summary>Releases individual actors that no longer participate in an otherwise active mission.</summary>
+		public void ReleaseActors(int missionId, IEnumerable<uint> actorIds)
+		{
+			if (actorIds == null || (!missionActors.TryGetValue(missionId, out var actors) &&
+				!parkedMissionActors.TryGetValue(missionId, out actors)))
+				return;
+
+			foreach (var id in actorIds.Distinct())
+				if (actors.Remove(id))
+					actorReservations.Remove(id);
+		}
 	}
 }
