@@ -71,5 +71,25 @@ namespace OpenRA.Test
 			Assert.That(GeneralizedCombatThreatCalculator.CanonicalKey("mtnk", "ORCA"),
 				Is.EqualTo(("mtnk", "orca")));
 		}
+
+		[TestCase(-1, 1)]
+		[TestCase(0, 1)]
+		[TestCase(1, 1.25)]
+		[TestCase(2, 1.5625)]
+		[TestCase(3, 2.44)]
+		[TestCase(99, 2.44)]
+		public void CachedVeterancyUsesSimpleBoundedFactors(int level, double expected)
+		{
+			Assert.That(GeneralizedCombatThreatCalculator.VeterancyFactor(level), Is.EqualTo(expected));
+		}
+
+		[Test]
+		public void CachedVeterancyScalesRelativeExchangeAndEqualRanksCancel()
+		{
+			Assert.That(GeneralizedCombatThreatCalculator.ScaleCachedExchange(4, 1.5625, 1), Is.EqualTo(6.25));
+			Assert.That(GeneralizedCombatThreatCalculator.ScaleCachedExchange(4, 2.44, 2.44), Is.EqualTo(4));
+			Assert.That(GeneralizedCombatThreatCalculator.ScaleCachedExchange(4, 1.25, 2.44),
+				Is.EqualTo(4 * 1.25 / 2.44).Within(0.000001));
+		}
 	}
 }

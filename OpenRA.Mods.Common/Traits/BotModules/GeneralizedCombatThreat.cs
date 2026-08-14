@@ -86,6 +86,8 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			public DirectionalThreat Forward { get; internal set; }
 			public DirectionalThreat Reverse { get; internal set; }
+			public double AttackerVeterancyFactor { get; internal set; } = 1;
+			public double DefenderVeterancyFactor { get; internal set; } = 1;
 			public double DefenderThreatInAttackerEquivalents { get; internal set; }
 			public double AttackerThreatInDefenderEquivalents { get; internal set; }
 		}
@@ -136,6 +138,62 @@ namespace OpenRA.Mods.Common.Traits
 			return true;
 		}
 
+		/// <summary>
+		/// Fast actor lookup using the immutable type-pair cache plus the deliberately
+		/// simple CNC veterancy factors. Other live state is intentionally ignored.
+		/// </summary>
+		public bool TryGetCached(Actor attacker, Actor defender, out PairThreat threat)
+		{
+			var attackerLevel = attacker.TraitOrDefault<GainsExperience>()?.Level ?? 0;
+			var defenderLevel = defender.TraitOrDefault<GainsExperience>()?.Level ?? 0;
+			return TryGetCached(attacker.Info.Name, defender.Info.Name, attackerLevel, defenderLevel, out threat);
+		}
+
+		public bool TryGetCached(string attacker, string defender, int attackerVeterancyLevel,
+			int defenderVeterancyLevel, out PairThreat threat)
+		{
+			if (!TryGet(attacker, defender, out var baseline))
+			{
+				threat = null;
+				return false;
+			}
+
+			threat = ApplyVeterancyFactors(baseline, VeterancyFactor(attackerVeterancyLevel),
+				VeterancyFactor(defenderVeterancyLevel));
+			return true;
+		}
+
+		public static double VeterancyFactor(int level)
+		{
+			switch (level.Clamp(0, 3))
+			{
+				case 1: return 1.25;
+				case 2: return 1.5625;
+				case 3: return 2.44;
+				default: return 1;
+			}
+		}
+
+		static PairThreat ApplyVeterancyFactors(PairThreat baseline, double attackerFactor, double defenderFactor)
+		{
+			return new PairThreat
+			{
+				Forward = baseline.Forward,
+				Reverse = baseline.Reverse,
+				AttackerVeterancyFactor = attackerFactor,
+				DefenderVeterancyFactor = defenderFactor,
+				DefenderThreatInAttackerEquivalents = ScaleCachedExchange(
+					baseline.DefenderThreatInAttackerEquivalents, defenderFactor, attackerFactor),
+				AttackerThreatInDefenderEquivalents = ScaleCachedExchange(
+					baseline.AttackerThreatInDefenderEquivalents, attackerFactor, defenderFactor)
+			};
+		}
+
+		public static double ScaleCachedExchange(double baseline, double subjectFactor, double opponentFactor)
+		{
+			return baseline * subjectFactor / opponentFactor;
+		}
+
 		public IEnumerable<PairThreat> OrderedPairs()
 		{
 			foreach (var pair in cache.Values)
@@ -164,6 +222,8 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				Forward = pair.Reverse,
 				Reverse = pair.Forward,
+				AttackerVeterancyFactor = pair.DefenderVeterancyFactor,
+				DefenderVeterancyFactor = pair.AttackerVeterancyFactor,
 				DefenderThreatInAttackerEquivalents = pair.AttackerThreatInDefenderEquivalents,
 				AttackerThreatInDefenderEquivalents = pair.DefenderThreatInAttackerEquivalents
 			};
