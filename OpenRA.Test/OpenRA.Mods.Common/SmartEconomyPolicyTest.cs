@@ -19,6 +19,78 @@ namespace OpenRA.Test.Mods.Common
 	public class SmartEconomyPolicyTest
 	{
 		[Test]
+		public void QueueStallEvidenceRequiresSustainedAbsentPaidProgress()
+		{
+			var evidence = QueueStallRecoveryPolicy.UpdateNoProgressEvidence(0, true, false, 25);
+			Assert.That(evidence, Is.EqualTo(25));
+			evidence = QueueStallRecoveryPolicy.UpdateNoProgressEvidence(evidence, true, false, 25);
+			Assert.That(evidence, Is.EqualTo(50));
+			Assert.That(QueueStallRecoveryPolicy.UpdateNoProgressEvidence(evidence, true, true, 25), Is.Zero,
+				"ordinary paid streaming must reset stall evidence even when cash is low");
+			Assert.That(QueueStallRecoveryPolicy.UpdateNoProgressEvidence(50, false, false, 25), Is.Zero,
+				"ineligible queue states must not retain stale evidence");
+		}
+
+		[TestCase(true, 3, true, 3, QueueStallRecoveryEligibility.Eligible)]
+		[TestCase(false, 3, true, 3, QueueStallRecoveryEligibility.LowPower)]
+		[TestCase(true, 5, true, 3, QueueStallRecoveryEligibility.HarvesterTargetMet)]
+		[TestCase(true, 3, false, 3, QueueStallRecoveryEligibility.MissingCriticalCandidate)]
+		[TestCase(true, 3, true, 1, QueueStallRecoveryEligibility.InsufficientContention)]
+		public void QueueStallEligibilityClassifiesPowerPrerequisiteAndContentionTransitions(
+			bool normalPower, int liveHarvesters, bool criticalCandidate, int fronts,
+			QueueStallRecoveryEligibility expected)
+		{
+			Assert.That(QueueStallRecoveryPolicy.ClassifyEconomyObservation(
+				normalPower, liveHarvesters, 5, criticalCandidate, fronts), Is.EqualTo(expected));
+		}
+
+		[TestCase(3, true, 3, 250, true)]
+		[TestCase(5, true, 3, 250, false)]
+		[TestCase(3, false, 3, 250, false)]
+		[TestCase(3, true, 1, 250, false)]
+		[TestCase(3, true, 3, 249, false)]
+		public void QueueStallEconomyGateRequiresBelowFiveCriticalCandidateAndContention(
+			int liveHarvesters, bool criticalCandidate, int fronts, int evidence, bool expected)
+		{
+			Assert.That(QueueStallRecoveryPolicy.ShouldRecoverEconomy(liveHarvesters, 5,
+				criticalCandidate, fronts, evidence, 250), Is.EqualTo(expected));
+		}
+
+		[TestCase(true, true, false, true)]
+		[TestCase(true, false, true, false)]
+		[TestCase(false, true, false, false)]
+		[TestCase(false, false, true, true)]
+		[TestCase(false, true, true, true)]
+		public void QueueStallCriticalCandidateRequiresUnloadingPathBeforeHarvester(
+			bool usableRefinery, bool harvesterCandidate, bool refineryCandidate, bool expected)
+		{
+			Assert.That(QueueStallRecoveryPolicy.HasCriticalEconomyCandidate(
+				usableRefinery, harvesterCandidate, refineryCandidate), Is.EqualTo(expected));
+		}
+
+		[TestCase(true, true, false, QueueStallRecoverySelectedFrontState.Active)]
+		[TestCase(true, true, true, QueueStallRecoverySelectedFrontState.CompletedAwaitingExit)]
+		[TestCase(false, true, false, QueueStallRecoverySelectedFrontState.Invalidated)]
+		[TestCase(true, false, false, QueueStallRecoverySelectedFrontState.Invalidated)]
+		public void QueueStallSelectedFrontDistinguishesExitWaitFromInvalidation(bool producerAvailable,
+			bool selectedItemIsCurrent, bool selectedItemDone, QueueStallRecoverySelectedFrontState expected)
+		{
+			Assert.That(QueueStallRecoveryPolicy.ClassifySelectedFront(
+				producerAvailable, selectedItemIsCurrent, selectedItemDone), Is.EqualTo(expected));
+		}
+
+		[TestCase(QueueStallRecoverySelectedFrontState.Active, false, false)]
+		[TestCase(QueueStallRecoverySelectedFrontState.CompletedAwaitingExit, false, true)]
+		[TestCase(QueueStallRecoverySelectedFrontState.CompletedAwaitingExit, true, false)]
+		[TestCase(QueueStallRecoverySelectedFrontState.Invalidated, false, false)]
+		public void QueueStallCompletedFrontIsTrackedOnlyUntilItsActorExits(
+			QueueStallRecoverySelectedFrontState state, bool outcomeActorCompleted, bool expected)
+		{
+			Assert.That(QueueStallRecoveryPolicy.ShouldAwaitSelectedFrontOutcome(state, outcomeActorCompleted),
+				Is.EqualTo(expected));
+		}
+
+		[Test]
 		public void PostLoadSettlementDelaysOneSamplerWithoutOverflow()
 		{
 			Assert.That(SmartEconomyPolicy.PostLoadResumeTick(1303, 25), Is.EqualTo(1328));

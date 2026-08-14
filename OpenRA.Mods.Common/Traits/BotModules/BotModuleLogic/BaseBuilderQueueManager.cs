@@ -133,6 +133,9 @@ namespace OpenRA.Mods.Common.Traits
 		bool TickQueue(IBot bot, ProductionQueue queue)
 		{
 			var currentBuilding = queue.AllQueued().FirstOrDefault();
+			if (currentBuilding == null && baseBuilder.QueueStallRecoveryActive)
+				return false;
+
 			if (currentBuilding != null)
 			{
 				var priorityRecoveryActive = baseBuilder.OpeningActive ||

@@ -350,6 +350,21 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Write smart-economy observations, transitions, and requests to debug.log.")]
 		public readonly bool SmartEconomyDebugLogging = false;
 
+		[Desc("Enable bounded player-level recovery when compatible production fronts demonstrate no paid progress.")]
+		public readonly bool EnableQueueStallRecovery = false;
+
+		[Desc("Bot types that retain this BaseBuilder configuration but disable queue-stall recovery for matched controls.")]
+		public readonly HashSet<string> QueueStallRecoveryExcludedBotTypes = new HashSet<string>();
+
+		[Desc("Ticks between bounded queue-stall observations.")]
+		public readonly int QueueStallRecoveryScanInterval = 25;
+
+		[Desc("Ticks of absent aggregate paid progress required before queue-stall recovery may act.")]
+		public readonly int QueueStallRecoveryActivationTicks = 250;
+
+		[Desc("Write queue-stall recovery transitions and selected-item progress to debug.log.")]
+		public readonly bool QueueStallRecoveryDebugLogging = false;
+
 		[Desc("Radius in cells around a factory scanned for rally points by the AI.")]
 		public readonly int RallyPointScanRadius = 8;
 
@@ -605,6 +620,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly Dictionary<uint, AirRepairBuildingReservation> airRepairBuildingReservations =
 			new Dictionary<uint, AirRepairBuildingReservation>();
 		BaseBuilderSmartEconomyManager smartEconomy;
+		BaseBuilderQueueStallRecoveryManager queueStallRecovery;
 		BaseBuilderEconomyDefenseSamPlanner economyDefenseSam;
 
 		readonly List<BaseBuilderQueueManager> builders = new List<BaseBuilderQueueManager>();
@@ -635,6 +651,8 @@ namespace OpenRA.Mods.Common.Traits
 				playerResources, playerPower, resourceLayer);
 			if (Info.EnableSmartEconomy)
 				smartEconomy = new BaseBuilderSmartEconomyManager(this, player, playerResources, unitProduction);
+			if (Info.EnableQueueStallRecovery)
+				queueStallRecovery = new BaseBuilderQueueStallRecoveryManager(this, player, playerPower);
 			if (Info.EconomyDefenseSamTypes.Count > 0)
 				economyDefenseSam = new BaseBuilderEconomyDefenseSamPlanner(this, player, playerPower,
 					playerResources, techTree);
@@ -776,12 +794,13 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		bool IBotRequestPauseUnitProduction.PauseUnitProduction => !IsTraitDisabled &&
-			(!HasAdequateRefineryCount || SmartEconomyShouldReserveCashForRefinery);
+			(!HasAdequateRefineryCount || SmartEconomyShouldReserveCashForRefinery || QueueStallRecoveryActive);
 
 		void IBotTick.BotTick(IBot bot)
 		{
 			WallPlanner?.Tick(bot);
 			UpdateOpening(bot);
+			queueStallRecovery?.Tick(bot);
 			smartEconomy?.Tick(bot);
 			TiberiumFieldManager?.Tick();
 			DefenseClusterManager?.Tick(bot);
@@ -809,6 +828,8 @@ namespace OpenRA.Mods.Common.Traits
 
 		internal bool OpeningOwnsMcvProduction => Info.EnableOpeningPolicy && !openingCompletionLogged &&
 			!string.IsNullOrEmpty(Info.OpeningMcvType) && OpeningMcvsBuilt < Info.OpeningMcvCount;
+
+		internal bool QueueStallRecoveryActive => queueStallRecovery?.Active ?? false;
 
 		internal bool SmartEconomyWantsRefinery => smartEconomy?.WantsRefinery ?? false;
 
@@ -1333,6 +1354,9 @@ namespace OpenRA.Mods.Common.Traits
 			var clusterState = DefenseClusterManager?.IssueTraitData();
 			if (clusterState != null)
 				data.Add(clusterState);
+			var queueStallRecoveryState = queueStallRecovery?.IssueTraitData();
+			if (queueStallRecoveryState != null)
+				data.Add(queueStallRecoveryState);
 
 			return data;
 		}
@@ -1352,6 +1376,7 @@ namespace OpenRA.Mods.Common.Traits
 
 			DefenseClusterManager?.ResolveTraitData(data);
 			WallPlanner?.ResolveTraitData(data);
+			queueStallRecovery?.ResolveTraitData(data);
 
 			var openingInitializedNode = data.FirstOrDefault(n => n.Key == "OpeningInitialized");
 			if (openingInitializedNode != null)
