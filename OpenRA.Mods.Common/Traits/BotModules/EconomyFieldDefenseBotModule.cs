@@ -205,41 +205,52 @@ namespace OpenRA.Mods.Common.Traits
 
 		void IBotRespondToAttack.RespondToAttack(IBot enabledBot, Actor self, AttackInfo e)
 		{
-			if (!Info.LowFrequencyTriggerControl || IsTraitDisabled || player.WinState != WinState.Undefined || self == null ||
-				self.Owner != player || e.Damage.Value <= 0 || e.Attacker == null || e.Attacker == self ||
-				player.RelationshipWith(e.Attacker.Owner) != PlayerRelationship.Enemy)
+			if (!Info.LowFrequencyTriggerControl || IsTraitDisabled || player.WinState != WinState.Undefined ||
+				self == null || self.Disposed || self.Owner != player ||
+				!EconomyFieldDefensePolicy.HasActionableAttack(e))
 				return;
 
-			if (fields.ContainsKey(self.ActorID))
-			{
-				var field = fields[self.ActorID];
-				var detected = IsDetectedEnemy(e.Attacker);
-				foreach (var actorId in field.Tanks.Concat(field.Infantry).Concat(field.AntiAir).OrderBy(id => id))
-					MarkDirty(field.HarvesterId, actorId, "associated-harvester-attacked",
-						detected ? e.Attacker.Location : (CPos?)null);
+			// AttackInfo is mutable and its attacker may be disposed by another impact in the
+			// same world tick. Snapshot and validate it once before consulting visibility.
+			var attacker = e.Attacker;
+			if (attacker == self || attacker.Disposed || !attacker.IsInWorld || attacker.Owner == null ||
+				player.RelationshipWith(attacker.Owner) != PlayerRelationship.Enemy)
+				return;
 
-				Debug("associated harvester attack field={0} guard-wake-count={1} detected={2}", field.HarvesterId,
-					field.Tanks.Count + field.Infantry.Count + field.AntiAir.Count, detected);
+			var detectedEnemy = IsDetectedEnemy(attacker) ? attacker.Location : (CPos?)null;
+			if (fields.TryGetValue(self.ActorID, out var assignedField) && assignedField != null)
+			{
+				foreach (var actorId in assignedField.Tanks.Concat(assignedField.Infantry)
+					.Concat(assignedField.AntiAir).OrderBy(id => id))
+					MarkDirty(assignedField.HarvesterId, actorId, "associated-harvester-attacked", detectedEnemy);
+
+				Debug("associated harvester attack field={0} guard-wake-count={1} detected={2}",
+					assignedField.HarvesterId, assignedField.Tanks.Count + assignedField.Infantry.Count +
+					assignedField.AntiAir.Count, detectedEnemy.HasValue);
 				return;
 			}
 
-			foreach (var field in fields.Values.OrderBy(field => field.HarvesterId))
+			foreach (var field in fields.Values.Where(field => field != null).OrderBy(field => field.HarvesterId))
 				if (IsAssigned(field, self.ActorID))
 				{
 					MarkDirty(field.HarvesterId, self.ActorID, "assigned-guard-attacked",
-						IsDetectedEnemy(e.Attacker) ? e.Attacker.Location : (CPos?)null);
+						detectedEnemy);
 					return;
 				}
 		}
 
 		bool IsDetectedEnemy(Actor actor)
 		{
-			return IsOwnedUsableEnemy(actor) && player.Shroud.IsVisible(actor.Location) && actor.CanBeViewedByPlayer(player);
+			// Support powers attribute their damage to the owning PlayerActor. This is a
+			// valid enemy attacker, but it has no map position: wake the assigned guards
+			// without manufacturing a target cell for them.
+			return IsOwnedUsableEnemy(actor) && actor.OccupiesSpace != null && player?.Shroud != null &&
+				player.Shroud.IsVisible(actor.Location) && actor.CanBeViewedByPlayer(player);
 		}
 
 		bool IsOwnedUsableEnemy(Actor actor)
 		{
-			return actor != null && actor.IsInWorld && !actor.IsDead &&
+			return actor != null && !actor.Disposed && actor.IsInWorld && !actor.IsDead && actor.Owner != null &&
 				player.RelationshipWith(actor.Owner) == PlayerRelationship.Enemy;
 		}
 

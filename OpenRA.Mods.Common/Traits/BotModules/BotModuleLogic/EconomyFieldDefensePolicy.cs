@@ -9,6 +9,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using OpenRA.Traits;
 
 namespace OpenRA.Mods.Common.Traits
 {
@@ -172,6 +173,11 @@ namespace OpenRA.Mods.Common.Traits
 	/// <summary>World-independent transition and demand rules for economy field defense.</summary>
 	public static class EconomyFieldDefensePolicy
 	{
+		public static bool HasActionableAttack(AttackInfo attack)
+		{
+			return attack?.Damage != null && attack.Damage.Value > 0 && attack.Attacker != null;
+		}
+
 		public static bool MergeDetectedDirtyEvent(uint actorId, string reason, CPos? detectedEnemy,
 			IDictionary<uint, string> dirtyReasons, IDictionary<uint, CPos> dirtyEnemyTargets)
 		{

@@ -10,12 +10,29 @@ using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using OpenRA.Mods.Common.Traits;
+using OpenRA.Traits;
 
 namespace OpenRA.Test
 {
 	[TestFixture]
 	public sealed class EconomyFieldDefensePolicyTest
 	{
+		[Test]
+		public void AttackCallbackRejectsIncompleteOrHarmlessPayloads()
+		{
+			Assert.That(EconomyFieldDefensePolicy.HasActionableAttack(null), Is.False);
+			Assert.That(EconomyFieldDefensePolicy.HasActionableAttack(new AttackInfo()), Is.False);
+			Assert.That(EconomyFieldDefensePolicy.HasActionableAttack(new AttackInfo
+			{
+				Damage = new Damage(1)
+			}), Is.False);
+			Assert.That(EconomyFieldDefensePolicy.HasActionableAttack(new AttackInfo
+			{
+				Damage = new Damage(0),
+				Attacker = null
+			}), Is.False);
+		}
+
 		[Test]
 		public void ExactRouteEncodingPreservesEveryAdjacentSafeCell()
 		{
