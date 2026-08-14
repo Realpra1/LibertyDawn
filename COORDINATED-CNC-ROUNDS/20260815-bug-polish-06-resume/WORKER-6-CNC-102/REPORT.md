@@ -1,52 +1,58 @@
-# CNC-102 cycle 1 report
+# CNC-102 cycle 2 report
 
 ## Outcome
 
-Proposed status: **First iteration - testing**.
+Proposed status: **Second iteration - testing**.
 
-The scoped port now starts a 1500-game-tick deadline only when the reserved
-Resonator production item is complete and being placed. It continues to prefer
-the unchanged CNC-41 fancy site. If that site is still illegal at the deadline,
-the same ready item is placed through the pre-existing refinery-near-resource
-locator. Friendly SAM coverage is a best-effort ordering preference and cannot
-withhold an otherwise legal fallback. The deadline is saved and restored with
-the field project and is cleared on project retry.
+Cycle 2 preserved the ready-only 1500-tick fallback from cycle 1 and made one
+additional scoped correction: optional economy-SAM construction is now
+considered only after a waiting field project has declined an idle building
+queue. This enforces the literal requirement that friendly SAM coverage cannot
+delay Resonator work. Opening, refinery recovery, power, air-repair ownership,
+field geometry, balance, and Tiberium rules are unchanged.
 
-No costs, production durations, actor stats, Tiberium behavior, enclosure
-geometry, or construction policy were changed. The only YAML value added is the
-task-authorized 1500-tick ready-placement fallback delay for Brutalis and Iron
-Reaper.
+The ignored scenario generator now supplies a sustained test economy and
+bot-specific non-red fields so ordinary Brutalis and Economy Iron Reaper can be
+observed independently with all normal modules enabled. No field timing or
+manager state is injected.
+
+Runtime acceptance remains incomplete. A calibration run naturally reserved
+and produced Brutalis's Resonator: reservation at tick 1649, production
+accepted at 1701, and the ready timer started at 2578. A later blocked run
+started the timer at tick 3193 with deadline 4693 and issued the old simple
+refinery/resource placement at tick 4696, location 37,170, under friendly SAM
+coverage. This proves the implementation can retain and release one real ready
+item after the full delay. That run exceeded the 120-second harness ceiling by
+0.4 seconds and is evidence only, not an accepted scenario.
+
+The two-AI acceptance pair did not pass. Across production-faithful scenario
+iterations, dynamic construction-yard enclosure ownership or continuously
+occupied ordinary building queues prevented Iron Reaper, and sometimes
+Brutalis, from reaching a ready Resonator before the scheduled obstruction.
+Save artifacts were created, and pre-readiness restores retained a zero ready
+deadline, but the final save/control leg did not contain both required ready
+markers. No duplicate or early fallback marker was observed.
 
 ## Verification
 
-- Affected `OpenRA.Mods.Common` Debug build with warnings-as-errors: pass,
-  0 warnings and 0 errors.
+- Affected Debug build with warnings as errors: pass, 0 warnings and 0 errors.
 - Focused `TiberiumFieldPolicyTest`: 17/17 pass.
-- CNC MiniYAML, both generated scenario packages, Python syntax, and
-  `git diff --check`: pass.
-- Fresh full-engine scenario pair: 2/2 passed to tick 2000, with ordinary
-  Brutalis, Economy Iron Reaper, and Skynet, normal modules, headless MAX,
-  saves at tick 1500, benchmarks, and replays.
-- Blocked scenario reload: passed from the tick-1500 save through tick 4500.
-- Fancy scenario reload: passed serially from the tick-1500 save through tick
-  4500. One earlier parallel reload is excluded because both engine processes
-  contended on the shared `lua/scriptwrapper.lua`; serial retry was clean.
+- Global CNC MiniYAML validation: pass.
+- Scenario generator Python syntax and `git diff --check`: pass.
+- Two of three parallel no-block same-site seed probes reached tick 3000 with
+  ordinary Brutalis, Economy Iron Reaper, and Skynet and retained both projects
+  without extension. The third is excluded for concurrent Lua-wrapper
+  file-contention failure before game start.
 
-Artifacts are ignored and retained under `.worktrees/cnc102-cycle1/`, notably
-`fresh-scenarios-run`, `reload-scenarios-run-2/blocked-ready-reload`,
-`fancy-reload-serial-run`, and `discovery-run-9`.
+Ignored evidence is retained under `.worktrees/cnc102-cycle2/`, notably
+`calibration-run/`, `final-fresh-run-3/`, `final-fresh-run-4/`,
+`final-fresh-run-5/`, and `seed-search-run-4/`.
 
-## Remaining failure and risk
+## Remaining risk and next test
 
-The literal runtime acceptance did not pass. Both saved projects restored with
-`ready-placement-deadline=0`, which is useful evidence that elapsed time and
-save/load do not start the timer before readiness. Neither ordinary target AI
-then reserved or produced a Resonator: opening/building queues remained
-preemptive, and after opening completion the observed Brutalis admission fell
-below protected cash (cash 0 at tick 3274). Consequently the runs did not
-exercise a ready obstruction, the 60-second fallback order, legal fancy
-placement, duplicate prevention, or post-timeout placement.
-
-The next authorized cycle should retain this implementation and replace only
-the scenario setup with a production-faithful route to a naturally ready
-Resonator. No PR was opened in this incomplete cycle.
+Do not claim acceptance or open a PR yet. The next cycle should use the
+same-site, bot-specific field layout from the updated generator and establish
+an ordinary idle building-queue window for both AIs without changing policy
+timings or injecting manager state. Then schedule obstruction only after both
+normal productions are accepted, run the blocked pair through both deadlines,
+and reload the distinct legal/control scenario through the control deadline.

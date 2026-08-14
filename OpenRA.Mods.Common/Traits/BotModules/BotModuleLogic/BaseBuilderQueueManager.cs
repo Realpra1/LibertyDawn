@@ -431,17 +431,6 @@ namespace OpenRA.Mods.Common.Traits
 				return null;
 			}
 
-			// Once the authored opening and power prerequisites are satisfied, an uncovered
-			// economy anchor may reserve one normal SAM build. Existing powered overlapping
-			// coverage and a single in-flight reservation suppress duplicate sites.
-			var economySam = baseBuilder.EconomyDefenseSamBuilding(queue, buildableThings);
-			if (economySam != null)
-			{
-				AIUtils.BotDebug("{0} decided to build {1}: uncovered economy air approach",
-					queue.Actor.Owner, DisplayName(economySam.Name));
-				return economySam;
-			}
-
 			// Next is to build up a strong economy
 			if (!baseBuilder.HasAdequateRefineryCount)
 			{
@@ -507,6 +496,17 @@ namespace OpenRA.Mods.Common.Traits
 				AIUtils.BotDebug("{0} decided to build {1}: reserved Tiberium field project",
 					queue.Actor.Owner, DisplayName(fieldBuilding.Name));
 				return fieldBuilding;
+			}
+
+			// Friendly SAM coverage is optional for field development. Only reserve an
+			// uncovered economy-air approach after a waiting field project has declined
+			// this idle queue, so SAM construction can never delay Resonator placement.
+			var economySam = baseBuilder.EconomyDefenseSamBuilding(queue, buildableThings);
+			if (economySam != null)
+			{
+				AIUtils.BotDebug("{0} decided to build {1}: uncovered economy air approach",
+					queue.Actor.Owner, DisplayName(economySam.Name));
+				return economySam;
 			}
 
 			// Preserve the original random production-building selector when cash is floating.

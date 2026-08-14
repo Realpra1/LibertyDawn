@@ -32,36 +32,39 @@ def add_controlled_trees(text: str, title: str) -> str:
 \tCnc102TreeWest: splitblue
 \t\tOwner: Neutral
 \t\tLocation: 43,162
-\tCnc102SiteGuard01: brik
+\tCnc102WestSiteGuard01: brik
 \t\tOwner: Neutral
 \t\tLocation: 42,159
-\tCnc102SiteGuard02: brik
+\tCnc102WestSiteGuard02: brik
 \t\tOwner: Neutral
 \t\tLocation: 43,159
-\tCnc102SiteGuard03: brik
+\tCnc102WestSiteGuard03: brik
 \t\tOwner: Neutral
 \t\tLocation: 44,159
-\tCnc102SiteGuard04: brik
+\tCnc102WestSiteGuard04: brik
 \t\tOwner: Neutral
 \t\tLocation: 45,159
-\tCnc102SiteGuard05: brik
+\tCnc102WestSiteGuard05: brik
 \t\tOwner: Neutral
 \t\tLocation: 42,160
-\tCnc102SiteGuard06: brik
+\tCnc102WestSiteGuard06: brik
 \t\tOwner: Neutral
 \t\tLocation: 45,160
-\tCnc102SiteGuard07: brik
+\tCnc102WestSiteGuard07: brik
 \t\tOwner: Neutral
 \t\tLocation: 42,161
-\tCnc102SiteGuard08: brik
+\tCnc102WestSiteGuard08: brik
 \t\tOwner: Neutral
 \t\tLocation: 43,161
-\tCnc102SiteGuard09: brik
+\tCnc102WestSiteGuard09: brik
 \t\tOwner: Neutral
 \t\tLocation: 44,161
-\tCnc102SiteGuard10: brik
+\tCnc102WestSiteGuard10: brik
 \t\tOwner: Neutral
 \t\tLocation: 45,161
+\tCnc102TreeEast: split3
+\t\tOwner: Neutral
+\t\tLocation: 44,162
 \tCnc102WestRefinery: proc
 \t\tOwner: Multi0
 \t\tLocation: 35,162
@@ -121,19 +124,19 @@ def add_controlled_trees(text: str, title: str) -> str:
 \t\tLocation: 49,158
 \tCnc102EastFactoryB: fact
 \t\tOwner: Multi1
-\t\tLocation: 60,155
+\t\tLocation: 55,165
 \tCnc102EastFactoryC: fact
 \t\tOwner: Multi1
-\t\tLocation: 60,160
-\tCnc102EastFactoryD: fact
-\t\tOwner: Multi1
-\t\tLocation: 60,165
+\t\tLocation: 75,160
 \tCnc102EastPowerA: nuk2
 \t\tOwner: Multi1
 \t\tLocation: 46,158
 \tCnc102EastPowerB: nuk2
 \t\tOwner: Multi1
 \t\tLocation: 46,162
+\tCnc102EastPowerC: nuk2
+\t\tOwner: Multi1
+\t\tLocation: 67,167
 \tCnc102EastBarracks: pyle
 \t\tOwner: Multi1
 \t\tLocation: 53,158
@@ -175,8 +178,12 @@ def rules(block_west: str | None, block_east: str | None) -> str:
 	return f"""Player:
 \tBaseBuilderBotModule@brutalis:
 \t\tTiberiumFieldDebugLogging: true
+\t\tOpeningDebugLogging: true
+\t\tTiberiumFieldTreeTypes: splitblue
 \tBaseBuilderBotModule@ironreaper:
 \t\tTiberiumFieldDebugLogging: true
+\t\tOpeningDebugLogging: true
+\t\tTiberiumFieldTreeTypes: split3
 
 World:
 \tLuaScript:
@@ -200,7 +207,9 @@ World:
 \t\tUpgrades: upgrade.covert1
 """, f"""WorldLoaded = function()
 \tNeutral = Player.GetPlayer("Neutral")
-\tTrigger.AfterDelay(DateTime.Seconds(140), function()
+\tPlayer.GetPlayer("Multi0").Cash = 100000
+\tPlayer.GetPlayer("Multi1").Cash = 100000
+\tTrigger.AfterDelay(DateTime.Seconds(88), function()
 {blocker_body}
 \tend)
 end
