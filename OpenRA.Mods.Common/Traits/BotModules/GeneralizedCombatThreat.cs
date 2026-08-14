@@ -219,7 +219,7 @@ namespace OpenRA.Mods.Common.Traits
 			var applicable = attacker.TraitInfos<ArmamentInfo>()
 				.Where(a => a.WeaponInfo != null && a.WeaponInfo.IsValidTarget(targetTypes))
 				.Select(a => CalculateArmament(a, armor, hitRadius, a.ModifiedRange,
-					Array.Empty<int>(), Array.Empty<int>(), Array.Empty<int>()))
+					Array.Empty<int>(), Array.Empty<int>(), Array.Empty<int>(), null, null))
 				.Where(a => a.DamagePerTick > 0).ToArray();
 
 			return CombineDirections(attacker.Name, defender.Name, hp, armor, hitRadius, applicable);
@@ -243,7 +243,7 @@ namespace OpenRA.Mods.Common.Traits
 				.Where(a => ammoPools.Where(p => p.Info.Armaments.Contains(a.Info.Name))
 					.All(p => p.CurrentAmmoCount >= a.Info.AmmoUsage))
 				.Select(a => CalculateArmament(a.Info, armor, hitRadius, a.MaxRange(),
-					firepowerModifiers, reloadModifiers, inaccuracyModifiers))
+					firepowerModifiers, reloadModifiers, inaccuracyModifiers, attacker, defender))
 				.Where(a => a.DamagePerTick > 0).ToArray();
 
 			return CombineDirections(attacker.Info.Name, defender.Info.Name, hp, armor, hitRadius, applicable);
@@ -275,7 +275,8 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		static DirectionalThreat CalculateArmament(ArmamentInfo armament, string armor, double hitRadius,
-			WDist effectiveRange, int[] firepowerModifiers, int[] reloadModifiers, int[] inaccuracyModifiers)
+			WDist effectiveRange, int[] firepowerModifiers, int[] reloadModifiers, int[] inaccuracyModifiers,
+			Actor attacker, Actor defender)
 		{
 			var weapon = armament.WeaponInfo;
 			var inaccuracy = weapon.TargetActorCenter ? 0 :
@@ -289,7 +290,10 @@ namespace OpenRA.Mods.Common.Traits
 			var allZones = new List<SplashZone>();
 			foreach (var warhead in damagingWarheads)
 			{
-				var warheadDamage = Util.ApplyPercentageModifiers(warhead.Damage, firepowerModifiers) * Versus(warhead, armor);
+				var warheadDamage = Util.ApplyPercentageModifiers(warhead.Damage,
+					firepowerModifiers.Append(Versus(warhead, armor)));
+				if (defender != null)
+					warheadDamage = ApplyDamageModifiers(warheadDamage, warhead.DamageTypes, attacker, defender);
 				var zones = warhead is SpreadDamageWarhead spread ? SplashZones(spread) : Array.Empty<SplashZone>();
 				var splash = zones.Count == 0 ? 1 : SplashFactor(zones);
 				var splashRadius = zones.Select(z => z.OuterRadiusCells).DefaultIfEmpty(0).Max();
@@ -330,12 +334,26 @@ namespace OpenRA.Mods.Common.Traits
 			return weight > 0 ? values.Sum(v => selector(v) * v.DamagePerCycle) / weight : 0;
 		}
 
-		static double Versus(DamageWarhead warhead, string armor)
+		static int Versus(DamageWarhead warhead, string armor)
 		{
 			if (armor == null || !warhead.Versus.TryGetValue(armor, out var percentage))
-				return 1;
+				return 100;
 
-			return percentage / 100d;
+			return percentage;
+		}
+
+		static int ApplyDamageModifiers(int value, BitSet<DamageType> damageTypes, Actor attacker, Actor defender)
+		{
+			var damage = new Damage(value, damageTypes);
+			var applied = (decimal)value;
+			foreach (var modifier in defender.TraitsImplementing<IDamageModifier>())
+				applied *= modifier.GetDamageModifier(attacker, damage) / 100m;
+
+			if (defender.Owner?.PlayerActor != null)
+				foreach (var modifier in defender.Owner.PlayerActor.TraitsImplementing<IDamageModifier>())
+					applied *= modifier.GetDamageModifier(attacker, damage) / 100m;
+
+			return (int)applied;
 		}
 
 		public static double Cells(WDist distance) => distance.Length / 1024d;
