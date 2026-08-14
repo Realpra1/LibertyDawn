@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 
@@ -16,10 +17,16 @@ LAUNCHER_PATH = (
     REPO_ROOT
     / ".agents/skills/coordinate-cnc-development/scripts/launch_role.py"
 )
+sys.path.insert(0, str(LAUNCHER_PATH.parent))
 MODULE_SPEC = importlib.util.spec_from_file_location("launch_role", LAUNCHER_PATH)
 launch_role = importlib.util.module_from_spec(MODULE_SPEC)
 sys.modules[MODULE_SPEC.name] = launch_role
 MODULE_SPEC.loader.exec_module(launch_role)
+from external_worker_runtime import (
+    ProcessIdentityError,
+    compare_process_identity,
+    read_process_identity,
+)
 
 
 class LaunchRoleTest(unittest.TestCase):
@@ -158,22 +165,95 @@ class LaunchRoleTest(unittest.TestCase):
                 command, str(self.root / "definitely-missing-codex")
             )
 
-    def make_fake_codex(self, exit_code=0):
+    def make_fake_codex(self, exit_code=0, probe_stdin=False):
         fake_bin = self.root / f"fake-bin-{exit_code}"
         fake_bin.mkdir()
         fake = fake_bin / "codex"
         fake.write_text(
             "#!/usr/bin/env python3\n"
-            "import json,pathlib,sys\n"
+            "import json,os,pathlib,sys\n"
             "args=sys.argv[1:]\n"
             "output=pathlib.Path(args[args.index('-o')+1])\n"
-            "output.write_text('fake final message\\n')\n"
-            "print(json.dumps({'type':'fake-event'}), flush=True)\n"
+            + (
+                "output.write_text(os.readlink('/proc/self/fd/0') + '\\n')\n"
+                if probe_stdin
+                else "output.write_text('fake final message\\n')\n"
+            )
+            + "print(json.dumps({'type':'fake-event'}), flush=True)\n"
             f"raise SystemExit({exit_code})\n",
             encoding="utf-8",
         )
         fake.chmod(0o755)
+        for name in ("systemctl", "systemd-run"):
+            unavailable = fake_bin / name
+            unavailable.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+            unavailable.chmod(0o755)
         return fake_bin
+
+    def test_host_supervision_capability_and_durable_supported_metadata(self):
+        capability = {
+            "checked_utc": "2026-08-14T00:00:00+00:00",
+            "probe_timeout_seconds": 3.0,
+            "mechanism": "systemd-user-service",
+            "systemctl": "/bin/systemctl",
+            "systemd_run": "/bin/systemd-run",
+            "supported": True,
+            "fallback_reason": None,
+        }
+        args = self.make_args("worker")
+        policy = launch_role.runtime_policy(args)
+        identity = {
+            "boot_id": "test-boot",
+            "pid": 4242,
+            "start_time_ticks": 100,
+            "parent_pid": 1,
+            "process_group_id": 4242,
+            "session_id": 4242,
+            "process_state": "S",
+        }
+        completed = subprocess.CompletedProcess([], 0, "", "")
+        shown = subprocess.CompletedProcess([], 0, "4242\n", "")
+        with mock.patch.object(
+            launch_role, "host_supervision_capability", return_value=capability
+        ), mock.patch.object(
+            launch_role.subprocess, "run", side_effect=[completed, shown]
+        ) as run, mock.patch.object(
+            launch_role, "read_process_identity", return_value=identity
+        ):
+            record = launch_role._start_supervisor(
+                args,
+                assignment_root=args.output_dir,
+                assignment_id="a" * 36,
+                attempt_id="b" * 36,
+                generation=2,
+                policy=policy,
+                started_utc="2026-08-14T00:00:00+00:00",
+            )
+        self.assertEqual(run.call_count, 2)
+        self.assertEqual(record["pid"], 4242)
+        self.assertEqual(record["supervision"]["mechanism"], "systemd-user-service")
+        self.assertTrue(record["supervision"]["strong_host_supervision"])
+        self.assertEqual(
+            record["supervision"]["service_unit"],
+            "libertydawn-worker-aaaaaaaaaaaa-g2-bbbbbbbb.service",
+        )
+        self.assertIsNone(record["supervision"]["fallback_reason"])
+        self.assertEqual(
+            record["supervision"]["stdout"],
+            str((args.output_dir / "supervisor.log").resolve()),
+        )
+
+    def test_host_supervision_probe_timeout_is_actionable_fallback(self):
+        with mock.patch.object(
+            launch_role.shutil, "which", side_effect=lambda name: f"/bin/{name}"
+        ), mock.patch.object(
+            launch_role.subprocess,
+            "run",
+            side_effect=subprocess.TimeoutExpired(["systemctl"], 3),
+        ):
+            capability = launch_role.host_supervision_capability()
+        self.assertFalse(capability["supported"])
+        self.assertIn("exceeded 3.0s", capability["fallback_reason"])
 
     def test_foreground_fake_exit_and_policy_background_rejection(self):
         failed_args = self.make_args("commenter")
@@ -229,7 +309,9 @@ class LaunchRoleTest(unittest.TestCase):
     def test_background_supervision_metadata(self):
         background_args = self.make_args("commenter")
         environment = dict(__import__("os").environ)
-        environment["PATH"] = f"{self.make_fake_codex(0)}:{environment['PATH']}"
+        environment["PATH"] = (
+            f"{self.make_fake_codex(0, probe_stdin=True)}:{environment['PATH']}"
+        )
         launched = subprocess.run(
             [
                 sys.executable,
@@ -270,10 +352,75 @@ class LaunchRoleTest(unittest.TestCase):
         self.assertEqual(value["output_dir"], str(background_args.output_dir))
         self.assertTrue(value["supervised"])
         self.assertEqual(value["supervisor_pid"], supervisor["pid"])
+        self.assertEqual(value["schema"], "libertydawn.external-worker-attempt/v1")
+        self.assertEqual(value["assignment_id"], supervisor["assignment_id"])
+        self.assertEqual(value["attempt_id"], supervisor["attempt_id"])
+        self.assertEqual(value["generation"], 1)
+        self.assertTrue(
+            compare_process_identity(
+                supervisor["identity"], value["supervisor_identity"]
+            )["match"]
+        )
+        self.assertEqual(
+            (background_args.output_dir / "last-message.md").read_text().strip(),
+            "/dev/null",
+        )
         self.assertEqual(supervisor["role"], "commenter")
         self.assertEqual(supervisor["model"], "gpt-5.6-terra")
         self.assertEqual(supervisor["reasoning_effort"], "medium")
         self.assertEqual(supervisor["sandbox"], "workspace-write")
+        self.assertEqual(
+            supervisor["supervision"]["mechanism"],
+            "detached-session-watchdog-fallback",
+        )
+        self.assertFalse(supervisor["supervision"]["strong_host_supervision"])
+        self.assertFalse(supervisor["supervision"]["capability"]["supported"])
+        self.assertIn(
+            "systemd user manager is unavailable",
+            supervisor["supervision"]["fallback_reason"],
+        )
+        self.assertEqual(supervisor["supervision"]["stdin"], "/dev/null")
+        self.assertEqual(
+            supervisor["supervision"]["stdout"],
+            str((background_args.output_dir / "supervisor.log").resolve()),
+        )
+
+    def test_stable_process_identity_detects_pid_reuse_fields_without_signalling(self):
+        sleeper = subprocess.Popen(
+            [sys.executable, "-c", "import time; time.sleep(30)"],
+            start_new_session=True,
+        )
+        try:
+            identity = read_process_identity(sleeper.pid)
+            self.assertEqual(identity["pid"], sleeper.pid)
+            self.assertEqual(identity["process_group_id"], sleeper.pid)
+            self.assertEqual(identity["session_id"], sleeper.pid)
+            self.assertTrue(compare_process_identity(identity, dict(identity))["match"])
+            reused = dict(identity)
+            reused["start_time_ticks"] += 1
+            comparison = compare_process_identity(identity, reused)
+            self.assertFalse(comparison["match"])
+            self.assertEqual(comparison["mismatches"], ["start_time_ticks"])
+            rebooted = dict(identity)
+            rebooted["boot_id"] = "00000000-0000-0000-0000-000000000000"
+            self.assertEqual(
+                compare_process_identity(identity, rebooted)["mismatches"],
+                ["boot_id"],
+            )
+            self.assertIsNone(sleeper.poll())
+        finally:
+            sleeper.terminate()
+            sleeper.wait(timeout=3)
+
+    def test_malformed_proc_identity_is_actionable_not_healthy(self):
+        proc_root = self.root / "proc"
+        process_dir = proc_root / "123"
+        process_dir.mkdir(parents=True)
+        (process_dir / "stat").write_text("partial record\n", encoding="ascii")
+        boot_id = self.root / "boot-id"
+        boot_id.write_text("8e08e4c3-8636-4a17-bd81-c1542bcffe31\n", encoding="ascii")
+        with self.assertRaisesRegex(ProcessIdentityError, "malformed /proc stat"):
+            read_process_identity(123, boot_id_path=boot_id, proc_root=proc_root)
 
     def test_callers_cannot_supply_protected_model_or_effort(self):
         completed = subprocess.run(

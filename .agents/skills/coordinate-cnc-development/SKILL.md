@@ -259,10 +259,62 @@ an existing task require a new or revised spec before selection.
 ## Recovery
 
 After compaction, interruption, or a role crash, reread this skill and coordinator
-state. Inspect process/result files without loading worker specs. Restart a fresh
-role from its durable input rather than reconstructing its context. Never select a
-new task merely because a worker temporarily stopped responding.
+state. Never select a new task merely because a worker temporarily stopped
+responding. Launch recoverable background workers with one explicit round-local
+registry:
 
-To stop an external role, signal the exact child `pid` in its `process.json`, wait
-for the supervisor to record the final exit status, and then verify no assigned
-game/build process remains. Never use a broad process-name kill.
+```text
+python3 scripts/launch_role.py ... --background \
+  --watchdog-registry <ignored-round-role-root>/external-workers.json
+```
+
+Background launch probes the user service manager within a fixed bound. When it
+is usable, the supervisor runs as a transient collected user service; otherwise
+the launcher keeps the detached-session fallback and mandatory watchdog path.
+Read `supervisor.json.supervision` for the selected mechanism, capability result,
+fallback reason, service unit (when applicable), timeout bounds, and durable
+stdin/stdout/stderr destinations. A timed-out ambiguous service launch is blocked
+and never followed by a second fallback supervisor.
+
+Run one watcher for that registry. Its default 30-second poll is production-safe
+and may not be configured above 60 seconds. Always give it the canonical global
+resource-lock directory so recovery consumes CNC-94 kernel truth:
+
+```text
+python3 scripts/watch_external_workers.py \
+  --registry <ignored-round-role-root>/external-workers.json \
+  --resource-lock-dir <repository-root>/.agents/locks
+```
+
+The watcher audits only explicitly registered assignment roots, serializes each
+assignment on its stable kernel lease, emits diagnostics only when the durable
+state signature changes, and recomputes every replacement through the current
+protected launcher. Treat `blocked` as actionable; never bypass it with a raw PID,
+stored command, metadata-only lock claim, or manually reused output directory.
+
+To stop an external worker, publish durable stop intent and let the same verified
+audit path resolve its assignment-owned tree:
+
+```text
+python3 scripts/stop_external_worker.py --output-dir <assignment-root> \
+  --reason <reason> --requested-by <actor> \
+  --resource-lock-dir <repository-root>/.agents/locks
+```
+
+An explicitly stopped worker remains suppressed until a later authorized start.
+Resume it only through the same assignment lease and protected launcher policy:
+
+```text
+python3 scripts/start_external_worker.py --output-dir <assignment-root> \
+  --reason <authorization-reason> --requested-by <actor> \
+  --resource-lock-dir <repository-root>/.agents/locks
+```
+
+The start transaction requires a fully resolved `stopped` generation, conclusively
+non-live recorded identities, and available registered kernel resources. It preserves
+the superseded stop intent in `start.json`; a rejected request leaves stop intent in
+force, and competing starts can create at most one new attempt generation.
+
+Do not signal a PID from `process.json` directly and never use a broad process-name
+kill. Automatic restart remains suppressed until a future explicit authorized
+start clears or supersedes stop intent.
