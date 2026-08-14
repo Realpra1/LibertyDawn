@@ -167,13 +167,28 @@ from tick 1301 onward; two ordinary queues completed by tick 1351 in the first
 game and tick 1376 in the second. Both games reached tick 3000 without fatal Lua
 errors or desyncs.
 
-Separate Luna narration and policy review were performed for each game. Each
-narrator confirmed the stall, one-time refund, exit-block interval, visible
-completion, post-release progress, and clean tick-3000 exit. Each policy reviewer
-found the behavior consistent with Liberty Dawn's economy/survival design and
-frozen balance, with no duplicate refund, free resources, or abnormal production
-advantage.
+Fresh role-bounded native narration and policy review were performed separately
+for each game. The factual narratives confirm the stall, exact refund amount,
+exit-block interval, actor-live release, post-release progress, clean tick-3000
+exit, and absence of fatal Lua/desync markers. They also preserve two evidence
+limits: activation logs four cancellation attempts while the resolution tracks
+three entries (all resolved, with the exact 306-credit expected refund), and the
+logs show live-Harvester count transitions rather than actor-level unload/route
+events.
+
+Both policy reviews found the observed behavior compatible with Liberty Dawn's
+economy/survival design and frozen balance. Their highest recommendation is
+**advisory**: future diagnostics may label cancellation attempts versus tracked
+resolution entries and add actor lifecycle markers when those events are the
+fixture subject. Disposition: accept the documentation clarification here, but
+make no product, balance, configuration, or additional-game change. The evidence
+shows `unresolved=0`, the exact expected refund, release only after one Harvester
+is live, and resumed ordinary parallel completions; it establishes no duplicate
+refund, premature release, or task-contract violation.
 
 Raw Cycle 4 artifacts remain outside Git at
 `/tmp/cnc106-cycle4.GQQzY1/results/`; the exact markers are in each scenario's
 `support/Logs/debug.log`, and timing evidence is in the benchmark CSVs.
+Fresh analysis artifacts remain outside Git at
+`/tmp/cnc106-cycle4.GQQzY1/role-reviews/`: `game-a-commentary.md`,
+`game-a-policy.md`, `game-b-commentary.md`, and `game-b-policy.md`.

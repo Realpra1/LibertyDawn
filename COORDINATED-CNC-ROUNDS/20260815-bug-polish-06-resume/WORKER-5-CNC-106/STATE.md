@@ -5,7 +5,7 @@
 - Task: `CNC-106 — General queue-stall prevention and smart-economy serialization`
 - Base: `4f806e742bd12145d2a601cc9ff71c3a0b141a13` (PR117 head)
 - Branch: `agent/round-20260815-cnc106-queue-stall`
-- Status: `Cycle 4 complete — final-review repair ready for handoff`
+- Status: `Cycle 4 complete — fresh role evidence ready for final re-review`
 - Cycle: `4`
 - PR: `none`
 
@@ -178,11 +178,20 @@ final review/PR handoff.
   Harvesters, and released at tick 1226 only after one Harvester was live beside
   the retained Refinery. Ordinary multi-queue paid progress began afterward at
   tick 1301, with two ordinary completions by ticks 1351 and 1376 respectively.
-- Separate Luna narration and policy review ran for each game. Both narrations
-  confirmed the required sequence, tick-3000 completion, and no fatal Lua error
-  or desync. Both policy reviews judged the bounded recovery compatible with the
-  Liberty Dawn design and frozen balance, with no duplicate refund, free progress,
-  or abnormal production advantage.
+- Fresh role-bounded native narration and policy review ran separately for each
+  game. Both narrations confirm the observed stall/recovery/exit-block sequence,
+  tick-3000 completion, and absence of fatal Lua/desync markers, while limiting
+  claims about unlogged actor-level unload events. Both policy reviews judge the
+  bounded recovery compatible with Liberty Dawn design and frozen balance.
+- Policy recommendation disposition: both highest recommendations are
+  **advisory** and are accepted as evidence-documentation limits only. The report
+  now distinguishes four cancellation attempts at activation from three tracked
+  cancellation-resolution entries (`unresolved=0`, exact 306-credit expected
+  refund) and does not claim an observed unload path. No product, balance,
+  configuration, or additional-game change is warranted by those observations.
 - Raw Cycle 4 artifacts remain outside Git at
   `/tmp/cnc106-cycle4.GQQzY1/results/`. Detailed evidence is in each scenario's
   `support/Logs/debug.log` and benchmark CSVs.
+- Fresh analysis artifacts remain outside Git at
+  `/tmp/cnc106-cycle4.GQQzY1/role-reviews/`: `game-a-commentary.md`,
+  `game-a-policy.md`, `game-b-commentary.md`, and `game-b-policy.md`.
