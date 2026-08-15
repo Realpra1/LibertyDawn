@@ -203,6 +203,16 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Minimum excess power the AI should try to maintain.")]
 		public readonly int MinimumExcessPower = 0;
 
+		[Desc("Additional excess-power buffer enabled after ExcessPowerBufferDelaySeconds.",
+			"The buffer is disabled while critical economy recovery is active.")]
+		public readonly int ExcessPowerBuffer = 0;
+
+		[Desc("In-game seconds before the optional excess-power buffer becomes active.")]
+		public readonly int ExcessPowerBufferDelaySeconds = 0;
+
+		[Desc("Write excess-power target transitions to debug.log.")]
+		public readonly bool ExcessPowerDebugLogging = false;
+
 		[Desc("The targeted excess power the AI tries to maintain cannot rise above this.")]
 		public readonly int MaximumExcessPower = 0;
 
@@ -919,6 +929,9 @@ namespace OpenRA.Mods.Common.Traits
 			!string.IsNullOrEmpty(Info.OpeningMcvType) && OpeningMcvsBuilt < Info.OpeningMcvCount;
 
 		internal bool QueueStallRecoveryActive => queueStallRecovery?.BlocksOrdinaryProduction ?? false;
+
+		internal bool CriticalEconomyRecoveryActive => QueueStallRecoveryActive ||
+			SmartEconomySerializesMissingRefinery || SmartEconomyShouldReserveCashForRefinery;
 
 		internal bool SmartEconomyWantsRefinery => smartEconomy?.WantsRefinery ?? false;
 

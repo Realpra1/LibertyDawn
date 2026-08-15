@@ -27,6 +27,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly PlayerResources playerResources;
 		readonly PlayerStatistics playerStats;
 		readonly IResourceLayer resourceLayer;
+		readonly int gameTimeTimestep;
 
 		int waitTicks;
 		Actor[] playerBuildings;
@@ -36,6 +37,7 @@ namespace OpenRA.Mods.Common.Traits
 		int cachedBases;
 		int cachedBuildings;
 		int minimumExcessPower;
+		int loggedMinimumExcessPower = int.MinValue;
 		CPos? lastUsedDefenseLocation = null;
 
 		WaterCheck waterState = WaterCheck.NotChecked;
@@ -52,6 +54,8 @@ namespace OpenRA.Mods.Common.Traits
 			playerResources = pr;
 			playerStats = p.PlayerActor.Trait<PlayerStatistics>();
 			resourceLayer = rl;
+			var gameSpeeds = Game.ModData.Manifest.Get<GameSpeeds>();
+			gameTimeTimestep = gameSpeeds.Speeds[gameSpeeds.DefaultSpeed].Timestep;
 			this.category = category;
 			failRetryTicks = baseBuilder.Info.StructureProductionResumeDelay;
 			minimumExcessPower = baseBuilder.Info.MinimumExcessPower;
@@ -111,8 +115,23 @@ namespace OpenRA.Mods.Common.Traits
 				return;
 
 			playerBuildings = world.ActorsHavingTrait<Building>().Where(a => a.Owner == player).ToArray();
-			var excessPowerBonus = baseBuilder.Info.ExcessPowerIncrement * (playerBuildings.Count() / baseBuilder.Info.ExcessPowerIncreaseThreshold.Clamp(1, int.MaxValue));
-			minimumExcessPower = (baseBuilder.Info.MinimumExcessPower + excessPowerBonus).Clamp(baseBuilder.Info.MinimumExcessPower, baseBuilder.Info.MaximumExcessPower);
+			minimumExcessPower = BaseBuilderPowerPolicy.TargetExcessPower(world.WorldTick,
+				gameTimeTimestep, baseBuilder.CriticalEconomyRecoveryActive,
+				baseBuilder.Info.MinimumExcessPower, baseBuilder.Info.MaximumExcessPower,
+				baseBuilder.Info.ExcessPowerBuffer, baseBuilder.Info.ExcessPowerBufferDelaySeconds,
+				baseBuilder.Info.ExcessPowerIncrement, baseBuilder.Info.ExcessPowerIncreaseThreshold,
+				playerBuildings.Length);
+			if (baseBuilder.Info.ExcessPowerDebugLogging &&
+				minimumExcessPower != loggedMinimumExcessPower)
+			{
+				loggedMinimumExcessPower = minimumExcessPower;
+				Log.Write("debug", "AI power policy: {0} tick={1} target={2} minimum={3} " +
+					"buffer={4} delay-seconds={5} recovery={6} buildings={7}", player,
+					world.WorldTick, minimumExcessPower, baseBuilder.Info.MinimumExcessPower,
+					baseBuilder.Info.ExcessPowerBuffer,
+					baseBuilder.Info.ExcessPowerBufferDelaySeconds,
+					baseBuilder.CriticalEconomyRecoveryActive, playerBuildings.Length);
+			}
 
 			var active = false;
 			foreach (var queue in AIUtils.FindQueues(player, category))

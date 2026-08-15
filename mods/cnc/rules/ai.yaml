@@ -1285,7 +1285,9 @@ Player:
 		FirstTowerDebugLogging: false
 		BuildingQueues: Building.Nod, Building.GDI
 		DefenseQueues: Defence.Nod, Defence.GDI
-		MinimumExcessPower: 151
+		MinimumExcessPower: 1
+		ExcessPowerBuffer: 150
+		ExcessPowerBufferDelaySeconds: 300
 		MaximumExcessPower: 700
 		ExcessPowerIncrement: 5
 		ExcessPowerIncreaseThreshold: 1
