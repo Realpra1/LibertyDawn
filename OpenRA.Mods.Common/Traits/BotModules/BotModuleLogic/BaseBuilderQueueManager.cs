@@ -316,6 +316,28 @@ namespace OpenRA.Mods.Common.Traits
 				.Sum(p => p.Amount) + playerPower.ExcessPower) >= baseBuilder.Info.MinimumExcessPower;
 		}
 
+		bool HasSufficientFundsForActor(ProductionQueue queue, ActorInfo actorInfo)
+		{
+			return Math.Max(0, playerResources.Cash + playerResources.Resources) >=
+				queue.GetProductionCost(actorInfo);
+		}
+
+		bool ShouldHoldOptionalConstructionForFirstRefinery()
+		{
+			if (!baseBuilder.ProtectedOpeningRefineryGoalActive)
+				return false;
+
+			var committed = baseBuilder.HasProtectedOpeningRefineryCommitment;
+			var actionable = baseBuilder.Info.BuildingQueues.Concat(baseBuilder.Info.DefenseQueues)
+				.SelectMany(q => AIUtils.FindQueues(player, q))
+				.Where(q => !q.AllQueued().Any())
+				.Any(q => q.BuildableItems().Any(a =>
+					baseBuilder.SmartEconomyRefineryTypes.Contains(a.Name) &&
+					HasSufficientPowerForActor(a) && HasSufficientFundsForActor(q, a)));
+			return OpeningPolicyLogic.HoldOptionalConstructionForFirstRefinery(true,
+				baseBuilder.CountActors(baseBuilder.SmartEconomyRefineryTypes), committed, actionable);
+		}
+
 		ActorInfo ChooseBuildingToBuild(ProductionQueue queue)
 		{
 			var buildableThings = queue.BuildableItems();
@@ -346,6 +368,29 @@ namespace OpenRA.Mods.Common.Traits
 					AIUtils.BotDebug("{0} decided to build {1}: serialized missing-refinery recovery",
 						queue.Actor.Owner, DisplayName(refinery.Name));
 					return refinery;
+				}
+
+				return null;
+			}
+
+			// The ordinary opening has not recovered until its first Refinery is live.
+			// Let an actionable compatible queue claim that goal, then keep idle construction
+			// queues from consuming its remaining production cash. Busy work is left alone by
+			// TickQueue, while unavailable or unaffordable goals still yield normally.
+			if (ShouldHoldOptionalConstructionForFirstRefinery())
+			{
+				// Another queue already owns the protected goal. Hold this idle queue without
+				// repeatedly re-running and logging a reservation attempt that cannot succeed.
+				if (baseBuilder.HasProtectedOpeningRefineryCommitment)
+					return null;
+
+				var protectedRefinery = baseBuilder.OpeningBuilding(buildableThings);
+				if (protectedRefinery != null && baseBuilder.SmartEconomyRefineryTypes.Contains(protectedRefinery.Name) &&
+					baseBuilder.TryReserveSmartEconomyOpeningRefinery(queue, protectedRefinery.Name))
+				{
+					AIUtils.BotDebug("{0} decided to build {1}: protected opening economy",
+						queue.Actor.Owner, DisplayName(protectedRefinery.Name));
+					return protectedRefinery;
 				}
 
 				return null;
@@ -390,7 +435,7 @@ namespace OpenRA.Mods.Common.Traits
 			if (opening != null)
 			{
 				if (baseBuilder.SmartEconomyRefineryTypes.Contains(opening.Name) &&
-					!baseBuilder.TryReserveSmartEconomyControlledRefinery(queue, opening.Name))
+					!baseBuilder.TryReserveSmartEconomyOpeningRefinery(queue, opening.Name))
 					opening = null;
 			}
 
@@ -398,6 +443,21 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				AIUtils.BotDebug("{0} decided to build {1}: parallel opening policy", queue.Actor.Owner, DisplayName(opening.Name));
 				return opening;
+			}
+
+			// Storage pressure owns the next free compatible defense commitment, but never
+			// cancels work already in production. A global reservation prevents parallel Facts
+			// from requesting duplicates before the first StartProduction order is observed.
+			if (baseBuilder.SmartEconomyWantsSilo)
+			{
+				var silo = GetProducibleBuilding(baseBuilder.NeedBasedSiloTypes, buildableThings);
+				if (silo != null && HasSufficientPowerForActor(silo) &&
+					HasSufficientFundsForActor(queue, silo) && baseBuilder.TryReserveNeedBasedSilo(queue, silo.Name))
+				{
+					AIUtils.BotDebug("{0} decided to build {1}: storage-pressure commitment",
+						queue.Actor.Owner, DisplayName(silo.Name));
+					return silo;
+				}
 			}
 
 			// Defense queues are independent from the ordered building queue. Give their first
@@ -529,23 +589,6 @@ namespace OpenRA.Mods.Common.Traits
 				}
 
 				if (power != null && navalproduction != null && !HasSufficientPowerForActor(navalproduction))
-				{
-					AIUtils.BotDebug("{0} decided to build {1}: Priority override (would be low power)", queue.Actor.Owner, DisplayName(power.Name));
-					return power;
-				}
-			}
-
-			// Create some head room for resource storage if we really need it
-			if (playerResources.Resources > 0.8 * playerResources.ResourceCapacity)
-			{
-				var silo = GetProducibleBuilding(baseBuilder.Info.SiloTypes, buildableThings);
-				if (silo != null && HasSufficientPowerForActor(silo))
-				{
-					AIUtils.BotDebug("{0} decided to build {1}: Priority override (silo)", queue.Actor.Owner, DisplayName(silo.Name));
-					return silo;
-				}
-
-				if (power != null && silo != null && !HasSufficientPowerForActor(silo))
 				{
 					AIUtils.BotDebug("{0} decided to build {1}: Priority override (would be low power)", queue.Actor.Owner, DisplayName(power.Name));
 					return power;

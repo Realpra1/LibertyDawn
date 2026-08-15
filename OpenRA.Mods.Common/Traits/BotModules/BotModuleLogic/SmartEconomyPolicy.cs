@@ -101,6 +101,18 @@ namespace OpenRA.Mods.Common.Traits
 			return (long)Math.Max(0, storedResources) * 100 >= (long)resourceCapacity * threshold;
 		}
 
+		public static bool WantsNeedBasedSilo(bool enabled, int storedResources, int resourceCapacity,
+			int thresholdPercent)
+		{
+			return enabled && StoragePressure(storedResources, resourceCapacity, thresholdPercent);
+		}
+
+		public static bool CanClaimNeedBasedSiloQueue(bool storagePressure, bool queueHasProduction,
+			bool siloActionable, bool siloAlreadyCommitted)
+		{
+			return storagePressure && !queueHasProduction && siloActionable && !siloAlreadyCommitted;
+		}
+
 		public static SmartEconomyRefineryDemand RefineryDemand(int liveHarvesters, int queuedHarvesters,
 			int requestedHarvesters, int liveRefineries, int queuedRefineries, int reservedRefineries,
 			int freeHarvestersPerPendingRefinery, int harvestersPerRefinery, int maximumParallelRefineries,
@@ -130,7 +142,14 @@ namespace OpenRA.Mods.Common.Traits
 			return Math.Max(0, Math.Max(0, refineryCost) - Math.Max(0, spendableCash));
 		}
 
-		public static bool NeedsSerializedFirstRefinery(bool enabled, int liveRefineries,
+		public static bool NeedsSerializedRefineryRecovery(bool enabled, bool hadUsableRefinery,
+			int liveRefineries, int queuedRefineries = 0, int reservedRefineries = 0)
+		{
+			return enabled && hadUsableRefinery && liveRefineries <= 0 &&
+				queuedRefineries <= 0 && reservedRefineries <= 0;
+		}
+
+		public static bool NeedsFirstRefineryCommitment(bool enabled, int liveRefineries,
 			int queuedRefineries, int reservedRefineries)
 		{
 			return enabled && liveRefineries <= 0 && queuedRefineries <= 0 && reservedRefineries <= 0;

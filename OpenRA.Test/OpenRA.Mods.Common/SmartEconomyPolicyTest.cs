@@ -72,6 +72,28 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
+		public void NeedBasedSiloRequiresAnExplicitOptIn()
+		{
+			Assert.That(SmartEconomyPolicy.WantsNeedBasedSilo(false, 800, 1000, 80), Is.False);
+			Assert.That(SmartEconomyPolicy.WantsNeedBasedSilo(true, 799, 1000, 80), Is.False);
+			Assert.That(SmartEconomyPolicy.WantsNeedBasedSilo(true, 800, 1000, 80), Is.True);
+		}
+
+		[Test]
+		public void NeedBasedSiloClaimsOnlyAnActionableFreeUnownedQueueBoundary()
+		{
+			Assert.That(SmartEconomyPolicy.CanClaimNeedBasedSiloQueue(true, false, true, false), Is.True);
+			Assert.That(SmartEconomyPolicy.CanClaimNeedBasedSiloQueue(false, false, true, false), Is.False,
+				"No-pressure construction must retain ordinary tower selection.");
+			Assert.That(SmartEconomyPolicy.CanClaimNeedBasedSiloQueue(true, true, true, false), Is.False,
+				"Pressure must not cancel or displace production that already owns the queue.");
+			Assert.That(SmartEconomyPolicy.CanClaimNeedBasedSiloQueue(true, false, false, false), Is.False,
+				"An unavailable or unaffordable Silo must not create a phantom commitment.");
+			Assert.That(SmartEconomyPolicy.CanClaimNeedBasedSiloQueue(true, false, true, true), Is.False,
+				"Parallel Facts must not duplicate one unresolved Silo commitment.");
+		}
+
+		[Test]
 		public void RefineryDemandCountsQueuesRequestsAndFreePendingHarvesters()
 		{
 			var demand = SmartEconomyPolicy.RefineryDemand(
@@ -130,14 +152,25 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
-		public void SmartEconomySerializesOnlyTheMissingFirstRefinery()
+		public void SmartEconomySerializesOnlyPostEstablishmentRefineryRecovery()
 		{
-			Assert.That(SmartEconomyPolicy.NeedsSerializedFirstRefinery(true, 0, 0, 0), Is.True);
-			Assert.That(SmartEconomyPolicy.NeedsSerializedFirstRefinery(true, 0, 1, 0), Is.False);
-			Assert.That(SmartEconomyPolicy.NeedsSerializedFirstRefinery(true, 0, 0, 1), Is.False);
-			Assert.That(SmartEconomyPolicy.NeedsSerializedFirstRefinery(true, 1, 0, 0), Is.False);
-			Assert.That(SmartEconomyPolicy.NeedsSerializedFirstRefinery(false, 0, 0, 0), Is.False,
+			Assert.That(SmartEconomyPolicy.NeedsSerializedRefineryRecovery(true, false, 0), Is.False,
+				"An ordinary fresh start must remain inside the protected opening prefix.");
+			Assert.That(SmartEconomyPolicy.NeedsSerializedRefineryRecovery(true, true, 0), Is.True);
+			Assert.That(SmartEconomyPolicy.NeedsSerializedRefineryRecovery(true, true, 0, 1, 0), Is.False);
+			Assert.That(SmartEconomyPolicy.NeedsSerializedRefineryRecovery(true, true, 0, 0, 1), Is.False);
+			Assert.That(SmartEconomyPolicy.NeedsSerializedRefineryRecovery(true, true, 1), Is.False);
+			Assert.That(SmartEconomyPolicy.NeedsSerializedRefineryRecovery(false, true, 0), Is.False,
 				"Feature-disabled controls retain their legacy behavior.");
+		}
+
+		[Test]
+		public void OpeningCanOwnTheFirstRefineryWithoutClaimingRecovery()
+		{
+			Assert.That(SmartEconomyPolicy.NeedsFirstRefineryCommitment(true, 0, 0, 0), Is.True);
+			Assert.That(SmartEconomyPolicy.NeedsFirstRefineryCommitment(true, 0, 1, 0), Is.False);
+			Assert.That(SmartEconomyPolicy.NeedsFirstRefineryCommitment(true, 0, 0, 1), Is.False);
+			Assert.That(SmartEconomyPolicy.NeedsFirstRefineryCommitment(true, 1, 0, 0), Is.False);
 		}
 
 		[Test]
