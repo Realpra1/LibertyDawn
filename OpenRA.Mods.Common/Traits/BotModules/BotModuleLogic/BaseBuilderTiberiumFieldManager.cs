@@ -127,6 +127,13 @@ namespace OpenRA.Mods.Common.Traits
 			return enabled && baseBuilder.Info.TiberiumFieldResonatorTypes.Contains(type);
 		}
 
+		public bool OwnsReadyProduction(uint queueActorId, string actorType)
+		{
+			return enabled && project != null && project.QueueActorId == queueActorId &&
+				project.ActiveActorType == actorType && project.Phase == ProjectPhase.Producing &&
+				project.ReadyPlacementDeadlineTick > 0;
+		}
+
 		public MiniYamlNode IssueTraitData()
 		{
 			if (!enabled)
@@ -573,12 +580,20 @@ namespace OpenRA.Mods.Common.Traits
 				world.WorldTick, project.ReadyPlacementDeadlineTick, true,
 				baseBuilder.Info.TiberiumFieldReadyPlacementFallbackDelay);
 			if (previousReadyDeadline == 0)
+			{
+				// A completed item may no longer appear in AllQueued while the building queue
+				// retains it for placement. Keep reservation recovery behind the ready-only
+				// fallback window so RefreshProjectState cannot discard the waiting item first.
+				project.DeadlineTick = TiberiumFieldPolicy.NextDeadline(
+					project.ReadyPlacementDeadlineTick, baseBuilder.Info.TiberiumFieldPlacementTimeout);
 				Log("{0} tick={1} resonator-ready-placement-timer-start tree={2}/{3}@{4} " +
 					"resonator={5} fancy-site={6} fallback-deadline={7} delay={8}",
 					player, world.WorldTick, project.TreeActorId, project.TreeType,
 					project.TreeLocation, project.ResonatorType, project.ResonatorLocation,
 					project.ReadyPlacementDeadlineTick,
 					baseBuilder.Info.TiberiumFieldReadyPlacementFallbackDelay);
+			}
+
 			retainReady = true;
 			var fancyLegal = buildingInfo != null && IsLegalResonatorSite(project.ResonatorLocation,
 				actorInfo, buildingInfo, world.GetActorById(project.TreeActorId));

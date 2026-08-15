@@ -185,6 +185,16 @@ def rules(block_west: str | None, block_east: str | None) -> str:
 \t\tOpeningDebugLogging: true
 \t\tTiberiumFieldTreeTypes: split3
 
+CNC102FACT:
+\tInherits: FACT
+\tRenderSprites:
+\t\tImage: fact
+\t-Transforms:
+\t-TransformsIntoMobile:
+\t-TransformsIntoPassenger:
+\t-TransformsIntoRepairable:
+\t-TransformsIntoTransforms:
+
 World:
 \tLuaScript:
 \t\tScripts: cnc102.lua
@@ -207,8 +217,24 @@ World:
 \t\tUpgrades: upgrade.covert1
 """, f"""WorldLoaded = function()
 \tNeutral = Player.GetPlayer("Neutral")
-\tPlayer.GetPlayer("Multi0").Cash = 100000
-\tPlayer.GetPlayer("Multi1").Cash = 100000
+\tPlayer.GetPlayer("Multi0").Cash = 5000
+\tPlayer.GetPlayer("Multi1").Cash = 5000
+\tfor i = 1, 6 do
+\t\tTrigger.AfterDelay(DateTime.Seconds(i * 10), function()
+\t\t\tPlayer.GetPlayer("Multi0").Cash = 5000
+\t\t\tPlayer.GetPlayer("Multi1").Cash = 5000
+\t\tend)
+\tend
+\tTrigger.AfterDelay(DateTime.Seconds(65), function()
+\t\tPlayer.GetPlayer("Multi0").Cash = 100000
+\t\tPlayer.GetPlayer("Multi1").Cash = 100000
+\tend)
+\tTrigger.AfterDelay(DateTime.Seconds(66), function()
+\t\tfor i = 0, 7 do
+\t\t\tActor.Create("cnc102fact", true, {{ Owner = Player.GetPlayer("Multi0"), Location = CPos.New(10 + i * 4, 185) }})
+\t\t\tActor.Create("cnc102fact", true, {{ Owner = Player.GetPlayer("Multi1"), Location = CPos.New(60 + i * 4, 185) }})
+\t\tend
+\tend)
 \tTrigger.AfterDelay(DateTime.Seconds(88), function()
 {blocker_body}
 \tend)

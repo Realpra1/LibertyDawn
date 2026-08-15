@@ -132,7 +132,13 @@ namespace OpenRA.Mods.Common.Traits
 
 		bool TickQueue(IBot bot, ProductionQueue queue)
 		{
-			var currentBuilding = queue.AllQueued().FirstOrDefault();
+			var queuedBuildings = queue.AllQueued().ToArray();
+			var currentBuilding = queuedBuildings.FirstOrDefault(item =>
+				baseBuilder.TiberiumFieldManager?.OwnsReadyProduction(queue.Actor.ActorID, item.Item) == true) ??
+				queuedBuildings.FirstOrDefault();
+			var retainedReadyFieldBuilding = currentBuilding != null &&
+				baseBuilder.TiberiumFieldManager?.OwnsReadyProduction(
+					queue.Actor.ActorID, currentBuilding.Item) == true;
 			if (currentBuilding != null)
 			{
 				var priorityRecoveryActive = baseBuilder.OpeningActive ||
@@ -162,7 +168,7 @@ namespace OpenRA.Mods.Common.Traits
 				bot.QueueOrder(Order.StartProduction(queue.Actor, item.Name, 1));
 				baseBuilder.LogProductionSpend(item, queue);
 			}
-			else if (currentBuilding != null && currentBuilding.Done)
+			else if (currentBuilding != null && (currentBuilding.Done || retainedReadyFieldBuilding))
 			{
 				// Production is complete
 				// Choose the placement logic
