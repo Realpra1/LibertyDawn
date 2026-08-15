@@ -43,6 +43,25 @@ namespace OpenRA.Test
 		}
 
 		[Test]
+		public void InvalidTransportOrPassengerCanBeReleasedWithoutDroppingSurvivingPairs()
+		{
+			var coordinator = new TransportMissionCoordinator(1);
+			var mission = coordinator.TryReserve(new uint[] { 10, 11, 20, 21, 30, 31 });
+
+			coordinator.ReleaseActors(mission, new uint[] { 10, 11 });
+			Assert.That(coordinator.IsReserved(10), Is.False, "Destroyed carrier reservation must be released.");
+			Assert.That(coordinator.IsReserved(11), Is.False, "Its surviving passenger must return to normal AI ownership.");
+			Assert.That(coordinator.IsReserved(20), Is.True);
+			Assert.That(coordinator.IsReserved(21), Is.True);
+
+			coordinator.ReleaseActors(mission, new uint[] { 30, 31 });
+			Assert.That(coordinator.IsReserved(30), Is.False, "Mirrored passenger invalidation must release the pair.");
+			Assert.That(coordinator.IsReserved(31), Is.False);
+			Assert.That(coordinator.IsReserved(20), Is.True, "A valid surviving pair must keep its mission ownership.");
+			Assert.That(coordinator.MissionCount, Is.EqualTo(1));
+		}
+
+		[Test]
 		public void CarrierAndExitClaimsReplaceAtomicallyAndReleaseWithMission()
 		{
 			var coordinator = new TransportMissionCoordinator(2);

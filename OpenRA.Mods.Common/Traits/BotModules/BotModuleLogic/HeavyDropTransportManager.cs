@@ -145,6 +145,10 @@ namespace OpenRA.Mods.Common.Traits
 			if (wave == null)
 				return;
 
+			DiscardInvalidPairs(bot);
+			if (wave == null)
+				return;
+
 			if (wave.Stage == WaveStage.Gathering)
 				AdvanceGathering(bot);
 			else if (wave.Stage == WaveStage.Travelling)
@@ -160,6 +164,9 @@ namespace OpenRA.Mods.Common.Traits
 
 			var pair = wave.Pairs.FirstOrDefault(p => p.Transport == actor);
 			if (pair == null)
+				return;
+
+			if (!IsTransportUsable(actor))
 				return;
 
 			var cargo = actor.TraitOrDefault<Cargo>();
@@ -238,8 +245,11 @@ namespace OpenRA.Mods.Common.Traits
 			nextWaveTick = world.WorldTick + info.HeavyDropCooldownTicks;
 			foreach (var pair in pairs)
 			{
-				bot.QueueOrder(new Order("Stop", pair.Transport, false));
-				bot.QueueOrder(new Order("Stop", pair.Passenger, false));
+				if (!IsPairUsable(pair))
+					continue;
+
+				QueueStopIfUsable(bot, pair.Transport);
+				QueueStopIfUsable(bot, pair.Passenger);
 				IssueRoutedLanding(pair.Transport, pair.PickupDestination);
 				pair.PickupOrdered = true;
 			}
@@ -277,6 +287,9 @@ namespace OpenRA.Mods.Common.Traits
 			foreach (var pair in livePairs.Where(p => !IsLoaded(p) && p.PickupOrdered &&
 				!p.BoardingOrdered && PickupReady(p)).OrderBy(p => p.Passenger.ActorID))
 			{
+				if (!IsPairUsable(pair))
+					continue;
+
 				bot.QueueOrder(new Order("EnterTransport", pair.Passenger,
 					Target.FromActor(pair.Transport), false));
 				pair.BoardingOrdered = true;
@@ -287,7 +300,7 @@ namespace OpenRA.Mods.Common.Traits
 
 			foreach (var pair in livePairs.Where(p => !IsLoaded(p) && BoardingOrderExpired(p)))
 			{
-				bot.QueueOrder(new Order("Stop", pair.Passenger, false));
+				QueueStopIfUsable(bot, pair.Passenger);
 				pair.BoardingOrdered = false;
 				Debug("wave {0} recovering expired boarding approach: carrier={1}, passenger={2}",
 					wave.Id, pair.Transport, pair.Passenger);
@@ -313,16 +326,65 @@ namespace OpenRA.Mods.Common.Traits
 
 		void DiscardUnloadedPairs(IBot bot)
 		{
-			var unloaded = wave.Pairs.Where(p => !IsLoaded(p)).ToList();
+			var unloaded = wave.Pairs.Where(p => IsPairUsable(p) && !IsLoaded(p)).ToList();
 			foreach (var pair in unloaded)
 			{
-				bot.QueueOrder(new Order("Stop", pair.Transport, false));
-				bot.QueueOrder(new Order("Stop", pair.Passenger, false));
+				QueueStopIfUsable(bot, pair.Transport);
+				ReleasePassengerReservation(pair.Passenger);
+				QueueStopIfUsable(bot, pair.Passenger);
 			}
 
-			wave.Pairs.RemoveAll(p => !IsLoaded(p));
+			wave.Pairs.RemoveAll(unloaded.Contains);
+			ReleasePairs(unloaded);
+			squadManager()?.RestoreTransportedUnits(unloaded.Select(p => p.Passenger).ToList());
 			if (unloaded.Count > 0)
 				Debug("wave {0} released {1} unassembled pairs before departure", wave.Id, unloaded.Count);
+		}
+
+		void DiscardInvalidPairs(IBot bot)
+		{
+			var invalid = wave.Pairs.Where(p => !IsPairUsable(p)).ToList();
+			if (invalid.Count == 0)
+				return;
+
+			var restoredPassengers = new List<Actor>();
+			foreach (var pair in invalid)
+			{
+				QueueStopIfUsable(bot, pair.Transport);
+				if (IsActorUsable(pair.Passenger))
+				{
+					ReleasePassengerReservation(pair.Passenger);
+					QueueStopIfUsable(bot, pair.Passenger);
+					restoredPassengers.Add(pair.Passenger);
+				}
+			}
+
+			wave.Pairs.RemoveAll(invalid.Contains);
+			ReleasePairs(invalid);
+			squadManager()?.RestoreTransportedUnits(restoredPassengers);
+			Debug("wave {0} discarded {1} invalid lifecycle pairs; survivors={2}",
+				wave.Id, invalid.Count, restoredPassengers.Count);
+
+			if (wave.Pairs.Count == 0)
+				FinishWave(bot, "all pairs invalidated");
+		}
+
+		void ReleasePairs(IEnumerable<Pair> pairs)
+		{
+			coordinator.ReleaseActors(wave.Id, pairs.SelectMany(p =>
+				new[] { p.Transport?.ActorID ?? 0, p.Passenger?.ActorID ?? 0 }).Where(id => id != 0));
+		}
+
+		static void ReleasePassengerReservation(Actor passenger)
+		{
+			if (IsActorUsable(passenger))
+				passenger.TraitOrDefault<Passenger>()?.Unreserve(passenger);
+		}
+
+		static void QueueStopIfUsable(IBot bot, Actor actor)
+		{
+			if (IsActorUsable(actor))
+				bot.QueueOrder(new Order("Stop", actor, false));
 		}
 
 		void DebugGatheringFailure(List<Pair> pairs, int loaded)
@@ -379,7 +441,7 @@ namespace OpenRA.Mods.Common.Traits
 					if (wave.ReturningToAssembly)
 					{
 						foreach (var pair in loadedPairs)
-							bot.QueueOrder(new Order("Stop", pair.Transport, false));
+							QueueStopIfUsable(bot, pair.Transport);
 
 						Debug("wave {0} holding outside known danger: no safe assembly unload-plan set; reason={1}",
 							wave.Id, rejection);
@@ -431,6 +493,9 @@ namespace OpenRA.Mods.Common.Traits
 					info.HeavyDropUnloadRangeCells * info.HeavyDropUnloadRangeCells)
 				{
 					pair.LastOrderTick = world.WorldTick;
+					if (!IsPairUsable(pair))
+						continue;
+
 					bot.QueueOrder(TransportUnloadOrder.Create(world, pair.Transport, pair.UnloadPlan));
 					Debug("wave {0} carrier {1} committing exact unload: carrierCell={2}, exit={3}, " +
 						"passenger={4}, revision={5}, snapshot={6}, outcome={7}", wave.Id, pair.Transport,
@@ -491,6 +556,9 @@ namespace OpenRA.Mods.Common.Traits
 
 			foreach (var pair in carrying.Where(ReadyToRetry))
 			{
+				if (!IsPairUsable(pair))
+					continue;
+
 				bot.QueueOrder(TransportUnloadOrder.Create(world, pair.Transport, pair.UnloadPlan));
 				pair.LastOrderTick = world.WorldTick;
 			}
@@ -508,7 +576,7 @@ namespace OpenRA.Mods.Common.Traits
 				!IssueWaveCurrentFallback(bot, loadedPairs, reason))
 			{
 				foreach (var pair in loadedPairs)
-					bot.QueueOrder(new Order("Stop", pair.Transport, false));
+					QueueStopIfUsable(bot, pair.Transport);
 
 				Debug("wave {0} holding outside known danger: no safe assembly plan", wave.Id);
 			}
@@ -516,6 +584,9 @@ namespace OpenRA.Mods.Common.Traits
 
 		bool IssueWaveCurrentFallback(IBot bot, List<Pair> pairs, string reason)
 		{
+			if (pairs.Any(p => !IsPairUsable(p) || !IsLoaded(p)))
+				return false;
+
 			var unavailable = new HashSet<CPos>();
 			var replacements = new List<KeyValuePair<Pair, TransportUnloadPlan>>();
 			foreach (var pair in pairs.OrderBy(p => p.Transport.ActorID))
@@ -567,6 +638,12 @@ namespace OpenRA.Mods.Common.Traits
 
 		bool TryPlanWave(List<Pair> pairs, out string rejection)
 		{
+			if (pairs.Count == 0 || pairs.Any(p => !IsPairUsable(p) || !IsLoaded(p)))
+			{
+				rejection = "carrier or passenger lifecycle invalidated";
+				return false;
+			}
+
 			var unavailable = new HashSet<CPos>();
 			var replacements = new List<KeyValuePair<Pair, TransportUnloadPlan>>();
 			foreach (var pair in pairs.OrderBy(p => p.Transport.ActorID))
@@ -607,6 +684,12 @@ namespace OpenRA.Mods.Common.Traits
 
 		bool RevalidateWavePlans(List<Pair> pairs, out string rejection)
 		{
+			if (pairs.Count == 0 || pairs.Any(p => !IsPairUsable(p) || !IsLoaded(p)))
+			{
+				rejection = "carrier or passenger lifecycle invalidated";
+				return false;
+			}
+
 			var unavailable = new HashSet<CPos>();
 			var plans = new List<TransportUnloadPlan>();
 			foreach (var pair in pairs.OrderBy(p => p.Transport.ActorID))
@@ -630,7 +713,7 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				if (!IssuePairRoute(bot, pair))
 				{
-					bot.QueueOrder(new Order("Stop", pair.Transport, false));
+					QueueStopIfUsable(bot, pair.Transport);
 					Debug("wave {0} route failed without unsafe direct append: carrier={1}, carrierCell={2}",
 						wave.Id, pair.Transport, pair.UnloadPlan?.CarrierCell);
 				}
@@ -643,6 +726,9 @@ namespace OpenRA.Mods.Common.Traits
 
 		bool IssuePairRoute(IBot bot, Pair pair)
 		{
+			if (!IsPairUsable(pair) || !IsLoaded(pair) || pair.UnloadPlan == null)
+				return false;
+
 			var route = unloadPlanner.Route(pair.Transport, pair.UnloadPlan);
 			if (route == null || (route.Count == 0 && pair.Transport.Location != pair.UnloadPlan.CarrierCell))
 				return false;
@@ -661,6 +747,9 @@ namespace OpenRA.Mods.Common.Traits
 
 		void IssueRoutedLanding(Actor transport, CPos destination)
 		{
+			if (!IsTransportUsable(transport))
+				return;
+
 			issueRoutedAirMove(transport, destination,
 				new Order("Land", transport, Target.FromCell(world, destination), true));
 		}
@@ -674,8 +763,9 @@ namespace OpenRA.Mods.Common.Traits
 			var loadedPairs = wave.Pairs.Where(p => IsPairUsable(p) && IsLoaded(p)).ToList();
 			foreach (var pair in wave.Pairs.Where(p => IsPairUsable(p) && !IsLoaded(p)))
 			{
-				bot.QueueOrder(new Order("Stop", pair.Passenger, false));
-				bot.QueueOrder(new Order("Stop", pair.Transport, false));
+				ReleasePassengerReservation(pair.Passenger);
+				QueueStopIfUsable(bot, pair.Passenger);
+				QueueStopIfUsable(bot, pair.Transport);
 				pair.LastOrderTick = world.WorldTick;
 			}
 
@@ -692,7 +782,7 @@ namespace OpenRA.Mods.Common.Traits
 			if (!IssueWaveTravel(bot, $"abort: {reason}; returning for planned safe unload"))
 			{
 				foreach (var pair in loadedPairs)
-					bot.QueueOrder(new Order("Stop", pair.Transport, false));
+					QueueStopIfUsable(bot, pair.Transport);
 
 				Debug("wave {0} aborted and holding loaded carriers: no safe assembly unload plans", wave.Id);
 			}
@@ -878,19 +968,20 @@ namespace OpenRA.Mods.Common.Traits
 
 		bool IsPairUsable(Pair pair)
 		{
-			return IsTransportUsable(pair.Transport) && pair.Passenger != null && !pair.Passenger.IsDead &&
+			return pair != null && IsTransportUsable(pair.Transport) && pair.Passenger != null && !pair.Passenger.IsDead &&
 				(pair.Passenger.IsInWorld || pair.Passenger.TraitOrDefault<Passenger>()?.Transport == pair.Transport);
 		}
 
-		static bool IsLoaded(Pair pair)
+		bool IsLoaded(Pair pair)
 		{
-			return pair.Transport.TraitOrDefault<Cargo>()?.Passengers.Any(a => a == pair.Passenger) == true;
+			return IsPairUsable(pair) &&
+				pair.Transport.TraitOrDefault<Cargo>()?.Passengers.Any(a => a == pair.Passenger) == true;
 		}
 
-		static bool IsBoarding(Pair pair)
+		bool IsBoarding(Pair pair)
 		{
-			return pair.PickupOrdered || pair.BoardingOrdered ||
-				(pair.Passenger.TraitOrDefault<Passenger>()?.ReservedCargo == pair.Transport.TraitOrDefault<Cargo>());
+			return IsPairUsable(pair) && (pair.PickupOrdered || pair.BoardingOrdered ||
+				pair.Passenger.TraitOrDefault<Passenger>()?.ReservedCargo == pair.Transport.TraitOrDefault<Cargo>());
 		}
 
 		bool BoardingOrderExpired(Pair pair)
@@ -917,7 +1008,8 @@ namespace OpenRA.Mods.Common.Traits
 
 		static bool IsCargoReserved(Pair pair)
 		{
-			return pair.Passenger.TraitOrDefault<Passenger>()?.ReservedCargo ==
+			return pair != null && IsTransportUsable(pair.Transport) && IsActorUsable(pair.Passenger) &&
+				pair.Passenger.TraitOrDefault<Passenger>()?.ReservedCargo ==
 				pair.Transport.TraitOrDefault<Cargo>();
 		}
 
@@ -944,7 +1036,8 @@ namespace OpenRA.Mods.Common.Traits
 
 		static bool IsCarrierIdle(Actor actor)
 		{
-			return actor.IsIdle || actor.CurrentActivity == null || actor.CurrentActivity is FlyIdle;
+			return IsTransportUsable(actor) &&
+				(actor.IsIdle || actor.CurrentActivity == null || actor.CurrentActivity is FlyIdle);
 		}
 
 		static int EconomicValue(Actor actor)
