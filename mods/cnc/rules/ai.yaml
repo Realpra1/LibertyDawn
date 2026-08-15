@@ -1030,6 +1030,7 @@ Player:
 		TiberiumFieldPerimeterStandoff: 4
 		TiberiumFieldExtensionStep: 6
 		TiberiumFieldMaintenanceInterval: 1500
+		TiberiumFieldReadyPlacementFallbackDelay: 1500
 		TiberiumFieldDebugLogging: true
 		SmartEconomyRefineryTypes: proc
 		SmartEconomyMcvTypes: mcv
@@ -1795,6 +1796,7 @@ Player:
 		TiberiumFieldPerimeterStandoff: 4
 		TiberiumFieldExtensionStep: 6
 		TiberiumFieldMaintenanceInterval: 1500
+		TiberiumFieldReadyPlacementFallbackDelay: 1500
 		TiberiumFieldDebugLogging: true
 		SmartEconomyRefineryTypes: proc
 		SmartEconomyMcvTypes: mcv

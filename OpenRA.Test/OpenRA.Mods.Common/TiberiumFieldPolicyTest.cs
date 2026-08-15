@@ -202,6 +202,19 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
+		public void ReadyPlacementFallbackStartsOnlyAtReadinessAndHonorsExactDeadline()
+		{
+			Assert.That(TiberiumFieldPolicy.ReadyPlacementDeadline(100, 0, false, 1500), Is.Zero);
+			var deadline = TiberiumFieldPolicy.ReadyPlacementDeadline(100, 0, true, 1500);
+			Assert.That(deadline, Is.EqualTo(1600));
+			Assert.That(TiberiumFieldPolicy.ReadyPlacementDeadline(800, deadline, true, 1500),
+				Is.EqualTo(deadline));
+			Assert.That(TiberiumFieldPolicy.UseSimplePlacementFallback(false, 1599, deadline), Is.False);
+			Assert.That(TiberiumFieldPolicy.UseSimplePlacementFallback(false, 1600, deadline), Is.True);
+			Assert.That(TiberiumFieldPolicy.UseSimplePlacementFallback(true, 1600, deadline), Is.False);
+		}
+
+		[Test]
 		public void NoProgressDeferralWaitsForCadenceAndDoesNotMaskAdmission()
 		{
 			Assert.That(TiberiumFieldPolicy.ShouldDeferNoProgress(1499, 1500, false, false), Is.False);

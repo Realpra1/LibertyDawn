@@ -176,6 +176,9 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Ticks to wait for a placed Resonator to become live and powered.")]
 		public readonly int TiberiumFieldPlacementTimeout = 3000;
 
+		[Desc("Ticks a fully produced Resonator keeps trying its planned field site before ordinary refinery placement is allowed.")]
+		public readonly int TiberiumFieldReadyPlacementFallbackDelay = 1500;
+
 		[Desc("Consecutive failed field placements before entering a visible deferred state.")]
 		public readonly int TiberiumFieldMaximumRetries = 3;
 
