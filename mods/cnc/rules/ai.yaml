@@ -715,6 +715,8 @@ Player:
 		McvFactoryTypes: weap,afld
 	BaseBuilderBotModule@cabal:
 		RequiresCondition: enable-cabal-ai
+		EnableOpeningPrefix: true
+		EnableQueueStallRecovery: true
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: false
 		MaximumWallSegments: 24
@@ -730,6 +732,7 @@ Player:
 		ConstructionYardTypes: fact
 		RefineryTypes: proc
 		PowerTypes: nuke, nuk2
+		RadarRecoveryTypes: hq
 		BarracksTypes: pyle, hand
 		VehiclesFactoryTypes: weap, afld
 		ProductionTypes: pyle, hand, weap, afld, hpad, hq
@@ -812,6 +815,8 @@ Player:
 			harv: 8
 	BaseBuilderBotModule@watson:
 		RequiresCondition: enable-watson-ai
+		EnableOpeningPrefix: true
+		EnableQueueStallRecovery: true
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: false
 		MaximumWallSegments: 24
@@ -827,6 +832,7 @@ Player:
 		ConstructionYardTypes: fact
 		RefineryTypes: proc
 		PowerTypes: nuke,nuk2
+		RadarRecoveryTypes: hq
 		BarracksTypes: pyle,hand
 		VehiclesFactoryTypes: weap,afld
 		ProductionTypes: pyle,hand,weap,afld,hpad, hq
@@ -909,6 +915,8 @@ Player:
 			harv: 8
     BaseBuilderBotModule@hal9001:
 		RequiresCondition: enable-hal9001-ai
+		EnableOpeningPrefix: true
+		EnableQueueStallRecovery: true
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: false
 		MaximumWallSegments: 24
@@ -924,6 +932,7 @@ Player:
 		ConstructionYardTypes: fact
 		RefineryTypes: proc
 		PowerTypes: nuke,nuk2
+		RadarRecoveryTypes: hq
 		BarracksTypes: pyle,hand
 		VehiclesFactoryTypes: weap,afld
 		ProductionTypes: pyle,hand,weap,afld,hpad, hq
@@ -1008,6 +1017,8 @@ Player:
 			harv: 8
     BaseBuilderBotModule@brutalis:
 		RequiresCondition: enable-brutalis-ai || enable-wavemaker-ai
+		EnableOpeningPrefix: true
+		EnableQueueStallRecovery: true
 		EnableSmartEconomy: true
 		EnableTiberiumFieldPolicy: true
 		TiberiumFieldTreeTypes: split2, split3, splitblue, splitred
@@ -1019,6 +1030,7 @@ Player:
 		TiberiumFieldPerimeterStandoff: 4
 		TiberiumFieldExtensionStep: 6
 		TiberiumFieldMaintenanceInterval: 1500
+		TiberiumFieldReadyPlacementFallbackDelay: 1500
 		TiberiumFieldDebugLogging: true
 		SmartEconomyRefineryTypes: proc
 		SmartEconomyMcvTypes: mcv
@@ -1080,6 +1092,7 @@ Player:
 		ConstructionYardTypes: fact
 		RefineryTypes: proc, resonator
 		PowerTypes: nuke,nuk2
+		RadarRecoveryTypes: hq
 		BarracksTypes: pyle,hand
 		VehiclesFactoryTypes: weap,afld
 		ProductionTypes: pyle,hand,weap,afld,hpad,hq
@@ -1242,6 +1255,8 @@ Player:
             mcv: 3000
     BaseBuilderBotModule@viki:
 		RequiresCondition: enable-viki-ai
+		EnableOpeningPrefix: true
+		EnableQueueStallRecovery: true
 		EnableSmartEconomy: true
 		SmartEconomyRefineryTypes: proc
 		SmartEconomyMcvTypes: mcv
@@ -1279,6 +1294,7 @@ Player:
 		ConstructionYardTypes: fact
 		RefineryTypes: proc
 		PowerTypes: nuke,nuk2
+		RadarRecoveryTypes: hq
 		BarracksTypes: pyle,hand
 		VehiclesFactoryTypes: weap,afld
 		ProductionTypes: pyle,hand,weap,afld,hpad,hq
@@ -1415,6 +1431,8 @@ Player:
             mcv: 1
     BaseBuilderBotModule@skynet:
 		RequiresCondition: enable-skynet-ai
+		EnableOpeningPrefix: true
+		EnableQueueStallRecovery: true
 		EnableSmartEconomy: true
 		SmartEconomyRefineryTypes: proc
 		SmartEconomyMcvTypes: mcv
@@ -1460,6 +1478,7 @@ Player:
 		ConstructionYardTypes: fact
 		RefineryTypes: proc
 		PowerTypes: nuke,nuk2
+		RadarRecoveryTypes: hq
 		BarracksTypes: pyle,hand
 		VehiclesFactoryTypes: weap,afld
 		ProductionTypes: pyle,hand,weap,afld,hpad,hq
@@ -1764,6 +1783,8 @@ Player:
             mhq: 1
     BaseBuilderBotModule@ironreaper:
 		RequiresCondition: enable-ironreaper-ai
+		EnableOpeningPrefix: true
+		EnableQueueStallRecovery: true
 		EnableSmartEconomy: true
 		EnableTiberiumFieldPolicy: true
 		TiberiumFieldTreeTypes: split2, split3, splitblue, splitred
@@ -1775,6 +1796,7 @@ Player:
 		TiberiumFieldPerimeterStandoff: 4
 		TiberiumFieldExtensionStep: 6
 		TiberiumFieldMaintenanceInterval: 1500
+		TiberiumFieldReadyPlacementFallbackDelay: 1500
 		TiberiumFieldDebugLogging: true
 		SmartEconomyRefineryTypes: proc
 		SmartEconomyMcvTypes: mcv
@@ -1832,6 +1854,7 @@ Player:
 		ConstructionYardTypes: fact
 		RefineryTypes: proc, resonator
 		PowerTypes: nuke, nuk2
+		RadarRecoveryTypes: hq
         PlaceAsDefenses: nuke, hand, pyle, weap, afld, proc, fix
         PlaceAsDefenseChance: 33
 		BarracksTypes: pyle,hand
@@ -2019,6 +2042,8 @@ Player:
             upgrade.recon3: 32000
     BaseBuilderBotModule@Easy:
 		RequiresCondition: enable-Easy-ai
+		EnableOpeningPrefix: true
+		EnableQueueStallRecovery: true
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: false
 		MaximumWallSegments: 24
@@ -2035,6 +2060,7 @@ Player:
 		ConstructionYardTypes: fact
 		RefineryTypes: proc
 		PowerTypes: nuke,nuk2
+		RadarRecoveryTypes: hq
 		BarracksTypes: pyle,hand
 		VehiclesFactoryTypes: weap,afld
 		ProductionTypes: pyle,hand,weap,afld,hpad,hq
@@ -2165,6 +2191,8 @@ Player:
             rmbo: 2
     BaseBuilderBotModule@Easiest:
 		RequiresCondition: enable-Easiest-ai
+		EnableOpeningPrefix: true
+		EnableQueueStallRecovery: true
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: false
 		MaximumWallSegments: 24
@@ -2181,6 +2209,7 @@ Player:
 		ConstructionYardTypes: fact
 		RefineryTypes: proc
 		PowerTypes: nuke,nuk2
+		RadarRecoveryTypes: hq
 		BarracksTypes: pyle,hand
 		VehiclesFactoryTypes: weap,afld
 		ProductionTypes: pyle,hand,weap,afld,hpad,hq

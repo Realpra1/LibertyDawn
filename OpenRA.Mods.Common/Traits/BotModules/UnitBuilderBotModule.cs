@@ -172,6 +172,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly HashSet<string> sampledUnitTypes = new HashSet<string>();
 
 		IBotRequestPauseUnitProduction[] requestPause;
+		BaseBuilderBotModule[] baseBuilders;
 		PlayerResources playerResources;
 		PlayerStatistics playerStats;
 		int idleUnitCount;
@@ -218,6 +219,7 @@ namespace OpenRA.Mods.Common.Traits
 		protected override void Created(Actor self)
 		{
 			requestPause = self.Owner.PlayerActor.TraitsImplementing<IBotRequestPauseUnitProduction>().ToArray();
+			baseBuilders = self.Owner.PlayerActor.TraitsImplementing<BaseBuilderBotModule>().ToArray();
 			playerResources = self.Owner.PlayerActor.Trait<PlayerResources>();
 			playerStats = self.Owner.PlayerActor.Trait<PlayerStatistics>();
 			if (Info.AdaptiveUnitCap)
@@ -235,6 +237,9 @@ namespace OpenRA.Mods.Common.Traits
 
 		void IBotTick.BotTick(IBot bot)
 		{
+			if (baseBuilders.Any(b => b.QueueStallRecoveryActive))
+				return;
+
 			if (Info.AdaptiveProductionDebugLogging && !adaptiveInitializationLogged)
 			{
 				adaptiveInitializationLogged = true;

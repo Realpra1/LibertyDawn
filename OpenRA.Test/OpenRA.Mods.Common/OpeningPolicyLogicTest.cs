@@ -29,6 +29,31 @@ namespace OpenRA.Test.Mods.Common
 		};
 
 		[Test]
+		public void FirstRefineryHoldsOnlyActionableOrCommittedOptionalConstruction()
+		{
+			Assert.That(OpeningPolicyLogic.HoldOptionalConstructionForFirstRefinery(true, 0, false, true), Is.True,
+				"An actionable initial Refinery must win the next idle construction commitment.");
+			Assert.That(OpeningPolicyLogic.HoldOptionalConstructionForFirstRefinery(true, 0, true, false), Is.True,
+				"A started Refinery must retain priority until it becomes live.");
+			Assert.That(OpeningPolicyLogic.HoldOptionalConstructionForFirstRefinery(true, 0, false, false), Is.False,
+				"An unavailable or unaffordable goal must not stall independent construction.");
+			Assert.That(OpeningPolicyLogic.HoldOptionalConstructionForFirstRefinery(false, 0, true, true), Is.False,
+				"The hold is scoped to the protected Refinery goal.");
+			Assert.That(OpeningPolicyLogic.HoldOptionalConstructionForFirstRefinery(true, 1, true, true), Is.False,
+				"Optional construction must resume as soon as the Refinery is live.");
+		}
+
+		[Test]
+		public void AdvancedUnitMilestonesWaitForTheRequiredStructurePrefix()
+		{
+			Assert.That(OpeningPolicyLogic.RequiredPrefixComplete(new[] { 0, 1 }, 3), Is.False);
+			Assert.That(OpeningPolicyLogic.RequiredPrefixComplete(new[] { 0, 1, 3 }, 3), Is.False);
+			Assert.That(OpeningPolicyLogic.RequiredPrefixComplete(new[] { 0, 1, 2 }, 3), Is.True);
+			Assert.That(OpeningPolicyLogic.RequiredPrefixComplete(new[] { 0, 1, 2, 4 }, 3), Is.True);
+			Assert.That(OpeningPolicyLogic.RequiredPrefixComplete(null, 3), Is.False);
+		}
+
+		[Test]
 		public void PicksPreferredAlternativeFromFirstBuildableGoal()
 		{
 			var goal = OpeningPolicyLogic.FirstBuildableGoal(

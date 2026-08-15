@@ -69,6 +69,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly World world;
 		readonly Player player;
 		IBotRequestUnitProduction[] unitProduction;
+		IBotRequestPauseUnitProduction[] productionPauses;
 		PlayerStatistics playerStatistics;
 		int nextRequestTick;
 		int nextRallyRetryTick;
@@ -88,6 +89,7 @@ namespace OpenRA.Mods.Common.Traits
 		protected override void Created(Actor self)
 		{
 			unitProduction = player.PlayerActor.TraitsImplementing<IBotRequestUnitProduction>().ToArray();
+			productionPauses = player.PlayerActor.TraitsImplementing<IBotRequestPauseUnitProduction>().ToArray();
 			playerStatistics = player.PlayerActor.Trait<PlayerStatistics>();
 		}
 
@@ -115,6 +117,13 @@ namespace OpenRA.Mods.Common.Traits
 			}
 
 			if (world.WorldTick < nextRequestTick)
+				return;
+
+			// Emergency defenders above remain available, but the discretionary opening
+			// garrison must respect economy owners that are protecting construction cash.
+			// These requests are external UnitBuilder work and would otherwise bypass its
+			// ordinary random-production pause while the first Refinery is still producing.
+			if (productionPauses.Any(p => p.PauseUnitProduction))
 				return;
 
 			if (Info.RifleTypes.Concat(Info.RocketTypes).Any(type => unitProduction.Any(p => p.IsTraitEnabled() &&

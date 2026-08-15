@@ -11,6 +11,7 @@
 
 using System.Collections.Generic;
 using System.Linq;
+using OpenRA.Mods.Common.Traits.Radar;
 using OpenRA.Primitives;
 using OpenRA.Traits;
 
@@ -64,6 +65,9 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Use the configured ordered opening goals before ordinary structure selection.")]
 		public readonly bool EnableOpeningPolicy = false;
 
+		[Desc("Require the common Power, Barracks, Refinery opening prefix without enabling the advanced continuation.")]
+		public readonly bool EnableOpeningPrefix = false;
+
 		[Desc("Opening structure alternatives. Only the earliest incomplete goal is coordinated; unrelated idle queues use normal logic.")]
 		public readonly string[] OpeningPowerTypes = System.Array.Empty<string>();
 		public readonly string[] OpeningSiloTypes = System.Array.Empty<string>();
@@ -96,6 +100,18 @@ namespace OpenRA.Mods.Common.Traits
 
 		[Desc("Write opening goal, request, completion, and stall diagnostics to debug.log.")]
 		public readonly bool OpeningDebugLogging = false;
+
+		[Desc("Ordered radar-capable buildings used to replace a radar after one was established and lost.")]
+		public readonly string[] RadarRecoveryTypes = System.Array.Empty<string>();
+
+		[Desc("Ticks to retain a same-tick global radar recovery reservation before retrying an idle queue.")]
+		public readonly int RadarRecoveryReservationTimeout = 250;
+
+		[Desc("Ticks between bounded live-provider and commitment observations.")]
+		public readonly int RadarRecoveryScanInterval = 25;
+
+		[Desc("Write bounded radar establishment, reservation, and release transitions to debug.log.")]
+		public readonly bool RadarRecoveryDebugLogging = false;
 
 		[Desc("Owned repair-building types that should scale with the repairable aircraft fleet.")]
 		public readonly HashSet<string> AirRepairBuildingTypes = new HashSet<string>();
@@ -159,6 +175,9 @@ namespace OpenRA.Mods.Common.Traits
 
 		[Desc("Ticks to wait for a placed Resonator to become live and powered.")]
 		public readonly int TiberiumFieldPlacementTimeout = 3000;
+
+		[Desc("Ticks a fully produced Resonator keeps trying its planned field site before ordinary refinery placement is allowed.")]
+		public readonly int TiberiumFieldReadyPlacementFallbackDelay = 1500;
 
 		[Desc("Consecutive failed field placements before entering a visible deferred state.")]
 		public readonly int TiberiumFieldMaximumRetries = 3;
@@ -350,6 +369,21 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Write smart-economy observations, transitions, and requests to debug.log.")]
 		public readonly bool SmartEconomyDebugLogging = false;
 
+		[Desc("Enable bounded player-level recovery when compatible production fronts demonstrate no paid progress.")]
+		public readonly bool EnableQueueStallRecovery = false;
+
+		[Desc("Bot types that retain this BaseBuilder configuration but disable queue-stall recovery for matched controls.")]
+		public readonly HashSet<string> QueueStallRecoveryExcludedBotTypes = new HashSet<string>();
+
+		[Desc("Ticks between bounded queue-stall observations.")]
+		public readonly int QueueStallRecoveryScanInterval = 25;
+
+		[Desc("Ticks of absent aggregate paid progress required before queue-stall recovery may act.")]
+		public readonly int QueueStallRecoveryActivationTicks = 250;
+
+		[Desc("Write queue-stall recovery transitions and selected-item progress to debug.log.")]
+		public readonly bool QueueStallRecoveryDebugLogging = false;
+
 		[Desc("Radius in cells around a factory scanned for rally points by the AI.")]
 		public readonly int RallyPointScanRadius = 8;
 
@@ -460,6 +494,18 @@ namespace OpenRA.Mods.Common.Traits
 		public override void RulesetLoaded(Ruleset rules, ActorInfo ai)
 		{
 			base.RulesetLoaded(rules, ai);
+			if (RadarRecoveryTypes.Length > 0)
+			{
+				if (RadarRecoveryReservationTimeout <= 0 || RadarRecoveryScanInterval <= 0 ||
+					RadarRecoveryTypes.Distinct(System.StringComparer.Ordinal).Count() != RadarRecoveryTypes.Length)
+					throw new YamlException("Radar recovery types must be unique and use positive reservation and scan intervals.");
+
+				foreach (var actorType in RadarRecoveryTypes)
+					if (!rules.Actors.TryGetValue(actorType, out var actor) ||
+						actor.TraitInfoOrDefault<BuildingInfo>() == null || !actor.HasTraitInfo<ProvidesRadarInfo>())
+						throw new YamlException($"Radar recovery actor '{actorType}' must be a building with ProvidesRadar.");
+			}
+
 			if (EnableDefenseClusterPolicy)
 			{
 				if (DefenseClusterTowerTypes.Length == 0 || DefenseClusterRepairFacilityTypes.Length == 0 ||
@@ -551,6 +597,7 @@ namespace OpenRA.Mods.Common.Traits
 		IBotTick, IBotPositionsUpdated, IBotRespondToAttack, IBotRequestPauseUnitProduction,
 		IBotTemporaryUnitControl
 	{
+		const int OpeningRefineryGoal = 2;
 		const int OpeningRadarGoal = 5;
 		const int OpeningDefenseGoal = 8;
 
@@ -558,6 +605,14 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			public string Type;
 			public int Tick;
+		}
+
+		sealed class SiloBuildReservation
+		{
+			public uint QueueActorId;
+			public string Type;
+			public int Tick;
+			public int TargetCount;
 		}
 
 		public CPos GetRandomBaseCenter()
@@ -604,8 +659,12 @@ namespace OpenRA.Mods.Common.Traits
 		int nextOpeningProgressLogTick;
 		readonly Dictionary<uint, AirRepairBuildingReservation> airRepairBuildingReservations =
 			new Dictionary<uint, AirRepairBuildingReservation>();
+		SiloBuildReservation siloBuildReservation;
 		BaseBuilderSmartEconomyManager smartEconomy;
+		BaseBuilderQueueStallRecoveryManager queueStallRecovery;
 		BaseBuilderEconomyDefenseSamPlanner economyDefenseSam;
+		BaseBuilderRadarRecoveryManager radarRecovery;
+		BaseBuilderRadarStoragePressureManager radarStoragePressure;
 
 		readonly List<BaseBuilderQueueManager> builders = new List<BaseBuilderQueueManager>();
 		UnitBuilderBotModule[] unitBuilders;
@@ -635,9 +694,16 @@ namespace OpenRA.Mods.Common.Traits
 				playerResources, playerPower, resourceLayer);
 			if (Info.EnableSmartEconomy)
 				smartEconomy = new BaseBuilderSmartEconomyManager(this, player, playerResources, unitProduction);
+			if (Info.EnableQueueStallRecovery)
+				queueStallRecovery = new BaseBuilderQueueStallRecoveryManager(this, player, playerPower);
 			if (Info.EconomyDefenseSamTypes.Count > 0)
 				economyDefenseSam = new BaseBuilderEconomyDefenseSamPlanner(this, player, playerPower,
 					playerResources, techTree);
+			if (Info.RadarRecoveryTypes.Length > 0)
+			{
+				radarRecovery = new BaseBuilderRadarRecoveryManager(this, player);
+				radarStoragePressure = new BaseBuilderRadarStoragePressureManager(this, player);
+			}
 		}
 
 		internal ActorInfo EconomyDefenseSamBuilding(ProductionQueue queue, IEnumerable<ActorInfo> buildables)
@@ -681,6 +747,43 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			return unitBuilders.Where(u => !u.IsTraitDisabled)
 				.Select(u => u.ProductionBuildingDemand(building)).DefaultIfEmpty(0).Max();
+		}
+
+		internal ActorInfo RadarRecoveryBuilding(IEnumerable<ActorInfo> buildables)
+		{
+			return radarRecovery?.Candidate(buildables);
+		}
+
+		internal bool RadarRecoveryNeeded => radarRecovery?.NeedsRecovery == true;
+
+		internal ActorInfo RadarRecoveryStoragePressureSilo(ProductionQueue queue, int minimumExcessPower)
+		{
+			return radarStoragePressure?.Candidate(queue, minimumExcessPower);
+		}
+
+		internal bool RadarRecoveryStoragePressureOwnsSelection => radarStoragePressure?.OwnsSelection == true;
+
+		internal bool RadarRecoveryStoragePressureBlocksRadar => radarStoragePressure?.BlocksRadar == true;
+
+		internal void ObserveRadarRecoveryQueueChoice(ProductionQueue queue, IEnumerable<ActorInfo> buildables,
+			bool essentialPowerBlocked, bool essentialRefineryBlocked)
+		{
+			radarRecovery?.ObserveQueueChoice(queue, buildables, essentialPowerBlocked, essentialRefineryBlocked);
+		}
+
+		internal void ObserveBusyRadarRecoveryQueue(ProductionQueue queue, ProductionItem currentBuilding)
+		{
+			radarRecovery?.ObserveBusyQueue(queue, currentBuilding);
+		}
+
+		internal void RadarRecoveryPlacementFailed(ProductionQueue queue, string actorType)
+		{
+			radarRecovery?.PlacementFailed(queue, actorType);
+		}
+
+		internal bool TryReserveRadarRecovery(ProductionQueue queue, string actorType)
+		{
+			return radarRecovery?.TryReserve(queue, actorType) ?? false;
 		}
 
 		internal ActorInfo AirRepairCapacityBuilding(IEnumerable<ActorInfo> buildables)
@@ -776,13 +879,16 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		bool IBotRequestPauseUnitProduction.PauseUnitProduction => !IsTraitDisabled &&
-			(!HasAdequateRefineryCount || SmartEconomyShouldReserveCashForRefinery);
+			(!HasAdequateRefineryCount || SmartEconomyShouldReserveCashForRefinery || QueueStallRecoveryActive);
 
 		void IBotTick.BotTick(IBot bot)
 		{
+			radarRecovery?.Update();
 			WallPlanner?.Tick(bot);
 			UpdateOpening(bot);
+			queueStallRecovery?.Tick(bot);
 			smartEconomy?.Tick(bot);
+			RefreshSiloBuildReservation();
 			TiberiumFieldManager?.Tick();
 			DefenseClusterManager?.Tick(bot);
 			FirstTowerPlanner.Update();
@@ -805,10 +911,14 @@ namespace OpenRA.Mods.Common.Traits
 			return !IsTraitDisabled && WallPlanner != null && WallPlanner.IsUnitTemporarilyControlled(actor);
 		}
 
-		internal bool OpeningActive => Info.EnableOpeningPolicy && !openingCompletionLogged && !OpeningComplete;
+		bool OpeningPolicyEnabled => Info.EnableOpeningPrefix || Info.EnableOpeningPolicy;
+
+		internal bool OpeningActive => OpeningPolicyEnabled && !openingCompletionLogged && !OpeningComplete;
 
 		internal bool OpeningOwnsMcvProduction => Info.EnableOpeningPolicy && !openingCompletionLogged &&
 			!string.IsNullOrEmpty(Info.OpeningMcvType) && OpeningMcvsBuilt < Info.OpeningMcvCount;
+
+		internal bool QueueStallRecoveryActive => queueStallRecovery?.BlocksOrdinaryProduction ?? false;
 
 		internal bool SmartEconomyWantsRefinery => smartEconomy?.WantsRefinery ?? false;
 
@@ -819,7 +929,10 @@ namespace OpenRA.Mods.Common.Traits
 		internal bool SmartEconomyWantsEarlyVehicleProductionCapacity =>
 			smartEconomy?.WantsEarlyVehicleProductionCapacity ?? false;
 
-		internal bool SmartEconomyWantsSilo => smartEconomy?.WantsSilo ?? false;
+		internal bool SmartEconomyWantsSilo => SmartEconomyPolicy.WantsNeedBasedSilo(Info.EnableOpeningPrefix,
+			playerResources.Resources, playerResources.ResourceCapacity, Info.SmartEconomyStorageThresholdPercent);
+
+		internal HashSet<string> NeedBasedSiloTypes => Info.SiloTypes;
 
 		internal HashSet<string> SmartEconomyRefineryTypes => Info.SmartEconomyRefineryTypes.Count > 0 ?
 			Info.SmartEconomyRefineryTypes : Info.RefineryTypes;
@@ -839,6 +952,14 @@ namespace OpenRA.Mods.Common.Traits
 		internal bool TryReserveSmartEconomyMissingRefinery(ProductionQueue queue, string type)
 		{
 			return smartEconomy?.TryReserveMissingRefineryBuild(queue, type) ?? false;
+		}
+
+		internal bool TryReserveSmartEconomyOpeningRefinery(ProductionQueue queue, string type)
+		{
+			if (!SmartEconomyEnabled)
+				return true;
+
+			return smartEconomy.TryReserveOpeningRefineryBuild(queue, type);
 		}
 
 		internal bool TryReserveSmartEconomyVehicleFactory(ProductionQueue queue, string type)
@@ -866,6 +987,54 @@ namespace OpenRA.Mods.Common.Traits
 			AIUtils.BotDebug(format, args);
 			if (Info.SmartEconomyDebugLogging)
 				Log.Write("debug", "AI smart economy: " + format, args);
+		}
+
+		internal bool TryReserveNeedBasedSilo(ProductionQueue queue, string type)
+		{
+			RefreshSiloBuildReservation();
+			var alreadyCommitted = siloBuildReservation != null ||
+				CountQueuedOrPendingActors(NeedBasedSiloTypes) > 0;
+			if (!SmartEconomyPolicy.CanClaimNeedBasedSiloQueue(SmartEconomyWantsSilo,
+				queue == null || queue.AllQueued().Any(), NeedBasedSiloTypes.Contains(type), alreadyCommitted))
+				return false;
+
+			siloBuildReservation = new SiloBuildReservation
+			{
+				QueueActorId = queue.Actor.ActorID,
+				Type = type,
+				Tick = world.WorldTick,
+				TargetCount = CountActors(NeedBasedSiloTypes) + 1
+			};
+			LogSmartEconomy(
+				"{0} reserved storage-pressure silo: type={1}, fact={2}, target={3}, resources={4}/{5}",
+				player, type, queue.Actor.ActorID, siloBuildReservation.TargetCount,
+				playerResources.Resources, playerResources.ResourceCapacity);
+			return true;
+		}
+
+		void RefreshSiloBuildReservation()
+		{
+			if (siloBuildReservation == null)
+				return;
+
+			if (CountActors(NeedBasedSiloTypes) >= siloBuildReservation.TargetCount)
+			{
+				LogSmartEconomy("{0} storage-pressure silo completed: fact={1}, silos={2}/{3}, resources={4}/{5}",
+					player, siloBuildReservation.QueueActorId, CountActors(NeedBasedSiloTypes),
+					siloBuildReservation.TargetCount, playerResources.Resources, playerResources.ResourceCapacity);
+				siloBuildReservation = null;
+				return;
+			}
+
+			var queueActor = world.GetActorById(siloBuildReservation.QueueActorId);
+			var queued = queueActor != null && queueActor.TraitsImplementing<ProductionQueue>()
+				.Any(q => q.AllQueued().Any(i => i.Item == siloBuildReservation.Type));
+			if (queued || world.WorldTick - siloBuildReservation.Tick < System.Math.Max(1, Info.OpeningRequestRetryDelay))
+				return;
+
+			LogSmartEconomy("{0} released stalled storage-pressure silo: fact={1}, type={2}",
+				player, siloBuildReservation.QueueActorId, siloBuildReservation.Type);
+			siloBuildReservation = null;
 		}
 
 		internal ActorInfo OpeningBuilding(IEnumerable<ActorInfo> buildables)
@@ -897,17 +1066,51 @@ namespace OpenRA.Mods.Common.Traits
 			return openingStructureReservations.Keys.Any(i => i >= 0 && i < goals.Count && goals[i].Contains(type));
 		}
 
+		internal bool IsProtectedOpeningRefinery(string type)
+		{
+			return OpeningActive && SmartEconomyRefineryTypes.Contains(type);
+		}
+
+		internal bool ProtectedOpeningRefineryGoalActive
+		{
+			get
+			{
+				if (!OpeningActive)
+					return false;
+
+				var completed = CompletedOpeningStructureGoals(OpeningStructureGoals);
+				return completed.Contains(OpeningRefineryGoal - 2) &&
+					completed.Contains(OpeningRefineryGoal - 1) && !completed.Contains(OpeningRefineryGoal);
+			}
+		}
+
+		internal bool HasProtectedOpeningRefineryCommitment =>
+			CountQueuedOrPendingActors(SmartEconomyRefineryTypes) > 0 ||
+			SmartEconomyRefineryTypes.Any(IsOpeningStructureReserved);
+
+		string[] RequiredOpeningTypes(string[] advancedTypes, HashSet<string> commonTypes)
+		{
+			if (!Info.EnableOpeningPrefix && !Info.EnableOpeningPolicy)
+				return System.Array.Empty<string>();
+
+			return Info.EnableOpeningPolicy && advancedTypes.Length > 0 ? advancedTypes :
+				commonTypes.OrderBy(t => t, System.StringComparer.Ordinal).ToArray();
+		}
+
 		IReadOnlyList<string[]> OpeningStructureGoals => new[]
 		{
-			Info.OpeningPowerTypes,
-			Info.OpeningBarracksTypes,
-			Info.OpeningRefineryTypes,
-			Info.OpeningFactoryTypes,
-			Info.OpeningAdditionalFactoryTypes,
-			Info.OpeningRadarTypes,
-			Info.OpeningHelipadTypes,
-			Info.OpeningSiloTypes,
-			Info.OpeningDefenseTypes
+			RequiredOpeningTypes(Info.OpeningPowerTypes, Info.PowerTypes),
+			RequiredOpeningTypes(Info.OpeningBarracksTypes, Info.BarracksTypes),
+			RequiredOpeningTypes(Info.OpeningRefineryTypes, SmartEconomyRefineryTypes),
+			Info.EnableOpeningPolicy ? Info.OpeningFactoryTypes : System.Array.Empty<string>(),
+			Info.EnableOpeningPolicy ? Info.OpeningAdditionalFactoryTypes : System.Array.Empty<string>(),
+			Info.EnableOpeningPolicy ? Info.OpeningRadarTypes : System.Array.Empty<string>(),
+			Info.EnableOpeningPolicy ? Info.OpeningHelipadTypes : System.Array.Empty<string>(),
+
+			// Storage pressure owns silo selection and reservation. Keeping this semantic slot
+			// empty preserves save indices while preventing an unconditional opening silo.
+			System.Array.Empty<string>(),
+			Info.EnableOpeningPolicy ? Info.OpeningDefenseTypes : System.Array.Empty<string>()
 		};
 
 		IReadOnlyList<int> OpeningStructureGoalCounts => new[]
@@ -971,7 +1174,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		void UpdateOpening(IBot bot)
 		{
-			if (!Info.EnableOpeningPolicy)
+			if (!OpeningPolicyEnabled)
 				return;
 
 			if (!openingInitialized)
@@ -998,24 +1201,32 @@ namespace OpenRA.Mods.Common.Traits
 					OpeningMcvsBuilt, Info.OpeningMcvCount);
 			}
 
-			if (Info.OpeningSoldierTypes.Length > 0 && OpeningSoldiersBuilt < Info.OpeningSoldierCount &&
+			// Advanced unit milestones follow the shared structure prefix. External unit
+			// requests bypass the ordinary unit-production pause, so issuing soldiers here
+			// before the first Refinery is usable can consume the last construction funds
+			// and strand the protected economy opening.
+			var requiredPrefixComplete = OpeningPolicyLogic.RequiredPrefixComplete(
+				CompletedOpeningStructureGoals(OpeningStructureGoals), OpeningRefineryGoal + 1);
+			if (Info.EnableOpeningPolicy && requiredPrefixComplete &&
+				Info.OpeningSoldierTypes.Length > 0 && OpeningSoldiersBuilt < Info.OpeningSoldierCount &&
 				world.WorldTick >= nextOpeningSoldierRequestTick &&
 				RequestFirstAvailable(bot, Info.OpeningSoldierTypes, "opening soldiers"))
 				nextOpeningSoldierRequestTick = world.WorldTick + System.Math.Max(1, Info.OpeningUnitRequestCooldown);
 
-			if (Info.OpeningHarvesterTypes.Length > 0 && OpeningCommittedHarvesters < Info.OpeningHarvesterCount &&
+			if (Info.EnableOpeningPolicy && requiredPrefixComplete &&
+				Info.OpeningHarvesterTypes.Length > 0 && OpeningCommittedHarvesters < Info.OpeningHarvesterCount &&
 				world.WorldTick >= nextOpeningHarvesterRequestTick &&
 				RequestFirstAvailable(bot, Info.OpeningHarvesterTypes, "opening harvesters"))
 				nextOpeningHarvesterRequestTick = world.WorldTick + System.Math.Max(1, Info.OpeningUnitRequestCooldown);
 
-			if (!completedStructures.Contains(OpeningDefenseGoal) && completedStructures.Contains(OpeningRadarGoal) &&
+			if (Info.EnableOpeningPolicy && !completedStructures.Contains(OpeningDefenseGoal) && completedStructures.Contains(OpeningRadarGoal) &&
 				(!Info.PrioritizeOpeningFirstTower || !FirstTowerPlanner.HasBuildCommitment) &&
 				Info.OpeningDefenseUnlockTypes.Length > 0 && CountActors(Info.OpeningDefenseUnlockTypes) == 0 &&
 				world.WorldTick >= nextOpeningDefenseUnlockRequestTick &&
 				RequestFirstAvailable(bot, Info.OpeningDefenseUnlockTypes, "opening defense unlock"))
 				nextOpeningDefenseUnlockRequestTick = world.WorldTick + System.Math.Max(1, Info.OpeningUnitRequestCooldown);
 
-			if (!string.IsNullOrEmpty(Info.OpeningMcvType) &&
+			if (Info.EnableOpeningPolicy && requiredPrefixComplete && !string.IsNullOrEmpty(Info.OpeningMcvType) &&
 				OpeningCommittedHarvesters >= Info.OpeningHarvesterCount &&
 				OpeningMcvsBuilt < Info.OpeningMcvCount &&
 				!openingMcvRequestOutstanding && !HasLiveActor(Info.OpeningMcvType) &&
@@ -1081,10 +1292,10 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		bool OpeningComplete => CompletedOpeningStructureGoals(OpeningStructureGoals).Count == OpeningStructureGoals.Count &&
-			(Info.OpeningSoldierTypes.Length == 0 || OpeningSoldiersBuilt >= Info.OpeningSoldierCount) &&
-			(Info.OpeningHarvesterTypes.Length == 0 || OpeningCommittedHarvesters >= Info.OpeningHarvesterCount) &&
-			(string.IsNullOrEmpty(Info.OpeningMcvType) ||
-				OpeningMcvsBuilt >= Info.OpeningMcvCount);
+			(!Info.EnableOpeningPolicy ||
+				((Info.OpeningSoldierTypes.Length == 0 || OpeningSoldiersBuilt >= Info.OpeningSoldierCount) &&
+				(Info.OpeningHarvesterTypes.Length == 0 || OpeningCommittedHarvesters >= Info.OpeningHarvesterCount) &&
+				(string.IsNullOrEmpty(Info.OpeningMcvType) || OpeningMcvsBuilt >= Info.OpeningMcvCount)));
 
 		internal int CountActors(IEnumerable<string> types)
 		{
@@ -1289,6 +1500,18 @@ namespace OpenRA.Mods.Common.Traits
 				new MiniYamlNode("CompletedOpeningGoals", FieldSaver.FormatValue(loggedCompletedOpeningGoals.ToArray())),
 				new MiniYamlNode("SkippedOpeningGoals", FieldSaver.FormatValue(skippedOpeningGoals.ToArray())),
 				new MiniYamlNode("OpeningCompletionLogged", FieldSaver.FormatValue(openingCompletionLogged)),
+				new MiniYamlNode("RadarRecoveryEverEstablished", FieldSaver.FormatValue(radarRecovery?.EverEstablished ?? false)),
+				new MiniYamlNode("RadarRecoveryReservationQueueActorId", FieldSaver.FormatValue(radarRecovery?.ReservationQueueActorId ?? 0)),
+				new MiniYamlNode("RadarRecoveryReservationQueueType", FieldSaver.FormatValue(radarRecovery?.ReservationQueueType ?? "")),
+				new MiniYamlNode("RadarRecoveryReservationActorType", FieldSaver.FormatValue(radarRecovery?.ReservationActorType ?? "")),
+				new MiniYamlNode("RadarRecoveryReservationTick", FieldSaver.FormatValue(radarRecovery?.ReservationTick ?? 0)),
+				new MiniYamlNode("RadarRecoveryReservationCommitmentObserved", FieldSaver.FormatValue(radarRecovery?.ReservationCommitmentObserved ?? false)),
+				new MiniYamlNode("RadarStorageReservationQueueActorId", FieldSaver.FormatValue(radarStoragePressure?.ReservationQueueActorId ?? 0)),
+				new MiniYamlNode("RadarStorageReservationQueueType", FieldSaver.FormatValue(radarStoragePressure?.ReservationQueueType ?? "")),
+				new MiniYamlNode("RadarStorageReservationActorType", FieldSaver.FormatValue(radarStoragePressure?.ReservationActorType ?? "")),
+				new MiniYamlNode("RadarStorageReservationTick", FieldSaver.FormatValue(radarStoragePressure?.ReservationTick ?? 0)),
+				new MiniYamlNode("RadarStorageReservationTargetCount", FieldSaver.FormatValue(radarStoragePressure?.TargetCount ?? 0)),
+				new MiniYamlNode("RadarStorageOrderIssuedTick", FieldSaver.FormatValue(radarStoragePressure?.OrderIssuedTick ?? -1)),
 				new MiniYamlNode("NextOpeningSoldierRequestTick", FieldSaver.FormatValue(nextOpeningSoldierRequestTick)),
 				new MiniYamlNode("NextOpeningHarvesterRequestTick", FieldSaver.FormatValue(nextOpeningHarvesterRequestTick)),
 				new MiniYamlNode("NextOpeningDefenseUnlockRequestTick", FieldSaver.FormatValue(nextOpeningDefenseUnlockRequestTick)),
@@ -1317,6 +1540,12 @@ namespace OpenRA.Mods.Common.Traits
 				new MiniYamlNode("SmartEconomyRefineryPressureActive", FieldSaver.FormatValue(smartEconomy?.RefineryPressure.Active ?? false)),
 				new MiniYamlNode("SmartEconomyCashEvidenceTicks", FieldSaver.FormatValue(smartEconomy?.CashPressure.EvidenceTicks ?? 0)),
 				new MiniYamlNode("SmartEconomyCashPressureActive", FieldSaver.FormatValue(smartEconomy?.CashPressure.Active ?? false)),
+				new MiniYamlNode("SmartEconomyHadUsableRefinery", FieldSaver.FormatValue(smartEconomy?.HadUsableRefinery ?? false)),
+				new MiniYamlNode("SiloBuildReservationActive", FieldSaver.FormatValue(siloBuildReservation != null)),
+				new MiniYamlNode("SiloBuildReservationQueueActorId", FieldSaver.FormatValue(siloBuildReservation?.QueueActorId ?? 0)),
+				new MiniYamlNode("SiloBuildReservationType", FieldSaver.FormatValue(siloBuildReservation?.Type ?? "")),
+				new MiniYamlNode("SiloBuildReservationTick", FieldSaver.FormatValue(siloBuildReservation?.Tick ?? 0)),
+				new MiniYamlNode("SiloBuildReservationTargetCount", FieldSaver.FormatValue(siloBuildReservation?.TargetCount ?? 0)),
 				new MiniYamlNode("EconomyDefenseSamReservationActive", FieldSaver.FormatValue(economyDefenseSam?.HasBuildReservation ?? false)),
 				new MiniYamlNode("EconomyDefenseSamReservationQueueActorId", FieldSaver.FormatValue(economyDefenseSam?.ReservationQueueActorId ?? 0)),
 				new MiniYamlNode("EconomyDefenseSamReservationQueueType", FieldSaver.FormatValue(economyDefenseSam?.ReservationQueueType ?? "")),
@@ -1333,6 +1562,9 @@ namespace OpenRA.Mods.Common.Traits
 			var clusterState = DefenseClusterManager?.IssueTraitData();
 			if (clusterState != null)
 				data.Add(clusterState);
+			var queueStallRecoveryState = queueStallRecovery?.IssueTraitData();
+			if (queueStallRecoveryState != null)
+				data.Add(queueStallRecoveryState);
 
 			return data;
 		}
@@ -1352,6 +1584,7 @@ namespace OpenRA.Mods.Common.Traits
 
 			DefenseClusterManager?.ResolveTraitData(data);
 			WallPlanner?.ResolveTraitData(data);
+			queueStallRecovery?.ResolveTraitData(data);
 
 			var openingInitializedNode = data.FirstOrDefault(n => n.Key == "OpeningInitialized");
 			if (openingInitializedNode != null)
@@ -1379,6 +1612,37 @@ namespace OpenRA.Mods.Common.Traits
 			var completionNode = data.FirstOrDefault(n => n.Key == "OpeningCompletionLogged");
 			if (completionNode != null)
 				openingCompletionLogged = FieldLoader.GetValue<bool>("OpeningCompletionLogged", completionNode.Value.Value);
+
+			var radarEstablishedNode = data.FirstOrDefault(n => n.Key == "RadarRecoveryEverEstablished");
+			var radarQueueNode = data.FirstOrDefault(n => n.Key == "RadarRecoveryReservationQueueActorId");
+			var radarQueueTypeNode = data.FirstOrDefault(n => n.Key == "RadarRecoveryReservationQueueType");
+			var radarTypeNode = data.FirstOrDefault(n => n.Key == "RadarRecoveryReservationActorType");
+			var radarTickNode = data.FirstOrDefault(n => n.Key == "RadarRecoveryReservationTick");
+			var radarCommitmentObservedNode = data.FirstOrDefault(n => n.Key == "RadarRecoveryReservationCommitmentObserved");
+			if (radarRecovery != null && radarEstablishedNode != null)
+				radarRecovery.LoadState(
+					FieldLoader.GetValue<bool>("RadarRecoveryEverEstablished", radarEstablishedNode.Value.Value),
+					radarQueueNode != null ? FieldLoader.GetValue<uint>("RadarRecoveryReservationQueueActorId", radarQueueNode.Value.Value) : 0,
+					radarQueueTypeNode != null ? FieldLoader.GetValue<string>("RadarRecoveryReservationQueueType", radarQueueTypeNode.Value.Value) : "",
+					radarTypeNode != null ? FieldLoader.GetValue<string>("RadarRecoveryReservationActorType", radarTypeNode.Value.Value) : "",
+					radarTickNode != null ? FieldLoader.GetValue<int>("RadarRecoveryReservationTick", radarTickNode.Value.Value) : 0,
+					radarCommitmentObservedNode != null && FieldLoader.GetValue<bool>(
+						"RadarRecoveryReservationCommitmentObserved", radarCommitmentObservedNode.Value.Value));
+
+			var radarStorageQueueNode = data.FirstOrDefault(n => n.Key == "RadarStorageReservationQueueActorId");
+			var radarStorageQueueTypeNode = data.FirstOrDefault(n => n.Key == "RadarStorageReservationQueueType");
+			var radarStorageTypeNode = data.FirstOrDefault(n => n.Key == "RadarStorageReservationActorType");
+			var radarStorageTickNode = data.FirstOrDefault(n => n.Key == "RadarStorageReservationTick");
+			var radarStorageTargetNode = data.FirstOrDefault(n => n.Key == "RadarStorageReservationTargetCount");
+			var radarStorageIssuedNode = data.FirstOrDefault(n => n.Key == "RadarStorageOrderIssuedTick");
+			if (radarStoragePressure != null && radarStorageQueueNode != null)
+				radarStoragePressure.LoadState(
+					FieldLoader.GetValue<uint>("RadarStorageReservationQueueActorId", radarStorageQueueNode.Value.Value),
+					radarStorageQueueTypeNode != null ? FieldLoader.GetValue<string>("RadarStorageReservationQueueType", radarStorageQueueTypeNode.Value.Value) : "",
+					radarStorageTypeNode != null ? FieldLoader.GetValue<string>("RadarStorageReservationActorType", radarStorageTypeNode.Value.Value) : "",
+					radarStorageTickNode != null ? FieldLoader.GetValue<int>("RadarStorageReservationTick", radarStorageTickNode.Value.Value) : 0,
+					radarStorageTargetNode != null ? FieldLoader.GetValue<int>("RadarStorageReservationTargetCount", radarStorageTargetNode.Value.Value) : 0,
+					radarStorageIssuedNode != null ? FieldLoader.GetValue<int>("RadarStorageOrderIssuedTick", radarStorageIssuedNode.Value.Value) : -1);
 
 			var soldierRequestNode = data.FirstOrDefault(n => n.Key == "NextOpeningSoldierRequestTick");
 			if (soldierRequestNode != null)
@@ -1421,6 +1685,7 @@ namespace OpenRA.Mods.Common.Traits
 			var refineryActiveNode = data.FirstOrDefault(n => n.Key == "SmartEconomyRefineryPressureActive");
 			var cashEvidenceNode = data.FirstOrDefault(n => n.Key == "SmartEconomyCashEvidenceTicks");
 			var cashActiveNode = data.FirstOrDefault(n => n.Key == "SmartEconomyCashPressureActive");
+			var hadUsableRefineryNode = data.FirstOrDefault(n => n.Key == "SmartEconomyHadUsableRefinery");
 			if (smartEconomy != null && (smartScanNode != null || smartMcvRequestNode != null || smartProgressLogNode != null ||
 				smartRefineryOutstandingNode != null || smartRefineryExpiryNode != null || smartRefineryTargetNode != null ||
 				smartMcvOutstandingNode != null || smartMcvExpiryNode != null || smartMcvTargetNode != null ||
@@ -1440,7 +1705,8 @@ namespace OpenRA.Mods.Common.Traits
 						refineryActiveNode != null && FieldLoader.GetValue<bool>("SmartEconomyRefineryPressureActive", refineryActiveNode.Value.Value)),
 					new SmartEconomyPressure(
 						cashEvidenceNode != null ? FieldLoader.GetValue<int>("SmartEconomyCashEvidenceTicks", cashEvidenceNode.Value.Value) : 0,
-						cashActiveNode != null && FieldLoader.GetValue<bool>("SmartEconomyCashPressureActive", cashActiveNode.Value.Value)));
+						cashActiveNode != null && FieldLoader.GetValue<bool>("SmartEconomyCashPressureActive", cashActiveNode.Value.Value)),
+					hadUsableRefineryNode != null && FieldLoader.GetValue<bool>("SmartEconomyHadUsableRefinery", hadUsableRefineryNode.Value.Value));
 
 			if (smartEconomy != null && smartRefineryQueueIdsNode != null && smartRefineryTypesNode != null &&
 				smartRefineryExpiryTicksNode != null && smartRefineryTargetCountsNode != null && smartRefineryCostsNode != null)
@@ -1458,6 +1724,21 @@ namespace OpenRA.Mods.Common.Traits
 					FieldLoader.GetValue<string[]>("SmartEconomyVehicleFactoryReservationTypes", smartVehicleFactoryTypesNode.Value.Value),
 					FieldLoader.GetValue<int[]>("SmartEconomyVehicleFactoryReservationExpiryTicks", smartVehicleFactoryExpiryTicksNode.Value.Value),
 					FieldLoader.GetValue<int[]>("SmartEconomyVehicleFactoryReservationTargetCounts", smartVehicleFactoryTargetCountsNode.Value.Value));
+
+			var siloActiveNode = data.FirstOrDefault(n => n.Key == "SiloBuildReservationActive");
+			var siloQueueActorNode = data.FirstOrDefault(n => n.Key == "SiloBuildReservationQueueActorId");
+			var siloTypeNode = data.FirstOrDefault(n => n.Key == "SiloBuildReservationType");
+			var siloTickNode = data.FirstOrDefault(n => n.Key == "SiloBuildReservationTick");
+			var siloTargetNode = data.FirstOrDefault(n => n.Key == "SiloBuildReservationTargetCount");
+			if (siloActiveNode != null && FieldLoader.GetValue<bool>("SiloBuildReservationActive", siloActiveNode.Value.Value) &&
+				siloQueueActorNode != null && siloTypeNode != null && siloTickNode != null && siloTargetNode != null)
+				siloBuildReservation = new SiloBuildReservation
+				{
+					QueueActorId = FieldLoader.GetValue<uint>("SiloBuildReservationQueueActorId", siloQueueActorNode.Value.Value),
+					Type = FieldLoader.GetValue<string>("SiloBuildReservationType", siloTypeNode.Value.Value),
+					Tick = FieldLoader.GetValue<int>("SiloBuildReservationTick", siloTickNode.Value.Value),
+					TargetCount = FieldLoader.GetValue<int>("SiloBuildReservationTargetCount", siloTargetNode.Value.Value)
+				};
 
 			var economySamActiveNode = data.FirstOrDefault(n => n.Key == "EconomyDefenseSamReservationActive");
 			var economySamQueueActorNode = data.FirstOrDefault(n => n.Key == "EconomyDefenseSamReservationQueueActorId");

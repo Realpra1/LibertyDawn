@@ -415,6 +415,22 @@ namespace OpenRA.Mods.Common.Traits
 			return Math.Max(0, currentTick) >= Math.Max(0, deadline);
 		}
 
+		public static int ReadyPlacementDeadline(int currentTick, int existingDeadline,
+			bool resonatorReady, int fallbackDelay)
+		{
+			if (!resonatorReady)
+				return 0;
+
+			return existingDeadline > 0 ? existingDeadline : NextDeadline(currentTick, fallbackDelay);
+		}
+
+		public static bool UseSimplePlacementFallback(bool fancyPlacementLegal,
+			int currentTick, int readyPlacementDeadline)
+		{
+			return !fancyPlacementLegal && readyPlacementDeadline > 0 &&
+				DeadlineReached(currentTick, readyPlacementDeadline);
+		}
+
 		public static bool ShouldDeferNoProgress(int currentTick, int nextProgressCheckTick,
 			bool hasLegalWork, bool admissionRejected)
 		{

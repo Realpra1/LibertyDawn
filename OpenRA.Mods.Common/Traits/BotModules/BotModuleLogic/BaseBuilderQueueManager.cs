@@ -132,7 +132,16 @@ namespace OpenRA.Mods.Common.Traits
 
 		bool TickQueue(IBot bot, ProductionQueue queue)
 		{
-			var currentBuilding = queue.AllQueued().FirstOrDefault();
+			var queuedBuildings = queue.AllQueued().ToArray();
+			var currentBuilding = queuedBuildings.FirstOrDefault(item =>
+				baseBuilder.TiberiumFieldManager?.OwnsReadyProduction(queue.Actor.ActorID, item.Item) == true) ??
+				queuedBuildings.FirstOrDefault();
+			var retainedReadyFieldBuilding = currentBuilding != null &&
+				baseBuilder.TiberiumFieldManager?.OwnsReadyProduction(
+					queue.Actor.ActorID, currentBuilding.Item) == true;
+			baseBuilder.ObserveBusyRadarRecoveryQueue(queue, currentBuilding);
+			if (currentBuilding == null && baseBuilder.QueueStallRecoveryActive)
+				return false;
 			if (currentBuilding != null)
 			{
 				var priorityRecoveryActive = baseBuilder.OpeningActive ||
@@ -162,7 +171,7 @@ namespace OpenRA.Mods.Common.Traits
 				bot.QueueOrder(Order.StartProduction(queue.Actor, item.Name, 1));
 				baseBuilder.LogProductionSpend(item, queue);
 			}
-			else if (currentBuilding != null && currentBuilding.Done)
+			else if (currentBuilding != null && (currentBuilding.Done || retainedReadyFieldBuilding))
 			{
 				// Production is complete
 				// Choose the placement logic
@@ -172,6 +181,8 @@ namespace OpenRA.Mods.Common.Traits
 				CPos? location = null;
 				string orderString = "PlaceBuilding";
 				var fieldPlacement = false;
+				var retainReadyFieldBuilding = false;
+				var simpleFieldFallback = false;
 
 				// Check if Building is a plug for other Building
 				var actorInfo = world.Map.Rules.Actors[currentBuilding.Item];
@@ -189,11 +200,15 @@ namespace OpenRA.Mods.Common.Traits
 				}
 				else if (baseBuilder.TiberiumFieldManager != null &&
 					baseBuilder.TiberiumFieldManager.TryGetPlacement(
-						queue.Actor.ActorID, actorInfo.Name, out location, out var fieldLineBuild))
+						queue.Actor.ActorID, actorInfo.Name, out location, out var fieldLineBuild,
+						out retainReadyFieldBuilding, out simpleFieldFallback))
 				{
 					fieldPlacement = true;
 					if (fieldLineBuild)
 						orderString = "LineBuild";
+					if (simpleFieldFallback)
+						location = ChooseBuildLocation(currentBuilding.Item, true,
+							BuildingType.Refinery, true);
 				}
 				else if (baseBuilder.DefenseClusterManager?.OwnsPlacement(queue, actorInfo.Name) == true)
 				{
@@ -231,6 +246,13 @@ namespace OpenRA.Mods.Common.Traits
 
 				if (location == null)
 				{
+					if (retainReadyFieldBuilding)
+					{
+						AIUtils.BotDebug($"{player} is retaining ready {DisplayName(currentBuilding.Item)} while waiting for a field placement");
+						return true;
+					}
+
+					baseBuilder.RadarRecoveryPlacementFailed(queue, currentBuilding.Item);
 					if (fieldPlacement)
 						baseBuilder.TiberiumFieldManager.PlacementFailed("reserved site became illegal before placement");
 
@@ -259,7 +281,8 @@ namespace OpenRA.Mods.Common.Traits
 						SuppressVisualFeedback = true
 					});
 					if (fieldPlacement)
-						baseBuilder.TiberiumFieldManager.PlacementOrdered();
+						baseBuilder.TiberiumFieldManager.PlacementOrdered(simpleFieldFallback,
+							location, simpleFieldFallback && HasFriendlySamCoverage(location.Value));
 
 					return true;
 				}
@@ -316,6 +339,28 @@ namespace OpenRA.Mods.Common.Traits
 				.Sum(p => p.Amount) + playerPower.ExcessPower) >= baseBuilder.Info.MinimumExcessPower;
 		}
 
+		bool HasSufficientFundsForActor(ProductionQueue queue, ActorInfo actorInfo)
+		{
+			return Math.Max(0, playerResources.Cash + playerResources.Resources) >=
+				queue.GetProductionCost(actorInfo);
+		}
+
+		bool ShouldHoldOptionalConstructionForFirstRefinery()
+		{
+			if (!baseBuilder.ProtectedOpeningRefineryGoalActive)
+				return false;
+
+			var committed = baseBuilder.HasProtectedOpeningRefineryCommitment;
+			var actionable = baseBuilder.Info.BuildingQueues.Concat(baseBuilder.Info.DefenseQueues)
+				.SelectMany(q => AIUtils.FindQueues(player, q))
+				.Where(q => !q.AllQueued().Any())
+				.Any(q => q.BuildableItems().Any(a =>
+					baseBuilder.SmartEconomyRefineryTypes.Contains(a.Name) &&
+					HasSufficientPowerForActor(a) && HasSufficientFundsForActor(q, a)));
+			return OpeningPolicyLogic.HoldOptionalConstructionForFirstRefinery(true,
+				baseBuilder.CountActors(baseBuilder.SmartEconomyRefineryTypes), committed, actionable);
+		}
+
 		ActorInfo ChooseBuildingToBuild(ProductionQueue queue)
 		{
 			var buildableThings = queue.BuildableItems();
@@ -323,9 +368,12 @@ namespace OpenRA.Mods.Common.Traits
 			// This gets used quite a bit, so let's cache it here
 			var power = GetProducibleBuilding(baseBuilder.Info.PowerTypes, buildableThings,
 				a => a.TraitInfos<PowerInfo>().Where(i => i.EnabledByDefault).Sum(p => p.Amount));
+			var essentialPowerBlocked = playerPower != null && playerPower.ExcessPower < minimumExcessPower;
+			baseBuilder.ObserveRadarRecoveryQueueChoice(queue, buildableThings, essentialPowerBlocked,
+				baseBuilder.SmartEconomySerializesMissingRefinery);
 
 			// First priority is to get out of a low power situation
-			if (playerPower != null && playerPower.ExcessPower < minimumExcessPower)
+			if (essentialPowerBlocked)
 			{
 				if (power != null && power.TraitInfos<PowerInfo>().Where(i => i.EnabledByDefault).Sum(p => p.Amount) > 0)
 				{
@@ -346,6 +394,29 @@ namespace OpenRA.Mods.Common.Traits
 					AIUtils.BotDebug("{0} decided to build {1}: serialized missing-refinery recovery",
 						queue.Actor.Owner, DisplayName(refinery.Name));
 					return refinery;
+				}
+
+				return null;
+			}
+
+			// The ordinary opening has not recovered until its first Refinery is live.
+			// Let an actionable compatible queue claim that goal, then keep idle construction
+			// queues from consuming its remaining production cash. Busy work is left alone by
+			// TickQueue, while unavailable or unaffordable goals still yield normally.
+			if (ShouldHoldOptionalConstructionForFirstRefinery())
+			{
+				// Another queue already owns the protected goal. Hold this idle queue without
+				// repeatedly re-running and logging a reservation attempt that cannot succeed.
+				if (baseBuilder.HasProtectedOpeningRefineryCommitment)
+					return null;
+
+				var protectedRefinery = baseBuilder.OpeningBuilding(buildableThings);
+				if (protectedRefinery != null && baseBuilder.SmartEconomyRefineryTypes.Contains(protectedRefinery.Name) &&
+					baseBuilder.TryReserveSmartEconomyOpeningRefinery(queue, protectedRefinery.Name))
+				{
+					AIUtils.BotDebug("{0} decided to build {1}: protected opening economy",
+						queue.Actor.Owner, DisplayName(protectedRefinery.Name));
+					return protectedRefinery;
 				}
 
 				return null;
@@ -390,7 +461,7 @@ namespace OpenRA.Mods.Common.Traits
 			if (opening != null)
 			{
 				if (baseBuilder.SmartEconomyRefineryTypes.Contains(opening.Name) &&
-					!baseBuilder.TryReserveSmartEconomyControlledRefinery(queue, opening.Name))
+					!baseBuilder.TryReserveSmartEconomyOpeningRefinery(queue, opening.Name))
 					opening = null;
 			}
 
@@ -398,6 +469,33 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				AIUtils.BotDebug("{0} decided to build {1}: parallel opening policy", queue.Actor.Owner, DisplayName(opening.Name));
 				return opening;
+			}
+
+			// Storage pressure owns the next free compatible defense commitment, but never
+			// cancels work already in production. A global reservation prevents parallel Facts
+			// from requesting duplicates before the first StartProduction order is observed.
+			if (baseBuilder.SmartEconomyWantsSilo)
+			{
+				var silo = GetProducibleBuilding(baseBuilder.NeedBasedSiloTypes, buildableThings);
+				if (silo != null && HasSufficientPowerForActor(silo) &&
+					HasSufficientFundsForActor(queue, silo) && baseBuilder.TryReserveNeedBasedSilo(queue, silo.Name))
+				{
+					AIUtils.BotDebug("{0} decided to build {1}: storage-pressure commitment",
+						queue.Actor.Owner, DisplayName(silo.Name));
+					return silo;
+				}
+			}
+
+			// CNC-101's actionable storage-pressure commitment owns this boundary before
+			// radar recovery. Reserve its compatible queue globally before an independent
+			// Building queue can issue radar first in the same decision window.
+			var reservedSilo = baseBuilder.SmartEconomyWantsSilo ?
+				baseBuilder.RadarRecoveryStoragePressureSilo(queue, minimumExcessPower) : null;
+			if (reservedSilo != null)
+			{
+				AIUtils.BotDebug("{0} decided to build {1}: reserved storage-pressure commitment",
+					queue.Actor.Owner, DisplayName(reservedSilo.Name));
+				return reservedSilo;
 			}
 
 			// Defense queues are independent from the ordered building queue. Give their first
@@ -418,16 +516,35 @@ namespace OpenRA.Mods.Common.Traits
 				return null;
 			}
 
-			// Once the authored opening and power prerequisites are satisfied, an uncovered
-			// economy anchor may reserve one normal SAM build. Existing powered overlapping
-			// coverage and a single in-flight reservation suppress duplicate sites.
-			var economySam = baseBuilder.EconomyDefenseSamBuilding(queue, buildableThings);
-			if (economySam != null)
+			if (baseBuilder.RadarRecoveryStoragePressureBlocksRadar)
+				return null;
+
+			// Once an established radar capability is genuinely absent, its globally
+			// serialized replacement owns the next idle discretionary building choice.
+			// Low power, a missing unloading refinery, and already-owned opening/tower work
+			// above remain authoritative blockers.
+			var radarRecovery = baseBuilder.RadarRecoveryBuilding(buildableThings);
+			if (radarRecovery != null)
 			{
-				AIUtils.BotDebug("{0} decided to build {1}: uncovered economy air approach",
-					queue.Actor.Owner, DisplayName(economySam.Name));
-				return economySam;
-			}
+				if (!HasSufficientPowerForActor(radarRecovery))
+				{
+					if (power != null)
+					{
+						AIUtils.BotDebug("{0} decided to build {1}: radar recovery requires power",
+							queue.Actor.Owner, DisplayName(power.Name));
+						return power;
+					}
+
+					return null;
+				}
+
+				if (baseBuilder.TryReserveRadarRecovery(queue, radarRecovery.Name))
+				{
+					AIUtils.BotDebug("{0} decided to build {1}: lost radar recovery",
+						queue.Actor.Owner, DisplayName(radarRecovery.Name));
+					return radarRecovery;
+				}
+				}
 
 			// Next is to build up a strong economy
 			if (!baseBuilder.HasAdequateRefineryCount)
@@ -496,6 +613,17 @@ namespace OpenRA.Mods.Common.Traits
 				return fieldBuilding;
 			}
 
+			// Friendly SAM coverage is optional for field development. Only reserve an
+			// uncovered economy-air approach after a waiting field project has declined
+			// this idle queue, so SAM construction can never delay Resonator placement.
+			var economySam = baseBuilder.EconomyDefenseSamBuilding(queue, buildableThings);
+			if (economySam != null)
+			{
+				AIUtils.BotDebug("{0} decided to build {1}: uncovered economy air approach",
+					queue.Actor.Owner, DisplayName(economySam.Name));
+				return economySam;
+			}
+
 			// Preserve the original random production-building selector when cash is floating.
 			// Smart economy only decides refinery work; all other choices retain authored limits.
 			var availableFunds = Math.Max(0, playerResources.Cash + playerResources.Resources);
@@ -529,23 +657,6 @@ namespace OpenRA.Mods.Common.Traits
 				}
 
 				if (power != null && navalproduction != null && !HasSufficientPowerForActor(navalproduction))
-				{
-					AIUtils.BotDebug("{0} decided to build {1}: Priority override (would be low power)", queue.Actor.Owner, DisplayName(power.Name));
-					return power;
-				}
-			}
-
-			// Create some head room for resource storage if we really need it
-			if (playerResources.Resources > 0.8 * playerResources.ResourceCapacity)
-			{
-				var silo = GetProducibleBuilding(baseBuilder.Info.SiloTypes, buildableThings);
-				if (silo != null && HasSufficientPowerForActor(silo))
-				{
-					AIUtils.BotDebug("{0} decided to build {1}: Priority override (silo)", queue.Actor.Owner, DisplayName(silo.Name));
-					return silo;
-				}
-
-				if (power != null && silo != null && !HasSufficientPowerForActor(silo))
 				{
 					AIUtils.BotDebug("{0} decided to build {1}: Priority override (would be low power)", queue.Actor.Owner, DisplayName(power.Name));
 					return power;
@@ -669,7 +780,8 @@ namespace OpenRA.Mods.Common.Traits
 			return (int)Math.Round(adapted);
 		}
 
-		CPos? ChooseBuildLocation(string actorType, bool distanceToBaseIsImportant, BuildingType type)
+		CPos? ChooseBuildLocation(string actorType, bool distanceToBaseIsImportant,
+			BuildingType type, bool preferSamCoverage = false)
 		{
 			var actorInfo = world.Map.Rules.Actors[actorType];
 			var bi = actorInfo.TraitInfoOrDefault<BuildingInfo>();
@@ -691,6 +803,7 @@ namespace OpenRA.Mods.Common.Traits
 					cells = candidateCells.Shuffle(world.LocalRandom);
 
 				CPos? reservedFallback = null;
+				CPos? unreservedFallback = null;
 				var legalCandidates = 0;
 				foreach (var cell in cells)
 				{
@@ -703,6 +816,13 @@ namespace OpenRA.Mods.Common.Traits
 					legalCandidates++;
 					if (!baseBuilder.WallPlanner.OverlapsConstructionYardEnclosure(cell, bi))
 					{
+						if (preferSamCoverage && !HasFriendlySamCoverage(cell))
+						{
+							if (unreservedFallback == null)
+								unreservedFallback = cell;
+							continue;
+						}
+
 						if (reservedFallback != null)
 							baseBuilder.WallPlanner.LogReservationDecision(actorType,
 								reservedFallback.Value, cell, false);
@@ -734,7 +854,7 @@ namespace OpenRA.Mods.Common.Traits
 					baseBuilder.WallPlanner.LogReservationDecision(actorType,
 						reservedFallback.Value, reservedFallback.Value, true);
 
-				return reservedFallback;
+				return unreservedFallback ?? reservedFallback;
 			};
 
 			var baseCenter = baseBuilder.GetRandomBaseCenter();
@@ -779,6 +899,22 @@ namespace OpenRA.Mods.Common.Traits
 
 			// Can't find a build location
 			return null;
+		}
+
+		bool HasFriendlySamCoverage(CPos cell)
+		{
+			foreach (var sam in world.Actors.Where(a => a.Owner == player && a.IsInWorld && !a.IsDead &&
+				baseBuilder.Info.EconomyDefenseSamTypes.Contains(a.Info.Name)))
+			{
+				var range = sam.TraitsImplementing<Armament>()
+					.Where(a => !a.IsTraitDisabled && !a.IsTraitPaused)
+					.Select(a => a.MaxRange().Length).DefaultIfEmpty(0).Max();
+				var radius = Math.Max(0, range / 1024 - baseBuilder.Info.EconomyDefenseSamCoverageMarginCells);
+				if (radius > 0 && (sam.Location - cell).LengthSquared <= radius * radius)
+					return true;
+			}
+
+			return false;
 		}
 	}
 }
