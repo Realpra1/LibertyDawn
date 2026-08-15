@@ -134,6 +134,8 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			var currentBuilding = queue.AllQueued().FirstOrDefault();
 			baseBuilder.ObserveBusyRadarRecoveryQueue(queue, currentBuilding);
+			if (currentBuilding == null && baseBuilder.QueueStallRecoveryActive)
+				return false;
 			if (currentBuilding != null)
 			{
 				var priorityRecoveryActive = baseBuilder.OpeningActive ||

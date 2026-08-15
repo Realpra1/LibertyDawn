@@ -716,6 +716,7 @@ Player:
 	BaseBuilderBotModule@cabal:
 		RequiresCondition: enable-cabal-ai
 		EnableOpeningPrefix: true
+		EnableQueueStallRecovery: true
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: false
 		MaximumWallSegments: 24
@@ -815,6 +816,7 @@ Player:
 	BaseBuilderBotModule@watson:
 		RequiresCondition: enable-watson-ai
 		EnableOpeningPrefix: true
+		EnableQueueStallRecovery: true
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: false
 		MaximumWallSegments: 24
@@ -914,6 +916,7 @@ Player:
     BaseBuilderBotModule@hal9001:
 		RequiresCondition: enable-hal9001-ai
 		EnableOpeningPrefix: true
+		EnableQueueStallRecovery: true
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: false
 		MaximumWallSegments: 24
@@ -1015,6 +1018,7 @@ Player:
     BaseBuilderBotModule@brutalis:
 		RequiresCondition: enable-brutalis-ai || enable-wavemaker-ai
 		EnableOpeningPrefix: true
+		EnableQueueStallRecovery: true
 		EnableSmartEconomy: true
 		EnableTiberiumFieldPolicy: true
 		TiberiumFieldTreeTypes: split2, split3, splitblue, splitred
@@ -1251,6 +1255,7 @@ Player:
     BaseBuilderBotModule@viki:
 		RequiresCondition: enable-viki-ai
 		EnableOpeningPrefix: true
+		EnableQueueStallRecovery: true
 		EnableSmartEconomy: true
 		SmartEconomyRefineryTypes: proc
 		SmartEconomyMcvTypes: mcv
@@ -1426,6 +1431,7 @@ Player:
     BaseBuilderBotModule@skynet:
 		RequiresCondition: enable-skynet-ai
 		EnableOpeningPrefix: true
+		EnableQueueStallRecovery: true
 		EnableSmartEconomy: true
 		SmartEconomyRefineryTypes: proc
 		SmartEconomyMcvTypes: mcv
@@ -1777,6 +1783,7 @@ Player:
     BaseBuilderBotModule@ironreaper:
 		RequiresCondition: enable-ironreaper-ai
 		EnableOpeningPrefix: true
+		EnableQueueStallRecovery: true
 		EnableSmartEconomy: true
 		EnableTiberiumFieldPolicy: true
 		TiberiumFieldTreeTypes: split2, split3, splitblue, splitred
@@ -2034,6 +2041,7 @@ Player:
     BaseBuilderBotModule@Easy:
 		RequiresCondition: enable-Easy-ai
 		EnableOpeningPrefix: true
+		EnableQueueStallRecovery: true
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: false
 		MaximumWallSegments: 24
@@ -2182,6 +2190,7 @@ Player:
     BaseBuilderBotModule@Easiest:
 		RequiresCondition: enable-Easiest-ai
 		EnableOpeningPrefix: true
+		EnableQueueStallRecovery: true
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: false
 		MaximumWallSegments: 24
