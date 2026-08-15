@@ -1073,7 +1073,8 @@ namespace OpenRA.Mods.Common.Traits
 				return null;
 
 			openingStructureReservations[goal] = world.WorldTick;
-			LogOpening("{0} reserved structure goal {1}: {2}", player, OpeningGoalName(goal), selected);
+			LogOpening("{0} tick={1} reserved structure goal {2}: {3}", player, world.WorldTick,
+				OpeningGoalName(goal), selected);
 			return buildableArray.First(a => a.Name == selected);
 		}
 
@@ -1160,7 +1161,8 @@ namespace OpenRA.Mods.Common.Traits
 				{
 					completed.Add(i);
 					if (loggedCompletedOpeningGoals.Add(i))
-						LogOpening("{0} completed structure goal {1}", player, OpeningGoalName(i));
+						LogOpening("{0} tick={1} completed structure goal {2}", player,
+							world.WorldTick, OpeningGoalName(i));
 				}
 			}
 
@@ -1184,7 +1186,8 @@ namespace OpenRA.Mods.Common.Traits
 				{
 					openingStructureReservations.Remove(reservation.Key);
 					if (!completed)
-						LogOpening("{0} released stalled structure goal {1} for retry", player, OpeningGoalName(reservation.Key));
+						LogOpening("{0} tick={1} released stalled structure goal {2} for retry", player,
+							world.WorldTick, OpeningGoalName(reservation.Key));
 				}
 			}
 		}
