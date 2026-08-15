@@ -248,9 +248,12 @@ namespace OpenRA.Mods.Common.Traits
 					if (fieldLineBuild)
 						orderString = "LineBuild";
 					if (simpleFieldFallback)
-						location = ChooseBuildLocation(currentBuilding.Item, true,
-							BuildingType.Refinery, true);
+						location = baseBuilder.TiberiumFieldManager.ChooseSimpleFallbackCell(
+							actorInfo, actorInfo.TraitInfo<BuildingInfo>());
 				}
+				else if (baseBuilder.TiberiumFieldManager?.TryGetPlannedBorderPlacement(
+					actorInfo.Name, actorInfo, actorInfo.TraitInfo<BuildingInfo>(), out location) == true)
+					retainReadyFieldBuilding = true;
 				else if (baseBuilder.DefenseClusterManager?.OwnsPlacement(queue, actorInfo.Name) == true)
 				{
 					location = baseBuilder.DefenseClusterManager.ChooseLocation(queue, actorInfo,
@@ -968,6 +971,8 @@ namespace OpenRA.Mods.Common.Traits
 				{
 					if (!world.CanPlaceBuilding(cell, actorInfo, bi, null))
 						continue;
+					if (baseBuilder.TiberiumFieldManager?.OverlapsTreeReservation(cell, bi) == true)
+						continue;
 
 					if (distanceToBaseIsImportant && !bi.IsCloseEnoughToBase(world, player, actorInfo, cell))
 						continue;
@@ -999,6 +1004,7 @@ namespace OpenRA.Mods.Common.Traits
 				{
 					var alternative = ConstructionYardEnclosurePolicy.FirstLegalUnreservedCell(candidateCells,
 						cell => world.CanPlaceBuilding(cell, actorInfo, bi, null) &&
+							baseBuilder.TiberiumFieldManager?.OverlapsTreeReservation(cell, bi) != true &&
 							(!distanceToBaseIsImportant || bi.IsCloseEnoughToBase(world, player, actorInfo, cell)),
 						cell => baseBuilder.WallPlanner.OverlapsConstructionYardEnclosure(cell, bi));
 					if (alternative != null)

@@ -447,7 +447,7 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				var actor = world.GetActorById(actorId);
 				if (actor == null || actor.Owner != player || !actor.IsInWorld || actor.IsDead ||
-					world.WorldTick >= temporarilyMovedUnits[actorId] || !IsEnclosureProtectedCell(actor.Location))
+					world.WorldTick >= temporarilyMovedUnits[actorId])
 					temporarilyMovedUnits.Remove(actorId);
 			}
 		}
@@ -457,7 +457,18 @@ namespace OpenRA.Mods.Common.Traits
 			if (bot == null || enclosurePlan == null)
 				return;
 
-			var blockers = enclosurePlan.WallCells.Concat(enclosurePlan.AccessCells)
+			TemporarilyClearFriendlyBlockers(bot,
+				enclosurePlan.WallCells.Concat(enclosurePlan.AccessCells), enclosureYardLocation);
+		}
+
+		public void TemporarilyClearFriendlyBlockers(IBot bot, IEnumerable<CPos> protectedCells,
+			CPos planCenter, Action<Actor, CPos> moved = null)
+		{
+			if (bot == null || protectedCells == null)
+				return;
+
+			var cells = protectedCells.Distinct().ToHashSet();
+			var blockers = cells
 				.SelectMany(world.ActorMap.GetActorsAt)
 				.Where(a => a.Owner == player && a.IsInWorld && !a.IsDead &&
 					a.Info.TraitInfoOrDefault<BuildingInfo>() == null &&
@@ -465,18 +476,19 @@ namespace OpenRA.Mods.Common.Traits
 				.Distinct().OrderBy(a => a.ActorID).ToArray();
 			foreach (var actor in blockers)
 			{
-				var destination = FindTemporaryClearCell(actor);
+				var destination = FindTemporaryClearCell(actor, cells, planCenter);
 				if (destination == null)
 					continue;
 
 				temporarilyMovedUnits[actor.ActorID] = world.WorldTick + 75;
 				bot.QueueOrder(new Order("Move", actor, Target.FromCell(world, destination.Value), false));
+				moved?.Invoke(actor, destination.Value);
 				LogEnclosure("{0} tick={1} temporarily cleared blocker={2}#{3} from={4} to={5}; squad ownership retained.",
 					player, world.WorldTick, actor.Info.Name, actor.ActorID, actor.Location, destination.Value);
 			}
 		}
 
-		CPos? FindTemporaryClearCell(Actor actor)
+		CPos? FindTemporaryClearCell(Actor actor, HashSet<CPos> protectedCells, CPos planCenter)
 		{
 			var mobile = actor.TraitOrDefault<Mobile>();
 			if (mobile == null)
@@ -485,10 +497,10 @@ namespace OpenRA.Mods.Common.Traits
 			for (var radius = 1; radius <= 6; radius++)
 			{
 				var candidates = world.Map.FindTilesInAnnulus(actor.Location, radius - 1, radius)
-					.Where(c => !IsEnclosureProtectedCell(c) && !IsFactFootprintCell(c) &&
+					.Where(c => !protectedCells.Contains(c) && !IsFactFootprintCell(c) &&
 						!world.ActorMap.GetActorsAt(c).Any(a => a.IsInWorld && !a.IsDead) &&
 						mobile.CanEnterCell(c, check: BlockedByActor.Immovable))
-					.OrderByDescending(c => (c - enclosureYardLocation).LengthSquared)
+					.OrderByDescending(c => (c - planCenter).LengthSquared)
 					.ThenBy(c => c.X).ThenBy(c => c.Y).ToArray();
 				if (candidates.Length > 0)
 					return candidates[0];

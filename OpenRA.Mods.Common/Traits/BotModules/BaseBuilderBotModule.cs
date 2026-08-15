@@ -903,7 +903,7 @@ namespace OpenRA.Mods.Common.Traits
 			queueStallRecovery?.Tick(bot);
 			smartEconomy?.Tick(bot);
 			RefreshSiloBuildReservation();
-			TiberiumFieldManager?.Tick();
+			TiberiumFieldManager?.Tick(bot);
 			DefenseClusterManager?.Tick(bot);
 			FirstTowerPlanner.Update();
 			SetRallyPointsForNewProductionBuildings(bot);

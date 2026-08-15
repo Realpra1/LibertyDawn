@@ -12,6 +12,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using OpenRA.Traits;
 
 namespace OpenRA.Mods.Common.Traits
 {
@@ -35,6 +36,9 @@ namespace OpenRA.Mods.Common.Traits
 			public CPos TreeLocation;
 			public string ResonatorType;
 			public CPos ResonatorLocation;
+			public CPos SamLocation;
+			public CPos BorderBuildingLocation;
+			public string BorderBuildingType;
 			public uint QueueActorId;
 			public ProjectPhase Phase;
 			public int DeadlineTick;
@@ -95,6 +99,9 @@ namespace OpenRA.Mods.Common.Traits
 		readonly Dictionary<uint, HarvesterAccessObservation> harvesterAccess =
 			new Dictionary<uint, HarvesterAccessObservation>();
 		readonly HashSet<uint> provenHarvestTrees = new HashSet<uint>();
+		readonly HashSet<uint> loggedClearHarvesters = new HashSet<uint>();
+		readonly HashSet<uint> loggedSoldBlockers = new HashSet<uint>();
+		readonly HashSet<uint> loggedMovedBlockers = new HashSet<uint>();
 		readonly Dictionary<uint, ActiveRedEnclosure> activeRedEnclosures =
 			new Dictionary<uint, ActiveRedEnclosure>();
 
@@ -191,7 +198,7 @@ namespace OpenRA.Mods.Common.Traits
 			}
 		}
 
-		public void Tick()
+		public void Tick(IBot bot)
 		{
 			if (!enabled || world.WorldTick < nextScanTick)
 				return;
@@ -201,6 +208,7 @@ namespace OpenRA.Mods.Common.Traits
 			var trees = LiveTrees();
 			LogTreeTransitions(trees);
 			RefreshAssignments(trees);
+			ClearPlannedCellBlockers(bot);
 			ObserveHarvesterAccess(trees);
 			RefreshActiveRedEnclosures(trees);
 			RefreshProjectState(trees);
@@ -211,6 +219,185 @@ namespace OpenRA.Mods.Common.Traits
 			}
 			else
 				LogPlannedWait();
+		}
+
+		public bool OverlapsTreeReservation(CPos location, BuildingInfo buildingInfo)
+		{
+			return enabled && buildingInfo != null && LiveTrees().Any(tree =>
+				TiberiumFieldPolicy.IsWithinTreeReservation(
+					tree.Location, buildingInfo.Tiles(location)));
+		}
+
+		public CPos? PlannedSamLocation(uint resonatorActorId)
+		{
+			var assignment = assignedResonators.FirstOrDefault(a => a.Value == resonatorActorId);
+			if (assignment.Key == 0)
+				return null;
+
+			var tree = world.GetActorById(assignment.Key);
+			var fact = tree == null ? null : ClosestFact(tree.Location);
+			return tree == null || fact == null ? (CPos?)null :
+				TiberiumFieldPolicy.CreateBuildPlan(tree.Location, fact.Location).SamCell;
+		}
+
+		public bool TryGetPlannedBorderPlacement(string actorType, ActorInfo actorInfo,
+			BuildingInfo buildingInfo, out CPos? location)
+		{
+			location = null;
+			if (!enabled || actorInfo == null || buildingInfo == null)
+				return false;
+
+			var plannedLocations = new List<CPos>();
+			if (project != null && project.BorderBuildingType == actorType)
+				plannedLocations.Add(project.BorderBuildingLocation);
+			foreach (var assignment in assignedResonators.OrderBy(a => a.Key))
+			{
+				var tree = world.GetActorById(assignment.Key);
+				var fact = tree == null ? null : ClosestFact(tree.Location);
+				if (tree == null || fact == null)
+					continue;
+
+				var plan = TiberiumFieldPolicy.CreateBuildPlan(tree.Location, fact.Location);
+				if (plan.BorderBuildingType == actorType)
+					plannedLocations.Add(plan.BorderBuildingCell);
+			}
+
+			location = TiberiumFieldPolicy.FirstLegalCell(
+				plannedLocations.Distinct().OrderBy(c => c.Y).ThenBy(c => c.X), cell =>
+			{
+				if (world.ActorsHavingTrait<Building>().Any(a => a.Owner == player &&
+					a.IsInWorld && !a.IsDead && a.Info.Name == actorType && a.Location == cell))
+					return false;
+
+				return buildingInfo.Tiles(cell).All(world.Map.Contains) &&
+					world.CanPlaceBuilding(cell, actorInfo, buildingInfo, null) &&
+					buildingInfo.IsCloseEnoughToBase(world, player, actorInfo, cell);
+			});
+
+			return location.HasValue;
+		}
+
+		public CPos? ChooseSimpleFallbackCell(ActorInfo actorInfo, BuildingInfo buildingInfo)
+		{
+			if (!enabled || project == null || actorInfo == null || buildingInfo == null ||
+				resourceLayer == null)
+				return null;
+
+			var resonators = world.Actors.Where(a => a.Owner == player && a.IsInWorld && !a.IsDead &&
+				baseBuilder.Info.TiberiumFieldResonatorTypes.Contains(a.Info.Name))
+				.Select(a => a.Location).Append(project.ResonatorLocation).ToArray();
+			var protectedPlanCells = PlannedBuildingCells().ToHashSet();
+			var candidates = world.Map.AllCells.Where(c => resourceLayer.GetResource(c).Type != null)
+				.SelectMany(c => world.Map.FindTilesInAnnulus(c, 1, 1))
+				.Distinct().OrderBy(c => (c - project.TreeLocation).LengthSquared)
+				.ThenBy(c => c.Y).ThenBy(c => c.X);
+			foreach (var cell in candidates)
+			{
+				var footprint = buildingInfo.Tiles(cell).ToArray();
+				if (footprint.Any(c => protectedPlanCells.Contains(c) &&
+					!buildingInfo.Tiles(project.ResonatorLocation).Contains(c)) ||
+					!TiberiumFieldPolicy.HasMinimumResonatorSpacing(cell, resonators) ||
+					!world.CanPlaceBuilding(cell, actorInfo, buildingInfo, null) ||
+					!buildingInfo.IsCloseEnoughToBase(world, player, actorInfo, cell))
+					continue;
+
+				return cell;
+			}
+
+			return null;
+		}
+
+		void ClearPlannedCellBlockers(IBot bot)
+		{
+			if (bot == null || project == null)
+				return;
+
+			var plannedCells = PlannedBuildingCells().ToHashSet();
+			if (project.RedWallCells != null)
+				plannedCells.UnionWith(project.RedWallCells);
+			if (plannedCells.Count == 0)
+				return;
+
+			var resourceTarget = plannedCells.Where(c => world.Map.Contains(c) && resourceLayer != null &&
+				resourceLayer.GetResource(c).Type != null)
+				.OrderBy(c => (c - project.TreeLocation).LengthSquared)
+				.ThenBy(c => c.Y).ThenBy(c => c.X).Select(c => (CPos?)c).FirstOrDefault();
+			if (resourceTarget.HasValue)
+				foreach (var harvester in world.ActorsHavingTrait<Harvester>()
+					.Where(a => a.Owner == player && a.IsInWorld && !a.IsDead)
+					.OrderBy(a => a.ActorID))
+				{
+					bot.QueueOrder(new Order("Harvest", harvester,
+						Target.FromCell(world, resourceTarget.Value), false));
+					if (loggedClearHarvesters.Add(harvester.ActorID))
+						Log("{0} tick={1} planner-clear-resource harvester={2}/{3}@{4} target={5}",
+							player, world.WorldTick, harvester.ActorID, harvester.Info.Name,
+							harvester.Location, resourceTarget.Value);
+				}
+
+			var blockers = plannedCells.SelectMany(world.ActorMap.GetActorsAt)
+				.Where(a => a.Owner == player && a.IsInWorld && !a.IsDead &&
+					a.Info.TraitInfoOrDefault<BuildingInfo>() != null && !IsDesiredPlannedBuilding(a))
+				.Distinct().OrderBy(a => a.ActorID).ToArray();
+			foreach (var blocker in blockers)
+			{
+				bot.QueueOrder(new Order("Sell", blocker, false));
+				if (loggedSoldBlockers.Add(blocker.ActorID))
+					Log("{0} tick={1} planner-sell-blocker actor={2}/{3}@{4}", player,
+						world.WorldTick, blocker.ActorID, blocker.Info.Name, blocker.Location);
+			}
+
+			baseBuilder.WallPlanner.TemporarilyClearFriendlyBlockers(
+				bot, plannedCells, project.TreeLocation, (blocker, destination) =>
+				{
+					if (loggedMovedBlockers.Add(blocker.ActorID))
+						Log("{0} tick={1} planner-move-blocker actor={2}/{3}@{4} destination={5}",
+							player, world.WorldTick, blocker.ActorID, blocker.Info.Name,
+							blocker.Location, destination);
+				});
+		}
+
+		IEnumerable<CPos> PlannedBuildingCells()
+		{
+			if (world.Map.Rules.Actors.TryGetValue(project.ResonatorType, out var resonatorInfo))
+			{
+				var building = resonatorInfo.TraitInfoOrDefault<BuildingInfo>();
+				if (building != null)
+					foreach (var cell in building.Tiles(project.ResonatorLocation))
+						yield return cell;
+			}
+
+			if (project.SamLocation != CPos.Zero)
+				foreach (var samType in baseBuilder.Info.EconomyDefenseSamTypes
+					.Where(world.Map.Rules.Actors.ContainsKey).OrderBy(t => t, StringComparer.Ordinal))
+				{
+					var building = world.Map.Rules.Actors[samType].TraitInfoOrDefault<BuildingInfo>();
+					if (building == null)
+						continue;
+					foreach (var cell in building.Tiles(project.SamLocation))
+						yield return cell;
+					break;
+				}
+
+			if (!string.IsNullOrEmpty(project.BorderBuildingType) &&
+				world.Map.Rules.Actors.TryGetValue(project.BorderBuildingType, out var borderInfo))
+			{
+				var building = borderInfo.TraitInfoOrDefault<BuildingInfo>();
+				if (building != null)
+					foreach (var cell in building.Tiles(project.BorderBuildingLocation))
+						yield return cell;
+			}
+		}
+
+		bool IsDesiredPlannedBuilding(Actor actor)
+		{
+			return (actor.Info.Name == project.ResonatorType && actor.Location == project.ResonatorLocation) ||
+				(baseBuilder.Info.EconomyDefenseSamTypes.Contains(actor.Info.Name) &&
+					actor.Location == project.SamLocation) ||
+				(actor.Info.Name == project.BorderBuildingType &&
+					actor.Location == project.BorderBuildingLocation) ||
+				(baseBuilder.Info.TiberiumFieldWallTypes.Contains(actor.Info.Name) &&
+					project.RedWallCells?.Contains(actor.Location) == true);
 		}
 
 		public ActorInfo TryChooseBuilding(ProductionQueue queue, IEnumerable<ActorInfo> buildables,
@@ -1146,6 +1333,7 @@ namespace OpenRA.Mods.Common.Traits
 					RedSegmentIndex = firstIncompleteSegment,
 					RedAnchorIndex = 2
 				};
+				PopulateDirectionalPlan(project);
 				Log("{0} tick={1} maintenance-queued tree={2}/{3}@{4} resonator={5} " +
 					"segment={6}/{7} missing={8} gate-preserved=true", player, world.WorldTick,
 					project.TreeActorId, project.TreeType, project.TreeLocation,
@@ -1168,13 +1356,26 @@ namespace OpenRA.Mods.Common.Traits
 			var sites = new Dictionary<uint, CPos>();
 			var candidates = new List<TiberiumFieldProjectCandidate>();
 			var redPlans = new Dictionary<uint, TiberiumFieldPerimeterPlan>();
+			var buildPlans = new Dictionary<uint, TiberiumFieldBuildPlan>();
 			var ownedWallCells = world.ActorsHavingTrait<Building>()
 				.Where(a => a.Owner == player && a.IsInWorld && !a.IsDead &&
 					baseBuilder.Info.TiberiumFieldWallTypes.Contains(a.Info.Name))
 				.Select(a => a.Location).ToHashSet();
-			foreach (var tree in trees.Where(t => !assignedResonators.ContainsKey(t.ActorID)))
+			var committedResonators = world.Actors.Where(a => a.Owner == player && a.IsInWorld && !a.IsDead &&
+				baseBuilder.Info.TiberiumFieldResonatorTypes.Contains(a.Info.Name))
+				.Select(a => a.Location).ToList();
+			if (project != null)
+				committedResonators.Add(project.ResonatorLocation);
+			foreach (var tree in trees.Where(t => !TreeHasConstructedResonator(t)))
 			{
-				var site = ChooseResonatorSite(tree, resonatorInfo, buildingInfo);
+				var fact = ClosestFact(tree.Location);
+				var buildPlan = fact == null ? (TiberiumFieldBuildPlan?)null :
+					TiberiumFieldPolicy.CreateBuildPlan(tree.Location, fact.Location);
+				var site = buildPlan.HasValue && IsPotentialPlannedResonatorSite(
+					buildPlan.Value.ResonatorCell, resonatorInfo, buildingInfo, tree) &&
+					TiberiumFieldPolicy.HasMinimumResonatorSpacing(
+						buildPlan.Value.ResonatorCell, committedResonators) ?
+					(CPos?)buildPlan.Value.ResonatorCell : null;
 				var demand = CountUsefulResourceCells(tree.Location);
 				var isRed = baseBuilder.Info.TiberiumFieldRedTreeTypes.Contains(tree.Info.Name);
 				TiberiumFieldPerimeterPlan redPlan = null;
@@ -1192,7 +1393,7 @@ namespace OpenRA.Mods.Common.Traits
 				}
 
 				var routeFeasible = site.HasValue && demand > 0 && (!isRed || redPlan != null);
-				var safety = -NearestOwnedBuildingDistanceSquared(tree.Location);
+				var safety = fact == null ? int.MinValue : -(fact.Location - tree.Location).LengthSquared;
 				long cost = Math.Max(0, resonatorInfo.TraitInfoOrDefault<ValuedInfo>()?.Cost ?? 0);
 				if (redPlan != null)
 				{
@@ -1215,7 +1416,10 @@ namespace OpenRA.Mods.Common.Traits
 				candidates.Add(new TiberiumFieldProjectCandidate(tree.ActorID, routeFeasible,
 					demand, safety, (int)Math.Min(int.MaxValue, cost)));
 				if (site.HasValue)
+				{
 					sites.Add(tree.ActorID, site.Value);
+					buildPlans.Add(tree.ActorID, buildPlan.Value);
+				}
 				if (redPlan != null)
 					redPlans.Add(tree.ActorID, redPlan);
 			}
@@ -1225,6 +1429,7 @@ namespace OpenRA.Mods.Common.Traits
 				return;
 
 			var selectedTree = trees.First(t => t.ActorID == selected.Value.TreeActorId);
+			var selectedPlan = buildPlans[selectedTree.ActorID];
 			var selectedRed = baseBuilder.Info.TiberiumFieldRedTreeTypes.Contains(selectedTree.Info.Name);
 			redPlans.TryGetValue(selectedTree.ActorID, out var selectedRedPlan);
 			project = new FieldProject
@@ -1234,6 +1439,9 @@ namespace OpenRA.Mods.Common.Traits
 				TreeLocation = selectedTree.Location,
 				ResonatorType = resonatorInfo.Name,
 				ResonatorLocation = location,
+				SamLocation = selectedPlan.SamCell,
+				BorderBuildingLocation = selectedPlan.BorderBuildingCell,
+				BorderBuildingType = selectedPlan.BorderBuildingType,
 				Phase = selectedRed ? ProjectPhase.PlanningEnclosure : ProjectPhase.Planned,
 				PlannedTick = world.WorldTick,
 				NextWaitingLogTick = TiberiumFieldPolicy.NextDeadline(world.WorldTick,
@@ -1250,10 +1458,12 @@ namespace OpenRA.Mods.Common.Traits
 			var center = world.Map.CenterOfCell(location) + buildingInfo.CenterOffset(world);
 			var distance = (center - selectedTree.CenterPosition).HorizontalLength;
 			Log("{0} tick={1} planned tree={2}/{3}@{4} phase={5} resonator={6}@{7} " +
-				"distance={8} range={9} demand={10} safety={11} remaining={12} route=resource-backed",
+				"sam={8} border={9}@{10} approach={11} distance={12} range={13} " +
+				"demand={14} fact-distance-score={15} remaining={16} route=resource-backed",
 				player, world.WorldTick, project.TreeActorId, project.TreeType, project.TreeLocation,
 				project.Phase, project.ResonatorType, project.ResonatorLocation,
-				distance, effectRange.Length, selected.Value.UsefulDemand,
+				project.SamLocation, project.BorderBuildingType, project.BorderBuildingLocation,
+				selectedPlan.Approach, distance, effectRange.Length, selected.Value.UsefulDemand,
 				selected.Value.SafetyScore, selected.Value.RemainingCommitment);
 			if (selectedRed)
 				Log("{0} tick={1} red-enclosure-planned tree={2}/{3}@{4} resonator={5}@{6} " +
@@ -1444,12 +1654,44 @@ namespace OpenRA.Mods.Common.Traits
 				resonatorInfo.TraitInfo<ModifiesResourcesInfo>().Range.LengthSquared;
 		}
 
+		bool IsPotentialPlannedResonatorSite(CPos cell, ActorInfo resonatorInfo,
+			BuildingInfo buildingInfo, Actor tree)
+		{
+			if (tree == null || !tree.IsInWorld || tree.IsDead ||
+				buildingInfo.Tiles(cell).Any(c => !world.Map.Contains(c)) ||
+				baseBuilder.WallPlanner.OverlapsConstructionYardEnclosure(cell, buildingInfo))
+				return false;
+
+			var center = world.Map.CenterOfCell(cell) + buildingInfo.CenterOffset(world);
+			return (center - tree.CenterPosition).HorizontalLengthSquared <=
+				resonatorInfo.TraitInfo<ModifiesResourcesInfo>().Range.LengthSquared;
+		}
+
 		bool ProjectPartsWithinBuildArea(Actor tree)
 		{
 			var resonatorInfo = world.Map.Rules.Actors[project.ResonatorType];
 			var resonatorBuilding = resonatorInfo.TraitInfo<BuildingInfo>();
-			if (!IsLegalResonatorSite(project.ResonatorLocation, resonatorInfo, resonatorBuilding, tree))
+			if (!IsPotentialPlannedResonatorSite(project.ResonatorLocation,
+				resonatorInfo, resonatorBuilding, tree) ||
+				!resonatorBuilding.IsCloseEnoughToBase(world, player, resonatorInfo,
+					project.ResonatorLocation))
 				return false;
+
+			if (project.SamLocation != CPos.Zero)
+			{
+				var samWithinBuildArea = baseBuilder.Info.EconomyDefenseSamTypes
+					.Where(world.Map.Rules.Actors.ContainsKey)
+					.Select(t => world.Map.Rules.Actors[t])
+					.Any(sam =>
+					{
+						var samBuilding = sam.TraitInfoOrDefault<BuildingInfo>();
+						return samBuilding != null && samBuilding.Tiles(project.SamLocation)
+							.All(world.Map.Contains) && samBuilding.IsCloseEnoughToBase(
+								world, player, sam, project.SamLocation);
+					});
+				if (!samWithinBuildArea)
+					return false;
+			}
 
 			if (project.RedWallCells == null)
 				return true;
@@ -1461,6 +1703,44 @@ namespace OpenRA.Mods.Common.Traits
 				.ToArray();
 			return walls.Length > 0 && project.RedWallCells.Where(c => !HasOwnWall(c)).All(cell => walls.Any(w =>
 				w.TraitInfo<BuildingInfo>().IsCloseEnoughToBase(world, player, w, cell)));
+		}
+
+		Actor ClosestFact(CPos location)
+		{
+			return world.ActorsHavingTrait<Building>()
+				.Where(a => a.Owner == player && a.IsInWorld && !a.IsDead &&
+					baseBuilder.Info.ConstructionYardTypes.Contains(a.Info.Name))
+				.OrderBy(a => (a.Location - location).LengthSquared)
+				.ThenBy(a => a.ActorID).FirstOrDefault();
+		}
+
+		void PopulateDirectionalPlan(FieldProject fieldProject)
+		{
+			if (fieldProject == null || (!string.IsNullOrEmpty(fieldProject.BorderBuildingType) &&
+				fieldProject.SamLocation != CPos.Zero))
+				return;
+
+			var fact = ClosestFact(fieldProject.TreeLocation);
+			if (fact == null)
+				return;
+
+			var plan = TiberiumFieldPolicy.CreateBuildPlan(fieldProject.TreeLocation, fact.Location);
+			fieldProject.SamLocation = plan.SamCell;
+			fieldProject.BorderBuildingLocation = plan.BorderBuildingCell;
+			fieldProject.BorderBuildingType = plan.BorderBuildingType;
+		}
+
+		bool TreeHasConstructedResonator(Actor tree)
+		{
+			return world.Actors.Where(a => a.Owner == player && a.IsInWorld && !a.IsDead &&
+				baseBuilder.Info.TiberiumFieldResonatorTypes.Contains(a.Info.Name))
+				.Any(resonator =>
+				{
+					var modifier = resonator.TraitOrDefault<ModifiesResources>();
+					return modifier != null && modifier.Range != WDist.Zero &&
+						(resonator.CenterPosition - tree.CenterPosition).HorizontalLengthSquared <=
+						modifier.Range.LengthSquared;
+				});
 		}
 
 		TiberiumFieldExtensionCandidate? ChooseExtensionCell(ActorInfo powerInfo)
@@ -1514,14 +1794,6 @@ namespace OpenRA.Mods.Common.Traits
 			return world.Map.FindTilesInCircle(treeLocation,
 				Math.Max(1, baseBuilder.Info.TiberiumFieldDemandRadius))
 				.Count(c => resourceLayer.GetResource(c).Type != null);
-		}
-
-		int NearestOwnedBuildingDistanceSquared(CPos location)
-		{
-			return world.ActorsHavingTrait<Building>()
-				.Where(a => a.Owner == player && a.IsInWorld && !a.IsDead)
-				.Select(a => (a.Location - location).LengthSquared)
-				.DefaultIfEmpty(int.MaxValue).Min();
 		}
 
 		void RetryProject(string reason)
@@ -1582,6 +1854,9 @@ namespace OpenRA.Mods.Common.Traits
 				SaveValue("TreeLocation", value.TreeLocation),
 				SaveValue("ResonatorType", value.ResonatorType),
 				SaveValue("ResonatorLocation", value.ResonatorLocation),
+				SaveValue("SamLocation", value.SamLocation),
+				SaveValue("BorderBuildingLocation", value.BorderBuildingLocation),
+				SaveValue("BorderBuildingType", value.BorderBuildingType ?? ""),
 				SaveValue("QueueActorId", value.QueueActorId),
 				SaveValue("Phase", (int)value.Phase),
 				SaveValue("DeadlineTick", value.DeadlineTick),
@@ -1646,6 +1921,9 @@ namespace OpenRA.Mods.Common.Traits
 				TreeLocation = ReadValue<CPos>(nodes, "TreeLocation"),
 				ResonatorType = ReadValue<string>(nodes, "ResonatorType"),
 				ResonatorLocation = ReadValue<CPos>(nodes, "ResonatorLocation"),
+				SamLocation = ReadValue(nodes, "SamLocation", CPos.Zero),
+				BorderBuildingLocation = ReadValue(nodes, "BorderBuildingLocation", CPos.Zero),
+				BorderBuildingType = ReadValue(nodes, "BorderBuildingType", ""),
 				QueueActorId = ReadValue<uint>(nodes, "QueueActorId"),
 				Phase = (ProjectPhase)phase,
 				DeadlineTick = ReadValue<int>(nodes, "DeadlineTick"),
@@ -1695,6 +1973,7 @@ namespace OpenRA.Mods.Common.Traits
 
 			ValidateIdentity(loaded.TreeActorId, loaded.TreeType, loaded.TreeLocation,
 				loaded.ResonatorType, loaded.ResonatorLocation);
+			PopulateDirectionalPlan(loaded);
 			if (loaded.RedWallCells != null)
 				ValidateExpectedPerimeter(loaded.TreeLocation, loaded.ResonatorType,
 					loaded.ResonatorLocation, loaded.RedWallCells, loaded.RedGateCells,
