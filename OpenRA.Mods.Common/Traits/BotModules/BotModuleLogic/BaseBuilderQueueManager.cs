@@ -433,6 +433,21 @@ namespace OpenRA.Mods.Common.Traits
 			return null;
 		}
 
+		ActorInfo ConfiguredFirstDefense(IEnumerable<ActorInfo> buildables)
+		{
+			foreach (var type in baseBuilder.Info.OpeningDefenseTypes)
+			{
+				if (!baseBuilder.Info.FirstTowerTypes.Contains(type))
+					continue;
+
+				var defense = GetProducibleBuilding(new HashSet<string> { type }, buildables);
+				if (defense != null)
+					return defense;
+			}
+
+			return null;
+		}
+
 		bool HasSufficientPowerForActor(ActorInfo actorInfo)
 		{
 			return playerPower == null || (actorInfo.TraitInfos<PowerInfo>().Where(i => i.EnabledByDefault)
@@ -564,6 +579,45 @@ namespace OpenRA.Mods.Common.Traits
 				}
 
 				return null;
+			}
+
+			if (IsDefenseQueue && baseBuilder.SecondaryQueueOpeningEnabled)
+			{
+				const int RequiredOpeningWalls = 4;
+				var completedWalls = baseBuilder.WallPlanner?.CompletedWallCount(playerBuildings) ?? 0;
+				var silo = GetProducibleBuilding(baseBuilder.NeedBasedSiloTypes, buildableThings);
+				var siloActionable = silo != null && HasSufficientPowerForActor(silo) &&
+					HasSufficientFundsForActor(queue, silo);
+				var siloCommitted = baseBuilder.CountQueuedOrPendingActors(baseBuilder.NeedBasedSiloTypes) > 0;
+				if (completedWalls >= RequiredOpeningWalls)
+					baseBuilder.ObserveSecondaryQueueOpeningSiloCommitment(siloCommitted);
+				var firstDefense = ConfiguredFirstDefense(buildableThings);
+				var firstDefenseActionable = firstDefense != null && HasSufficientPowerForActor(firstDefense) &&
+					HasSufficientFundsForActor(queue, firstDefense);
+				var choice = OpeningPolicyLogic.ChooseSecondaryQueueOpening(true,
+					completedWalls, RequiredOpeningWalls, baseBuilder.SmartEconomyWantsSilo,
+					baseBuilder.SecondaryQueueOpeningSiloCompleted, siloActionable, siloCommitted,
+					baseBuilder.SecondaryQueueOpeningFirstDefenseRequired,
+					baseBuilder.FirstTowerPlanner.Complete, firstDefenseActionable,
+					baseBuilder.FirstTowerPlanner.HasBuildCommitment);
+
+				if (choice == SecondaryQueueOpeningChoice.Hold)
+					return null;
+				if (choice == SecondaryQueueOpeningChoice.Silo &&
+					baseBuilder.TryReserveNeedBasedSilo(queue, silo.Name))
+				{
+					AIUtils.BotDebug("{0} decided to build {1}: protected secondary-queue Silo",
+						queue.Actor.Owner, DisplayName(silo.Name));
+					return silo;
+				}
+
+				if (choice == SecondaryQueueOpeningChoice.FirstDefense &&
+					baseBuilder.FirstTowerPlanner.TryReserveBuild(firstDefense.Name))
+				{
+					AIUtils.BotDebug("{0} decided to build {1}: protected secondary-queue first defense",
+						queue.Actor.Owner, DisplayName(firstDefense.Name));
+					return firstDefense;
+				}
 			}
 
 			var enclosureWall = baseBuilder.WallPlanner?.ConstructionYardEnclosureWall(queue, buildableThings, playerBuildings);

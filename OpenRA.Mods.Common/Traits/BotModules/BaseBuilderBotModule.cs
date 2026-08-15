@@ -661,6 +661,8 @@ namespace OpenRA.Mods.Common.Traits
 		readonly HashSet<int> loggedCompletedOpeningGoals = new HashSet<int>();
 		readonly HashSet<int> skippedOpeningGoals = new HashSet<int>();
 		bool openingCompletionLogged;
+		bool secondaryQueueOpeningSiloCompleted;
+		int secondaryQueueOpeningSiloTargetCount;
 		bool openingInitialized;
 		int openingSoldierBuiltBaseline;
 		int openingMcvBuiltBaseline;
@@ -949,6 +951,25 @@ namespace OpenRA.Mods.Common.Traits
 		internal bool SmartEconomyWantsSilo => SmartEconomyPolicy.WantsNeedBasedSilo(Info.EnableOpeningPrefix,
 			playerResources.Resources, playerResources.ResourceCapacity, Info.SmartEconomyStorageThresholdPercent);
 
+		internal bool SecondaryQueueOpeningEnabled => Info.EnableOpeningPolicy;
+
+		internal bool SecondaryQueueOpeningSiloCompleted => secondaryQueueOpeningSiloCompleted;
+
+		internal void ObserveSecondaryQueueOpeningSiloCommitment(bool siloCommitted)
+		{
+			var liveSilos = CountActors(NeedBasedSiloTypes);
+			var targetCount = OpeningPolicyLogic.ObserveSecondaryQueueSiloTarget(
+				secondaryQueueOpeningSiloTargetCount, liveSilos, siloCommitted);
+			if (targetCount != secondaryQueueOpeningSiloTargetCount)
+				LogSmartEconomy("{0} observed secondary-opening Silo commitment: target={1}, live={2}",
+					player, targetCount, liveSilos);
+			secondaryQueueOpeningSiloTargetCount = targetCount;
+		}
+
+		internal bool SecondaryQueueOpeningFirstDefenseRequired =>
+			!skippedOpeningGoals.Contains(OpeningDefenseGoal) &&
+			Info.OpeningDefenseTypes.Any(Info.FirstTowerTypes.Contains);
+
 		internal HashSet<string> NeedBasedSiloTypes => Info.SiloTypes;
 
 		internal HashSet<string> SmartEconomyRefineryTypes => Info.SmartEconomyRefineryTypes.Count > 0 ?
@@ -1031,13 +1052,20 @@ namespace OpenRA.Mods.Common.Traits
 
 		void RefreshSiloBuildReservation()
 		{
+			var liveSilos = CountActors(NeedBasedSiloTypes);
+			if (!secondaryQueueOpeningSiloCompleted &&
+				(OpeningPolicyLogic.SecondaryQueueSiloTargetCompleted(
+					secondaryQueueOpeningSiloTargetCount, liveSilos) ||
+				(siloBuildReservation != null && liveSilos >= siloBuildReservation.TargetCount)))
+				secondaryQueueOpeningSiloCompleted = true;
+
 			if (siloBuildReservation == null)
 				return;
 
-			if (CountActors(NeedBasedSiloTypes) >= siloBuildReservation.TargetCount)
+			if (liveSilos >= siloBuildReservation.TargetCount)
 			{
 				LogSmartEconomy("{0} storage-pressure silo completed: fact={1}, silos={2}/{3}, resources={4}/{5}",
-					player, siloBuildReservation.QueueActorId, CountActors(NeedBasedSiloTypes),
+					player, siloBuildReservation.QueueActorId, liveSilos,
 					siloBuildReservation.TargetCount, playerResources.Resources, playerResources.ResourceCapacity);
 				siloBuildReservation = null;
 				return;
@@ -1520,6 +1548,8 @@ namespace OpenRA.Mods.Common.Traits
 				new MiniYamlNode("CompletedOpeningGoals", FieldSaver.FormatValue(loggedCompletedOpeningGoals.ToArray())),
 				new MiniYamlNode("SkippedOpeningGoals", FieldSaver.FormatValue(skippedOpeningGoals.ToArray())),
 				new MiniYamlNode("OpeningCompletionLogged", FieldSaver.FormatValue(openingCompletionLogged)),
+				new MiniYamlNode("SecondaryQueueOpeningSiloCompleted", FieldSaver.FormatValue(secondaryQueueOpeningSiloCompleted)),
+				new MiniYamlNode("SecondaryQueueOpeningSiloTargetCount", FieldSaver.FormatValue(secondaryQueueOpeningSiloTargetCount)),
 				new MiniYamlNode("RadarRecoveryEverEstablished", FieldSaver.FormatValue(radarRecovery?.EverEstablished ?? false)),
 				new MiniYamlNode("RadarRecoveryReservationQueueActorId", FieldSaver.FormatValue(radarRecovery?.ReservationQueueActorId ?? 0)),
 				new MiniYamlNode("RadarRecoveryReservationQueueType", FieldSaver.FormatValue(radarRecovery?.ReservationQueueType ?? "")),
@@ -1632,6 +1662,14 @@ namespace OpenRA.Mods.Common.Traits
 			var completionNode = data.FirstOrDefault(n => n.Key == "OpeningCompletionLogged");
 			if (completionNode != null)
 				openingCompletionLogged = FieldLoader.GetValue<bool>("OpeningCompletionLogged", completionNode.Value.Value);
+			var secondarySiloCompletedNode = data.FirstOrDefault(n => n.Key == "SecondaryQueueOpeningSiloCompleted");
+			if (secondarySiloCompletedNode != null)
+				secondaryQueueOpeningSiloCompleted = FieldLoader.GetValue<bool>(
+					"SecondaryQueueOpeningSiloCompleted", secondarySiloCompletedNode.Value.Value);
+			var secondarySiloTargetNode = data.FirstOrDefault(n => n.Key == "SecondaryQueueOpeningSiloTargetCount");
+			if (secondarySiloTargetNode != null)
+				secondaryQueueOpeningSiloTargetCount = FieldLoader.GetValue<int>(
+					"SecondaryQueueOpeningSiloTargetCount", secondarySiloTargetNode.Value.Value);
 
 			var radarEstablishedNode = data.FirstOrDefault(n => n.Key == "RadarRecoveryEverEstablished");
 			var radarQueueNode = data.FirstOrDefault(n => n.Key == "RadarRecoveryReservationQueueActorId");

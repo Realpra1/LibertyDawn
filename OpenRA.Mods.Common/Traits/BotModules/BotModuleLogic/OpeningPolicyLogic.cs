@@ -15,8 +15,56 @@ using System.Linq;
 
 namespace OpenRA.Mods.Common.Traits
 {
+	public enum SecondaryQueueOpeningChoice
+	{
+		None,
+		Silo,
+		FirstDefense,
+		Hold
+	}
+
 	public static class OpeningPolicyLogic
 	{
+		public static int ObserveSecondaryQueueSiloTarget(int currentTarget, int liveSilos, bool siloCommitted)
+		{
+			if (currentTarget > 0 || !siloCommitted)
+				return currentTarget;
+
+			return Math.Max(0, liveSilos) + 1;
+		}
+
+		public static bool SecondaryQueueSiloTargetCompleted(int target, int liveSilos)
+		{
+			return target > 0 && liveSilos >= target;
+		}
+
+		public static SecondaryQueueOpeningChoice ChooseSecondaryQueueOpening(
+			bool enabled, int completedWalls, int requiredWalls,
+			bool siloNeeded, bool siloCompleted, bool siloActionable, bool siloCommitted,
+			bool firstDefenseRequired, bool firstDefenseCompleted,
+			bool firstDefenseActionable, bool firstDefenseCommitted)
+		{
+			if (!enabled || completedWalls < Math.Max(0, requiredWalls))
+				return SecondaryQueueOpeningChoice.None;
+
+			if (!siloCompleted)
+			{
+				if (siloCommitted)
+					return SecondaryQueueOpeningChoice.Hold;
+
+				return siloNeeded && siloActionable ? SecondaryQueueOpeningChoice.Silo :
+					SecondaryQueueOpeningChoice.Hold;
+			}
+
+			if (!firstDefenseRequired || firstDefenseCompleted)
+				return SecondaryQueueOpeningChoice.None;
+			if (firstDefenseCommitted)
+				return SecondaryQueueOpeningChoice.Hold;
+
+			return firstDefenseActionable ? SecondaryQueueOpeningChoice.FirstDefense :
+				SecondaryQueueOpeningChoice.Hold;
+		}
+
 		public static bool HoldOptionalConstructionForFirstRefinery(bool refineryGoalActive,
 			int liveRefineries, bool refineryCommitted, bool refineryActionable)
 		{

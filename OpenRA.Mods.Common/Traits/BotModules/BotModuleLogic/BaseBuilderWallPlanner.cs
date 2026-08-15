@@ -136,6 +136,11 @@ namespace OpenRA.Mods.Common.Traits
 			return Info.WallTypes.Contains(actorType) || Info.ConstructionYardEnclosureWallTypes.Contains(actorType);
 		}
 
+		public int CompletedWallCount(Actor[] playerBuildings)
+		{
+			return WallCount(playerBuildings);
+		}
+
 		public bool OwnsClusterWallCell(CPos cell)
 		{
 			return clusterWallCells.Contains(cell);
