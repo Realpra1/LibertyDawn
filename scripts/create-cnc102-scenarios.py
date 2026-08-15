@@ -214,7 +214,6 @@ World:
 \t\tSupportActors: harv, harv
 \t\tInnerSupportRadius: 3
 \t\tOuterSupportRadius: 8
-\t\tUpgrades: upgrade.covert1
 """, f"""WorldLoaded = function()
 \tNeutral = Player.GetPlayer("Neutral")
 \tPlayer.GetPlayer("Multi0").Cash = 5000
