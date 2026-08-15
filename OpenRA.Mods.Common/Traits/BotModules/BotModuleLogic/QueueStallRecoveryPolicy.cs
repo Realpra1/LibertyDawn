@@ -26,13 +26,22 @@ namespace OpenRA.Mods.Common.Traits
 		LowPower,
 		HarvesterTargetMet,
 		MissingCriticalCandidate,
+		SufficientFunds,
 		InsufficientContention
+	}
+
+	public enum QueueStallRecoveryConstructionChoice
+	{
+		None,
+		ConstructionYardEnclosure,
+		NeedBasedSilo
 	}
 
 	public static class QueueStallRecoveryPolicy
 	{
 		public static QueueStallRecoveryEligibility ClassifyEconomyObservation(bool normalPower,
-			int liveHarvesters, int harvesterTarget, bool hasCriticalEconomyCandidate, int competingFronts)
+			int liveHarvesters, int harvesterTarget, bool hasCriticalEconomyCandidate,
+			bool cashConstrained, int competingFronts)
 		{
 			if (!normalPower)
 				return QueueStallRecoveryEligibility.LowPower;
@@ -42,6 +51,8 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (!hasCriticalEconomyCandidate)
 				return QueueStallRecoveryEligibility.MissingCriticalCandidate;
+			if (!cashConstrained)
+				return QueueStallRecoveryEligibility.SufficientFunds;
 
 			return competingFronts >= 2 ? QueueStallRecoveryEligibility.Eligible :
 				QueueStallRecoveryEligibility.InsufficientContention;
@@ -57,9 +68,10 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		public static bool ShouldRecoverEconomy(int liveHarvesters, int harvesterTarget,
-			bool hasCriticalEconomyCandidate, int competingFronts, int evidenceTicks, int activationTicks)
+			bool hasCriticalEconomyCandidate, bool cashConstrained, int competingFronts,
+			int evidenceTicks, int activationTicks)
 		{
-			return liveHarvesters < Math.Max(1, harvesterTarget) && hasCriticalEconomyCandidate &&
+			return liveHarvesters < Math.Max(1, harvesterTarget) && hasCriticalEconomyCandidate && cashConstrained &&
 				competingFronts >= 2 && evidenceTicks >= Math.Max(1, activationTicks);
 		}
 
@@ -88,6 +100,18 @@ namespace OpenRA.Mods.Common.Traits
 		public static bool ShouldPauseOrdinaryProduction(bool active, bool awaitingSelectedExit)
 		{
 			return active || awaitingSelectedExit;
+		}
+
+		public static QueueStallRecoveryConstructionChoice ChooseProtectedConstruction(
+			bool recoveryActive, bool enclosureAvailable, bool needBasedSiloAvailable)
+		{
+			if (!recoveryActive)
+				return QueueStallRecoveryConstructionChoice.None;
+			if (enclosureAvailable)
+				return QueueStallRecoveryConstructionChoice.ConstructionYardEnclosure;
+
+			return needBasedSiloAvailable ? QueueStallRecoveryConstructionChoice.NeedBasedSilo :
+				QueueStallRecoveryConstructionChoice.None;
 		}
 	}
 }

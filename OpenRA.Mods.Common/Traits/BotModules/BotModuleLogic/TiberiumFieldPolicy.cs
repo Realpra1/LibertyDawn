@@ -431,6 +431,11 @@ namespace OpenRA.Mods.Common.Traits
 				DeadlineReached(currentTick, readyPlacementDeadline);
 		}
 
+		public static bool UsePlanningFallback(int currentTick, int plannedTick, int delay)
+		{
+			return DeadlineReached(currentTick, NextDeadline(plannedTick, delay));
+		}
+
 		public static bool ShouldDeferNoProgress(int currentTick, int nextProgressCheckTick,
 			bool hasLegalWork, bool admissionRejected)
 		{

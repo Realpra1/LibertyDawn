@@ -31,29 +31,32 @@ namespace OpenRA.Test.Mods.Common
 				"ineligible queue states must not retain stale evidence");
 		}
 
-		[TestCase(true, 3, true, 3, QueueStallRecoveryEligibility.Eligible)]
-		[TestCase(false, 3, true, 3, QueueStallRecoveryEligibility.LowPower)]
-		[TestCase(true, 5, true, 3, QueueStallRecoveryEligibility.HarvesterTargetMet)]
-		[TestCase(true, 3, false, 3, QueueStallRecoveryEligibility.MissingCriticalCandidate)]
-		[TestCase(true, 3, true, 1, QueueStallRecoveryEligibility.InsufficientContention)]
+		[TestCase(true, 3, true, true, 3, QueueStallRecoveryEligibility.Eligible)]
+		[TestCase(false, 3, true, true, 3, QueueStallRecoveryEligibility.LowPower)]
+		[TestCase(true, 5, true, true, 3, QueueStallRecoveryEligibility.HarvesterTargetMet)]
+		[TestCase(true, 3, false, true, 3, QueueStallRecoveryEligibility.MissingCriticalCandidate)]
+		[TestCase(true, 3, true, false, 3, QueueStallRecoveryEligibility.SufficientFunds)]
+		[TestCase(true, 3, true, true, 1, QueueStallRecoveryEligibility.InsufficientContention)]
 		public void QueueStallEligibilityClassifiesPowerPrerequisiteAndContentionTransitions(
-			bool normalPower, int liveHarvesters, bool criticalCandidate, int fronts,
+			bool normalPower, int liveHarvesters, bool criticalCandidate, bool cashConstrained, int fronts,
 			QueueStallRecoveryEligibility expected)
 		{
 			Assert.That(QueueStallRecoveryPolicy.ClassifyEconomyObservation(
-				normalPower, liveHarvesters, 5, criticalCandidate, fronts), Is.EqualTo(expected));
+				normalPower, liveHarvesters, 5, criticalCandidate, cashConstrained, fronts), Is.EqualTo(expected));
 		}
 
-		[TestCase(3, true, 3, 250, true)]
-		[TestCase(5, true, 3, 250, false)]
-		[TestCase(3, false, 3, 250, false)]
-		[TestCase(3, true, 1, 250, false)]
-		[TestCase(3, true, 3, 249, false)]
+		[TestCase(3, true, true, 3, 250, true)]
+		[TestCase(5, true, true, 3, 250, false)]
+		[TestCase(3, false, true, 3, 250, false)]
+		[TestCase(3, true, false, 3, 250, false)]
+		[TestCase(3, true, true, 1, 250, false)]
+		[TestCase(3, true, true, 3, 249, false)]
 		public void QueueStallEconomyGateRequiresBelowFiveCriticalCandidateAndContention(
-			int liveHarvesters, bool criticalCandidate, int fronts, int evidence, bool expected)
+			int liveHarvesters, bool criticalCandidate, bool cashConstrained,
+			int fronts, int evidence, bool expected)
 		{
 			Assert.That(QueueStallRecoveryPolicy.ShouldRecoverEconomy(liveHarvesters, 5,
-				criticalCandidate, fronts, evidence, 250), Is.EqualTo(expected));
+				criticalCandidate, cashConstrained, fronts, evidence, 250), Is.EqualTo(expected));
 		}
 
 		[TestCase(true, true, false, true)]
@@ -99,6 +102,18 @@ namespace OpenRA.Test.Mods.Common
 		{
 			Assert.That(QueueStallRecoveryPolicy.ShouldPauseOrdinaryProduction(active, awaitingSelectedExit),
 				Is.EqualTo(expected));
+		}
+
+		[TestCase(false, true, true, QueueStallRecoveryConstructionChoice.None)]
+		[TestCase(true, true, true, QueueStallRecoveryConstructionChoice.ConstructionYardEnclosure)]
+		[TestCase(true, false, true, QueueStallRecoveryConstructionChoice.NeedBasedSilo)]
+		[TestCase(true, false, false, QueueStallRecoveryConstructionChoice.None)]
+		public void QueueRecoveryAllowsOnlyEnclosureThenNeedBasedSilo(bool active,
+			bool enclosureAvailable, bool siloAvailable,
+			QueueStallRecoveryConstructionChoice expected)
+		{
+			Assert.That(QueueStallRecoveryPolicy.ChooseProtectedConstruction(active,
+				enclosureAvailable, siloAvailable), Is.EqualTo(expected));
 		}
 
 		[Test]

@@ -57,6 +57,7 @@ namespace OpenRA.Mods.Common.Traits
 			public CPos? ExtensionTargetCell;
 			public int ExtensionCount;
 			public int ExtensionProgressCells;
+			public bool SimpleFallback;
 		}
 
 		sealed class ActiveRedEnclosure
@@ -88,6 +89,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly IResourceLayer resourceLayer;
 		readonly bool enabled;
 		readonly Dictionary<uint, uint> assignedResonators = new Dictionary<uint, uint>();
+		readonly HashSet<uint> observedResonators = new HashSet<uint>();
 		readonly HashSet<uint> knownTrees = new HashSet<uint>();
 		readonly HashSet<uint> loggedDeferredRedTrees = new HashSet<uint>();
 		readonly Dictionary<uint, HarvesterAccessObservation> harvesterAccess =
@@ -203,12 +205,16 @@ namespace OpenRA.Mods.Common.Traits
 			RefreshActiveRedEnclosures(trees);
 			RefreshProjectState(trees);
 			if (project == null)
-				PlanNextProject(trees);
+			{
+				if (CanPlanProject())
+					PlanNextProject(trees);
+			}
 			else
 				LogPlannedWait();
 		}
 
-		public ActorInfo TryChooseBuilding(ProductionQueue queue, IEnumerable<ActorInfo> buildables)
+		public ActorInfo TryChooseBuilding(ProductionQueue queue, IEnumerable<ActorInfo> buildables,
+			bool allowQueuedSimpleFallback = false)
 		{
 			if (!enabled || project == null || queue == null)
 				return null;
@@ -224,7 +230,7 @@ namespace OpenRA.Mods.Common.Traits
 			project.LastQueueOfferTick = world.WorldTick;
 
 			if (project.Phase != ProjectPhase.Planned || world.WorldTick < project.DeferredUntilTick ||
-				queue.AllQueued().Any())
+				(queue.AllQueued().Any() && (!allowQueuedSimpleFallback || !project.SimpleFallback)))
 				return null;
 
 			var configuredResonator = world.Map.Rules.Actors[project.ResonatorType];
@@ -265,12 +271,18 @@ namespace OpenRA.Mods.Common.Traits
 				CountUsefulResourceCells(project.TreeLocation) > 0;
 			var criticalRecovery = baseBuilder.SmartEconomySerializesMissingRefinery ||
 				baseBuilder.SmartEconomyShouldReserveCashForRefinery || baseBuilder.SmartEconomyWantsSilo;
-			var admission = TiberiumFieldPolicy.EvaluateAdmission(enabled,
-				!baseBuilder.Info.TiberiumFieldRedTreeTypes.Contains(project.TreeType),
-				baseBuilder.OpeningActive, criticalRecovery,
-				baseBuilder.CountActors(baseBuilder.SmartEconomyRefineryTypes) > 0,
-				playerResources.ResourceCapacity > 0, hasHarvesterRoute, hasPowerMargin,
-				spendableCash, baseBuilder.Info.TiberiumFieldProtectedCash, cost);
+
+			// Once fancy planning has timed out, restore the original refinery-style behavior.
+			// In particular, do not keep applying the discretionary field cash reserve to the
+			// fallback or it can remain suppressed for the rest of an otherwise healthy game.
+			var protectedCash = project.SimpleFallback ? 0 : baseBuilder.Info.TiberiumFieldProtectedCash;
+			var admission = project.SimpleFallback ? TiberiumFieldAdmissionResult.Admitted :
+				TiberiumFieldPolicy.EvaluateAdmission(enabled,
+					!baseBuilder.Info.TiberiumFieldRedTreeTypes.Contains(project.TreeType),
+					baseBuilder.OpeningActive, criticalRecovery,
+					baseBuilder.CountActors(baseBuilder.SmartEconomyRefineryTypes) > 0,
+					playerResources.ResourceCapacity > 0, hasHarvesterRoute, hasPowerMargin,
+					spendableCash, protectedCash, cost);
 			if (admission != TiberiumFieldAdmissionResult.Admitted)
 			{
 				if (lastAdmissionResult != admission || world.WorldTick >= nextAdmissionLogTick)
@@ -282,7 +294,7 @@ namespace OpenRA.Mods.Common.Traits
 						"reason={7} cash={8} protected={9} power={10} storage={11} opening={12} recovery={13}",
 						player, world.WorldTick, project.TreeActorId, project.TreeType, project.TreeLocation,
 						resonator.Name, project.ResonatorLocation, admission, spendableCash,
-						baseBuilder.Info.TiberiumFieldProtectedCash,
+						protectedCash,
 						playerPower?.ExcessPower ?? int.MaxValue, playerResources.ResourceCapacity,
 						baseBuilder.OpeningActive, criticalRecovery);
 				}
@@ -301,9 +313,28 @@ namespace OpenRA.Mods.Common.Traits
 				player, world.WorldTick, project.TreeActorId, project.TreeType, project.TreeLocation,
 				project.Phase, resonator.Name, project.ResonatorLocation, queue.Actor.ActorID,
 				queue.Info.Type, project.DeadlineTick, spendableCash,
-				baseBuilder.Info.TiberiumFieldProtectedCash,
+				protectedCash,
 				playerPower?.ExcessPower ?? int.MaxValue);
 			return resonator;
+		}
+
+		public ActorInfo TryChooseQueuedSimpleFallback(ProductionQueue queue,
+			IEnumerable<ActorInfo> buildables)
+		{
+			return project?.SimpleFallback == true ?
+				TryChooseBuilding(queue, buildables, true) : null;
+		}
+
+		bool CanPlanProject()
+		{
+			if (baseBuilder.OpeningActive || baseBuilder.CriticalEconomyRecoveryActive ||
+				baseBuilder.SmartEconomyWantsSilo)
+				return false;
+
+			return baseBuilder.Info.BuildingQueues.Concat(baseBuilder.Info.DefenseQueues)
+				.SelectMany(category => AIUtils.FindQueues(player, category))
+				.Any(queue => queue.BuildableItems().Any(actor =>
+					baseBuilder.Info.TiberiumFieldResonatorTypes.Contains(actor.Name)));
 		}
 
 		ActorInfo TryChooseExtensionPower(ProductionQueue queue, IEnumerable<ActorInfo> buildables)
@@ -575,6 +606,13 @@ namespace OpenRA.Mods.Common.Traits
 
 			var actorInfo = world.Map.Rules.Actors[actorType];
 			var buildingInfo = actorInfo.TraitInfoOrDefault<BuildingInfo>();
+			if (project.SimpleFallback)
+			{
+				retainReady = true;
+				simpleFallback = true;
+				return true;
+			}
+
 			var previousReadyDeadline = project.ReadyPlacementDeadlineTick;
 			project.ReadyPlacementDeadlineTick = TiberiumFieldPolicy.ReadyPlacementDeadline(
 				world.WorldTick, project.ReadyPlacementDeadlineTick, true,
@@ -739,11 +777,19 @@ namespace OpenRA.Mods.Common.Traits
 
 		void RefreshAssignments(Actor[] trees)
 		{
-			var resonators = world.Actors.Where(a => a.Owner == player && a.IsInWorld && !a.IsDead &&
-				baseBuilder.Info.TiberiumFieldResonatorTypes.Contains(a.Info.Name) &&
+			var liveResonators = world.Actors.Where(a => a.Owner == player && a.IsInWorld && !a.IsDead &&
+				baseBuilder.Info.TiberiumFieldResonatorTypes.Contains(a.Info.Name)).OrderBy(a => a.ActorID).ToArray();
+			foreach (var resonator in liveResonators)
+				if (observedResonators.Add(resonator.ActorID))
+					Log("{0} tick={1} resonator-live actor={2}/{3}@{4} power-state={5}", player,
+						world.WorldTick, resonator.ActorID, resonator.Info.Name, resonator.Location,
+						playerPower?.PowerState.ToString() ?? "unmanaged");
+
+			observedResonators.IntersectWith(liveResonators.Select(a => a.ActorID));
+			var resonators = liveResonators.Where(a =>
 				(playerPower == null || playerPower.PowerState == PowerState.Normal) &&
 				(a.TraitOrDefault<ModifiesResources>()?.Range ?? WDist.Zero) != WDist.Zero)
-				.OrderBy(a => a.ActorID).ToArray();
+				.ToArray();
 			var coverageCandidates = new List<TiberiumFieldCoverageCandidate>();
 			foreach (var resonator in resonators)
 			{
@@ -833,7 +879,8 @@ namespace OpenRA.Mods.Common.Traits
 			}
 
 			if ((project.Phase == ProjectPhase.Planned ||
-				project.Phase == ProjectPhase.PlanningEnclosure) && !ProjectPartsWithinBuildArea(tree))
+				project.Phase == ProjectPhase.PlanningEnclosure) && !project.SimpleFallback &&
+				!ProjectPartsWithinBuildArea(tree))
 			{
 				project.QueueActorId = 0;
 				project.ActiveActorType = null;
@@ -906,7 +953,29 @@ namespace OpenRA.Mods.Common.Traits
 			}
 
 			if (project.Phase == ProjectPhase.PlanningExtension)
+			{
+				if (!project.MaintenanceOnly && TiberiumFieldPolicy.UsePlanningFallback(
+					world.WorldTick, project.PlannedTick,
+					baseBuilder.Info.TiberiumFieldPlanningFallbackDelay))
+				{
+					project.QueueActorId = 0;
+					project.ActiveActorType = null;
+					project.ExtensionTargetCell = null;
+					project.DeferredUntilTick = 0;
+					project.DeadlineTick = 0;
+					project.SimpleFallback = true;
+					project.Phase = ProjectPhase.Planned;
+					Log("{0} tick={1} fancy-planning-timeout tree={2}/{3}@{4} " +
+						"resonator={5} planned={6} delay={7} completed-extensions={8}; " +
+						"normal-refinery-fallback=enabled", player, world.WorldTick,
+						project.TreeActorId, project.TreeType, project.TreeLocation,
+						project.ResonatorType, project.PlannedTick,
+						baseBuilder.Info.TiberiumFieldPlanningFallbackDelay,
+						project.ExtensionCount);
+				}
+
 				return;
+			}
 
 			if (project.Phase == ProjectPhase.AwaitingEnclosure)
 			{
@@ -1533,7 +1602,8 @@ namespace OpenRA.Mods.Common.Traits
 				SaveValue("HasExtensionTargetCell", value.ExtensionTargetCell.HasValue),
 				SaveValue("ExtensionTargetCell", value.ExtensionTargetCell ?? CPos.Zero),
 				SaveValue("ExtensionCount", value.ExtensionCount),
-				SaveValue("ExtensionProgressCells", value.ExtensionProgressCells)
+				SaveValue("ExtensionProgressCells", value.ExtensionProgressCells),
+				SaveValue("SimpleFallback", value.SimpleFallback)
 			};
 			if (value.RedWallCells != null)
 			{
@@ -1594,7 +1664,8 @@ namespace OpenRA.Mods.Common.Traits
 				ActiveActorType = ReadValue(nodes, "ActiveActorType", ""),
 				MaintenanceOnly = ReadValue(nodes, "MaintenanceOnly", false),
 				ExtensionCount = ReadValue(nodes, "ExtensionCount", 0),
-				ExtensionProgressCells = ReadValue(nodes, "ExtensionProgressCells", 0)
+				ExtensionProgressCells = ReadValue(nodes, "ExtensionProgressCells", 0),
+				SimpleFallback = ReadValue(nodes, "SimpleFallback", false)
 			};
 			if (ReadValue(nodes, "HasRedTargetCell", false))
 				loaded.RedTargetCell = ReadValue<CPos>(nodes, "RedTargetCell");

@@ -179,6 +179,10 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Ticks a fully produced Resonator keeps trying its planned field site before ordinary refinery placement is allowed.")]
 		public readonly int TiberiumFieldReadyPlacementFallbackDelay = 1500;
 
+		[Desc("Ticks an actionable fancy extension plan may wait without progress before building the Resonator",
+			"for ordinary Refinery placement instead.")]
+		public readonly int TiberiumFieldPlanningFallbackDelay = 1500;
+
 		[Desc("Consecutive failed field placements before entering a visible deferred state.")]
 		public readonly int TiberiumFieldMaximumRetries = 3;
 
@@ -202,6 +206,16 @@ namespace OpenRA.Mods.Common.Traits
 
 		[Desc("Minimum excess power the AI should try to maintain.")]
 		public readonly int MinimumExcessPower = 0;
+
+		[Desc("Additional excess-power buffer enabled after ExcessPowerBufferDelaySeconds.",
+			"The buffer is disabled while critical economy recovery is active.")]
+		public readonly int ExcessPowerBuffer = 0;
+
+		[Desc("In-game seconds before the optional excess-power buffer becomes active.")]
+		public readonly int ExcessPowerBufferDelaySeconds = 0;
+
+		[Desc("Write excess-power target transitions to debug.log.")]
+		public readonly bool ExcessPowerDebugLogging = false;
 
 		[Desc("The targeted excess power the AI tries to maintain cannot rise above this.")]
 		public readonly int MaximumExcessPower = 0;
@@ -920,6 +934,9 @@ namespace OpenRA.Mods.Common.Traits
 
 		internal bool QueueStallRecoveryActive => queueStallRecovery?.BlocksOrdinaryProduction ?? false;
 
+		internal bool CriticalEconomyRecoveryActive => QueueStallRecoveryActive ||
+			SmartEconomySerializesMissingRefinery || SmartEconomyShouldReserveCashForRefinery;
+
 		internal bool SmartEconomyWantsRefinery => smartEconomy?.WantsRefinery ?? false;
 
 		internal bool SmartEconomyEnabled => smartEconomy?.Enabled ?? false;
@@ -1056,7 +1073,8 @@ namespace OpenRA.Mods.Common.Traits
 				return null;
 
 			openingStructureReservations[goal] = world.WorldTick;
-			LogOpening("{0} reserved structure goal {1}: {2}", player, OpeningGoalName(goal), selected);
+			LogOpening("{0} tick={1} reserved structure goal {2}: {3}", player, world.WorldTick,
+				OpeningGoalName(goal), selected);
 			return buildableArray.First(a => a.Name == selected);
 		}
 
@@ -1143,7 +1161,8 @@ namespace OpenRA.Mods.Common.Traits
 				{
 					completed.Add(i);
 					if (loggedCompletedOpeningGoals.Add(i))
-						LogOpening("{0} completed structure goal {1}", player, OpeningGoalName(i));
+						LogOpening("{0} tick={1} completed structure goal {2}", player,
+							world.WorldTick, OpeningGoalName(i));
 				}
 			}
 
@@ -1167,7 +1186,8 @@ namespace OpenRA.Mods.Common.Traits
 				{
 					openingStructureReservations.Remove(reservation.Key);
 					if (!completed)
-						LogOpening("{0} released stalled structure goal {1} for retry", player, OpeningGoalName(reservation.Key));
+						LogOpening("{0} tick={1} released stalled structure goal {2} for retry", player,
+							world.WorldTick, OpeningGoalName(reservation.Key));
 				}
 			}
 		}

@@ -46,7 +46,12 @@ namespace OpenRA.Mods.Common.Traits
 				if (completedGoals.Contains(i))
 					continue;
 
-				return !reservedGoals.Contains(i) && orderedGoals[i].Any(buildable.Contains) ? i : -1;
+				// A reservation is an accepted commitment, so another independent Fact may
+				// reserve the next ordered goal instead of idling until construction completes.
+				if (reservedGoals.Contains(i))
+					continue;
+
+				return orderedGoals[i].Any(buildable.Contains) ? i : -1;
 			}
 
 			return -1;

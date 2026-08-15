@@ -244,8 +244,13 @@ namespace OpenRA.Mods.Common.Traits
 			var hasRefineryCandidate = fronts.Any(f => refineryTypes.Contains(f.Item.Item));
 			var hasEconomyCandidate = QueueStallRecoveryPolicy.HasCriticalEconomyCandidate(
 				hasUsableRefinery, hasHarvesterCandidate, hasRefineryCandidate);
+			var criticalTypes = hasUsableRefinery ? harvesterTypes : refineryTypes;
+			var criticalRemainingCost = fronts.Where(f => criticalTypes.Contains(f.Item.Item))
+				.Select(f => Math.Max(0, f.Item.RemainingCost)).DefaultIfEmpty(int.MaxValue).Min();
+			var availableFunds = Math.Max(0, playerResources.Cash + playerResources.Resources);
+			var cashConstrained = criticalRemainingCost != int.MaxValue && availableFunds < criticalRemainingCost;
 			var eligibility = QueueStallRecoveryPolicy.ClassifyEconomyObservation(normalPower,
-				liveHarvesters, HarvesterTarget, hasEconomyCandidate, fronts.Count);
+				liveHarvesters, HarvesterTarget, hasEconomyCandidate, cashConstrained, fronts.Count);
 			var eligible = eligibility == QueueStallRecoveryEligibility.Eligible;
 
 			var madePaidProgress = false;
@@ -262,14 +267,13 @@ namespace OpenRA.Mods.Common.Traits
 			noProgressEvidenceTicks = QueueStallRecoveryPolicy.UpdateNoProgressEvidence(
 				noProgressEvidenceTicks, eligible, madePaidProgress, elapsed);
 			MaybeDebugObservation(fronts, liveHarvesters, hasUsableRefinery, normalPower,
-				hasEconomyCandidate, eligibility);
+				hasEconomyCandidate, eligibility, availableFunds, criticalRemainingCost);
 			RememberFronts(fronts);
 			if (!QueueStallRecoveryPolicy.ShouldRecoverEconomy(liveHarvesters, HarvesterTarget,
-				hasEconomyCandidate, fronts.Count, noProgressEvidenceTicks,
+				hasEconomyCandidate, cashConstrained, fronts.Count, noProgressEvidenceTicks,
 				baseBuilder.Info.QueueStallRecoveryActivationTicks))
 				return;
 
-			var criticalTypes = hasUsableRefinery ? harvesterTypes : refineryTypes;
 			var selected = fronts.Where(f => criticalTypes.Contains(f.Item.Item))
 				.OrderBy(f => f.Item.RemainingCost)
 				.ThenBy(f => f.Queue.Actor.ActorID)
@@ -280,7 +284,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		void MaybeDebugObservation(IReadOnlyCollection<FrontSnapshot> fronts, int liveHarvesters,
 			bool hasUsableRefinery, bool normalPower, bool hasEconomyCandidate,
-			QueueStallRecoveryEligibility eligibility)
+			QueueStallRecoveryEligibility eligibility, int availableFunds, int criticalRemainingCost)
 		{
 			if (!baseBuilder.Info.QueueStallRecoveryDebugLogging)
 				return;
@@ -298,8 +302,10 @@ namespace OpenRA.Mods.Common.Traits
 			}));
 			Debug("{0} observation tick={1} eligibility={2} normal-power={3} usable-refinery={4} " +
 				"live-harvesters={5}/5 economy-candidate={6} fronts=[{7}] " +
-				"paid-progress-since-heartbeat={8} evidence={9}", player, world.WorldTick, reason,
+				"funds={8} critical-remaining={9} paid-progress-since-heartbeat={10} evidence={11}",
+				player, world.WorldTick, reason,
 				normalPower, hasUsableRefinery, liveHarvesters, hasEconomyCandidate, frontDetails,
+				availableFunds, criticalRemainingCost == int.MaxValue ? 0 : criticalRemainingCost,
 				paidProgressSinceDebug, noProgressEvidenceTicks);
 
 			diagnosticFronts.Clear();
@@ -328,6 +334,8 @@ namespace OpenRA.Mods.Common.Traits
 					return "harvester-target-met";
 				case QueueStallRecoveryEligibility.MissingCriticalCandidate:
 					return hasUsableRefinery ? "no-harvester-candidate" : "no-refinery-candidate";
+				case QueueStallRecoveryEligibility.SufficientFunds:
+					return "sufficient-funds";
 				default:
 					return "insufficient-contention";
 			}

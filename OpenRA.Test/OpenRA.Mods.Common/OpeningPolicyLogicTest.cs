@@ -65,12 +65,12 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
-		public void ReservedGoalKeepsLaterGoalsOrderedWhileOtherQueuesFallBack()
+		public void ReservedGoalLetsAnotherFactCommitTheNextOrderedGoal()
 		{
 			var goal = OpeningPolicyLogic.FirstBuildableGoal(
 				Goals, new[] { 0 }, new[] { 1 }, new[] { "guard-tower", "turret" });
 
-			Assert.That(goal, Is.EqualTo(-1));
+			Assert.That(goal, Is.EqualTo(2));
 		}
 
 		[Test]

@@ -766,6 +766,118 @@ Player:
 			fix: 1
 			hpad: 2
 	SquadManagerBotModule@cabal:
+		AirTargetHarvesterValue: 1000
+		AirTargetUnitValue: 450
+		AirTargetProductionValue: 300
+		AirTargetBuildingValue: 100
+		AirTargetDefencelessBonus: 250
+		AirTargetAntiAirPenalty: 700
+		AirTargetDistancePenalty: 12
+		AirTargetReferenceSpeed: 160
+		AirTargetFullAmmoDistanceBonus: 100
+		AirTargetAaClearUnlockPercent: 125
+		AirTargetAaClearFallbackScans: 3
+		AirTargetAaClearValueRatio: 10
+		AirTargetAaClearWeakestCandidates: 3
+		AirTargetAaClearSupportRadius: 36
+		AirTargetPowerActors: nuke, nuk2
+		AirTargetPowerCoverageThresholdPercent: 90
+		AirTargetPowerPriorityMaximum: 10000
+		AirTargetMinimumScore: 1
+		AirTargetSwitchImprovementPercent: 50
+		AirTargetStallTicks: 150
+		AirTargetClosestCandidates: 15
+		AirTargetHighestValueCandidates: 10
+		AirTargetHarvesterCandidates: 10
+		AirTargetDebugLogging: false
+		AirAdaptiveRiskInterval: 125
+		AirAdaptiveRiskRollbackTicks: 1500
+		AirAdaptiveRiskMinimumUnits: 3
+		AirAdaptiveRiskApacheFullAmmoGrowth: 100
+		AirAdaptiveRiskOrcaFullAmmoGrowth: 50
+		AirAdaptiveRiskLowUnitDecay: 100
+		AirAdaptiveRiskApacheKillGrowth: 0
+		AirAdaptiveRiskOrcaKillGrowth: 0
+		AirAdaptiveRiskLossDecrement: 2500
+		AirInfluenceCellSize: 6
+		AirInfluenceCacheInterval: 125
+		AirSafetyCheckInterval: 25
+		AirThreatScanRadius: 16
+		AirThreatFleeMultiplier: 8
+		AirThreatMemoryTicks: 300
+		AirThreatMemorySize: 12
+		AirThreatMemoryMergeRadius: 3
+		AirRetreatOrderInterval: 50
+		AirRouteThreatPenalty: 200
+		AirRouteThreatRadius: 8
+		AirSquadSize: 0
+		MaximumAirSquads: 4
+		AirSquadDefinitions:
+			Orca:
+				UnitTypes: orca
+				SquadCount: 2
+				Profile: Orca
+			Apache:
+				UnitTypes: heli
+				SquadCount: 2
+				Profile: Apache
+		AirEvadeDistance: 12
+		AirEvadeJitter: 5
+		AirThreatRangeBuffer: 1.5
+		AirThreatWeightOverrides:
+			e3: 0
+			bike: 0
+			stnk: 0
+		AirMassedAttackIdleThreshold: 6
+		HealthRetreatThreshold: 0.5
+		AirPassiveRepairActors: fix
+		AirTargetPriorityOrca:
+			mcv: 10000
+			harv: 5000
+			sharv: 5000
+			arty: 5000
+			mlrs: 5000
+			bike: 5000
+			stnk: 5000
+			nuk2: 5000
+			htnk: 2500
+			mtnk: 2000
+			ltnk: 1250
+			proc: 1250
+			fact: 625
+			fact.gdi: 625
+			fact.nod: 625
+			hq: 312
+			nuke: 156
+			e1: 100
+			e2: 100
+			e3: 100
+			e4: 100
+			e5: 100
+			obli: 1
+		AirTargetPriorityHeli:
+			mcv: 10000
+			harv: 5000
+			sharv: 5000
+			arty: 5000
+			mlrs: 5000
+			e3: 2000
+			msam: 6500
+			stnk: 5000
+			bike: 5000
+			rmbo: 2000
+			bggy: 2000
+			ltnk: 750
+			mtnk: 250
+			htnk: 100
+			e1: 100
+			e2: 2000
+			e4: 2000
+			e5: 2000
+			e6: 2000
+			nuk2: 312
+			proc: 156
+			obli: 1
 		RequiresCondition: enable-cabal-ai
 		SquadSize: 15
 		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck, tran
@@ -866,6 +978,118 @@ Player:
 			sam: 7
 			fix: 1
     SquadManagerBotModule@watson:
+		AirTargetHarvesterValue: 1000
+		AirTargetUnitValue: 450
+		AirTargetProductionValue: 300
+		AirTargetBuildingValue: 100
+		AirTargetDefencelessBonus: 250
+		AirTargetAntiAirPenalty: 700
+		AirTargetDistancePenalty: 12
+		AirTargetReferenceSpeed: 160
+		AirTargetFullAmmoDistanceBonus: 100
+		AirTargetAaClearUnlockPercent: 125
+		AirTargetAaClearFallbackScans: 3
+		AirTargetAaClearValueRatio: 10
+		AirTargetAaClearWeakestCandidates: 3
+		AirTargetAaClearSupportRadius: 36
+		AirTargetPowerActors: nuke, nuk2
+		AirTargetPowerCoverageThresholdPercent: 90
+		AirTargetPowerPriorityMaximum: 10000
+		AirTargetMinimumScore: 1
+		AirTargetSwitchImprovementPercent: 50
+		AirTargetStallTicks: 150
+		AirTargetClosestCandidates: 15
+		AirTargetHighestValueCandidates: 10
+		AirTargetHarvesterCandidates: 10
+		AirTargetDebugLogging: false
+		AirAdaptiveRiskInterval: 125
+		AirAdaptiveRiskRollbackTicks: 1500
+		AirAdaptiveRiskMinimumUnits: 3
+		AirAdaptiveRiskApacheFullAmmoGrowth: 100
+		AirAdaptiveRiskOrcaFullAmmoGrowth: 50
+		AirAdaptiveRiskLowUnitDecay: 100
+		AirAdaptiveRiskApacheKillGrowth: 0
+		AirAdaptiveRiskOrcaKillGrowth: 0
+		AirAdaptiveRiskLossDecrement: 2500
+		AirInfluenceCellSize: 6
+		AirInfluenceCacheInterval: 125
+		AirSafetyCheckInterval: 25
+		AirThreatScanRadius: 16
+		AirThreatFleeMultiplier: 8
+		AirThreatMemoryTicks: 300
+		AirThreatMemorySize: 12
+		AirThreatMemoryMergeRadius: 3
+		AirRetreatOrderInterval: 50
+		AirRouteThreatPenalty: 200
+		AirRouteThreatRadius: 8
+		AirSquadSize: 0
+		MaximumAirSquads: 4
+		AirSquadDefinitions:
+			Orca:
+				UnitTypes: orca
+				SquadCount: 2
+				Profile: Orca
+			Apache:
+				UnitTypes: heli
+				SquadCount: 2
+				Profile: Apache
+		AirEvadeDistance: 12
+		AirEvadeJitter: 5
+		AirThreatRangeBuffer: 1.5
+		AirThreatWeightOverrides:
+			e3: 0
+			bike: 0
+			stnk: 0
+		AirMassedAttackIdleThreshold: 6
+		HealthRetreatThreshold: 0.5
+		AirPassiveRepairActors: fix
+		AirTargetPriorityOrca:
+			mcv: 10000
+			harv: 5000
+			sharv: 5000
+			arty: 5000
+			mlrs: 5000
+			bike: 5000
+			stnk: 5000
+			nuk2: 5000
+			htnk: 2500
+			mtnk: 2000
+			ltnk: 1250
+			proc: 1250
+			fact: 625
+			fact.gdi: 625
+			fact.nod: 625
+			hq: 312
+			nuke: 156
+			e1: 100
+			e2: 100
+			e3: 100
+			e4: 100
+			e5: 100
+			obli: 1
+		AirTargetPriorityHeli:
+			mcv: 10000
+			harv: 5000
+			sharv: 5000
+			arty: 5000
+			mlrs: 5000
+			e3: 2000
+			msam: 6500
+			stnk: 5000
+			bike: 5000
+			rmbo: 2000
+			bggy: 2000
+			ltnk: 750
+			mtnk: 250
+			htnk: 100
+			e1: 100
+			e2: 2000
+			e4: 2000
+			e5: 2000
+			e6: 2000
+			nuk2: 312
+			proc: 156
+			obli: 1
 		RequiresCondition: enable-watson-ai
 		SquadSize: 15
 		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck, tran
@@ -966,6 +1190,118 @@ Player:
 			sam: 7
 			fix: 1
 	SquadManagerBotModule@hal9001:
+		AirTargetHarvesterValue: 1000
+		AirTargetUnitValue: 450
+		AirTargetProductionValue: 300
+		AirTargetBuildingValue: 100
+		AirTargetDefencelessBonus: 250
+		AirTargetAntiAirPenalty: 700
+		AirTargetDistancePenalty: 12
+		AirTargetReferenceSpeed: 160
+		AirTargetFullAmmoDistanceBonus: 100
+		AirTargetAaClearUnlockPercent: 125
+		AirTargetAaClearFallbackScans: 3
+		AirTargetAaClearValueRatio: 10
+		AirTargetAaClearWeakestCandidates: 3
+		AirTargetAaClearSupportRadius: 36
+		AirTargetPowerActors: nuke, nuk2
+		AirTargetPowerCoverageThresholdPercent: 90
+		AirTargetPowerPriorityMaximum: 10000
+		AirTargetMinimumScore: 1
+		AirTargetSwitchImprovementPercent: 50
+		AirTargetStallTicks: 150
+		AirTargetClosestCandidates: 15
+		AirTargetHighestValueCandidates: 10
+		AirTargetHarvesterCandidates: 10
+		AirTargetDebugLogging: false
+		AirAdaptiveRiskInterval: 125
+		AirAdaptiveRiskRollbackTicks: 1500
+		AirAdaptiveRiskMinimumUnits: 3
+		AirAdaptiveRiskApacheFullAmmoGrowth: 100
+		AirAdaptiveRiskOrcaFullAmmoGrowth: 50
+		AirAdaptiveRiskLowUnitDecay: 100
+		AirAdaptiveRiskApacheKillGrowth: 0
+		AirAdaptiveRiskOrcaKillGrowth: 0
+		AirAdaptiveRiskLossDecrement: 2500
+		AirInfluenceCellSize: 6
+		AirInfluenceCacheInterval: 125
+		AirSafetyCheckInterval: 25
+		AirThreatScanRadius: 16
+		AirThreatFleeMultiplier: 8
+		AirThreatMemoryTicks: 300
+		AirThreatMemorySize: 12
+		AirThreatMemoryMergeRadius: 3
+		AirRetreatOrderInterval: 50
+		AirRouteThreatPenalty: 200
+		AirRouteThreatRadius: 8
+		AirSquadSize: 0
+		MaximumAirSquads: 4
+		AirSquadDefinitions:
+			Orca:
+				UnitTypes: orca
+				SquadCount: 2
+				Profile: Orca
+			Apache:
+				UnitTypes: heli
+				SquadCount: 2
+				Profile: Apache
+		AirEvadeDistance: 12
+		AirEvadeJitter: 5
+		AirThreatRangeBuffer: 1.5
+		AirThreatWeightOverrides:
+			e3: 0
+			bike: 0
+			stnk: 0
+		AirMassedAttackIdleThreshold: 6
+		HealthRetreatThreshold: 0.5
+		AirPassiveRepairActors: fix
+		AirTargetPriorityOrca:
+			mcv: 10000
+			harv: 5000
+			sharv: 5000
+			arty: 5000
+			mlrs: 5000
+			bike: 5000
+			stnk: 5000
+			nuk2: 5000
+			htnk: 2500
+			mtnk: 2000
+			ltnk: 1250
+			proc: 1250
+			fact: 625
+			fact.gdi: 625
+			fact.nod: 625
+			hq: 312
+			nuke: 156
+			e1: 100
+			e2: 100
+			e3: 100
+			e4: 100
+			e5: 100
+			obli: 1
+		AirTargetPriorityHeli:
+			mcv: 10000
+			harv: 5000
+			sharv: 5000
+			arty: 5000
+			mlrs: 5000
+			e3: 2000
+			msam: 6500
+			stnk: 5000
+			bike: 5000
+			rmbo: 2000
+			bggy: 2000
+			ltnk: 750
+			mtnk: 250
+			htnk: 100
+			e1: 100
+			e2: 2000
+			e4: 2000
+			e5: 2000
+			e6: 2000
+			nuk2: 312
+			proc: 156
+			obli: 1
 		RequiresCondition: enable-hal9001-ai
 		SquadSize: 8
 		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck, tran
@@ -1058,7 +1394,7 @@ Player:
 		OpeningRequestRetryDelay: 250
 		OpeningDebugLogging: false
 		AirRepairBuildingTypes: hpad
-		AirUnitsPerRepairBuilding: 4
+		AirUnitsPerRepairBuilding: 0
 		AirRepairCapacityDebugLogging: false
 		FirstTowerTypes: gtwr, gun, atwr, obli
 		FirstTowerSearchRadius: 20
@@ -1148,6 +1484,118 @@ Player:
 			hpad: 1
             resonator: 5
     SquadManagerBotModule@brutalis:
+		AirTargetHarvesterValue: 1000
+		AirTargetUnitValue: 450
+		AirTargetProductionValue: 300
+		AirTargetBuildingValue: 100
+		AirTargetDefencelessBonus: 250
+		AirTargetAntiAirPenalty: 700
+		AirTargetDistancePenalty: 12
+		AirTargetReferenceSpeed: 160
+		AirTargetFullAmmoDistanceBonus: 100
+		AirTargetAaClearUnlockPercent: 125
+		AirTargetAaClearFallbackScans: 3
+		AirTargetAaClearValueRatio: 10
+		AirTargetAaClearWeakestCandidates: 3
+		AirTargetAaClearSupportRadius: 36
+		AirTargetPowerActors: nuke, nuk2
+		AirTargetPowerCoverageThresholdPercent: 90
+		AirTargetPowerPriorityMaximum: 10000
+		AirTargetMinimumScore: 1
+		AirTargetSwitchImprovementPercent: 50
+		AirTargetStallTicks: 150
+		AirTargetClosestCandidates: 15
+		AirTargetHighestValueCandidates: 10
+		AirTargetHarvesterCandidates: 10
+		AirTargetDebugLogging: false
+		AirAdaptiveRiskInterval: 125
+		AirAdaptiveRiskRollbackTicks: 1500
+		AirAdaptiveRiskMinimumUnits: 3
+		AirAdaptiveRiskApacheFullAmmoGrowth: 100
+		AirAdaptiveRiskOrcaFullAmmoGrowth: 50
+		AirAdaptiveRiskLowUnitDecay: 100
+		AirAdaptiveRiskApacheKillGrowth: 0
+		AirAdaptiveRiskOrcaKillGrowth: 0
+		AirAdaptiveRiskLossDecrement: 2500
+		AirInfluenceCellSize: 6
+		AirInfluenceCacheInterval: 125
+		AirSafetyCheckInterval: 25
+		AirThreatScanRadius: 16
+		AirThreatFleeMultiplier: 8
+		AirThreatMemoryTicks: 300
+		AirThreatMemorySize: 12
+		AirThreatMemoryMergeRadius: 3
+		AirRetreatOrderInterval: 50
+		AirRouteThreatPenalty: 200
+		AirRouteThreatRadius: 8
+		AirSquadSize: 0
+		MaximumAirSquads: 4
+		AirSquadDefinitions:
+			Orca:
+				UnitTypes: orca
+				SquadCount: 2
+				Profile: Orca
+			Apache:
+				UnitTypes: heli
+				SquadCount: 2
+				Profile: Apache
+		AirEvadeDistance: 12
+		AirEvadeJitter: 5
+		AirThreatRangeBuffer: 1.5
+		AirThreatWeightOverrides:
+			e3: 0
+			bike: 0
+			stnk: 0
+		AirMassedAttackIdleThreshold: 6
+		HealthRetreatThreshold: 0.5
+		AirPassiveRepairActors: fix
+		AirTargetPriorityOrca:
+			mcv: 10000
+			harv: 5000
+			sharv: 5000
+			arty: 5000
+			mlrs: 5000
+			bike: 5000
+			stnk: 5000
+			nuk2: 5000
+			htnk: 2500
+			mtnk: 2000
+			ltnk: 1250
+			proc: 1250
+			fact: 625
+			fact.gdi: 625
+			fact.nod: 625
+			hq: 312
+			nuke: 156
+			e1: 100
+			e2: 100
+			e3: 100
+			e4: 100
+			e5: 100
+			obli: 1
+		AirTargetPriorityHeli:
+			mcv: 10000
+			harv: 5000
+			sharv: 5000
+			arty: 5000
+			mlrs: 5000
+			e3: 2000
+			msam: 6500
+			stnk: 5000
+			bike: 5000
+			rmbo: 2000
+			bggy: 2000
+			ltnk: 750
+			mtnk: 250
+			htnk: 100
+			e1: 100
+			e2: 2000
+			e4: 2000
+			e5: 2000
+			e6: 2000
+			nuk2: 312
+			proc: 156
+			obli: 1
 		RequiresCondition: enable-brutalis-ai
 		SquadSize: 20
 		UseStrategicGroundTargeting: true
@@ -1159,6 +1607,118 @@ Player:
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
     SquadManagerBotModule@wavemaker:
+		AirTargetHarvesterValue: 1000
+		AirTargetUnitValue: 450
+		AirTargetProductionValue: 300
+		AirTargetBuildingValue: 100
+		AirTargetDefencelessBonus: 250
+		AirTargetAntiAirPenalty: 700
+		AirTargetDistancePenalty: 12
+		AirTargetReferenceSpeed: 160
+		AirTargetFullAmmoDistanceBonus: 100
+		AirTargetAaClearUnlockPercent: 125
+		AirTargetAaClearFallbackScans: 3
+		AirTargetAaClearValueRatio: 10
+		AirTargetAaClearWeakestCandidates: 3
+		AirTargetAaClearSupportRadius: 36
+		AirTargetPowerActors: nuke, nuk2
+		AirTargetPowerCoverageThresholdPercent: 90
+		AirTargetPowerPriorityMaximum: 10000
+		AirTargetMinimumScore: 1
+		AirTargetSwitchImprovementPercent: 50
+		AirTargetStallTicks: 150
+		AirTargetClosestCandidates: 15
+		AirTargetHighestValueCandidates: 10
+		AirTargetHarvesterCandidates: 10
+		AirTargetDebugLogging: false
+		AirAdaptiveRiskInterval: 125
+		AirAdaptiveRiskRollbackTicks: 1500
+		AirAdaptiveRiskMinimumUnits: 3
+		AirAdaptiveRiskApacheFullAmmoGrowth: 100
+		AirAdaptiveRiskOrcaFullAmmoGrowth: 50
+		AirAdaptiveRiskLowUnitDecay: 100
+		AirAdaptiveRiskApacheKillGrowth: 0
+		AirAdaptiveRiskOrcaKillGrowth: 0
+		AirAdaptiveRiskLossDecrement: 2500
+		AirInfluenceCellSize: 6
+		AirInfluenceCacheInterval: 125
+		AirSafetyCheckInterval: 25
+		AirThreatScanRadius: 16
+		AirThreatFleeMultiplier: 8
+		AirThreatMemoryTicks: 300
+		AirThreatMemorySize: 12
+		AirThreatMemoryMergeRadius: 3
+		AirRetreatOrderInterval: 50
+		AirRouteThreatPenalty: 200
+		AirRouteThreatRadius: 8
+		AirSquadSize: 0
+		MaximumAirSquads: 4
+		AirSquadDefinitions:
+			Orca:
+				UnitTypes: orca
+				SquadCount: 2
+				Profile: Orca
+			Apache:
+				UnitTypes: heli
+				SquadCount: 2
+				Profile: Apache
+		AirEvadeDistance: 12
+		AirEvadeJitter: 5
+		AirThreatRangeBuffer: 1.5
+		AirThreatWeightOverrides:
+			e3: 0
+			bike: 0
+			stnk: 0
+		AirMassedAttackIdleThreshold: 6
+		HealthRetreatThreshold: 0.5
+		AirPassiveRepairActors: fix
+		AirTargetPriorityOrca:
+			mcv: 10000
+			harv: 5000
+			sharv: 5000
+			arty: 5000
+			mlrs: 5000
+			bike: 5000
+			stnk: 5000
+			nuk2: 5000
+			htnk: 2500
+			mtnk: 2000
+			ltnk: 1250
+			proc: 1250
+			fact: 625
+			fact.gdi: 625
+			fact.nod: 625
+			hq: 312
+			nuke: 156
+			e1: 100
+			e2: 100
+			e3: 100
+			e4: 100
+			e5: 100
+			obli: 1
+		AirTargetPriorityHeli:
+			mcv: 10000
+			harv: 5000
+			sharv: 5000
+			arty: 5000
+			mlrs: 5000
+			e3: 2000
+			msam: 6500
+			stnk: 5000
+			bike: 5000
+			rmbo: 2000
+			bggy: 2000
+			ltnk: 750
+			mtnk: 250
+			htnk: 100
+			e1: 100
+			e2: 2000
+			e4: 2000
+			e5: 2000
+			e6: 2000
+			nuk2: 312
+			proc: 156
+			obli: 1
 		RequiresCondition: enable-wavemaker-ai
 		SquadSize: 120
 		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck, tran
@@ -1285,7 +1845,9 @@ Player:
 		FirstTowerDebugLogging: false
 		BuildingQueues: Building.Nod, Building.GDI
 		DefenseQueues: Defence.Nod, Defence.GDI
-		MinimumExcessPower: 151
+		MinimumExcessPower: 1
+		ExcessPowerBuffer: 150
+		ExcessPowerBufferDelaySeconds: 300
 		MaximumExcessPower: 700
 		ExcessPowerIncrement: 5
 		ExcessPowerIncreaseThreshold: 1
@@ -1351,6 +1913,118 @@ Player:
 			tmpl: 1
 			fix: 1
     SquadManagerBotModule@viki:
+		AirTargetHarvesterValue: 1000
+		AirTargetUnitValue: 450
+		AirTargetProductionValue: 300
+		AirTargetBuildingValue: 100
+		AirTargetDefencelessBonus: 250
+		AirTargetAntiAirPenalty: 700
+		AirTargetDistancePenalty: 12
+		AirTargetReferenceSpeed: 160
+		AirTargetFullAmmoDistanceBonus: 100
+		AirTargetAaClearUnlockPercent: 125
+		AirTargetAaClearFallbackScans: 3
+		AirTargetAaClearValueRatio: 10
+		AirTargetAaClearWeakestCandidates: 3
+		AirTargetAaClearSupportRadius: 36
+		AirTargetPowerActors: nuke, nuk2
+		AirTargetPowerCoverageThresholdPercent: 90
+		AirTargetPowerPriorityMaximum: 10000
+		AirTargetMinimumScore: 1
+		AirTargetSwitchImprovementPercent: 50
+		AirTargetStallTicks: 150
+		AirTargetClosestCandidates: 15
+		AirTargetHighestValueCandidates: 10
+		AirTargetHarvesterCandidates: 10
+		AirTargetDebugLogging: false
+		AirAdaptiveRiskInterval: 125
+		AirAdaptiveRiskRollbackTicks: 1500
+		AirAdaptiveRiskMinimumUnits: 3
+		AirAdaptiveRiskApacheFullAmmoGrowth: 100
+		AirAdaptiveRiskOrcaFullAmmoGrowth: 50
+		AirAdaptiveRiskLowUnitDecay: 100
+		AirAdaptiveRiskApacheKillGrowth: 0
+		AirAdaptiveRiskOrcaKillGrowth: 0
+		AirAdaptiveRiskLossDecrement: 2500
+		AirInfluenceCellSize: 6
+		AirInfluenceCacheInterval: 125
+		AirSafetyCheckInterval: 25
+		AirThreatScanRadius: 16
+		AirThreatFleeMultiplier: 8
+		AirThreatMemoryTicks: 300
+		AirThreatMemorySize: 12
+		AirThreatMemoryMergeRadius: 3
+		AirRetreatOrderInterval: 50
+		AirRouteThreatPenalty: 200
+		AirRouteThreatRadius: 8
+		AirSquadSize: 0
+		MaximumAirSquads: 4
+		AirSquadDefinitions:
+			Orca:
+				UnitTypes: orca
+				SquadCount: 2
+				Profile: Orca
+			Apache:
+				UnitTypes: heli
+				SquadCount: 2
+				Profile: Apache
+		AirEvadeDistance: 12
+		AirEvadeJitter: 5
+		AirThreatRangeBuffer: 1.5
+		AirThreatWeightOverrides:
+			e3: 0
+			bike: 0
+			stnk: 0
+		AirMassedAttackIdleThreshold: 6
+		HealthRetreatThreshold: 0.5
+		AirPassiveRepairActors: fix
+		AirTargetPriorityOrca:
+			mcv: 10000
+			harv: 5000
+			sharv: 5000
+			arty: 5000
+			mlrs: 5000
+			bike: 5000
+			stnk: 5000
+			nuk2: 5000
+			htnk: 2500
+			mtnk: 2000
+			ltnk: 1250
+			proc: 1250
+			fact: 625
+			fact.gdi: 625
+			fact.nod: 625
+			hq: 312
+			nuke: 156
+			e1: 100
+			e2: 100
+			e3: 100
+			e4: 100
+			e5: 100
+			obli: 1
+		AirTargetPriorityHeli:
+			mcv: 10000
+			harv: 5000
+			sharv: 5000
+			arty: 5000
+			mlrs: 5000
+			e3: 2000
+			msam: 6500
+			stnk: 5000
+			bike: 5000
+			rmbo: 2000
+			bggy: 2000
+			ltnk: 750
+			mtnk: 250
+			htnk: 100
+			e1: 100
+			e2: 2000
+			e4: 2000
+			e5: 2000
+			e6: 2000
+			nuk2: 312
+			proc: 156
+			obli: 1
 		RequiresCondition: enable-viki-ai
 		SquadSize: 30
 		UseStrategicGroundTargeting: true
@@ -1458,7 +2132,7 @@ Player:
 		OpeningRequestRetryDelay: 250
 		OpeningDebugLogging: false
 		AirRepairBuildingTypes: hpad
-		AirUnitsPerRepairBuilding: 4
+		AirUnitsPerRepairBuilding: 0
 		AirRepairCapacityDebugLogging: false
 		FirstTowerTypes: gtwr, gun, atwr, obli
 		PrioritizeOpeningFirstTower: true
@@ -1821,8 +2495,7 @@ Player:
 		OpeningRequestRetryDelay: 250
 		OpeningDebugLogging: false
 		AirRepairBuildingTypes: hpad
-		AirUnitsPerRepairBuilding: 4
-		MinimumPostOpeningAirRepairBuildings: 2
+		AirUnitsPerRepairBuilding: 0
 		AirRepairCapacityDebugLogging: false
 		FirstTowerTypes: gtwr, gun, atwr, obli
 		FirstTowerSearchRadius: 20
@@ -1931,6 +2604,118 @@ Player:
 		StatusLogInterval: 750
 		DebugLogging: false
     SquadManagerBotModule@ironreaper:
+		AirTargetHarvesterValue: 1000
+		AirTargetUnitValue: 450
+		AirTargetProductionValue: 300
+		AirTargetBuildingValue: 100
+		AirTargetDefencelessBonus: 250
+		AirTargetAntiAirPenalty: 700
+		AirTargetDistancePenalty: 12
+		AirTargetReferenceSpeed: 160
+		AirTargetFullAmmoDistanceBonus: 100
+		AirTargetAaClearUnlockPercent: 125
+		AirTargetAaClearFallbackScans: 3
+		AirTargetAaClearValueRatio: 10
+		AirTargetAaClearWeakestCandidates: 3
+		AirTargetAaClearSupportRadius: 36
+		AirTargetPowerActors: nuke, nuk2
+		AirTargetPowerCoverageThresholdPercent: 90
+		AirTargetPowerPriorityMaximum: 10000
+		AirTargetMinimumScore: 1
+		AirTargetSwitchImprovementPercent: 50
+		AirTargetStallTicks: 150
+		AirTargetClosestCandidates: 15
+		AirTargetHighestValueCandidates: 10
+		AirTargetHarvesterCandidates: 10
+		AirTargetDebugLogging: false
+		AirAdaptiveRiskInterval: 125
+		AirAdaptiveRiskRollbackTicks: 1500
+		AirAdaptiveRiskMinimumUnits: 3
+		AirAdaptiveRiskApacheFullAmmoGrowth: 100
+		AirAdaptiveRiskOrcaFullAmmoGrowth: 50
+		AirAdaptiveRiskLowUnitDecay: 100
+		AirAdaptiveRiskApacheKillGrowth: 0
+		AirAdaptiveRiskOrcaKillGrowth: 0
+		AirAdaptiveRiskLossDecrement: 2500
+		AirInfluenceCellSize: 6
+		AirInfluenceCacheInterval: 125
+		AirSafetyCheckInterval: 25
+		AirThreatScanRadius: 16
+		AirThreatFleeMultiplier: 8
+		AirThreatMemoryTicks: 300
+		AirThreatMemorySize: 12
+		AirThreatMemoryMergeRadius: 3
+		AirRetreatOrderInterval: 50
+		AirRouteThreatPenalty: 200
+		AirRouteThreatRadius: 8
+		AirSquadSize: 0
+		MaximumAirSquads: 4
+		AirSquadDefinitions:
+			Orca:
+				UnitTypes: orca
+				SquadCount: 2
+				Profile: Orca
+			Apache:
+				UnitTypes: heli
+				SquadCount: 2
+				Profile: Apache
+		AirEvadeDistance: 12
+		AirEvadeJitter: 5
+		AirThreatRangeBuffer: 1.5
+		AirThreatWeightOverrides:
+			e3: 0
+			bike: 0
+			stnk: 0
+		AirMassedAttackIdleThreshold: 6
+		HealthRetreatThreshold: 0.5
+		AirPassiveRepairActors: fix
+		AirTargetPriorityOrca:
+			mcv: 10000
+			harv: 5000
+			sharv: 5000
+			arty: 5000
+			mlrs: 5000
+			bike: 5000
+			stnk: 5000
+			nuk2: 5000
+			htnk: 2500
+			mtnk: 2000
+			ltnk: 1250
+			proc: 1250
+			fact: 625
+			fact.gdi: 625
+			fact.nod: 625
+			hq: 312
+			nuke: 156
+			e1: 100
+			e2: 100
+			e3: 100
+			e4: 100
+			e5: 100
+			obli: 1
+		AirTargetPriorityHeli:
+			mcv: 10000
+			harv: 5000
+			sharv: 5000
+			arty: 5000
+			mlrs: 5000
+			e3: 2000
+			msam: 6500
+			stnk: 5000
+			bike: 5000
+			rmbo: 2000
+			bggy: 2000
+			ltnk: 750
+			mtnk: 250
+			htnk: 100
+			e1: 100
+			e2: 2000
+			e4: 2000
+			e5: 2000
+			e6: 2000
+			nuk2: 312
+			proc: 156
+			obli: 1
 		RequiresCondition: enable-ironreaper-ai
 		SquadSize: 20
 		UseStrategicGroundTargeting: true
@@ -2115,6 +2900,118 @@ Player:
 			fix: 1
 			hpad: 1
     SquadManagerBotModule@Easy:
+		AirTargetHarvesterValue: 1000
+		AirTargetUnitValue: 450
+		AirTargetProductionValue: 300
+		AirTargetBuildingValue: 100
+		AirTargetDefencelessBonus: 250
+		AirTargetAntiAirPenalty: 700
+		AirTargetDistancePenalty: 12
+		AirTargetReferenceSpeed: 160
+		AirTargetFullAmmoDistanceBonus: 100
+		AirTargetAaClearUnlockPercent: 125
+		AirTargetAaClearFallbackScans: 3
+		AirTargetAaClearValueRatio: 10
+		AirTargetAaClearWeakestCandidates: 3
+		AirTargetAaClearSupportRadius: 36
+		AirTargetPowerActors: nuke, nuk2
+		AirTargetPowerCoverageThresholdPercent: 90
+		AirTargetPowerPriorityMaximum: 10000
+		AirTargetMinimumScore: 1
+		AirTargetSwitchImprovementPercent: 50
+		AirTargetStallTicks: 150
+		AirTargetClosestCandidates: 15
+		AirTargetHighestValueCandidates: 10
+		AirTargetHarvesterCandidates: 10
+		AirTargetDebugLogging: false
+		AirAdaptiveRiskInterval: 125
+		AirAdaptiveRiskRollbackTicks: 1500
+		AirAdaptiveRiskMinimumUnits: 3
+		AirAdaptiveRiskApacheFullAmmoGrowth: 100
+		AirAdaptiveRiskOrcaFullAmmoGrowth: 50
+		AirAdaptiveRiskLowUnitDecay: 100
+		AirAdaptiveRiskApacheKillGrowth: 0
+		AirAdaptiveRiskOrcaKillGrowth: 0
+		AirAdaptiveRiskLossDecrement: 2500
+		AirInfluenceCellSize: 6
+		AirInfluenceCacheInterval: 125
+		AirSafetyCheckInterval: 25
+		AirThreatScanRadius: 16
+		AirThreatFleeMultiplier: 8
+		AirThreatMemoryTicks: 300
+		AirThreatMemorySize: 12
+		AirThreatMemoryMergeRadius: 3
+		AirRetreatOrderInterval: 50
+		AirRouteThreatPenalty: 200
+		AirRouteThreatRadius: 8
+		AirSquadSize: 0
+		MaximumAirSquads: 4
+		AirSquadDefinitions:
+			Orca:
+				UnitTypes: orca
+				SquadCount: 2
+				Profile: Orca
+			Apache:
+				UnitTypes: heli
+				SquadCount: 2
+				Profile: Apache
+		AirEvadeDistance: 12
+		AirEvadeJitter: 5
+		AirThreatRangeBuffer: 1.5
+		AirThreatWeightOverrides:
+			e3: 0
+			bike: 0
+			stnk: 0
+		AirMassedAttackIdleThreshold: 6
+		HealthRetreatThreshold: 0.5
+		AirPassiveRepairActors: fix
+		AirTargetPriorityOrca:
+			mcv: 10000
+			harv: 5000
+			sharv: 5000
+			arty: 5000
+			mlrs: 5000
+			bike: 5000
+			stnk: 5000
+			nuk2: 5000
+			htnk: 2500
+			mtnk: 2000
+			ltnk: 1250
+			proc: 1250
+			fact: 625
+			fact.gdi: 625
+			fact.nod: 625
+			hq: 312
+			nuke: 156
+			e1: 100
+			e2: 100
+			e3: 100
+			e4: 100
+			e5: 100
+			obli: 1
+		AirTargetPriorityHeli:
+			mcv: 10000
+			harv: 5000
+			sharv: 5000
+			arty: 5000
+			mlrs: 5000
+			e3: 2000
+			msam: 6500
+			stnk: 5000
+			bike: 5000
+			rmbo: 2000
+			bggy: 2000
+			ltnk: 750
+			mtnk: 250
+			htnk: 100
+			e1: 100
+			e2: 2000
+			e4: 2000
+			e5: 2000
+			e6: 2000
+			nuk2: 312
+			proc: 156
+			obli: 1
 		RequiresCondition: enable-Easy-ai
 		SquadSize: 4
 		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck, tran
@@ -2265,6 +3162,118 @@ Player:
 			fix: 1
 			hpad: 1
     SquadManagerBotModule@Easiest:
+		AirTargetHarvesterValue: 1000
+		AirTargetUnitValue: 450
+		AirTargetProductionValue: 300
+		AirTargetBuildingValue: 100
+		AirTargetDefencelessBonus: 250
+		AirTargetAntiAirPenalty: 700
+		AirTargetDistancePenalty: 12
+		AirTargetReferenceSpeed: 160
+		AirTargetFullAmmoDistanceBonus: 100
+		AirTargetAaClearUnlockPercent: 125
+		AirTargetAaClearFallbackScans: 3
+		AirTargetAaClearValueRatio: 10
+		AirTargetAaClearWeakestCandidates: 3
+		AirTargetAaClearSupportRadius: 36
+		AirTargetPowerActors: nuke, nuk2
+		AirTargetPowerCoverageThresholdPercent: 90
+		AirTargetPowerPriorityMaximum: 10000
+		AirTargetMinimumScore: 1
+		AirTargetSwitchImprovementPercent: 50
+		AirTargetStallTicks: 150
+		AirTargetClosestCandidates: 15
+		AirTargetHighestValueCandidates: 10
+		AirTargetHarvesterCandidates: 10
+		AirTargetDebugLogging: false
+		AirAdaptiveRiskInterval: 125
+		AirAdaptiveRiskRollbackTicks: 1500
+		AirAdaptiveRiskMinimumUnits: 3
+		AirAdaptiveRiskApacheFullAmmoGrowth: 100
+		AirAdaptiveRiskOrcaFullAmmoGrowth: 50
+		AirAdaptiveRiskLowUnitDecay: 100
+		AirAdaptiveRiskApacheKillGrowth: 0
+		AirAdaptiveRiskOrcaKillGrowth: 0
+		AirAdaptiveRiskLossDecrement: 2500
+		AirInfluenceCellSize: 6
+		AirInfluenceCacheInterval: 125
+		AirSafetyCheckInterval: 25
+		AirThreatScanRadius: 16
+		AirThreatFleeMultiplier: 8
+		AirThreatMemoryTicks: 300
+		AirThreatMemorySize: 12
+		AirThreatMemoryMergeRadius: 3
+		AirRetreatOrderInterval: 50
+		AirRouteThreatPenalty: 200
+		AirRouteThreatRadius: 8
+		AirSquadSize: 0
+		MaximumAirSquads: 4
+		AirSquadDefinitions:
+			Orca:
+				UnitTypes: orca
+				SquadCount: 2
+				Profile: Orca
+			Apache:
+				UnitTypes: heli
+				SquadCount: 2
+				Profile: Apache
+		AirEvadeDistance: 12
+		AirEvadeJitter: 5
+		AirThreatRangeBuffer: 1.5
+		AirThreatWeightOverrides:
+			e3: 0
+			bike: 0
+			stnk: 0
+		AirMassedAttackIdleThreshold: 6
+		HealthRetreatThreshold: 0.5
+		AirPassiveRepairActors: fix
+		AirTargetPriorityOrca:
+			mcv: 10000
+			harv: 5000
+			sharv: 5000
+			arty: 5000
+			mlrs: 5000
+			bike: 5000
+			stnk: 5000
+			nuk2: 5000
+			htnk: 2500
+			mtnk: 2000
+			ltnk: 1250
+			proc: 1250
+			fact: 625
+			fact.gdi: 625
+			fact.nod: 625
+			hq: 312
+			nuke: 156
+			e1: 100
+			e2: 100
+			e3: 100
+			e4: 100
+			e5: 100
+			obli: 1
+		AirTargetPriorityHeli:
+			mcv: 10000
+			harv: 5000
+			sharv: 5000
+			arty: 5000
+			mlrs: 5000
+			e3: 2000
+			msam: 6500
+			stnk: 5000
+			bike: 5000
+			rmbo: 2000
+			bggy: 2000
+			ltnk: 750
+			mtnk: 250
+			htnk: 100
+			e1: 100
+			e2: 2000
+			e4: 2000
+			e5: 2000
+			e6: 2000
+			nuk2: 312
+			proc: 156
+			obli: 1
 		RequiresCondition: enable-Easiest-ai
 		SquadSize: 3
 		ExcludeFromSquadsTypes: harv, mcv, a10, e6, rmbo, truck, tran

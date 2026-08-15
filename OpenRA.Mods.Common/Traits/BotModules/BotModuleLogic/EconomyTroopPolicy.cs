@@ -12,6 +12,7 @@ using System.Collections.Generic;
 namespace OpenRA.Mods.Common.Traits
 {
 	public enum EconomyReadinessDecision { NotReady, Observing, Ready }
+	public enum EconomyApproachDecision { Inactive, Observing, Active }
 
 	/// <summary>Deterministic, world-independent policy shared by the Economy troop roles.</summary>
 	public static class EconomyTroopPolicy
@@ -40,6 +41,23 @@ namespace OpenRA.Mods.Common.Traits
 
 			return currentTick >= observationStartedTick + observationTicks ?
 				EconomyReadinessDecision.Ready : EconomyReadinessDecision.Observing;
+		}
+
+		public static EconomyApproachDecision AttackApproachDecision(bool established, bool currentlyActive,
+			bool hasPrerequisites, bool criticalThreat, bool readinessReady, int currentTick,
+			int observationStartedTick, int observationTicks)
+		{
+			if (!hasPrerequisites || criticalThreat)
+				return EconomyApproachDecision.Inactive;
+
+			if (!established)
+				return readinessReady ? EconomyApproachDecision.Active : EconomyApproachDecision.Inactive;
+
+			if (currentlyActive)
+				return EconomyApproachDecision.Active;
+
+			return observationStartedTick >= 0 && currentTick >= observationStartedTick + observationTicks ?
+				EconomyApproachDecision.Active : EconomyApproachDecision.Observing;
 		}
 
 		public static bool ShouldRequestMammoth(long mammothValue, long largestOtherTypeValue,
