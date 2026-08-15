@@ -4,13 +4,13 @@
 
 - Worker: `WORKER-2`
 - Task: `CNC-101 — Build-order protection and silo timing`
-- Status: `cycle 4 complete; Scenario B fixture-invalid, ready for cycle 5`
+- Status: `cycle 5 complete; First iteration - testing, evidence-only cycle 6 recommended`
 - Base: `4f806e742bd12145d2a601cc9ff71c3a0b141a13`
 - Task branch: `agent/round-20260815-cnc101-build-order-silo`
 - PR base: `4f806e742bd12145d2a601cc9ff71c3a0b141a13`
 - Balance: frozen; no costs, production values, prerequisites, power, storage,
   thresholds, delays, or other tuning changes
-- Cycle: `5/20`
+- Cycle: `6/20`
 - PR: none
 
 ## Literal scope
@@ -172,25 +172,64 @@ ownership against the PR117 base before retaining a commit.
   `.worktrees/coordinated-cnc/20260815-bug-polish-06-resume/analysis/worker-2-cnc101/cycle-04/`
   outside Git.
 
+## Cycle 5 durable result
+
+- Product head remains `56984ae1933e4a953dd09b9fadb086ba5e0d326e`;
+  no product or balance file changed. The interrupted predecessor had prepared
+  the cycle-5 custom maps and manifest but launched no game; that partial setup
+  was audited and reused without duplicating a run.
+- Release build passed with zero warnings/errors. Focused
+  `OpeningGarrisonLogicTest|OpeningPolicyLogicTest|SmartEconomyPolicyTest` passed
+  42/42. CNC and both cycle-5 custom-map YAML validation, Lua syntax, manifest
+  JSON validation, and `git diff --check` passed.
+- Scenario A passed at tick 9000/exit 0 in 16.364 seconds. Ordinary SkyNet/GDI
+  and Brutalis/Nod completed Power -> Barracks/Hand -> Refinery, created useful
+  infantry, and established initial Harvester income. SkyNet began at 1300 cash,
+  received the scripted release at tick 750, and completed its protected Refinery.
+  The later Brutalis zero-Harvester/blocked-extension state occurred after the
+  required prefix and is recorded as an unrelated advisory, not attributed to
+  this task.
+- Scenario B reached tick 7000/exit 0 in 15.661 seconds without crash, fatal Lua,
+  unhandled exception, or desync. The scripted `upgrade.recon2` became live one
+  tick after creation while Busy had zero cash; after cash restoration the exact
+  `gtwr` request was accepted at tick 3 and occupied Defence at tick 4. SkyNet
+  independently placed that `gtwr` at its preferred target `(79,92)` before its
+  Silo, and both sides later completed exactly one Silo with capacity 4150.
+- The Lua `Build` completion callback never fired despite the independently logged
+  live `gtwr` placement. The callback-dependent monitor therefore emitted its
+  explicit failure and stopped before proving the complete free/busy boundary,
+  preferred-tower resumption, and duplicate/phantom lifecycle. This is harness
+  state-order uncertainty, not exact evidence of a product defect.
+- Fresh Luna factual narrators and policy reviewers ran independently for both
+  games. Scenario A review was `insufficient evidence`; its highest recommendation
+  for a matched multi-cash changed/control matrix is rejected for this task because
+  literal acceptance requires the bounded A/B scenarios, not a mandatory old-policy
+  matrix, and cycles 1-5 repeatedly prove the opening prefix. Its late Brutalis
+  economy observation is retained as unrelated advisory evidence. Scenario B
+  review was `insufficient evidence / required follow-up`; its recommendation for
+  callback-independent queue/structure instrumentation is accepted for the next
+  evidence-only cycle. Exactly two full-engine games were run in cycle 5, so that
+  follow-up was not silently added as a third game.
+- Raw maps, logs, benchmark CSVs, staged role inputs, narratives, and reviews remain
+  at `.worktrees/coordinated-cnc/20260815-bug-polish-06-resume/analysis/worker-2-cnc101/cycle-05/`
+  outside Git.
+
 ## Next authorized cycle
 
-Cycle 5 must retain the current product unless new exact-item evidence identifies
-a product defect. Repair only the Scenario B prerequisite sequencing. Confirm the
-compatible Defence queue idle after the created base and 10000 cash are live,
-then temporarily make the busy side unable to afford a tower while the scripted
-`upgrade.recon2` propagates. Poll `HasPrerequisites` and queue/tower absence across
-at least one later tick. In the first callback where the prerequisite is live,
-restore 10000 cash and issue the scripted `gtwr` before normal bot selection can
-claim the queue. Keep the free side unable to preempt pressure until the busy
-request is established. Treat `IsProducing("gtwr")` only as occupancy, inspect
-first-tower diagnostics after the run, and reject any competing SkyNet tower
-reservation before establishment. Require the scripted callback plus a live
-`gtwr` before proving the busy boundary. Exercise one free side and one genuinely
-busy side, requiring tower completion, one later Silo only while pressure remains,
-capacity relief, preferred-tower resumption, and no duplicate/phantom commitment.
-Run the distinct Scenario A control in the same two-game cycle and repeat the
-focused/build/YAML/Lua/diff checks. Do not change product code for Lua prerequisite
-propagation or queue-observation ambiguity.
+Cycle 6 is suitable only as a minor evidence-only follow-up. Retain the current
+product unless callback-independent exact-item evidence identifies a product defect.
+Replace the Scenario B callback gate with deterministic observation keyed by player,
+queue actor, and item: record exact request acceptance, queued item identity,
+production/placement or cancellation, live actor identity/count, Silo reservation
+and completion, capacity, and reservation release. Apply resources above the actual
+existing storage-pressure threshold only after the busy `gtwr` is independently
+observed in queue, and prevent the free side from claiming an optional tower before
+that threshold is active. Require the busy tower live at its preferred placement
+before any later pressured Silo, one pressured Silo before a new optional tower on
+the free side, capacity relief, tower resumption, and no duplicates/phantom
+commitments. Run the distinct Scenario A control and the normal focused checks.
+Do not add an old-policy matrix, change balance, or change product code for Lua
+callback semantics unless exact independent evidence demonstrates a product defect.
 
 ## Handoff
 
