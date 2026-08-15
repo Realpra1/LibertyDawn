@@ -1,123 +1,145 @@
-# Ten-task cumulative playtest integration state
+# Round 06 resume cumulative integration state
 
 ## Status
 
-- Candidate: integrated testing complete; final release review pending
+- Tested release branch: `agent/round-20260815-bug-polish-06-resume`
+- Tested cumulative head: `5e74c362ba95986b422516bda074128262355081`
 - Integration cycle 1: complete
-- Integration cycle 2: complete
-- Valid counted full-engine games: cycle 1 exactly 2; cycle 2 exactly 2; total 4
-- Release blocker: none observed
-- Balance changes: none
-- Next action: final cumulative release review. Cycle 3 is not required: cycle 2
-  closed the literal field-assignment and save-load ownership gaps without finding
-  a concrete product defect.
+- Counted full-engine games: exactly 2
+- Concrete cumulative product defect: none observed
+- Product-code or balance change: none
+- Release blocker: none from cycle 1
+- Next authorized action: a fresh worker may begin integration cycle 2 from the
+  post-receipt head. This worker stopped before cycle 2 and did not push or merge
+  `bleed`.
 
-## Integrated ancestry
+## Verified ancestry and protected checks
 
-- Reviewed cumulative base: `07784f11899395bec8c909b588898f2048fe1d81`
-- CNC-100: `e1653f9e905742f7b9b659544f3a706e21a2e236`
-- CNC-96A: `25fb1fb59cdfe018279e4d557f7392a00da23c32`
-- CNC-96B: `7cc0d8da915586f399e669825979d33ec67dca2f`
-- Merge commits: `56a7f89554`, `4cef124e8f`, `bdc0e6a3b5`
+The worktree began clean at the exact assigned cumulative head. The common base
+`4f806e742bd12145d2a601cc9ff71c3a0b141a13` and all reviewed task heads are
+ancestors of the tested head:
 
-All four exact inputs were verified as ancestors after the merges. Conflict
-resolution retained CNC-100 streaming benchmark/load-shedding/registry behavior
-and CNC-96 repair, specialist, transport-objective, and launcher contracts.
+1. CNC-95 `d4bb47a6f1798bf4f9e1aca358e7afe963f840d7`
+2. CNC-101 `6d386d83f505609c7c7704492c1645a7a6dc6053`
+3. CNC-103 `f8fc1d447d2dee324a1e3fbfcd57d95c86a29ac0`
+4. CNC-106 `0100a95f96d24d8f40aef4489a0937b39e510a31`
+5. CNC-102 `22160c18dfd657196a51a5059ce1496c0d686536`
+6. CNC-84 `83ded7c1a1ccb45e7f6b4b7488a9d567da83872a`
+7. CNC-110 `4a515170f1b5a15f5e37fba6dba81bfab8f08db9`
 
-## Cycle 1 defects and disposition
+- `git diff --check` from the common base through the tested head: pass.
+- Protected `make check`, using the candidate's reviewed protected-entry helper
+  with the canonical `/root/github/LibertyDawn/.agents/locks` namespace: pass;
+  Debug CNC build completed with 0 warnings and 0 errors, followed by passing
+  explicit-interface and conditional-trait override checks.
+- A first check command selected the older helper in the main checkout, which
+  rejected the reviewed `--large-build-entry` option before starting a check. It
+  consumed no check and was corrected to the candidate helper.
 
-1. The Stealth repair lifecycle cached an inactive pre-condition
-   `SquadManagerBotModule`, so an active authored repair threshold could be missed.
-   The lifecycle now refreshes the active manager before repair evaluation. This is
-   a combined integration defect fix, not a policy or balance change.
-2. The streaming benchmark signature broke the existing benchmark unit-test API.
-   Its `World` argument is now optional and periodic reporting runs only when a
-   world is present, retaining both old tests and new runtime instrumentation.
-3. Merge-introduced strict analyzer formatting defects were corrected.
+## Counted game 1: combined build-policy pressure
 
-## Counted games
+- Custom map derived from shipped `Empire-Earth.oramap`, not a fixture:
+  `analysis/20260815-round06-integration/cycle-1/maps/cnc102-blocked-both.oramap`
+- Map SHA-256:
+  `e4164c7e8a8746db47c3896521bbc7cf1caba376ce40a4f9cdc8896d3cb4f8c7`
+- Seed `606101`; GDI Brutalis versus Nod IronReaper; ordinary AIs with all normal
+  modules, unrestricted tech, custom ready-economy starts, headless MAX.
+- Canonical launcher staged installed CNC content from
+  `/root/github/LibertyDawn/.build/cnc33a/runtime-content`; the isolated support
+  directory contained its own `Content` link.
+- Passed with exit 0, 6,500 valid world ticks, and 44.037 seconds wall time.
+  No fatal error, unhandled exception, or desync signal was observed.
+- Combined signals included both nine-goal openings; Brutalis field admission,
+  Resonator placement, field completion, low-power coverage loss/recovery, and
+  bounded illegal-extension backoff; and IronReaper radar loss, busy/power queue
+  contention, one HQ reservation/production, radar restoration, reservation
+  release, and later field-production continuation.
+- Performance stayed bounded: mean tick 6.216 ms, p95 14 ms, p99 20 ms. The
+  1,428.914 ms maximum was a bounded startup/runtime outlier; four freeze-threshold
+  samples were not attributed to a product module.
+- Evidence:
+  `analysis/20260815-round06-integration/cycle-1/games/game1-counted/round06-build-policy-pressure/`.
 
-### Game 1: VIKI repair lifecycle
+One earlier launch of this same map reached tick 6,500 and exited 0, but the
+harness rejected two fragile Lua `Media.Debug` expectations. It is explicitly
+uncounted. The repaired manifest used authoritative engine/module evidence and
+the clean rerun above is the sole counted Game 1.
 
-- Seed `961201`; VIKI (Nod) versus Brutalis (GDI); ordinary AIs, all modules;
-  headless MAX; 2,200 valid world ticks; passed.
-- Fixture map SHA-256:
-  `ed173b4642e37d524510a7120762521bbc05594524103ba55a874223b89f2a2e`.
-- A pre-spawned, reachable VIKI Repair Facility accepted the same damaged Stealth
-  Tank at 6,000/15,000 health. Health increased, reached 15,000/15,000, the tank
-  rejoined, and it continued useful harassment against a Harvester.
-- The surviving member remained controlled after its partner's scripted loss; a
-  replacement restored two reserved Stealth members with no ordinary-owner leak.
-- No air squad activity, fatal error, desync, or unhandled exception was observed.
-- The distinct active no-repair fallback was not mixed into this counted proof;
-  this remains a bounded evidence limit rather than an observed defect.
+## Counted game 2: HeavyDrop lifecycle and threat pressure
 
-### Game 2: load shedding and ownership pressure
+- Distinct custom map derived from shipped `island-duel.oramap`, not a fixture:
+  `analysis/20260815-round06-integration/cycle-1/maps/cnc110-passenger-invalid.oramap`
+- Map SHA-256:
+  `64c62c738a120f38f9f5a04e2de1906de07ec1c741c1fabbfb70ed14054385b3`
+- Seed `606102`; GDI Brutalis versus Nod IronReaper; ordinary AIs with all normal
+  modules, unrestricted tech, ten-carrier HeavyDrop pressure, headless MAX.
+- Canonical installed-content staging and an isolated `SupportDir/Content` link
+  were verified by the launcher.
+- Passed with exit 0, 3,000 valid world ticks, and 8.040 seconds wall time. No
+  fatal error, unhandled exception, or desync signal was observed.
+- Brutalis created a ten-pair HeavyDrop, discarded the scripted invalid passenger
+  pair, retained/routed the other pairs, rejected unsafe cells under enemy threat,
+  returned to safe assembly, released an all-invalidated wave cleanly, and later
+  issued threat-aware recovery routes and unload replans.
+- Performance stayed bounded: mean tick 1.518 ms, p95 3 ms, p99 5 ms, maximum
+  872.806 ms, with three bounded freeze-threshold samples.
+- Evidence:
+  `analysis/20260815-round06-integration/cycle-1/games/game2/round06-heavy-drop-air-pressure/`.
 
-- Seed `961202`; two ordinary Iron Reaper AIs; all modules; paced rendered mode;
-  1,000 valid world ticks over 50.093 seconds; passed.
-- Fixture map SHA-256:
-  `2b29080d7cb31bb05d80525835d28afd960558916197a1b51d300f0e3e2fa305`.
-- Load shedding disabled and reprobed advanced modules. Released actors registered
-  with the ordinary fallback and were later removed when claimed; Stealth and
-  Chemical reservations were exercised.
-- Registry audits reported zero corrections while tracking 1,215 actors/339
-  eligible actors for player 1 and 1,188/313 for player 2. No Harvester, silo
-  Harvester, MCV, or advanced MCV entered fallback combat registration/orders.
-- Periodic stall telemetry at tick 1,000 reported a 19.740 ms mean tick, 33 ms p95,
-  49 ms p99, and 10 freezes; module calls and orders remained bounded. The 1,595 ms
-  maximum was the startup sample, not sustained runaway work.
-- A handoff save was created at tick 600 and teardown at tick 1,000 was clean, with
-  no fatal error, desync, natural game-over, or unhandled exception.
-- The field-defense module was active but reported zero committed fields. Thus the
-  run does not literally prove field-defender ownership, and no save reload was
-  performed. These are bounded cycle-1 evidence limits, not observed corruption.
+The factual trace contained 5,601 repeated exact-unload diagnostics while
+passengers were logged as not in world. The game remained fast and terminated
+cleanly, and the available trace does not distinguish repeated logging from
+repeated lifecycle transitions. This is a required cycle-2 discriminator, not a
+proven strategic or release defect. CNC-84 air-squad avoidance was not directly
+observed; only the shared threat geometry used by transport planning was exercised.
 
-## Independent review
+## Fresh native Luna analysis and recommendation dispositions
 
-- Game 1 factual narration and policy review completed. Policy verdict: mostly
-  sensible, medium confidence. Safe repair/rejoin is accepted; danger-screen,
-  balance, targeting, and cadence changes were explicitly declined.
-- Game 2 factual narration and policy review completed. Policy verdict: mixed,
-  medium confidence. Ordinary fallback was accepted as containment, not proof of
-  advanced-policy quality. The recommendation for exact per-actor ownership checks
-  is accepted for cycle 2; economy-extension and broader strategy work remain out
-  of scope.
-- Both reviewers' durable general lessons were atomically promoted to the bounded
-  policy scratchpad.
+Each counted game received its own fresh native `gpt-5.6-luna` factual narrator
+and a separate fresh native `gpt-5.6-luna` policy reviewer. Analysis was isolated
+to copied inputs and policy work was serialized through the canonical scratchpad
+resource slot.
 
-## Cycle 2 closure
+### Game 1
 
-Two further distinct paced full-engine games used the same candidate and ordinary
-IronReaper/Brutalis AIs. Game A ran 2,600 ticks and forced real field commitments,
-mixed defenders, Stealth module shed/probe/recovery, registry release/claim, zero-
-correction audits after reconstruction, Harvester exclusion, a tick-2,400 save,
-and clean teardown. Game B loaded that exact save and continued to tick 3,200;
-loaded registries reported `overlap=0`, field assignments/routes restored, later
-audits required zero corrections, field defense continued to grow, the disabled
-module recovered, and teardown was clean. No product change was required.
+- Narrative:
+  `analysis/20260815-round06-integration/cycle-1/reviews/game1-narrator/NARRATIVE.md`
+- Policy:
+  `analysis/20260815-round06-integration/cycle-1/reviews/game1-policy/POLICY-REVIEW.md`
+- Verdict: insufficient evidence, high confidence; no narrow release-blocking
+  repair required.
+- Highest recommendation: run a matched changed/control game with forced legal
+  and illegal field placement plus radar loss and bounded queue/actor outcomes.
+- Disposition: accepted as required follow-up evidence for cycle 2. Rejected as a
+  cycle-1 code or balance change because the two-game cap is complete, the game
+  showed bounded progress and recovery, and no duplicated reservation, permanent
+  starvation, or failure to restore an eligible radar provider occurred.
 
-Fresh Luna factual narrators and policy reviewers completed for both games. Game A
-policy found insufficient evidence for strategic superiority but retained the
-ownership and module-handoff behavior as integration acceptance requirements.
-Game B judged save-load continuity mostly sensible with medium confidence. Their
-matched-control and richer combat/board telemetry recommendations are future
-policy-quality work, not a literal integration gap or release blocker.
+### Game 2
 
-## Final advisory review disposition
+- Narrative:
+  `analysis/20260815-round06-integration/cycle-1/reviews/game2-narrator/NARRATIVE.md`
+- Policy:
+  `analysis/20260815-round06-integration/cycle-1/reviews/game2-policy/POLICY-REVIEW.md`
+- Verdict: insufficient evidence, medium confidence; no narrow release-blocking
+  repair required. Repeated exact-unload output is an unresolved lifecycle,
+  logging, or performance concern, not yet a proven strategic defect.
+- Highest recommendation: run a matched full-engine discriminator with per-pair
+  timestamps/counts for creation, boarding, world removal, unload success/failure,
+  and restoration.
+- Disposition: accepted as required follow-up evidence for cycle 2. No cycle-1
+  code change is justified because lifecycle transitions were not counted
+  independently, the mission released cleanly, and measured execution remained
+  bounded. Cycle 2 should also force actual air-squad movement through layered
+  threat geometry to close the CNC-84 evidence gap.
 
-A fresh Terra integrated-candidate advisory review reported one concern: the CNC
-economy field-defense `ScanInterval` differs from the cumulative base (1,500
-versus 25). The concern is rejected as merge/integration drift. Git provenance
-shows exact included task-history commit `82bc63f661` (`Add low-frequency triggered
-field defense`) owns the 1,500-tick value and the accompanying per-tick cached
-invalidation/attack-trigger path. Restoring 25 would undo the accepted task's core
-low-frequency behavior rather than preserve balance. Integration itself introduced
-no new timing value. Cycle-2 fixtures explicitly overrode the interval to 25 only
-to force bounded literal field-assignment evidence; ordinary 1,500-tick strategic
-quality remains task evidence/policy territory, not a newly reproduced combined
-defect. Therefore this advisory does not require cycle 3.
+Policy reviewers produced bounded updated scratchpads in their isolated analysis
+directories. The canonical tracked scratchpad was not changed because this worker
+was explicitly authorized to update only integration state and receipt.
 
-The same Terra review role received one bounded reconsideration with that omitted
-provenance and returned `clear`, `advisory concern: none`: no integration-
-introduced release-safety defect remains.
+## Cycle 1 decision
+
+No concrete narrow cumulative defect was established, so no repair branch or
+product change was created. Balance and task policy remain unchanged. Cycle 1
+passes as bounded integration evidence; the two accepted discriminators above are
+the next worker's explicit recommendation carry-forward, not silent omissions.

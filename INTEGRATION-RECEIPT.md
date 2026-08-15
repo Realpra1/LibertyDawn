@@ -1,135 +1,69 @@
-# Ten-task cumulative playtest integration receipt
+# Round 06 resume integration cycle 1 receipt
 
-## Merge receipt
+## Candidate and checks
 
-The integration branch began at
-`07784f11899395bec8c909b588898f2048fe1d81` and preserves true merge ancestry for:
+- Branch: `agent/round-20260815-bug-polish-06-resume`
+- Exact tested head: `5e74c362ba95986b422516bda074128262355081`
+- Common base and all seven supplied reviewed heads: verified ancestors.
+- `git diff --check`: pass.
+- Protected `make check`: pass, 0 warnings and 0 errors; interface and conditional
+  trait-override gates passed.
+- Product/balance changes: none.
 
-- CNC-100 `e1653f9e905742f7b9b659544f3a706e21a2e236` via `56a7f89554`
-- CNC-96A `25fb1fb59cdfe018279e4d557f7392a00da23c32` via `4cef124e8f`
-- CNC-96B `7cc0d8da915586f399e669825979d33ec67dca2f` via `bdc0e6a3b5`
+## Full-engine receipt
 
-`git merge-base --is-ancestor` returned success for the base and each exact task
-head after conflict resolution.
+Exactly two successful games count. Both used deliberately constructed custom CNC
+maps, ordinary Brutalis/IronReaper AIs, unrestricted tech and all normal modules,
+the canonical launcher with the installed-content argument, isolated support and
+artifact directories, and verified `SupportDir/Content` links. Both were capped
+below 120 seconds.
 
-## Verification receipt
+1. **Combined build-policy pressure** — seed `606101`, map SHA-256
+   `e4164c7e8a8746db47c3896521bbc7cf1caba376ce40a4f9cdc8896d3cb4f8c7`.
+   Passed: exit 0, 6,500 valid ticks, 44.037 seconds. Field/Resonator progress,
+   queue/power contention, radar loss/reservation/production/restoration, and
+   continued AI activity were observed without fatal error or desync.
+2. **HeavyDrop lifecycle and threat pressure** — seed `606102`, map SHA-256
+   `64c62c738a120f38f9f5a04e2de1906de07ec1c741c1fabbfb70ed14054385b3`.
+   Passed: exit 0, 3,000 valid ticks, 8.040 seconds. Invalid-pair cleanup,
+   threat-aware safe routing/replanning, wave release, and later transport rescue
+   behavior were observed without fatal error or desync.
 
-All checks ran from the protected integration worktree and passed:
+An earlier Game-1 attempt exited 0 at tick 6,500 but failed two fragile harness
+log expectations. It is invalid and uncounted; the expectations were repaired and
+the scenario was rerun cleanly. A first protected-check command also failed before
+starting because it selected an older helper interface; it consumed no check.
 
-- `make all`: 0 warnings, 0 errors
-- `make check`: analyzer and interface checks passed, 0 warnings, 0 errors
-- `make test`: full supported CNC MiniYAML/map suite passed
-- `dotnet test OpenRA.Test/OpenRA.Test.csproj -c Release`: 707/707 passed
-- `python3 -m unittest tests.test_launch_ai_parallel tests.test_archipelago_readiness_fixtures tests.test_resource_slots tests.test_launch_role`: 39/39 passed
-- `git diff --check`: passed
+Raw maps, logs, benchmarks, replays, and analysis remain untracked under
+`analysis/20260815-round06-integration/cycle-1/`. The concise durable state records
+their exact paths and hashes.
 
-The final staged-file audit excludes raw logs, replays, saves, maps, build output,
-the local job envelope, and the ignored `analysis/` evidence tree.
+## Independent analysis receipt
 
-## Full-engine evidence receipt
+- Game 1 Luna narrator:
+  `analysis/20260815-round06-integration/cycle-1/reviews/game1-narrator/NARRATIVE.md`
+- Game 1 separate Luna policy review:
+  `analysis/20260815-round06-integration/cycle-1/reviews/game1-policy/POLICY-REVIEW.md`
+- Game 2 Luna narrator:
+  `analysis/20260815-round06-integration/cycle-1/reviews/game2-narrator/NARRATIVE.md`
+- Game 2 separate Luna policy review:
+  `analysis/20260815-round06-integration/cycle-1/reviews/game2-policy/POLICY-REVIEW.md`
 
-Exactly two successful games are counted. Earlier launcher/fixture setup attempts
-and later exploratory evidence probes are not counted.
+Both policy verdicts were `insufficient evidence`, reflecting absent matched
+controls/natural outcomes rather than a launch or release blocker. Both explicitly
+found no narrow release-blocking repair required now.
 
-### Game 1
+Recommendations are explicitly carried forward to cycle 2:
 
-- Durable local evidence:
-  `analysis/20260813-ten-task-playtest/cycle-1/game1-counted/ten-task-game1-repair/`
-- Summary: `status=passed`, exit 0, 2,200 valid ticks, 5.004 seconds
-- Runtime map SHA-256:
-  `ed173b4642e37d524510a7120762521bbc05594524103ba55a874223b89f2a2e`
-- Required evidence matched: compatible facility, queued Repair, health increase,
-  full repair, active-squad rejoin, useful post-rejoin action, survivor/replacement,
-  two reserved Stealth members, clean final lifecycle state.
-- Independent artifacts:
-  `analysis/20260813-ten-task-playtest/cycle-1/reviews/game1-commenter/NARRATIVE.md`
-  and
-  `analysis/20260813-ten-task-playtest/cycle-1/reviews/game1-policy/POLICY-REVIEW.md`.
+- matched field-placement/radar-loss queue contention with actor-level outcomes;
+- matched per-pair HeavyDrop lifecycle timestamps and transition counts; and
+- a forced air-squad traversal across layered threat geometry for direct CNC-84
+  coverage.
 
-### Game 2
+No recommendation was used to change balance or broaden task policy.
 
-- Durable local evidence:
-  `analysis/20260813-ten-task-playtest/cycle-1/game2-counted-final/ten-task-game2-pressure/`
-- Summary: `status=passed`, exit 0, 1,000 valid ticks, 50.093 seconds
-- Runtime map SHA-256:
-  `2b29080d7cb31bb05d80525835d28afd960558916197a1b51d300f0e3e2fa305`
-- Required evidence matched: module shed/reprobe transitions, released/claimed
-  registry handoffs, Stealth/Chemical reservation, zero-correction ownership
-  audits, Harvester exclusions, bounded telemetry, handoff save, clean teardown.
-- Local performance evidence:
-  `support/Logs/ten-task-game2-pressure-periodic-stall.tsv` under the game directory.
-- Independent artifacts:
-  `analysis/20260813-ten-task-playtest/cycle-1/reviews/game2-commenter/NARRATIVE.md`
-  and
-  `analysis/20260813-ten-task-playtest/cycle-1/reviews/game2-policy/POLICY-REVIEW.md`.
+## Handoff
 
-Raw local evidence is intentionally untracked. The concise state and this receipt
-are the durable Git evidence for cycle 1.
-
-## Integration cycle 2 receipt
-
-Cycle 2 used exactly two additional distinct successful full-engine games. Invalid
-tick-zero content-link setup attempts were stopped and are not counted. The valid
-launcher staged installed CNC content from
-`/root/github/LibertyDawn/.build/cnc33a/runtime-content`.
-
-### Game A: field commitment and ownership transitions
-
-- Evidence: `analysis/20260813-ten-task-playtest/cycle-2/game-a-counted/cycle2-field-ownership/`
-- Seed `962201`; paced rendered; IronReaper Nod versus Brutalis GDI; passed with
-  exit 0 and 2,600 valid ticks in 111.217 seconds.
-- Runtime map SHA-256:
-  `8c609882e7c1eb505ef5dc732c6a546d7b8aeeec5d47c4634a21e46c73482d5f`.
-- Both AIs committed economy fields and assigned actual Medium Tank, infantry, and
-  Mobile SAM defenders. IronReaper's forced Stealth module load triggered disable,
-  released-actor registration, enabled probes, re-shed, and eventual recovery.
-- Registry audits after initial reconstruction reported zero corrections through
-  the transitions; no Harvester/MCV entered fallback registration or combat orders.
-- A 42,591-byte save was created at tick 2,400 with SHA-256
-  `f19012e4932b6101e95a53acac3dbfaf1032a6de0a882e2f980e58476568ae49`.
-- Periodic stall and bot-module/order telemetry were emitted and the configured
-  teardown was clean, with no fatal error, desync, or unhandled exception.
-
-### Game B: post-load continuity
-
-- Evidence: `analysis/20260813-ten-task-playtest/cycle-2/game-b-counted/cycle2-field-post-load/`
-- Paced rendered load of Game A's exact save; passed with exit 0 and continuation
-  from tick 2,400 through tick 3,200 in 39.058 seconds.
-- The staged save SHA-256 matched Game A:
-  `f19012e4932b6101e95a53acac3dbfaf1032a6de0a882e2f980e58476568ae49`.
-- Registry load evidence reported `overlap=0` for both players. Economy field scan
-  phase, assignments, destinations, routes, and order progress restored; field
-  compositions and new assignments continued after load.
-- Every post-load registry audit reported zero corrections. The disabled Stealth
-  module advanced through enabled-probe, probe-pending, and recovered. No Harvester
-  entered fallback registration/orders; teardown was clean.
-- Performance telemetry captured the load boundary (including a bounded 895.608 ms
-  startup/load tick and 253.596 ms world phase) without sustained runaway work.
-
-### Cycle 2 independent analysis
-
-The required counted analyses are fresh `gpt-5.6-luna` medium sessions:
-
-- `analysis/20260813-ten-task-playtest/cycle-2/reviews/game-a-luna-commenter/NARRATIVE.md`
-- `analysis/20260813-ten-task-playtest/cycle-2/reviews/game-a-luna-policy/POLICY-REVIEW.md`
-- `analysis/20260813-ten-task-playtest/cycle-2/reviews/game-b-luna-commenter/NARRATIVE.md`
-- `analysis/20260813-ten-task-playtest/cycle-2/reviews/game-b-luna-policy/POLICY-REVIEW.md`
-
-Earlier Terra analyses are retained locally as supplemental cross-checks only and
-are not counted. Luna recommendations for matched strategic controls, temporary
-field-protection visibility, and richer board/combat traces are deferred policy-
-quality work. They do not contradict the demonstrated ownership continuity or
-identify a concrete combined product defect. No cycle-2 product code was changed.
-
-## Final advisory review receipt
-
-A fresh `gpt-5.6-terra` medium integrated-candidate review is stored locally at
-`analysis/20260813-ten-task-playtest/release-review/RELEASE-REVIEW.md`. Its sole
-advisory identified the 25-to-1,500 field-defense scan interval difference. The
-line is owned by included task commit `82bc63f661afa98a55cea9fa3fddf992d93c909e`
-and is coupled to that task's low-frequency triggered-control implementation; it
-is not a merge resolution or integration-cycle change. The advisory is rejected
-as a request to undo reviewed task behavior. The bounded Terra reconsideration at
-`analysis/20260813-ten-task-playtest/release-review/RECONSIDERED-REVIEW.md`
-returned `clear` with no remaining advisory concern. No product repair or cycle 3
-follows.
+Integration cycle 1 is complete with exactly two counted games. No repair branch
+was needed. Stop here: do not infer that cycle 2 has begun, and do not push or
+merge `bleed`.
