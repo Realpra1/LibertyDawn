@@ -12,7 +12,22 @@ import stat
 import subprocess
 import sys
 import tempfile
+import time
 from datetime import datetime, timezone
+
+from external_worker_runtime import (
+    ProcessIdentityError,
+    RECORD_SCHEMA,
+    atomic_write_json,
+    current_git_branch,
+    initialize_assignment_record,
+    new_assignment_id,
+    new_attempt_id,
+    read_process_identity,
+    register_watchdog_assignment,
+    update_assignment_record,
+    utc_now,
+)
 
 
 ROLES = {
@@ -32,6 +47,95 @@ ROLES = {
 POLICY_ROLES = {"policy-reviewer", "policy-speccer", "policy-escalation"}
 POLICY_OUTPUTS = ("POLICY-REVIEW.md", "POLICY-SCRATCHPAD.md")
 POLICY_SCRATCHPAD_LIMIT = 3000
+_DETACHED_SUPERVISORS: list[subprocess.Popen] = []
+HOST_SUPERVISION_PROBE_TIMEOUT_SECONDS = 3.0
+HOST_SUPERVISION_LAUNCH_TIMEOUT_SECONDS = 5.0
+
+
+def host_supervision_capability() -> dict[str, object]:
+    """Boundedly determine whether a usable systemd user manager is available."""
+    checked_utc = utc_now()
+    systemctl = shutil.which("systemctl")
+    systemd_run = shutil.which("systemd-run")
+    diagnostic: dict[str, object] = {
+        "checked_utc": checked_utc,
+        "probe_timeout_seconds": HOST_SUPERVISION_PROBE_TIMEOUT_SECONDS,
+        "mechanism": "systemd-user-service",
+        "systemctl": systemctl,
+        "systemd_run": systemd_run,
+    }
+    if not systemctl or not systemd_run:
+        diagnostic.update(
+            {
+                "supported": False,
+                "fallback_reason": "systemd user-service tools are unavailable",
+            }
+        )
+        return diagnostic
+    try:
+        probe = subprocess.run(
+            [systemctl, "--user", "show-environment"],
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            timeout=HOST_SUPERVISION_PROBE_TIMEOUT_SECONDS,
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        diagnostic.update(
+            {
+                "supported": False,
+                "fallback_reason": (
+                    "systemd user-manager capability probe exceeded "
+                    f"{HOST_SUPERVISION_PROBE_TIMEOUT_SECONDS:.1f}s"
+                ),
+            }
+        )
+        return diagnostic
+    except OSError as error:
+        diagnostic.update(
+            {
+                "supported": False,
+                "fallback_reason": f"systemd user-manager probe failed: {error}",
+            }
+        )
+        return diagnostic
+    diagnostic["probe_exit_code"] = probe.returncode
+    if probe.returncode != 0:
+        detail = (probe.stderr or probe.stdout).strip().replace("\n", " ")[:300]
+        diagnostic.update(
+            {
+                "supported": False,
+                "fallback_reason": (
+                    "systemd user manager is unavailable"
+                    + (f": {detail}" if detail else "")
+                ),
+            }
+        )
+        return diagnostic
+    diagnostic.update({"supported": True, "fallback_reason": None})
+    return diagnostic
+
+
+def _service_unit_name(assignment_id: str, attempt_id: str, generation: int) -> str:
+    return (
+        f"libertydawn-worker-{assignment_id[:12]}-g{generation}-"
+        f"{attempt_id[:8]}.service"
+    )
+
+
+def _stop_systemd_service(systemctl: str, service_unit: str) -> None:
+    """Best-effort bounded cleanup after an incompletely published service launch."""
+    try:
+        subprocess.run(
+            [systemctl, "--user", "stop", service_unit],
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            timeout=HOST_SUPERVISION_PROBE_TIMEOUT_SECONDS,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        pass
 
 
 def _resolved_path(value: object, field: str) -> pathlib.Path:
@@ -138,6 +242,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--job-file", required=True, type=pathlib.Path)
     parser.add_argument("--output-dir", required=True, type=pathlib.Path)
     parser.add_argument("--background", action="store_true")
+    parser.add_argument(
+        "--watchdog-registry",
+        type=pathlib.Path,
+        help="atomically register this background assignment for bounded recovery",
+    )
     parser.add_argument("--print-command", action="store_true")
     parser.add_argument(
         "--validate-cli",
@@ -398,9 +507,311 @@ def validate_cli_parser(
 
 
 def write_json(path: pathlib.Path, value: dict) -> None:
-    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    temporary.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
-    temporary.replace(path)
+    atomic_write_json(path, value)
+
+
+def _start_supervisor(
+    args: argparse.Namespace,
+    *,
+    assignment_root: pathlib.Path,
+    assignment_id: str,
+    attempt_id: str,
+    generation: int,
+    policy: dict,
+    started_utc: str,
+) -> dict:
+    supervisor_command = [
+        sys.executable,
+        str(pathlib.Path(__file__).resolve()),
+        "--role", args.role,
+        "--worktree", str(args.worktree.resolve()),
+        "--job-file", str(args.job_file.resolve()),
+        "--output-dir", str(args.output_dir.resolve()),
+        "--supervised",
+    ]
+    supervisor_log_path = (args.output_dir / "supervisor.log").resolve()
+    supervisor_log = supervisor_log_path.open("xb")
+    supervisor_log.close()
+    environment = dict(os.environ)
+    environment.update(
+        {
+            "LIBERTY_DAWN_ASSIGNMENT_ID": assignment_id,
+            "LIBERTY_DAWN_ATTEMPT_ID": attempt_id,
+            "LIBERTY_DAWN_ATTEMPT_GENERATION": str(generation),
+            "LIBERTY_DAWN_ASSIGNMENT_ROOT": str(assignment_root.resolve()),
+            "LIBERTY_DAWN_SUPERVISOR_GATE": str(
+                (args.output_dir / ".supervisor-start-gate").resolve()
+            ),
+        }
+    )
+    capability = host_supervision_capability()
+    supervision: dict[str, object] = {
+        "capability": capability,
+        "launch_timeout_seconds": HOST_SUPERVISION_LAUNCH_TIMEOUT_SECONDS,
+        "startup_gate_timeout_seconds": HOST_SUPERVISION_LAUNCH_TIMEOUT_SECONDS,
+        "stdin": "/dev/null",
+        "stdout": str(supervisor_log_path),
+        "stderr": str(supervisor_log_path),
+    }
+    supervisor: subprocess.Popen | None = None
+    service_unit: str | None = None
+    supervisor_pid: int | None = None
+    if capability.get("supported"):
+        systemd_run = str(capability["systemd_run"])
+        systemctl = str(capability["systemctl"])
+        service_unit = _service_unit_name(assignment_id, attempt_id, generation)
+        service_command = [
+            systemd_run,
+            "--user",
+            "--quiet",
+            "--collect",
+            "--service-type=exec",
+            f"--unit={service_unit}",
+            "--property=StandardInput=null",
+            f"--property=StandardOutput=append:{supervisor_log_path}",
+            f"--property=StandardError=append:{supervisor_log_path}",
+            f"--setenv=PATH={environment.get('PATH', '')}",
+        ]
+        for name in (
+            "LIBERTY_DAWN_ASSIGNMENT_ID",
+            "LIBERTY_DAWN_ATTEMPT_ID",
+            "LIBERTY_DAWN_ATTEMPT_GENERATION",
+            "LIBERTY_DAWN_ASSIGNMENT_ROOT",
+            "LIBERTY_DAWN_SUPERVISOR_GATE",
+        ):
+            service_command.append(f"--setenv={name}={environment[name]}")
+        service_command.extend(["--", *supervisor_command])
+        try:
+            launched = subprocess.run(
+                service_command,
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                text=True,
+                timeout=HOST_SUPERVISION_LAUNCH_TIMEOUT_SECONDS,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as error:
+            _stop_systemd_service(systemctl, service_unit)
+            raise RuntimeError(
+                "systemd supervisor launch timed out; refusing an ambiguous fallback"
+            ) from error
+        except OSError as error:
+            launched = subprocess.CompletedProcess(service_command, 127, "", str(error))
+        if launched.returncode == 0:
+            try:
+                shown = subprocess.run(
+                    [systemctl, "--user", "show", "--property=MainPID", "--value", service_unit],
+                    stdin=subprocess.DEVNULL,
+                    capture_output=True,
+                    text=True,
+                    timeout=HOST_SUPERVISION_LAUNCH_TIMEOUT_SECONDS,
+                    check=False,
+                )
+            except (OSError, subprocess.TimeoutExpired) as error:
+                _stop_systemd_service(systemctl, service_unit)
+                raise RuntimeError(
+                    f"systemd service identity query failed within its bound: {error}"
+                ) from error
+            try:
+                supervisor_pid = int(shown.stdout.strip()) if shown.returncode == 0 else 0
+            except ValueError:
+                supervisor_pid = 0
+            if supervisor_pid <= 0:
+                _stop_systemd_service(systemctl, service_unit)
+                raise RuntimeError(
+                    "systemd launched a service but did not publish a stable MainPID"
+                )
+            supervision.update(
+                {
+                    "mechanism": "systemd-user-service",
+                    "strong_host_supervision": True,
+                    "service_unit": service_unit,
+                    "fallback_reason": None,
+                }
+            )
+        else:
+            detail = (launched.stderr or launched.stdout).strip().replace("\n", " ")[:300]
+            supervision["fallback_reason"] = (
+                "systemd transient service launch rejected"
+                + (f": {detail}" if detail else "")
+            )
+    if supervisor_pid is None:
+        with supervisor_log_path.open("ab") as supervisor_log:
+            supervisor = subprocess.Popen(
+                supervisor_command,
+                stdin=subprocess.DEVNULL,
+                stdout=supervisor_log,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+                close_fds=True,
+                env=environment,
+            )
+        supervisor_pid = supervisor.pid
+        supervision.update(
+            {
+                "mechanism": "detached-session-watchdog-fallback",
+                "strong_host_supervision": False,
+                "service_unit": None,
+                "fallback_reason": supervision.get("fallback_reason")
+                or capability.get("fallback_reason"),
+            }
+        )
+    try:
+        identity = read_process_identity(supervisor_pid)
+    except Exception:
+        if supervisor is not None:
+            supervisor.terminate()
+            try:
+                supervisor.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                supervisor.kill()
+                supervisor.wait(timeout=2)
+        elif service_unit is not None:
+            _stop_systemd_service(str(capability["systemctl"]), service_unit)
+        raise
+    if supervisor is not None:
+        _DETACHED_SUPERVISORS[:] = [item for item in _DETACHED_SUPERVISORS if item.poll() is None]
+        _DETACHED_SUPERVISORS.append(supervisor)
+    record = {
+        "schema": RECORD_SCHEMA,
+        "assignment_id": assignment_id,
+        "attempt_id": attempt_id,
+        "generation": generation,
+        "pid": supervisor_pid,
+        "identity": identity,
+        "status": "launched",
+        "role": args.role,
+        "model": policy["model"],
+        "reasoning_effort": policy["reasoning_effort"],
+        "sandbox": policy["sandbox"],
+        "session_directory": str(policy["session_directory"]),
+        "output_dir": str(policy["output_dir"]),
+        "command": supervisor_command,
+        "supervision": supervision,
+        "started_utc": started_utc,
+    }
+    try:
+        write_json(args.output_dir / "supervisor.json", record)
+        pathlib.Path(environment["LIBERTY_DAWN_SUPERVISOR_GATE"]).open("xb").close()
+    except Exception:
+        if supervisor is not None:
+            supervisor.terminate()
+            try:
+                supervisor.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                supervisor.kill()
+                supervisor.wait(timeout=2)
+        elif service_unit is not None:
+            _stop_systemd_service(str(capability["systemctl"]), service_unit)
+        raise
+    return record
+
+
+def relaunch_assignment(
+    assignment_root: pathlib.Path,
+    assignment: dict[str, object],
+    interruption: dict[str, object],
+) -> dict[str, object]:
+    """Relaunch one interrupted worker through current protected launcher policy."""
+    role = assignment.get("role")
+    if role != "worker":
+        raise ProcessIdentityError(f"automatic recovery is not authorized for role {role!r}")
+    try:
+        worktree_path = pathlib.Path(str(assignment["worktree"]))
+        job_path = pathlib.Path(str(assignment["job_file"]))
+        if job_path.is_symlink():
+            raise ProcessIdentityError("relaunch job must not be a symlink")
+        worktree = worktree_path.resolve(strict=True)
+        job_file = job_path.resolve(strict=True)
+    except (KeyError, OSError) as error:
+        raise ProcessIdentityError(f"relaunch envelope is unavailable: {error}") from error
+    if not worktree.is_dir() or not job_file.is_file() or not job_file.is_relative_to(worktree):
+        raise ProcessIdentityError("relaunch job/worktree escapes the authorized envelope")
+    branch = assignment.get("branch")
+    if not isinstance(branch, str) or current_git_branch(worktree) != branch:
+        raise ProcessIdentityError("relaunch worktree branch does not match the authorized assignment")
+    assignment_id = assignment.get("assignment_id")
+    if assignment_id != new_assignment_id(role, worktree, job_file):
+        raise ProcessIdentityError("relaunch assignment identity does not match role/worktree/job")
+    generation = assignment.get("next_generation")
+    if not isinstance(generation, int) or generation != assignment.get("generation", 0) + 1:
+        raise ProcessIdentityError("relaunch generation reservation is invalid")
+    predecessor = assignment.get("current_attempt_id")
+    predecessor_lineage = {
+        "attempt_id": predecessor,
+        "generation": assignment.get("generation"),
+        "attempt_dir": assignment.get("current_attempt_dir"),
+        "status": assignment.get("status"),
+    }
+    for key in ("blocked_reason", "blocked_record", "blocked_diagnostics"):
+        if key in assignment:
+            predecessor_lineage[key] = assignment[key]
+    attempt_id = new_attempt_id()
+    attempt_dir = assignment_root / "attempts" / f"generation-{generation:06d}-{attempt_id}"
+    attempt_dir.mkdir(parents=True, exist_ok=False)
+    args = argparse.Namespace(
+        role=role,
+        worktree=worktree,
+        job_file=job_file,
+        output_dir=attempt_dir,
+        supervised=False,
+    )
+    policy = runtime_policy(args)
+    build_command(args)  # Recompute and validate protected model/sandbox/session policy.
+    next_assignment = dict(assignment)
+    for key in ("blocked_reason", "blocked_record", "blocked_diagnostics"):
+        next_assignment.pop(key, None)
+    next_assignment.update(
+        {
+            "current_attempt_id": attempt_id,
+            "generation": generation,
+            "next_generation": generation + 1,
+            "status": "recovering",
+            "current_attempt_dir": str(attempt_dir.resolve()),
+            "predecessor_attempt_id": predecessor,
+            "predecessor_lineage": predecessor_lineage,
+            "registrations": {"attempt_id": attempt_id, "descendants": [], "resources": []},
+            "updated_utc": utc_now(),
+        }
+    )
+    assignment_path = assignment_root / "assignment.json"
+    try:
+        atomic_write_json(assignment_path, next_assignment)
+    except Exception:
+        # No process can own an attempt whose current-view reservation failed.
+        # The directory is new and still empty at this boundary.
+        attempt_dir.rmdir()
+        raise
+    try:
+        record = _start_supervisor(
+            args,
+            assignment_root=assignment_root,
+            assignment_id=str(assignment_id),
+            attempt_id=attempt_id,
+            generation=generation,
+            policy=policy,
+            started_utc=utc_now(),
+        )
+    except Exception as error:
+        next_assignment.update({"status": "blocked", "blocked_reason": f"relaunch failed: {error}", "updated_utc": utc_now()})
+        atomic_write_json(assignment_path, next_assignment)
+        raise
+    if interruption.get("start_authorization"):
+        # Explicit-start staging intentionally retains durable stop intent until
+        # the replacement supervisor is published. The assignment lease remains
+        # held by the caller, so the child cannot publish running first.
+        next_assignment.update({"stop_intent": None, "updated_utc": utc_now()})
+        atomic_write_json(assignment_path, next_assignment)
+    return {
+        "event": "relaunch-started",
+        "assignment_id": assignment_id,
+        "attempt_id": attempt_id,
+        "generation": generation,
+        "predecessor_attempt_id": predecessor,
+        "attempt_dir": str(attempt_dir),
+        "supervisor": record["identity"],
+        "interruption_record": interruption.get("interruption_record"),
+    }
 
 
 def main() -> int:
@@ -413,6 +824,42 @@ def main() -> int:
     validate_analysis_job(args)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     policy = runtime_policy(args)
+    assignment_id = os.environ.get("LIBERTY_DAWN_ASSIGNMENT_ID")
+    attempt_id = os.environ.get("LIBERTY_DAWN_ATTEMPT_ID")
+    generation_text = os.environ.get("LIBERTY_DAWN_ATTEMPT_GENERATION")
+    if args.supervised:
+        if not assignment_id or not attempt_id or generation_text is None:
+            raise SystemExit("Supervised launch is missing protected attempt lineage")
+        try:
+            generation = int(generation_text)
+        except ValueError as error:
+            raise SystemExit("Supervised attempt generation must be an integer") from error
+        if generation < 1:
+            raise SystemExit("Supervised attempt generation must be positive")
+        assignment_root_text = os.environ.get("LIBERTY_DAWN_ASSIGNMENT_ROOT")
+        if not assignment_root_text:
+            raise SystemExit("Supervised launch is missing protected assignment root")
+        assignment_root = pathlib.Path(assignment_root_text).resolve(strict=True)
+        gate_text = os.environ.get("LIBERTY_DAWN_SUPERVISOR_GATE")
+        if not gate_text:
+            raise SystemExit("Supervised launch is missing its protected startup gate")
+        gate = pathlib.Path(gate_text)
+        if gate.resolve(strict=False).parent != args.output_dir.resolve():
+            raise SystemExit("Supervised startup gate escapes the attempt output directory")
+        gate_deadline = time.monotonic() + HOST_SUPERVISION_LAUNCH_TIMEOUT_SECONDS
+        while not gate.is_file():
+            if time.monotonic() >= gate_deadline:
+                raise SystemExit("Supervised startup gate was not published within its bound")
+            time.sleep(0.01)
+        try:
+            gate.unlink()
+        except OSError as error:
+            raise SystemExit(f"Supervised startup gate could not be consumed: {error}") from error
+    else:
+        assignment_id = new_assignment_id(args.role, args.worktree, args.job_file)
+        attempt_id = new_attempt_id()
+        generation = 1
+        assignment_root = args.output_dir.resolve()
     canonical_scratchpad = (
         args.worktree.resolve()
         / ".agents"
@@ -433,7 +880,11 @@ def main() -> int:
         "supervised": args.supervised,
         "prompt": prompt,
         "command": command,
-        "started_utc": datetime.now(timezone.utc).isoformat(),
+        "schema": RECORD_SCHEMA,
+        "assignment_id": assignment_id,
+        "attempt_id": attempt_id,
+        "generation": generation,
+        "started_utc": utc_now(),
     }
 
     if args.print_command:
@@ -465,43 +916,56 @@ def main() -> int:
                 file=sys.stderr,
             )
             return 64
-        supervisor_command = [
-            sys.executable,
-            str(pathlib.Path(__file__).resolve()),
-            "--role",
-            args.role,
-            "--worktree",
-            str(args.worktree.resolve()),
-            "--job-file",
-            str(args.job_file.resolve()),
-            "--output-dir",
-            str(args.output_dir.resolve()),
-            "--supervised",
-        ]
-        supervisor_log = (args.output_dir / "supervisor.log").open("wb")
-        supervisor = subprocess.Popen(
-            supervisor_command,
-            stdout=supervisor_log,
-            stderr=subprocess.STDOUT,
-            start_new_session=True,
-        )
-        supervisor_log.close()
-        write_json(
-            args.output_dir / "supervisor.json",
-            {
-                "pid": supervisor.pid,
-                "status": "launched",
-                "role": args.role,
-                "model": policy["model"],
-                "reasoning_effort": policy["reasoning_effort"],
-                "sandbox": policy["sandbox"],
-                "session_directory": str(policy["session_directory"]),
-                "output_dir": str(policy["output_dir"]),
-                "command": supervisor_command,
-                "started_utc": metadata["started_utc"],
-            },
-        )
-        print(supervisor.pid)
+        try:
+            initialize_assignment_record(
+                args.output_dir,
+                assignment_id=assignment_id,
+                attempt_id=attempt_id,
+                generation=generation,
+                role=args.role,
+                worktree=args.worktree,
+                job_file=args.job_file,
+                branch=current_git_branch(args.worktree),
+            )
+            if args.watchdog_registry is not None:
+                register_watchdog_assignment(args.watchdog_registry, args.output_dir)
+        except (OSError, ProcessIdentityError, TimeoutError, ValueError) as error:
+            print(f"External assignment launch rejected: {error}", file=sys.stderr)
+            return 75
+        try:
+            record = _start_supervisor(
+                args,
+                assignment_root=assignment_root,
+                assignment_id=assignment_id,
+                attempt_id=attempt_id,
+                generation=generation,
+                policy=policy,
+                started_utc=metadata["started_utc"],
+            )
+        except Exception as error:
+            reason = f"supervisor launch blocked: {error}"
+            update_assignment_record(
+                assignment_root,
+                assignment_id=assignment_id,
+                attempt_id=attempt_id,
+                generation=generation,
+                status="blocked",
+            )
+            write_json(
+                args.output_dir / "launch-blocked.json",
+                {
+                    "schema": RECORD_SCHEMA,
+                    "assignment_id": assignment_id,
+                    "attempt_id": attempt_id,
+                    "generation": generation,
+                    "status": "blocked",
+                    "reason": reason,
+                    "observed_utc": utc_now(),
+                },
+            )
+            print(reason, file=sys.stderr)
+            return 75
+        print(record["pid"])
         return 0
 
     if args.role in POLICY_ROLES:
@@ -519,16 +983,32 @@ def main() -> int:
 
     event_log = args.output_dir / "events.jsonl"
     with event_log.open("wb") as output:
-        process = subprocess.Popen(command, stdout=output, stderr=subprocess.STDOUT)
+        process = subprocess.Popen(
+            command,
+            stdin=subprocess.DEVNULL if args.supervised else None,
+            stdout=output,
+            stderr=subprocess.STDOUT,
+            close_fds=True,
+        )
         metadata["pid"] = process.pid
+        metadata["identity"] = read_process_identity(process.pid)
         if args.supervised:
             metadata["supervisor_pid"] = os.getpid()
+            metadata["supervisor_identity"] = read_process_identity(os.getpid())
         metadata["status"] = "running"
         write_json(args.output_dir / "process.json", metadata)
+        if args.supervised:
+            update_assignment_record(
+                assignment_root,
+                assignment_id=assignment_id,
+                attempt_id=attempt_id,
+                generation=generation,
+                status="running",
+            )
         return_code = process.wait()
 
     metadata["child_exit_code"] = return_code
-    metadata["completed_utc"] = datetime.now(timezone.utc).isoformat()
+    metadata["completed_utc"] = utc_now()
     if return_code == 0 and args.role in POLICY_ROLES:
         try:
             metadata["policy_output_contract"] = validate_and_promote_policy_outputs(
@@ -544,6 +1024,14 @@ def main() -> int:
     metadata["exit_code"] = return_code
     metadata["status"] = "complete" if return_code == 0 else "failed"
     write_json(args.output_dir / "process.json", metadata)
+    if args.supervised:
+        update_assignment_record(
+            assignment_root,
+            assignment_id=assignment_id,
+            attempt_id=attempt_id,
+            generation=generation,
+            status=metadata["status"],
+        )
     return return_code
 
 

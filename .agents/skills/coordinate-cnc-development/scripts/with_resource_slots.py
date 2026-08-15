@@ -28,6 +28,39 @@ POLL_INTERVAL_SECONDS = 0.05
 DESCENDANT_GRACE_SECONDS = 1.0
 DESCENDANT_TERMINATE_SECONDS = 2.0
 SUBREAPER_OPTION = 36  # Linux PR_SET_CHILD_SUBREAPER
+REGISTRATION_SCRIPT = pathlib.Path(__file__).with_name("register_external_worker.py")
+ASSIGNMENT_ENVIRONMENT = (
+    "LIBERTY_DAWN_ASSIGNMENT_ID",
+    "LIBERTY_DAWN_ATTEMPT_ID",
+    "LIBERTY_DAWN_ATTEMPT_GENERATION",
+    "LIBERTY_DAWN_ASSIGNMENT_ROOT",
+)
+
+
+def _assignment_root() -> str | None:
+    present = [name in os.environ for name in ASSIGNMENT_ENVIRONMENT]
+    if not any(present):
+        return None
+    if not all(present):
+        raise RuntimeError("protected assignment registration environment is incomplete")
+    return os.environ["LIBERTY_DAWN_ASSIGNMENT_ROOT"]
+
+
+def _register_owned_pid(pid: int) -> None:
+    root = _assignment_root()
+    if root is None:
+        return
+    completed = subprocess.run(
+        [sys.executable, str(REGISTRATION_SCRIPT), "--assignment-root", root, "--descendant-pid", str(pid)],
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError(
+            "assignment descendant registration failed: "
+            + (completed.stdout or completed.stderr).strip()
+        )
 
 
 def parse_args() -> argparse.Namespace:
@@ -298,6 +331,12 @@ def run_guardian(command: list[str], lock_fds: tuple[int, ...], entry_role: str)
         start_new_session=True,
         pass_fds=lock_fds,
     )
+    try:
+        _register_owned_pid(process.pid)
+    except Exception:
+        _signal_process_group(process.pid, signal.SIGTERM)
+        process.wait()
+        raise
     emit(
         "child-start",
         entry_role=entry_role,
@@ -357,6 +396,53 @@ def run_supervised_tree(
         json.dump(owner, handle)
         handle.write("\n")
         handle.flush()
+
+    assignment_root = _assignment_root()
+    if assignment_root is not None:
+        try:
+            _register_owned_pid(guardian_pid)
+        except Exception:
+            _signal_process_group(guardian_pid, signal.SIGTERM)
+            os.waitpid(guardian_pid, 0)
+            raise
+        registration_commands = []
+        for handle in held:
+            facts = os.fstat(handle.fileno())
+            registration_commands.append(
+                [
+                    sys.executable,
+                    str(REGISTRATION_SCRIPT),
+                    "--assignment-root",
+                    assignment_root,
+                    "--resource-json",
+                    json.dumps(
+                        {
+                            "resource": args.resource,
+                            "path": str(pathlib.Path(handle.name).resolve()),
+                            "device": facts.st_dev,
+                            "inode": facts.st_ino,
+                        }
+                    ),
+                ]
+            )
+        for command in registration_commands:
+            completed = subprocess.run(command, capture_output=True, text=True, timeout=10)
+            if completed.returncode != 0:
+                _signal_process_group(guardian_pid, signal.SIGTERM)
+                os.waitpid(guardian_pid, 0)
+                raise RuntimeError(
+                    "assignment ownership registration failed: "
+                    + (completed.stdout or completed.stderr).strip()
+                )
+        owner["assignment_id"] = os.environ["LIBERTY_DAWN_ASSIGNMENT_ID"]
+        owner["attempt_id"] = os.environ["LIBERTY_DAWN_ATTEMPT_ID"]
+        owner["generation"] = int(os.environ["LIBERTY_DAWN_ATTEMPT_GENERATION"])
+        for handle in held:
+            handle.seek(0)
+            handle.truncate()
+            json.dump(owner, handle)
+            handle.write("\n")
+            handle.flush()
 
     def forward(signum, _frame):
         emit(
