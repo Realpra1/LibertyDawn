@@ -4,7 +4,7 @@
 
 - Worker: `WORKER-2`
 - Task: `CNC-101 — Build-order protection and silo timing`
-- Status: `cycle 5 complete; First iteration - testing, evidence-only cycle 6 recommended`
+- Status: `cycle 6 complete; First iteration - testing, evidence-only cycle 7 authorized`
 - Base: `4f806e742bd12145d2a601cc9ff71c3a0b141a13`
 - Task branch: `agent/round-20260815-cnc101-build-order-silo`
 - PR base: `4f806e742bd12145d2a601cc9ff71c3a0b141a13`
@@ -214,22 +214,57 @@ ownership against the PR117 base before retaining a commit.
   at `.worktrees/coordinated-cnc/20260815-bug-polish-06-resume/analysis/worker-2-cnc101/cycle-05/`
   outside Git.
 
+## Cycle 6 durable result
+
+- Product head remains `56984ae1933e4a953dd09b9fadb086ba5e0d326e`;
+  no product, balance, or shipped map changed. The branch began clean at
+  `4f071b6a935e4bf466f2f34ae88a68176722dd6b`.
+- Release build passed with zero warnings/errors. Focused
+  `OpeningGarrisonLogicTest|OpeningPolicyLogicTest|SmartEconomyPolicyTest` passed
+  42/42. CNC and both final custom-map YAML validation, Lua and manifest syntax,
+  and `git diff --check` passed.
+- Exactly two acceptance-valid full-engine games ran in the final batch. Both
+  ordinary-AI games reached tick 9000/exit 0 without fatal Lua, crash, unhandled
+  exception, desync, or build stall. Scenario A took 21.031 seconds and Scenario B
+  took 27.039 seconds; the batch passed 2/2.
+- Scenario A re-proved the constrained common opening and normal continuation.
+  Exact first tens were SkyNet/GDI
+  `fact,sbag,nuk2,sbag,pyle,obli,proc,sbag,sbag,sbag` and Brutalis/Nod
+  `fact,cycl,nuke,cycl,hand,proc,cycl,cycl,cycl,cycl`. Both therefore completed
+  Power -> faction infantry structure -> Refinery while normal modules and wall
+  construction continued.
+- Scenario B used sustained real storage pressure only after a live Refinery,
+  first Power, and at least four live walls. It recorded first Power at tick 460,
+  the four-wall boundary (nine live by the observation tick) at tick 2014,
+  pressure at tick 2014, and exactly one first Silo at tick 2131. Capacity rose
+  from 150 to 4150; no duplicate occurred and play continued normally to tick
+  9000. Its exact first-ten sequences matched Scenario A.
+- Preliminary launches were acceptance-invalid and do not count toward the
+  two-game cap: callback-dependent harnesses ended at tick 4, one one-shot
+  pressure attempt reached tick 9000 without retaining the pressure precondition,
+  and early first-ten loggers used unsupported Lua behavior. They identified
+  harness defects only; the final direct observer uses live actor insertion order.
+- Fresh Luna narrators and separate fresh Luna policy reviewers completed for
+  each valid game. Scenario B policy was PASS/high confidence and recommended no
+  product change. Scenario A policy's recommendation for an unconditional Silo
+  in its no-pressure run is rejected as out of scope: the durable requirement
+  keeps Silo conditional on actual storage pressure, which Scenario B directly
+  proves. No callback or queue-internal follow-up remains required.
+- Fresh Terra-medium final review returned FAIL/high confidence on one bounded
+  evidence gap: the final direct Scenario B did not apply pressure while the
+  relevant preferred tower was already producing, so it did not prove no
+  cancellation and resumed preferred-tower production. All other checks and
+  dispositions passed review. No product defect is inferred.
+
 ## Next authorized cycle
 
-Cycle 6 is suitable only as a minor evidence-only follow-up. Retain the current
-product unless callback-independent exact-item evidence identifies a product defect.
-Replace the Scenario B callback gate with deterministic observation keyed by player,
-queue actor, and item: record exact request acceptance, queued item identity,
-production/placement or cancellation, live actor identity/count, Silo reservation
-and completion, capacity, and reservation release. Apply resources above the actual
-existing storage-pressure threshold only after the busy `gtwr` is independently
-observed in queue, and prevent the free side from claiming an optional tower before
-that threshold is active. Require the busy tower live at its preferred placement
-before any later pressured Silo, one pressured Silo before a new optional tower on
-the free side, capacity relief, tower resumption, and no duplicates/phantom
-commitments. Run the distinct Scenario A control and the normal focused checks.
-Do not add an old-policy matrix, change balance, or change product code for Lua
-callback semantics unless exact independent evidence demonstrates a product defect.
+Cycle 7 is authorized solely to prove the remaining busy-tower boundary with
+ordinary CNC AIs: establish the relevant preferred tower in production, apply
+real storage pressure while that item remains in progress, prove it is not
+cancelled, observe the conditional Silo ordering and capacity relief, and prove
+preferred-tower production resumes afterward. Keep the product unchanged unless
+that direct evidence identifies a concrete narrow defect. Do not revisit callback
+semantics, add an unconditional Silo requirement, or broaden policy.
 
 ## Handoff
 
