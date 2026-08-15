@@ -497,8 +497,6 @@ namespace OpenRA.Mods.Common.Traits
 					queue.Actor.Owner, DisplayName(reservedSilo.Name));
 				return reservedSilo;
 			}
-
-
 			// Defense queues are independent from the ordered building queue. Give their first
 			// build to the configured opening-defense preference instead of the shuffled fallback.
 			var firstTower = PreferredOpeningFirstTower(buildableThings);
@@ -547,16 +545,7 @@ namespace OpenRA.Mods.Common.Traits
 				}
 			}
 
-			// Once the authored opening and power prerequisites are satisfied, an uncovered
-			// economy anchor may reserve one normal SAM build. Existing powered overlapping
-			// coverage and a single in-flight reservation suppress duplicate sites.
-			var economySam = baseBuilder.EconomyDefenseSamBuilding(queue, buildableThings);
-			if (economySam != null)
-			{
-				AIUtils.BotDebug("{0} decided to build {1}: uncovered economy air approach",
-					queue.Actor.Owner, DisplayName(economySam.Name));
-				return economySam;
-			}
+
 			// Next is to build up a strong economy
 			if (!baseBuilder.HasAdequateRefineryCount)
 			{

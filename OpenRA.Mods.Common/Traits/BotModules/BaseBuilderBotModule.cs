@@ -1106,6 +1106,7 @@ namespace OpenRA.Mods.Common.Traits
 			Info.EnableOpeningPolicy ? Info.OpeningAdditionalFactoryTypes : System.Array.Empty<string>(),
 			Info.EnableOpeningPolicy ? Info.OpeningRadarTypes : System.Array.Empty<string>(),
 			Info.EnableOpeningPolicy ? Info.OpeningHelipadTypes : System.Array.Empty<string>(),
+
 			// Storage pressure owns silo selection and reservation. Keeping this semantic slot
 			// empty preserves save indices while preventing an unconditional opening silo.
 			System.Array.Empty<string>(),
