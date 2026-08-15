@@ -24,7 +24,8 @@ def without_tree_actors(text: str) -> str:
 	return "".join(result)
 
 
-def add_controlled_trees(text: str, title: str, include_east_tree: bool) -> str:
+def add_controlled_trees(text: str, title: str, include_east_tree: bool,
+	include_west_tree: bool = True, include_iron_followup: bool = False) -> str:
 	start = text.index("Title:")
 	end = text.index("\n", start)
 	text = text[:start] + f"Title: {title}" + text[end:]
@@ -164,6 +165,17 @@ def add_controlled_trees(text: str, title: str, include_east_tree: bool) -> str:
 """
 	if not include_east_tree:
 		actors = actors.replace("\tCnc102TreeEast: split3\n\t\tOwner: Neutral\n\t\tLocation: 44,162\n", "")
+	if not include_west_tree:
+		actors = actors.replace("\tCnc102TreeWest: splitblue\n\t\tOwner: Neutral\n\t\tLocation: 43,162\n", "")
+	if include_iron_followup:
+		actors += """\
+\tCnc102TreeEastFollowup: split3
+\t\tOwner: Neutral
+\t\tLocation: 60,179
+\tCnc102EastContinuationFactory: fact
+\t\tOwner: Multi1
+\t\tLocation: 60,172
+"""
 	text = text.rstrip() + "\n" + actors
 	if "\nRules:" not in text:
 		text = text.rstrip() + "\n\nRules: rules.yaml\n"
@@ -178,13 +190,38 @@ def rules(block_west: str | None, block_east: str | None, renew_trees: bool) -> 
 		blockers.append(f'\tActor.Create("brik", true, {{ Owner = Neutral, Location = CPos.New({block_east}) }})')
 	blocker_body = "\n".join(blockers) or "\t-- Discovery variant intentionally leaves both planned sites legal."
 	renewal_body = """\
-\tTrigger.AfterDelay(DateTime.Seconds(185), function()
+\t-- Make follow-up fields available before the first project finishes. The
+\t-- manager keeps its normal single project, but cannot lose continuation to a
+\t-- gap in target availability after releasing it.
+\tTrigger.AfterDelay(DateTime.Seconds(FOLLOWUP_SECONDS), function()
+\t\tActor.Create("splitblue", true, { Owner = Neutral, Location = CPos.New(31, 178) })
+\t\tActor.Create("split3", true, { Owner = Neutral, Location = CPos.New(50, 176) })
+\t\tActor.Create("cnc102fact", true, { Owner = Player.GetPlayer("Multi0"), Location = CPos.New(24, 180) })
+\t\tActor.Create("cnc102fact", true, { Owner = Player.GetPlayer("Multi1"), Location = CPos.New(74, 180) })
+\tend)
+\t-- Retire only the original targets after both first-project placement windows.
+\t-- This prevents a completed fallback from being selected again while leaving
+\t-- ordinary manager discovery and production untouched.
+\tTrigger.AfterDelay(DateTime.Seconds(RETIRE_SECONDS), function()
 \t\tCnc102TreeWest.Destroy()
-\t\tCnc102TreeEast.Destroy()
-\t\tActor.Create("splitblue", true, { Owner = Neutral, Location = CPos.New(43, 175) })
-\t\tActor.Create("split3", true, { Owner = Neutral, Location = CPos.New(65, 175) })
+\t\tif Cnc102TreeEast ~= nil then
+\t\t\tCnc102TreeEast.Destroy()
+\t\tend
+\tend)
+\tTrigger.AfterDelay(DateTime.Seconds(180), function()
+\t\tMedia.Debug("CNC102 post-fallback-count Brutalis=" .. #Player.GetPlayer("Multi0").GetActorsByType("resonator") ..
+\t\t\t" IronReaper=" .. #Player.GetPlayer("Multi1").GetActorsByType("resonator"))
+\tend)
+\tTrigger.AfterDelay(DateTime.Seconds(COUNT_SECONDS), function()
+\t\tMedia.Debug("CNC102 resonator-count Brutalis=" .. #Player.GetPlayer("Multi0").GetActorsByType("resonator") ..
+\t\t\t" IronReaper=" .. #Player.GetPlayer("Multi1").GetActorsByType("resonator"))
 \tend)
 """ if renew_trees else ""
+	if renew_trees:
+		blocked = bool(block_west or block_east)
+		renewal_body = renewal_body.replace("FOLLOWUP_SECONDS", "178" if blocked else "70")
+		renewal_body = renewal_body.replace("RETIRE_SECONDS", "178" if blocked else "190")
+		renewal_body = renewal_body.replace("COUNT_SECONDS", "235" if blocked else "260")
 	return f"""Player:
 \tBaseBuilderBotModule@brutalis:
 \t\tTiberiumFieldDebugLogging: true
@@ -236,10 +273,12 @@ World:
 \t\t\tPlayer.GetPlayer("Multi1").Cash = 5000
 \t\tend)
 \tend
-\tTrigger.AfterDelay(DateTime.Seconds(65), function()
-\t\tPlayer.GetPlayer("Multi0").Cash = 100000
-\t\tPlayer.GetPlayer("Multi1").Cash = 100000
-\tend)
+\tfor i = 0, 28 do
+\t\tTrigger.AfterDelay(DateTime.Seconds(65 + i * 10), function()
+\t\t\tPlayer.GetPlayer("Multi0").Cash = 100000
+\t\t\tPlayer.GetPlayer("Multi1").Cash = 100000
+\t\tend)
+\tend
 \tTrigger.AfterDelay(DateTime.Seconds(66), function()
 \t\tfor i = 0, 7 do
 \t\t\tActor.Create("cnc102fact", true, {{ Owner = Player.GetPlayer("Multi0"), Location = CPos.New(10 + i * 4, 185) }})
@@ -249,20 +288,26 @@ World:
 \tTrigger.AfterDelay(DateTime.Seconds(88), function()
 {blocker_body}
 \tend)
-{renewal_body}end
+{renewal_body}\tTrigger.AfterDelay(DateTime.Seconds(220), function()
+\t\tMedia.Debug("CNC102 live-resonators Brutalis=" .. #Player.GetPlayer("Multi0").GetActorsByType("resonator") ..
+\t\t\t" IronReaper=" .. #Player.GetPlayer("Multi1").GetActorsByType("resonator"))
+\tend)
+end
 """
 
 
 def write_map(source: Path, output: Path, title: str,
 	block_west: str | None, block_east: str | None,
-	include_east_tree: bool = True, renew_trees: bool = False) -> None:
+	include_east_tree: bool = True, renew_trees: bool = False,
+	include_west_tree: bool = True, include_iron_followup: bool = False) -> None:
 	with tempfile.TemporaryDirectory() as temporary:
 		root = Path(temporary)
 		with zipfile.ZipFile(source) as archive:
 			archive.extractall(root)
 		map_yaml = root / "map.yaml"
 		text = without_tree_actors(map_yaml.read_text(encoding="utf-8-sig"))
-		map_yaml.write_text(add_controlled_trees(text, title, include_east_tree), encoding="utf-8")
+		map_yaml.write_text(add_controlled_trees(text, title, include_east_tree,
+			include_west_tree, include_iron_followup), encoding="utf-8")
 		rules_yaml, lua = rules(block_west, block_east, renew_trees)
 		(root / "rules.yaml").write_text(rules_yaml, encoding="utf-8")
 		(root / "cnc102.lua").write_text(lua, encoding="utf-8")
@@ -284,7 +329,11 @@ def main() -> None:
 		"CNC-102 Blocked Then Continued Resonators", args.west_blocker,
 		args.east_blocker, renew_trees=True)
 	write_map(source, args.output / "cnc102-fancy-legal.oramap",
-		"CNC-102 Legal Fancy Resonator", None, None, include_east_tree=False)
+		"CNC-102 Legal Fancy Resonator Continuation", None, None,
+		include_east_tree=False, renew_trees=True)
+	write_map(source, args.output / "cnc102-iron-legal-continuation.oramap",
+		"CNC-102 Iron Reaper Legal Resonator Continuation", None, None,
+		include_west_tree=False, include_iron_followup=True)
 
 
 if __name__ == "__main__":
