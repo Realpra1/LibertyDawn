@@ -31,6 +31,7 @@ namespace OpenRA.Mods.Common.Traits
 			public int LastOrderTick;
 			public bool PickupOrdered;
 			public bool BoardingOrdered;
+			public int UnloadOrderCount;
 			public TransportUnloadPlan UnloadPlan;
 
 			public Pair(Actor transport, Actor passenger, CPos pickupDestination, CPos destination, int tick)
@@ -254,9 +255,9 @@ namespace OpenRA.Mods.Common.Traits
 				pair.PickupOrdered = true;
 			}
 
-			Debug("created wave {0}: pairs={1}, target={2}#{3}, landing={4}, AA={5:0.00}, defenders={6}, " +
-				"score={7}, firstStrategicThreatRejection={8}",
-				missionId, pairs.Count, plan.Target.Info.Name, plan.Target.ActorID, plan.LandingCenter,
+			Debug("created wave {0}: tick={1}, pairs={2}, target={3}#{4}, landing={5}, AA={6:0.00}, defenders={7}, " +
+				"score={8}, firstStrategicThreatRejection={9}",
+				missionId, world.WorldTick, pairs.Count, plan.Target.Info.Name, plan.Target.ActorID, plan.LandingCenter,
 				plan.AaDanger, plan.DefenderValue, plan.Score, plan.FirstThreatRejection ?? "none");
 			Debug("wave {0} routed all {1} carriers concurrently to distinct pickup cells", missionId, pairs.Count);
 		}
@@ -362,8 +363,12 @@ namespace OpenRA.Mods.Common.Traits
 			wave.Pairs.RemoveAll(invalid.Contains);
 			ReleasePairs(invalid);
 			squadManager()?.RestoreTransportedUnits(restoredPassengers);
-			Debug("wave {0} discarded {1} invalid lifecycle pairs; survivors={2}",
-				wave.Id, invalid.Count, restoredPassengers.Count);
+			foreach (var pair in invalid)
+				Debug("wave {0} invalid pair released: tick={1}, carrier={2}, passenger={3}, unloadOrders={4}",
+					wave.Id, world.WorldTick, pair.Transport, pair.Passenger, pair.UnloadOrderCount);
+
+			Debug("wave {0} discarded {1} invalid lifecycle pairs; survivors={2}, tick={3}",
+				wave.Id, invalid.Count, restoredPassengers.Count, world.WorldTick);
 
 			if (wave.Pairs.Count == 0)
 				FinishWave(bot, "all pairs invalidated");
@@ -490,18 +495,20 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				if (pair.UnloadPlan != null &&
 					(pair.Transport.Location - pair.UnloadPlan.CarrierCell).LengthSquared <=
-					info.HeavyDropUnloadRangeCells * info.HeavyDropUnloadRangeCells)
+					info.HeavyDropUnloadRangeCells * info.HeavyDropUnloadRangeCells && ReadyToRetry(pair))
 				{
 					pair.LastOrderTick = world.WorldTick;
 					if (!IsPairUsable(pair))
 						continue;
 
 					bot.QueueOrder(TransportUnloadOrder.Create(world, pair.Transport, pair.UnloadPlan));
+					pair.UnloadOrderCount++;
 					Debug("wave {0} carrier {1} committing exact unload: carrierCell={2}, exit={3}, " +
-						"passenger={4}, revision={5}, snapshot={6}, outcome={7}", wave.Id, pair.Transport,
+						"passenger={4}, revision={5}, snapshot={6}, outcome={7}, tick={8}, order={9}", wave.Id, pair.Transport,
 						pair.UnloadPlan.CarrierCell, pair.UnloadPlan.ExitCells[0], pair.Passenger,
 						pair.UnloadPlan.Revision, pair.UnloadPlan.SnapshotTick,
-						wave.ReturningToAssembly ? "safe-return" : "heavy-assault");
+						wave.ReturningToAssembly ? "safe-return" : "heavy-assault", world.WorldTick,
+						pair.UnloadOrderCount);
 					continue;
 				}
 
@@ -561,6 +568,9 @@ namespace OpenRA.Mods.Common.Traits
 
 				bot.QueueOrder(TransportUnloadOrder.Create(world, pair.Transport, pair.UnloadPlan));
 				pair.LastOrderTick = world.WorldTick;
+				pair.UnloadOrderCount++;
+				Debug("wave {0} carrier {1} retrying exact unload: passenger={2}, tick={3}, order={4}",
+					wave.Id, pair.Transport, pair.Passenger, world.WorldTick, pair.UnloadOrderCount);
 			}
 		}
 
@@ -1049,6 +1059,11 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			var completedWave = wave;
 			var passengers = completedWave.Pairs.Select(p => p.Passenger).ToList();
+			foreach (var pair in completedWave.Pairs.OrderBy(p => p.Transport?.ActorID ?? 0))
+				Debug("wave {0} pair completed: tick={1}, carrier={2}, passenger={3}, unloadOrders={4}, " +
+					"carrierUsable={5}, passengerInWorld={6}", completedWave.Id, world.WorldTick,
+					pair.Transport, pair.Passenger, pair.UnloadOrderCount, IsTransportUsable(pair.Transport),
+					IsActorUsable(pair.Passenger));
 			if (completedWave.SafeReturnFallback)
 				foreach (var pair in completedWave.Pairs.Where(p => IsTransportUsable(p.Transport) &&
 					p.UnloadPlan != null))

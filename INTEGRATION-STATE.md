@@ -2,144 +2,146 @@
 
 ## Status
 
-- Tested release branch: `agent/round-20260815-bug-polish-06-resume`
-- Tested cumulative head: `5e74c362ba95986b422516bda074128262355081`
-- Integration cycle 1: complete
-- Counted full-engine games: exactly 2
-- Concrete cumulative product defect: none observed
-- Product-code or balance change: none
-- Release blocker: none from cycle 1
-- Next authorized action: a fresh worker may begin integration cycle 2 from the
-  post-receipt head. This worker stopped before cycle 2 and did not push or merge
+- Release branch: `agent/round-20260815-bug-polish-06-resume`
+- Cycle-2 assigned clean base: `9812ebca7461e4fdf214e59da2da9a9c4ba46360`
+- Product candidate before receipt-only commits: `5e74c362ba95986b422516bda074128262355081`
+- Integration cycles 1-2: complete
+- Cycle-2 counted full-engine games: exactly 2
+- Concrete cycle-2 defect: HeavyDrop exact-unload orders were resubmitted every
+  world tick in the travelling state because that branch bypassed its existing
+  bounded retry gate.
+- Narrow correction: apply the existing `ReadyToRetry` gate to travelling-state
+  exact unloads and add per-pair tick/order lifecycle diagnostics. No balance,
+  policy, tuning, geometry, or strategy value changed.
+- Release blocker: none established.
+- Required cycle-3 evidence: one focused HeavyDrop lifecycle game proving that a
+  genuinely valid pair continues after exact unload while retaining invalid-pair
+  release and safe no-repair air activity checks.
+- Next authorized action: a fresh worker may begin integration cycle 3 from the
+  post-receipt head. This worker stopped before cycle 3 and did not push or merge
   `bleed`.
 
-## Verified ancestry and protected checks
+## Checks and defect evidence
 
-The worktree began clean at the exact assigned cumulative head. The common base
-`4f806e742bd12145d2a601cc9ff71c3a0b141a13` and all reviewed task heads are
-ancestors of the tested head:
+- The worktree began clean at the exact assigned base.
+- `make check`: pass; Debug CNC build completed with 0 warnings and 0 errors,
+  followed by passing explicit-interface and conditional-trait override checks.
+- `git diff --check`: pass.
+- Cycle-1 contained 5,601 `AI heavy drop ... committing exact unload` lines.
+  Source inspection established that these were 5,601 order submissions, not
+  merely duplicate logger output: the travelling-state commit branch had no
+  retry check, while the unloading-state retry branch already used one.
+- Cycle-2 Game B recorded exactly 9 commit submissions for 9 surviving pairs,
+  each at `order=1`, and 0 retry submissions. The scripted invalid pair released
+  independently at tick 53 with `unloadOrders=0`.
 
-1. CNC-95 `d4bb47a6f1798bf4f9e1aca358e7afe963f840d7`
-2. CNC-101 `6d386d83f505609c7c7704492c1645a7a6dc6053`
-3. CNC-103 `f8fc1d447d2dee324a1e3fbfcd57d95c86a29ac0`
-4. CNC-106 `0100a95f96d24d8f40aef4489a0937b39e510a31`
-5. CNC-102 `22160c18dfd657196a51a5059ce1496c0d686536`
-6. CNC-84 `83ded7c1a1ccb45e7f6b4b7488a9d567da83872a`
-7. CNC-110 `4a515170f1b5a15f5e37fba6dba81bfab8f08db9`
-
-- `git diff --check` from the common base through the tested head: pass.
-- Protected `make check`, using the candidate's reviewed protected-entry helper
-  with the canonical `/root/github/LibertyDawn/.agents/locks` namespace: pass;
-  Debug CNC build completed with 0 warnings and 0 errors, followed by passing
-  explicit-interface and conditional-trait override checks.
-- A first check command selected the older helper in the main checkout, which
-  rejected the reviewed `--large-build-entry` option before starting a check. It
-  consumed no check and was corrected to the candidate helper.
-
-## Counted game 1: combined build-policy pressure
+## Counted game A: matched Resonator/radar discriminator
 
 - Custom map derived from shipped `Empire-Earth.oramap`, not a fixture:
-  `analysis/20260815-round06-integration/cycle-1/maps/cnc102-blocked-both.oramap`
+  `analysis/20260815-round06-integration/cycle-2/maps/round06-resonator-radar-matched.oramap`
 - Map SHA-256:
-  `e4164c7e8a8746db47c3896521bbc7cf1caba376ce40a4f9cdc8896d3cb4f8c7`
-- Seed `606101`; GDI Brutalis versus Nod IronReaper; ordinary AIs with all normal
-  modules, unrestricted tech, custom ready-economy starts, headless MAX.
-- Canonical launcher staged installed CNC content from
-  `/root/github/LibertyDawn/.build/cnc33a/runtime-content`; the isolated support
-  directory contained its own `Content` link.
-- Passed with exit 0, 6,500 valid world ticks, and 44.037 seconds wall time.
+  `4f5ef348b18026230103e908856c61a8276750573781fed0440d3c8279df7f7b`
+- Seed `606201`; GDI Brutalis versus Nod IronReaper; ordinary AIs with all
+  normal modules, unrestricted tech, matched ready-economy starts, one forced
+  blocked field site and one legal path, simultaneous named-radar loss,
+  headless MAX.
+- Passed with exit 0, 6,500 valid world ticks, and 49.060 seconds wall time.
   No fatal error, unhandled exception, or desync signal was observed.
-- Combined signals included both nine-goal openings; Brutalis field admission,
-  Resonator placement, field completion, low-power coverage loss/recovery, and
-  bounded illegal-extension backoff; and IronReaper radar loss, busy/power queue
-  contention, one HQ reservation/production, radar restoration, reservation
-  release, and later field-production continuation.
-- Performance stayed bounded: mean tick 6.216 ms, p95 14 ms, p99 20 ms. The
-  1,428.914 ms maximum was a bounded startup/runtime outlier; four freeze-threshold
-  samples were not attributed to a product module.
+- Brutalis accepted Resonator production at tick 1,701 and placed actor 611 at
+  tick 2,651. Its legal continuation accepted and completed two extension steps
+  through tick 5,151, then boundedly deferred at `NoLegalProgressCell`.
+  IronReaper's forced illegal path deferred with zero progress at ticks 3,622
+  and 6,018.
+- IronReaper reserved/restored radar at ticks 3,622/4,250; Brutalis did so at
+  ticks 4,367/5,010. Both released recovery reservations. Continued production
+  and actor outcomes extended through tick 6,187; Brutalis's harvester count
+  rose from 17 at tick 3,001 to 68 at tick 6,451.
+- Performance: mean tick 6.888 ms, p95 16 ms, p99 24 ms, max 1,397.165 ms;
+  six bounded freeze-threshold samples were not attributed to the product fix.
 - Evidence:
-  `analysis/20260815-round06-integration/cycle-1/games/game1-counted/round06-build-policy-pressure/`.
+  `analysis/20260815-round06-integration/cycle-2/games/game-a-final/round06-resonator-radar-matched/`.
 
-One earlier launch of this same map reached tick 6,500 and exited 0, but the
-harness rejected two fragile Lua `Media.Debug` expectations. It is explicitly
-uncounted. The repaired manifest used authoritative engine/module evidence and
-the clean rerun above is the sole counted Game 1.
+Two earlier runs of this scenario reached tick 6,500 and exited 0 but failed
+fragile Lua or seed-timing harness expectations. They are invalid and uncounted.
+The final manifest uses only stable authoritative engine/module patterns. Record
+the recurring fragility of `Media.Debug` acceptance markers as a harness issue;
+do not reuse them as required evidence.
 
-## Counted game 2: HeavyDrop lifecycle and threat pressure
+## Counted game B: HeavyDrop lifecycle and safe air activity
 
 - Distinct custom map derived from shipped `island-duel.oramap`, not a fixture:
-  `analysis/20260815-round06-integration/cycle-1/maps/cnc110-passenger-invalid.oramap`
+  `analysis/20260815-round06-integration/cycle-2/maps/round06-heavydrop-air-repair.oramap`
 - Map SHA-256:
-  `64c62c738a120f38f9f5a04e2de1906de07ec1c741c1fabbfb70ed14054385b3`
-- Seed `606102`; GDI Brutalis versus Nod IronReaper; ordinary AIs with all normal
-  modules, unrestricted tech, ten-carrier HeavyDrop pressure, headless MAX.
-- Canonical installed-content staging and an isolated `SupportDir/Content` link
-  were verified by the launcher.
-- Passed with exit 0, 3,000 valid world ticks, and 8.040 seconds wall time. No
-  fatal error, unhandled exception, or desync signal was observed.
-- Brutalis created a ten-pair HeavyDrop, discarded the scripted invalid passenger
-  pair, retained/routed the other pairs, rejected unsafe cells under enemy threat,
-  returned to safe assembly, released an all-invalidated wave cleanly, and later
-  issued threat-aware recovery routes and unload replans.
-- Performance stayed bounded: mean tick 1.518 ms, p95 3 ms, p99 5 ms, maximum
-  872.806 ms, with three bounded freeze-threshold samples.
+  `8d1bc322de2c50e9b7142139bf7d923dae3fba8ded97cd7cd40435fe7c09f6d1`
+- Seed `606202`; GDI Brutalis versus Nod IronReaper; ordinary AIs with all
+  normal modules, unrestricted tech, ten-carrier HeavyDrop pressure, conquest
+  stop disabled for the bounded discriminator, headless MAX.
+- Passed with exit 0, 3,000 valid world ticks, and 10.008 seconds wall time.
+  No fatal error, unhandled exception, or desync signal was observed.
+- Wave 1 created 10 pairs at tick 3. The scripted invalid pair released at tick
+  53 with zero unload orders. Nine surviving pairs boarded, retained distinct
+  threat-aware safe-return plans after a bggy-covered cell rejection, and each
+  submitted exactly one exact unload at tick 296. They released at ticks
+  325-331 and the wave released cleanly.
+- The logs mark every selected passenger as `not in world` and finish with
+  `restored=0/0`; therefore successful post-unload continuation is not directly
+  proven. This is a required cycle-3 evidence discriminator, not a demonstrated
+  balance/policy defect and not authority for another cycle-2 change.
+- CNC-84 safe no-repair coverage was direct: the ordinary Generic air squad
+  continued attacks, target reassessments, threat-aware routing, and defended
+  cell rejection with no repair event present.
+- Performance: mean tick 2.149 ms, p95 3 ms, p99 6 ms, max 2,004.000 ms;
+  five bounded freeze-threshold samples included startup/early TransportManager
+  outliers and were not attributed to a release blocker.
 - Evidence:
-  `analysis/20260815-round06-integration/cycle-1/games/game2/round06-heavy-drop-air-pressure/`.
+  `analysis/20260815-round06-integration/cycle-2/games/game-b-counted/round06-heavydrop-air-repair/`.
 
-The factual trace contained 5,601 repeated exact-unload diagnostics while
-passengers were logged as not in world. The game remained fast and terminated
-cleanly, and the available trace does not distinguish repeated logging from
-repeated lifecycle transitions. This is a required cycle-2 discriminator, not a
-proven strategic or release defect. CNC-84 air-squad avoidance was not directly
-observed; only the shared threat geometry used by transport planning was exercised.
+One earlier startup reached tick 1,771 and natural game over before the required
+bound; it is invalid and uncounted. One later tick-3,000 run failed only its
+over-specific repair marker and is also uncounted. The counted rerun retained
+the same scenario while accepting authoritative safe no-repair air evidence.
 
 ## Fresh native Luna analysis and recommendation dispositions
 
 Each counted game received its own fresh native `gpt-5.6-luna` factual narrator
-and a separate fresh native `gpt-5.6-luna` policy reviewer. Analysis was isolated
-to copied inputs and policy work was serialized through the canonical scratchpad
-resource slot.
+and a separate fresh native `gpt-5.6-luna` policy reviewer. Policy calls were
+serialized through the shared scratchpad resource slot and used staged copies.
 
-### Game 1
-
-- Narrative:
-  `analysis/20260815-round06-integration/cycle-1/reviews/game1-narrator/NARRATIVE.md`
-- Policy:
-  `analysis/20260815-round06-integration/cycle-1/reviews/game1-policy/POLICY-REVIEW.md`
-- Verdict: insufficient evidence, high confidence; no narrow release-blocking
-  repair required.
-- Highest recommendation: run a matched changed/control game with forced legal
-  and illegal field placement plus radar loss and bounded queue/actor outcomes.
-- Disposition: accepted as required follow-up evidence for cycle 2. Rejected as a
-  cycle-1 code or balance change because the two-game cap is complete, the game
-  showed bounded progress and recovery, and no duplicated reservation, permanent
-  starvation, or failure to restore an eligible radar provider occurred.
-
-### Game 2
+### Game A
 
 - Narrative:
-  `analysis/20260815-round06-integration/cycle-1/reviews/game2-narrator/NARRATIVE.md`
+  `analysis/20260815-round06-integration/cycle-2/reviews/game-a-narrator/NARRATIVE.md`
 - Policy:
-  `analysis/20260815-round06-integration/cycle-1/reviews/game2-policy/POLICY-REVIEW.md`
-- Verdict: insufficient evidence, medium confidence; no narrow release-blocking
-  repair required. Repeated exact-unload output is an unresolved lifecycle,
-  logging, or performance concern, not yet a proven strategic defect.
-- Highest recommendation: run a matched full-engine discriminator with per-pair
-  timestamps/counts for creation, boarding, world removal, unload success/failure,
-  and restoration.
-- Disposition: accepted as required follow-up evidence for cycle 2. No cycle-1
-  code change is justified because lifecycle transitions were not counted
-  independently, the mission released cleanly, and measured execution remained
-  bounded. Cycle 2 should also force actual air-squad movement through layered
-  threat geometry to close the CNC-84 evidence gap.
+  `analysis/20260815-round06-integration/cycle-2/reviews/game-a-policy/POLICY-REVIEW.md`
+- Verdict: pass, high confidence; no code or balance change justified.
+- Highest recommendation: retain causal prerequisite/legal-cell tracing only if
+  a future diagnostic needs to explain the IronReaper asymmetry.
+- Disposition: recorded as advisory and rejected as required cycle-3 work. The
+  matched run met the literal discriminator, both radar recoveries completed,
+  and the unknown cause does not establish a defect or authorize policy change.
 
-Policy reviewers produced bounded updated scratchpads in their isolated analysis
-directories. The canonical tracked scratchpad was not changed because this worker
-was explicitly authorized to update only integration state and receipt.
+### Game B
 
-## Cycle 1 decision
+- Narrative:
+  `analysis/20260815-round06-integration/cycle-2/reviews/game-b-narrator/NARRATIVE.md`
+- Policy:
+  `analysis/20260815-round06-integration/cycle-2/reviews/game-b-policy/POLICY-REVIEW.md`
+- Verdict: required follow-up, high confidence; no further code or balance
+  change justified.
+- Highest recommendation: one focused valid-pair lifecycle verification after
+  the discriminator.
+- Disposition: accepted as the required cycle-3 evidence. Cycle 2 already
+  consumed exactly two valid games; the 5,601-to-9 defect correction is proven,
+  while post-unload continuation remains an evidence gap rather than a second
+  proven defect. Balance and policy remain frozen.
 
-No concrete narrow cumulative defect was established, so no repair branch or
-product change was created. Balance and task policy remain unchanged. Cycle 1
-passes as bounded integration evidence; the two accepted discriminators above are
-the next worker's explicit recommendation carry-forward, not silent omissions.
+Policy reviewers produced bounded updated scratchpads in their isolated ignored
+directories. The canonical tracked scratchpad was not changed by this worker.
+
+## Cycle 2 decision
+
+The concrete repeated-order defect was narrowly corrected and verified. Game A
+passes its field/radar discriminator. Game B proves bounded per-pair submissions,
+independent invalid-pair release, threat-aware continued handling, and safe
+ordinary air activity, but leaves valid post-unload passenger continuation for
+cycle 3. No release blocker or balance/policy change is established.
