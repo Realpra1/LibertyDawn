@@ -24,7 +24,7 @@ def without_tree_actors(text: str) -> str:
 	return "".join(result)
 
 
-def add_controlled_trees(text: str, title: str) -> str:
+def add_controlled_trees(text: str, title: str, include_east_tree: bool) -> str:
 	start = text.index("Title:")
 	end = text.index("\n", start)
 	text = text[:start] + f"Title: {title}" + text[end:]
@@ -162,27 +162,39 @@ def add_controlled_trees(text: str, title: str) -> str:
 \t\tOwner: Multi1
 \t\tLocation: 46,168
 """
+	if not include_east_tree:
+		actors = actors.replace("\tCnc102TreeEast: split3\n\t\tOwner: Neutral\n\t\tLocation: 44,162\n", "")
 	text = text.rstrip() + "\n" + actors
 	if "\nRules:" not in text:
 		text = text.rstrip() + "\n\nRules: rules.yaml\n"
 	return text
 
 
-def rules(block_west: str | None, block_east: str | None) -> str:
+def rules(block_west: str | None, block_east: str | None, renew_trees: bool) -> str:
 	blockers = []
 	if block_west:
 		blockers.append(f'\tActor.Create("brik", true, {{ Owner = Neutral, Location = CPos.New({block_west}) }})')
 	if block_east:
 		blockers.append(f'\tActor.Create("brik", true, {{ Owner = Neutral, Location = CPos.New({block_east}) }})')
 	blocker_body = "\n".join(blockers) or "\t-- Discovery variant intentionally leaves both planned sites legal."
+	renewal_body = """\
+\tTrigger.AfterDelay(DateTime.Seconds(185), function()
+\t\tCnc102TreeWest.Destroy()
+\t\tCnc102TreeEast.Destroy()
+\t\tActor.Create("splitblue", true, { Owner = Neutral, Location = CPos.New(43, 175) })
+\t\tActor.Create("split3", true, { Owner = Neutral, Location = CPos.New(65, 175) })
+\tend)
+""" if renew_trees else ""
 	return f"""Player:
 \tBaseBuilderBotModule@brutalis:
 \t\tTiberiumFieldDebugLogging: true
 \t\tOpeningDebugLogging: true
+\t\tEconomyDefenseSamDebugLogging: true
 \t\tTiberiumFieldTreeTypes: splitblue
 \tBaseBuilderBotModule@ironreaper:
 \t\tTiberiumFieldDebugLogging: true
 \t\tOpeningDebugLogging: true
+\t\tEconomyDefenseSamDebugLogging: true
 \t\tTiberiumFieldTreeTypes: split3
 
 CNC102FACT:
@@ -237,20 +249,21 @@ World:
 \tTrigger.AfterDelay(DateTime.Seconds(88), function()
 {blocker_body}
 \tend)
-end
+{renewal_body}end
 """
 
 
 def write_map(source: Path, output: Path, title: str,
-	block_west: str | None, block_east: str | None) -> None:
+	block_west: str | None, block_east: str | None,
+	include_east_tree: bool = True, renew_trees: bool = False) -> None:
 	with tempfile.TemporaryDirectory() as temporary:
 		root = Path(temporary)
 		with zipfile.ZipFile(source) as archive:
 			archive.extractall(root)
 		map_yaml = root / "map.yaml"
 		text = without_tree_actors(map_yaml.read_text(encoding="utf-8-sig"))
-		map_yaml.write_text(add_controlled_trees(text, title), encoding="utf-8")
-		rules_yaml, lua = rules(block_west, block_east)
+		map_yaml.write_text(add_controlled_trees(text, title, include_east_tree), encoding="utf-8")
+		rules_yaml, lua = rules(block_west, block_east, renew_trees)
 		(root / "rules.yaml").write_text(rules_yaml, encoding="utf-8")
 		(root / "cnc102.lua").write_text(lua, encoding="utf-8")
 		output.parent.mkdir(parents=True, exist_ok=True)
@@ -268,9 +281,10 @@ def main() -> None:
 	root = Path(__file__).resolve().parent.parent
 	source = root / "mods/cnc/maps/Empire-Earth.oramap"
 	write_map(source, args.output / "cnc102-blocked-both.oramap",
-		"CNC-102 Blocked Ready Resonators", args.west_blocker, args.east_blocker)
-	write_map(source, args.output / "cnc102-fancy-save-control.oramap",
-		"CNC-102 Fancy Save and Blocked Control", None, args.east_blocker)
+		"CNC-102 Blocked Then Continued Resonators", args.west_blocker,
+		args.east_blocker, renew_trees=True)
+	write_map(source, args.output / "cnc102-fancy-legal.oramap",
+		"CNC-102 Legal Fancy Resonator", None, None, include_east_tree=False)
 
 
 if __name__ == "__main__":
