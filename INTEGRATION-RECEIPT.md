@@ -1,30 +1,32 @@
-# Round 06 resume integration cycle 4 receipt
+# Round 06 resume integration cycle 5 receipt
 
-## Candidate and checks
+## Candidate and decision
 
-- Branch: `agent/round-20260815-bug-polish-06-resume`
-- Assigned clean base: `7f4604a5b2722ff83a9b207dae9e005d7c9911d7`
-- Concrete product defect: none established; no product code changed.
-- Focused AirThreatGeometry/AirRepairCapacity/TiberiumField/RadarRecovery policy test slice: exit 0.
+- Branch: `agent/round-20260815-bug-polish-06-resume`.
+- Assigned clean base/product candidate: `d25bb59ea1d981f2f2948aad84bada4b2e602a6a`.
+- Exactly two successful full-engine games count. No concrete product defect was established and no product source changed.
+- Balance, policy, tuning, strategy, geometry, thresholds, and retry values remained frozen.
+- Cycle 5 is complete; do not start another integration cycle.
+
+## Counted full-engine games
+
+1. **Pad destruction and all-four bounded air-repair disposition** — exact cycle-4 map SHA-256 `18d0efff0b6db0418c0b9ccbd16c94ab15761c3d4ad1c8ab96b351c7e560fa32`, seed `606402`. Passed: exit 0, 8,000 ticks, 20.022 seconds. The setup unconditionally destroyed named pad A. Orca 45 authoritatively detected the unavailable destination, replanned, completed, and rejoined; Orca 46 moved from wait to completion and attack rejoin; Orca 44 claimed the surviving pad and resumed ordinary target routes; Orca 47 remained in an identity-linked safe wait/retry state. Full drain is not claimed.
+2. **Final cumulative sustained regression** — map SHA-256 `bc855850c4c6333d59295d325442886b883ccb836f225c4b59cc7c42b6a6606b`, seed `606502`. Passed: exit 0, 9,000 ticks, 22.036 seconds. Authoritative module logs covered protected opening, smart economy, paid queue progress/cancel-refund recovery, field planning, radar restoration, specialist/combat activity, Orca repair completion, repeated exact HeavyDrop unload/completion, invalid lifecycle release, and nine-survivor ordinary handoff. The final newly assembling wave remained explicitly pending; no winner is claimed.
+
+Both used ordinary Brutalis/IronReaper AIs, all normal modules, unrestricted tech, the canonical launcher with installed CNC content, canonical global game slots, isolated support/artifact directories, and completed below 120 seconds without fatal, exception, or desync signals.
+
+## Independent analysis and recommendation dispositions
+
+- Game A narrator/policy: `analysis/20260815-round06-integration/cycle-5/reviews/game-a-narrator/NARRATIVE.md` and `game-a-policy/POLICY-REVIEW.md` — high-confidence acceptance-pattern pass, no blocker. Extra provider-loss/terminal instrumentation is rejected as a code change and accepted as a reporting boundary; no universal recovery claim is made.
+- Game B narrator/policy: `analysis/20260815-round06-integration/cycle-5/reviews/game-b-narrator/NARRATIVE.md` and `game-b-policy/POLICY-REVIEW.md` — high-confidence qualified pass, no blocker. Full terminal disposition for a newly assembling final wave is advisory, not a bounded-release requirement; completed and invalid prior pairs are already identity linked.
+
+All four roles were fresh native `gpt-5.6-luna` medium agents. Scratchpad replacements were serialized, bounded, validated, and promoted.
+
+## Invalid launches and checks
+
+- Uncounted: one pre-start lock-namespace rejection; six exit-0 Game-A harness iterations; two exit-0 Game-B harness iterations. They were rejected for missing literal evidence and revealed no product defect.
+- Focused AirThreatGeometry/AirRepairCapacity/TiberiumField/RadarRecovery tests: 109 passed, 0 failed, 0 skipped.
+- Protected `make check`: exit 0, 0 warnings, 0 errors, interface checks passed.
 - `git diff --check`: pass before receipt update.
-- Balance, policy, tuning, strategy, geometry, and retry values remained frozen.
 
-## Full-engine receipt
-
-Exactly two successful games count. Both used deliberately constructed custom CNC maps derived from shipped content, ordinary Brutalis/IronReaper AIs, unrestricted tech and all normal modules, the canonical launcher with installed CNC content, isolated support/artifact directories, and verified content staging. Both completed below 120 seconds.
-
-1. **Economy prerequisite/queue/radar recovery** — seed `606401`, map SHA-256 `fc4de5059e1d294a5cdd75c42b52b0e2da11a24941827a83d0b4c380891a4183`. Passed: exit 0, 7,000 valid ticks, 54.065 seconds. IronReaper produced and completed a powered Resonator after opening deferral, Brutalis retained paid progress across congested queue fronts, both AIs reserved and restored operational radar, and later field projects continued. No claim is made that every Brutalis project completed or that the focused run had a combat winner.
-2. **CNC-84 repair FIFO/stale recovery** — seed `606402`, map SHA-256 `18d0efff0b6db0418c0b9ccbd16c94ab15761c3d4ad1c8ab96b351c7e560fa32`. Passed: exit 0, 8,000 valid ticks, 16.025 seconds. Two Orcas claimed pads and two waited; an occupied-pad claimant detected an unavailable destination and replanned; after the first completion the oldest waiter claimed the surviving pad and completed; the same identity returned to ordinary routes/attacks. Other waiters held safely under AA pressure instead of thrashing. Full four-aircraft drain is not claimed.
-
-Invalid and uncounted: two Game-A topology iterations and five Game-B harness/timing iterations. Each was rejected despite exit 0/configured ticks because it lacked the final literal authoritative gate. None counts and none established a product defect.
-
-## Independent analysis and dispositions
-
-- Game A narrator: `analysis/20260815-round06-integration/cycle-4/reviews/game-a-narrator/NARRATIVE.md`
-- Game A policy: `analysis/20260815-round06-integration/cycle-4/reviews/game-a-policy/POLICY-REVIEW.md` — pass with required follow-up, high confidence. Final ownership/count evidence is accepted as a reporting boundary; no universal Brutalis Resonator or winner claim is made. It is rejected as a third cycle-4 game because direct literal module outcomes passed and exactly two games are allowed.
-- Game B narrator: `analysis/20260815-round06-integration/cycle-4/reviews/game-b-narrator/NARRATIVE.md`
-- Game B policy: `analysis/20260815-round06-integration/cycle-4/reviews/game-b-policy/POLICY-REVIEW.md` — pass with evidence limitation, high confidence. Direct pad-destruction logging and all-four completion are accepted as a cycle-5 advisory/reporting boundary, not a blocker; the receipt claims only the identity-linked stale recovery, FIFO completion, safe holding, and rejoin directly observed.
-
-All four roles were fresh native `gpt-5.6-luna` agents. Policy work was separate per game and serialized through the shared scratchpad slot. Bounded scratchpad replacements were promoted in order.
-
-Integration cycle 4 is complete with exactly two counted games and no product correction. Stop here before cycle 5. Do not push or merge `bleed`.
+Cycle 5 passes. Commit this receipt once, obtain a fresh native Terra-medium final release review, and publish only if ready. Never merge `bleed`.
