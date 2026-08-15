@@ -183,6 +183,18 @@ namespace OpenRA.Mods.Common.Traits
 					bot.QueueOrder(Order.StartProduction(queue.Actor, recovery.Name, 1));
 					baseBuilder.LogProductionSpend(recovery, queue);
 				}
+				else
+				{
+					var fieldFallback = baseBuilder.TiberiumFieldManager?.TryChooseQueuedSimpleFallback(
+						queue, queue.BuildableItems());
+					if (fieldFallback != null)
+					{
+						bot.QueueOrder(Order.StartProduction(queue.Actor, fieldFallback.Name, 1));
+						baseBuilder.LogProductionSpend(fieldFallback, queue);
+						AIUtils.BotDebug("{0} decided to queue {1}: timed-out Tiberium field fallback",
+							queue.Actor.Owner, DisplayName(fieldFallback.Name));
+					}
+				}
 			}
 
 			if (IsDefenseQueue)

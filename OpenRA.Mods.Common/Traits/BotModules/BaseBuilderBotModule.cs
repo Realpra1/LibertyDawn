@@ -179,6 +179,10 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Ticks a fully produced Resonator keeps trying its planned field site before ordinary refinery placement is allowed.")]
 		public readonly int TiberiumFieldReadyPlacementFallbackDelay = 1500;
 
+		[Desc("Ticks an actionable fancy extension plan may wait without progress before building the Resonator",
+			"for ordinary Refinery placement instead.")]
+		public readonly int TiberiumFieldPlanningFallbackDelay = 1500;
+
 		[Desc("Consecutive failed field placements before entering a visible deferred state.")]
 		public readonly int TiberiumFieldMaximumRetries = 3;
 

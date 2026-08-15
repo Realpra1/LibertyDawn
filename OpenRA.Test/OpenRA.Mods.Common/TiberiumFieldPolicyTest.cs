@@ -215,6 +215,15 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
+		public void FancyPlanningFallbackHonorsExactNoProgressDeadline()
+		{
+			Assert.That(TiberiumFieldPolicy.UsePlanningFallback(1599, 100, 1500), Is.False);
+			Assert.That(TiberiumFieldPolicy.UsePlanningFallback(1600, 100, 1500), Is.True);
+			Assert.That(TiberiumFieldPolicy.UsePlanningFallback(int.MaxValue,
+				int.MaxValue - 5, 1500), Is.True);
+		}
+
+		[Test]
 		public void NoProgressDeferralWaitsForCadenceAndDoesNotMaskAdmission()
 		{
 			Assert.That(TiberiumFieldPolicy.ShouldDeferNoProgress(1499, 1500, false, false), Is.False);
