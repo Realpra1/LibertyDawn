@@ -171,6 +171,7 @@ namespace OpenRA.Mods.Common.Traits
 			return existingOrPlannedResonators.All(c => c == candidate ||
 				(c - candidate).LengthSquared >= minimumSquared);
 		}
+
 		public static bool IsValidSavedSpatialIdentity(CPos savedTreeLocation,
 			CPos liveTreeLocation, IEnumerable<CPos> resonatorFootprint,
 			Func<CPos, bool> isMapCell, long effectDistanceSquared, long effectRangeSquared)

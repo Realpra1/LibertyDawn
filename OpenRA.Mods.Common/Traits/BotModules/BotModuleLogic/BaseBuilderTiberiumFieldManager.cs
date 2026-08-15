@@ -1420,6 +1420,7 @@ namespace OpenRA.Mods.Common.Traits
 					sites.Add(tree.ActorID, site.Value);
 					buildPlans.Add(tree.ActorID, buildPlan.Value);
 				}
+
 				if (redPlan != null)
 					redPlans.Add(tree.ActorID, redPlan);
 			}
