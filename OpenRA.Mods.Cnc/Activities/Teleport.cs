@@ -78,7 +78,7 @@ namespace OpenRA.Mods.Cnc.Activities
 			Game.Sound.Play(SoundType.World, sound, self.World.Map.CenterOfCell(destination));
 
 			self.Trait<IPositionable>().SetPosition(self, destination);
-			self.Generation++;
+			self.IncrementGeneration();
 
 			if (killCargo)
 			{

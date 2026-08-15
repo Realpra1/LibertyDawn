@@ -23,7 +23,7 @@ namespace OpenRA.Mods.Common.Activities
 		public override bool Tick(Actor self)
 		{
 			self.Trait<IPositionable>().SetPosition(self, destination);
-			self.Generation++;
+			self.IncrementGeneration();
 			return true;
 		}
 	}

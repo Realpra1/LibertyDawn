@@ -24,6 +24,22 @@ using OpenRA.Traits;
 
 namespace OpenRA
 {
+	internal sealed class ActorGenerationHistory
+	{
+		readonly List<(int NetFrame, int Generation)> transitions = new List<(int, int)> { (0, 0) };
+
+		public void Record(int netFrame, int generation) { transitions.Add((netFrame, generation)); }
+
+		public int AtNetFrame(int frame)
+		{
+			for (var i = transitions.Count - 1; i >= 0; i--)
+				if (transitions[i].NetFrame <= frame)
+					return transitions[i].Generation;
+
+			return transitions[0].Generation;
+		}
+	}
+
 	[Flags]
 	public enum SystemActors
 	{
@@ -63,7 +79,19 @@ namespace OpenRA
 		}
 
 		public int Generation;
+		readonly ActorGenerationHistory generationHistory = new ActorGenerationHistory();
 		public Actor ReplacedByActor;
+
+		public void IncrementGeneration()
+		{
+			Generation++;
+			generationHistory.Record(World.OrderManager.NetFrameNumber, Generation);
+		}
+
+		internal int GenerationAtNetFrame(int frame)
+		{
+			return generationHistory.AtNetFrame(frame);
+		}
 
 		public IEffectiveOwner EffectiveOwner { get; private set; }
 		public IOccupySpace OccupiesSpace { get; private set; }
@@ -462,7 +490,7 @@ namespace OpenRA
 				World.Remove(this);
 
 			Owner = newOwner;
-			Generation++;
+			IncrementGeneration();
 
 			foreach (var t in TraitsImplementing<INotifyOwnerChanged>())
 				t.OnOwnerChanged(this, oldOwner, newOwner);

@@ -116,7 +116,8 @@ namespace OpenRA.Mods.Common.Traits
 
 		void INotifyCreated.Created(Actor self)
 		{
-			if (self.World.IsReplay && self.Owner.IsBot && self.Owner.BotType == info.Type)
+			if (self.World.IsReplay && !OpenRA.Server.ProtocolVersion.HasRecordedBotPolicy(self.World.ReplayOrdersProtocol) &&
+				self.Owner.IsBot && self.Owner.BotType == info.Type)
 				replayPolicyModules = self.TraitsImplementing<IReplayBotPolicyTick>().ToArray();
 		}
 
@@ -218,7 +219,20 @@ namespace OpenRA.Mods.Common.Traits
 
 			var ordersToIssueThisTick = Math.Min((orders.Count + info.MinOrderQuotientPerTick - 1) / info.MinOrderQuotientPerTick, orders.Count);
 			for (var i = 0; i < ordersToIssueThisTick; i++)
-				world.IssueOrder(orders.Dequeue());
+			{
+				var order = orders.Dequeue();
+				if (IsOrderValidForIssue(order))
+					world.IssueOrder(order);
+			}
+		}
+
+		bool IsOrderValidForIssue(Order order)
+		{
+			if (order.Subject != null &&
+				(order.Subject.Owner != player || !order.Subject.IsInWorld || order.Subject.IsDead))
+				return false;
+
+			return order.Target.Actor == null || order.Target.Type == TargetType.Actor;
 		}
 
 		void UpdateAdvancedFailsafe()

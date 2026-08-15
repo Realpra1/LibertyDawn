@@ -62,7 +62,7 @@ namespace OpenRA.Mods.Common.Traits
 	}
 
 	public sealed class EconomyTroopProductionBotModule : ConditionalTrait<EconomyTroopProductionBotModuleInfo>,
-		IBotEnabled, IBotTick, IBotAttackApproachPolicy, IReplayBotPolicyTick, IGameSaveTraitData
+		IBotEnabled, IBotTick, IBotAttackApproachPolicy, IReplayBotPolicyTick, IResolveOrder, IGameSaveTraitData
 	{
 		sealed class ReadinessSnapshot
 		{
@@ -98,6 +98,7 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		const string RequestOwner = "economy-troop-production";
+		const string SetAttackApproachPolicyOrder = "SetEconomyAttackApproachPolicy";
 		static readonly BitSet<TargetableType> GroundTargetTypes = new BitSet<TargetableType>("Ground");
 
 		readonly World world;
@@ -115,6 +116,8 @@ namespace OpenRA.Mods.Common.Traits
 		internal bool IsReadyForRaid { get; private set; }
 		internal bool IsAttackApproachActive { get; private set; }
 		bool attackApproachEstablished;
+		[Sync]
+		bool recordedAttackApproachActive;
 
 		public EconomyTroopProductionBotModule(Actor self, EconomyTroopProductionBotModuleInfo info)
 			: base(info)
@@ -149,7 +152,9 @@ namespace OpenRA.Mods.Common.Traits
 
 		bool IBotAttackApproachPolicy.IsAttackApproachPolicyActive(Actor attacker, string policy)
 		{
-			var active = world.IsReplay ? IsAttackApproachActive : bot != null && IsReadyForRaid;
+			var active = world.IsReplay && !OpenRA.Server.ProtocolVersion.HasRecordedBotPolicy(world.ReplayOrdersProtocol) ?
+				(UsesLegacyAttackApproachReconstruction ? IsAttackApproachActive : IsReadyForRaid) :
+				recordedAttackApproachActive;
 			return active && !IsTraitDisabled &&
 				attacker != null && attacker.Owner == player &&
 				policy == Info.AttackApproachPolicy && Info.MammothTypes.Contains(attacker.Info.Name) &&
@@ -158,11 +163,23 @@ namespace OpenRA.Mods.Common.Traits
 
 		void IReplayBotPolicyTick.ReplayBotPolicyTick() { UpdateReadiness(); }
 
+		void IResolveOrder.ResolveOrder(Actor self, Order order)
+		{
+			if (order.OrderString == SetAttackApproachPolicyOrder && order.ExtraData <= 1)
+				recordedAttackApproachActive = order.ExtraData != 0;
+		}
+
 		void IBotTick.BotTick(IBot enabledBot)
 		{
 			var readiness = UpdateReadiness();
 			if (readiness == null)
 				return;
+
+			if (recordedAttackApproachActive != readiness.Ready)
+				bot.QueueOrder(new Order(SetAttackApproachPolicyOrder, player.PlayerActor, false)
+				{
+					ExtraData = readiness.Ready ? 1u : 0u
+				});
 
 			if (!readiness.HasPrerequisites)
 			{
@@ -262,7 +279,7 @@ namespace OpenRA.Mods.Common.Traits
 
 			var ready = readinessDecision == EconomyReadinessDecision.Ready;
 			IsReadyForRaid = ready;
-			if (world.IsReplay)
+			if (UsesLegacyAttackApproachReconstruction)
 			{
 				var approachDecision = EconomyTroopPolicy.AttackApproachDecision(attackApproachEstablished,
 					IsAttackApproachActive, true, criticalThreat, ready, world.WorldTick,
@@ -281,6 +298,9 @@ namespace OpenRA.Mods.Common.Traits
 			return new ReadinessSnapshot(true, live, harvesters, screen, artillery, antiAir, cash,
 				criticalThreat, readinessDecision, ready, readinessCash);
 		}
+
+		bool UsesLegacyAttackApproachReconstruction =>
+			world.ReplayVersion == "playtest-20260815";
 
 		bool IsOwnedUsable(Actor actor)
 		{
@@ -362,6 +382,7 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				new MiniYamlNode("EconomyTroopProductionScanTicks", FieldSaver.FormatValue(scanTicks)),
 				new MiniYamlNode("EconomyTroopProductionReady", FieldSaver.FormatValue(IsReadyForRaid)),
+				new MiniYamlNode("EconomyAttackApproachActive", FieldSaver.FormatValue(recordedAttackApproachActive)),
 				new MiniYamlNode("EconomyTroopProductionObservationStarted", FieldSaver.FormatValue(readinessObservationStartedTick))
 			};
 		}
@@ -376,6 +397,7 @@ namespace OpenRA.Mods.Common.Traits
 				{
 					case "EconomyTroopProductionScanTicks": scanTicks = FieldLoader.GetValue<int>(node.Key, node.Value.Value); break;
 					case "EconomyTroopProductionReady": IsReadyForRaid = FieldLoader.GetValue<bool>(node.Key, node.Value.Value); break;
+					case "EconomyAttackApproachActive": recordedAttackApproachActive = FieldLoader.GetValue<bool>(node.Key, node.Value.Value); break;
 					case "EconomyTroopProductionObservationStarted": readinessObservationStartedTick = FieldLoader.GetValue<int>(node.Key, node.Value.Value); break;
 				}
 		}
