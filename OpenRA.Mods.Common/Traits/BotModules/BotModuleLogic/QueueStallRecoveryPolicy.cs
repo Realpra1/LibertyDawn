@@ -29,6 +29,13 @@ namespace OpenRA.Mods.Common.Traits
 		InsufficientContention
 	}
 
+	public enum QueueStallRecoveryConstructionChoice
+	{
+		None,
+		ConstructionYardEnclosure,
+		NeedBasedSilo
+	}
+
 	public static class QueueStallRecoveryPolicy
 	{
 		public static QueueStallRecoveryEligibility ClassifyEconomyObservation(bool normalPower,
@@ -88,6 +95,18 @@ namespace OpenRA.Mods.Common.Traits
 		public static bool ShouldPauseOrdinaryProduction(bool active, bool awaitingSelectedExit)
 		{
 			return active || awaitingSelectedExit;
+		}
+
+		public static QueueStallRecoveryConstructionChoice ChooseProtectedConstruction(
+			bool recoveryActive, bool enclosureAvailable, bool needBasedSiloAvailable)
+		{
+			if (!recoveryActive)
+				return QueueStallRecoveryConstructionChoice.None;
+			if (enclosureAvailable)
+				return QueueStallRecoveryConstructionChoice.ConstructionYardEnclosure;
+
+			return needBasedSiloAvailable ? QueueStallRecoveryConstructionChoice.NeedBasedSilo :
+				QueueStallRecoveryConstructionChoice.None;
 		}
 	}
 }

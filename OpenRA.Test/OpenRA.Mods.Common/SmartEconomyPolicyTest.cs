@@ -101,6 +101,18 @@ namespace OpenRA.Test.Mods.Common
 				Is.EqualTo(expected));
 		}
 
+		[TestCase(false, true, true, QueueStallRecoveryConstructionChoice.None)]
+		[TestCase(true, true, true, QueueStallRecoveryConstructionChoice.ConstructionYardEnclosure)]
+		[TestCase(true, false, true, QueueStallRecoveryConstructionChoice.NeedBasedSilo)]
+		[TestCase(true, false, false, QueueStallRecoveryConstructionChoice.None)]
+		public void QueueRecoveryAllowsOnlyEnclosureThenNeedBasedSilo(bool active,
+			bool enclosureAvailable, bool siloAvailable,
+			QueueStallRecoveryConstructionChoice expected)
+		{
+			Assert.That(QueueStallRecoveryPolicy.ChooseProtectedConstruction(active,
+				enclosureAvailable, siloAvailable), Is.EqualTo(expected));
+		}
+
 		[Test]
 		public void PostLoadSettlementDelaysOneSamplerWithoutOverflow()
 		{

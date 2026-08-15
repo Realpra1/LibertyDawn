@@ -160,7 +160,16 @@ namespace OpenRA.Mods.Common.Traits
 					queue.Actor.ActorID, currentBuilding.Item) == true;
 			baseBuilder.ObserveBusyRadarRecoveryQueue(queue, currentBuilding);
 			if (currentBuilding == null && baseBuilder.QueueStallRecoveryActive)
-				return false;
+			{
+				var recoveryBuilding = ChooseQueueStallRecoveryBuilding(queue);
+				if (recoveryBuilding == null)
+					return false;
+
+				bot.QueueOrder(Order.StartProduction(queue.Actor, recoveryBuilding.Name, 1));
+				baseBuilder.LogProductionSpend(recoveryBuilding, queue);
+				return true;
+			}
+
 			if (currentBuilding != null)
 			{
 				var priorityRecoveryActive = baseBuilder.OpeningActive ||
@@ -378,6 +387,48 @@ namespace OpenRA.Mods.Common.Traits
 					HasSufficientPowerForActor(a) && HasSufficientFundsForActor(q, a)));
 			return OpeningPolicyLogic.HoldOptionalConstructionForFirstRefinery(true,
 				baseBuilder.CountActors(baseBuilder.SmartEconomyRefineryTypes), committed, actionable);
+		}
+
+		ActorInfo ChooseQueueStallRecoveryBuilding(ProductionQueue queue)
+		{
+			var buildables = queue.BuildableItems();
+			var enclosureWall = baseBuilder.WallPlanner?.ConstructionYardEnclosureWall(
+				queue, buildables, playerBuildings);
+			var enclosureAvailable = enclosureWall != null;
+
+			ActorInfo silo = null;
+			if (baseBuilder.SmartEconomyWantsSilo)
+			{
+				silo = GetProducibleBuilding(baseBuilder.NeedBasedSiloTypes, buildables);
+				if (silo != null && (!HasSufficientPowerForActor(silo) ||
+					!HasSufficientFundsForActor(queue, silo)))
+					silo = null;
+			}
+
+			var choice = QueueStallRecoveryPolicy.ChooseProtectedConstruction(true,
+				enclosureAvailable, silo != null);
+			if (choice == QueueStallRecoveryConstructionChoice.ConstructionYardEnclosure)
+			{
+				AIUtils.BotDebug("{0} decided to build {1}: queue-recovery enclosure continuation",
+					queue.Actor.Owner, DisplayName(enclosureWall.Name));
+				if (baseBuilder.Info.QueueStallRecoveryDebugLogging)
+					Log.Write("debug", "AI queue stall recovery: {0} tick={1} protected-construction=" +
+						"enclosure item={2} queue={3}/{4}", player, world.WorldTick,
+						enclosureWall.Name, queue.Actor.ActorID, queue.Info.Type);
+				return enclosureWall;
+			}
+
+			if (choice != QueueStallRecoveryConstructionChoice.NeedBasedSilo ||
+				!baseBuilder.TryReserveNeedBasedSilo(queue, silo.Name))
+				return null;
+
+			AIUtils.BotDebug("{0} decided to build {1}: queue-recovery storage-pressure commitment",
+				queue.Actor.Owner, DisplayName(silo.Name));
+			if (baseBuilder.Info.QueueStallRecoveryDebugLogging)
+				Log.Write("debug", "AI queue stall recovery: {0} tick={1} protected-construction=" +
+					"need-based-silo item={2} queue={3}/{4}", player, world.WorldTick,
+					silo.Name, queue.Actor.ActorID, queue.Info.Type);
+			return silo;
 		}
 
 		ActorInfo ChooseBuildingToBuild(ProductionQueue queue)
