@@ -32,10 +32,29 @@ namespace OpenRA.Mods.Common.Traits
 		/// earlier in the current bot tick before the engine has processed its reservation order.
 		/// </summary>
 		public static bool HasOtherRepairAssignment(IReadOnlyDictionary<uint, uint> assignments,
-			IReadOnlyCollection<uint> repairingAircraft, uint aircraftId, uint facilityId)
+			IReadOnlyCollection<uint> repairingAircraft, IReadOnlyCollection<uint> waitingAircraft,
+			uint aircraftId, uint facilityId)
 		{
 			return assignments != null && repairingAircraft != null && assignments.Any(a =>
-				a.Key != aircraftId && a.Value == facilityId && repairingAircraft.Contains(a.Key));
+				a.Key != aircraftId && a.Value == facilityId && repairingAircraft.Contains(a.Key) &&
+				(waitingAircraft == null || !waitingAircraft.Contains(a.Key)));
+		}
+
+		/// <summary>
+		/// Returns true when <paramref name="aircraftId"/> is the longest-waiting ready aircraft.
+		/// Actor id is a deterministic tie-breaker for aircraft discovered on the same tick.
+		/// </summary>
+		public static bool IsOldestReadyRepairWaiter(IReadOnlyDictionary<uint, int> waitingSince,
+			IEnumerable<uint> readyAircraft, uint aircraftId)
+		{
+			if (waitingSince == null || readyAircraft == null || !waitingSince.ContainsKey(aircraftId))
+				return false;
+
+			return readyAircraft
+				.Where(waitingSince.ContainsKey)
+				.OrderBy(id => waitingSince[id])
+				.ThenBy(id => id)
+				.FirstOrDefault() == aircraftId;
 		}
 
 		/// <summary>

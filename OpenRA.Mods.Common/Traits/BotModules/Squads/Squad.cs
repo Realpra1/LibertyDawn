@@ -53,6 +53,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		internal bool AirRouteQueued;
 		internal readonly HashSet<uint> AirUnitsRepairing = new HashSet<uint>();
 		internal readonly Dictionary<uint, uint> AirRepairTargets = new Dictionary<uint, uint>();
+		internal readonly HashSet<uint> AirRepairWaiting = new HashSet<uint>();
+		internal readonly Dictionary<uint, int> AirRepairWaitingSince = new Dictionary<uint, int>();
 		internal readonly HashSet<uint> AirRepairUnavailable = new HashSet<uint>();
 		internal readonly HashSet<uint> AirReinforcements = new HashSet<uint>();
 		internal readonly Dictionary<uint, uint> AirReinforcementTargets = new Dictionary<uint, uint>();
@@ -275,6 +277,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			}
 
 			AirUnitsRepairing.Add(actor.ActorID);
+			AirRepairWaiting.Remove(actor.ActorID);
+			AirRepairWaitingSince.Remove(actor.ActorID);
 			AirRepairUnavailable.Remove(actor.ActorID);
 			if (destination == null)
 				AirRepairTargets.Remove(actor.ActorID);
@@ -282,6 +286,15 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				AirRepairTargets[actor.ActorID] = destination.ActorID;
 
 			MarkAirReinforcement(actor);
+		}
+
+		internal void MarkAirRepairWaiting(Actor actor, Actor destination)
+		{
+			var firstWaitingTick = AirRepairWaitingSince.TryGetValue(actor.ActorID, out var tick) ?
+				tick : World.WorldTick;
+			MarkAirRepairing(actor, destination);
+			AirRepairWaiting.Add(actor.ActorID);
+			AirRepairWaitingSince.Add(actor.ActorID, firstWaitingTick);
 		}
 
 		internal void JoinAirFormation(Actor actor)
@@ -296,6 +309,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		{
 			var live = new HashSet<uint>(Units.Select(a => a.ActorID));
 			AirUnitsRepairing.RemoveWhere(id => !live.Contains(id));
+			AirRepairWaiting.RemoveWhere(id => !live.Contains(id));
+			foreach (var id in AirRepairWaitingSince.Keys.Where(id => !live.Contains(id)).ToList())
+				AirRepairWaitingSince.Remove(id);
 			AirRepairUnavailable.RemoveWhere(id => !live.Contains(id));
 			foreach (var id in AirRepairTargets.Keys.Where(id => !live.Contains(id)).ToList())
 				AirRepairTargets.Remove(id);
