@@ -4,13 +4,13 @@
 
 - Worker: `WORKER-2`
 - Task: `CNC-101 — Build-order protection and silo timing`
-- Status: `cycle 6 complete; First iteration - testing, evidence-only cycle 7 authorized`
+- Status: `cycle 7 evidence complete; fresh Terra-medium final review pending`
 - Base: `4f806e742bd12145d2a601cc9ff71c3a0b141a13`
 - Task branch: `agent/round-20260815-cnc101-build-order-silo`
 - PR base: `4f806e742bd12145d2a601cc9ff71c3a0b141a13`
 - Balance: frozen; no costs, production values, prerequisites, power, storage,
   thresholds, delays, or other tuning changes
-- Cycle: `6/20`
+- Cycle: `7/20`
 - PR: none
 
 ## Literal scope
@@ -256,15 +256,55 @@ ownership against the PR117 base before retaining a commit.
   cancellation and resumed preferred-tower production. All other checks and
   dispositions passed review. No product defect is inferred.
 
-## Next authorized cycle
+## Cycle 7 durable result
 
-Cycle 7 is authorized solely to prove the remaining busy-tower boundary with
-ordinary CNC AIs: establish the relevant preferred tower in production, apply
-real storage pressure while that item remains in progress, prove it is not
-cancelled, observe the conditional Silo ordering and capacity relief, and prove
-preferred-tower production resumes afterward. Keep the product unchanged unless
-that direct evidence identifies a concrete narrow defect. Do not revisit callback
-semantics, add an unconditional Silo requirement, or broaden policy.
+- Product head remains `56984ae1933e4a953dd09b9fadb086ba5e0d326e`;
+  no product, balance, shipped-map, callback, or policy file changed. The cycle
+  began clean at `a9873f583d474fece57274fd11e625681e91378b`.
+- Release build passed with zero warnings/errors. Focused
+  `OpeningGarrisonLogicTest|OpeningPolicyLogicTest|SmartEconomyPolicyTest` passed
+  42/42. CNC and both cycle-7 custom-map YAML validation, Lua and manifest
+  syntax, and `git diff --check` passed.
+- Exactly two acceptance-valid custom full-engine games ran, each with ordinary
+  SkyNet and Brutalis modules. Both reached tick 9000/exit 0 without fatal Lua,
+  crash, unhandled exception, desync, duplicate Silo, or task failure. Nod took
+  27.037 seconds; the GDI replacement took 32.027 seconds.
+- GDI/SkyNet's exact first ten were
+  `fact,nuk2,pyle,proc,sbag,sbag,sbag,sbag,nuk2,obli`; Brutalis/Nod's were
+  `fact,cycl,cycl,fact,nuke,cycl,cycl,cycl,cycl,cycl`. Native `obli`
+  reservation output preceded pressure at tick 142 with zero live towers and the
+  full boundary live. The committed `obli` completed at tick 1066 without
+  cancellation, one conditional Silo raised capacity from 150 to 4150 at tick
+  1183, and later tower production was live at tick 2515.
+- Nod/SkyNet's exact first ten were
+  `fact,nuke,hand,proc,cycl,cycl,cycl,cycl,gun,silo`; Brutalis/GDI's were
+  `fact,sbag,nuk2,sbag,pyle,proc,fact,sbag,sbag,sbag`. Native `gun`
+  reservation output preceded pressure at tick 133 with zero live towers and the
+  full boundary live. The committed `gun` completed at tick 526 without
+  cancellation, one conditional Silo raised capacity from 150 to 4150 at tick
+  643, and later tower production was live at tick 2485.
+- Preliminary tick-0 Lua starts and two tick-9000 observer runs were harness- or
+  evidence-invalid and do not count. They exposed only an actor/property mistake,
+  wall-queue ambiguity, a missing custom-map Silo prerequisite, and an observer
+  that incorrectly rejected a legal second-Fact/free-queue Silo. No product
+  defect was inferred, and the final pair used native reservation/completion
+  diagnostics plus factual actor presence.
+- Separate fresh Luna narrators listed both sides' exact first tens and the
+  busy-tower/Silo timestamps for each valid game. GDI policy passed every observed
+  behavior but labeled cycle-wide count/determinism outside its single-game
+  envelope; the complete pair supplies that evidence, so no follow-up is accepted.
+  Nod policy passed all downstream behavior but noted that native reservation
+  lines have no explicit tick. Ordered native output precedes the ticked
+  busy-before-live observation; the limitation is recorded for Terra to judge,
+  and new instrumentation is outside this bounded cycle. Neither reviewer
+  identified a product or policy defect.
+
+## Final review pending
+
+Obtain one fresh native Terra-medium review of the committed cycle-7 state/report,
+the two valid summaries/narratives/policy reviews, and the bounded task. No further
+game, callback, instrumentation, product, balance, or policy work is authorized
+unless that review identifies a concrete narrow task defect.
 
 ## Handoff
 
