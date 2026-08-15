@@ -2,7 +2,7 @@
 
 - Task ID: CNC-110
 - Title: Prevent destroyed-actor crashes throughout HeavyDrop transport lifecycle.
-- Status: final-review evidence response complete — implementation and evidence committed; balance and mission policy frozen
+- Status: complete — fresh independent Terra final review ready with no required fix; balance and mission policy frozen
 - Common base: `4f806e742bd12145d2a601cc9ff71c3a0b141a13`
 - Task branch: `agent/round-20260815-cnc110-heavydrop-lifecycle-hotfix`
 - Worker worktree: `/root/github/LibertyDawn/COORDINATED-CNC-ROUNDS/20260815-bug-polish-06-resume/workers/worker-8-cnc110`
@@ -52,3 +52,4 @@ Discard an invalid pair and release surviving unboarded cargo and reservations t
 - Worker fact-check: the setup, bots, seeds, tick limits, clean exits, lifecycle-discard messages, nine-carrier continuation, two-pair timeout release, eight-carrier continuation, and long-run absence of the supplied failure pattern agree with the original artifacts. In the three focused scenarios, a passenger printed as `(not in world)` while inside its paired transport is normally loaded cargo, not evidence that it is destroyed or invalid. The valid-pair predicate expressly permits that transported state, while every phase prunes pairs whose carrier or passenger is actually unusable before trait access or orders.
 - Recommendation disposition: adopt/already satisfied the reviewers' highest-priority lifecycle rule—terminally remove each actually invalid pair, release its exact coordinator entries and surviving unboarded cargo/reservations, issue no order to an unusable actor, and let independently valid pairs continue. Reject treating every loaded `(not in world)` passenger or the unchanged exact-unload retry behavior as an invalid-pair loop; that conflates normal cargo state with the supplied destroyed-actor failure and would change frozen mission policy. Reject extra matched-control, natural-game-outcome, economy, performance, or phase-instrumentation work for this evidence-only response: the prior final review accepted the product diff and focused portfolio, the focused runs stop intentionally at bounded tick limits, and regression assertions already cover continuation plus reservation ownership.
 - The exact acceptance anchor remains: `System.InvalidOperationException: Attempted to get trait from destroyed object (tran 3340 (not in world))`, at `HeavyDropTransportManager.IsLoaded` -> `DiscardUnloadedPairs` -> `AdvanceGathering` -> `Tick`.
+- Fresh independent Terra final review of evidence head `c8e7bef20a`: `ready`; required fix: `none`. Receipt: `REVIEW.md`.
