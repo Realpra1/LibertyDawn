@@ -82,7 +82,7 @@ namespace OpenRA.Mods.Common.Traits
 		public override object Create(ActorInitializer init) { return new ModularBot(this, init); }
 	}
 
-	public sealed class ModularBot : ITick, IBot, INotifyDamage, IGameSaveTraitData
+	public sealed class ModularBot : ITick, IBot, INotifyCreated, INotifyDamage, IGameSaveTraitData
 	{
 		public bool IsEnabled;
 
@@ -94,6 +94,7 @@ namespace OpenRA.Mods.Common.Traits
 		Player player;
 
 		IBotTick[] tickModules;
+		IReplayBotPolicyTick[] replayPolicyModules = Array.Empty<IReplayBotPolicyTick>();
 		IBotRespondToAttack[] attackResponseModules;
 		Dictionary<string, List<IAdvancedBotTick>> advancedModules;
 		readonly Dictionary<string, double> advancedElapsed = new Dictionary<string, double>(StringComparer.Ordinal);
@@ -111,6 +112,12 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			this.info = info;
 			world = init.World;
+		}
+
+		void INotifyCreated.Created(Actor self)
+		{
+			if (self.World.IsReplay && self.Owner.IsBot && self.Owner.BotType == info.Type)
+				replayPolicyModules = self.TraitsImplementing<IReplayBotPolicyTick>().ToArray();
 		}
 
 		// Called by the host's player creation code
@@ -161,6 +168,14 @@ namespace OpenRA.Mods.Common.Traits
 
 		void ITick.Tick(Actor self)
 		{
+			if (self.World.IsReplay)
+			{
+				foreach (var policy in replayPolicyModules)
+					policy.ReplayBotPolicyTick();
+
+				return;
+			}
+
 			if (!IsEnabled || self.World.IsLoadingGameSave)
 				return;
 

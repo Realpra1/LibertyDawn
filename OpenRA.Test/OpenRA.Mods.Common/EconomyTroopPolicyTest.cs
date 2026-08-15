@@ -67,6 +67,26 @@ namespace OpenRA.Test
 		}
 
 		[Test]
+		public void AttackApproachUsesReplayStableSafetyStateAfterInitialReadiness()
+		{
+			Assert.That(EconomyTroopPolicy.AttackApproachDecision(false, false, true, false, false,
+				100, -1, 300), Is.EqualTo(EconomyApproachDecision.Inactive));
+			Assert.That(EconomyTroopPolicy.AttackApproachDecision(false, false, true, false, true,
+				100, -1, 300), Is.EqualTo(EconomyApproachDecision.Active));
+			Assert.That(EconomyTroopPolicy.AttackApproachDecision(true, true, true, false, false,
+				100, -1, 300), Is.EqualTo(EconomyApproachDecision.Active),
+				"Transient production composition must not change synchronized attack movement.");
+			Assert.That(EconomyTroopPolicy.AttackApproachDecision(true, true, true, true, true,
+				100, -1, 300), Is.EqualTo(EconomyApproachDecision.Inactive));
+			Assert.That(EconomyTroopPolicy.AttackApproachDecision(true, false, true, false, false,
+				399, 100, 300), Is.EqualTo(EconomyApproachDecision.Observing));
+			Assert.That(EconomyTroopPolicy.AttackApproachDecision(true, false, true, false, false,
+				400, 100, 300), Is.EqualTo(EconomyApproachDecision.Active));
+			Assert.That(EconomyTroopPolicy.AttackApproachDecision(true, true, false, false, true,
+				400, -1, 300), Is.EqualTo(EconomyApproachDecision.Inactive));
+		}
+
+		[Test]
 		public void MammothPriorityRequiresBothLargestTypeAndTargetValueShare()
 		{
 			Assert.That(EconomyTroopPolicy.ShouldRequestMammoth(3400, 3200, 6200, 55), Is.True,

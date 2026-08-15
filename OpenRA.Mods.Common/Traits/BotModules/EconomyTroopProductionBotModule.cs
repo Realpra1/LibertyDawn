@@ -62,8 +62,41 @@ namespace OpenRA.Mods.Common.Traits
 	}
 
 	public sealed class EconomyTroopProductionBotModule : ConditionalTrait<EconomyTroopProductionBotModuleInfo>,
-		IBotEnabled, IBotTick, IBotAttackApproachPolicy, IGameSaveTraitData
+		IBotEnabled, IBotTick, IBotAttackApproachPolicy, IReplayBotPolicyTick, IGameSaveTraitData
 	{
+		sealed class ReadinessSnapshot
+		{
+			public readonly bool HasPrerequisites;
+			public readonly List<Actor> Live;
+			public readonly int Harvesters;
+			public readonly int Screen;
+			public readonly int Artillery;
+			public readonly int AntiAir;
+			public readonly int Cash;
+			public readonly bool CriticalThreat;
+			public readonly EconomyReadinessDecision Decision;
+			public readonly bool Ready;
+			public readonly int ReadinessCash;
+
+			public ReadinessSnapshot(bool hasPrerequisites, List<Actor> live = null, int harvesters = 0,
+				int screen = 0, int artillery = 0, int antiAir = 0, int cash = 0, bool criticalThreat = false,
+				EconomyReadinessDecision decision = EconomyReadinessDecision.NotReady, bool ready = false,
+				int readinessCash = 0)
+			{
+				HasPrerequisites = hasPrerequisites;
+				Live = live;
+				Harvesters = harvesters;
+				Screen = screen;
+				Artillery = artillery;
+				AntiAir = antiAir;
+				Cash = cash;
+				CriticalThreat = criticalThreat;
+				Decision = decision;
+				Ready = ready;
+				ReadinessCash = readinessCash;
+			}
+		}
+
 		const string RequestOwner = "economy-troop-production";
 		static readonly BitSet<TargetableType> GroundTargetTypes = new BitSet<TargetableType>("Ground");
 
@@ -76,9 +109,12 @@ namespace OpenRA.Mods.Common.Traits
 		IBotUnitReservations[] unitReservations;
 		int scanTicks;
 		int readinessObservationStartedTick = -1;
+		int approachObservationStartedTick = -1;
 		string lastDecisionCategory;
 		int nextDecisionLogTick;
 		internal bool IsReadyForRaid { get; private set; }
+		internal bool IsAttackApproachActive { get; private set; }
+		bool attackApproachEstablished;
 
 		public EconomyTroopProductionBotModule(Actor self, EconomyTroopProductionBotModuleInfo info)
 			: base(info)
@@ -101,6 +137,9 @@ namespace OpenRA.Mods.Common.Traits
 		protected override void TraitDisabled(Actor self)
 		{
 			IsReadyForRaid = false;
+			IsAttackApproachActive = false;
+			attackApproachEstablished = false;
+			approachObservationStartedTick = -1;
 			readinessObservationStartedTick = -1;
 			CancelRequests();
 			lastDecisionCategory = null;
@@ -110,51 +149,38 @@ namespace OpenRA.Mods.Common.Traits
 
 		bool IBotAttackApproachPolicy.IsAttackApproachPolicyActive(Actor attacker, string policy)
 		{
-			return bot != null && !IsTraitDisabled && IsReadyForRaid && attacker != null && attacker.Owner == player &&
+			var active = world.IsReplay ? IsAttackApproachActive : bot != null && IsReadyForRaid;
+			return active && !IsTraitDisabled &&
+				attacker != null && attacker.Owner == player &&
 				policy == Info.AttackApproachPolicy && Info.MammothTypes.Contains(attacker.Info.Name) &&
 				techTree.HasPrerequisites(Info.RequiredPrerequisites);
 		}
 
+		void IReplayBotPolicyTick.ReplayBotPolicyTick() { UpdateReadiness(); }
+
 		void IBotTick.BotTick(IBot enabledBot)
 		{
-			if (IsTraitDisabled || player.WinState != WinState.Undefined || --scanTicks > 0)
+			var readiness = UpdateReadiness();
+			if (readiness == null)
 				return;
 
-			scanTicks = Info.ScanInterval;
-			if (!techTree.HasPrerequisites(Info.RequiredPrerequisites))
+			if (!readiness.HasPrerequisites)
 			{
-				IsReadyForRaid = false;
-				readinessObservationStartedTick = -1;
 				CancelRequests();
 				LogDecision("inactive", "prerequisites");
 				return;
 			}
 
-			var live = world.Actors.Where(IsOwnedUsable).ToList();
-			var harvesters = live.Count(a => Info.HarvesterTypes.Contains(a.Info.Name));
-			var screen = live.Count(a => Info.ScreenTypes.Contains(a.Info.Name) &&
-				!unitReservations.Any(r => r.IsUnitReserved(a)));
-			var artillery = live.Count(a => Info.ArtilleryTypes.Contains(a.Info.Name));
-			var antiAir = live.Count(a => Info.AntiAirTypes.Contains(a.Info.Name));
-			var cash = Math.Max(0, playerResources.Cash + playerResources.Resources);
-			var criticalThreat = HasCriticalThreat(live);
-			var entryReady = EconomyTroopPolicy.IsReady(harvesters, Info.MinimumHarvesters, screen,
-				Info.MinimumScreen, artillery, Info.MinimumArtillery, antiAir, Info.MinimumAntiAir,
-				cash, Info.MinimumAvailableCash, criticalThreat);
-			var maintenanceReady = EconomyTroopPolicy.IsReady(harvesters, Info.MinimumHarvesters, screen,
-				Info.MinimumScreen, artillery, Info.MinimumArtillery, antiAir, Info.MinimumAntiAir,
-				cash, Info.MinimumMaintainCash, criticalThreat);
-			var readinessDecision = EconomyTroopPolicy.ReadinessDecision(IsReadyForRaid, entryReady,
-				maintenanceReady, world.WorldTick, readinessObservationStartedTick, Info.ReadinessObservationTicks);
-			if (readinessDecision == EconomyReadinessDecision.Observing && readinessObservationStartedTick < 0)
-				readinessObservationStartedTick = world.WorldTick;
-			else if (readinessDecision != EconomyReadinessDecision.Observing)
-				readinessObservationStartedTick = -1;
-
-			var ready = readinessDecision == EconomyReadinessDecision.Ready;
-			IsReadyForRaid = ready;
-			var readinessCash = ready || readinessDecision == EconomyReadinessDecision.Observing ?
-				Info.MinimumMaintainCash : Info.MinimumAvailableCash;
+			var live = readiness.Live;
+			var harvesters = readiness.Harvesters;
+			var screen = readiness.Screen;
+			var artillery = readiness.Artillery;
+			var antiAir = readiness.AntiAir;
+			var cash = readiness.Cash;
+			var criticalThreat = readiness.CriticalThreat;
+			var readinessDecision = readiness.Decision;
+			var ready = readiness.Ready;
+			var readinessCash = readiness.ReadinessCash;
 
 			var mammothCount = live.Count(a => Info.MammothTypes.Contains(a.Info.Name));
 			var requiredScreen = Math.Max(Info.MinimumScreen, (mammothCount + 1) / 2);
@@ -195,6 +221,65 @@ namespace OpenRA.Mods.Common.Traits
 				CancelRequests();
 				LogDecision("mixed-target-met", $"value={mammothValue}/{totalValue} largest-other={otherValue} cash={cash}/{readinessCash}");
 			}
+		}
+
+		ReadinessSnapshot UpdateReadiness()
+		{
+			if (IsTraitDisabled || player.WinState != WinState.Undefined || --scanTicks > 0)
+				return null;
+
+			scanTicks = Info.ScanInterval;
+			if (!techTree.HasPrerequisites(Info.RequiredPrerequisites))
+			{
+				IsReadyForRaid = false;
+				IsAttackApproachActive = false;
+				attackApproachEstablished = false;
+				approachObservationStartedTick = -1;
+				readinessObservationStartedTick = -1;
+				return new ReadinessSnapshot(false);
+			}
+
+			var live = world.Actors.Where(IsOwnedUsable).ToList();
+			var harvesters = live.Count(a => Info.HarvesterTypes.Contains(a.Info.Name));
+			var screen = live.Count(a => Info.ScreenTypes.Contains(a.Info.Name) &&
+				!unitReservations.Any(r => r.IsUnitReserved(a)));
+			var artillery = live.Count(a => Info.ArtilleryTypes.Contains(a.Info.Name));
+			var antiAir = live.Count(a => Info.AntiAirTypes.Contains(a.Info.Name));
+			var cash = Math.Max(0, playerResources.Cash + playerResources.Resources);
+			var criticalThreat = HasCriticalThreat(live);
+			var entryReady = EconomyTroopPolicy.IsReady(harvesters, Info.MinimumHarvesters, screen,
+				Info.MinimumScreen, artillery, Info.MinimumArtillery, antiAir, Info.MinimumAntiAir,
+				cash, Info.MinimumAvailableCash, criticalThreat);
+			var maintenanceReady = EconomyTroopPolicy.IsReady(harvesters, Info.MinimumHarvesters, screen,
+				Info.MinimumScreen, artillery, Info.MinimumArtillery, antiAir, Info.MinimumAntiAir,
+				cash, Info.MinimumMaintainCash, criticalThreat);
+			var readinessDecision = EconomyTroopPolicy.ReadinessDecision(IsReadyForRaid, entryReady,
+				maintenanceReady, world.WorldTick, readinessObservationStartedTick, Info.ReadinessObservationTicks);
+			if (readinessDecision == EconomyReadinessDecision.Observing && readinessObservationStartedTick < 0)
+				readinessObservationStartedTick = world.WorldTick;
+			else if (readinessDecision != EconomyReadinessDecision.Observing)
+				readinessObservationStartedTick = -1;
+
+			var ready = readinessDecision == EconomyReadinessDecision.Ready;
+			IsReadyForRaid = ready;
+			if (world.IsReplay)
+			{
+				var approachDecision = EconomyTroopPolicy.AttackApproachDecision(attackApproachEstablished,
+					IsAttackApproachActive, true, criticalThreat, ready, world.WorldTick,
+					approachObservationStartedTick, Info.ReadinessObservationTicks);
+				if (approachDecision == EconomyApproachDecision.Observing && approachObservationStartedTick < 0)
+					approachObservationStartedTick = world.WorldTick;
+				else if (approachDecision != EconomyApproachDecision.Observing)
+					approachObservationStartedTick = -1;
+
+				IsAttackApproachActive = approachDecision == EconomyApproachDecision.Active;
+				attackApproachEstablished |= IsAttackApproachActive;
+			}
+
+			var readinessCash = ready || readinessDecision == EconomyReadinessDecision.Observing ?
+				Info.MinimumMaintainCash : Info.MinimumAvailableCash;
+			return new ReadinessSnapshot(true, live, harvesters, screen, artillery, antiAir, cash,
+				criticalThreat, readinessDecision, ready, readinessCash);
 		}
 
 		bool IsOwnedUsable(Actor actor)

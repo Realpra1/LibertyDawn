@@ -679,6 +679,16 @@ namespace OpenRA.Mods.Common.Traits
 		bool IsAttackApproachPolicyActive(Actor attacker, string policy);
 	}
 
+	/// <summary>
+	/// Updates only the deterministic state exposed by bot policy interfaces while replayed bot orders drive the world.
+	/// Implementations must not issue orders or mutate actors.
+	/// </summary>
+	[RequireExplicitImplementation]
+	public interface IReplayBotPolicyTick
+	{
+		void ReplayBotPolicyTick();
+	}
+
 	[RequireExplicitImplementation]
 	public interface IBotHarvesterResourcePolicy
 	{
