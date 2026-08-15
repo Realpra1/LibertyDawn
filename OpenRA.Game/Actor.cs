@@ -24,7 +24,7 @@ using OpenRA.Traits;
 
 namespace OpenRA
 {
-	internal sealed class ActorGenerationHistory
+	sealed class ActorGenerationHistory
 	{
 		readonly List<(int NetFrame, int Generation)> transitions = new List<(int, int)> { (0, 0) };
 
