@@ -495,7 +495,7 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				AIUtils.BotDebug("{0} decided to build {1}: reserved storage-pressure commitment",
 					queue.Actor.Owner, DisplayName(reservedSilo.Name));
-					return reservedSilo;
+				return reservedSilo;
 			}
 
 			// Defense queues are independent from the ordered building queue. Give their first
@@ -544,7 +544,8 @@ namespace OpenRA.Mods.Common.Traits
 						queue.Actor.Owner, DisplayName(radarRecovery.Name));
 					return radarRecovery;
 				}
-			}
+				}
+
 			// Next is to build up a strong economy
 			if (!baseBuilder.HasAdequateRefineryCount)
 			{
