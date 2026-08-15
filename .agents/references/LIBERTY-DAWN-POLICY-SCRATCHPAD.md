@@ -1,9 +1,31 @@
-# Persistent policy observations
+Game B policy scratchpad — reusable
 
-- Field harvesters are fragile and low-vision; a mixed tank plus anti-air screen is a sensible default, but station changes must transfer protection without a visible ownership gap.
-- Stealth raiders should reject screened or detector-covered targets rather than trade their weak armor for forced activity. Safety should be paired with a bounded search for a less-blocked target or route when one is available.
-- Failsafe recovery should validate the module before issuing new squads while retaining enough reservation/ownership state to reconstitute them promptly. Recovery delay is only meaningful when tied to lost protection or missed safe opportunities.
-- Field-defense and harassment judgments require board-state and combat traces; assignment and “waiting” logs alone show intent, not strategic value. CPU stalls can also distort apparent order latency.
-- Transport operations should treat actor existence as a hard gate: discard invalid pairs without orders, give each surviving passenger one unload and explicit return-to-world/adoption confirmation, and release carriers for later work. Threat-driven holds are sensible when no safe cell exists, but need a bounded safe-cell comparison to distinguish caution from avoidable stalling.
-- Queue and power recovery should be judged by legal-work availability, not counters alone. A deferred plan may be sensible under missing prerequisites or low power; repeated deferral with prerequisites and safe capacity available is evidence of a recovery defect. (Advisory; setup- and faction-dependent.)
-- Large economy, army value, or specialist-capture totals do not establish combat advantage without target-contact, damage, loss, and survival traces. (High confidence for aggregate-only evidence.)
+Evidence standard:
+- Module records prove logged identity, routing, waiting, replanning, and
+  completion events; do not treat them alone as proof of destruction,
+  ownership, world state, or universal completion.
+- Distinguish an acceptance-pattern pass from proof of the full terminal
+  scenario. State exactly which identities reached recovery completion.
+- Performance/load timing is not repair-queue latency unless a queue-specific
+  metric is supplied.
+
+Air repair / FIFO policy:
+- A sound repair policy assigns damaged aircraft to owned active pads,
+  preserves identity while pads are occupied, and uses safe bounded holding
+  positions (including AA-aware routes) when capacity is unavailable.
+- When a reserved destination becomes unusable, the aircraft must detect the
+  stale destination, replan, and continue waiting or route to a surviving
+  owned pad. Repeated exclusive use of a surviving pad is valid evidence of
+  recovery rather than a stall.
+- Recovery completion should be logged per aircraft, followed by explicit
+  return/adoption into ordinary Air activity. Do not infer completion for
+  identities absent from completion records.
+
+Acceptance and follow-up:
+- A configured run may pass when required routing, wait, stale-target,
+  surviving-pad, and identity-rejoin patterns are present and no forbidden
+  error/interruption occurs.
+- For strong end-to-end claims, require direct provider-loss/destruction
+  logging plus completion records for every queued aircraft. Missing evidence
+  is a required follow-up unless the acceptance contract explicitly excludes
+  those terminal assertions; it is not automatically a release blocker.
