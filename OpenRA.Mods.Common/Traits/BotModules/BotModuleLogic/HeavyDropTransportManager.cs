@@ -541,6 +541,12 @@ namespace OpenRA.Mods.Common.Traits
 				p.Transport.TraitOrDefault<Cargo>()?.IsEmpty() == false).ToList();
 			if (carrying.Count == 0)
 			{
+				// Cargo removal and passenger world insertion complete on separate engine frames.
+				// Hold the reservation during that bounded handoff so normal squad adoption sees
+				// the passenger after it becomes orderable again.
+				if (wave.Pairs.Any(p => !p.Passenger.IsInWorld && IsPendingUnloadHandoff(p)))
+					return;
+
 				FinishWave(bot, wave.ReturningToAssembly ? "safe assembly return complete" :
 					"ground-force handoff complete");
 				return;
@@ -979,7 +985,13 @@ namespace OpenRA.Mods.Common.Traits
 		bool IsPairUsable(Pair pair)
 		{
 			return pair != null && IsTransportUsable(pair.Transport) && pair.Passenger != null && !pair.Passenger.IsDead &&
-				(pair.Passenger.IsInWorld || pair.Passenger.TraitOrDefault<Passenger>()?.Transport == pair.Transport);
+				(pair.Passenger.IsInWorld || pair.Passenger.TraitOrDefault<Passenger>()?.Transport == pair.Transport ||
+				IsPendingUnloadHandoff(pair));
+		}
+
+		bool IsPendingUnloadHandoff(Pair pair)
+		{
+			return pair.UnloadOrderCount > 0 && world.WorldTick - pair.LastOrderTick < info.AssaultOrderRetryTicks;
 		}
 
 		bool IsLoaded(Pair pair)
