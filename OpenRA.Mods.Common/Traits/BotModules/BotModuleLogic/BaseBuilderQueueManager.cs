@@ -38,6 +38,7 @@ namespace OpenRA.Mods.Common.Traits
 		int cachedBuildings;
 		int minimumExcessPower;
 		int loggedMinimumExcessPower = int.MinValue;
+		bool useSmartEconomyConstruction = true;
 		CPos? lastUsedDefenseLocation = null;
 
 		WaterCheck waterState = WaterCheck.NotChecked;
@@ -354,6 +355,62 @@ namespace OpenRA.Mods.Common.Traits
 			return available.RandomOrDefault(world.LocalRandom);
 		}
 
+		ActorInfo GetAdaptiveProductionBuilding(IEnumerable<ActorInfo> buildables)
+		{
+			var available = buildables.Where(actor => baseBuilder.Info.ProductionTypes.Contains(actor.Name))
+				.Where(actor => !baseBuilder.Info.BuildingLimits.TryGetValue(actor.Name, out var limit) ||
+					playerBuildings.Count(a => a.Info.Name == actor.Name) +
+					baseBuilder.CountQueuedOrPendingActors(new[] { actor.Name }) +
+					(baseBuilder.IsOpeningStructureReserved(actor.Name) ? 1 : 0) < limit)
+				.OrderBy(actor => actor.Name, StringComparer.Ordinal).ToArray();
+			if (available.Length == 0)
+				return null;
+
+			var weights = available.ToDictionary(actor => actor.Name,
+				actor => AdaptiveProductionBuildingWeight(actor), StringComparer.Ordinal);
+			var shares = AdaptiveWeighting.ClampedShares(weights,
+				baseBuilder.Info.AdaptiveWeightFloor, baseBuilder.Info.AdaptiveWeightCeiling);
+			var selected = AdaptiveWeighting.WeightedPick(shares, world.LocalRandom.NextFloat());
+			var building = selected == null ? null : available.First(actor => actor.Name == selected);
+			if (building != null && baseBuilder.AdaptiveProductionDebugLogging)
+				baseBuilder.LogAdaptiveProduction(
+					"{0} selected production building {1}: demand={2:0.###} weight={3:0.###} share={4:0.###}",
+					player, DisplayName(building.Name), baseBuilder.AdaptiveProductionBuildingDemand(building),
+					weights[building.Name], shares[building.Name]);
+
+			return building;
+		}
+
+		double AdaptiveProductionBuildingWeight(ActorInfo building)
+		{
+			var committed = playerBuildings.Count(a => a.Info.Name == building.Name) +
+				baseBuilder.CountQueuedOrPendingActors(new[] { building.Name });
+			return Math.Max(1, AdaptiveWeighting.ProductionBuildingScore(
+				baseBuilder.AdaptiveProductionBuildingDemand(building), committed));
+		}
+
+		IEnumerable<KeyValuePair<string, int>> AdaptiveBuildingOrder()
+		{
+			var remaining = baseBuilder.Info.BuildingFractions
+				.OrderBy(entry => entry.Key, StringComparer.Ordinal)
+				.ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.Ordinal);
+			while (remaining.Count != 0)
+			{
+				var weights = remaining.Keys.ToDictionary(name => name, name =>
+				{
+					if (!baseBuilder.Info.ProductionTypes.Contains(name) ||
+						!world.Map.Rules.Actors.TryGetValue(name, out var building))
+						return 1d;
+
+					return AdaptiveProductionBuildingWeight(building);
+				}, StringComparer.Ordinal);
+				var selected = AdaptiveWeighting.WeightedPick(weights, world.LocalRandom.NextFloat());
+				var value = remaining[selected];
+				remaining.Remove(selected);
+				yield return new KeyValuePair<string, int>(selected, value);
+			}
+		}
+
 		ActorInfo PreferredOpeningFirstTower(IEnumerable<ActorInfo> buildables)
 		{
 			if (!baseBuilder.Info.PrioritizeOpeningFirstTower || !baseBuilder.OpeningActive ||
@@ -446,6 +503,8 @@ namespace OpenRA.Mods.Common.Traits
 		ActorInfo ChooseBuildingToBuild(ProductionQueue queue)
 		{
 			var buildableThings = queue.BuildableItems();
+			var smartEconomyPlanningQueue = !baseBuilder.SmartEconomyEnabled ||
+				useSmartEconomyConstruction;
 
 			// This gets used quite a bit, so let's cache it here
 			var power = GetProducibleBuilding(baseBuilder.Info.PowerTypes, buildableThings,
@@ -514,7 +573,7 @@ namespace OpenRA.Mods.Common.Traits
 
 			// Once the first refinery is live, establish the configured share of useful
 			// vehicle-factory capacity before any refinery source can consume those Facts.
-			if (baseBuilder.SmartEconomyWantsEarlyVehicleProductionCapacity)
+			if (smartEconomyPlanningQueue && baseBuilder.SmartEconomyWantsEarlyVehicleProductionCapacity)
 			{
 				var vehicleFactories = buildableThings.Where(a => baseBuilder.Info.VehiclesFactoryTypes.Contains(a.Name))
 					.OrderByDescending(a => AdaptiveWeighting.ProductionBuildingScore(
@@ -527,7 +586,7 @@ namespace OpenRA.Mods.Common.Traits
 					{
 						baseBuilder.LogSmartEconomy("{0} decided to build {1}: early vehicle-production priority",
 							queue.Actor.Owner, DisplayName(vehicleFactory.Name));
-						return vehicleFactory;
+						return ClaimSmartEconomyTurn(vehicleFactory);
 					}
 				}
 
@@ -535,7 +594,7 @@ namespace OpenRA.Mods.Common.Traits
 				{
 					baseBuilder.LogSmartEconomy("{0} decided to build {1}: early vehicle factory requires power",
 						queue.Actor.Owner, DisplayName(power.Name));
-					return power;
+					return ClaimSmartEconomyTurn(power);
 				}
 			}
 
@@ -629,26 +688,26 @@ namespace OpenRA.Mods.Common.Traits
 				}
 
 			// Next is to build up a strong economy
-			if (!baseBuilder.HasAdequateRefineryCount)
+			if (smartEconomyPlanningQueue && !baseBuilder.HasAdequateRefineryCount)
 			{
 				var refinery = GetProducibleBuilding(baseBuilder.SmartEconomyRefineryTypes, buildableThings);
 				if (refinery != null && HasSufficientPowerForActor(refinery) &&
 					baseBuilder.TryReserveSmartEconomyControlledRefinery(queue, refinery.Name))
 				{
 					AIUtils.BotDebug("{0} decided to build {1}: Priority override (refinery)", queue.Actor.Owner, DisplayName(refinery.Name));
-					return refinery;
+					return ClaimSmartEconomyTurn(refinery);
 				}
 
 				if (power != null && refinery != null && !HasSufficientPowerForActor(refinery))
 				{
 					AIUtils.BotDebug("{0} decided to build {1}: Priority override (would be low power)", queue.Actor.Owner, DisplayName(power.Name));
-					return power;
+					return ClaimSmartEconomyTurn(power);
 				}
 			}
 
 			// Persistent loaded-harvester congestion is stronger evidence than a fixed
 			// harvester/refinery ratio. Add unloading capacity before discretionary scaling.
-			if (baseBuilder.SmartEconomyWantsRefinery)
+			if (smartEconomyPlanningQueue && baseBuilder.SmartEconomyWantsRefinery)
 			{
 				var refinery = GetProducibleBuilding(baseBuilder.SmartEconomyRefineryTypes, buildableThings);
 				if (refinery != null && HasSufficientPowerForActor(refinery) &&
@@ -656,62 +715,67 @@ namespace OpenRA.Mods.Common.Traits
 				{
 					baseBuilder.LogSmartEconomy("{0} decided to build {1}: sustained unload congestion",
 						queue.Actor.Owner, DisplayName(refinery.Name));
-					return refinery;
+					return ClaimSmartEconomyTurn(refinery);
 				}
 
 				if (power != null && refinery != null && !HasSufficientPowerForActor(refinery))
 				{
 					baseBuilder.LogSmartEconomy("{0} decided to build {1}: congested refinery requires power",
 						queue.Actor.Owner, DisplayName(power.Name));
-					return power;
+					return ClaimSmartEconomyTurn(power);
 				}
 			}
 
 			// Aircraft production and repair are independent activities, but each occupied pad
 			// can service only one aircraft at a time. Scale repair capacity with the live fleet.
-			var airRepair = baseBuilder.AirRepairCapacityBuilding(buildableThings);
+			var airRepair = smartEconomyPlanningQueue ? baseBuilder.AirRepairCapacityBuilding(buildableThings) : null;
 			if (airRepair != null && HasSufficientPowerForActor(airRepair) &&
 				baseBuilder.TryReserveAirRepairCapacity(queue, airRepair.Name))
 			{
 				AIUtils.BotDebug("{0} decided to build {1}: aircraft repair-capacity demand",
 					queue.Actor.Owner, DisplayName(airRepair.Name));
-				return airRepair;
+				return ClaimSmartEconomyTurn(airRepair);
 			}
 
 			if (power != null && airRepair != null && !HasSufficientPowerForActor(airRepair))
 			{
 				AIUtils.BotDebug("{0} decided to build {1}: aircraft repair capacity requires power",
 					queue.Actor.Owner, DisplayName(power.Name));
-				return power;
+				return ClaimSmartEconomyTurn(power);
 			}
 
 			// Field development is discretionary and serialized globally. It is considered only
 			// after opening/refinery/power/repair owners, and it applies its own cash and route gate.
-			var fieldBuilding = baseBuilder.TiberiumFieldManager?.TryChooseBuilding(queue, buildableThings);
+			var fieldBuilding = smartEconomyPlanningQueue ?
+				baseBuilder.TiberiumFieldManager?.TryChooseBuilding(queue, buildableThings) : null;
 			if (fieldBuilding != null)
 			{
 				AIUtils.BotDebug("{0} decided to build {1}: reserved Tiberium field project",
 					queue.Actor.Owner, DisplayName(fieldBuilding.Name));
-				return fieldBuilding;
+				return ClaimSmartEconomyTurn(fieldBuilding);
 			}
 
 			// Friendly SAM coverage is optional for field development. Only reserve an
 			// uncovered economy-air approach after a waiting field project has declined
 			// this idle queue, so SAM construction can never delay Resonator placement.
-			var economySam = baseBuilder.EconomyDefenseSamBuilding(queue, buildableThings);
+			var economySam = smartEconomyPlanningQueue ?
+				baseBuilder.EconomyDefenseSamBuilding(queue, buildableThings) : null;
 			if (economySam != null)
 			{
 				AIUtils.BotDebug("{0} decided to build {1}: uncovered economy air approach",
 					queue.Actor.Owner, DisplayName(economySam.Name));
-				return economySam;
+				return ClaimSmartEconomyTurn(economySam);
 			}
+
+			if (baseBuilder.SmartEconomyEnabled && !smartEconomyPlanningQueue)
+				useSmartEconomyConstruction = true;
 
 			// Preserve the original random production-building selector when cash is floating.
 			// Smart economy only decides refinery work; all other choices retain authored limits.
 			var availableFunds = Math.Max(0, playerResources.Cash + playerResources.Resources);
 			if (baseBuilder.Info.NewProductionCashThreshold > 0 && availableFunds > baseBuilder.Info.NewProductionCashThreshold)
 			{
-				var production = GetProducibleBuilding(baseBuilder.Info.ProductionTypes, buildableThings);
+				var production = GetAdaptiveProductionBuilding(buildableThings);
 				if (production != null && HasSufficientPowerForActor(production))
 				{
 					AIUtils.BotDebug("{0} decided to build {1}: Priority override (production)",
@@ -763,7 +827,7 @@ namespace OpenRA.Mods.Common.Traits
 			}
 
 			// Build everything else
-			foreach (var frac in baseBuilder.Info.BuildingFractions.Shuffle(world.LocalRandom))
+			foreach (var frac in AdaptiveBuildingOrder())
 			{
 				var name = frac.Key;
 				if (limitedFractions.ContainsKey(name))
@@ -827,7 +891,7 @@ namespace OpenRA.Mods.Common.Traits
 				// Enabled smart bots route every refinery source through the same per-Fact
 				// reservation after all other authored checks have accepted the candidate.
 				if (baseBuilder.SmartEconomyRefineryTypes.Contains(name) &&
-					!baseBuilder.TryReserveSmartEconomyControlledRefinery(queue, name))
+					(!smartEconomyPlanningQueue || !baseBuilder.TryReserveSmartEconomyControlledRefinery(queue, name)))
 					continue;
 
 				// Lets build this
@@ -837,6 +901,11 @@ namespace OpenRA.Mods.Common.Traits
 					baseBuilder.LogAdaptiveProduction(
 						"{0} selected adaptive defense building {1}: authored={2} adapted={3} owned={4} buildings={5}",
 						player, DisplayName(name), frac.Value, fractionValue, count, playerBuildings.Length);
+				if (baseBuilder.AdaptiveProductionDebugLogging && baseBuilder.Info.ProductionTypes.Contains(name))
+					baseBuilder.LogAdaptiveProduction(
+						"{0} selected production building {1}: demand={2:0.###} weight={3:0.###}",
+						player, DisplayName(name), baseBuilder.AdaptiveProductionBuildingDemand(actor),
+						AdaptiveProductionBuildingWeight(actor));
 
 				return actor;
 			}
@@ -844,6 +913,14 @@ namespace OpenRA.Mods.Common.Traits
 			// Too spammy to keep enabled all the time, but very useful when debugging specific issues.
 			// AIUtils.BotDebug("{0} couldn't decide what to build for queue {1}.", queue.Actor.Owner, queue.Info.Group);
 			return null;
+		}
+
+		ActorInfo ClaimSmartEconomyTurn(ActorInfo building)
+		{
+			if (baseBuilder.SmartEconomyEnabled)
+				useSmartEconomyConstruction = false;
+
+			return building;
 		}
 
 		// BuildingFractions is already a percentage ceiling, so the adaptive floor/ceiling (Q6: "1%/50%")

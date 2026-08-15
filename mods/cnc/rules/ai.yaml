@@ -1058,7 +1058,7 @@ Player:
 		OpeningRequestRetryDelay: 250
 		OpeningDebugLogging: false
 		AirRepairBuildingTypes: hpad
-		AirUnitsPerRepairBuilding: 4
+		AirUnitsPerRepairBuilding: 0
 		AirRepairCapacityDebugLogging: false
 		FirstTowerTypes: gtwr, gun, atwr, obli
 		FirstTowerSearchRadius: 20
@@ -1460,7 +1460,7 @@ Player:
 		OpeningRequestRetryDelay: 250
 		OpeningDebugLogging: false
 		AirRepairBuildingTypes: hpad
-		AirUnitsPerRepairBuilding: 4
+		AirUnitsPerRepairBuilding: 0
 		AirRepairCapacityDebugLogging: false
 		FirstTowerTypes: gtwr, gun, atwr, obli
 		PrioritizeOpeningFirstTower: true
@@ -1823,8 +1823,7 @@ Player:
 		OpeningRequestRetryDelay: 250
 		OpeningDebugLogging: false
 		AirRepairBuildingTypes: hpad
-		AirUnitsPerRepairBuilding: 4
-		MinimumPostOpeningAirRepairBuildings: 2
+		AirUnitsPerRepairBuilding: 0
 		AirRepairCapacityDebugLogging: false
 		FirstTowerTypes: gtwr, gun, atwr, obli
 		FirstTowerSearchRadius: 20
