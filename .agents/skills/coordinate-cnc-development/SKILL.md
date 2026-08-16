@@ -1,320 +1,322 @@
 ---
 name: coordinate-cnc-development
-description: Coordinate parallel autonomous Command & Conquer development using fresh task-reader, task-maker, speccer, worker, reviewer, and integration agents with isolated context, Git worktrees, durable worker-state files, queued headless MAX testing, individual task PRs, and a final release PR. Use when Codex should run or resume a multi-task autonomous CNC development round without loading the task sheet or task implementation details into the parent coordinator.
+description: Coordinate parallel autonomous Command & Conquer development through isolated task intake, literal worker assignments, one-cycle workers, match narration, policy review, code review, integration, and a cumulative release PR. Use to run or resume a multi-task CNC round without loading task or implementation detail into the coordinator.
 ---
 
 # Coordinate CNC Development
 
-Run this skill from a Terra 5.6 medium session. A skill cannot change its current
-model; record a mismatch in coordinator state and use exact model selection for
-new sessions.
+Run the coordinator with `gpt-5.6-sol` high. It routes durable files and process
+results; it does not solve tasks. Run every isolated development worker and
+integration test/fix worker with `gpt-5.6-sol` medium. Keep Task Maker, Task
+Reader, commenters, policy reviewers, code reviewers, final reviewers, and the
+Merger at their separately pinned tiers below. Allow at most ten worker cycles
+per task; every cycle keeps the normal two-game, narration, policy-review, and
+review contracts.
 
 ## Boundaries
 
-- Read applicable `AGENTS.md`, this skill, and `COORDINATED-CNC-STATE.md`.
-- Do not read the task sheet, worker specs, task reports, code diffs, or role-skill
-  bodies into coordinator context. Route those artifacts to fresh role sessions.
-- Do not ask implementation or preference questions. Let the focused role inspect
-  the repository, choose the strongest safe option, and record material assumptions.
-- Do not exceed granted authority. Record credentials, permission, missing-file,
-  unsafe-path, or unavailable-model blockers and stop only the affected workstream.
-- Treat conversation as control input. Answer status questions and record notes,
-  then continue unless the user explicitly pauses or a real blocker prevents work.
-- Never push to or merge `bleed`. The user promotes the final release PR.
-- Keep task-sheet writes single-owner: only a Task Maker session may edit it.
-- Keep coordinator-state writes single-owner: only the coordinator may edit it.
-- Let workers update only their own state/report and code branch.
-- Treat balance as frozen throughout specification, implementation, review, and
-  integration unless the selected task expressly authorizes the exact balance
-  surface. Never permit tuning values to manufacture behavioral improvement.
-- Preserve unrelated local work. Fetch before trusting remote branch state; never
-  discard or rewrite an unknown change to manufacture a clean checkpoint.
+- Read only applicable `AGENTS.md`, this skill, and `COORDINATED-CNC-STATE.md`.
+  Never read the task sheet, task packets, worker states/reports, diffs, or role
+  skill bodies; fresh roles own those contexts.
+- Only the coordinator edits coordinator state. Only Task Maker edits the task
+  sheet. Workers edit only their branch, state, and report.
+- Treat user messages as control input. Answer questions and continue unless the
+  user explicitly pauses. A question, observation, worker idea, test anomaly, or
+  reviewer suggestion is not permission to create a task.
+- Continuation is authorized by default for the active round. Do not stop after
+  a status response, a `First iteration - testing` handoff, a `Needs help`
+  handoff, or the end of the primary five cycles. Continue reviews, integration,
+  and the allowed Luna minor-fix/testing tail until the release is integrated or
+  the user explicitly says to pause/stop.
+- Create or amend a task only after the user explicitly asks. Put worthwhile
+  unrequested ideas in `DEFERRED_WORK.md`; do not route them to Task Maker.
+- Freeze balance unless the selected task expressly authorizes the exact surface.
+- Never push or merge `bleed`. Preserve unrelated work and use isolated worktrees.
 
-For a long unattended round, use a reversible session-scoped keep-awake mechanism
-when the host permits it. Record its process identity and restore normal sleep
-behavior whenever the round pauses or ends; never change a permanent power plan.
+After compaction, interruption, or a test cycle, reread this skill and coordinator
+state. Restart a fresh role from its durable input instead of reconstructing its
+context.
 
-## Durable layout
+Use only native collaboration agents for coordinator roles. Do not launch Codex
+roles through `scripts/launch_role.py`, `codex exec`, tmux, cron, watchdogs, or
+other external supervisors. Keep the active coordinator turn open with
+`wait_agent`, consume native-agent receipts, and route the next action. A finished
+native agent remains reusable: assign its next isolated durable job with
+`followup_task` instead of treating its thread as a permanently occupied slot.
+Use `list_agents` before claiming capacity is exhausted. If every native agent is
+currently running, wait for one to finish; never replace it with an external role.
 
-Use:
+## Roles and models
 
-```text
-COORDINATED-CNC-STATE.md
-COORDINATED-CNC-ROUNDS/<round-id>/
-  TASK-READER-<worker>.md
-  TASK-PACKET-<worker>.md
-  REVIEW-<worker>.md
-  INTEGRATION.md
-  WORKER-<worker>-<task>/STATE.md
-  WORKER-<worker>-<task>/REPORT.md
-```
-
-Keep `.agents/references/LIBERTY-DAWN-DESIGN.md` as the shared strategic reference.
-Store detailed per-match narratives and policy reviews under the ignored round
-analysis area, for example `.worktrees/coordinated-cnc/<round>/analysis/<worker>/`;
-commit concise conclusions and paths in worker state/report rather than flooding
-Git with every generated analysis.
-
-Commit local state during normal task/release pushes. A task branch contains only
-its own worker state. After task and release PRs are merged or closed, remove
-obsolete active-round files in an ordinary cleanup PR after preserving concise
-results in task reports and coordinator state. Keep raw logs, saves, replays, and
-build artifacts in ignored paths.
-
-## Fresh role sessions
-
-Use a fresh context whenever practical:
-
-| Role | Model | Input |
+| Role | Model | Scope |
 |---|---|---|
-| Task Reader | Terra 5.6 medium | Task sheet, exclusions, output packet path |
-| Task Maker | Terra 5.6 medium | User request/status receipt, task sheet |
-| Speccer | Sol 5.6 xhigh | One task packet, repository, worker-state output path |
-| Worker | Sol 5.6 high | One worker `STATE.md` only |
-| Commenter | Terra 5.6 medium | Assigned match/control logs and optional design doc |
-| Policy Reviewer | Terra 5.6 medium | Design doc, short task context, match narrative |
-| Spec Policy Reviewer | Sol 5.6 high | Design doc, short task context, proposed-policy narrative |
-| Escalated Policy Reviewer | Sol 5.6 xhigh | Once after at least ten persistent-problem game tests |
-| Cycle Reviewer | Terra 5.6 medium | One worker state, cumulative scoped diff, and evidence through cycle 5/10/15/20 |
-| Reviewer | Sol 5.6 high | One task PR, its worker state, evidence |
-| Integrator | Sol 5.6 high | Reviewed branch heads and integration state |
+| Coordinator | Sol high | Routing and state only |
+| Task Reader | Luna medium | Select one task and write its literal worker state |
+| Task Maker/updater | Luna medium | Sole task-sheet writer |
+| Task Intake Reviewer | Terra medium | Ask exactly two pre-creation questions |
+| Worker cycles 1-5 | Sol medium | Implementation/correction and two games |
+| Worker escalation | Sol medium | At most two exceptional cycles for an unresolved blocker |
+| Worker optional cycles 6-10 | Sol medium | Minor obvious fixes/testing only |
+| Match Commenter | Luna medium | One factual narrative per game |
+| Match Policy Reviewer | Luna medium | One policy review per game |
+| Cycle-3 Reviewer | Luna medium | One advisory code concern |
+| Task/release Reviewer | Terra medium | Independent PR/release gate |
+| Integrator/Merger | Terra medium | Merge and release coordination |
+| Integration worker/tester (cycles 1-5) | Sol medium | Combined testing and minor fixes |
+| Integration escalation | Sol medium | Explicitly authorized diagnosis for a release-blocking failure |
 
-Prefer native fresh agents while slots exist for roles other than Commenter and
-Policy Reviewer. Spawn those native delegated roles with no inherited conversation
-history. Always launch `commenter`, `policy-reviewer`, `policy-speccer`, and
-`policy-escalation` through `scripts/launch_role.py`, even when a native slot is
-free. The caller selects only the role and strict job envelope; it must not
-reconstruct or override model, reasoning, sandbox, output, or session settings.
-Because the native four-agent limit includes the coordinator, use the same launcher
-for additional independent sessions of other roles. Do not share a mutable
-worktree. The launcher tells each session to read/work its role-instruction file
-and job file without asking the coordinator to preload that role. Its worker
-prompt points only at the worker state, which is the worker's complete contract.
-Put launcher event/process output under the ignored `.worktrees/` coordination
-area; keep only concise durable results in tracked state.
+Use exact model IDs `gpt-5.6-luna`, `gpt-5.6-terra`, and `gpt-5.6-sol` when
+spawning native agents. Prefer a new native thread when a free slot exists. When
+the native thread limit has been reached, reuse a completed agent with
+`followup_task`; tell it to treat the new durable job file as its complete
+assignment and not rely on prior-task context. Never share a mutable worktree.
 
-The external launcher pins `danger-full-access` with approval policy `never` so an
-unattended worker can build, game-test, push its assigned branch, and open its PR.
-Use it only with an exact authorized Liberty Dawn worktree and task-local job file;
-never point it at a home directory, workspace root shared by another writer, or an
-unrelated repository.
+Analysis roles run in exclusive output directories under `workspace-write`.
+Commenter jobs contain `artifacts`, `task_context`, optional `design_reference`,
+and `output`. Policy jobs contain exactly `design_reference`, `task_context`,
+`narrative`, and `output`. Stage regular-file copies under `inputs/`; never pass
+source, diffs, full specs, or preferred conclusions. Serialize policy calls with
+the shared `policy-scratchpad` slot, stage the canonical scratchpad, and promote a
+valid replacement of at most 3,000 Unicode characters atomically.
 
-Commenter and Policy Reviewer sessions instead run from their dedicated output
-directory under `workspace-write` with approval policy `never`; they cannot mutate
-the repository worktree. Keep each such output directory exclusive to one running
-role.
+## Task intake
 
-Use exact model IDs `gpt-5.6-terra` and `gpt-5.6-sol`. Use the role's reasoning
-effort from the table. Do not silently substitute a weaker model; record the
-blocker or receive a user override.
+For a new task explicitly requested by the user:
 
-Commenter and Policy Reviewer launcher jobs must be strict JSON path envelopes
-stored directly in their output directory. Commenter keys are `artifacts`, optional
-`design_reference`, and `output`; its output is `NARRATIVE.md`. Policy-role keys
-are exactly `design_reference`, `task_context`, `narrative`, and `output`; its output is
-`POLICY-REVIEW.md`. The launcher rejects extra inline context, a different design
-document, missing inputs, relative paths, or outputs outside the role directory.
-Before launch, copy only authorized Commenter game evidence into that role
-directory's `inputs/` subtree. Copy the one proposed or factual narrative to the
-Policy Reviewer directory as `inputs/NARRATIVE.md`; do not use symlinks. Stage a
-short `inputs/TASK-CONTEXT.md` containing task identity, why, change category,
-in/out-of-scope behavior, and explicit balance authority. The
-launcher rejects analysis inputs outside these staged roots.
-Also stage the canonical policy scratchpad as the regular file
-`inputs/POLICY-SCRATCHPAD.md` while holding the shared capacity-one
-`policy-scratchpad` resource slot. Every successful policy role must freshly write
-both `POLICY-REVIEW.md` and a complete `POLICY-SCRATCHPAD.md` replacement. The
-launcher validates both as non-symlink regular UTF-8 files, limits the replacement
-to 3,000 Unicode characters, and atomically promotes it before publishing success.
-Keep the slot held through foreground completion; invalid output leaves the
-canonical scratchpad unchanged.
-Run the launcher with `--validate-cli` for a no-agent smoke against the installed
-Codex parser. This retains every constructed option, substitutes parser help only
-for the free-form prompt, and proves a legacy approval option is rejected. Use
-`--background` or foreground execution for the real isolated role; there is no
-native analysis-role bypass.
+1. Stage its short request as task context and launch a fresh Terra-medium
+   `task-intake-reviewer`. It asks exactly two high-value questions about expected
+   behavior, wrong outcomes, predicted change, why, scope, or bug facts.
+2. Relay those questions. Do not create the task until the user answers them.
+3. Launch a fresh Luna-medium Task Maker with the request, answers, and intake
+   receipt. It validates and writes the smallest task-sheet change.
 
-## Start a round
+Status receipts and amendments to an existing authorized task do not require the
+two-question new-task gate. Normal questions never enter this flow.
 
-1. Fetch remotes without discarding local changes. Choose and record one exact
-   base commit for all five task branches.
-2. Create a round ID and coordinator entry from
-   `assets/COORDINATOR-STATE.template.md`.
-3. For worker slots 1 through 5, launch a fresh Task Reader one at a time. Give it
-   the already-selected task IDs so it cannot duplicate them. Receive one task
-   packet only; do not read the packet yourself. Immediately and atomically record
-   the returned task ID, worker slot, packet path, selection time, and `claimed`
-   phase in coordinator state before launching another reader. Treat every durable
-   claim and active task PR as excluded after restart. Once the batch is claimed,
-   have a Task Maker mark those rows `in progress`.
-4. Launch a fresh Speccer for each packet, one at a time. It creates that worker's
-   `STATE.md` using the dedicated spec skill, consults one Sol-high Policy Reviewer
-   through a proposed-policy narrative for AI-policy work, and records useful
-   policy and cross-task/PR concerns.
-5. Create five branches and worktrees from the recorded base. Put only the
-   assigned state file into each task branch. A fixed five-task round is allowed;
-   record dependency or overlap concerns but do not silently reorder the user's
-   task sheet.
-6. Launch one Sol-high worker per state file. Use external sessions when native
-   slots are exhausted. Workers may code while other workers' games run.
+## Start or resume a five-task round
 
-If fewer than five eligible tasks exist, run the available tasks rather than
-inventing work. If none exist but coordinator state contains reviewed task heads
-awaiting combination, launch the Integrator instead of creating an empty round. If
-there is neither eligible nor pending integration work, record the empty queue and
-remain ready without inventing a full-game proof requirement for an integration-
-only bookkeeping pass.
+1. Fetch safely and record one exact common base for all task branches.
+2. Launch fresh Task Readers sequentially. After each returned ID, atomically
+   record its claim before selecting another. The coordinator reads only returned
+   ID/title/path/blocker metadata.
+3. Have Task Maker mark the claimed rows `in progress`.
+4. Have each Task Reader write the task's concise worker `STATE.md` directly from
+   the authoritative task text, user amendments, supplied base/branch paths, and
+   directly linked dependency pointers. It may normalize formatting but must not
+   add behavior, acceptance rules, architecture, policy, geometry, exclusions,
+   tests, or constraints that the user did not request.
+5. Create one branch/worktree per task from the common base and launch every
+   authorized cycle as `worker-sol`, which is pinned to Sol medium.
 
-## Task changes from the user
+There is no speccer or specification-policy stage. The Sol-medium first-cycle worker
+owns repository investigation, decomposition into small implementation steps,
+and selection of the simplest faithful solution. Preserve the user's words as
+the acceptance authority. If repository history, a prior task, reviewer, or
+generated state conflicts with the user text, the user text wins. Ask the user
+only when a genuine ambiguity would materially change player-visible behavior;
+never resolve ambiguity by inventing a broader or opposite requirement.
 
-When the user adds or changes a task, launch a fresh Task Maker with the exact user
-message. It either writes a ready task or preserves a draft and returns missing
-questions. Relay those questions without loading the task sheet. Bug additions to
-an existing task require a new or revised spec before selection.
+Run fewer than five tasks when fewer are eligible; never invent work. Do not add
+barriers between unrelated tasks: as soon as one task has a valid packet/state,
+launch its worker; as soon as its worker state is complete, launch its next
+authorized development cycle. Other workers, games, narrators, policy
+reviews, and code reviews continue independently. Wait only for a task's own
+durable prerequisite, a named cross-worker dependency, a contested resource
+slot, or the merge/integration gate that genuinely needs all included heads.
+Workers may code while other workers' simulations or analysis roles run. Route an
+authorized role through `spawn_agent` when a native slot is free. Otherwise reuse
+a completed native agent through `followup_task`; completed threads do not block
+new work. If every native agent is actively running, use `wait_agent` and route
+the next job as soon as one completes. Maintain useful occupancy without external
+Codex processes: if a worker is not blocked on its own code/check or required
+analysis, start its next bounded game run. Do not leave a reusable native agent
+idle while an eligible packet, worker cycle, or review is ready.
 
-## Resource scheduling
+Completion is a routing event, not a stopping point. When any worker, narrator,
+reviewer, or integration agent exits, immediately consume its receipt,
+update only the coordinator state, and launch the next authorized role or test
+for that stream. A cycle marked `First iteration - testing` still advances to
+its next cycle; it is not a reason to pause the round. A blocked stream gets a
+targeted diagnosis or is recorded as blocked, while unrelated streams continue.
+Do not finish a coordinator turn, report the round idle, or wait for user input
+while any eligible next cycle, review, game, or integration action exists.
 
-- Start with two total game slots and one large-build slot across all workers.
-- Treat full-engine ordinary-AI simulations as cheap primary feedback, not a late
-  acceptance expense. Queue them from each worker's first behavioral test and keep
-  game slots busy while other workers inspect, code, build, or analyze evidence.
-- After each materially judged match or paired batch, launch a fresh Terra-medium
-  Commenter. For AI-policy work, pass its narrative to a fresh Terra-medium Policy
-  Reviewer before the worker chooses the next change. These model sessions do not
-  consume local game slots and can analyze while another simulation runs.
-- After each isolated product-change cycle 5, 10, 15, and 20 that occurs, launch
-  a fresh Terra-medium `cycle-reviewer` before the next product change or
-  publication. Give it only that worker's state, cumulative diff from the common
-  base, relevant evidence through the checkpoint, and a task-local output path.
-  It returns at most one advisory concern. Require the worker to record an
-  evidence-based adoption or rejection; an adopted code change consumes the next
-  normal cycle. Do not grant extra cycles or replace the final Sol-high PR review.
-- Run every large build or full test through the protected entry mode; callers
-  select their ownership role but cannot select a filename or capacity:
+For every coordinator status receipt, report all five selected task streams
+individually, including each task's model/role, current phase, build or game
+wait, active test, analysis/review, completion, blocker, and next action. Do not
+omit a task because it is waiting for a resource or has already completed its
+cycle.
 
-  ```text
-  python3 scripts/with_resource_slots.py --lock-dir <repository-root>/.agents/locks \
-    --large-build-entry worker -- COMMAND...
-  ```
+Every two minutes during concurrent development, perform a lightweight progress
+audit of each active role's process record, child game/build state, durable state
+timestamp, and latest output. A build, bounded game, or required analysis that is
+still advancing is healthy and must not be interrupted. If a role has no live
+child, no durable output movement, and no declared wait for two consecutive
+audits, send a checkpoint request; safely relaunch or escalate only after the
+role's exact assignment and process evidence show it is stalled. Never kill a
+healthy game merely because its parent agent is quiet.
 
-  Reviewers use `--large-build-entry reviewer` and Integrators use
-  `--large-build-entry integrator`. This covers `make`, `make all`, `make test`,
-  `make check`, equivalent full `dotnet`/`msbuild` suites, packaging, and other
-  comparably expensive shared-engine checks. The helper owns the canonical
-  capacity-one lock and complete command-tree lifetime. After the foreground
-  command exits it allows short-lived assigned descendants a bounded grace period,
-  then terminates and reaps persistent build servers before releasing. Do not use
-  direct `flock` or generic `--resource large-build`.
-- Continue to use generic `scripts/with_resource_slots.py` reservations for game
-  batches; games retain independent capacity two. `game`, `large-build`, and
-  `policy-scratchpad` are registered repository-global resources. Every round and
-  worktree must pass the main repository's canonical `.agents/locks` directory;
-  the helper rejects alternate namespaces and caller-selected capacities before
-  opening a lock. Retained JSON is last-known metadata only; use `--status` for an
-  authoritative nonblocking flock snapshot of a registered resource.
-- Serialize every Policy Reviewer scratchpad staging, foreground role completion,
-  validation, and promotion with `--resource policy-scratchpad --capacity 1`
-  against that same canonical namespace. Do not background the protected role or
-  release the slot before promotion finishes.
-- A worker may reserve two game slots for a two-game comparison. Use the existing
-  `launch-ai-parallel.py` inside the reservation.
-- Keep every game's support directory, logs, saves, replay, map artifact, port,
-  benchmark prefix, and display isolated.
-- If measured contention makes tests unreliable, reduce concurrency. If the
-  orchestration itself needs code changes, send a high-priority task request to a
-  Task Maker; do not let every worker patch the coordinator ad hoc.
+The coordinator must perform these audits in a loop while work remains. A user
+status question is an observation point, not the end of the loop: answer it,
+reread this skill/state when due, and continue routing. Keep the native
+coordinator turn active with `wait_agent` while authorized work remains.
 
-## Review and release flow
+## Development-cycle contract
 
-1. Each worker opens one task PR from its isolated branch and proposes `Complete -
-   testing` or `First iteration - testing` in its state.
-2. Confirm every due cycle-5/10/15/20 Terra review and worker disposition is
-   recorded. Missing an advisory checkpoint does not authorize a retroactive
-   code change outside the cycle budget; complete it before publication when
-   possible or record the gap for the final reviewer.
-3. Launch one fresh Reviewer per PR after the worker finishes. Give the reviewer
-   only that PR, state/spec, and evidence. Return its single highest-impact
-   compatible correction to the worker for at most one review-response code/test
-   cycle. Record disagreements; review never replaces CI or runtime evidence.
-4. After reviews and required task-PR checks, launch the Integrator. It creates one
-   stable `agent/cnc-<round>-release` branch from the common base and locally
-   merges the reviewed feature heads with merge commits. Its initial head is RC1.
-   Do not invoke GitHub's merge action on the individual PRs.
-5. Open one draft release PR from that stable branch to `bleed`. Keep source PRs
-   open and visible.
-6. Ask the five workers to test the combined candidate for up to three
-   code-change cycles each. Stop workers whose relevant combined tests pass.
-7. Put required release fixes on individual repair branches based on the current
-   release head. Merge reviewed repair heads back into the same stable release
-   branch; each new tested head becomes RC2, RC3, or RC4 and automatically updates
-   the existing release PR. Repeat at most four candidate rounds, providing at
-   most twelve merged-branch cycles per task and 32 total cycles per task including
-   its 20 isolated cycles.
-8. Reactivate a stopped worker when a later repair touches its subsystem or
-   invalidates its evidence.
-9. When the final candidate passes, have the Task Maker finalize task-sheet
-   statuses and promote the draft release PR to the product release PR. The user
-   decides whether to merge it.
+A worker invocation performs exactly one code-change/test cycle, updates durable
+state, and exits. A cycle includes at least two distinct, adversarial full-engine
+games. Each game:
 
-## Recovery
+- uses a deliberately constructed custom scenario;
+- runs at most 120 seconds wall-clock, normally headless MAX;
+- enables all game features and all AI modules;
+- includes ordinary enemy AIs, not passive test bots;
+- tests a different assumption, pressure, topology, timing, resource state,
+  control, or failure mode from the other game; and
+- gets its own fresh Luna Commenter and its own fresh Luna Policy Reviewer before
+  the next code decision. Never combine two games into one analysis call.
 
-After compaction, interruption, or a role crash, reread this skill and coordinator
-state. Never select a new task merely because a worker temporarily stopped
-responding. Launch recoverable background workers with one explicit round-local
-registry:
+`Full-engine game` means the real engine, ordinary AIs, and enabled modules—not a
+full-length natural match. Focused custom scenarios capped at 120 seconds are the
+normal acceptance evidence. Stop once the task-specific behavior and adversarial
+response have been observed. Do not require natural game-over, a winner, an
+unbounded endurance match, or a complete-game old/control pair unless the user or
+literal task explicitly requests one. Missing match outcome cannot by itself
+downgrade proven focused behavior to `First iteration` or stall integration.
 
-```text
-python3 scripts/launch_role.py ... --background \
-  --watchdog-registry <ignored-round-role-root>/external-workers.json
-```
+Making the game run correctly is part of every worker's job. A launch that fails
+before the intended map reaches world tick 1 is not a game, not evidence, and not
+a completed cycle. The worker must diagnose and repair its own build, content,
+launcher, path, display/audio, process-cleanup, or test-scenario setup in the
+task worktree as needed, then rerun the game. Do not repeat an identical broken
+launch and count it as testing. If a common host/runtime blocker remains after
+reasonable targeted diagnosis, preserve the exact logs and process evidence,
+preserve the exact logs and process evidence, but continue repair and retry
+within the authorized cycle budget; do not spend the remaining cycle budget
+pretending the product was tested or surrender the cycle early.
+Before recording an environment blocker, compare the failed command with the
+repository's canonical launcher and the latest known-good setup. If the failure
+matches a solved setup omission (especially missing installed-content staging,
+SupportDir links, map placement, or display/runtime arguments), repair the
+invocation and rerun it. A stale `blocked` line in a worker state does not
+override a coordinator-proven remediation; the coordinator must route a fresh
+Terra retry with the canonical setup before escalating or stopping that stream.
+A worker may not surrender an authorized cycle: it must spend the cycle on
+repair and valid reruns, and may hand off only after the available cycle budget
+is exhausted.
+If the coordinator has concrete evidence that a reported environment blocker is
+a known, already-solved invocation/setup omission, that evidence itself
+authorizes a fresh recovery job even when the worker state still contains a
+stale `blocked` line. The recovery job must read the state, apply the canonical
+fix, run the remaining cycle work, and reconcile the state/report; do not wait
+for a new user prompt or pretend that stale state is a safety barrier.
 
-Background launch probes the user service manager within a fixed bound. When it
-is usable, the supervisor runs as a transient collected user service; otherwise
-the launcher keeps the detached-session fallback and mandatory watchdog path.
-Read `supervisor.json.supervision` for the selected mechanism, capability result,
-fallback reason, service unit (when applicable), timeout bounds, and durable
-stdin/stdout/stderr destinations. A timed-out ambiguous service launch is blocked
-and never followed by a second fallback supervisor.
+Cycle 1 is the substantial Sol-medium implementation. Cycles 2-5 are Sol-medium
+corrections to observed bugs or wrong assumptions, not redesign invitations. After
+cycle 3, run one Luna-medium cycle code review before cycle 4. If the task is still
+not close to the spec after cycle 5, report `Needs help`/`First iteration -
+testing`; five failed rounds require human or stronger-agent help. If a code or
+policy reviewer identifies a critical finding that makes the release unsafe or
+impossible to run—or a common engine/launcher blocker—and the normal worker has
+made a good-faith response without resolving it, the coordinator may authorize
+at most two exceptional Sol-medium cycles. Each must name the critical finding,
+make the smallest targeted correction, run the normal two games, and record why
+escalation was necessary. Missing evidence, an imperfect but plausible solution,
+or ordinary policy disagreement is not escalation-worthy; mark `First iteration -
+testing`. Do not use this path for ordinary work or to bypass Terra cycles; stop
+after two and request help if still blocked.
 
-Run one watcher for that registry. Its default 30-second poll is production-safe
-and may not be configured above 60 seconds. Always give it the canonical global
-resource-lock directory so recovery consumes CNC-94 kernel truth:
+The coordinator may authorize up to five extra cycles (6-10) only when remaining
+work is minor and obvious. Sol-medium workers handle this tail; Luna narrators
+and policy reviewers keep their normal roles. Workers may fix a narrow defect,
+assertion, guard, configuration
+mistake, or test setup; they must not introduce new architecture, policy, balance,
+or broad refactors. Stop the tail and request help as soon as the fix is no longer
+obvious. Never exceed ten isolated cycles.
 
-```text
-python3 scripts/watch_external_workers.py \
-  --registry <ignored-round-role-root>/external-workers.json \
-  --resource-lock-dir <repository-root>/.agents/locks
-```
+When a task reaches `First iteration - testing` or `Needs help` after cycle 5,
+inspect its durable handoff and continue with Sol-medium cycles 6-10 whenever the
+remaining work is minor, obvious, or evidence-only. This is normal authorized
+continuation, not an escalation and not permission to redesign. If the task is
+not suitable for a Luna fix, route its final review/integration handoff while
+the other streams continue; do not leave the entire round idle waiting for it.
 
-The watcher audits only explicitly registered assignment roots, serializes each
-assignment on its stable kernel lease, emits diagnostics only when the durable
-state signature changes, and recomputes every replacement through the current
-protected launcher. Treat `blocked` as actionable; never bypass it with a raw PID,
-stored command, metadata-only lock claim, or manually reused output directory.
+After a worker receipt, re-read the coordinator state and route that stream
+again: launch cycle N+1 when authorized, launch its required reviewer when due,
+or hand it to the merger/integration gate when complete. Do this independently
+for all five streams; completion of one stream must never leave the other four
+waiting for a new coordinator invocation.
 
-To stop an external worker, publish durable stop intent and let the same verified
-audit path resolve its assignment-owned tree:
+For old/new performance comparisons, use matched custom scenarios with many
+pre-spawned units and structures (normally two Iron Reapers with at least 300
+units plus structures each). Cap every leg at 120 seconds and compare pre-Codex,
+newest with advanced squad modules disabled, and newest with them enabled.
 
-```text
-python3 scripts/stop_external_worker.py --output-dir <assignment-root> \
-  --reason <reason> --requested-by <actor> \
-  --resource-lock-dir <repository-root>/.agents/locks
-```
+## Resource use
 
-An explicitly stopped worker remains suppressed until a later authorized start.
-Resume it only through the same assignment lease and protected launcher policy:
+- Start with two game slots and one large-build slot; try three game slots only
+  after measured contention shows evidence remains valid.
+- Reserve slots with `with_resource_slots.py`; isolate support directories, ports,
+  maps, logs, saves, replays, benchmarks, and displays.
+- Use the game launcher/supervisor as the completion helper. Start the bounded
+  foreground job and wait for its process completion/result file; do not spend
+  agent turns sleeping or repeatedly polling. If the execution tool yields, use
+  one blocking wait/resume mechanism rather than reasoning between polls.
+- Reduce concurrency when timing or evidence is contaminated. Record an
+  orchestration problem in deferred work unless the user explicitly requests a
+  task for it.
 
-```text
-python3 scripts/start_external_worker.py --output-dir <assignment-root> \
-  --reason <authorization-reason> --requested-by <actor> \
-  --resource-lock-dir <repository-root>/.agents/locks
-```
+## Review and release
 
-The start transaction requires a fully resolved `stopped` generation, conclusively
-non-live recorded identities, and available registered kernel resources. It preserves
-the superseded stop intent in `start.json`; a rejected request leaves stop intent in
-force, and competing starts can create at most one new attempt generation.
+1. Each worker opens one task PR and proposes `Complete - testing` or `First
+   iteration - testing` with evidence and remaining risks.
+2. Launch one fresh Terra-medium final Reviewer per PR. Return its single highest
+   compatible correction for at most one response cycle using the model tier
+   appropriate to the current phase.
+3. Launch the Terra-medium Integrator after reviewed PRs and checks are ready. It
+   merges feature heads locally into one stable release branch and opens one draft
+   PR to `bleed`; source PRs stay open.
+4. Use fresh Sol-medium integration workers/testers for the combined candidate's
+   first five integration cycles,
+   with the normal worker's complete game setup, bounded two-games-per-cycle
+   contract, and Luna narration/policy review. Use the repository's canonical
+   full-engine launcher and pass its installed-content argument; verify each
+   isolated support directory contains the staged `Content` link before launch.
+   A custom command must reproduce the same content, engine-directory, support,
+   map, display/audio, timeout, cleanup, and artifact preflight. Put fixes on
+   task-scoped repair branches and merge reviewed fixes into the stable branch.
+   Stop after five release-wide integration test/fix cycles.
+   A pre-map-start launch failure invalidates that integration cycle; the Terra
+   worker must repair the launcher/runtime setup or isolate the common host cause
+   before consuming another integration cycle. Five repeated invalid launches are
+   not a successful release test.
+5. When the candidate passes, send structured receipts to Task Maker and promote
+   the draft release PR. The user decides whether to merge it.
 
-Do not signal a PID from `process.json` directly and never use a broad process-name
-kill. Automatic restart remains suppressed until a future explicit authorized
-start clears or supersedes stop intent.
+Policy reviews guide the next decision; they do not silently veto coordination.
+Workers and the coordinator must explicitly disposition every highest-priority
+recommendation: implement it in the next smallest change, test it in the next
+focused game, or reject it with a concrete scope, evidence, or safety reason.
+Silently ignoring a correct policy recommendation is a failed process step.
+Before launching the next worker cycle, the coordinator must verify that the
+durable handoff names that recommendation and its chosen disposition, and must
+copy that disposition into the next cycle's job envelope. A worker may not replace
+it with a lower-priority investigation merely because the recommendation is
+inconvenient. If it is rejected, the next cycle must contain the concrete
+scope/safety evidence for rejection.
+Resolve `release blocker` findings before promotion, schedule one focused
+adversarial follow-up for `required follow-up`, and record `advisory` observations
+without stalling a passing cycle. “Insufficient evidence” alone is not a blocker
+unless the missing evidence is part of literal task acceptance or a required
+control. Never pressure a reviewer to inflate confidence; convert uncertainty
+into the smallest discriminating test and record the result.
+
+Keep raw artifacts ignored. Store detailed narratives/reviews under the round's
+ignored analysis directory and concise conclusions/paths in worker reports. The
+passive task history is never read; only Task Maker appends a one-line release
+record after confirmed merge to `bleed`.
+
+Never start an external Codex role. If legacy external roles are discovered while
+resuming old state, stop only their exact recorded child PIDs after verifying they
+do not own a healthy game/build, preserve their worktrees, and resume each job on
+a native agent.
