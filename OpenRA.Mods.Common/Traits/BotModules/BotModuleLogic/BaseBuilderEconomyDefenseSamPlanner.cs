@@ -120,6 +120,26 @@ namespace OpenRA.Mods.Common.Traits
 
 			var coverageRadius = CoverageRadiusCells(actorInfo);
 			var traffic = RefineryTrafficCells();
+			var plannedCell = baseBuilder.TiberiumFieldManager?.PlannedSamLocation(anchor.Value.ActorId);
+			if (plannedCell.HasValue)
+			{
+				var cell = plannedCell.Value;
+				if ((cell - anchor.Value.Cell).LengthSquared <= coverageRadius * coverageRadius &&
+					!buildingInfo.Tiles(cell).Any(traffic.Contains) &&
+					world.CanPlaceBuilding(cell, actorInfo, buildingInfo, null) &&
+					(!distanceToBaseIsImportant ||
+						buildingInfo.IsCloseEnoughToBase(world, player, actorInfo, cell)))
+				{
+					Debug("planned field placement type={0} anchor={1} cell={2} coverage={3}",
+						actorType, anchor.Value.ActorId, cell, coverageRadius);
+					return cell;
+				}
+
+				Debug("withheld planned field placement type={0} anchor={1} cell={2}: planned cell unavailable",
+					actorType, anchor.Value.ActorId, cell);
+				return null;
+			}
+
 			var cells = world.Map.FindTilesInAnnulus(anchor.Value.Cell,
 				Info.EconomyDefenseSamMinimumRadius, Info.EconomyDefenseSamMaximumRadius)
 				.OrderBy(c => (c - anchor.Value.Cell).LengthSquared)

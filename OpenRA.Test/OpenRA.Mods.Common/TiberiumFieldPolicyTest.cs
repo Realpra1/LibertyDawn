@@ -120,6 +120,18 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
+		public void PlannedBorderPlacementSkipsUnavailableCandidatesAndRequiresALegalCell()
+		{
+			var unavailable = new CPos(10, 4);
+			var available = new CPos(12, 4);
+			var candidates = new[] { unavailable, available };
+
+			Assert.That(TiberiumFieldPolicy.FirstLegalCell(candidates, c => c == available),
+				Is.EqualTo(available));
+			Assert.That(TiberiumFieldPolicy.FirstLegalCell(candidates, c => false), Is.Null);
+		}
+
+		[Test]
 		public void CoverageIsOneToOneAndDeterministic()
 		{
 			var selected = TiberiumFieldPolicy.SelectOneToOneCoverage(new[]
@@ -138,18 +150,54 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
-		public void ProjectRankingUsesRouteDemandSafetyCommitmentThenIdentity()
+		public void ProjectRankingChoosesClosestUnconstructedTreeToFactThenIdentity()
 		{
 			var selected = TiberiumFieldPolicy.BestProject(new[]
 			{
 				new TiberiumFieldProjectCandidate(1, false, 100, 100, 1),
-				new TiberiumFieldProjectCandidate(4, true, 10, 4, 1000),
-				new TiberiumFieldProjectCandidate(3, true, 10, 5, 1000),
-				new TiberiumFieldProjectCandidate(2, true, 10, 5, 500)
+				new TiberiumFieldProjectCandidate(4, true, 100, -4, 1),
+				new TiberiumFieldProjectCandidate(3, true, 1, -3, 1000),
+				new TiberiumFieldProjectCandidate(2, true, 10, -3, 500)
 			});
 
 			Assert.That(selected.HasValue, Is.True);
 			Assert.That(selected.Value.TreeActorId, Is.EqualTo(2));
+		}
+
+		[Test]
+		public void Pr120DirectionalPlansKeepExactResonatorSamAndBorderOffsets()
+		{
+			var tree = new CPos(40, 40);
+			var north = TiberiumFieldPolicy.CreateBuildPlan(tree, new CPos(40, 20));
+			var south = TiberiumFieldPolicy.CreateBuildPlan(tree, new CPos(40, 60));
+			var west = TiberiumFieldPolicy.CreateBuildPlan(tree, new CPos(20, 40));
+			var east = TiberiumFieldPolicy.CreateBuildPlan(tree, new CPos(60, 40));
+
+			Assert.That(north.ResonatorCell, Is.EqualTo(new CPos(40, 39)));
+			Assert.That(north.SamCell, Is.EqualTo(new CPos(34, 39)));
+			Assert.That(north.BorderBuildingCell, Is.EqualTo(new CPos(39, 33)));
+			Assert.That(north.BorderBuildingType, Is.EqualTo("proc"));
+			Assert.That(south.SamCell, Is.EqualTo(new CPos(45, 39)));
+			Assert.That(south.BorderBuildingCell, Is.EqualTo(new CPos(39, 43)));
+			Assert.That(south.BorderBuildingType, Is.EqualTo("fix"));
+			Assert.That(west.SamCell, Is.EqualTo(new CPos(34, 39)));
+			Assert.That(west.BorderBuildingCell, Is.EqualTo(new CPos(35, 42)));
+			Assert.That(east.SamCell, Is.EqualTo(new CPos(45, 38)));
+			Assert.That(east.BorderBuildingCell, Is.EqualTo(new CPos(44, 42)));
+		}
+
+		[Test]
+		public void TreeReservationAndFallbackSpacingUseLiteralCellRadii()
+		{
+			var tree = new CPos(10, 10);
+			Assert.That(TiberiumFieldPolicy.IsWithinTreeReservation(tree,
+				new[] { new CPos(18, 10) }), Is.True);
+			Assert.That(TiberiumFieldPolicy.IsWithinTreeReservation(tree,
+				new[] { new CPos(19, 10) }), Is.False);
+			Assert.That(TiberiumFieldPolicy.HasMinimumResonatorSpacing(new CPos(20, 20),
+				new[] { new CPos(26, 20), new CPos(20, 26) }), Is.True);
+			Assert.That(TiberiumFieldPolicy.HasMinimumResonatorSpacing(new CPos(20, 20),
+				new[] { new CPos(25, 20) }), Is.False);
 		}
 
 		[Test]

@@ -38,7 +38,8 @@ namespace OpenRA
 		ExtraData = 0x20,
 		TargetIsCell = 0x40,
 		Subject = 0x80,
-		Grouped = 0x100
+		Grouped = 0x100,
+		TargetActorGeneration = 0x200
 	}
 
 	static class OrderFieldsExts
@@ -91,7 +92,7 @@ namespace OpenRA
 			GroupedActors = groupedActors;
 		}
 
-		public static Order Deserialize(World world, BinaryReader r)
+		public static Order Deserialize(World world, BinaryReader r, int? legacyTargetGenerationFrame = null)
 		{
 			try
 			{
@@ -118,10 +119,18 @@ namespace OpenRA
 							{
 								case TargetType.Actor:
 									{
-										if (world != null && TryGetActorFromUInt(world, r.ReadUInt32(), out var targetActor))
-											target = Target.FromActor(targetActor);
+										var targetActorId = r.ReadUInt32();
+										var targetGeneration = flags.HasField(OrderFields.TargetActorGeneration) ? r.ReadInt32() : (int?)null;
+										if (world != null && TryGetActorFromUInt(world, targetActorId, out var targetActor))
+										{
+											if (targetGeneration == null && legacyTargetGenerationFrame != null)
+												targetGeneration = targetActor.GenerationAtNetFrame(legacyTargetGenerationFrame.Value);
+
+											target = targetGeneration != null ? Target.FromActor(targetActor, targetGeneration.Value) : Target.FromActor(targetActor);
+										}
+
 										break;
-									}
+								}
 
 								case TargetType.FrozenActor:
 									{
@@ -339,6 +348,9 @@ namespace OpenRA
 					if (Target.SerializableType != TargetType.Invalid)
 						fields |= OrderFields.Target;
 
+					if (Target.SerializableType == TargetType.Actor)
+						fields |= OrderFields.TargetActorGeneration;
+
 					if (Queued)
 						fields |= OrderFields.Queued;
 
@@ -366,6 +378,7 @@ namespace OpenRA
 						{
 							case TargetType.Actor:
 								w.Write(UIntFromActor(Target.SerializableActor));
+								w.Write(Target.SerializableGeneration);
 								break;
 							case TargetType.FrozenActor:
 								w.Write(Target.FrozenActor.Viewer.PlayerActor.ActorID);

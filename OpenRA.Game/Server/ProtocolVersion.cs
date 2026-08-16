@@ -34,8 +34,9 @@ namespace OpenRA.Server
 		//   - Length-prefixed string specifying a value / data
 		// - 0xFF: World order
 		//   - Length-prefixed string specifying the order name
-		//   - OrderFields enum encoded as a byte: specifies the data included in the rest of the order
-		//   - Order-specific data - see OpenRA.Game/Server/Order.cs for details
+		//   - OrderFields enum encoded as an Int16: specifies the data included in the rest of the order
+		//   - Order-specific data - see OpenRA.Game/Network/Order.cs for details. Protocol 19 adds the
+		//     issue-time actor generation after actor target IDs so delayed targets retain their identity.
 		// - 0x10: Order acknowledgement (sent from the server to a client in response to a packet with world orders)
 		//   - Int32 containing the frame number that the client should apply the orders it sent
 		//   - byte containing the number of sent order packets to apply
@@ -77,6 +78,11 @@ namespace OpenRA.Server
 		// The protocol for server and world orders
 		// This applies after the handshake has completed, and is provided to support
 		// alternative server implementations that wish to support multiple versions in parallel
-		public const int Orders = 18;
+		public const int ActorTargetGeneration = 19;
+		public const int RecordedBotPolicy = 19;
+		public const int Orders = 19;
+
+		public static bool HasActorTargetGeneration(int version) { return version >= ActorTargetGeneration; }
+		public static bool HasRecordedBotPolicy(int version) { return version >= RecordedBotPolicy; }
 	}
 }

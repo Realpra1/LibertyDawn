@@ -25,7 +25,8 @@ def without_tree_actors(text: str) -> str:
 
 
 def add_controlled_trees(text: str, title: str, include_east_tree: bool,
-	include_west_tree: bool = True, include_iron_followup: bool = False) -> str:
+	include_west_tree: bool = True, include_iron_followup: bool = False,
+	include_fallback_resonator: bool = False) -> str:
 	start = text.index("Title:")
 	end = text.index("\n", start)
 	text = text[:start] + f"Title: {title}" + text[end:]
@@ -33,39 +34,9 @@ def add_controlled_trees(text: str, title: str, include_east_tree: bool,
 \tCnc102TreeWest: splitblue
 \t\tOwner: Neutral
 \t\tLocation: 43,162
-\tCnc102WestSiteGuard01: brik
-\t\tOwner: Neutral
-\t\tLocation: 42,159
-\tCnc102WestSiteGuard02: brik
-\t\tOwner: Neutral
-\t\tLocation: 43,159
-\tCnc102WestSiteGuard03: brik
-\t\tOwner: Neutral
-\t\tLocation: 44,159
-\tCnc102WestSiteGuard04: brik
-\t\tOwner: Neutral
-\t\tLocation: 45,159
-\tCnc102WestSiteGuard05: brik
-\t\tOwner: Neutral
-\t\tLocation: 42,160
-\tCnc102WestSiteGuard06: brik
-\t\tOwner: Neutral
-\t\tLocation: 45,160
-\tCnc102WestSiteGuard07: brik
-\t\tOwner: Neutral
-\t\tLocation: 42,161
-\tCnc102WestSiteGuard08: brik
-\t\tOwner: Neutral
-\t\tLocation: 43,161
-\tCnc102WestSiteGuard09: brik
-\t\tOwner: Neutral
-\t\tLocation: 44,161
-\tCnc102WestSiteGuard10: brik
-\t\tOwner: Neutral
-\t\tLocation: 45,161
 \tCnc102TreeEast: split3
 \t\tOwner: Neutral
-\t\tLocation: 44,162
+\t\tLocation: 60,179
 \tCnc102WestRefinery: proc
 \t\tOwner: Multi0
 \t\tLocation: 35,162
@@ -75,15 +46,6 @@ def add_controlled_trees(text: str, title: str, include_east_tree: bool,
 \tCnc102WestFactory: fact
 \t\tOwner: Multi0
 \t\tLocation: 35,158
-\tCnc102WestFactoryB: fact
-\t\tOwner: Multi0
-\t\tLocation: 24,155
-\tCnc102WestFactoryC: fact
-\t\tOwner: Multi0
-\t\tLocation: 24,160
-\tCnc102WestFactoryD: fact
-\t\tOwner: Multi0
-\t\tLocation: 24,165
 \tCnc102WestPowerA: nuk2
 \t\tOwner: Multi0
 \t\tLocation: 39,158
@@ -114,6 +76,24 @@ def add_controlled_trees(text: str, title: str, include_east_tree: bool,
 \tCnc102WestDefense: gtwr
 \t\tOwner: Multi0
 \t\tLocation: 39,168
+\tCnc102WestMcv: mcv
+\t\tOwner: Multi0
+\t\tLocation: 24,180
+\tCnc102WestHarvester1: harv
+\t\tOwner: Multi0
+\t\tLocation: 28,180
+\tCnc102WestHarvester2: harv
+\t\tOwner: Multi0
+\t\tLocation: 30,180
+\tCnc102WestHarvester3: harv
+\t\tOwner: Multi0
+\t\tLocation: 32,180
+\tCnc102WestHarvester4: harv
+\t\tOwner: Multi0
+\t\tLocation: 34,180
+\tCnc102WestHarvester5: harv
+\t\tOwner: Multi0
+\t\tLocation: 36,180
 \tCnc102EastRefinery: proc
 \t\tOwner: Multi1
 \t\tLocation: 49,162
@@ -123,12 +103,6 @@ def add_controlled_trees(text: str, title: str, include_east_tree: bool,
 \tCnc102EastFactory: fact
 \t\tOwner: Multi1
 \t\tLocation: 49,158
-\tCnc102EastFactoryB: fact
-\t\tOwner: Multi1
-\t\tLocation: 55,165
-\tCnc102EastFactoryC: fact
-\t\tOwner: Multi1
-\t\tLocation: 75,160
 \tCnc102EastPowerA: nuk2
 \t\tOwner: Multi1
 \t\tLocation: 46,158
@@ -162,9 +136,36 @@ def add_controlled_trees(text: str, title: str, include_east_tree: bool,
 \tCnc102EastDefense: gtwr
 \t\tOwner: Multi1
 \t\tLocation: 46,168
+\tCnc102EastMcv: mcv
+\t\tOwner: Multi1
+\t\tLocation: 84,180
+\tCnc102EastHarvester1: harv
+\t\tOwner: Multi1
+\t\tLocation: 72,180
+\tCnc102EastHarvester2: harv
+\t\tOwner: Multi1
+\t\tLocation: 74,180
+\tCnc102EastHarvester3: harv
+\t\tOwner: Multi1
+\t\tLocation: 76,180
+\tCnc102EastHarvester4: harv
+\t\tOwner: Multi1
+\t\tLocation: 78,180
+\tCnc102EastHarvester5: harv
+\t\tOwner: Multi1
+\t\tLocation: 80,180
+"""
+	if include_fallback_resonator:
+		actors += """\
+\tCnc102FallbackSpacingResonatorWest: resonator
+\t\tOwner: Multi0
+\t\tLocation: 20,150
+\tCnc102FallbackSpacingResonator: resonator
+\t\tOwner: Multi1
+\t\tLocation: 84,150
 """
 	if not include_east_tree:
-		actors = actors.replace("\tCnc102TreeEast: split3\n\t\tOwner: Neutral\n\t\tLocation: 44,162\n", "")
+		actors = actors.replace("\tCnc102TreeEast: split3\n\t\tOwner: Neutral\n\t\tLocation: 60,179\n", "")
 	if not include_west_tree:
 		actors = actors.replace("\tCnc102TreeWest: splitblue\n\t\tOwner: Neutral\n\t\tLocation: 43,162\n", "")
 	if include_iron_followup:
@@ -182,12 +183,20 @@ def add_controlled_trees(text: str, title: str, include_east_tree: bool,
 	return text
 
 
-def rules(block_west: str | None, block_east: str | None, renew_trees: bool) -> str:
+def rules(block_west: str | None, block_east: str | None, renew_trees: bool,
+	blocker_owner: str = "Neutral", unit_blockers: bool = False) -> str:
 	blockers = []
 	if block_west:
-		blockers.append(f'\tActor.Create("brik", true, {{ Owner = Neutral, Location = CPos.New({block_west}) }})')
+		owner = "Multi0" if blocker_owner == "Owned" else blocker_owner
+		blockers.append(f'\tActor.Create("brik", true, {{ Owner = Player.GetPlayer("{owner}"), Location = CPos.New({block_west}) }})')
 	if block_east:
-		blockers.append(f'\tActor.Create("brik", true, {{ Owner = Neutral, Location = CPos.New({block_east}) }})')
+		owner = "Multi1" if blocker_owner == "Owned" else blocker_owner
+		blockers.append(f'\tActor.Create("brik", true, {{ Owner = Player.GetPlayer("{owner}"), Location = CPos.New({block_east}) }})')
+	if unit_blockers:
+		blockers.extend([
+			'\tActor.Create("e1", true, { Owner = Player.GetPlayer("Multi0"), Location = CPos.New(43,161) })',
+			'\tActor.Create("e1", true, { Owner = Player.GetPlayer("Multi1"), Location = CPos.New(60,178) })',
+		])
 	blocker_body = "\n".join(blockers) or "\t-- Discovery variant intentionally leaves both planned sites legal."
 	renewal_body = """\
 \t-- Make follow-up fields available before the first project finishes. The
@@ -228,11 +237,25 @@ def rules(block_west: str | None, block_east: str | None, renew_trees: bool) -> 
 \t\tOpeningDebugLogging: true
 \t\tEconomyDefenseSamDebugLogging: true
 \t\tTiberiumFieldTreeTypes: splitblue
+\t\tOpeningMcvCount: 0
+\t\tSmartEconomyHarvestersPerRefinery: 10
+\t\tSmartEconomyFreeHarvestersPerRefinery: 10
+\t\tSmartEconomyWaitingHarvesterThreshold: 99
 \tBaseBuilderBotModule@ironreaper:
 \t\tTiberiumFieldDebugLogging: true
 \t\tOpeningDebugLogging: true
 \t\tEconomyDefenseSamDebugLogging: true
 \t\tTiberiumFieldTreeTypes: split3
+\t\tOpeningMcvCount: 0
+\t\tSmartEconomyHarvestersPerRefinery: 10
+\t\tSmartEconomyFreeHarvestersPerRefinery: 10
+\t\tSmartEconomyWaitingHarvesterThreshold: 99
+
+FACT:
+\tPower:
+\t\tAmount: 2000
+\tStoresResources:
+\t\tCapacity: 100000
 
 CNC102FACT:
 \tInherits: FACT
@@ -265,12 +288,12 @@ World:
 \t\tOuterSupportRadius: 8
 """, f"""WorldLoaded = function()
 \tNeutral = Player.GetPlayer("Neutral")
-\tPlayer.GetPlayer("Multi0").Cash = 5000
-\tPlayer.GetPlayer("Multi1").Cash = 5000
+\tPlayer.GetPlayer("Multi0").Cash = 100000
+\tPlayer.GetPlayer("Multi1").Cash = 100000
 \tfor i = 1, 6 do
 \t\tTrigger.AfterDelay(DateTime.Seconds(i * 10), function()
-\t\t\tPlayer.GetPlayer("Multi0").Cash = 5000
-\t\t\tPlayer.GetPlayer("Multi1").Cash = 5000
+\t\t\tPlayer.GetPlayer("Multi0").Cash = 100000
+\t\t\tPlayer.GetPlayer("Multi1").Cash = 100000
 \t\tend)
 \tend
 \tfor i = 0, 28 do
@@ -279,14 +302,12 @@ World:
 \t\t\tPlayer.GetPlayer("Multi1").Cash = 100000
 \t\tend)
 \tend
-\tTrigger.AfterDelay(DateTime.Seconds(66), function()
-\t\tfor i = 0, 7 do
-\t\t\tActor.Create("cnc102fact", true, {{ Owner = Player.GetPlayer("Multi0"), Location = CPos.New(10 + i * 4, 185) }})
-\t\t\tActor.Create("cnc102fact", true, {{ Owner = Player.GetPlayer("Multi1"), Location = CPos.New(60 + i * 4, 185) }})
-\t\tend
-\tend)
-\tTrigger.AfterDelay(DateTime.Seconds(88), function()
+\tTrigger.AfterDelay(DateTime.Seconds(5), function()
 {blocker_body}
+\tend)
+\tTrigger.AfterDelay(DateTime.Seconds(110), function()
+\t\tMedia.Debug("CNC102 planner-count Brutalis=" .. #Player.GetPlayer("Multi0").GetActorsByType("resonator") ..
+\t\t\t" IronReaper=" .. #Player.GetPlayer("Multi1").GetActorsByType("resonator"))
 \tend)
 {renewal_body}\tTrigger.AfterDelay(DateTime.Seconds(220), function()
 \t\tMedia.Debug("CNC102 live-resonators Brutalis=" .. #Player.GetPlayer("Multi0").GetActorsByType("resonator") ..
@@ -299,7 +320,9 @@ end
 def write_map(source: Path, output: Path, title: str,
 	block_west: str | None, block_east: str | None,
 	include_east_tree: bool = True, renew_trees: bool = False,
-	include_west_tree: bool = True, include_iron_followup: bool = False) -> None:
+	include_west_tree: bool = True, include_iron_followup: bool = False,
+	blocker_owner: str = "Neutral", unit_blockers: bool = False,
+	include_fallback_resonator: bool = False) -> None:
 	with tempfile.TemporaryDirectory() as temporary:
 		root = Path(temporary)
 		with zipfile.ZipFile(source) as archive:
@@ -307,8 +330,10 @@ def write_map(source: Path, output: Path, title: str,
 		map_yaml = root / "map.yaml"
 		text = without_tree_actors(map_yaml.read_text(encoding="utf-8-sig"))
 		map_yaml.write_text(add_controlled_trees(text, title, include_east_tree,
-			include_west_tree, include_iron_followup), encoding="utf-8")
-		rules_yaml, lua = rules(block_west, block_east, renew_trees)
+			include_west_tree, include_iron_followup, include_fallback_resonator),
+			encoding="utf-8")
+		rules_yaml, lua = rules(block_west, block_east, renew_trees,
+			blocker_owner, unit_blockers)
 		(root / "rules.yaml").write_text(rules_yaml, encoding="utf-8")
 		(root / "cnc102.lua").write_text(lua, encoding="utf-8")
 		output.parent.mkdir(parents=True, exist_ok=True)
@@ -334,6 +359,12 @@ def main() -> None:
 	write_map(source, args.output / "cnc102-iron-legal-continuation.oramap",
 		"CNC-102 Iron Reaper Legal Resonator Continuation", None, None,
 		include_west_tree=False, include_iron_followup=True)
+	write_map(source, args.output / "cnc102-planner-owned-blockers.oramap",
+		"CNC-102 Planner Owned Blockers", "43, 161", "60, 178",
+		blocker_owner="Owned", unit_blockers=True)
+	write_map(source, args.output / "cnc102-planner-fallback-spacing.oramap",
+		"CNC-102 Planner Fallback Spacing", "43, 161", "60, 178",
+		include_fallback_resonator=True)
 
 
 if __name__ == "__main__":

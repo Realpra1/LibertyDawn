@@ -28,6 +28,7 @@ namespace OpenRA.Network
 		readonly Queue<(int Frame, int SyncHash, ulong DefeatState)> sync = new Queue<(int, int, ulong)>();
 		readonly Dictionary<int, int> lastClientsFrame = new Dictionary<int, int>();
 		readonly int orderLatency;
+		readonly int legacyOrderLatency;
 		int ordersFrame;
 
 		public readonly int TickCount;
@@ -35,11 +36,15 @@ namespace OpenRA.Network
 		public readonly bool IsValid;
 		public readonly Session LobbyInfo;
 		public readonly string Filename;
+		public readonly string ReplayVersion;
+		public readonly int OrdersProtocol;
 
 		public ReplayConnection(string replayFilename)
 		{
 			Filename = replayFilename;
-			FinalGameTick = ReplayMetadata.Read(replayFilename).GameInfo.FinalGameTick;
+			var replayMetadata = ReplayMetadata.Read(replayFilename);
+			FinalGameTick = replayMetadata.GameInfo.FinalGameTick;
+			ReplayVersion = replayMetadata.GameInfo.Version;
 
 			// Parse replay data into a struct that can be fed to the game in chunks
 			// to avoid issues with all immediate orders being resolved on the first tick.
@@ -75,6 +80,8 @@ namespace OpenRA.Network
 									IsValid = true;
 								else if (o.OrderString == "SyncInfo" && !IsValid)
 									LobbyInfo = Session.Deserialize(o.TargetString);
+								else if (o.OrderString == "HandshakeResponse")
+									OrdersProtocol = HandshakeResponse.Deserialize(o.TargetString).OrdersProtocol;
 							}
 						}
 					}
@@ -120,7 +127,13 @@ namespace OpenRA.Network
 			var gameSpeeds = Game.ModData.Manifest.Get<GameSpeeds>();
 			var gameSpeedName = LobbyInfo.GlobalSettings.OptionOrDefault("gamespeed", gameSpeeds.DefaultSpeed);
 			orderLatency = gameSpeeds.Speeds[gameSpeedName].OrderLatency;
+			legacyOrderLatency = LegacyOrderLatency(LobbyInfo.GlobalSettings.Dedicated, orderLatency);
 			ordersFrame = orderLatency;
+		}
+
+		internal static int LegacyOrderLatency(bool dedicated, int configuredOrderLatency)
+		{
+			return dedicated ? configuredOrderLatency : 1;
 		}
 
 		void IConnection.StartGame() { }
@@ -155,7 +168,10 @@ namespace OpenRA.Network
 						if (orders.Frame == 0)
 							orderManager.ReceiveImmediateOrders(o.ClientId, orders.Orders);
 						else
+						{
+							orders.Orders.UseLegacyTargetGenerationFrame(orders.Frame - legacyOrderLatency);
 							orderManager.ReceiveOrders(o.ClientId, orders);
+						}
 					}
 					else
 						throw new InvalidDataException($"Received unknown packet from client {o.ClientId} with length {o.Packet.Length}");

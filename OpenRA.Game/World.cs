@@ -105,6 +105,8 @@ namespace OpenRA
 		public bool ShroudObscures(PPos uv) { return RenderPlayer != null && !RenderPlayer.Shroud.IsExplored(uv); }
 
 		public bool IsReplay => OrderManager.Connection is ReplayConnection;
+		public string ReplayVersion => (OrderManager.Connection as ReplayConnection)?.ReplayVersion;
+		public int ReplayOrdersProtocol => (OrderManager.Connection as ReplayConnection)?.OrdersProtocol ?? Server.ProtocolVersion.Orders;
 
 		public bool IsLoadingGameSave => OrderManager.NetFrameNumber <= OrderManager.GameSaveLastFrame;
 

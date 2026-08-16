@@ -44,6 +44,79 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
+		public void SecondaryQueueProtectsSiloAndConfiguredDefenseAfterFourWalls()
+		{
+			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, 3, 4,
+				true, false, true, false, true, false, true, false), Is.EqualTo(SecondaryQueueOpeningChoice.None));
+			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, 4, 4,
+				true, false, true, false, true, false, true, false), Is.EqualTo(SecondaryQueueOpeningChoice.Silo));
+			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, 4, 4,
+				false, true, false, false, true, false, true, false), Is.EqualTo(SecondaryQueueOpeningChoice.FirstDefense));
+			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, 4, 4,
+				false, true, false, false, true, true, true, false), Is.EqualTo(SecondaryQueueOpeningChoice.None));
+		}
+
+		[Test]
+		public void SecondaryQueueHoldsBoundaryWithoutClaimingImpossibleWork()
+		{
+			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, 4, 4,
+				false, false, true, false, true, false, true, false), Is.EqualTo(SecondaryQueueOpeningChoice.Hold));
+			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, 4, 4,
+				true, false, false, false, true, false, true, false), Is.EqualTo(SecondaryQueueOpeningChoice.Hold));
+			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, 4, 4,
+				true, false, false, true, true, false, true, false), Is.EqualTo(SecondaryQueueOpeningChoice.Hold));
+			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, 4, 4,
+				false, true, false, false, true, false, false, false), Is.EqualTo(SecondaryQueueOpeningChoice.Hold));
+			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, 4, 4,
+				false, true, false, false, true, false, false, true), Is.EqualTo(SecondaryQueueOpeningChoice.Hold));
+		}
+
+		[Test]
+		public void SecondaryQueueReleasesPermanentlyUnavailableConfiguredDefense()
+		{
+			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, 4, 4,
+				false, true, false, false, false, false, false, false), Is.EqualTo(SecondaryQueueOpeningChoice.None),
+				"A defense goal skipped by the existing opening policy must not strand the secondary queue.");
+			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, 4, 4,
+				false, true, false, false, true, false, false, false), Is.EqualTo(SecondaryQueueOpeningChoice.Hold),
+				"A configured defense that is only temporarily unavailable must retain the boundary.");
+		}
+
+		[Test]
+		public void FirstQueueSiloCommitmentCompletesSecondaryBoundaryAtItsCapturedTarget()
+		{
+			var target = OpeningPolicyLogic.ObserveSecondaryQueueSiloTarget(0, 1, true);
+			Assert.That(target, Is.EqualTo(2),
+				"The four-wall boundary must capture the next live Silo even when another queue owns it.");
+			Assert.That(OpeningPolicyLogic.SecondaryQueueSiloTargetCompleted(target, 1), Is.False);
+			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, 4, 4,
+				false, false, false, true, true, false, false, false), Is.EqualTo(SecondaryQueueOpeningChoice.Hold));
+
+			Assert.That(OpeningPolicyLogic.SecondaryQueueSiloTargetCompleted(target, 0), Is.False,
+				"Losing the baseline Silo must not weaken the boundary-time target.");
+			Assert.That(OpeningPolicyLogic.SecondaryQueueSiloTargetCompleted(target, 1), Is.False,
+				"Replacing only the lost baseline Silo is not completion of the committed target.");
+			Assert.That(OpeningPolicyLogic.SecondaryQueueSiloTargetCompleted(target, 2), Is.True);
+			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, 4, 4,
+				false, true, false, false, true, false, true, false),
+				Is.EqualTo(SecondaryQueueOpeningChoice.FirstDefense),
+				"The configured defense must release immediately after the first queue completes the Silo target.");
+		}
+
+		[Test]
+		public void SecondaryBoundaryDoesNotClaimLowCashOrPowerWorkDuringRecovery()
+		{
+			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, 4, 4,
+				true, false, false, false, true, false, true, false), Is.EqualTo(SecondaryQueueOpeningChoice.Hold),
+				"An unaffordable or low-power Silo is held without creating a production claim.");
+			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, 4, 4,
+				false, true, false, false, true, false, false, false), Is.EqualTo(SecondaryQueueOpeningChoice.Hold),
+				"An unaffordable or low-power defense is held without creating a production claim.");
+			Assert.That(OpeningPolicyLogic.HoldOptionalConstructionForFirstRefinery(true, 0, true, false), Is.True,
+				"The existing committed-refinery recovery hold remains authoritative.");
+		}
+
+		[Test]
 		public void AdvancedUnitMilestonesWaitForTheRequiredStructurePrefix()
 		{
 			Assert.That(OpeningPolicyLogic.RequiredPrefixComplete(new[] { 0, 1 }, 3), Is.False);

@@ -10,7 +10,10 @@
 #endregion
 
 using System.IO;
+using System.Runtime.Serialization;
 using NUnit.Framework;
+using OpenRA.Network;
+using OpenRA.Server;
 using OpenRA.Traits;
 
 namespace OpenRA.Test
@@ -69,6 +72,52 @@ namespace OpenRA.Test
 				IsImmediate = true,
 			}.Serialize();
 			Assert.That(RoundTripOrder(o), Is.EqualTo(o));
+		}
+
+		[TestCase(TestName = "Actor generation history resolves exact net-frame state")]
+		public void ActorGenerationHistoryResolvesExactFrame()
+		{
+			var history = new ActorGenerationHistory();
+			history.Record(5, 1);
+			history.Record(9, 2);
+
+			Assert.That(history.AtNetFrame(4), Is.EqualTo(0));
+			Assert.That(history.AtNetFrame(5), Is.EqualTo(1));
+			Assert.That(history.AtNetFrame(8), Is.EqualTo(1));
+			Assert.That(history.AtNetFrame(9), Is.EqualTo(2));
+		}
+
+		[TestCase(TestName = "Legacy replay latency follows recorded server type")]
+		public void LegacyReplayLatencyUsesLocalServerContract()
+		{
+			Assert.That(ReplayConnection.LegacyOrderLatency(false, 6), Is.EqualTo(1));
+			Assert.That(ReplayConnection.LegacyOrderLatency(true, 6), Is.EqualTo(6));
+		}
+
+		[TestCase(TestName = "Actor-generation wire format bumps orders protocol")]
+		public void ActorGenerationWireFormatHasProtocolVersion()
+		{
+			Assert.That(ProtocolVersion.Orders, Is.EqualTo(19));
+			Assert.That(ProtocolVersion.ActorTargetGeneration, Is.EqualTo(19));
+			Assert.That(ProtocolVersion.RecordedBotPolicy, Is.EqualTo(19));
+			Assert.That(ProtocolVersion.HasActorTargetGeneration(18), Is.False);
+			Assert.That(ProtocolVersion.HasActorTargetGeneration(19), Is.True);
+			Assert.That(ProtocolVersion.HasRecordedBotPolicy(18), Is.False);
+			Assert.That(ProtocolVersion.HasRecordedBotPolicy(19), Is.True);
+
+			var actor = (Actor)FormatterServices.GetUninitializedObject(typeof(Actor));
+			actor.Generation = 7;
+			var bytes = new Order("Test", null, Target.FromActor(actor), false).Serialize();
+			using (var reader = new BinaryReader(new MemoryStream(bytes)))
+			{
+				Assert.That((OrderType)reader.ReadByte(), Is.EqualTo(OrderType.Fields));
+				Assert.That(reader.ReadString(), Is.EqualTo("Test"));
+				var fields = (OrderFields)reader.ReadInt16();
+				Assert.That(fields.HasField(OrderFields.TargetActorGeneration), Is.True);
+				Assert.That((TargetType)reader.ReadByte(), Is.EqualTo(TargetType.Actor));
+				Assert.That(reader.ReadUInt32(), Is.EqualTo(0));
+				Assert.That(reader.ReadInt32(), Is.EqualTo(7));
+			}
 		}
 	}
 }

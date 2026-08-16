@@ -19,6 +19,7 @@ namespace OpenRA.Network
 	{
 		readonly Order[] orders;
 		readonly MemoryStream data;
+		int? legacyTargetGenerationFrame;
 		public OrderPacket(Order[] orders)
 		{
 			this.orders = orders;
@@ -46,10 +47,15 @@ namespace OpenRA.Network
 			var reader = new BinaryReader(data);
 			while (data.Position < data.Length)
 			{
-				var o = Order.Deserialize(world, reader);
+				var o = Order.Deserialize(world, reader, legacyTargetGenerationFrame);
 				if (o != null)
 					yield return o;
 			}
+		}
+
+		public void UseLegacyTargetGenerationFrame(int frame)
+		{
+			legacyTargetGenerationFrame = frame;
 		}
 
 		public byte[] Serialize(int frame)

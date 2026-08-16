@@ -56,11 +56,11 @@ namespace OpenRA.Traits
 			generation = 0;
 		}
 
-		Target(Actor a)
+		Target(Actor a, int? generation = null)
 		{
 			type = TargetType.Actor;
 			actor = a;
-			generation = a.Generation;
+			this.generation = generation ?? a.Generation;
 
 			terrainCenterPosition = WPos.Zero;
 			terrainPositions = null;
@@ -86,6 +86,7 @@ namespace OpenRA.Traits
 		public static Target FromTargetPositions(in Target t) { return new Target(t.CenterPosition, t.Positions.ToArray()); }
 		public static Target FromCell(World w, CPos c, SubCell subCell = SubCell.FullCell) { return new Target(w, c, subCell); }
 		public static Target FromActor(Actor a) { return a != null ? new Target(a) : Invalid; }
+		internal static Target FromActor(Actor a, int generation) { return a != null ? new Target(a, generation) : Invalid; }
 		public static Target FromFrozenActor(FrozenActor fa) { return new Target(fa); }
 
 		public Actor Actor => actor;
@@ -227,6 +228,7 @@ namespace OpenRA.Traits
 		// Expose internal state for serialization by the orders code *only*
 		internal TargetType SerializableType => type;
 		internal Actor SerializableActor => actor;
+		internal int SerializableGeneration => generation;
 		internal CPos? SerializableCell => cell;
 		internal SubCell? SerializableSubCell => subCell;
 		internal WPos SerializablePos => terrainCenterPosition;

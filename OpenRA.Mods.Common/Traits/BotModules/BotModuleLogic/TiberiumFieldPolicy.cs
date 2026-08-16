@@ -76,6 +76,33 @@ namespace OpenRA.Mods.Common.Traits
 		}
 	}
 
+	public enum TiberiumFieldApproach
+	{
+		North,
+		East,
+		South,
+		West
+	}
+
+	public readonly struct TiberiumFieldBuildPlan
+	{
+		public readonly TiberiumFieldApproach Approach;
+		public readonly CPos ResonatorCell;
+		public readonly CPos SamCell;
+		public readonly CPos BorderBuildingCell;
+		public readonly string BorderBuildingType;
+
+		public TiberiumFieldBuildPlan(TiberiumFieldApproach approach, CPos resonatorCell,
+			CPos samCell, CPos borderBuildingCell, string borderBuildingType)
+		{
+			Approach = approach;
+			ResonatorCell = resonatorCell;
+			SamCell = samCell;
+			BorderBuildingCell = borderBuildingCell;
+			BorderBuildingType = borderBuildingType;
+		}
+	}
+
 	public sealed class TiberiumFieldPerimeterPlan
 	{
 		public readonly CPos[] WallCells;
@@ -97,6 +124,54 @@ namespace OpenRA.Mods.Common.Traits
 	/// </summary>
 	public static class TiberiumFieldPolicy
 	{
+		public const int TreeReservationRadius = 8;
+		public const int MinimumResonatorSpacing = 6;
+
+		public static TiberiumFieldApproach ApproachFrom(CPos tree, CPos fact)
+		{
+			var delta = fact - tree;
+			if (Math.Abs(delta.Y) >= Math.Abs(delta.X))
+				return delta.Y <= 0 ? TiberiumFieldApproach.North : TiberiumFieldApproach.South;
+
+			return delta.X < 0 ? TiberiumFieldApproach.West : TiberiumFieldApproach.East;
+		}
+
+		// Exact tree-relative variants from PR120 tests/ResonatorDesigns.oramap at
+		// e8440144b2a5654a6b47523a5dd3240b3f904f54 (blob a730e7cdfab32a8b5ba5edb08a607692cc696937).
+		public static TiberiumFieldBuildPlan CreateBuildPlan(CPos tree, CPos fact)
+		{
+			var approach = ApproachFrom(tree, fact);
+			switch (approach)
+			{
+				case TiberiumFieldApproach.North:
+					return new TiberiumFieldBuildPlan(approach, tree + new CVec(0, -1),
+						tree + new CVec(-6, -1), tree + new CVec(-1, -7), "proc");
+				case TiberiumFieldApproach.South:
+					return new TiberiumFieldBuildPlan(approach, tree + new CVec(0, -1),
+						tree + new CVec(5, -1), tree + new CVec(-1, 3), "fix");
+				case TiberiumFieldApproach.West:
+					return new TiberiumFieldBuildPlan(approach, tree + new CVec(0, -1),
+						tree + new CVec(-6, -1), tree + new CVec(-5, 2), "nuk2");
+				default:
+					return new TiberiumFieldBuildPlan(approach, tree + new CVec(0, -1),
+						tree + new CVec(5, -2), tree + new CVec(4, 2), "nuk2");
+			}
+		}
+
+		public static bool IsWithinTreeReservation(CPos tree, IEnumerable<CPos> footprint)
+		{
+			var radiusSquared = TreeReservationRadius * TreeReservationRadius;
+			return footprint.Any(c => (c - tree).LengthSquared <= radiusSquared);
+		}
+
+		public static bool HasMinimumResonatorSpacing(CPos candidate,
+			IEnumerable<CPos> existingOrPlannedResonators)
+		{
+			var minimumSquared = MinimumResonatorSpacing * MinimumResonatorSpacing;
+			return existingOrPlannedResonators.All(c => c == candidate ||
+				(c - candidate).LengthSquared >= minimumSquared);
+		}
+
 		public static bool IsValidSavedSpatialIdentity(CPos savedTreeLocation,
 			CPos liveTreeLocation, IEnumerable<CPos> resonatorFootprint,
 			Func<CPos, bool> isMapCell, long effectDistanceSquared, long effectRangeSquared)
@@ -162,6 +237,15 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			foreach (var candidate in candidates)
 				if (candidate != reservedCell && isLegal(candidate))
+					return candidate;
+
+			return null;
+		}
+
+		public static CPos? FirstLegalCell(IEnumerable<CPos> candidates, Func<CPos, bool> isLegal)
+		{
+			foreach (var candidate in candidates)
+				if (isLegal(candidate))
 					return candidate;
 
 			return null;
@@ -346,9 +430,7 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			var ranked = candidates
 				.OrderByDescending(c => c.RouteFeasible)
-				.ThenByDescending(c => c.UsefulDemand)
 				.ThenByDescending(c => c.SafetyScore)
-				.ThenBy(c => c.RemainingCommitment)
 				.ThenBy(c => c.TreeActorId)
 				.ToArray();
 			return ranked.Length > 0 ? ranked[0] : (TiberiumFieldProjectCandidate?)null;
