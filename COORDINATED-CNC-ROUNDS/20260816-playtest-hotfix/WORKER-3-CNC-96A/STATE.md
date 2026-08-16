@@ -28,7 +28,8 @@ Diagnose actor discovery, ownership transfer, claim/reservation lifecycle, and s
 
 - Analysis directory: `/root/github/.build/coordinated-cnc/20260816-playtest-hotfix/WORKER-3-CNC-96A/analysis`
 - Report: `COORDINATED-CNC-ROUNDS/20260816-playtest-hotfix/WORKER-3-CNC-96A/REPORT.md`
-- Product head: pending final local commit.
+- Product head: `3c01f53805` (`68cefc613d` claim implementation plus
+  `3c01f53805` overflow-hardening correction).
 - Focused Stealth Tank policy tests: 87/87 passed.
 - Protected check: `make test` passed with Release build 0 warnings/errors and
   full CNC validation; `git diff --check` clean.
@@ -48,4 +49,6 @@ Diagnose actor discovery, ownership transfer, claim/reservation lifecycle, and s
 - Initial fresh Terra-medium review required overflow-safe four-squad validation;
   `SquadCount` now saturates at `int.MaxValue`, its boundary test passes, and the
   87-case focused suite plus `git diff --check` rerun cleanly.
-- Fresh correction review: pending.
+- Fresh correction review:
+  `analysis/reviews/final-terra-correction/REVIEW.md`; verdict READY.
+- Final status: Complete - testing. Branch is local only; no push, PR, or merge.

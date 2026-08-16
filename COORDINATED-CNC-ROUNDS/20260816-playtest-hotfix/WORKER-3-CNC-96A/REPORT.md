@@ -97,4 +97,8 @@ Terra review is asked to gate this explicit scope/evidence disposition.
 - Correction: `SquadCount` now saturates at `int.MaxValue`; a boundary assertion
   proves the invalid configuration remains above the four-squad ceiling. Focused
   suite rerun: 87/87 passed; `git diff --check` clean.
-- Fresh correction review: pending.
+- Fresh correction review:
+  `/root/github/.build/coordinated-cnc/20260816-playtest-hotfix/WORKER-3-CNC-96A/analysis/reviews/final-terra-correction/REVIEW.md`.
+  Verdict: READY. No further correction requested.
+- Final product head: `3c01f53805` (claim implementation `68cefc613d`,
+  overflow-hardening correction `3c01f53805`).
