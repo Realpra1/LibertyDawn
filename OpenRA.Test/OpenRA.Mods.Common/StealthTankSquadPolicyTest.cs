@@ -150,6 +150,9 @@ namespace OpenRA.Test.Mods.Common
 				Is.EqualTo(StealthTankSquadPolicy.MaximumSquadCount));
 			Assert.That(StealthTankSquadPolicy.SquadCount(4, true),
 				Is.GreaterThan(StealthTankSquadPolicy.MaximumSquadCount));
+			Assert.That(StealthTankSquadPolicy.SquadCount(int.MaxValue, true),
+				Is.GreaterThan(StealthTankSquadPolicy.MaximumSquadCount),
+				"Overflow must not let an invalid configuration bypass the four-squad ruleset guard.");
 		}
 
 		[TestCase(0, 0)]

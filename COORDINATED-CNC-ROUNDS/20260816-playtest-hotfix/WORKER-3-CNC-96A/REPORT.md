@@ -89,4 +89,12 @@ Terra review is asked to gate this explicit scope/evidence disposition.
 
 ## Review
 
-- Fresh Terra-medium final review: pending.
+- Initial fresh Terra-medium final review:
+  `/root/github/.build/coordinated-cnc/20260816-playtest-hotfix/WORKER-3-CNC-96A/analysis/reviews/final-terra/REVIEW.md`.
+  It accepted the core claim lifecycle, default-profile isolation, save/load,
+  transport, and exact-two-game evidence, but required one fix: prevent
+  `int.MaxValue + 1` overflow from bypassing the four-squad ruleset guard.
+- Correction: `SquadCount` now saturates at `int.MaxValue`; a boundary assertion
+  proves the invalid configuration remains above the four-squad ceiling. Focused
+  suite rerun: 87/87 passed; `git diff --check` clean.
+- Fresh correction review: pending.

@@ -31,7 +31,8 @@ namespace OpenRA.Mods.Common.Traits
 
 		public static int SquadCount(int maximumHarassmentGroups, bool includeAttackGroup)
 		{
-			return Math.Max(0, maximumHarassmentGroups) + (includeAttackGroup ? 1 : 0);
+			var harassmentGroups = Math.Max(0, maximumHarassmentGroups);
+			return includeAttackGroup && harassmentGroups < int.MaxValue ? harassmentGroups + 1 : harassmentGroups;
 		}
 
 		public static bool ShouldReserveUnit(bool alreadyReserved, bool claimAllEligible, bool eligible)

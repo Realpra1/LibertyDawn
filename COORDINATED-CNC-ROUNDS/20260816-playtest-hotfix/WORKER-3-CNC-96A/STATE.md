@@ -45,4 +45,7 @@ Diagnose actor discovery, ownership transfer, claim/reservation lifecycle, and s
   repair/reinforcement/no-repair game markers. Disposition: reject a third game
   because this assignment authorizes exactly two; no affected behavior was
   changed and the focused repair/no-repair/reformation lifecycle tests pass.
-- Fresh Terra-medium final review: pending.
+- Initial fresh Terra-medium review required overflow-safe four-squad validation;
+  `SquadCount` now saturates at `int.MaxValue`, its boundary test passes, and the
+  87-case focused suite plus `git diff --check` rerun cleanly.
+- Fresh correction review: pending.
