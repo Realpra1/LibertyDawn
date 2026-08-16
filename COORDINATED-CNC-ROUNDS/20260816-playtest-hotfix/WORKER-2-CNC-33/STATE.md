@@ -28,4 +28,18 @@ Use matched full-engine evidence and direct accounting/routing diagnostics, not 
 
 - Analysis directory: `/root/github/.build/coordinated-cnc/20260816-playtest-hotfix/WORKER-2-CNC-33/analysis`
 - Report: `COORDINATED-CNC-ROUNDS/20260816-playtest-hotfix/WORKER-2-CNC-33/REPORT.md`
-- Product head, audit proof, checks, game results, narrator/reviewer paths, and Terra review: pending.
+- Product head: pending commit.
+- Audit proof: Brutalis had no `WeightedUnitSelection` or `EconomyTypes` entry.
+  `EconomyCombatSplit` defaults to 0.5 but is reached only by
+  `ChooseWeightedUnitToBuild`; unweighted Brutalis therefore never consumes it.
+  The local change enables weighted selection, defines `harv` as the economy
+  bucket, and pins the intended split at `0.5` without changing weights, limits,
+  refineries, silos, or queues.
+- Checks: `make check` passed with 0 warnings and 0 errors; `git diff --check`
+  passed.
+- Interrupted legacy control: invalid and uncounted. It loaded `modcontent` and
+  failed platform initialization before world tick 1. Its diagnostic-only YAML
+  edit was audited and replaced by the narrow product configuration above.
+- Game results, Luna analyses, and Terra final review: pending. Do not claim
+  completion or consume a further cycle until two valid ordinary-AI custom games
+  are run with an installed CNC `SupportDir/Content` parent.

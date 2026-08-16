@@ -1739,6 +1739,9 @@ Player:
 		SampledUnitChance: 0.05
 		MaximumSampledUnitChance: 0.5
 		UnitSamplingDebugLogging: false
+		WeightedUnitSelection: true
+		EconomyTypes: harv
+		EconomyCombatSplit: 0.5
 		UnitQueues: Vehicle.Nod, Vehicle.GDI, Infantry.Nod, Infantry.GDI, Aircraft.Nod, Aircraft.GDI, Upgrade
         IdleBaseUnitsMaximum: 999
 		UnitsToBuild:
