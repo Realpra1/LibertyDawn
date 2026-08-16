@@ -48,6 +48,8 @@ namespace OpenRA.Mods.Common.Traits
 		public readonly int MaximumHarassmentGroups = 2;
 		public readonly bool IncludeAttackGroup = true;
 		public readonly bool ReserveOpeningPair = true;
+		[Desc("Claim every eligible unit for this specialist manager instead of leaving an ordinary-army reserve.")]
+		public readonly bool ClaimAllEligible = false;
 		public readonly int ThreatRangeBufferCells = 2;
 		public readonly int DetectorRangeBufferCells = 2;
 		public readonly int KiteRangeMarginCells = 1;
@@ -91,6 +93,8 @@ namespace OpenRA.Mods.Common.Traits
 			base.RulesetLoaded(rules, ai);
 			if (UnitTypes.Count == 0 || string.IsNullOrWhiteSpace(SquadLabel) || ScanInterval <= 0 || OrderInterval <= 0 ||
 				MaximumTargetCandidates <= 0 || MaximumHarassmentGroups <= 0 ||
+				StealthTankSquadPolicy.SquadCount(MaximumHarassmentGroups, IncludeAttackGroup) >
+					StealthTankSquadPolicy.MaximumSquadCount ||
 				ThreatRangeBufferCells < 0 || DetectorRangeBufferCells < 0 ||
 				KiteRangeMarginCells < 0 || CarefulClearValueRatio <= 0 || MinimumLateHarassmentGroupSize <= 0 ||
 				TargetSwitchImprovementPercent < 0 || HarassmentDistancePenalty <= 0 ||
@@ -232,7 +236,8 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			world = self.World;
 			player = self.Owner;
-			var groupCount = info.MaximumHarassmentGroups + (info.IncludeAttackGroup ? 1 : 0);
+			var groupCount = StealthTankSquadPolicy.SquadCount(
+				info.MaximumHarassmentGroups, info.IncludeAttackGroup);
 			groups = Enumerable.Range(0, groupCount).Select(i => new SpecialistGroup(i)).ToArray();
 		}
 
@@ -304,7 +309,8 @@ namespace OpenRA.Mods.Common.Traits
 
 		bool IBotUnitReservations.IsUnitReserved(Actor actor)
 		{
-			return actor != null && reserved.Contains(actor.ActorID);
+			return actor != null && StealthTankSquadPolicy.ShouldReserveUnit(
+				reserved.Contains(actor.ActorID), Info.ClaimAllEligible, IsEligible(actor));
 		}
 
 		string IBotPerformanceIdentity.PerformanceIdentity =>
@@ -745,7 +751,7 @@ namespace OpenRA.Mods.Common.Traits
 			var previousGroups = groups.Select(g => g.Units.Select(a => a.ActorID).ToArray()).ToArray();
 			var eligible = world.Actors.Where(IsEligible).OrderBy(a => a.ActorID).ToList();
 			var selectedIds = StealthTankSquadPolicy.SelectSpecialistIds(
-				eligible.Select(a => a.ActorID), reserved, Info.ReserveOpeningPair);
+				eligible.Select(a => a.ActorID), reserved, Info.ReserveOpeningPair, Info.ClaimAllEligible);
 			var eligibleById = eligible.ToDictionary(a => a.ActorID);
 			var selected = selectedIds.Select(id => eligibleById[id]).ToList();
 
@@ -779,9 +785,10 @@ namespace OpenRA.Mods.Common.Traits
 				}
 
 			if (Info.DebugLogging && (eligible.Count != lastEligibleCount || !previous.SetEquals(reserved)))
-				Log.Write("debug", "AI stealth squads {0} [{1}]: total={2} reserved={3} groups={4} ordinary={5}.",
+				Log.Write("debug", "AI stealth squads {0} [{1}]: total={2} reserved={3} groups={4} ordinary={5} actors={6}.",
 					Info.SquadLabel, player.PlayerName, eligible.Count, reserved.Count,
-					string.Join("/", groups.Select(g => g.Units.Count)), eligible.Count - reserved.Count);
+					string.Join("/", groups.Select(g => g.Units.Count)), eligible.Count - reserved.Count,
+					string.Join(",", selected.Select(a => a.ActorID)));
 
 			lastEligibleCount = eligible.Count;
 		}

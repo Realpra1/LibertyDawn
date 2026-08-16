@@ -9,12 +9,7 @@ import zipfile
 from pathlib import Path
 
 
-RULES = """Player:
-\tBaseBuilderBotModule@brutalis:
-\t\tFirstTowerDebugLogging: true
-\t\tSmartEconomyDebugLogging: true
-
-World:
+RULES = """World:
 \tLuaScript:
 \t\tScripts: utils.lua, cnc101-secondary.lua
 """
@@ -55,13 +50,20 @@ end
 Observe = function()
 \tlocal tick = DateTime.GameTime
 \tlocal walls = Count({ "brik", "sbag", "cycl" })
+\tlocal brik = Count({ "brik" })
+\tlocal sbag = Count({ "sbag" })
+\tlocal cycl = Count({ "cycl" })
 \tlocal silos = Count({ "silo" })
 \tlocal defenses = Count({ "obli", "gtwr", "gun", "atwr" })
 
 \tif walls > LastWalls then
 \t\tif FirstWallTick == nil then FirstWallTick = tick end
-\t\tif walls >= 4 and FourthWallTick == nil then FourthWallTick = tick end
+\t\tif walls >= 4 and FourthWallTick == nil then
+\t\t\tFourthWallTick = tick
+\t\t\tActor.Create("upgrade.recon1", true, { Owner = Target })
+\t\tend
 \t\tMedia.Debug("CNC101 secondary observation tick=" .. tick .. " event=wall walls=" .. walls ..
+\t\t\t" brik=" .. brik .. " sbag=" .. sbag .. " cycl=" .. cycl ..
 \t\t\t" silos=" .. silos .. " configured-defenses=" .. defenses)
 \tend
 
@@ -118,10 +120,12 @@ end
 WorldLoaded = function()
 \tTarget = Player.GetPlayer("Multi0")
 \tTarget.Cash = 100000
-\tActor.Create("upgrade.recon1", true, { Owner = Target })
+\tActor.Create("upgrade.covert1", true, { Owner = Target })
+\tActor.Create("upgrade.economy1", true, { Owner = Target })
 \tMedia.Debug("CNC101 secondary observer loaded tick=" .. DateTime.GameTime ..
 \t\t" player=" .. Target.Name .. " faction=" .. Target.Faction ..
-\t\t" cash=" .. Target.Cash .. " staged-upgrade=upgrade.recon1")
+\t\t" cash=" .. Target.Cash .. " staged-upgrades=upgrade.covert1,upgrade.economy1" ..
+\t\t" sbag-build-time=" .. Actor.BuildTime("sbag", "Defence.GDI"))
 end
 
 Tick = function()
@@ -148,6 +152,9 @@ def main() -> None:
 		start = text.index("Title:")
 		end = text.index("\n", start)
 		text = text[:start] + "Title: Empire Earth4 CNC-101 Secondary Queue" + text[end:]
+		text = text.replace("Actors:\n", "Actors:\n\tActorCNC101SecondSpawn: mpspawn\n"
+			"\t\tOwner: Neutral\n\t\tLocation: 20,180\n"
+			"\tActorCNC101TargetPower: nuke\n\t\tOwner: Multi0\n\t\tLocation: 105,100\n", 1)
 		text = text.rstrip() + "\n\nRules: rules.yaml\nScript: cnc101-secondary.lua\n"
 		map_yaml.write_text(text, encoding="utf-8")
 		rules = RULES

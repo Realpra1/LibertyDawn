@@ -18,6 +18,7 @@ namespace OpenRA.Mods.Common.Traits
 	public enum SecondaryQueueOpeningChoice
 	{
 		None,
+		Wall,
 		Silo,
 		FirstDefense,
 		Hold
@@ -25,6 +26,20 @@ namespace OpenRA.Mods.Common.Traits
 
 	public static class OpeningPolicyLogic
 	{
+		public static bool KeepsEmptySecondaryQueueActive(SecondaryQueueOpeningChoice choice)
+		{
+			return choice == SecondaryQueueOpeningChoice.Wall;
+		}
+
+		public static int SecondaryOpeningPollDelay(int normalDelay, int activeDelay,
+			bool enabled, int completedWalls, int requiredWalls)
+		{
+			if (!enabled || completedWalls >= Math.Max(0, requiredWalls))
+				return Math.Max(1, normalDelay);
+
+			return Math.Min(Math.Max(1, normalDelay), Math.Max(1, activeDelay));
+		}
+
 		public static int ObserveSecondaryQueueSiloTarget(int currentTarget, int liveSilos, bool siloCommitted)
 		{
 			if (currentTarget > 0 || !siloCommitted)
@@ -44,8 +59,10 @@ namespace OpenRA.Mods.Common.Traits
 			bool firstDefenseRequired, bool firstDefenseCompleted,
 			bool firstDefenseActionable, bool firstDefenseCommitted)
 		{
-			if (!enabled || completedWalls < Math.Max(0, requiredWalls))
+			if (!enabled)
 				return SecondaryQueueOpeningChoice.None;
+			if (completedWalls < Math.Max(0, requiredWalls))
+				return SecondaryQueueOpeningChoice.Wall;
 
 			if (!siloCompleted)
 			{

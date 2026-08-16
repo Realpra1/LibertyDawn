@@ -562,7 +562,12 @@ namespace OpenRA.Mods.Common.Traits
 
 		int NextEnclosureScanTick()
 		{
-			var interval = Math.Max(1, Info.ConstructionYardEnclosureMaintenanceInterval);
+			var wallCount = world.ActorsHavingTrait<Building>()
+				.Count(a => a.Owner == player && a.IsInWorld && !a.IsDead && IsWallType(a.Info.Name));
+			var interval = OpeningPolicyLogic.SecondaryOpeningPollDelay(
+				Info.ConstructionYardEnclosureMaintenanceInterval,
+				1,
+				baseBuilder.SecondaryQueueOpeningEnabled, wallCount, 4);
 			return world.WorldTick > int.MaxValue - interval ? int.MaxValue : world.WorldTick + interval;
 		}
 
