@@ -47,13 +47,32 @@ namespace OpenRA.Test.Mods.Common
 		public void SecondaryQueueProtectsSiloAndConfiguredDefenseAfterFourWalls()
 		{
 			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, 3, 4,
-				true, false, true, false, true, false, true, false), Is.EqualTo(SecondaryQueueOpeningChoice.None));
+				true, false, true, false, true, false, true, false), Is.EqualTo(SecondaryQueueOpeningChoice.Wall));
 			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, 4, 4,
 				true, false, true, false, true, false, true, false), Is.EqualTo(SecondaryQueueOpeningChoice.Silo));
 			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, 4, 4,
 				false, true, false, false, true, false, true, false), Is.EqualTo(SecondaryQueueOpeningChoice.FirstDefense));
 			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, 4, 4,
 				false, true, false, false, true, true, true, false), Is.EqualTo(SecondaryQueueOpeningChoice.None));
+		}
+
+		[Test]
+		public void SecondaryQueueKeepsFourWallPhaseActiveDuringFirstRefineryRecovery()
+		{
+			Assert.That(OpeningPolicyLogic.HoldOptionalConstructionForFirstRefinery(true, 0, true, false), Is.True,
+				"The primary construction queue may still be serializing its first Refinery.");
+			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, 0, 4,
+				true, false, true, false, true, false, true, false),
+				Is.EqualTo(SecondaryQueueOpeningChoice.Wall),
+				"The protected secondary queue must keep polling and completing its four-wall prefix independently.");
+			Assert.That(OpeningPolicyLogic.KeepsEmptySecondaryQueueActive(SecondaryQueueOpeningChoice.Wall), Is.True,
+				"A transiently empty wall planner must retain the short active poll delay.");
+			Assert.That(OpeningPolicyLogic.KeepsEmptySecondaryQueueActive(SecondaryQueueOpeningChoice.Hold), Is.False,
+				"A deliberate post-wall policy hold must not spin at the active poll rate.");
+			Assert.That(OpeningPolicyLogic.SecondaryOpeningPollDelay(130, 30, true, 3, 4), Is.EqualTo(30),
+				"The wall prefix must override an inactive empty-queue delay.");
+			Assert.That(OpeningPolicyLogic.SecondaryOpeningPollDelay(130, 30, true, 4, 4), Is.EqualTo(130),
+				"The short poll override must end at the four-wall boundary.");
 		}
 
 		[Test]
