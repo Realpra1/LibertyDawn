@@ -28,4 +28,38 @@ Use matched full-engine evidence and direct accounting/routing diagnostics, not 
 
 - Analysis directory: `/root/github/.build/coordinated-cnc/20260816-playtest-hotfix/WORKER-2-CNC-33/analysis`
 - Report: `COORDINATED-CNC-ROUNDS/20260816-playtest-hotfix/WORKER-2-CNC-33/REPORT.md`
-- Product head, audit proof, checks, game results, narrator/reviewer paths, and Terra review: pending.
+- Product commit: `215ff53d96a518e0eb1f46594cd62d4fe99652a0`.
+- Audit proof: Brutalis had no `WeightedUnitSelection` or `EconomyTypes` entry.
+  `EconomyCombatSplit` defaults to 0.5 but is reached only by
+  `ChooseWeightedUnitToBuild`; unweighted Brutalis therefore never consumes it.
+  The local change enables weighted selection, defines `harv` as the economy
+  bucket, and pins the intended split at `0.5` without changing weights, limits,
+  refineries, silos, or queues.
+- Checks: `make check` passed with 0 warnings and 0 errors; the Release
+  `OpenRA.Test` project passed 791/791; sequential CNC YAML validation and both
+  custom-map YAML checks passed; `launch-ai-parallel.py` byte-compilation and
+  `git diff --check` passed.
+- Interrupted legacy control: invalid and uncounted. It loaded `modcontent` and
+  failed platform initialization before world tick 1. Its diagnostic-only YAML
+  edit was audited and replaced by the narrow product configuration above.
+- Game 1: `game1-brutalis-viki-differential` passed at tick 6000 in 34.026
+  seconds, with Brutalis/Nod versus VIKI Control/GDI, replay and tick-5990 save,
+  and no fatal/desync signal. Evidence:
+  `analysis/game1-batch/game1-brutalis-viki-differential/summary.json`;
+  narrator `analysis/game1-narrator.md`; policy `analysis/game1-policy.md`.
+  The reviews accepted the physical smart-economy evidence but requested direct
+  routing attribution before accepting the split.
+- Game 2: distinct `game2-brutalis-viki-nod-instrumented` passed at tick 8000
+  in 23.024 seconds, with both Nod, swapped spawns, replay and tick-7990 save,
+  and no fatal/desync signal. A temporary debug-gated, behavior-neutral trace
+  (removed before final checks and absent from the product diff) recorded 63
+  split decisions: 33 economy and 30 combat, all carrying `split=0.50`; 30
+  economy decisions were forced by the income/spend safety gate. Evidence:
+  `analysis/game2-batch/game2-brutalis-viki-nod-instrumented/summary.json`;
+  narrator `analysis/game2-narrator.md`; policy `analysis/game2-policy.md`.
+  Policy accepted unchanged with the bounded interpretation that 0.5 is route
+  selection probability, not a dollar-spend quota.
+- Final native review: READY with no blocker at `analysis/final-review.md`.
+  Native-only constraints and fixed completed-thread models made Terra-medium
+  unavailable, so the strongest available fresh gate was Luna-medium; no
+  external process was used.
