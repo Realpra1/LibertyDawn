@@ -129,6 +129,32 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(StealthTankSquadPolicy.SpecialistCount(total), Is.EqualTo(expected));
 		}
 
+		[Test]
+		public void ClaimAllPolicySelectsEveryDistinctEligibleTankAndReservesNewDiscoveries()
+		{
+			var selected = StealthTankSquadPolicy.SelectSpecialistIds(
+				new uint[] { 14, 11, 13, 12, 14 }, new uint[] { 11, 99 }, true, true);
+
+			Assert.That(selected, Is.EqualTo(new uint[] { 11, 12, 13, 14 }));
+			Assert.That(selected, Is.Unique);
+			Assert.That(StealthTankSquadPolicy.ShouldReserveUnit(false, true, true), Is.True,
+				"A produced or captured eligible tank must be reserved before the next strategic scan.");
+			Assert.That(StealthTankSquadPolicy.ShouldReserveUnit(false, true, false), Is.False);
+		}
+
+		[Test]
+		public void SpecialistSquadTopologyHasAHardFourSquadCeiling()
+		{
+			Assert.That(StealthTankSquadPolicy.SquadCount(2, true), Is.EqualTo(3));
+			Assert.That(StealthTankSquadPolicy.SquadCount(3, true),
+				Is.EqualTo(StealthTankSquadPolicy.MaximumSquadCount));
+			Assert.That(StealthTankSquadPolicy.SquadCount(4, true),
+				Is.GreaterThan(StealthTankSquadPolicy.MaximumSquadCount));
+			Assert.That(StealthTankSquadPolicy.SquadCount(int.MaxValue, true),
+				Is.GreaterThan(StealthTankSquadPolicy.MaximumSquadCount),
+				"Overflow must not let an invalid configuration bypass the four-squad ruleset guard.");
+		}
+
 		[TestCase(0, 0)]
 		[TestCase(1, 0)]
 		[TestCase(2, 1)]

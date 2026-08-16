@@ -27,6 +27,19 @@ namespace OpenRA.Mods.Common.Traits
 
 	public static class StealthTankSquadPolicy
 	{
+		public const int MaximumSquadCount = 4;
+
+		public static int SquadCount(int maximumHarassmentGroups, bool includeAttackGroup)
+		{
+			var harassmentGroups = Math.Max(0, maximumHarassmentGroups);
+			return includeAttackGroup && harassmentGroups < int.MaxValue ? harassmentGroups + 1 : harassmentGroups;
+		}
+
+		public static bool ShouldReserveUnit(bool alreadyReserved, bool claimAllEligible, bool eligible)
+		{
+			return alreadyReserved || (claimAllEligible && eligible);
+		}
+
 		public static bool ShouldRunStrategicScan(ref int countdown, int interval)
 		{
 			if (--countdown > 0)
@@ -71,6 +84,15 @@ namespace OpenRA.Mods.Common.Traits
 
 		public static int SpecialistCount(int total, bool reserveOpeningPair, int retainedSpecialists)
 		{
+			return SpecialistCount(total, reserveOpeningPair, retainedSpecialists, false);
+		}
+
+		public static int SpecialistCount(int total, bool reserveOpeningPair, int retainedSpecialists,
+			bool claimAllEligible)
+		{
+			if (claimAllEligible)
+				return Math.Max(0, total);
+
 			if (total < 2)
 				return total > 0 && retainedSpecialists > 0 ? 1 : 0;
 			if (!reserveOpeningPair)
@@ -82,12 +104,13 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		public static uint[] SelectSpecialistIds(IEnumerable<uint> eligibleIds,
-			IEnumerable<uint> previouslyOwnedIds, bool reserveOpeningPair = true)
+			IEnumerable<uint> previouslyOwnedIds, bool reserveOpeningPair = true,
+			bool claimAllEligible = false)
 		{
 			var eligible = eligibleIds.Distinct().OrderBy(id => id).ToArray();
 			var owned = new HashSet<uint>(previouslyOwnedIds);
 			var retained = eligible.Count(owned.Contains);
-			var desired = SpecialistCount(eligible.Length, reserveOpeningPair, retained);
+			var desired = SpecialistCount(eligible.Length, reserveOpeningPair, retained, claimAllEligible);
 			return eligible.Where(owned.Contains).Concat(eligible.Where(id => !owned.Contains(id)))
 				.Take(desired).ToArray();
 		}

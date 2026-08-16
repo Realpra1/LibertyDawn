@@ -24,8 +24,31 @@ Diagnose actor discovery, ownership transfer, claim/reservation lifecycle, and s
 - Obtain a fresh Terra-medium final review after the two games and checks.
 - Do not edit another stream, create tasks, push, merge bleed, or open an independent PR. Update only this state, the task report, and the task branch.
 
-## Evidence
+## Evidence and handoff
 
 - Analysis directory: `/root/github/.build/coordinated-cnc/20260816-playtest-hotfix/WORKER-3-CNC-96A/analysis`
 - Report: `COORDINATED-CNC-ROUNDS/20260816-playtest-hotfix/WORKER-3-CNC-96A/REPORT.md`
-- Product head, checks, game results, narrator/reviewer paths, and Terra review: pending.
+- Product head: `3c01f53805` (`68cefc613d` claim implementation plus
+  `3c01f53805` overflow-hardening correction).
+- Focused Stealth Tank policy tests: 87/87 passed.
+- Protected check: `make test` passed with Release build 0 warnings/errors and
+  full CNC validation; `git diff --check` clean.
+- Valid game 1: `analysis/games/valid2/produced-claim`, exit 0 at tick 2500;
+  12/12 produced `stnk` reserved, three groups, ordinary=0, no recipient leakage.
+- Valid game 2: `analysis/games/valid2/captured-four-squads`, exit 0 at tick 2500;
+  12/12 ownership-transferred `stnk` reserved, exactly four groups, ordinary=0,
+  no recipient leakage.
+- Narratives: `analysis/reviews/game1-commenter/NARRATIVE.md` and
+  `analysis/reviews/game2-commenter/NARRATIVE.md`.
+- Policy reviews: `analysis/reviews/game1-policy/POLICY-REVIEW.md` and
+  `analysis/reviews/game2-policy/POLICY-REVIEW.md`.
+- Highest policy recommendation: required evidence follow-up for absent explicit
+  repair/reinforcement/no-repair game markers. Disposition: reject a third game
+  because this assignment authorizes exactly two; no affected behavior was
+  changed and the focused repair/no-repair/reformation lifecycle tests pass.
+- Initial fresh Terra-medium review required overflow-safe four-squad validation;
+  `SquadCount` now saturates at `int.MaxValue`, its boundary test passes, and the
+  87-case focused suite plus `git diff --check` rerun cleanly.
+- Fresh correction review:
+  `analysis/reviews/final-terra-correction/REVIEW.md`; verdict READY.
+- Final status: Complete - testing. Branch is local only; no push, PR, or merge.
