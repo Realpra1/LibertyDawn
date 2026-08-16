@@ -5,7 +5,7 @@
 - Worker: `WORKER-1`; task: `CNC-101`
 - Role model: `gpt-5.6-sol`, medium reasoning
 - Base: `fcfafc21a9a6c2aa24e06b3b7c771c94df918d50` (origin/bleed)
-- Task branch: `agent/round-20260816-cnc101-playtest-hotfix`
+- Task branch: `agent/20260816-hotfix-cnc101` (inherited checkout branch; preserved)
 - PR: none; do not create an independent PR
 - Balance: frozen; no costs, build speeds, production values, prerequisites, or tuning changes
 - Cycle: `1/1`
@@ -28,4 +28,9 @@ Prove the player-visible timing and order in ordinary-AI full-engine custom game
 
 - Analysis directory: `/root/github/.build/coordinated-cnc/20260816-playtest-hotfix/WORKER-1-CNC-101/analysis`
 - Report: `COORDINATED-CNC-ROUNDS/20260816-playtest-hotfix/WORKER-1-CNC-101/REPORT.md`
-- Product head, checks, game results, narrator/reviewer paths, and Terra review: pending.
+- Product head: `ffd7707c855cd92b83c6894b0506089c9a08a2db`.
+- Checks: `make check` PASS; full `OpenRA.Test` 791/791 PASS; focused opening-policy 14/14 PASS; CNC YAML PASS; scenario Python compile PASS; `git diff --check` PASS.
+- Game 1: GDI target, default durations, fourth wall tick 325 (13.0 s), Silo 2120, configured defense 2535, continuation 2680; narrator/policy PASS at `analysis/game1-narrator.md` and `analysis/game1-policy.md`.
+- Game 2: Nod target, default durations, fourth wall tick 310 (12.4 s), Silo 2110, configured defense 2520, continuation 2665; narrator/policy PASS at `analysis/game2-narrator.md` and `analysis/game2-policy.md`.
+- Persistent policy update: none recommended.
+- Fresh Terra review: pending due native four-thread accounting; envelope at `analysis/terra-envelope.md`. No external role process used.
