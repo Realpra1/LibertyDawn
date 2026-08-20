@@ -488,7 +488,7 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			var buildables = queue.BuildableItems();
 			var enclosureWall = baseBuilder.WallPlanner?.ConstructionYardEnclosureWall(
-				queue, buildables, playerBuildings);
+				queue, buildables);
 			var enclosureAvailable = enclosureWall != null;
 
 			ActorInfo silo = null;
@@ -556,7 +556,7 @@ namespace OpenRA.Mods.Common.Traits
 			if (IsDefenseQueue && baseBuilder.SecondaryQueueOpeningEnabled)
 			{
 				var openingWall = baseBuilder.WallPlanner?.ConstructionYardEnclosureWall(
-					queue, buildableThings, playerBuildings);
+					queue, buildableThings);
 				var initialEnclosurePending = baseBuilder.WallPlanner?.InitialEnclosurePending ?? false;
 				var silo = GetProducibleBuilding(baseBuilder.NeedBasedSiloTypes, buildableThings);
 				var siloActionable = silo != null && HasSufficientPowerForActor(silo) &&
@@ -646,7 +646,7 @@ namespace OpenRA.Mods.Common.Traits
 				return null;
 			}
 
-			var enclosureWall = baseBuilder.WallPlanner?.ConstructionYardEnclosureWall(queue, buildableThings, playerBuildings);
+			var enclosureWall = baseBuilder.WallPlanner?.ConstructionYardEnclosureWall(queue, buildableThings);
 			if (enclosureWall != null)
 			{
 				AIUtils.BotDebug("{0} decided to build {1}: construction-yard enclosure",
@@ -937,7 +937,7 @@ namespace OpenRA.Mods.Common.Traits
 				// Walls are only worth queueing if the planner has a line ready for them, and only
 				// until we hit the segment cap. Everything about where they go is decided there.
 				if (baseBuilder.WallPlanner != null && baseBuilder.WallPlanner.IsWallType(name)
-					&& !baseBuilder.WallPlanner.WantsToBuildWall(queue, name, playerBuildings))
+					&& !baseBuilder.WallPlanner.WantsToBuildWall(queue, name))
 					continue;
 
 				// Do we want to build this structure? Adaptive defense types get their authored ceiling

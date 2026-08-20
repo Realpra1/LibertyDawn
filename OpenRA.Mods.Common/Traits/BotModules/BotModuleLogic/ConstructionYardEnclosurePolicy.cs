@@ -376,9 +376,18 @@ namespace OpenRA.Mods.Common.Traits
 			return Math.Min(Math.Max(1, normalDelay), Math.Max(1, maintenanceInterval));
 		}
 
-		public static bool IsActive(int worldTick, int cutoffTick, bool bound, bool stopped)
+		public static bool IsActive(int worldTick, int cutoffTick, bool bound, bool stopped,
+			bool initialEnclosurePending)
 		{
-			return bound && !stopped && worldTick < Math.Max(0, cutoffTick);
+			return bound && !stopped &&
+				(initialEnclosurePending || worldTick < Math.Max(0, cutoffTick));
+		}
+
+		public static bool CutoffMaintenanceUnavailable(bool initialEnclosurePending,
+			int worldTick, int cutoffTick)
+		{
+			return initialEnclosurePending &&
+				worldTick >= Math.Max(0, cutoffTick);
 		}
 
 		public static uint? SelectInitialYardActorId(IEnumerable<uint> liveYardActorIds, bool mayBind)

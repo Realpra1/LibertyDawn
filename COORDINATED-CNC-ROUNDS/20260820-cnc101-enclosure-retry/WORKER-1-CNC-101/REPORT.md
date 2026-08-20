@@ -63,3 +63,53 @@ An initial diagnostic terrain run exposed that an earlier draft counted every co
 ## Remaining risk
 
 The two games cover one terrain-sealed hole and one clear full ring with distinct retry timing, faction, and pressure. They do not prove every map geometry. The retry-limit escape is deterministically unit-tested but was intentionally not triggered in the qualifying games because both games were required to complete the enclosure before normal secondary construction.
+
+## Cycle 2: Terra correction and no-cap amendment
+
+### Proposal
+
+`Complete - testing`
+
+Starting from clean cycle-1 commit `47979e1dfac5d6900dc80e7d983a4e3e965970a6`, Terra found that the configured cutoff stopped unresolved initial-enclosure maintenance and made the secondary gate false. Terra also identified a wall-cap early return. The user amended CNC-101 to remove the cap itself. Authorized Task Maker commit `d2c4640327` updated only the task entry and worker acceptance; it was incorporated with `cherry-pick --no-commit` so cycle 2 still has one worker commit.
+
+The final correction keeps an unresolved bound enclosure active across cutoff, classifies cutoff as unavailable maintenance, and increments the persisted retry count until explicit 8/8 release. Physical/terrain closure is still checked first. The `MaximumWallSegments` field and description, all count/early-return planner logic and obsolete parameters, and all nine CNC AI YAML values (eight at 24 and Skynet at 150) are removed. There is no global or per-player wall-count ceiling in this policy.
+
+### Cycle-2 checks
+
+- Focused enclosure/opening tests: **46 passed, 0 failed**; four unrelated pre-existing analyzer warnings appeared in other test files.
+- Protected canonical wrapper plus `make check`: **passed**, build **0 warnings, 0 errors**, interface checks passed.
+- Full `./utility.sh cnc --check-yaml`: **passed** after all no-cap configuration changes.
+- Cutoff and replacement no-cap custom-map YAML plus embedded Lua: **passed**.
+- Production/config search found no `MaximumWallSegments` reference under `OpenRA.Mods.Common`, `OpenRA.Test`, or `mods/cnc`.
+- `git diff --check`: **passed**.
+
+### Cycle-2 qualifying Game 1: cutoff remains gated
+
+- Artifact: `.build/20260820-cnc101-enclosure-retry/cycle2-game1-final/cnc101-cycle2-game1-cutoff`.
+- Ordinary all-module Brutalis/GDI versus VIKI/Nod on the final no-cap code and a map with no cap setting; all 16 target perimeter cells blocked; cutoff tick 4; one-tick focused maintenance.
+- Initial unavailable observations reached 3/8 before cutoff. Cutoff maintenance remained pending at ticks 4–7 with retries 4/8–7/8, then explicitly released at tick 8 for `retry limit reached`, 8/8. No Silo or defense appeared before release.
+- Later order: Silo 4577, configured defense 6032, normal secondary 6059. Exit 0 at tick 9000 in 40.035 seconds; replay/save present; no fatal error or desync.
+- Narration: `.build/20260820-cnc101-enclosure-retry/analysis/cycle2-game1-narrator/NARRATIVE.md`.
+- Policy: `.build/20260820-cnc101-enclosure-retry/analysis/cycle2-game1-policy/POLICY-REVIEW.md` — bounded pass; optional other cutoff timings advisory.
+- Disposition: retain the all-blocked cutoff scope; no extra cutoff game because the exact-two cycle's second game is required to prove the independent no-cap amendment.
+
+### Cycle-2 qualifying replacement Game 2: construction exceeds former cap
+
+- Artifact: `.build/20260820-cnc101-enclosure-retry/cycle2-game2-qualified/cnc101-cycle2-game2-exceed`.
+- Ordinary all-module Brutalis/Nod versus VIKI/GDI under nearby infantry pressure; 24 prior owned walls, one impassable terrain-sealed ring cell, and 15 temporarily blocked buildable ring cells.
+- Retries 1/8–6/8 occurred at ticks 1–6; blockers cleared tick 5. The first new enclosure wall raised total ownership from the former 24-wall setting to 25 at tick 80.
+- Physical enclosure completed at tick 656 with 39 total walls (24 prior + 15 new), 16.4 seconds, and product release `complete` at retries 6/8. No Silo or defense appeared first.
+- Later order: Silo 5600, configured defense 6728, normal secondary 8114. Exit 0 at tick 9000 in 35.081 seconds; replay/save present; no retry-limit release, fatal error, or desync.
+- Narration: `.build/20260820-cnc101-enclosure-retry/analysis/cycle2-game2-narrator/NARRATIVE.md`.
+- Policy: `.build/20260820-cnc101-enclosure-retry/analysis/cycle2-game2-policy/POLICY-REVIEW.md` — bounded above-cap pass; optional broader counts/layouts advisory.
+- Disposition: retain the directly tested 24-to-39, terrain-sealed pressure scope; no extra game is required in this exact-two cycle.
+
+### Excluded setup/calibration runs
+
+- The original cutoff qualification ran before the no-cap amendment and used a scenario copy containing the former 24-wall setting. Its cutoff result was valid for the earlier patch, but it is superseded and excluded so both final qualifying games exercise the final no-cap code/configuration.
+- The cap-specific Game 2 was interrupted at tick 5000 immediately when the user removed the wall-cap policy. It is uncounted and not acceptance evidence.
+- The first no-cap replacement launch reached tick 9000 and proved construction from 24 to 32 walls, but a scenario-only one-tick maintenance override exhausted retries before closure. It is uncounted. Restoring the ordinary 250-tick maintenance interval produced the qualifying replacement above; product code did not change between these launches.
+
+### Remaining risk
+
+The evidence covers an impossible all-blocked cutoff and one terrain-sealed 24-to-39 wall expansion under pressure. It does not prove every starting count, topology, or cutoff timing. Both Luna policy reviewers classified broader coverage as advisory, not a blocker or required follow-up.

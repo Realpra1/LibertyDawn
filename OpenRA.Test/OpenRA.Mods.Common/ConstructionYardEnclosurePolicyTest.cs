@@ -247,9 +247,9 @@ namespace OpenRA.Test.Mods.Common
 		[Test]
 		public void CutoffAndIdentitySelectionAreLiteralBoundaries()
 		{
-			Assert.That(ConstructionYardEnclosurePolicy.IsActive(7499, 7500, true, false), Is.True);
-			Assert.That(ConstructionYardEnclosurePolicy.IsActive(7500, 7500, true, false), Is.False);
-			Assert.That(ConstructionYardEnclosurePolicy.IsActive(1, 7500, true, true), Is.False);
+			Assert.That(ConstructionYardEnclosurePolicy.IsActive(7499, 7500, true, false, false), Is.True);
+			Assert.That(ConstructionYardEnclosurePolicy.IsActive(7500, 7500, true, false, false), Is.False);
+			Assert.That(ConstructionYardEnclosurePolicy.IsActive(1, 7500, true, true, true), Is.False);
 			Assert.That(ConstructionYardEnclosurePolicy.SelectInitialYardActorId(
 				new uint[] { 19, 4, 12 }, true), Is.EqualTo(4));
 			Assert.That(ConstructionYardEnclosurePolicy.SelectInitialYardActorId(
@@ -257,12 +257,37 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
-		public void ExactCutoffTickDeactivatesWithoutWaitingForAnotherMaintenanceInterval()
+		public void UnresolvedInitialEnclosureRemainsActiveAcrossCutoffUntilExplicitRelease()
 		{
 			const int cutoff = 7500;
-			Assert.That(ConstructionYardEnclosurePolicy.IsActive(cutoff - 1, cutoff, true, false), Is.True);
-			Assert.That(ConstructionYardEnclosurePolicy.IsActive(cutoff, cutoff, true, false), Is.False);
-			Assert.That(ConstructionYardEnclosurePolicy.IsActive(cutoff + 250, cutoff, true, false), Is.False);
+			Assert.That(ConstructionYardEnclosurePolicy.IsActive(
+				cutoff - 1, cutoff, true, false, true), Is.True);
+			Assert.That(ConstructionYardEnclosurePolicy.IsActive(
+				cutoff, cutoff, true, false, true), Is.True,
+				"Cutoff must be accounted as an unavailable retry outcome, not bypass the initial gate.");
+			Assert.That(ConstructionYardEnclosurePolicy.IsActive(
+				cutoff + 250, cutoff, true, false, true), Is.True);
+			Assert.That(ConstructionYardEnclosurePolicy.IsActive(
+				cutoff + 250, cutoff, true, false, false), Is.False,
+				"Physical closure or explicit retry exhaustion ends the initial gate at cutoff.");
+		}
+
+		[Test]
+		public void CutoffMaintenanceCannotBypassRetryGate()
+		{
+			const int CutoffTick = 7500;
+			Assert.That(ConstructionYardEnclosurePolicy.CutoffMaintenanceUnavailable(
+				true, CutoffTick, CutoffTick), Is.True);
+
+			var retries = 0;
+			for (var i = 0; i < 8; i++)
+				retries = ConstructionYardEnclosurePolicy.NextInitialRetryCount(retries);
+
+			Assert.That(retries, Is.EqualTo(8));
+			Assert.That(ConstructionYardEnclosurePolicy.InitialRetryLimitReached(retries), Is.True);
+			Assert.That(ConstructionYardEnclosurePolicy.CutoffMaintenanceUnavailable(
+				false, CutoffTick, CutoffTick), Is.False,
+				"Once explicitly released, maintenance limits must not reopen the initial gate.");
 		}
 
 		[Test]
