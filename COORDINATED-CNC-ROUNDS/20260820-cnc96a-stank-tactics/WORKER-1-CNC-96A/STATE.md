@@ -16,6 +16,14 @@
   target acquisition and attack/reaction latency.
 - After attacking or revealing, every Stealth Tank retreats one 6x6 coarse
   strategic cell before reassessment/continuation.
+- When the current target crosses a 6x6 strategic-cell boundary, do not lose or
+  automatically replace it. Perform Air-style fresh incumbent-aware
+  reassessment.
+- Retain the incumbent unless invalid or a challenger meets Air's same
+  meaningful-improvement/switch threshold; if retained, refresh its route/order
+  for the new cell without treating it as target loss.
+- Air implementation and behavior are the golden reference and must not be
+  modified; do not invent a separate weaker threshold.
 - Preserve every produced/captured Stealth Tank claim, at most four squads per
   AI, one-unit survivor behavior, repair/no-repair/rejoin behavior, and zero
   ordinary-squad leakage. Do not alter unrelated squads, balance, Air, or add
@@ -218,3 +226,127 @@
   suggestion. Further repair-selection/timing combinations are optional and need
   no product change. Calibrations are disclosed in `REPORT.md`; no fixture/save
   mutation occurred.
+
+## Amendment acceptance: Air-style target retention
+
+- Direct focused tests and games must show an incumbent crossing multiple
+  strategic cells, remaining selected against weaker/marginal challengers,
+  switching for an invalid incumbent or sufficiently better challenger, and no
+  cancellation/idle gap during retained reassessment.
+- Preserve retreat, save/load, repair/rejoin, ownership, claim coverage, and
+  zero ordinary leakage. Air implementation and behavior remain unchanged.
+
+## Cycle-5 correction (recorded before code decisions)
+
+- Exact correction: when a current target crosses a 6x6 strategic-cell boundary,
+  perform fresh incumbent-aware reassessment using Air's same meaningful-
+  improvement/switch threshold/helper. Retain a valid incumbent unless a
+  challenger qualifies, and refresh the retained moved target's route/order
+  without representing target loss, Stop/cancellation, or an idle gap.
+- Direct evidence must cover one multi-cell moving incumbent retained against
+  weaker/marginal challengers and one invalid-incumbent or clearly threshold-
+  winning switch. Both preserve retreat/save/repair/ownership behavior and Air
+  output remains unchanged.
+- Starting head: `a5f0ed6c38b2d54ea49bf92bfb48751070246e77` plus authorized
+  Task Maker amendment `1587cb3c8c` applied without a separate commit.
+
+## Cycle-5 user amendment (recorded before amended code decisions)
+
+- Air helper parity is switch-decision parity only. Stealth retains its distinct
+  target priorities and scoring because it destroys buildings faster; do not
+  copy or unify Air target priorities into Stealth.
+- Add explicit configurable wall target priority `1` to both the Stealth and Air
+  profiles, far below their existing valuable-target priorities such as
+  harvesters (roughly thousands under existing configuration). This is the only
+  authorized Air behavior/configuration change.
+- The first strict retain/save and threshold-switch pair is pre-amendment and
+  uncounted final evidence. Preserve its diagnostics, then run exactly two new
+  post-amendment qualifying games with direct wall-versus-valuable-target
+  discrimination plus the required multi-cell retain and threshold switch/no-gap
+  behaviors, each with fresh Luna narration and policy review.
+- Task Maker amendment `a1db6a4fe9` was incorporated into the staged task sheet
+  and reconciled with this state without a separate commit.
+
+## Cycle-5 completion receipt
+
+- Product: a target crossing a 6x6 boundary now receives a fresh raw-score
+  incumbent/challenger reassessment through Air's exact
+  `ShouldSwitchTarget` decision helper. A retained incumbent reuses the existing
+  `TargetMoved` route refresh without Stop, cancellation, target clearing, or
+  idle gap. Stealth priorities and its value/distance formula remain distinct.
+- Amendment: explicit Stealth `WallTargetPriority` and Air
+  `AirTargetWallValue` are both configured to `1`. Wall classification uses
+  `LineBuildNodeInfo` before generic building fallback. All ten ordinary Air
+  profiles explicitly carry value 1; no Air priority table/formula changed.
+- Focused tests PASS 173/173, including exact threshold/category parity,
+  invalid-incumbent behavior, overflow-safe long scores, all ordinary Air
+  configs wall=1/harvester>wall, and distinct Stealth-versus-Air harvester
+  scoring. Final `make check` PASS 0 warnings/errors; full CNC YAML and both map
+  YAML checks PASS; diff/path audit PASS.
+- Final Game 1: ordinary all-module Brutalis Nod vs VIKI GDI, seed9653,
+  initial tick1275/10.012s and active-retreat load tick3500/15.026s, both exit0.
+  Apache scored HARV5550 versus BRIK1 and selected HARV. Stealth retained HARV
+  across two boundary crossings with distinct scores458333/183333, recorded
+  BRIK score3/priority1, refreshed with no gap, restored barrier=True on load,
+  then repaired/rejoined with ownership3 and ordinary0. Fresh narrator and
+  separate policy PASS; policy classification none.
+- Final Game 2: distinct ordinary all-module Brutalis Nod vs VIKI GDI,
+  seed9654, tick3500/16.031s, exit0. Apache repeatedly selected HARV5550 over
+  active BRIK1. At HARV boundary crossing, Stealth switched from raw282051 to
+  SHARV547619 over the 25% threshold while BRIK remained score3/priority1; the
+  routed order was immediate with no loss/Stop/cancel/idle gap. Retreat,
+  repair/rejoin, ownership3, and ordinary0 continued. Fresh narrator and
+  separate policy PASS; policy classification none.
+- Pre-amendment strict games and wall calibration are explicitly uncounted;
+  only the two post-amendment reviewed games above satisfy the cycle contract.
+  Status: ready for Terra review after the single cycle-5 commit.
+
+## Cycle-6 Terra correction (recorded before code decisions)
+
+- Exact blocker: boundary reassessment currently populates `freshIncumbent`
+  only from the list already capped by `MaximumTargetCandidates`. A valid live
+  incumbent ranked 49th or later is therefore misclassified invalid and can be
+  switched or abandoned without Air's configured 25% decision rule.
+- Smallest correction: explicitly include/evaluate the live incumbent outside
+  `MaximumTargetCandidates` only for boundary reassessment; keep the cap for
+  challengers and preserve raw scoring, defended-category, threshold, wall1,
+  route-refresh, retreat/save/repair/ownership, and all other behavior.
+- Required proof: focused over-cap regression plus exactly two new reviewed
+  ordinary-AI/all-module games: more than 48 viable candidates with a moving
+  incumbent retained against a non-qualifying capped challenger/no gap, and an
+  invalid or threshold-qualified switch control.
+- Starting head: `0427aaa0f1f930948767979fc7c1c251c8b2a5f0`.
+
+## Cycle-6 completion receipt
+
+- Product: boundary scans still cap and preserve the first 48 ranked
+  challengers, but now append the live incumbent when it lies outside that cap.
+  Non-boundary scans remain exactly capped and an incumbent already inside the
+  cap is not duplicated. Raw Stealth scoring, defended-category precedence,
+  Air's 25% switch helper, wall priority 1, and Air behavior are unchanged.
+- Focused Stealth/Air/config tests PASS 174/174, including rank-55 incumbent,
+  unchanged first-48 challenger ordering, no-boundary cap, no duplication, and
+  retained 100-versus-124 threshold behavior. Protected `make check` PASS with
+  0 warnings/errors; full CNC YAML, both final custom-map YAML checks,
+  `git diff --check`, and changed-path audit PASS.
+- Game 1: ordinary all-module Brutalis Nod versus VIKI GDI, seed9663. Strict
+  initial leg PASS/exit0 tick1500 in 12.013s and active-retreat save/load
+  continuation PASS/exit0 tick3500 in 16.028s. Fifty-five viable HTNKs put the
+  live HARV incumbent outside the first 48. Tick1125 logged cap48/count49,
+  `incumbent-outside-cap=True`, valid undefended incumbent score2500000 versus
+  defended challenger45454545, `RetainIncumbent`, refreshed routed Attack, and
+  no loss/Stop/cancel/idle gap. Save/load restored barrier=True before exact
+  retreat completion; repair/rejoin, ownership5/reserved5/ordinary0, and Air
+  valuable1550 versus wall1 continued. Fresh Luna narrator completed; corrected
+  bounded policy review PASS/classification none.
+- Game 2: distinct ordinary all-module threshold-switch control, seed9664,
+  PASS/exit0 tick3500 in 17.027s. Valid HARV282051 switched to qualifying
+  SHARV547619 at the 25% rule with cap48/count24/outsideFalse, immediate routed
+  order and no loss/Stop/cancel/idle gap. Exact multi-unit retreat, repair/rejoin,
+  ownership3/reserved3/ordinary0, and Air HARV5550 versus wall1 continued.
+  Fresh Luna narrator and policy PASS/classification none.
+- Setup/calibration runs are uncounted: the initial scenario lacked an Attack
+  incumbent; a custom inherited actor lacked its render alias; a 25-tick exit
+  produced an incomplete save. Each was corrected before the two strict games;
+  no fixture or save-byte mutation was used. Status: ready for fresh Terra
+  review after the single cycle-6 commit.

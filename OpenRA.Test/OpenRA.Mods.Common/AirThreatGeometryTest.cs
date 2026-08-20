@@ -518,7 +518,7 @@ namespace OpenRA.Test
 		public void TargetSwitchScoreComparisonDoesNotOverflow()
 		{
 			Assert.That(AirThreatGeometry.ShouldSwitchTarget(
-				true, int.MaxValue - 1, true, true, int.MaxValue, 50), Is.False);
+				true, long.MaxValue - 1, true, true, long.MaxValue, 50), Is.False);
 		}
 
 		[Test]

@@ -82,6 +82,8 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Number of lowest-total-defense opportunities considered before choosing by unlocked target score.")]
 		public readonly int DefenderClearWeakestCandidates = 3;
 		public readonly int InfantryTargetPriority = 1200;
+		[Desc("Priority assigned to line-build wall targets before the generic structure fallback.")]
+		public readonly int WallTargetPriority = 1;
 		public readonly int StructureTargetPriority = 500;
 		public readonly int TankTargetPriority = 1500;
 		public readonly int InfantryClusterRadiusCells = 0;
@@ -112,7 +114,7 @@ namespace OpenRA.Mods.Common.Traits
 				(RetreatAfterReveal && StrategicCellSize != StealthTankSquadPolicy.RequiredStrategicCellSize) ||
 				DefenderClearFallbackScans < 0 || DefenderClearValueRatio <= 0 ||
 				DefenderClearWeakestCandidates <= 0 ||
-				InfantryTargetPriority < 0 || StructureTargetPriority < 0 ||
+				InfantryTargetPriority < 0 || WallTargetPriority < 0 || StructureTargetPriority < 0 ||
 				TankTargetPriority < 0 || InfantryClusterRadiusCells < 0 || InfantryClusterBonusPercentPerNearbyActor < 0 ||
 				MaximumInfantryClusterMultiplierPercent < 100 || FailsafeTestAdvancedWorkMilliseconds < 0 ||
 				FailsafeTestAdvancedWorkFromTick < 0 || FailsafeTestAdvancedWorkUntilTick < 0 ||
@@ -1268,9 +1270,13 @@ namespace OpenRA.Mods.Common.Traits
 				.Where(a => !a.IsTraitDisabled && a.Weapon.IsValidTarget(GroundTargetTypes))
 				.Select(a => (int)Math.Ceiling(a.MaxRange().Length / 1024f)).DefaultIfEmpty(0).Max();
 			var squadValue = activeUnits.Sum(a => Math.Max(1, a.Info.TraitInfoOrDefault<ValuedInfo>()?.Cost ?? 1));
+			var incumbent = group.Target;
+			var targetCrossedStrategicCell = group.HasPlan && incumbent != null &&
+				!StealthTankSquadPolicy.IsSameStrategicCell(
+					incumbent.Location, group.PlannedTargetLocation, StrategicCellSize);
 
 			var phaseStarted = Stopwatch.GetTimestamp();
-			var candidates = enemies.Select(a => new
+			var rankedCandidates = enemies.Select(a => new
 			{
 				Actor = a,
 				Priority = Priority(role, a, activeUnits.Length),
@@ -1281,12 +1287,24 @@ namespace OpenRA.Mods.Common.Traits
 					c.Actor.Info.TraitInfoOrDefault<ValuedInfo>()?.Cost ?? 1, c.Distance,
 					c.Actor == group.Target ? 100 + Info.TargetSwitchImprovementPercent : 100,
 					c.ClusterMultiplier, role == StealthTankSquadRole.Harass ? Info.HarassmentDistancePenalty : 1))
-				.ThenBy(c => c.Actor.ActorID).Take(Info.MaximumTargetCandidates).ToList();
+				.ThenBy(c => c.Actor.ActorID);
+			var candidates = StealthTankSquadPolicy.BoundCandidatesWithIncumbent(rankedCandidates,
+				Info.MaximumTargetCandidates, targetCrossedStrategicCell, c => c.Actor == incumbent);
+			var incumbentOutsideCandidateCap = targetCrossedStrategicCell &&
+				candidates.Count > Info.MaximumTargetCandidates && candidates.Last().Actor == incumbent;
 			scanCandidateTicks += Stopwatch.GetTimestamp() - phaseStarted;
 
 			Actor selected = null;
 			long selectedScore = 0;
 			var selectedDanger = 0;
+			Actor freshIncumbent = null;
+			long freshIncumbentScore = 0;
+			var freshIncumbentDanger = 0;
+			Actor freshChallenger = null;
+			long freshChallengerScore = 0;
+			var freshChallengerDanger = 0;
+			Actor freshWall = null;
+			long freshWallScore = 0;
 			var dangerousCandidates = 0;
 			Actor rejectedTarget = null;
 			Actor rejectedBlocker = null;
@@ -1332,6 +1350,34 @@ namespace OpenRA.Mods.Common.Traits
 					}
 
 					continue;
+				}
+
+				var freshScore = StealthTankSquadPolicy.TargetScore(candidate.Priority,
+					candidate.Actor.Info.TraitInfoOrDefault<ValuedInfo>()?.Cost ?? 1, candidate.Distance,
+					100, candidate.ClusterMultiplier,
+					role == StealthTankSquadRole.Harass ? Info.HarassmentDistancePenalty : 1);
+				if (candidate.Actor == incumbent)
+				{
+					freshIncumbent = candidate.Actor;
+					freshIncumbentScore = freshScore;
+					freshIncumbentDanger = defendingValue;
+				}
+
+				if (candidate.Actor != incumbent && (freshChallenger == null ||
+					freshScore > freshChallengerScore ||
+					(freshScore == freshChallengerScore && candidate.Actor.ActorID < freshChallenger.ActorID)))
+				{
+					freshChallenger = candidate.Actor;
+					freshChallengerScore = freshScore;
+					freshChallengerDanger = defendingValue;
+				}
+
+				if (candidate.Actor.Info.HasTraitInfo<LineBuildNodeInfo>() &&
+					(freshWall == null || freshScore > freshWallScore ||
+						(freshScore == freshWallScore && candidate.Actor.ActorID < freshWall.ActorID)))
+				{
+					freshWall = candidate.Actor;
+					freshWallScore = freshScore;
 				}
 
 				var score = StealthTankSquadPolicy.TargetScore(candidate.Priority,
@@ -1393,6 +1439,59 @@ namespace OpenRA.Mods.Common.Traits
 							clear.ClearAction, group.ConsecutiveNoSafeTargetScans, clear.ProtectedTarget.Info.Name,
 							clear.ProtectedTarget.ActorID, clear.DefendingValue, clear.UnlockedScore);
 					break;
+				}
+			}
+
+			if (targetCrossedStrategicCell)
+			{
+				var challenger = freshChallenger;
+				var challengerScore = freshChallengerScore;
+				var challengerDanger = freshChallengerDanger;
+				if (freshIncumbent == null && challenger == null && selected != incumbent)
+				{
+					challenger = selected;
+					challengerScore = selectedScore;
+					challengerDanger = selectedDanger;
+				}
+
+				var reassessment = StealthTankSquadPolicy.ReassessMovedTarget(
+					freshIncumbent != null, freshIncumbentDanger == 0, freshIncumbentScore,
+					challenger != null, challengerDanger == 0, challengerScore,
+					Info.TargetSwitchImprovementPercent);
+				if (reassessment == StealthTankTargetReassessment.RetainIncumbent)
+				{
+					selected = freshIncumbent;
+					selectedScore = freshIncumbentScore;
+					selectedDanger = freshIncumbentDanger;
+					selectedClearAction = SpecialistDefenderClearAction.None;
+					selectedMinimumAttackRange = 0;
+				}
+				else if (reassessment == StealthTankTargetReassessment.SwitchToChallenger)
+				{
+					selected = challenger;
+					selectedScore = challengerScore;
+					selectedDanger = challengerDanger;
+					selectedClearAction = SpecialistDefenderClearAction.None;
+					selectedMinimumAttackRange = 0;
+				}
+				else
+					selected = null;
+
+				if (Info.DebugLogging)
+				{
+					var previousCell = StealthTankSquadPolicy.StrategicCell(
+						group.PlannedTargetLocation, StrategicCellSize);
+					var currentCell = StealthTankSquadPolicy.StrategicCell(
+						incumbent.Location, StrategicCellSize);
+					Log.Write("debug", "AI stealth target {0} [{1}:{2}] {3}#{4} moved strategic cell {5}->{6}; fresh reassessment={7} incumbent-valid={8} incumbent-score={9} challenger={10} challenger-score={11} best-wall={12} wall-score={13} wall-priority={14} candidate-cap={15} candidate-count={16} incumbent-outside-cap={17} threshold={18}% refresh-order={19} incumbent-undefended={20} challenger-undefended={21} target-loss=false stop=false cancel=false idle-gap=false.",
+						Info.SquadLabel, player.PlayerName, group.Index, incumbent.Info.Name, incumbent.ActorID,
+						previousCell, currentCell, reassessment, freshIncumbent != null, freshIncumbentScore,
+						challenger == null ? "none" : challenger.Info.Name + "#" + challenger.ActorID,
+						challengerScore, freshWall == null ? "none" : freshWall.Info.Name + "#" + freshWall.ActorID,
+						freshWallScore, Info.WallTargetPriority, Info.MaximumTargetCandidates,
+						candidates.Count, incumbentOutsideCandidateCap, Info.TargetSwitchImprovementPercent,
+						reassessment == StealthTankTargetReassessment.RetainIncumbent,
+						freshIncumbentDanger == 0, challengerDanger == 0);
 				}
 			}
 
@@ -1906,6 +2005,8 @@ namespace OpenRA.Mods.Common.Traits
 				return types.Overlaps(TankTargetTypes) ? 8000 : 0;
 			if (types.Overlaps(InfantryTargetTypes))
 				return Info.InfantryTargetPriority;
+			if (actor.Info.HasTraitInfo<LineBuildNodeInfo>())
+				return Info.WallTargetPriority;
 			if (types.Overlaps(StructureTargetTypes))
 			{
 				var armorType = actor.Info.TraitInfoOrDefault<ArmorInfo>()?.Type;
