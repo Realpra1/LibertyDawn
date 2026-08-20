@@ -547,3 +547,32 @@ that exposed empty-topology new-core promotion; one custom detector missing its
 render alias; one Chemical half-reserve selection calibration; and earlier
 pre-final-code passes/reviews. They are not acceptance games. No fixture or
 save-byte mutation was used; only the two final runs above count.
+
+## Terra evidence correction
+
+Terra's review at
+`/root/github/LibertyDawn/.build/20260820-cnc96a-reinforcement-terra/REVIEW.md`
+accepted the clean product scope and final game artifacts, but blocked release
+promotion because the asserted independent Luna verdicts had not been saved to
+durable review files. The correction was evidence-only: no source, test,
+scenario, game, raw artifact, push, PR, or merge change was required.
+
+Fresh isolated native Luna receipts were regenerated in serialized narrator →
+policy order for each final artifact:
+
+- Game 1 narrative: `.build/20260820-cnc96a-reinforcement-evidence/game1/NARRATIVE.md`
+  — factual completeness **PASS**; SHA-256
+  `e82b419ab289a3aa2502107aeb46534857fb62186202314cd611a29a577e9f4e`.
+- Game 1 policy: `.build/20260820-cnc96a-reinforcement-evidence/game1/POLICY-REVIEW.md`
+  — **PASS**, blocker classification **none**, disposition **accept**; SHA-256
+  `64c24391dfc602c68f70324b87c00d30e3b2ff018583f2830c9219d34da0f8d0`.
+  The explicit ownership-field visibility qualification is non-blocking.
+- Game 2 narrative: `.build/20260820-cnc96a-reinforcement-evidence/game2/NARRATIVE.md`
+  — factual completeness **PASS**; SHA-256
+  `de8a16fc5f450665b7c16c00ba1e6afd63a3746b86bab84d9dd78ee16ed240af`.
+- Game 2 policy: `.build/20260820-cnc96a-reinforcement-evidence/game2/POLICY-REVIEW.md`
+  — **ACCEPT / PASS**, **no blocker identified**; SHA-256
+  `184f71a49c228532be6eb54728008acdf98f3fe0082ed5379b9e52b043467e37`.
+
+These canonical receipts are durable ignored analysis artifacts beneath the
+worker worktree. Terra's sole evidence blocker is resolved for rereview.

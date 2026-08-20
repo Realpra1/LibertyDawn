@@ -436,3 +436,27 @@
   calibrations, and all pre-final-code matches are disclosed and uncounted.
   Only the two final acceptance games above count. No fixture or save-byte
   mutation was used. Publication remains the coordinator's post-review handoff.
+
+## Reinforcement evidence correction receipt
+
+- Terra review `/root/github/LibertyDawn/.build/20260820-cnc96a-reinforcement-terra/REVIEW.md`
+  accepted and dispositioned: product scope and final games required no change;
+  the sole blocker was the absence of durable separate Luna review files.
+- Final Game 1 fresh native Luna factual narrative: PASS at
+  `.build/20260820-cnc96a-reinforcement-evidence/game1/NARRATIVE.md`
+  (`sha256 e82b419ab289a3aa2502107aeb46534857fb62186202314cd611a29a577e9f4e`).
+- Final Game 1 separate serialized fresh native Luna policy review: PASS,
+  blocker classification none, disposition accept at
+  `.build/20260820-cnc96a-reinforcement-evidence/game1/POLICY-REVIEW.md`
+  (`sha256 64c24391dfc602c68f70324b87c00d30e3b2ff018583f2830c9219d34da0f8d0`).
+  Its bounded ownership-telemetry qualification is explicitly non-blocking.
+- Final Game 2 fresh native Luna factual narrative: PASS at
+  `.build/20260820-cnc96a-reinforcement-evidence/game2/NARRATIVE.md`
+  (`sha256 de8a16fc5f450665b7c16c00ba1e6afd63a3746b86bab84d9dd78ee16ed240af`).
+- Final Game 2 separate serialized fresh native Luna policy review: ACCEPT/PASS,
+  no blocker identified, at
+  `.build/20260820-cnc96a-reinforcement-evidence/game2/POLICY-REVIEW.md`
+  (`sha256 184f71a49c228532be6eb54728008acdf98f3fe0082ed5379b9e52b043467e37`).
+- The receipts are durable ignored analysis artifacts under the worker
+  worktree. No product, test, game, raw artifact, push, PR, or merge action was
+  needed. Terra's evidence blocker is resolved and ready for rereview.
