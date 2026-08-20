@@ -149,6 +149,9 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Score awarded to any other enemy building.")]
 		public readonly int AirTargetBuildingValue = 150;
 
+		[Desc("Score awarded to line-build wall targets before generic building classification.")]
+		public readonly int AirTargetWallValue = 1;
+
 		[Desc("Score awarded to an enemy mobile unit.")]
 		public readonly int AirTargetUnitValue = 100;
 
@@ -430,7 +433,7 @@ namespace OpenRA.Mods.Common.Traits
 			if (AirTargetReferenceSpeed <= 0)
 				throw new YamlException("AirTargetReferenceSpeed must be greater than zero.");
 
-			if (AirTargetFullAmmoDistanceBonus < 0 || AirTargetAaClearUnlockPercent < 0 ||
+			if (AirTargetWallValue < 0 || AirTargetFullAmmoDistanceBonus < 0 || AirTargetAaClearUnlockPercent < 0 ||
 				AirTargetAaClearFallbackScans < 0 || AirTargetAaClearValueRatio < 0 ||
 				AirTargetAaClearWeakestCandidates < 0 || AirTargetAaClearSupportRadius < 0)
 				throw new YamlException("Air target ammo-distance and AA-clear modifiers must not be negative.");

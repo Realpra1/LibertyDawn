@@ -343,3 +343,64 @@ retreat began. The first slowed no-repair calibration damaged before retreat;
 the next strict run exercised damage during retreat but expected completion 25
 ticks late. The corrected unchanged-map strict rerun is the qualifying control.
 Only the two games above count. No fixture or save-byte mutation was used.
+
+## Cycle-5 amendment (recorded before amended code decisions)
+
+Air helper parity is explicitly limited to the switch decision. Stealth keeps
+its distinct target priorities/scoring because it destroys buildings faster;
+Air priorities must not be copied into Stealth. The only authorized Air change
+is an explicit configurable wall target priority of `1`, mirrored by an explicit
+Stealth wall priority of `1`, both far below valuable targets such as harvesters.
+The completed retain/save and threshold-switch strict pair predates this
+amendment and is uncounted final evidence; its diagnostics and partial fresh
+reviews remain preserved. Final acceptance requires a new exactly-two reviewed
+pair proving wall-versus-valuable discrimination for both systems alongside the
+multi-cell retain and threshold/no-gap behaviors.
+
+## Cycle-5 implementation and checks
+
+- Boundary crossing computes fresh Stealth raw scores and passes only the
+  incumbent/challenger validity, defended tier, scores, and configured threshold
+  to Air's exact switch-decision helper. Retention refreshes the existing moved
+  target plan without a Stop, target clearing, cancellation, or idle gap.
+  Stealth actor priorities and value/distance scoring remain unchanged/distinct.
+- Added explicit configurable `WallTargetPriority: 1` for Stealth and
+  `AirTargetWallValue: 1` for all ten ordinary Air profiles. Both recognize
+  line-build walls before generic structures. This wall classification/value is
+  the sole Air behavior change; Air archetype priorities and scoring are intact.
+- Focused Stealth/Air/config suites PASS 173/173. Protected `make check` PASS
+  with 0 warnings/0 errors. Full CNC YAML, both final map YAML checks,
+  `git diff --check`, and changed-path audit PASS.
+
+## Exactly two qualifying post-amendment cycle-5 games
+
+1. `cycle5-post-game1-final-leg` + `cycle5-post-game1-final-load`: ordinary
+   all-module Brutalis Nod versus VIKI GDI, seed9653, PASS/PASS, exit0 at
+   tick1275/10.012s and tick3500/15.026s. Apache scored HARV utility5550 versus
+   BRIK wall1 and selected HARV. Stealth retained the HARV across two 6x6
+   crossings with its own scores458333 then183333, while BRIK logged score3 at
+   priority1; both refreshes logged target-loss/Stop/cancel/idle-gap false and
+   immediately continued routed attack. Tick1252 restored the active retreat
+   barrier before physical completion; repair/rejoin, later exact retreats,
+   ownership3/reserved3, and ordinary0 continued. Fresh narrator PASS; separate
+   policy PASS/classification none.
+2. `cycle5-post-game2-final`: distinct ordinary all-module Brutalis Nod versus
+   VIKI GDI, seed9654, PASS, exit0 tick3500/16.031s. With BRIK active, Apache
+   repeatedly scored HARV5550 versus wall1 and selected HARV. At the moving HARV
+   boundary, Stealth switched from its raw282051 incumbent to SHARV547619 over
+   threshold25 while BRIK was score3/priority1, then immediately issued routed
+   Harass with target-loss/Stop/cancel/idle-gap false. Exact retreat,
+   repair/rejoin, ownership3/reserved3, and ordinary0 continued. Fresh narrator
+   PASS; separate policy PASS/classification none.
+
+Cycle-5 reviews are under
+`.build/20260820-cnc96a-stank-tactics/cycle5-post-reviews/`.
+
+## Cycle-5 exclusions
+
+Pre-amendment strict games, their partial reviews, and wall scenario calibration
+are uncounted. One calibration batch process returned failure only because its
+old manifest expected the superseded second-cross tick1400; both games actually
+reached tick3500/exit0 and informed the tightened post-amendment scenarios. Only
+the two final reviewed games above count. No fixture or save-byte mutation was
+used.

@@ -381,6 +381,31 @@ namespace OpenRA.Test.Mods.Common
 				Is.LessThan(baseline));
 		}
 
+		[TestCase(true, 100, true, true, 124, 25, StealthTankTargetReassessment.RetainIncumbent)]
+		[TestCase(true, 100, true, true, 125, 25, StealthTankTargetReassessment.SwitchToChallenger)]
+		[TestCase(true, 10000, true, false, 100000, 0, StealthTankTargetReassessment.RetainIncumbent)]
+		[TestCase(false, 10000, true, true, 1, 100, StealthTankTargetReassessment.SwitchToChallenger)]
+		public void MovedTargetReassessmentUsesExactAirSwitchPolicy(bool incumbentUndefended,
+			long incumbentScore, bool challengerValid, bool challengerUndefended, long challengerScore,
+			int improvementPercent, StealthTankTargetReassessment expected)
+		{
+			Assert.That(StealthTankSquadPolicy.ReassessMovedTarget(true, incumbentUndefended,
+				incumbentScore, challengerValid, challengerUndefended, challengerScore, improvementPercent),
+				Is.EqualTo(expected));
+			Assert.That(expected == StealthTankTargetReassessment.SwitchToChallenger,
+				Is.EqualTo(AirThreatGeometry.ShouldSwitchTarget(incumbentUndefended, incumbentScore,
+					challengerValid, challengerUndefended, challengerScore, improvementPercent)));
+		}
+
+		[Test]
+		public void InvalidMovedTargetSwitchesOrAbandonsWithoutApplyingThreshold()
+		{
+			Assert.That(StealthTankSquadPolicy.ReassessMovedTarget(false, false, 10000,
+				true, false, 1, 100), Is.EqualTo(StealthTankTargetReassessment.SwitchToChallenger));
+			Assert.That(StealthTankSquadPolicy.ReassessMovedTarget(false, false, 10000,
+				false, false, 0, 100), Is.EqualTo(StealthTankTargetReassessment.Abandon));
+		}
+
 		[Test]
 		public void InfantryClusterBonusIsBoundedAndImprovesTargetScore()
 		{

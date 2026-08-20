@@ -25,6 +25,13 @@ namespace OpenRA.Mods.Common.Traits
 		NoProgress
 	}
 
+	public enum StealthTankTargetReassessment
+	{
+		RetainIncumbent,
+		SwitchToChallenger,
+		Abandon
+	}
+
 	public sealed class StealthTankRetreatSaveGroup
 	{
 		public int GroupIndex;
@@ -316,6 +323,20 @@ namespace OpenRA.Mods.Common.Traits
 				Math.Max(1, Math.Max(0, distanceCells) * Math.Max(1, distancePenalty) + 6);
 			return score * Math.Max(100, currentTargetBonusPercent) / 100 *
 				Math.Max(100, clusterMultiplierPercent) / 100;
+		}
+
+		public static StealthTankTargetReassessment ReassessMovedTarget(bool incumbentValid,
+			bool incumbentUndefended, long incumbentScore, bool challengerValid,
+			bool challengerUndefended, long challengerScore, int minimumImprovementPercent)
+		{
+			if (!incumbentValid)
+				return challengerValid ? StealthTankTargetReassessment.SwitchToChallenger :
+					StealthTankTargetReassessment.Abandon;
+
+			return AirThreatGeometry.ShouldSwitchTarget(incumbentUndefended, incumbentScore,
+				challengerValid, challengerUndefended, challengerScore, minimumImprovementPercent) ?
+				StealthTankTargetReassessment.SwitchToChallenger :
+				StealthTankTargetReassessment.RetainIncumbent;
 		}
 
 		public static int InfantryClusterMultiplier(int nearbyInfantry, int bonusPercentPerActor,

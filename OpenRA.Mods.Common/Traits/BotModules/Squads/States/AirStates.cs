@@ -509,7 +509,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				WeaponProjectileSpeed(bestAa.Weapon));
 		}
 
-		enum AirTargetClass { Unit, Building, Production, Harvester }
+		enum AirTargetClass { Unit, Wall, Building, Production, Harvester }
 
 		protected sealed class AirTargetPlan
 		{
@@ -1690,6 +1690,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				case AirTargetClass.Harvester: return info.AirTargetHarvesterValue;
 				case AirTargetClass.Production: return info.AirTargetProductionValue;
 				case AirTargetClass.Building: return info.AirTargetBuildingValue;
+				case AirTargetClass.Wall: return info.AirTargetWallValue;
 				default: return info.AirTargetUnitValue;
 			}
 		}
@@ -1698,6 +1699,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		{
 			if (a.Info.HasTraitInfo<HarvesterInfo>())
 				return AirTargetClass.Harvester;
+
+			if (a.Info.HasTraitInfo<LineBuildNodeInfo>())
+				return AirTargetClass.Wall;
 
 			if (!a.Info.HasTraitInfo<BuildingInfo>())
 				return AirTargetClass.Unit;
