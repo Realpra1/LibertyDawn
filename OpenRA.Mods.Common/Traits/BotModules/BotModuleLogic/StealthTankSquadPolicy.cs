@@ -28,6 +28,50 @@ namespace OpenRA.Mods.Common.Traits
 	public static class StealthTankSquadPolicy
 	{
 		public const int MaximumSquadCount = 4;
+		public const int RequiredStrategicCellSize = 6;
+		public const int NearbyReactionMaximumLatencyTicks = 25;
+
+		public static CPos StrategicCell(CPos cell, int strategicCellSize)
+		{
+			var size = Math.Max(1, strategicCellSize);
+			return new CPos(cell.X / size, cell.Y / size);
+		}
+
+		public static bool IsSameStrategicCell(CPos a, CPos b, int strategicCellSize)
+		{
+			return StrategicCell(a, strategicCellSize) == StrategicCell(b, strategicCellSize);
+		}
+
+		public static CPos OneStrategicCellRetreat(CPos unit, CPos target, int strategicCellSize,
+			int mapWidth, int mapHeight)
+		{
+			var size = Math.Max(1, strategicCellSize);
+			var width = Math.Max(1, (mapWidth + size - 1) / size);
+			var height = Math.Max(1, (mapHeight + size - 1) / size);
+			var start = StrategicCell(unit, size);
+			var targetCell = StrategicCell(target, size);
+			var rawDx = unit.X - target.X;
+			var rawDy = unit.Y - target.Y;
+			var preferredX = Math.Sign(start.X - targetCell.X);
+			var preferredY = Math.Sign(start.Y - targetCell.Y);
+			if (preferredX == 0 && preferredY == 0)
+			{
+				if (Math.Abs(rawDx) >= Math.Abs(rawDy))
+					preferredX = rawDx < 0 ? -1 : 1;
+				else
+					preferredY = rawDy < 0 ? -1 : 1;
+			}
+
+			var candidates = Enumerable.Range(-1, 3)
+				.SelectMany(y => Enumerable.Range(-1, 3).Select(x => new CPos(start.X + x, start.Y + y)))
+				.Where(c => c != start && c.X >= 0 && c.Y >= 0 && c.X < width && c.Y < height)
+				.OrderByDescending(c => (c.X - start.X) * preferredX + (c.Y - start.Y) * preferredY)
+				.ThenByDescending(c => (c - targetCell).LengthSquared)
+				.ThenBy(c => c.Y).ThenBy(c => c.X).ToArray();
+			var destination = candidates.Length > 0 ? candidates[0] : start;
+			return new CPos(Math.Min(mapWidth - 1, destination.X * size + size / 2),
+				Math.Min(mapHeight - 1, destination.Y * size + size / 2));
+		}
 
 		public static int SquadCount(int maximumHarassmentGroups, bool includeAttackGroup)
 		{

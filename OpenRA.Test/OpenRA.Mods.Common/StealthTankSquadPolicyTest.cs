@@ -116,6 +116,53 @@ namespace OpenRA.Test.Mods.Common
 				Is.EqualTo(expected));
 		}
 
+		[Test]
+		public void StealthStrategicGeometryUsesExactSixBySixCells()
+		{
+			Assert.That(StealthTankSquadPolicy.RequiredStrategicCellSize, Is.EqualTo(6));
+			Assert.That(StealthTankSquadPolicy.StrategicCell(new CPos(0, 0), 6), Is.EqualTo(new CPos(0, 0)));
+			Assert.That(StealthTankSquadPolicy.StrategicCell(new CPos(5, 5), 6), Is.EqualTo(new CPos(0, 0)));
+			Assert.That(StealthTankSquadPolicy.StrategicCell(new CPos(6, 6), 6), Is.EqualTo(new CPos(1, 1)));
+			Assert.That(StealthTankSquadPolicy.IsSameStrategicCell(
+				new CPos(6, 6), new CPos(11, 11), 6), Is.True);
+			Assert.That(StealthTankSquadPolicy.IsSameStrategicCell(
+				new CPos(5, 5), new CPos(6, 6), 6), Is.False);
+		}
+
+		[Test]
+		public void MobileTargetInsideMissionCellDoesNotCauseImmediateOrderChurn()
+		{
+			var movedInsideCell = !StealthTankSquadPolicy.IsSameStrategicCell(
+				new CPos(7, 8), new CPos(10, 11), 6);
+			Assert.That(movedInsideCell, Is.False);
+			Assert.That(StealthTankSquadPolicy.ClassifyPlanInvalidation(true, false,
+				false, movedInsideCell, false, 299, 0, 300), Is.EqualTo(StealthTankPlanInvalidation.None));
+			Assert.That(StealthTankSquadPolicy.ClassifyPlanInvalidation(true, false,
+				false, movedInsideCell, false, 300, 0, 300), Is.EqualTo(StealthTankPlanInvalidation.NoProgress));
+		}
+
+		[TestCase(18, 18, 6, 6, 27, 27)]
+		[TestCase(18, 18, 30, 18, 15, 15)]
+		[TestCase(1, 1, 8, 1, 3, 9)]
+		public void RevealRetreatMovesExactlyOneAdjacentSixCellStrategicCell(
+			int unitX, int unitY, int targetX, int targetY, int expectedX, int expectedY)
+		{
+			var start = StealthTankSquadPolicy.StrategicCell(new CPos(unitX, unitY), 6);
+			var destination = StealthTankSquadPolicy.OneStrategicCellRetreat(
+				new CPos(unitX, unitY), new CPos(targetX, targetY), 6, 96, 96);
+			var destinationCell = StealthTankSquadPolicy.StrategicCell(destination, 6);
+
+			Assert.That(destination, Is.EqualTo(new CPos(expectedX, expectedY)));
+			Assert.That(System.Math.Max(System.Math.Abs(destinationCell.X - start.X),
+				System.Math.Abs(destinationCell.Y - start.Y)), Is.EqualTo(1));
+		}
+
+		[Test]
+		public void NearbyUndefendedReactionHasATwentyFiveTickBound()
+		{
+			Assert.That(StealthTankSquadPolicy.NearbyReactionMaximumLatencyTicks, Is.EqualTo(25));
+		}
+
 		[TestCase(0, 0)]
 		[TestCase(1, 0)]
 		[TestCase(2, 2)]
