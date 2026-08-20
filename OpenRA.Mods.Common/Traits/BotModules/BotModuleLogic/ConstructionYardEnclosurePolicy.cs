@@ -114,6 +114,17 @@ namespace OpenRA.Mods.Common.Traits
 			return retryCount >= MaximumInitialRetries;
 		}
 
+		public static bool MaintenanceRetryDue(int currentTick, int nextRetryTick)
+		{
+			return currentTick >= Math.Max(0, nextRetryTick);
+		}
+
+		public static int NextMaintenanceRetryTick(int currentTick, int retryInterval)
+		{
+			var interval = Math.Max(1, retryInterval);
+			return currentTick > int.MaxValue - interval ? int.MaxValue : currentTick + interval;
+		}
+
 		public static bool IssuedCellRetryDue(int currentTick, int issuedTick, int retryInterval)
 		{
 			return currentTick - issuedTick >= Math.Max(1, retryInterval);
@@ -366,6 +377,11 @@ namespace OpenRA.Mods.Common.Traits
 		public static bool IsValidSavedTick(int savedTick, int currentWorldTick)
 		{
 			return savedTick >= 0 && currentWorldTick >= 0 && savedTick <= currentWorldTick;
+		}
+
+		public static bool IsValidScheduledTick(int savedTick)
+		{
+			return savedTick >= 0;
 		}
 
 		public static int QueuePollDelay(int normalDelay, int maintenanceInterval, bool enclosureActive)

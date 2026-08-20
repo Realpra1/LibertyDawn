@@ -492,6 +492,40 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
+		public void UnavailableRetriesRemainMaintenanceAgedAcrossCompetingQueuePolls()
+		{
+			const int MaintenanceInterval = 250;
+			var retries = 0;
+			var nextRetryTick = 0;
+			var consumedTicks = new List<int>();
+
+			for (var tick = 1; tick <= 500; tick++)
+				for (var competingPoll = 0; competingPoll < 4; competingPoll++)
+					if (ConstructionYardEnclosurePolicy.MaintenanceRetryDue(tick, nextRetryTick))
+					{
+						retries = ConstructionYardEnclosurePolicy.NextInitialRetryCount(retries);
+						nextRetryTick = ConstructionYardEnclosurePolicy.NextMaintenanceRetryTick(
+							tick, MaintenanceInterval);
+						consumedTicks.Add(tick);
+					}
+
+			Assert.That(consumedTicks, Is.EqualTo(new[] { 1, 251 }),
+				"Four queue polls per tick must still consume at most one retry per 250 ticks.");
+			Assert.That(retries, Is.EqualTo(2));
+			Assert.That(nextRetryTick, Is.EqualTo(501));
+			Assert.That(ConstructionYardEnclosurePolicy.MaintenanceRetryDue(500, nextRetryTick), Is.False);
+			Assert.That(ConstructionYardEnclosurePolicy.MaintenanceRetryDue(501, nextRetryTick), Is.True);
+		}
+
+		[TestCase(-1, false)]
+		[TestCase(0, true)]
+		[TestCase(100000, true)]
+		public void ScheduledRetryTicksMayBeFutureButNeverNegative(int savedTick, bool expected)
+		{
+			Assert.That(ConstructionYardEnclosurePolicy.IsValidScheduledTick(savedTick), Is.EqualTo(expected));
+		}
+
+		[Test]
 		public void TerrainSealedHoleCompletesWithoutInventingAPlacement()
 		{
 			Assert.That(ConstructionYardEnclosurePolicy.IsSatisfiedCell(true, false), Is.True);

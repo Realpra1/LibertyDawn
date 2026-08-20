@@ -54,3 +54,22 @@ The initial MCV enclosure phase must retry missing or terrain-constrained wall p
 - Qualifying replacement Game 2, no cap: 24 prior walls, one terrain-sealed ring cell and 15 temporarily blocked cells; first new wall exceeded the former cap at tick 80; total 39 walls and physical closure tick 656 (16.4 seconds) with retries 6/8; no preemption; Silo/configured defense/normal at ticks 5600/6728/8114; exit 0 at tick 9000 in 35.081 seconds.
 - Separate Luna narration and policy reviews passed for both qualifying games. Both highest-priority recommendations were advisory only; their bounded-scope wording is recorded in `REPORT.md` and no extra game/code change is required.
 - The pre-amendment cutoff run, interrupted cap-specific run, and one-tick-maintenance replacement calibration are explicitly superseded/uncounted and excluded from final acceptance.
+
+## Cycle-3 reviewer correction
+
+- Starting head: `9ca432f4d06e8b83b7e5dfb915ad80e572984aee` (clean).
+- Terra correction: unavailable-cell retries remain queue-poll-aged because `NextEnclosureScanTick` reduces pending scans to one tick and ordinary no-legal/cutoff-unavailable branches increment at every scan.
+- Required correction: persist or deterministically derive a next-retry timestamp and increment unavailable/cutoff retries no more than once per configured `ConstructionYardEnclosureMaintenanceInterval`, including under competing queue polls.
+- Preserve: no wall cap, per-Fact physical/terrain closure, maximum eight retries, cutoff gating, save/load determinism, and post-release Silo/configured-defense/normal construction order.
+- Required evidence: interval-250 and competing-poll focused regressions, protected checks, and exactly two new distinct ordinary-AI/all-module games at most 120 seconds with separate fresh Luna narration/policy. Both games use the normal maintenance interval and directly timestamp maintenance-aged retries, no preemption, physical closure within 30 seconds where achievable or explicit bounded behavior, and later construction continuation/order.
+- Cycle-3 status: `Complete - testing`.
+
+## Cycle-3 receipt
+
+- Production correction: the planner persists `NextInitialRetryTick` and funnels unavailable-cell, cutoff-unavailable, and due issued-cell outcomes through one maintenance-aged retry consumer. Competing one-tick queue polls cannot consume again before the configured interval. Save data advances compatibly to version 5; versions 2-4 default the new schedule to immediate eligibility, future scheduled ticks are valid, and negative state is rejected.
+- Focused enclosure/opening tests: 50 passed, 0 failed, including interval-250/four-competing-polls coverage at ticks 1 and 251. Protected `make check` passed with 0 warnings and 0 errors. Full CNC YAML, both custom-map YAML/Lua validations, and `git diff --check` passed.
+- Qualifying Game 1, recoverable terrain/no-cap pressure: ordinary all-module Brutalis/Nod versus VIKI/GDI; retry 1/8 tick 1 scheduled tick 251; blockers cleared tick 5 without retry 2; first plan tick 251; 25 walls tick 323; terrain-sealed physical closure at tick 902 (22.55 seconds) with 39 walls and release at 1/8; Silo/defense/normal ticks 5546/7265/7439; exit 0 at tick 9000 in 36.088 seconds.
+- Qualifying Game 2, impossible geometry plus cutoff: ordinary all-module Brutalis/GDI versus VIKI/Nod; retries exactly ticks 1/251/501/751/1001/1251/1501/1751; explicit `retry limit reached` release at 8/8 tick 1751; Silo/defense/normal ticks 4898/6374/6407; exit 0 at tick 9000 in 34.127 seconds.
+- Separate fresh Luna narration and policy reviews completed for each qualifying game. Both highest-priority recommendations were `KEEP`; accepted without further product or game changes, with claims bounded to the two tested scenarios.
+- The first Game-2 launcher invocation failed before engine startup because of an invalid output option. It is disclosed as an uncounted setup failure; the corrected unchanged launch is the qualifying run.
+- Detailed receipt and ignored artifact paths: `REPORT.md`.

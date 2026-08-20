@@ -113,3 +113,52 @@ The final correction keeps an unresolved bound enclosure active across cutoff, c
 ### Remaining risk
 
 The evidence covers an impossible all-blocked cutoff and one terrain-sealed 24-to-39 wall expansion under pressure. It does not prove every starting count, topology, or cutoff timing. Both Luna policy reviewers classified broader coverage as advisory, not a blocker or required follow-up.
+
+## Cycle 3: Terra maintenance-aging correction
+
+### Proposal
+
+`Complete - testing`
+
+Starting from clean cycle-2 commit `9ca432f4d06e8b83b7e5dfb915ad80e572984aee`, Terra found that ordinary unavailable-cell and cutoff-unavailable retries were still aged by competing one-tick queue polls rather than the configured enclosure maintenance interval. `NextEnclosureScanTick` deliberately kept the protected secondary queue responsive, but the no-legal and cutoff branches incremented on every resulting scan.
+
+The smallest correction adds a persisted `NextInitialRetryTick` shared by unavailable-cell, cutoff-unavailable, and due issued-cell retry outcomes. A retry can be consumed only when that timestamp is due, then the timestamp advances by at least one configured maintenance interval. Responsive queue polling remains intact without accelerating the maximum-eight escape. Save data advances from version 4 to version 5; versions 2-4 remain accepted with immediate eligibility, future absolute retry ticks remain valid for deterministic restoration, negative scheduled ticks are rejected, and invalid state retains the existing safe-disable behavior. No-wall-cap behavior, per-Fact physical/terrain closure, cutoff gating, and later queue order are unchanged.
+
+### Cycle-3 checks
+
+- Focused enclosure/opening tests: **50 passed, 0 failed**. The new interval-250 regression simulates four competing polls per tick and consumes only at ticks 1 and 251, with the next retry at 501. Four unrelated pre-existing analyzer warnings appeared in other test files.
+- Protected canonical large-build wrapper plus `make check`: **passed**, build **0 warnings, 0 errors**, explicit interface checks passed.
+- Full `./utility.sh cnc --check-yaml`: **passed**.
+- Both cycle-3 custom-map YAML validations: **passed**.
+- Both embedded scenario Lua syntax checks: **passed**.
+- `git diff --check`: **passed**.
+
+### Cycle-3 qualifying Game 1: recoverable blockers and terrain seal
+
+- Artifact: `.build/20260820-cnc101-enclosure-retry/cycle3-game1/cnc101-cycle3-game1-recover`.
+- Ordinary all-module Brutalis/Nod versus VIKI/GDI under nearby infantry pressure; normal maintenance interval 250; 24 prior owned walls, fifteen temporarily blocked ring cells, and one impassable terrain-sealed ring position.
+- Retry 1/8 occurred at tick 1 with `next-retry=251`. Blockers cleared at tick 5; competing polling produced no retry 2. The first target ring-wall plan occurred at tick 251.
+- Total ownership exceeded the former cap at 25 walls on tick 323. Physical/terrain closure completed at tick 902 with 39 total walls, 22.55 seconds at 40 ticks/second, and product release `complete` at retries 1/8. No ordinary secondary acceptance marker preceded release.
+- Later order: Silo 5546, configured defense 7265, normal secondary 7439. Exit 0 at tick 9000 in 36.088 seconds; replay/save present; no scenario failure, retry-limit release, fatal error, or desync.
+- Narration: `.build/20260820-cnc101-enclosure-retry/analysis/cycle3-game1-narrator/NARRATIVE.md`.
+- Policy: `.build/20260820-cnc101-enclosure-retry/analysis/cycle3-game1-policy/POLICY-REVIEW.md` — highest-priority verdict `KEEP`.
+- Disposition: accept `KEEP` without code or policy changes; retain the review's bounded one-scenario claim and use the required distinct cutoff game for the impossible-geometry path.
+
+### Cycle-3 qualifying Game 2: permanent blockage and cutoff
+
+- Artifact: `.build/20260820-cnc101-enclosure-retry/cycle3-game2/cnc101-cycle3-game2-cutoff`.
+- Ordinary all-module Brutalis/GDI versus VIKI/Nod; normal maintenance interval 250; all sixteen ring positions permanently unavailable; cutoff tick 4.
+- Target retries occurred exactly at ticks 1, 251, 501, 751, 1001, 1251, 1501, and 1751. Cutoff therefore did not bypass the gate or accelerate the retries under competing polling.
+- Physical closure was deliberately impossible. Product release occurred only at explicit `retry limit reached`, 8/8, tick 1751. The scenario's tick-1751 secondary floor detected no preemption.
+- Later order: Silo 4898, configured defense 6374, normal secondary 6407. Exit 0 at tick 9000 in 34.127 seconds; replay/save present; no physical-complete release, scenario failure, fatal error, or desync.
+- Narration: `.build/20260820-cnc101-enclosure-retry/analysis/cycle3-game2-narrator/NARRATIVE.md`.
+- Policy: `.build/20260820-cnc101-enclosure-retry/analysis/cycle3-game2-policy/POLICY-REVIEW.md` — highest-priority verdict `KEEP`.
+- Disposition: accept `KEEP` without code or policy changes; retain the bounded permanent-blockage/cutoff claim. Exactly two qualifying games are complete, so no extra game is added.
+
+### Excluded setup attempt
+
+The first Game-2 command used the launcher's unsupported `--output-dir` option. The launcher exited 2 before engine startup and acquired no game evidence. It is disclosed and uncounted. The corrected `--output` launch used the unchanged manifest/map and is the qualifying Game 2 above.
+
+### Remaining risk
+
+The games cover recovery after transient blockers with a terrain seal, construction beyond the former cap, and maintenance-aged explicit exhaustion under permanent blockage plus cutoff. They do not cover every geometry or a mid-run save reload. Save/load determinism is supported by the versioned absolute timestamp, compatibility validation, and focused policy tests; both Luna policy reviewers classified the observed behavior `KEEP` within the staged evidence bounds.

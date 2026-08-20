@@ -103,6 +103,7 @@ namespace OpenRA.Mods.Common.Traits
 		bool enclosureStopped;
 		bool initialEnclosureReleased;
 		int initialEnclosureRetryCount;
+		int nextInitialEnclosureRetryTick;
 		bool enclosureStopLogged;
 		int nextEnclosureScanTick;
 		readonly HashSet<CPos> clusterWallCells = new HashSet<CPos>();
@@ -589,6 +590,7 @@ namespace OpenRA.Mods.Common.Traits
 					Info.ConstructionYardEnclosureMargin.Clamp(0, 8),
 					Info.ConstructionYardEnclosureAccessWidth);
 				nextEnclosureScanTick = world.WorldTick;
+				nextInitialEnclosureRetryTick = world.WorldTick;
 				LogEnclosure("{0} tick={1} bound first yard={2}/{3}@{4} walls={5} access={6} cutoff={7}.",
 					player, world.WorldTick, enclosureYardActorId, enclosureYardType, enclosureYardLocation,
 					enclosurePlan.WallCells.Length, string.Join(",", enclosurePlan.AccessCells),
@@ -781,7 +783,7 @@ namespace OpenRA.Mods.Common.Traits
 				Info.ConstructionYardEnclosureCutoffTick))
 			{
 				RecordUnavailableInitialEnclosureMaintenance(
-					missingCells, wallInfo, wallBuildingInfo);
+					"cutoff", missingCells, wallInfo, wallBuildingInfo);
 				return false;
 			}
 
@@ -806,26 +808,10 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (destination == null)
 			{
-				if (!initialEnclosureReleased)
-				{
-					initialEnclosureRetryCount = ConstructionYardEnclosurePolicy.NextInitialRetryCount(
-						initialEnclosureRetryCount);
-					if (outstanding != null)
-						issuedEnclosureCells[outstanding.Value.Key] = world.WorldTick;
-					if (ConstructionYardEnclosurePolicy.InitialRetryLimitReached(initialEnclosureRetryCount))
-						ReleaseInitialEnclosure("retry limit reached");
-				}
-
-				nextEnclosureScanTick = NextEnclosureScanTick();
-				LogEnclosure("{0} tick={1} pending yard={2}@{3}: missing={4} legal={5} retries={6}/{7}.",
-					player, world.WorldTick, enclosureYardActorId, enclosureYardLocation,
-					missingCells.Length, candidates.Length, initialEnclosureRetryCount,
-					ConstructionYardEnclosurePolicy.MaximumInitialRetries);
-				if (Info.ConstructionYardEnclosureDebugLogging)
-					LogEnclosure("{0} tick={1} pending-cell-status yard={2}@{3}: {4}.",
-						player, world.WorldTick, enclosureYardActorId, enclosureYardLocation,
-						string.Join(";", missingCells.Select(c =>
-							c + "=" + DescribeEnclosureCell(c, wallInfo, wallBuildingInfo))));
+				var retryConsumed = RecordUnavailableInitialEnclosureMaintenance(
+					"unavailable cells", missingCells, wallInfo, wallBuildingInfo);
+				if (retryConsumed && outstanding != null)
+					issuedEnclosureCells[outstanding.Value.Key] = world.WorldTick;
 				return false;
 			}
 
@@ -837,8 +823,14 @@ namespace OpenRA.Mods.Common.Traits
 					return false;
 				}
 
-				initialEnclosureRetryCount = ConstructionYardEnclosurePolicy.NextInitialRetryCount(
-					initialEnclosureRetryCount);
+				if (!ConstructionYardEnclosurePolicy.MaintenanceRetryDue(
+					world.WorldTick, nextInitialEnclosureRetryTick))
+				{
+					nextEnclosureScanTick = Math.Max(nextEnclosureScanTick, nextInitialEnclosureRetryTick);
+					return false;
+				}
+
+				ConsumeInitialEnclosureRetry();
 				issuedEnclosureCells[destination.Value] = world.WorldTick;
 			}
 
@@ -852,24 +844,40 @@ namespace OpenRA.Mods.Common.Traits
 			return true;
 		}
 
-		void RecordUnavailableInitialEnclosureMaintenance(CPos[] missingCells,
+		bool RecordUnavailableInitialEnclosureMaintenance(string reason, CPos[] missingCells,
 			ActorInfo wallInfo, BuildingInfo wallBuildingInfo)
 		{
-			initialEnclosureRetryCount = ConstructionYardEnclosurePolicy.NextInitialRetryCount(
-				initialEnclosureRetryCount);
-			if (ConstructionYardEnclosurePolicy.InitialRetryLimitReached(initialEnclosureRetryCount))
-				ReleaseInitialEnclosure("retry limit reached");
+			if (initialEnclosureReleased || !ConstructionYardEnclosurePolicy.MaintenanceRetryDue(
+				world.WorldTick, nextInitialEnclosureRetryTick))
+			{
+				nextEnclosureScanTick = initialEnclosureReleased ?
+					NextEnclosureScanTick() : Math.Max(nextEnclosureScanTick, nextInitialEnclosureRetryTick);
+				return false;
+			}
 
-			nextEnclosureScanTick = NextEnclosureScanTick();
-			LogEnclosure("{0} tick={1} pending yard={2}@{3}: maintenance=cutoff missing={4} retries={5}/{6}.",
-				player, world.WorldTick, enclosureYardActorId, enclosureYardLocation,
+			ConsumeInitialEnclosureRetry();
+
+			nextEnclosureScanTick = initialEnclosureReleased ? NextEnclosureScanTick() : nextInitialEnclosureRetryTick;
+			LogEnclosure("{0} tick={1} pending yard={2}@{3}: maintenance={4} missing={5} retries={6}/{7} next-retry={8}.",
+				player, world.WorldTick, enclosureYardActorId, enclosureYardLocation, reason,
 				missingCells.Length, initialEnclosureRetryCount,
-				ConstructionYardEnclosurePolicy.MaximumInitialRetries);
+				ConstructionYardEnclosurePolicy.MaximumInitialRetries, nextInitialEnclosureRetryTick);
 			if (Info.ConstructionYardEnclosureDebugLogging)
 				LogEnclosure("{0} tick={1} pending-cell-status yard={2}@{3}: {4}.",
 					player, world.WorldTick, enclosureYardActorId, enclosureYardLocation,
 					string.Join(";", missingCells.Select(c =>
 						c + "=" + DescribeEnclosureCell(c, wallInfo, wallBuildingInfo))));
+			return true;
+		}
+
+		void ConsumeInitialEnclosureRetry()
+		{
+			initialEnclosureRetryCount = ConstructionYardEnclosurePolicy.NextInitialRetryCount(
+				initialEnclosureRetryCount);
+			nextInitialEnclosureRetryTick = ConstructionYardEnclosurePolicy.NextMaintenanceRetryTick(
+				world.WorldTick, Info.ConstructionYardEnclosureMaintenanceInterval);
+			if (ConstructionYardEnclosurePolicy.InitialRetryLimitReached(initialEnclosureRetryCount))
+				ReleaseInitialEnclosure("retry limit reached");
 		}
 
 		bool IsTerrainSealedEnclosureCell(CPos cell)
@@ -968,11 +976,12 @@ namespace OpenRA.Mods.Common.Traits
 
 			var nodes = new List<MiniYamlNode>
 			{
-				new MiniYamlNode("Version", FieldSaver.FormatValue(4)),
+				new MiniYamlNode("Version", FieldSaver.FormatValue(5)),
 				new MiniYamlNode("Bound", FieldSaver.FormatValue(enclosureBound)),
 				new MiniYamlNode("Stopped", FieldSaver.FormatValue(enclosureStopped)),
 				new MiniYamlNode("InitialReleased", FieldSaver.FormatValue(initialEnclosureReleased)),
 				new MiniYamlNode("InitialRetryCount", FieldSaver.FormatValue(initialEnclosureRetryCount)),
+				new MiniYamlNode("NextInitialRetryTick", FieldSaver.FormatValue(nextInitialEnclosureRetryTick)),
 				new MiniYamlNode("NextScanTick", FieldSaver.FormatValue(nextEnclosureScanTick))
 			};
 			if (enclosureBound)
@@ -1034,7 +1043,7 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				var nodes = state.Value.Nodes;
 				var version = ReadSavedValue<int>(nodes, "Version");
-				if (version != 2 && version != 3 && version != 4)
+				if (version != 2 && version != 3 && version != 4 && version != 5)
 					throw new InvalidOperationException("unsupported version " + version);
 
 				enclosureBound = ReadSavedValue<bool>(nodes, "Bound");
@@ -1045,6 +1054,10 @@ namespace OpenRA.Mods.Common.Traits
 				if (initialEnclosureRetryCount < 0 ||
 					initialEnclosureRetryCount > ConstructionYardEnclosurePolicy.MaximumInitialRetries)
 					throw new InvalidOperationException("initial enclosure retry count is outside its bound");
+				nextInitialEnclosureRetryTick = version >= 5 ?
+					ReadSavedValue<int>(nodes, "NextInitialRetryTick") : 0;
+				if (!ConstructionYardEnclosurePolicy.IsValidScheduledTick(nextInitialEnclosureRetryTick))
+					throw new InvalidOperationException("next initial enclosure retry tick is invalid");
 				nextEnclosureScanTick = ReadSavedValue<int>(nodes, "NextScanTick");
 				if (!enclosureBound)
 					return;
@@ -1126,6 +1139,7 @@ namespace OpenRA.Mods.Common.Traits
 				enclosureStopped = true;
 				initialEnclosureReleased = false;
 				initialEnclosureRetryCount = 0;
+				nextInitialEnclosureRetryTick = 0;
 				LogEnclosure("{0} tick={1} rejected invalid saved enclosure state ({2}: {3}); policy disabled.",
 					player, world.WorldTick, ex.GetType().Name, ex.Message);
 			}
