@@ -116,6 +116,144 @@ namespace OpenRA.Test.Mods.Common
 				Is.EqualTo(expected));
 		}
 
+		[Test]
+		public void StealthStrategicGeometryUsesExactSixBySixCells()
+		{
+			Assert.That(StealthTankSquadPolicy.RequiredStrategicCellSize, Is.EqualTo(6));
+			Assert.That(StealthTankSquadPolicy.StrategicCell(new CPos(0, 0), 6), Is.EqualTo(new CPos(0, 0)));
+			Assert.That(StealthTankSquadPolicy.StrategicCell(new CPos(5, 5), 6), Is.EqualTo(new CPos(0, 0)));
+			Assert.That(StealthTankSquadPolicy.StrategicCell(new CPos(6, 6), 6), Is.EqualTo(new CPos(1, 1)));
+			Assert.That(StealthTankSquadPolicy.IsSameStrategicCell(
+				new CPos(6, 6), new CPos(11, 11), 6), Is.True);
+			Assert.That(StealthTankSquadPolicy.IsSameStrategicCell(
+				new CPos(5, 5), new CPos(6, 6), 6), Is.False);
+		}
+
+		[Test]
+		public void MobileTargetInsideMissionCellDoesNotCauseImmediateOrderChurn()
+		{
+			var movedInsideCell = !StealthTankSquadPolicy.IsSameStrategicCell(
+				new CPos(7, 8), new CPos(10, 11), 6);
+			Assert.That(movedInsideCell, Is.False);
+			Assert.That(StealthTankSquadPolicy.ClassifyPlanInvalidation(true, false,
+				false, movedInsideCell, false, 299, 0, 300), Is.EqualTo(StealthTankPlanInvalidation.None));
+			Assert.That(StealthTankSquadPolicy.ClassifyPlanInvalidation(true, false,
+				false, movedInsideCell, false, 300, 0, 300), Is.EqualTo(StealthTankPlanInvalidation.NoProgress));
+		}
+
+		[TestCase(18, 18, 6, 6, 27, 27)]
+		[TestCase(18, 18, 30, 18, 15, 15)]
+		[TestCase(1, 1, 8, 1, 3, 9)]
+		public void RevealRetreatMovesExactlyOneAdjacentSixCellStrategicCell(
+			int unitX, int unitY, int targetX, int targetY, int expectedX, int expectedY)
+		{
+			var start = StealthTankSquadPolicy.StrategicCell(new CPos(unitX, unitY), 6);
+			var destination = StealthTankSquadPolicy.OneStrategicCellRetreat(
+				new CPos(unitX, unitY), new CPos(targetX, targetY), 6, 96, 96);
+			var destinationCell = StealthTankSquadPolicy.StrategicCell(destination, 6);
+
+			Assert.That(destination, Is.EqualTo(new CPos(expectedX, expectedY)));
+			Assert.That(System.Math.Max(System.Math.Abs(destinationCell.X - start.X),
+				System.Math.Abs(destinationCell.Y - start.Y)), Is.EqualTo(1));
+		}
+
+		[Test]
+		public void NearbyUndefendedReactionHasATwentyFiveTickBound()
+		{
+			Assert.That(StealthTankSquadPolicy.NearbyReactionMaximumLatencyTicks, Is.EqualTo(25));
+		}
+
+		[Test]
+		public void VersionedMultiUnitRetreatSaveRestoresBarrierUntilEveryMemberCompletes()
+		{
+			var saved = StealthTankSquadPolicy.SaveRetreatState(new[]
+			{
+				new StealthTankRetreatSaveGroup
+				{
+					GroupIndex = 0,
+					TargetId = 91,
+					Destinations = new[]
+					{
+						new System.Collections.Generic.KeyValuePair<uint, CPos>(11, new CPos(27, 21)),
+						new System.Collections.Generic.KeyValuePair<uint, CPos>(12, new CPos(33, 27))
+					}
+				}
+			});
+
+			Assert.That(StealthTankSquadPolicy.TryLoadRetreatState(saved, out var restored), Is.True);
+			Assert.That(restored, Has.Length.EqualTo(1));
+			Assert.That(restored[0].TargetId, Is.EqualTo(91));
+			Assert.That(restored[0].Destinations.Select(d => d.Key), Is.EqualTo(new uint[] { 11, 12 }));
+
+			var remaining = restored[0].Destinations.ToDictionary(d => d.Key, d => d.Value);
+			Assert.That(StealthTankSquadPolicy.ShouldBlockReassessment(remaining.Count), Is.True);
+			remaining.Remove(11);
+			Assert.That(StealthTankSquadPolicy.ShouldBlockReassessment(remaining.Count), Is.True,
+				"One completed member must not release the restored multi-unit retreat barrier.");
+			remaining.Remove(12);
+			Assert.That(StealthTankSquadPolicy.ShouldBlockReassessment(remaining.Count), Is.False);
+		}
+
+		[Test]
+		public void MalformedOrFutureRetreatSaveFallsBackWithoutState()
+		{
+			var malformed = new MiniYamlNode("StealthTankRetreatState", "", new[]
+			{
+				new MiniYamlNode("Version", FieldSaver.FormatValue(
+					StealthTankSquadPolicy.RetreatSaveVersion + 1))
+			}.ToList());
+
+			Assert.That(StealthTankSquadPolicy.TryLoadRetreatState(malformed, out var restored), Is.False);
+			Assert.That(restored, Is.Empty);
+		}
+
+		[Test]
+		public void RestoredRetreatRecomputesAwayFromLiveTargetThatMovedAcrossUnit()
+		{
+			var unit = new CPos(18, 18);
+			var originalTarget = new CPos(30, 18);
+			var movedTarget = new CPos(6, 18);
+			var savedDestination = StealthTankSquadPolicy.OneStrategicCellRetreat(
+				unit, originalTarget, 6, 96, 96);
+			var saved = StealthTankSquadPolicy.SaveRetreatState(new[]
+			{
+				new StealthTankRetreatSaveGroup
+				{
+					GroupIndex = 0,
+					TargetId = 91,
+					Destinations = new[]
+					{
+						new System.Collections.Generic.KeyValuePair<uint, CPos>(11, savedDestination)
+					}
+				}
+			});
+
+			Assert.That(StealthTankSquadPolicy.TryLoadRetreatState(saved, out var restored), Is.True);
+			Assert.That(StealthTankSquadPolicy.IsRetreatDestinationAwayFromTarget(unit,
+				restored[0].Destinations[0].Value, movedTarget, 6, 96, 96), Is.False,
+				"The saved westward destination now points toward the moved live target.");
+
+			var recomputed = StealthTankSquadPolicy.OneStrategicCellRetreat(unit, movedTarget, 6, 96, 96);
+			Assert.That(StealthTankSquadPolicy.IsRetreatDestinationAwayFromTarget(
+				unit, recomputed, movedTarget, 6, 96, 96), Is.True);
+			Assert.That(recomputed.X, Is.GreaterThan(unit.X),
+				"Restore must resume east, away from the target that moved west of the unit.");
+		}
+
+		[Test]
+		public void RepairingMemberDoesNotResolveRetreatResponsibilityBeforeArrival()
+		{
+			Assert.That(StealthTankSquadPolicy.IsRetreatResponsibilityResolved(
+				true, true, false), Is.False,
+				"Entering repair must not silently release the group retreat barrier.");
+			Assert.That(StealthTankSquadPolicy.IsRetreatResponsibilityResolved(
+				true, true, true), Is.True,
+				"Physical arrival completes the responsibility even if repair starts afterward.");
+			Assert.That(StealthTankSquadPolicy.IsRetreatResponsibilityResolved(
+				false, true, false), Is.True,
+				"A dead or otherwise ineligible actor cannot retain an impossible responsibility.");
+		}
+
 		[TestCase(0, 0)]
 		[TestCase(1, 0)]
 		[TestCase(2, 2)]
