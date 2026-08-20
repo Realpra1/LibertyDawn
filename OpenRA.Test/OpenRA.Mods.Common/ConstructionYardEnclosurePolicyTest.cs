@@ -247,9 +247,9 @@ namespace OpenRA.Test.Mods.Common
 		[Test]
 		public void CutoffAndIdentitySelectionAreLiteralBoundaries()
 		{
-			Assert.That(ConstructionYardEnclosurePolicy.IsActive(7499, 7500, true, false), Is.True);
-			Assert.That(ConstructionYardEnclosurePolicy.IsActive(7500, 7500, true, false), Is.False);
-			Assert.That(ConstructionYardEnclosurePolicy.IsActive(1, 7500, true, true), Is.False);
+			Assert.That(ConstructionYardEnclosurePolicy.IsActive(7499, 7500, true, false, false), Is.True);
+			Assert.That(ConstructionYardEnclosurePolicy.IsActive(7500, 7500, true, false, false), Is.False);
+			Assert.That(ConstructionYardEnclosurePolicy.IsActive(1, 7500, true, true, true), Is.False);
 			Assert.That(ConstructionYardEnclosurePolicy.SelectInitialYardActorId(
 				new uint[] { 19, 4, 12 }, true), Is.EqualTo(4));
 			Assert.That(ConstructionYardEnclosurePolicy.SelectInitialYardActorId(
@@ -257,12 +257,37 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
-		public void ExactCutoffTickDeactivatesWithoutWaitingForAnotherMaintenanceInterval()
+		public void UnresolvedInitialEnclosureRemainsActiveAcrossCutoffUntilExplicitRelease()
 		{
 			const int cutoff = 7500;
-			Assert.That(ConstructionYardEnclosurePolicy.IsActive(cutoff - 1, cutoff, true, false), Is.True);
-			Assert.That(ConstructionYardEnclosurePolicy.IsActive(cutoff, cutoff, true, false), Is.False);
-			Assert.That(ConstructionYardEnclosurePolicy.IsActive(cutoff + 250, cutoff, true, false), Is.False);
+			Assert.That(ConstructionYardEnclosurePolicy.IsActive(
+				cutoff - 1, cutoff, true, false, true), Is.True);
+			Assert.That(ConstructionYardEnclosurePolicy.IsActive(
+				cutoff, cutoff, true, false, true), Is.True,
+				"Cutoff must be accounted as an unavailable retry outcome, not bypass the initial gate.");
+			Assert.That(ConstructionYardEnclosurePolicy.IsActive(
+				cutoff + 250, cutoff, true, false, true), Is.True);
+			Assert.That(ConstructionYardEnclosurePolicy.IsActive(
+				cutoff + 250, cutoff, true, false, false), Is.False,
+				"Physical closure or explicit retry exhaustion ends the initial gate at cutoff.");
+		}
+
+		[Test]
+		public void CutoffMaintenanceCannotBypassRetryGate()
+		{
+			const int CutoffTick = 7500;
+			Assert.That(ConstructionYardEnclosurePolicy.CutoffMaintenanceUnavailable(
+				true, CutoffTick, CutoffTick), Is.True);
+
+			var retries = 0;
+			for (var i = 0; i < 8; i++)
+				retries = ConstructionYardEnclosurePolicy.NextInitialRetryCount(retries);
+
+			Assert.That(retries, Is.EqualTo(8));
+			Assert.That(ConstructionYardEnclosurePolicy.InitialRetryLimitReached(retries), Is.True);
+			Assert.That(ConstructionYardEnclosurePolicy.CutoffMaintenanceUnavailable(
+				false, CutoffTick, CutoffTick), Is.False,
+				"Once explicitly released, maintenance limits must not reopen the initial gate.");
 		}
 
 		[Test]
@@ -446,6 +471,68 @@ namespace OpenRA.Test.Mods.Common
 		{
 			Assert.That(ConstructionYardEnclosurePolicy.QueuePollDelay(
 				normalDelay, maintenanceInterval, enclosureActive), Is.EqualTo(expected));
+		}
+
+		[Test]
+		public void InitialRetryCountSaturatesAtEightWithoutDuplicateGrowth()
+		{
+			var retries = 0;
+			for (var i = 0; i < 20; i++)
+				retries = ConstructionYardEnclosurePolicy.NextInitialRetryCount(retries);
+
+			Assert.That(retries, Is.EqualTo(8));
+			Assert.That(ConstructionYardEnclosurePolicy.InitialRetryLimitReached(7), Is.False);
+			Assert.That(ConstructionYardEnclosurePolicy.InitialRetryLimitReached(8), Is.True);
+			Assert.That(ConstructionYardEnclosurePolicy.InitialRetryLimitReached(80), Is.True,
+				"Malformed or repeated observations must not reopen an exhausted retry phase.");
+			Assert.That(ConstructionYardEnclosurePolicy.IssuedCellRetryDue(349, 100, 250), Is.False,
+				"A competing queue poll must not consume a retry while placement confirmation is in flight.");
+			Assert.That(ConstructionYardEnclosurePolicy.IssuedCellRetryDue(350, 100, 250), Is.True,
+				"One missing issued endpoint becomes retryable only at the bounded maintenance edge.");
+		}
+
+		[Test]
+		public void UnavailableRetriesRemainMaintenanceAgedAcrossCompetingQueuePolls()
+		{
+			const int MaintenanceInterval = 250;
+			var retries = 0;
+			var nextRetryTick = 0;
+			var consumedTicks = new List<int>();
+
+			for (var tick = 1; tick <= 500; tick++)
+				for (var competingPoll = 0; competingPoll < 4; competingPoll++)
+					if (ConstructionYardEnclosurePolicy.MaintenanceRetryDue(tick, nextRetryTick))
+					{
+						retries = ConstructionYardEnclosurePolicy.NextInitialRetryCount(retries);
+						nextRetryTick = ConstructionYardEnclosurePolicy.NextMaintenanceRetryTick(
+							tick, MaintenanceInterval);
+						consumedTicks.Add(tick);
+					}
+
+			Assert.That(consumedTicks, Is.EqualTo(new[] { 1, 251 }),
+				"Four queue polls per tick must still consume at most one retry per 250 ticks.");
+			Assert.That(retries, Is.EqualTo(2));
+			Assert.That(nextRetryTick, Is.EqualTo(501));
+			Assert.That(ConstructionYardEnclosurePolicy.MaintenanceRetryDue(500, nextRetryTick), Is.False);
+			Assert.That(ConstructionYardEnclosurePolicy.MaintenanceRetryDue(501, nextRetryTick), Is.True);
+		}
+
+		[TestCase(-1, false)]
+		[TestCase(0, true)]
+		[TestCase(100000, true)]
+		public void ScheduledRetryTicksMayBeFutureButNeverNegative(int savedTick, bool expected)
+		{
+			Assert.That(ConstructionYardEnclosurePolicy.IsValidScheduledTick(savedTick), Is.EqualTo(expected));
+		}
+
+		[Test]
+		public void TerrainSealedHoleCompletesWithoutInventingAPlacement()
+		{
+			Assert.That(ConstructionYardEnclosurePolicy.IsSatisfiedCell(true, false), Is.True);
+			Assert.That(ConstructionYardEnclosurePolicy.IsSatisfiedCell(false, true), Is.True,
+				"Impassable terrain physically closes a perimeter cell without a duplicate wall order.");
+			Assert.That(ConstructionYardEnclosurePolicy.IsSatisfiedCell(false, false), Is.False,
+				"A merely missing or transiently blocked cell must remain in the retry phase.");
 		}
 	}
 }

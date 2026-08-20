@@ -152,7 +152,7 @@ namespace OpenRA.Mods.Common.Traits
 				nextWaitTicks = OpeningPolicyLogic.SecondaryOpeningPollDelay(nextWaitTicks,
 					1,
 					baseBuilder.SecondaryQueueOpeningEnabled,
-					baseBuilder.WallPlanner.CompletedWallCount(playerBuildings), 4);
+					baseBuilder.WallPlanner.InitialEnclosurePending);
 			}
 
 			waitTicks = nextWaitTicks;
@@ -488,7 +488,7 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			var buildables = queue.BuildableItems();
 			var enclosureWall = baseBuilder.WallPlanner?.ConstructionYardEnclosureWall(
-				queue, buildables, playerBuildings);
+				queue, buildables);
 			var enclosureAvailable = enclosureWall != null;
 
 			ActorInfo silo = null;
@@ -555,19 +555,20 @@ namespace OpenRA.Mods.Common.Traits
 			// inactive and defer the next poll. Low-power recovery above remains absolute.
 			if (IsDefenseQueue && baseBuilder.SecondaryQueueOpeningEnabled)
 			{
-				const int RequiredOpeningWalls = 4;
-				var completedWalls = baseBuilder.WallPlanner?.CompletedWallCount(playerBuildings) ?? 0;
+				var openingWall = baseBuilder.WallPlanner?.ConstructionYardEnclosureWall(
+					queue, buildableThings);
+				var initialEnclosurePending = baseBuilder.WallPlanner?.InitialEnclosurePending ?? false;
 				var silo = GetProducibleBuilding(baseBuilder.NeedBasedSiloTypes, buildableThings);
 				var siloActionable = silo != null && HasSufficientPowerForActor(silo) &&
 					HasSufficientFundsForActor(queue, silo);
 				var siloCommitted = baseBuilder.CountQueuedOrPendingActors(baseBuilder.NeedBasedSiloTypes) > 0;
-				if (completedWalls >= RequiredOpeningWalls)
+				if (!initialEnclosurePending)
 					baseBuilder.ObserveSecondaryQueueOpeningSiloCommitment(siloCommitted);
 				var firstDefense = ConfiguredFirstDefense(buildableThings);
 				var firstDefenseActionable = firstDefense != null && HasSufficientPowerForActor(firstDefense) &&
 					HasSufficientFundsForActor(queue, firstDefense);
 				var choice = OpeningPolicyLogic.ChooseSecondaryQueueOpening(true,
-					completedWalls, RequiredOpeningWalls, baseBuilder.SmartEconomyWantsSilo,
+					initialEnclosurePending, baseBuilder.SmartEconomyWantsSilo,
 					baseBuilder.SecondaryQueueOpeningSiloCompleted, siloActionable, siloCommitted,
 					baseBuilder.SecondaryQueueOpeningFirstDefenseRequired,
 					baseBuilder.FirstTowerPlanner.Complete, firstDefenseActionable,
@@ -594,8 +595,6 @@ namespace OpenRA.Mods.Common.Traits
 
 				if (choice == SecondaryQueueOpeningChoice.Wall)
 				{
-					var openingWall = baseBuilder.WallPlanner?.ConstructionYardEnclosureWall(
-						queue, buildableThings, playerBuildings);
 					if (openingWall != null)
 					{
 						AIUtils.BotDebug("{0} decided to build {1}: protected secondary-queue enclosure",
@@ -647,7 +646,7 @@ namespace OpenRA.Mods.Common.Traits
 				return null;
 			}
 
-			var enclosureWall = baseBuilder.WallPlanner?.ConstructionYardEnclosureWall(queue, buildableThings, playerBuildings);
+			var enclosureWall = baseBuilder.WallPlanner?.ConstructionYardEnclosureWall(queue, buildableThings);
 			if (enclosureWall != null)
 			{
 				AIUtils.BotDebug("{0} decided to build {1}: construction-yard enclosure",
@@ -938,7 +937,7 @@ namespace OpenRA.Mods.Common.Traits
 				// Walls are only worth queueing if the planner has a line ready for them, and only
 				// until we hit the segment cap. Everything about where they go is decided there.
 				if (baseBuilder.WallPlanner != null && baseBuilder.WallPlanner.IsWallType(name)
-					&& !baseBuilder.WallPlanner.WantsToBuildWall(queue, name, playerBuildings))
+					&& !baseBuilder.WallPlanner.WantsToBuildWall(queue, name))
 					continue;
 
 				// Do we want to build this structure? Adaptive defense types get their authored ceiling
