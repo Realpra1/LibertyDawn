@@ -240,6 +240,20 @@ namespace OpenRA.Test.Mods.Common
 				"Restore must resume east, away from the target that moved west of the unit.");
 		}
 
+		[Test]
+		public void RepairingMemberDoesNotResolveRetreatResponsibilityBeforeArrival()
+		{
+			Assert.That(StealthTankSquadPolicy.IsRetreatResponsibilityResolved(
+				true, true, false), Is.False,
+				"Entering repair must not silently release the group retreat barrier.");
+			Assert.That(StealthTankSquadPolicy.IsRetreatResponsibilityResolved(
+				true, true, true), Is.True,
+				"Physical arrival completes the responsibility even if repair starts afterward.");
+			Assert.That(StealthTankSquadPolicy.IsRetreatResponsibilityResolved(
+				false, true, false), Is.True,
+				"A dead or otherwise ineligible actor cannot retain an impossible responsibility.");
+		}
+
 		[TestCase(0, 0)]
 		[TestCase(1, 0)]
 		[TestCase(2, 2)]

@@ -130,6 +130,19 @@ namespace OpenRA.Mods.Common.Traits
 			return retreatDestinationCount > 0;
 		}
 
+		public static bool IsRetreatResponsibilityResolved(bool eligible, bool repairing,
+			bool reachedDestination)
+		{
+			if (!eligible || reachedDestination)
+				return true;
+
+			// Repair supersedes the current Move activity, but not its group responsibility.
+			if (repairing)
+				return false;
+
+			return false;
+		}
+
 		public static CPos StrategicCell(CPos cell, int strategicCellSize)
 		{
 			var size = Math.Max(1, strategicCellSize);

@@ -171,3 +171,50 @@
   satisfied by Game 2. Additional invalid-target/map coverage is optional and
   requires no product change. Calibrations are disclosed in `REPORT.md`; no
   fixture or save-byte mutation occurred.
+
+## Cycle-4 required Luna advisory (recorded before code decisions)
+
+- Advisory blocker: `UpdateStrategicRetreat` currently removes a member's
+  destination as soon as that actor enters `repairing`. A repairing tank has not
+  necessarily reached its issued retreat destination, so this can empty the
+  group barrier and resume strategic reassessment/Harass before every retreat
+  responsibility completes.
+- Required disposition: accept and correct the advisory with the smallest
+  coherent lifecycle. A repairing member must not be silently counted complete;
+  its responsibility must remain pending until explicitly completed, or be
+  explicitly canceled/reissued/accounted while the group remains blocked until
+  every responsibility resolves. Preserve repair safety/rejoin and all other
+  behavior.
+- Required regression/evidence: focused coverage plus exactly two fresh reviewed
+  games directly exercising damage-to-repair during an active multi-member
+  retreat, no premature barrier release, repair/rejoin and later reassessment,
+  with distinct control/no-repair/ownership pressure.
+- Status: cycle 4 complete from clean head
+  `91ddc055c1ead4efcd0e2a3815299074038248ed`; ready for fresh Terra final
+  rereview after the single cycle-4 commit.
+
+## Cycle-4 completion receipt
+
+- Advisory disposition: accepted and corrected. Repairing no longer resolves a
+  retreat responsibility. Only ineligibility or physical strategic-cell arrival
+  removes it; full repair/cancellation explicitly reissues any pending Move
+  under the retained group barrier.
+- Focused test: `StealthTankSquadPolicyTest` PASS 97/97, including repairing,
+  physical-arrival, and ineligible responsibility outcomes.
+- Protected checks: final `make check` PASS with 0 warnings/0 errors; isolated
+  full CNC YAML and both maps PASS after one concurrent host bus error; diff/path
+  audit PASS with no Air or Chemical path changed.
+- Game 1: strict repair-pressure PASS, tick3500, 13.011 seconds. Active
+  three-member retreat, damage/displacement, real repair with pending=True, no
+  reassessment while repairing, explicit repair-resume barrier at tick2650,
+  physical completion2725, later Harass/retreat cycles, repair/rejoin, and
+  ordinary=0. Fresh narrator/policy PASS/no blocker.
+- Game 2: distinct strict slowed no-repair control PASS, tick3500, 13.010
+  seconds. Damage occurred during active three-member retreat; no repair path
+  kept the member active and no reassessment occurred before physical completion
+  tick1300; later Harass/retreat cycles and ordinary=0 continued. Fresh
+  narrator/policy PASS/no blocker.
+- Policy dispositions: Game 2 satisfies Game 1's optional broader timing/map
+  suggestion. Further repair-selection/timing combinations are optional and need
+  no product change. Calibrations are disclosed in `REPORT.md`; no fixture/save
+  mutation occurred.

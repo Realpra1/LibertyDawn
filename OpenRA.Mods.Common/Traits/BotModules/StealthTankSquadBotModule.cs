@@ -689,9 +689,11 @@ namespace OpenRA.Mods.Common.Traits
 			foreach (var actorId in group.RetreatDestinations.Keys.ToArray())
 			{
 				var unit = world.GetActorById(actorId);
-				if (!IsEligible(unit) || repairing.Contains(actorId) ||
-					StealthTankSquadPolicy.IsSameStrategicCell(unit.Location,
-						group.RetreatDestinations[actorId], StrategicCellSize))
+				var eligible = IsEligible(unit);
+				var reachedDestination = eligible && StealthTankSquadPolicy.IsSameStrategicCell(
+					unit.Location, group.RetreatDestinations[actorId], StrategicCellSize);
+				if (StealthTankSquadPolicy.IsRetreatResponsibilityResolved(
+					eligible, repairing.Contains(actorId), reachedDestination))
 					group.RetreatDestinations.Remove(actorId);
 			}
 
@@ -747,7 +749,7 @@ namespace OpenRA.Mods.Common.Traits
 				if (Info.DebugLogging)
 					Log.Write("debug", "AI stealth repair {0} [{1}] {2}#{3}: fully repaired; rejoined active squad.",
 						Info.SquadLabel, player.PlayerName, unit.Info.Name, unit.ActorID);
-				return 0;
+				return ResumeRetreatResponsibility(unit, "fully-repaired");
 			}
 
 			if (wasRepairing && repairTargets.TryGetValue(unit.ActorID, out var currentTargetId) &&
@@ -766,18 +768,20 @@ namespace OpenRA.Mods.Common.Traits
 				fullyRepaired, route != null && facility != null);
 			if (disposition != SpecialistRepairDisposition.Repair)
 			{
+				var resumedRetreatOrders = 0;
 				if (wasRepairing)
 				{
 					repairing.Remove(unit.ActorID);
 					repairTargets.Remove(unit.ActorID);
 					foreach (var group in groups.Where(g => g.Units.Contains(unit)))
 						group.MembershipChanged = true;
+					resumedRetreatOrders = ResumeRetreatResponsibility(unit, "repair-canceled");
 				}
 
 				if (damaged && Info.DebugLogging)
 					Log.Write("debug", "AI stealth repair {0} [{1}] {2}#{3}: {4}/{5} HP, no compatible reachable safe repair path; staying active.",
 						Info.SquadLabel, player.PlayerName, unit.Info.Name, unit.ActorID, health.HP, health.MaxHP);
-				return 0;
+				return resumedRetreatOrders;
 			}
 
 			if (wasRepairing && repairTargets.TryGetValue(unit.ActorID, out var targetId) &&
@@ -798,10 +802,35 @@ namespace OpenRA.Mods.Common.Traits
 			foreach (var group in groups.Where(g => g.Units.Contains(unit)))
 				group.MembershipChanged = true;
 			if (Info.DebugLogging)
-				Log.Write("debug", "AI stealth repair {0} [{1}] {2}#{3}: {4}/{5} HP, moving by {6} waypoint(s) to compatible safe repair aura {7}#{8}; queued Repair order.",
+				Log.Write("debug", "AI stealth repair {0} [{1}] {2}#{3}: {4}/{5} HP, moving by {6} waypoint(s) to compatible safe repair aura {7}#{8}; queued Repair order; retreat-pending={9} destinations={10}.",
 					Info.SquadLabel, player.PlayerName, unit.Info.Name, unit.ActorID, health.HP,
-					health.MaxHP, route.Count, facility.Info.Name, facility.ActorID);
+					health.MaxHP, route.Count, facility.Info.Name, facility.ActorID,
+					groups.Any(g => g.RetreatDestinations.ContainsKey(unit.ActorID)),
+					string.Join(",", groups.Where(g => g.RetreatDestinations.ContainsKey(unit.ActorID))
+						.Select(g => g.Index + ":" + g.RetreatDestinations[unit.ActorID])));
 			return route.Count + 1;
+		}
+
+		int ResumeRetreatResponsibility(Actor unit, string reason)
+		{
+			var orders = 0;
+			foreach (var group in groups.Where(g => g.RetreatDestinations.TryGetValue(
+				unit.ActorID, out _)))
+			{
+				var destination = group.RetreatDestinations[unit.ActorID];
+				if (StealthTankSquadPolicy.IsSameStrategicCell(
+					unit.Location, destination, StrategicCellSize))
+					continue;
+
+				bot.QueueOrder(new Order("Move", unit, Target.FromCell(world, destination), false));
+				orders++;
+				if (Info.DebugLogging)
+					Log.Write("debug", "AI stealth retreat repair-resume {0} [{1}:{2}] tick={3}: unit={4} reason={5} destination={6} barrier=True.",
+						Info.SquadLabel, player.PlayerName, group.Index, world.WorldTick,
+						unit.ActorID, reason, destination);
+			}
+
+			return orders;
 		}
 
 		List<CPos> FindRepairRoute(Actor unit, out Actor facility)

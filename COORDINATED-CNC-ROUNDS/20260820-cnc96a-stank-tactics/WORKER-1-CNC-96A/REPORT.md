@@ -1,15 +1,15 @@
-# CNC-96A worker report (cycles 1-3)
+# CNC-96A worker report (cycles 1-4)
 
 ## Result
 
-READY for the required Luna cycle-3 advisory code review, then fresh Terra
-rereview. A restored destination for a still-live target is now accepted only
-when it remains in the target's current exact one-cell-away 6x6 strategic
-direction. A target-crossing save/load directly proves invalid old directions
-are recomputed, replacement Move orders complete under the retained barrier,
-and reassessment resumes only afterward. Existing save compatibility,
-ownership, repair, stale-target, stable-mission, and nearby-reaction behavior
-remains intact. Air and Chemical behavior are unchanged.
+READY for fresh Terra final rereview. A member that enters repair during an
+active retreat no longer silently releases its group responsibility. The
+destination remains pending through safe repair; full repair/cancellation
+explicitly reissues it, and group reassessment stays blocked until physical
+completion. A distinct no-repair control proves damaged active members continue
+their original responsibility. Existing save compatibility, moving/stale-target
+restore, ownership, stable-mission, and nearby-reaction behavior remains intact.
+Air and Chemical behavior are unchanged.
 
 ## Root cause and correction
 
@@ -260,3 +260,86 @@ direction change; the first moving-target load correctly recomputed fallback
 destinations but exposed that replacement Move orders were not queued, so the
 barrier did not complete. The corrected strict pairs above are the only two
 qualifying cycle-3 games. No test fixture or save-byte mutation was used.
+
+## Cycle-4 required Luna advisory (recorded before code decisions)
+
+The required cycle-3 Luna advisory found that `UpdateStrategicRetreat` removes a
+member destination immediately when the actor enters `repairing`. Because that
+tank may not have reached its retreat destination, this can empty the group
+barrier and resume Harass/reassessment before all retreat responsibilities
+complete. Cycle 4 accepts the finding and must implement the smallest explicit
+repair/retreat lifecycle: never silently count repair as retreat completion,
+retain or explicitly account/reissue the responsibility while keeping the group
+blocked, preserve repair safety/rejoin, add focused coverage, and run two new
+reviewed damage-to-repair/no-repair ownership games.
+
+## Cycle-4 correction
+
+- `UpdateStrategicRetreat` now resolves a member responsibility only when its
+  actor is ineligible or physically reaches the saved strategic destination.
+  Entering `repairing` is explicitly not completion, so the group barrier
+  persists while repair supersedes the Move activity.
+- When repair fully completes or is canceled, any still-outstanding retreat
+  destination is explicitly reissued before the member can rejoin normal group
+  activity. Diagnostics record `retreat-pending=True` on repair entry and
+  `repair-resume ... barrier=True` on reissue.
+- A member without a compatible safe repair path remains active, keeps its
+  original Move responsibility, and physically completes it normally.
+
+## Cycle-4 tests and protected checks
+
+- Focused `StealthTankSquadPolicyTest`: PASS 97/97. New regression proves repair
+  without arrival does not resolve responsibility, while physical arrival and
+  actor ineligibility do.
+- Final protected `make check`: PASS, 0 warnings and 0 errors; interface guards
+  clean.
+- Full CNC YAML and both qualifying custom-map YAML checks: PASS. One concurrent
+  full-YAML attempt hit a host bus error; the isolated unchanged rerun passed.
+- `git diff --check`: PASS; changed-path audit contains no Air or Chemical path.
+
+## Exactly two qualifying cycle-4 games
+
+1. `cycle4-game1-final4/cnc96a-cycle4-repair`: ordinary all-module Brutalis Nod
+   versus VIKI GDI, seed 9641, strict PASS, exit 0, tick 3500 in 13.011 seconds.
+   Three members began an exact size-6/delta-1 reveal retreat at tick 1100.
+   STNK#9 was damaged/displaced at ticks 1105/1106, then queued a real safe
+   repair with `retreat-pending=True`. No completion, reassessment, Harass, or
+   replacement retreat occurred while it repaired. At tick 2650 it fully
+   repaired/rejoined and product explicitly reissued destination 93,87 with
+   `barrier=True`. Physical completion occurred tick 2725; only afterward did
+   three-member Harass resume. Later exact retreats continued and ownership
+   remained total/reserved=3/3, ordinary=0. Fresh narrator PASS; separate fresh
+   policy PASS/no blocker.
+2. `cycle4-game2-final2/cnc96a-cycle4-norepair`: distinct slowed-movement,
+   no-compatible-repair custom control, ordinary all-module Brutalis Nod versus
+   VIKI GDI, seed 9642, strict PASS, exit 0, tick 3500 in 13.010 seconds.
+   Three members began an exact size-6/delta-1 retreat at tick 1125; STNK#8 was
+   damaged at tick 1130 while the barrier was active. Product repeatedly found
+   no compatible safe repair path and kept it active. No completion/Harass
+   occurred until all responsibilities physically completed at tick 1300;
+   normal three-member Harass resumed afterward. Later exact retreats continued,
+   damaged #8 stayed owned/active, and total/reserved=3/3, ordinary=0 persisted.
+   Fresh narrator PASS; separate fresh policy PASS/no blocker.
+
+Cycle-4 reviews:
+
+- `.build/20260820-cnc96a-stank-tactics/cycle4-reviews/game1-narrator/NARRATIVE.md`
+- `.build/20260820-cnc96a-stank-tactics/cycle4-reviews/game1-policy/POLICY-REVIEW.md`
+- `.build/20260820-cnc96a-stank-tactics/cycle4-reviews/game2-narrator/NARRATIVE.md`
+- `.build/20260820-cnc96a-stank-tactics/cycle4-reviews/game2-policy/POLICY-REVIEW.md`
+
+Game 1 policy's optional broader timing/map coverage is satisfied by Game 2's
+different no-repair timing and movement assumption. Game 2's still broader
+repair-selection/damage timing suggestion is optional evidence, not a blocker
+or product correction.
+
+## Cycle-4 exclusions
+
+Uncounted setup/calibration runs remain ignored. The first repair-pressure run
+damaged the member too late and it physically arrived before repair evaluation;
+shifting ownership and widening its starting position did not change that
+arrival. The final scenario added deterministic damage displacement after
+retreat began. The first slowed no-repair calibration damaged before retreat;
+the next strict run exercised damage during retreat but expected completion 25
+ticks late. The corrected unchanged-map strict rerun is the qualifying control.
+Only the two games above count. No fixture or save-byte mutation was used.
