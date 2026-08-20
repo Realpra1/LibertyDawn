@@ -1053,6 +1053,7 @@ namespace OpenRA.Mods.Common.Traits
 			var restoredMembers = 0;
 			var droppedMembers = 0;
 			var fallbackMembers = 0;
+			var fallbackGeometry = new List<string>();
 			foreach (var saved in pendingRetreatRestore)
 			{
 				if (saved.GroupIndex < 0 || saved.GroupIndex >= groups.Length)
@@ -1079,7 +1080,8 @@ namespace OpenRA.Mods.Common.Traits
 						savedDestination.Value, StrategicCellSize))
 						continue;
 
-					var savedDestinationValid = ValidateRestoredRetreatDestination(unit, savedDestination.Value);
+					var savedDestinationValid = ValidateRestoredRetreatDestination(unit,
+						savedDestination.Value, group.RetreatTarget);
 					var destination = savedDestinationValid ? savedDestination.Value :
 						group.RetreatTarget == null ? (CPos?)null :
 						FindStrategicRetreatDestination(unit, group.RetreatTarget.Location);
@@ -1091,7 +1093,22 @@ namespace OpenRA.Mods.Common.Traits
 
 					group.RetreatDestinations.Add(unit.ActorID, destination.Value);
 					if (!savedDestinationValid)
+					{
+						bot.QueueOrder(new Order("Move", unit,
+							Target.FromCell(world, destination.Value), false));
+						var from = StealthTankSquadPolicy.StrategicCell(unit.Location, StrategicCellSize);
+						var to = StealthTankSquadPolicy.StrategicCell(destination.Value, StrategicCellSize);
+						var targetCell = StealthTankSquadPolicy.StrategicCell(
+							group.RetreatTarget.Location, StrategicCellSize);
+						var delta = Math.Max(Math.Abs(to.X - from.X), Math.Abs(to.Y - from.Y));
+						var away = StealthTankSquadPolicy.IsRetreatDestinationAwayFromTarget(
+							unit.Location, destination.Value, group.RetreatTarget.Location,
+							StrategicCellSize, world.Map.MapSize.X, world.Map.MapSize.Y);
+						fallbackGeometry.Add(unit.ActorID + ":" + from + ">" + to +
+							":target=" + targetCell + ":delta=" + delta + ":away=" + away);
 						fallbackMembers++;
+					}
+
 					restoredMembers++;
 				}
 
@@ -1107,7 +1124,7 @@ namespace OpenRA.Mods.Common.Traits
 			}
 
 			if (Info.DebugLogging)
-				Log.Write("debug", "AI stealth retreat restore {0} [{1}] tick={2}: version={3} groups={4} members={5} dropped={6} fallback={7} barrier={8} targets={9} destinations={10}.",
+				Log.Write("debug", "AI stealth retreat restore {0} [{1}] tick={2}: version={3} groups={4} members={5} dropped={6} fallback={7} barrier={8} targets={9} destinations={10} fallback-geometry={11}.",
 					Info.SquadLabel, player.PlayerName, world.WorldTick,
 					StealthTankSquadPolicy.RetreatSaveVersion, restoredGroups, restoredMembers,
 					droppedMembers, fallbackMembers,
@@ -1115,11 +1132,12 @@ namespace OpenRA.Mods.Common.Traits
 					string.Join(",", groups.Where(g => g.RetreatDestinations.Count > 0)
 						.Select(g => g.Index + ":" + (g.RetreatTarget?.ActorID.ToString() ?? "none"))),
 					string.Join(",", groups.SelectMany(g => g.RetreatDestinations.OrderBy(pair => pair.Key)
-						.Select(pair => g.Index + ":" + pair.Key + ":" + pair.Value))));
+						.Select(pair => g.Index + ":" + pair.Key + ":" + pair.Value))),
+					string.Join(",", fallbackGeometry));
 			pendingRetreatRestore = null;
 		}
 
-		bool ValidateRestoredRetreatDestination(Actor unit, CPos destination)
+		bool ValidateRestoredRetreatDestination(Actor unit, CPos destination, Actor target)
 		{
 			var mobile = unit.TraitOrDefault<Mobile>();
 			if (mobile == null || !world.Map.Contains(destination) || !mobile.CanEnterCell(destination) ||
@@ -1128,7 +1146,10 @@ namespace OpenRA.Mods.Common.Traits
 
 			var from = StealthTankSquadPolicy.StrategicCell(unit.Location, StrategicCellSize);
 			var to = StealthTankSquadPolicy.StrategicCell(destination, StrategicCellSize);
-			return Math.Max(Math.Abs(to.X - from.X), Math.Abs(to.Y - from.Y)) == 1;
+			return Math.Max(Math.Abs(to.X - from.X), Math.Abs(to.Y - from.Y)) == 1 &&
+				(target == null || StealthTankSquadPolicy.IsRetreatDestinationAwayFromTarget(
+					unit.Location, destination, target.Location, StrategicCellSize,
+					world.Map.MapSize.X, world.Map.MapSize.Y));
 		}
 
 		bool IsEnemyTarget(Actor actor)

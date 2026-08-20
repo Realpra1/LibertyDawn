@@ -1,14 +1,15 @@
-# CNC-96A worker report (cycles 1-2)
+# CNC-96A worker report (cycles 1-3)
 
 ## Result
 
-READY for fresh Terra cycle-2 review. Active Stealth Tank reveal-retreat state
-now survives a normal save/load with a versioned, validated per-group payload.
-Restored destinations remain the reassessment barrier; stale targets and
-already-completed, ineligible, wrong-group, or impassable state are rejected or
-recomputed safely. Existing ownership, repair, survivor, reformation, exact
-6x6 geometry, stable mission, and nearby-reaction behavior remains intact. Old
-saves remain compatible. Air and Chemical behavior are unchanged.
+READY for the required Luna cycle-3 advisory code review, then fresh Terra
+rereview. A restored destination for a still-live target is now accepted only
+when it remains in the target's current exact one-cell-away 6x6 strategic
+direction. A target-crossing save/load directly proves invalid old directions
+are recomputed, replacement Move orders complete under the retained barrier,
+and reassessment resumes only afterward. Existing save compatibility,
+ownership, repair, stale-target, stable-mission, and nearby-reaction behavior
+remains intact. Air and Chemical behavior are unchanged.
 
 ## Root cause and correction
 
@@ -171,3 +172,91 @@ controlled load had a strict expected-count mismatch while the product safely
 reported one already-arrived destination. The two strict save/load pairs above
 are the only qualifying cycle-2 games. No synthetic test fixture was created or
 used, and no save bytes were mutated.
+
+## Cycle-3 Terra correction (recorded before code decisions)
+
+Terra found that restored-destination validation checks passability and exact
+adjacent-one-cell geometry but does not compare the destination direction to a
+still-live target's current position. A target that moves between save/load can
+therefore turn a formerly-away saved destination into a toward-target move.
+Cycle 3 must pass the validated live target into restore validation, require
+current away-direction geometry, and otherwise recompute with
+`FindStrategicRetreatDestination`. It must add a focused moving-target
+save/load regression and two new reviewed games: one active-retreat save with
+the target moved before continuation/load, plus distinct multi-unit/stale/
+repair/ownership pressure.
+
+## Cycle-3 correction
+
+- Restore validation now receives the already-validated live target. In
+  addition to map, passability/domain, and exact adjacent-one-cell checks, a
+  saved destination must occupy the same current away-direction strategic cell
+  selected by `OneStrategicCellRetreat`.
+- A destination made invalid by target movement is recomputed through the
+  existing `FindStrategicRetreatDestination`. Restore queues a replacement Move
+  only for such recomputed fallbacks; validated saved activities remain
+  untouched. This replacement order was necessary because the serialized old
+  Move otherwise continued toward the target and could leave the new barrier
+  permanently pending.
+- Restore diagnostics directly record each fallback member's origin,
+  destination, current target strategic cell, delta, and away result.
+- Stale/dead targets preserve the cycle-2 behavior: valid saved destinations
+  remain the barrier without inventing a direction from a nonexistent target.
+
+## Cycle-3 tests and protected checks
+
+- Focused `StealthTankSquadPolicyTest`: PASS 96/96. The new versioned
+  serialize/load regression moves a live target across the unit, rejects the
+  formerly-away saved direction, and proves the recomputed destination is away.
+- Final protected `make check`: PASS, 0 warnings and 0 errors; interface guards
+  clean.
+- Full CNC YAML and both qualifying custom-map YAML checks: PASS.
+- `git diff --check`: PASS; changed-path audit contains no Air or Chemical path.
+
+## Exactly two qualifying cycle-3 games
+
+1. `cycle3-game1-final-leg` + `cycle3-game1-final-load`: genuine moving-target
+   custom scenario, ordinary all-module Brutalis Nod versus VIKI GDI, seed 9631,
+   strict PASS/PASS, exit 0. Initial tick 1410 took 10.010 seconds; loaded tick
+   2800 took 12.017 seconds. Two tanks began a live-HARV retreat at tick 1375
+   with exact size-6/delta-1 eastward destinations. The HARV crossed from west
+   to east at tick 1386 and the engine saved active state at tick 1390. Restore
+   tick 1393 reported members=2, fallback=2, barrier=True, target=12. Both new
+   destinations were west and directly logged `delta=1:away=True` relative to
+   target cell 17,16. No Harass/order/replacement retreat appeared before
+   completion tick 1467; normal Harass resumed afterward. The third tank fully
+   repaired/rejoined at tick 2167; ownership stayed total/reserved=3/3,
+   ordinary=0. Fresh narrator PASS; separate fresh policy PASS/no blocker.
+2. `cycle3-game2-final-leg` + `cycle3-game2-final-load`: distinct controlled
+   stale-target/repair scenario, ordinary all-module Brutalis Nod versus VIKI
+   GDI, seed 9632, strict PASS/PASS, exit 0. Initial tick 1140 took 10.008
+   seconds; loaded tick 3500 took 14.014 seconds. Two tanks began an exact
+   size-6/delta-1 retreat at tick 1100, the real PROC target died at tick 1115,
+   and the engine saved active state at tick 1117. Restore tick 1120 retained
+   both members/destinations with dropped=0, fallback=0, barrier=True while
+   rejecting the stale target (`target=none`). No order appeared before
+   completion tick 1169; normal Harass resumed afterward. The third tank fully
+   repaired/rejoined, a later three-member exact retreat completed/reengaged,
+   and ownership remained total/reserved=3/3, ordinary=0. Fresh narrator PASS;
+   separate fresh policy PASS/no blocker.
+
+Cycle-3 reviews:
+
+- `.build/20260820-cnc96a-stank-tactics/cycle3-reviews/game1-narrator/NARRATIVE.md`
+- `.build/20260820-cnc96a-stank-tactics/cycle3-reviews/game1-policy/POLICY-REVIEW.md`
+- `.build/20260820-cnc96a-stank-tactics/cycle3-reviews/game2-narrator/NARRATIVE.md`
+- `.build/20260820-cnc96a-stank-tactics/cycle3-reviews/game2-policy/POLICY-REVIEW.md`
+
+Game 1 policy's optional stale-target/lifecycle coverage is satisfied directly
+by Game 2. Game 2's optional additional invalid-target/map experiment is broader
+coverage, not a product correction or release blocker.
+
+## Cycle-3 exclusions
+
+Uncounted setup/calibration runs remain ignored: the first moving scenario tried
+to teleport a structure and failed before a valid game; the first movable-HARV
+calibration moved before reveal retreat and therefore did not exercise restored
+direction change; the first moving-target load correctly recomputed fallback
+destinations but exposed that replacement Move orders were not queued, so the
+barrier did not complete. The corrected strict pairs above are the only two
+qualifying cycle-3 games. No test fixture or save-byte mutation was used.

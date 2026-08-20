@@ -120,3 +120,54 @@
 - Game 2 policy's optional all-pending save suggestion is already covered by
   Game 1's three-member restore. Uncounted calibrations are disclosed in
   `REPORT.md`. No fixture/save-byte mutation occurred.
+
+## Cycle-3 Terra correction (recorded before code decisions)
+
+- Exact blocker: restored destination validation currently checks only
+  passability and adjacent-one-cell geometry. If a still-live retreat target
+  moves between save and load, a formerly-away saved destination can now point
+  toward the target.
+- Required correction: pass the validated live target into restored-destination
+  validation and require current away-direction geometry. If that validation
+  fails, recompute with `FindStrategicRetreatDestination`.
+- Required regression/evidence: add a focused moving-live-target save/load
+  regression proving no restored member resumes toward it; run exactly two new
+  reviewed ordinary-AI/all-module games. At least one must save an active
+  retreat, move the target before load/continuation, and prove recomputed exact
+  one-cell-away destinations, barrier/no churn, completion, and reengagement.
+  The other must cover multi-unit/stale/repair/ownership behavior.
+- Status: cycle 3 complete from clean head
+  `dafc4de0fd37084ff409c9e60167cbbfe57e6b04`; ready for the required Luna
+  cycle-3 advisory code review after the single cycle-3 commit, then Terra
+  rereview.
+
+## Cycle-3 completion receipt
+
+- Product: restored destination validation now includes the current position of
+  a validated live target and accepts only the exact current one-cell-away 6x6
+  strategic direction. A changed direction recomputes through
+  `FindStrategicRetreatDestination` and queues a replacement Move so the old
+  serialized activity cannot continue toward the target or strand the barrier.
+  Fallback diagnostics record origin/destination/target cells, delta, and away.
+  Stale-target behavior remains compatible.
+- Focused test: `StealthTankSquadPolicyTest` PASS 96/96, including versioned
+  serialize/load with the live target crossing the unit and the saved direction
+  being rejected/recomputed away.
+- Protected checks: final `make check` PASS with 0 warnings/0 errors; full CNC
+  YAML and both qualifying map checks PASS; diff/path audit PASS with no Air or
+  Chemical path changed.
+- Game 1: strict active-save/load PASS/PASS at ticks 1410/2800 in
+  10.010/12.017 seconds. Target crossed after retreat began and before save.
+  Restore recomputed both members (`fallback=2`) with direct size-6
+  `delta=1:away=True` geometry, retained barrier/no churn until completion tick
+  1467, then reengaged. Repair/rejoin and ordinary=0 continued. Fresh narrator
+  and separate policy PASS/no blocker.
+- Game 2: distinct strict stale-target save/load PASS/PASS at ticks 1140/3500
+  in 10.008/14.014 seconds. Restore retained two destinations with barrier=True
+  while rejecting the dead target; no order before completion tick 1169, then
+  Harass, repair/rejoin, later three-member exact retreat, and ordinary=0.
+  Fresh narrator and separate policy PASS/no blocker.
+- Policy dispositions: Game 1's optional stale-target/lifecycle request is
+  satisfied by Game 2. Additional invalid-target/map coverage is optional and
+  requires no product change. Calibrations are disclosed in `REPORT.md`; no
+  fixture or save-byte mutation occurred.

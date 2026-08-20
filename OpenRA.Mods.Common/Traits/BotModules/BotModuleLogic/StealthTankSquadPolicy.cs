@@ -172,6 +172,13 @@ namespace OpenRA.Mods.Common.Traits
 				Math.Min(mapHeight - 1, destination.Y * size + size / 2));
 		}
 
+		public static bool IsRetreatDestinationAwayFromTarget(CPos unit, CPos destination, CPos target,
+			int strategicCellSize, int mapWidth, int mapHeight)
+		{
+			var expected = OneStrategicCellRetreat(unit, target, strategicCellSize, mapWidth, mapHeight);
+			return StrategicCell(destination, strategicCellSize) == StrategicCell(expected, strategicCellSize);
+		}
+
 		public static int SquadCount(int maximumHarassmentGroups, bool includeAttackGroup)
 		{
 			var harassmentGroups = Math.Max(0, maximumHarassmentGroups);

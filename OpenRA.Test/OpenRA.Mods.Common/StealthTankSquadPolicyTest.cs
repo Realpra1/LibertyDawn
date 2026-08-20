@@ -207,6 +207,39 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(restored, Is.Empty);
 		}
 
+		[Test]
+		public void RestoredRetreatRecomputesAwayFromLiveTargetThatMovedAcrossUnit()
+		{
+			var unit = new CPos(18, 18);
+			var originalTarget = new CPos(30, 18);
+			var movedTarget = new CPos(6, 18);
+			var savedDestination = StealthTankSquadPolicy.OneStrategicCellRetreat(
+				unit, originalTarget, 6, 96, 96);
+			var saved = StealthTankSquadPolicy.SaveRetreatState(new[]
+			{
+				new StealthTankRetreatSaveGroup
+				{
+					GroupIndex = 0,
+					TargetId = 91,
+					Destinations = new[]
+					{
+						new System.Collections.Generic.KeyValuePair<uint, CPos>(11, savedDestination)
+					}
+				}
+			});
+
+			Assert.That(StealthTankSquadPolicy.TryLoadRetreatState(saved, out var restored), Is.True);
+			Assert.That(StealthTankSquadPolicy.IsRetreatDestinationAwayFromTarget(unit,
+				restored[0].Destinations[0].Value, movedTarget, 6, 96, 96), Is.False,
+				"The saved westward destination now points toward the moved live target.");
+
+			var recomputed = StealthTankSquadPolicy.OneStrategicCellRetreat(unit, movedTarget, 6, 96, 96);
+			Assert.That(StealthTankSquadPolicy.IsRetreatDestinationAwayFromTarget(
+				unit, recomputed, movedTarget, 6, 96, 96), Is.True);
+			Assert.That(recomputed.X, Is.GreaterThan(unit.X),
+				"Restore must resume east, away from the target that moved west of the unit.");
+		}
+
 		[TestCase(0, 0)]
 		[TestCase(1, 0)]
 		[TestCase(2, 2)]
