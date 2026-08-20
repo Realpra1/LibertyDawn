@@ -1,5 +1,23 @@
 # Autonomous CNC Task Sheet
 
+## CNC-96A amendment — Air-style reinforcement staging and joining
+
+Add Air-style reinforcement staging/joining to the Stealth Tank squad module.
+Preserve the surviving/core squad and its current mission while produced,
+captured, or repaired Stealth Tanks travel to join it. Give each incoming
+reinforcement its own hazard-safe route from its current position, and promote
+it into the core only when it reaches the same or an adjacent 6x6 strategic
+cell as the core formation or target destination. If no safe join route exists,
+safe-hold and retry; never take an unsafe direct route or stop the core squad.
+Audit Air squad AI for directly useful lifecycle behavior, but do not broaden
+implementation without a concrete compatibility benefit. The current audit
+finding is that Chemical Tanks use the same `StealthTankSquadBotModule` class
+under a separate `@chemical` profile in `mods/cnc/rules/ai.yaml`, not a separate
+module; do not silently change Chemical behavior, preserving it unless shared
+ownership makes this correction necessarily common. Preserve all prior
+CNC-96A requirements, with no new task/round/PR, balance change, unrelated Air
+behavior, or merge to bleed.
+
 ## CNC-96A amendment — distinct priorities and wall priority 1
 
 Reuse Air's target switch decision, but keep Stealth Tank priorities and scoring

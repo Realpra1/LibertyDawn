@@ -350,3 +350,36 @@
   produced an incomplete save. Each was corrected before the two strict games;
   no fixture or save-byte mutation was used. Status: ready for fresh Terra
   review after the single cycle-6 commit.
+## Amendment acceptance: distinct priorities and wall priority 1
+
+- Reuse Air's target switch decision, but keep Stealth Tank priorities and
+  scoring distinct because Stealth Tanks destroy buildings faster; do not copy
+  or unify Air priorities into Stealth.
+- Add explicit target-selection configuration for both Stealth and Air with
+  walls at priority `1`, far below valuable targets such as harvesters (roughly
+  thousands under the existing configuration).
+- The wall-priority configuration is the only authorized Air behavior/config
+  change; preserve all other Air behavior and prior CNC-96A requirements.
+- Final focused tests/games must distinguish walls from valuable targets and
+  prove walls are selected only at very low priority while retaining Air-style
+  boundary reassessment semantics with Stealth-specific scores.
+
+## Amendment acceptance: Air-style reinforcement staging and joining
+
+- Add Air-style reinforcement staging/joining to the Stealth Tank squad module.
+- Preserve the surviving/core squad and its current mission while produced,
+  captured, or repaired Stealth Tanks travel to join it.
+- Give each incoming reinforcement its own hazard-safe route from its current
+  position; promote it into the core only when it reaches the same or an
+  adjacent 6x6 strategic cell as the core formation or target destination.
+- If no safe join route exists, safe-hold and retry; never take an unsafe direct
+  route or stop the core squad.
+- Audit Air squad AI for directly useful lifecycle behavior, but do not broaden
+  implementation without a concrete compatibility benefit. Chemical Tanks use
+  the same `StealthTankSquadBotModule` class under a separate `@chemical`
+  profile in `mods/cnc/rules/ai.yaml`, not a separate module; preserve Chemical
+  behavior unless shared ownership necessarily makes this correction common.
+- Preserve all prior CNC-96A requirements and prove reinforcement staging,
+  joining, safe-hold/retry, core mission continuity, ownership, repair/rejoin,
+  and no ordinary leakage in focused checks and the existing two-game evidence
+  contract.
