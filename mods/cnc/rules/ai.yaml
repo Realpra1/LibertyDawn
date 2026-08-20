@@ -720,7 +720,6 @@ Player:
 		EnableQueueStallRecovery: true
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: false
-		MaximumWallSegments: 24
 		FirstTowerTypes: gtwr, gun, atwr, obli
 		FirstTowerSearchRadius: 20
 		FirstTowerDebugLogging: false
@@ -932,7 +931,6 @@ Player:
 		EnableQueueStallRecovery: true
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: false
-		MaximumWallSegments: 24
 		FirstTowerTypes: gtwr, gun, atwr, obli
 		FirstTowerSearchRadius: 20
 		FirstTowerDebugLogging: false
@@ -1144,7 +1142,6 @@ Player:
 		EnableQueueStallRecovery: true
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: false
-		MaximumWallSegments: 24
 		FirstTowerTypes: gtwr, gun, atwr, obli
 		FirstTowerSearchRadius: 20
 		FirstTowerDebugLogging: false
@@ -1374,7 +1371,6 @@ Player:
 		SmartEconomyDebugLogging: false
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: false
-		MaximumWallSegments: 24
 		EnableOpeningPolicy: true
 		OpeningPowerTypes: nuk2, nuke
 		OpeningSiloTypes: silo
@@ -1827,7 +1823,6 @@ Player:
 		SmartEconomyDebugLogging: false
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: false
-		MaximumWallSegments: 24
 		EnableOpeningPolicy: true
 		OpeningPowerTypes: nuk2, nuke
 		OpeningSiloTypes: silo
@@ -2165,7 +2160,6 @@ Player:
 		WalledDefenseTypes: gtwr, gun, atwr, obli, sam
 		AdaptiveBuildingTypes: gtwr, gun, atwr, obli, sam
 		WallDistanceFromTower: 3
-		MaximumWallSegments: 150
 		WallPathCheckLocomotor: wheeled
 		EnableDefenseClusterPolicy: true
 		DefenseClusterTowerTypes: atwr, gtwr, gun, sam, obli
@@ -2481,7 +2475,6 @@ Player:
 		SmartEconomyDebugLogging: false
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: false
-		MaximumWallSegments: 24
 		EnableOpeningPolicy: true
 		OpeningPowerTypes: nuk2, nuke
 		OpeningSiloTypes: silo
@@ -2835,7 +2828,6 @@ Player:
 		EnableQueueStallRecovery: true
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: false
-		MaximumWallSegments: 24
 		FirstTowerTypes: gtwr, gun, atwr, obli
 		FirstTowerSearchRadius: 20
 		FirstTowerDebugLogging: false
@@ -3096,7 +3088,6 @@ Player:
 		EnableQueueStallRecovery: true
 		ConstructionYardEnclosureWallTypes: brik, sbag, cycl
 		ConstructionYardEnclosureDebugLogging: false
-		MaximumWallSegments: 24
 		FirstTowerTypes: gtwr, gun, atwr, obli
 		FirstTowerSearchRadius: 20
 		FirstTowerDebugLogging: false

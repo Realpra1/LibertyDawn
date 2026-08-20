@@ -102,6 +102,39 @@ namespace OpenRA.Mods.Common.Traits
 	/// <summary>Deterministic, world-independent policy for the bounded first-Fact enclosure.</summary>
 	public static class ConstructionYardEnclosurePolicy
 	{
+		public const int MaximumInitialRetries = 8;
+
+		public static int NextInitialRetryCount(int currentCount)
+		{
+			return Math.Min(MaximumInitialRetries, Math.Max(0, currentCount) + 1);
+		}
+
+		public static bool InitialRetryLimitReached(int retryCount)
+		{
+			return retryCount >= MaximumInitialRetries;
+		}
+
+		public static bool MaintenanceRetryDue(int currentTick, int nextRetryTick)
+		{
+			return currentTick >= Math.Max(0, nextRetryTick);
+		}
+
+		public static int NextMaintenanceRetryTick(int currentTick, int retryInterval)
+		{
+			var interval = Math.Max(1, retryInterval);
+			return currentTick > int.MaxValue - interval ? int.MaxValue : currentTick + interval;
+		}
+
+		public static bool IssuedCellRetryDue(int currentTick, int issuedTick, int retryInterval)
+		{
+			return currentTick - issuedTick >= Math.Max(1, retryInterval);
+		}
+
+		public static bool IsSatisfiedCell(bool hasWall, bool terrainSealsCell)
+		{
+			return hasWall || terrainSealsCell;
+		}
+
 		public static ConstructionYardEnclosurePlan CreatePlan(CPos topLeft, CVec dimensions, int margin, int accessWidth)
 		{
 			var corners = BotWallGeometry.EnclosureCorners(topLeft, dimensions, margin);
@@ -346,6 +379,11 @@ namespace OpenRA.Mods.Common.Traits
 			return savedTick >= 0 && currentWorldTick >= 0 && savedTick <= currentWorldTick;
 		}
 
+		public static bool IsValidScheduledTick(int savedTick)
+		{
+			return savedTick >= 0;
+		}
+
 		public static int QueuePollDelay(int normalDelay, int maintenanceInterval, bool enclosureActive)
 		{
 			if (!enclosureActive)
@@ -354,9 +392,18 @@ namespace OpenRA.Mods.Common.Traits
 			return Math.Min(Math.Max(1, normalDelay), Math.Max(1, maintenanceInterval));
 		}
 
-		public static bool IsActive(int worldTick, int cutoffTick, bool bound, bool stopped)
+		public static bool IsActive(int worldTick, int cutoffTick, bool bound, bool stopped,
+			bool initialEnclosurePending)
 		{
-			return bound && !stopped && worldTick < Math.Max(0, cutoffTick);
+			return bound && !stopped &&
+				(initialEnclosurePending || worldTick < Math.Max(0, cutoffTick));
+		}
+
+		public static bool CutoffMaintenanceUnavailable(bool initialEnclosurePending,
+			int worldTick, int cutoffTick)
+		{
+			return initialEnclosurePending &&
+				worldTick >= Math.Max(0, cutoffTick);
 		}
 
 		public static uint? SelectInitialYardActorId(IEnumerable<uint> liveYardActorIds, bool mayBind)

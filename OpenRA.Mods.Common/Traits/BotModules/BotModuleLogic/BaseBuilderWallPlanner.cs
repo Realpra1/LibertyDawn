@@ -101,6 +101,9 @@ namespace OpenRA.Mods.Common.Traits
 		CVec enclosureYardDimensions;
 		bool enclosureBound;
 		bool enclosureStopped;
+		bool initialEnclosureReleased;
+		int initialEnclosureRetryCount;
+		int nextInitialEnclosureRetryTick;
 		bool enclosureStopLogged;
 		int nextEnclosureScanTick;
 		readonly HashSet<CPos> clusterWallCells = new HashSet<CPos>();
@@ -125,8 +128,7 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			get
 			{
-				return Info.MaximumWallSegments > 0 &&
-					(Info.WallTypes.Count > 0 || Info.ConstructionYardEnclosureWallTypes.Length > 0) &&
+				return (Info.WallTypes.Count > 0 || Info.ConstructionYardEnclosureWallTypes.Length > 0) &&
 					(Info.WalledDefenseTypes.Count > 0 || Info.ConstructionYardEnclosureWallTypes.Length > 0);
 			}
 		}
@@ -136,10 +138,16 @@ namespace OpenRA.Mods.Common.Traits
 			return Info.WallTypes.Contains(actorType) || Info.ConstructionYardEnclosureWallTypes.Contains(actorType);
 		}
 
-		public int CompletedWallCount(Actor[] playerBuildings)
+		public bool InitialEnclosurePending
 		{
-			return WallCount(playerBuildings);
+			get
+			{
+				EnsureEnclosureState();
+				return enclosureBound && !enclosureStopped && !initialEnclosureReleased;
+			}
 		}
+
+		public int InitialEnclosureRetryCount => initialEnclosureRetryCount;
 
 		public bool OwnsClusterWallCell(CPos cell)
 		{
@@ -181,7 +189,8 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		bool EnclosureActive => ConstructionYardEnclosurePolicy.IsActive(world.WorldTick,
-			Info.ConstructionYardEnclosureCutoffTick, enclosureBound, enclosureStopped);
+			Info.ConstructionYardEnclosureCutoffTick, enclosureBound, enclosureStopped,
+			enclosureBound && !enclosureStopped && !initialEnclosureReleased);
 
 		public int LimitConstructionYardEnclosurePollDelay(int normalDelay)
 		{
@@ -216,10 +225,9 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		public ActorInfo ConstructionYardEnclosureWall(ProductionQueue queue,
-			IEnumerable<ActorInfo> buildables, Actor[] playerBuildings)
+			IEnumerable<ActorInfo> buildables)
 		{
-			if (!Enabled || queue == null || Info.ConstructionYardEnclosureWallTypes.Length == 0 ||
-				WallCount(playerBuildings) >= Info.MaximumWallSegments)
+			if (!Enabled || queue == null || Info.ConstructionYardEnclosureWallTypes.Length == 0)
 				return null;
 
 			RefreshEnclosureBuildOwnership();
@@ -249,12 +257,9 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		/// <summary>Gate used when deciding what to put into the production queue.</summary>
-		public bool WantsToBuildWall(ProductionQueue queue, string actorType, Actor[] playerBuildings)
+		public bool WantsToBuildWall(ProductionQueue queue, string actorType)
 		{
 			if (!Enabled || !IsWallType(actorType))
-				return false;
-
-			if (WallCount(playerBuildings) >= Info.MaximumWallSegments)
 				return false;
 
 			var cell = PeekAnchor(actorType);
@@ -380,16 +385,6 @@ namespace OpenRA.Mods.Common.Traits
 				(queue, actorType) => queue.AllQueued().Any(i => i.Item == actorType)))
 				LogEnclosure("{0} tick={1} released stale enclosure queue ownership yard={2}@{3}.",
 					player, world.WorldTick, enclosureYardActorId, enclosureYardLocation);
-		}
-
-		int WallCount(Actor[] playerBuildings)
-		{
-			var count = 0;
-			for (var i = 0; i < playerBuildings.Length; i++)
-				if (IsWallType(playerBuildings[i].Info.Name))
-					count++;
-
-			return count;
 		}
 
 		bool CanAnchorAt(CPos cell, ActorInfo wallInfo, BuildingInfo bi)
@@ -562,12 +557,10 @@ namespace OpenRA.Mods.Common.Traits
 
 		int NextEnclosureScanTick()
 		{
-			var wallCount = world.ActorsHavingTrait<Building>()
-				.Count(a => a.Owner == player && a.IsInWorld && !a.IsDead && IsWallType(a.Info.Name));
 			var interval = OpeningPolicyLogic.SecondaryOpeningPollDelay(
 				Info.ConstructionYardEnclosureMaintenanceInterval,
 				1,
-				baseBuilder.SecondaryQueueOpeningEnabled, wallCount, 4);
+				baseBuilder.SecondaryQueueOpeningEnabled, InitialEnclosurePending);
 			return world.WorldTick > int.MaxValue - interval ? int.MaxValue : world.WorldTick + interval;
 		}
 
@@ -575,12 +568,6 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			if (Info.ConstructionYardEnclosureWallTypes.Length == 0 || enclosureStopped)
 				return;
-
-			if (world.WorldTick >= Math.Max(0, Info.ConstructionYardEnclosureCutoffTick))
-			{
-				StopEnclosure("cutoff");
-				return;
-			}
 
 			if (!enclosureBound)
 			{
@@ -603,6 +590,7 @@ namespace OpenRA.Mods.Common.Traits
 					Info.ConstructionYardEnclosureMargin.Clamp(0, 8),
 					Info.ConstructionYardEnclosureAccessWidth);
 				nextEnclosureScanTick = world.WorldTick;
+				nextInitialEnclosureRetryTick = world.WorldTick;
 				LogEnclosure("{0} tick={1} bound first yard={2}/{3}@{4} walls={5} access={6} cutoff={7}.",
 					player, world.WorldTick, enclosureYardActorId, enclosureYardType, enclosureYardLocation,
 					enclosurePlan.WallCells.Length, string.Join(",", enclosurePlan.AccessCells),
@@ -780,35 +768,70 @@ namespace OpenRA.Mods.Common.Traits
 							cell, world.WorldTick - issuedTick);
 				}
 
-			var wallCount = world.ActorsHavingTrait<Building>()
-				.Count(a => a.Owner == player && a.IsInWorld && !a.IsDead && IsWallType(a.Info.Name));
-			var remainingCapacity = Info.MaximumWallSegments - wallCount;
-			if (remainingCapacity <= 0)
+			bool IsSatisfied(CPos cell) => ConstructionYardEnclosurePolicy.IsSatisfiedCell(
+				HasOwnWall(cell), IsTerrainSealedEnclosureCell(cell));
+			var missingCells = enclosurePlan.WallCells.Where(c => !IsSatisfied(c)).ToArray();
+			if (missingCells.Length == 0)
+			{
+				ReleaseInitialEnclosure("complete");
+				nextEnclosureScanTick = NextEnclosureScanTick();
+				return false;
+			}
+
+			if (ConstructionYardEnclosurePolicy.CutoffMaintenanceUnavailable(
+				!initialEnclosureReleased, world.WorldTick,
+				Info.ConstructionYardEnclosureCutoffTick))
+			{
+				RecordUnavailableInitialEnclosureMaintenance(
+					"cutoff", missingCells, wallInfo, wallBuildingInfo);
+				return false;
+			}
+
+			var outstanding = issuedEnclosureCells
+				.Where(entry => !IsSatisfied(entry.Key))
+				.OrderBy(entry => entry.Value).ThenBy(entry => entry.Key.X).ThenBy(entry => entry.Key.Y)
+				.Select(entry => (KeyValuePair<CPos, int>?)entry).FirstOrDefault();
+			if (outstanding != null && !ConstructionYardEnclosurePolicy.IssuedCellRetryDue(
+				world.WorldTick, outstanding.Value.Value, Info.ConstructionYardEnclosureMaintenanceInterval))
 			{
 				nextEnclosureScanTick = NextEnclosureScanTick();
-				LogEnclosure("{0} tick={1} deferred yard={2}@{3}: wall cap {4}/{5}.",
-					player, world.WorldTick, enclosureYardActorId, enclosureYardLocation,
-					wallCount, Info.MaximumWallSegments);
 				return false;
 			}
 
 			var candidates = ConstructionYardEnclosurePolicy.OrderedLegalMissingCells(enclosurePlan,
-				enclosureYardLocation, HasOwnWall, c => CanAnchorAt(c, wallInfo, wallBuildingInfo));
-			var destination = candidates.Cast<CPos?>().FirstOrDefault();
+				enclosureYardLocation, IsSatisfied, c => CanAnchorAt(c, wallInfo, wallBuildingInfo));
+			var destination = outstanding?.Key;
+			if (destination != null && !candidates.Contains(destination.Value))
+				destination = null;
+			else if (destination == null)
+				destination = candidates.Cast<CPos?>().FirstOrDefault();
 
 			if (destination == null)
 			{
-				nextEnclosureScanTick = NextEnclosureScanTick();
-				var missingCells = enclosurePlan.WallCells.Where(c => !HasOwnWall(c)).ToArray();
-				LogEnclosure("{0} tick={1} pending yard={2}@{3}: missing={4} legal={5}.",
-					player, world.WorldTick, enclosureYardActorId, enclosureYardLocation,
-					missingCells.Length, candidates.Length);
-				if (Info.ConstructionYardEnclosureDebugLogging)
-					LogEnclosure("{0} tick={1} pending-cell-status yard={2}@{3}: {4}.",
-						player, world.WorldTick, enclosureYardActorId, enclosureYardLocation,
-						string.Join(";", missingCells.Select(c =>
-							c + "=" + DescribeEnclosureCell(c, wallInfo, wallBuildingInfo))));
+				var retryConsumed = RecordUnavailableInitialEnclosureMaintenance(
+					"unavailable cells", missingCells, wallInfo, wallBuildingInfo);
+				if (retryConsumed && outstanding != null)
+					issuedEnclosureCells[outstanding.Value.Key] = world.WorldTick;
 				return false;
+			}
+
+			if (!initialEnclosureReleased && outstanding != null)
+			{
+				if (ConstructionYardEnclosurePolicy.InitialRetryLimitReached(initialEnclosureRetryCount))
+				{
+					ReleaseInitialEnclosure("retry limit reached");
+					return false;
+				}
+
+				if (!ConstructionYardEnclosurePolicy.MaintenanceRetryDue(
+					world.WorldTick, nextInitialEnclosureRetryTick))
+				{
+					nextEnclosureScanTick = Math.Max(nextEnclosureScanTick, nextInitialEnclosureRetryTick);
+					return false;
+				}
+
+				ConsumeInitialEnclosureRetry();
+				issuedEnclosureCells[destination.Value] = world.WorldTick;
 			}
 
 			pendingAnchors.Add(destination.Value);
@@ -819,6 +842,59 @@ namespace OpenRA.Mods.Common.Traits
 				wallInfo.Name, destination.Value, Array.IndexOf(candidates, destination.Value) + 1,
 				candidates.Length, observedEnclosureWalls.Contains(destination.Value));
 			return true;
+		}
+
+		bool RecordUnavailableInitialEnclosureMaintenance(string reason, CPos[] missingCells,
+			ActorInfo wallInfo, BuildingInfo wallBuildingInfo)
+		{
+			if (initialEnclosureReleased || !ConstructionYardEnclosurePolicy.MaintenanceRetryDue(
+				world.WorldTick, nextInitialEnclosureRetryTick))
+			{
+				nextEnclosureScanTick = initialEnclosureReleased ?
+					NextEnclosureScanTick() : Math.Max(nextEnclosureScanTick, nextInitialEnclosureRetryTick);
+				return false;
+			}
+
+			ConsumeInitialEnclosureRetry();
+
+			nextEnclosureScanTick = initialEnclosureReleased ? NextEnclosureScanTick() : nextInitialEnclosureRetryTick;
+			LogEnclosure("{0} tick={1} pending yard={2}@{3}: maintenance={4} missing={5} retries={6}/{7} next-retry={8}.",
+				player, world.WorldTick, enclosureYardActorId, enclosureYardLocation, reason,
+				missingCells.Length, initialEnclosureRetryCount,
+				ConstructionYardEnclosurePolicy.MaximumInitialRetries, nextInitialEnclosureRetryTick);
+			if (Info.ConstructionYardEnclosureDebugLogging)
+				LogEnclosure("{0} tick={1} pending-cell-status yard={2}@{3}: {4}.",
+					player, world.WorldTick, enclosureYardActorId, enclosureYardLocation,
+					string.Join(";", missingCells.Select(c =>
+						c + "=" + DescribeEnclosureCell(c, wallInfo, wallBuildingInfo))));
+			return true;
+		}
+
+		void ConsumeInitialEnclosureRetry()
+		{
+			initialEnclosureRetryCount = ConstructionYardEnclosurePolicy.NextInitialRetryCount(
+				initialEnclosureRetryCount);
+			nextInitialEnclosureRetryTick = ConstructionYardEnclosurePolicy.NextMaintenanceRetryTick(
+				world.WorldTick, Info.ConstructionYardEnclosureMaintenanceInterval);
+			if (ConstructionYardEnclosurePolicy.InitialRetryLimitReached(initialEnclosureRetryCount))
+				ReleaseInitialEnclosure("retry limit reached");
+		}
+
+		bool IsTerrainSealedEnclosureCell(CPos cell)
+		{
+			return world.Map.Contains(cell) && locomotor != null &&
+				locomotor.MovementCostForCell(cell) == PathGraph.MovementCostForUnreachableCell;
+		}
+
+		void ReleaseInitialEnclosure(string reason)
+		{
+			if (initialEnclosureReleased)
+				return;
+
+			initialEnclosureReleased = true;
+			LogEnclosure("{0} tick={1} released initial enclosure yard={2}@{3} reason={4} retries={5}/{6}; secondary construction may continue.",
+				player, world.WorldTick, enclosureYardActorId, enclosureYardLocation, reason,
+				initialEnclosureRetryCount, ConstructionYardEnclosurePolicy.MaximumInitialRetries);
 		}
 
 		bool TryFindExactEnclosureRoute(CPos destination, out CPos origin, out List<CPos> route)
@@ -900,9 +976,12 @@ namespace OpenRA.Mods.Common.Traits
 
 			var nodes = new List<MiniYamlNode>
 			{
-				new MiniYamlNode("Version", FieldSaver.FormatValue(3)),
+				new MiniYamlNode("Version", FieldSaver.FormatValue(5)),
 				new MiniYamlNode("Bound", FieldSaver.FormatValue(enclosureBound)),
 				new MiniYamlNode("Stopped", FieldSaver.FormatValue(enclosureStopped)),
+				new MiniYamlNode("InitialReleased", FieldSaver.FormatValue(initialEnclosureReleased)),
+				new MiniYamlNode("InitialRetryCount", FieldSaver.FormatValue(initialEnclosureRetryCount)),
+				new MiniYamlNode("NextInitialRetryTick", FieldSaver.FormatValue(nextInitialEnclosureRetryTick)),
 				new MiniYamlNode("NextScanTick", FieldSaver.FormatValue(nextEnclosureScanTick))
 			};
 			if (enclosureBound)
@@ -964,11 +1043,21 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				var nodes = state.Value.Nodes;
 				var version = ReadSavedValue<int>(nodes, "Version");
-				if (version != 2 && version != 3)
+				if (version != 2 && version != 3 && version != 4 && version != 5)
 					throw new InvalidOperationException("unsupported version " + version);
 
 				enclosureBound = ReadSavedValue<bool>(nodes, "Bound");
 				enclosureStopped = ReadSavedValue<bool>(nodes, "Stopped");
+				initialEnclosureReleased = version >= 4 && ReadSavedValue<bool>(nodes, "InitialReleased");
+				initialEnclosureRetryCount = version >= 4 ?
+					ReadSavedValue<int>(nodes, "InitialRetryCount") : 0;
+				if (initialEnclosureRetryCount < 0 ||
+					initialEnclosureRetryCount > ConstructionYardEnclosurePolicy.MaximumInitialRetries)
+					throw new InvalidOperationException("initial enclosure retry count is outside its bound");
+				nextInitialEnclosureRetryTick = version >= 5 ?
+					ReadSavedValue<int>(nodes, "NextInitialRetryTick") : 0;
+				if (!ConstructionYardEnclosurePolicy.IsValidScheduledTick(nextInitialEnclosureRetryTick))
+					throw new InvalidOperationException("next initial enclosure retry tick is invalid");
 				nextEnclosureScanTick = ReadSavedValue<int>(nodes, "NextScanTick");
 				if (!enclosureBound)
 					return;
@@ -1022,7 +1111,7 @@ namespace OpenRA.Mods.Common.Traits
 					pendingPurpose = PendingWallPurpose.Enclosure;
 					pendingAnchors.AddRange(restoredAnchors);
 
-					if (version == 3 && !TryRestoreEnclosureBuildOwnership(nodes, restoredType))
+					if (version >= 3 && !TryRestoreEnclosureBuildOwnership(nodes, restoredType))
 					{
 						ClearPendingAnchors();
 						LogEnclosure("{0} tick={1} discarded pending enclosure anchors yard={2}@{3}: exact queued build owner unavailable.",
@@ -1048,6 +1137,9 @@ namespace OpenRA.Mods.Common.Traits
 				enclosureBound = false;
 				enclosurePlan = null;
 				enclosureStopped = true;
+				initialEnclosureReleased = false;
+				initialEnclosureRetryCount = 0;
+				nextInitialEnclosureRetryTick = 0;
 				LogEnclosure("{0} tick={1} rejected invalid saved enclosure state ({2}: {3}); policy disabled.",
 					player, world.WorldTick, ex.GetType().Name, ex.Message);
 			}

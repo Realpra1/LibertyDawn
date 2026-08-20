@@ -449,10 +449,6 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("How many cells in front of a tower, on its enemy facing side, its wall is placed.")]
 		public readonly int WallDistanceFromTower = 3;
 
-		[Desc("Hard cap on the number of wall actors the AI will own. Zero disables wall building,",
-			"which is the default so other mods and bots are unaffected.")]
-		public readonly int MaximumWallSegments = 0;
-
 		[Desc("Name of the locomotor used to verify the AI can still move around after walling.")]
 		public readonly string WallPathCheckLocomotor = "wheeled";
 
