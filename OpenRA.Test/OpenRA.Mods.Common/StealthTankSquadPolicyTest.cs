@@ -163,6 +163,50 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(StealthTankSquadPolicy.NearbyReactionMaximumLatencyTicks, Is.EqualTo(25));
 		}
 
+		[Test]
+		public void VersionedMultiUnitRetreatSaveRestoresBarrierUntilEveryMemberCompletes()
+		{
+			var saved = StealthTankSquadPolicy.SaveRetreatState(new[]
+			{
+				new StealthTankRetreatSaveGroup
+				{
+					GroupIndex = 0,
+					TargetId = 91,
+					Destinations = new[]
+					{
+						new System.Collections.Generic.KeyValuePair<uint, CPos>(11, new CPos(27, 21)),
+						new System.Collections.Generic.KeyValuePair<uint, CPos>(12, new CPos(33, 27))
+					}
+				}
+			});
+
+			Assert.That(StealthTankSquadPolicy.TryLoadRetreatState(saved, out var restored), Is.True);
+			Assert.That(restored, Has.Length.EqualTo(1));
+			Assert.That(restored[0].TargetId, Is.EqualTo(91));
+			Assert.That(restored[0].Destinations.Select(d => d.Key), Is.EqualTo(new uint[] { 11, 12 }));
+
+			var remaining = restored[0].Destinations.ToDictionary(d => d.Key, d => d.Value);
+			Assert.That(StealthTankSquadPolicy.ShouldBlockReassessment(remaining.Count), Is.True);
+			remaining.Remove(11);
+			Assert.That(StealthTankSquadPolicy.ShouldBlockReassessment(remaining.Count), Is.True,
+				"One completed member must not release the restored multi-unit retreat barrier.");
+			remaining.Remove(12);
+			Assert.That(StealthTankSquadPolicy.ShouldBlockReassessment(remaining.Count), Is.False);
+		}
+
+		[Test]
+		public void MalformedOrFutureRetreatSaveFallsBackWithoutState()
+		{
+			var malformed = new MiniYamlNode("StealthTankRetreatState", "", new[]
+			{
+				new MiniYamlNode("Version", FieldSaver.FormatValue(
+					StealthTankSquadPolicy.RetreatSaveVersion + 1))
+			}.ToList());
+
+			Assert.That(StealthTankSquadPolicy.TryLoadRetreatState(malformed, out var restored), Is.False);
+			Assert.That(restored, Is.Empty);
+		}
+
 		[TestCase(0, 0)]
 		[TestCase(1, 0)]
 		[TestCase(2, 2)]

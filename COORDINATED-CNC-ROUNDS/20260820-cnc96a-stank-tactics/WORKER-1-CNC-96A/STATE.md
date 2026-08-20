@@ -72,3 +72,51 @@
 - Uncounted setup/calibration runs are disclosed in `REPORT.md`; only the two
   final strict passes above count toward the exactly-two contract.
 - Status: ready for fresh Terra review after the single worker commit.
+
+## Cycle-2 Terra correction (recorded before code decisions)
+
+- Exact blocker: the new reveal-retreat lifecycle is unsaved;
+  `IssueTraitData`/`ResolveTraitData` only persist `ReservedSpecialists` while
+  `RetreatTarget`/`RetreatDestinations` are the sole reassessment barrier.
+- Required correction: implement the smallest versioned per-group save/restore
+  for retreat target/destinations with ownership, eligibility, passability, and
+  group validation plus safe fallback; preserve existing save compatibility and
+  all cycle-1 behavior.
+- Required regression/evidence: prove restored multi-unit retreat blocks
+  reassessment until completion; run exactly two fresh reviewed games, including
+  an active-retreat save/load and a stale/dead/malformed or safe-fallback case.
+- Status: cycle 2 complete from clean head
+  `4369b912bc60ad42d27bc1adfff896bd7dbcc852`; ready for fresh Terra rereview
+  after the single cycle-2 worker commit.
+
+## Cycle-2 completion receipt
+
+- Product: added version-1 per-group retreat target/destination serialization
+  alongside the unchanged reservation node. Old or malformed/future saves
+  restore safely with no retreat state. Restore is applied after deterministic
+  regrouping and validates ownership, eligibility, reservation, group
+  membership, passability/domain, exact adjacent 6x6 geometry, and enemy target
+  lifetime; invalid cells recompute only from a valid target or safely drop.
+- Lifecycle: any validated destination clears retained/normal targeting and
+  blocks every strategic/nearby reassessment path until all remaining members
+  arrive. Already-arrived members and stale targets are safely discarded.
+- Focused test: `StealthTankSquadPolicyTest` PASS 95/95, including the versioned
+  multi-member barrier and malformed/future fallback regressions.
+- Protected checks: final `make check` PASS with 0 warnings/0 errors; full CNC
+  YAML PASS; both qualifying custom maps YAML PASS; diff check/path audit PASS;
+  no Air or Chemical path changed.
+- Game 1: strict normal-save/load PASS/PASS at ticks 4225/5000 in
+  20.020/15.018 seconds. Three-member restore at tick 4177 reported version=1,
+  members=3, dropped=0, fallback=0, barrier=True; no reassessment/order before
+  completion tick 4226, then normal Harass resumed; ordinary=0. Fresh narrator
+  and separate policy both PASS/no blocker.
+- Game 2: distinct genuine controlled custom scenario strict PASS/PASS at ticks
+  1150/3500 in 9.007/16.020 seconds. Real target died during active retreat and
+  normal engine save occurred at tick 1125. Restore tick 1126 rejected the stale
+  target and one already-arrived member but retained one valid destination as
+  `barrier=True`; no reassessment/order before completion tick 1175. Repair/
+  rejoin, later engagement, total/reserved=3/3, and ordinary=0 continued. Fresh
+  narrator and separate policy both PASS/no blocker.
+- Game 2 policy's optional all-pending save suggestion is already covered by
+  Game 1's three-member restore. Uncounted calibrations are disclosed in
+  `REPORT.md`. No fixture/save-byte mutation occurred.

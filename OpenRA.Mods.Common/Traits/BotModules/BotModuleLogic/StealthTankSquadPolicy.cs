@@ -25,11 +25,110 @@ namespace OpenRA.Mods.Common.Traits
 		NoProgress
 	}
 
+	public sealed class StealthTankRetreatSaveGroup
+	{
+		public int GroupIndex;
+		public uint TargetId;
+		public KeyValuePair<uint, CPos>[] Destinations;
+	}
+
 	public static class StealthTankSquadPolicy
 	{
 		public const int MaximumSquadCount = 4;
 		public const int RequiredStrategicCellSize = 6;
 		public const int NearbyReactionMaximumLatencyTicks = 25;
+		public const int RetreatSaveVersion = 1;
+
+		public static MiniYamlNode SaveRetreatState(IEnumerable<StealthTankRetreatSaveGroup> groups)
+		{
+			var nodes = new List<MiniYamlNode>
+			{
+				new MiniYamlNode("Version", FieldSaver.FormatValue(RetreatSaveVersion))
+			};
+			nodes.AddRange(groups.OrderBy(g => g.GroupIndex).Select(group =>
+				new MiniYamlNode("Group", "", new List<MiniYamlNode>
+				{
+					new MiniYamlNode("Index", FieldSaver.FormatValue(group.GroupIndex)),
+					new MiniYamlNode("Target", FieldSaver.FormatValue(group.TargetId)),
+					new MiniYamlNode("Destinations", "", group.Destinations.OrderBy(d => d.Key)
+						.Select(destination => new MiniYamlNode("Destination", "", new List<MiniYamlNode>
+						{
+							new MiniYamlNode("Member", FieldSaver.FormatValue(destination.Key)),
+							new MiniYamlNode("Cell", FieldSaver.FormatValue(destination.Value))
+						})).ToList())
+				})));
+			return new MiniYamlNode("StealthTankRetreatState", "", nodes);
+		}
+
+		public static bool TryLoadRetreatState(MiniYamlNode state,
+			out StealthTankRetreatSaveGroup[] groups)
+		{
+			groups = Array.Empty<StealthTankRetreatSaveGroup>();
+			if (state == null)
+				return false;
+
+			try
+			{
+				var version = state.Value.Nodes.Single(n => n.Key == "Version");
+				if (FieldLoader.GetValue<int>(version.Key, version.Value.Value) != RetreatSaveVersion)
+					return false;
+
+				var loaded = new List<StealthTankRetreatSaveGroup>();
+				foreach (var groupNode in state.Value.Nodes.Where(n => n.Key == "Group"))
+				{
+					var indexNode = groupNode.Value.Nodes.Single(n => n.Key == "Index");
+					var targetNode = groupNode.Value.Nodes.Single(n => n.Key == "Target");
+					var destinationsNode = groupNode.Value.Nodes.Single(n => n.Key == "Destinations");
+					var destinations = destinationsNode.Value.Nodes.Where(n => n.Key == "Destination")
+						.Select(destinationNode =>
+						{
+							var memberNode = destinationNode.Value.Nodes.Single(n => n.Key == "Member");
+							var cellNode = destinationNode.Value.Nodes.Single(n => n.Key == "Cell");
+							return new KeyValuePair<uint, CPos>(
+								FieldLoader.GetValue<uint>(memberNode.Key, memberNode.Value.Value),
+								FieldLoader.GetValue<CPos>(cellNode.Key, cellNode.Value.Value));
+						}).ToArray();
+					var group = new StealthTankRetreatSaveGroup
+					{
+						GroupIndex = FieldLoader.GetValue<int>(indexNode.Key, indexNode.Value.Value),
+						TargetId = FieldLoader.GetValue<uint>(targetNode.Key, targetNode.Value.Value),
+						Destinations = destinations
+					};
+					if (group.GroupIndex < 0 || destinations.Length == 0 ||
+						destinations.Select(d => d.Key).Distinct().Count() != destinations.Length)
+						return false;
+
+					loaded.Add(group);
+				}
+
+				if (loaded.Select(g => g.GroupIndex).Distinct().Count() != loaded.Count)
+					return false;
+
+				groups = loaded.ToArray();
+				return true;
+			}
+			catch (InvalidOperationException)
+			{
+				return false;
+			}
+			catch (FormatException)
+			{
+				return false;
+			}
+			catch (OverflowException)
+			{
+				return false;
+			}
+			catch (YamlException)
+			{
+				return false;
+			}
+		}
+
+		public static bool ShouldBlockReassessment(int retreatDestinationCount)
+		{
+			return retreatDestinationCount > 0;
+		}
 
 		public static CPos StrategicCell(CPos cell, int strategicCellSize)
 		{

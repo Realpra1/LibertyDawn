@@ -210,6 +210,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly Dictionary<uint, int> nextRepairEvaluation = new Dictionary<uint, int>();
 		readonly Dictionary<uint, bool> lastCloaked = new Dictionary<uint, bool>();
 		readonly Dictionary<CPos, bool> resourceHazardCache = new Dictionary<CPos, bool>();
+		StealthTankRetreatSaveGroup[] pendingRetreatRestore;
 		readonly SpecialistGroup[] groups;
 		readonly StrategicView strategicView = new StrategicView();
 		SpecialistInfluenceMap influenceMap;
@@ -297,6 +298,7 @@ namespace OpenRA.Mods.Common.Traits
 			repairTargets.Clear();
 			nextRepairEvaluation.Clear();
 			lastCloaked.Clear();
+			pendingRetreatRestore = null;
 			lastEligibleCount = -1;
 			foreach (var group in groups)
 			{
@@ -448,7 +450,8 @@ namespace OpenRA.Mods.Common.Traits
 			var ordersBefore = scanQueuedOrders;
 			foreach (var group in groups)
 			{
-				if (group.SuspendedEngagementTarget != null || group.RetreatDestinations.Count > 0)
+				if (group.SuspendedEngagementTarget != null || StealthTankSquadPolicy.ShouldBlockReassessment(
+					group.RetreatDestinations.Count))
 					continue;
 
 				var active = group.Units.Where(IsActiveSpecialist).ToArray();
@@ -680,7 +683,7 @@ namespace OpenRA.Mods.Common.Traits
 		bool UpdateStrategicRetreat(SpecialistGroup group, out int orders)
 		{
 			orders = 0;
-			if (group.RetreatDestinations.Count == 0)
+			if (!StealthTankSquadPolicy.ShouldBlockReassessment(group.RetreatDestinations.Count))
 				return false;
 
 			foreach (var actorId in group.RetreatDestinations.Keys.ToArray())
@@ -692,7 +695,7 @@ namespace OpenRA.Mods.Common.Traits
 					group.RetreatDestinations.Remove(actorId);
 			}
 
-			if (group.RetreatDestinations.Count > 0)
+			if (StealthTankSquadPolicy.ShouldBlockReassessment(group.RetreatDestinations.Count))
 				return true;
 
 			if (Info.DebugLogging)
@@ -973,6 +976,8 @@ namespace OpenRA.Mods.Common.Traits
 			for (var i = 0; i < groups.Length; i++)
 				groups[i].MembershipChanged = !previousGroups[i].SequenceEqual(groups[i].Units.Select(a => a.ActorID));
 
+			ApplyPendingRetreatRestore();
+
 			foreach (var group in groups)
 				if (group.Target != null && (!group.Target.IsInWorld || group.Target.IsDead ||
 					player.RelationshipWith(group.Target.Owner) != PlayerRelationship.Enemy))
@@ -1000,11 +1005,20 @@ namespace OpenRA.Mods.Common.Traits
 			if (IsTraitDisabled)
 				return null;
 
-			return new List<MiniYamlNode>
+			var data = new List<MiniYamlNode>
 			{
 				new MiniYamlNode("ReservedSpecialists",
 					FieldSaver.FormatValue(reserved.OrderBy(id => id).ToArray()))
 			};
+			data.Add(StealthTankSquadPolicy.SaveRetreatState(groups
+				.Where(group => group.RetreatDestinations.Count > 0)
+				.Select(group => new StealthTankRetreatSaveGroup
+				{
+					GroupIndex = group.Index,
+					TargetId = group.RetreatTarget?.ActorID ?? 0,
+					Destinations = group.RetreatDestinations.OrderBy(pair => pair.Key).ToArray()
+				})));
+			return data;
 		}
 
 		void IGameSaveTraitData.ResolveTraitData(Actor self, List<MiniYamlNode> data)
@@ -1018,6 +1032,103 @@ namespace OpenRA.Mods.Common.Traits
 
 			reserved.Clear();
 			reserved.UnionWith(FieldLoader.GetValue<uint[]>(reservedNode.Key, reservedNode.Value.Value));
+			foreach (var group in groups)
+			{
+				group.RetreatTarget = null;
+				group.RetreatDestinations.Clear();
+			}
+
+			var retreatNode = data.FirstOrDefault(n => n.Key == "StealthTankRetreatState");
+			pendingRetreatRestore = StealthTankSquadPolicy.TryLoadRetreatState(retreatNode, out var restored) ?
+				restored : Array.Empty<StealthTankRetreatSaveGroup>();
+			scanTicks = 1;
+		}
+
+		void ApplyPendingRetreatRestore()
+		{
+			if (pendingRetreatRestore == null)
+				return;
+
+			var restoredGroups = 0;
+			var restoredMembers = 0;
+			var droppedMembers = 0;
+			var fallbackMembers = 0;
+			foreach (var saved in pendingRetreatRestore)
+			{
+				if (saved.GroupIndex < 0 || saved.GroupIndex >= groups.Length)
+				{
+					droppedMembers += saved.Destinations.Length;
+					continue;
+				}
+
+				var group = groups[saved.GroupIndex];
+				group.RetreatDestinations.Clear();
+				var target = world.GetActorById(saved.TargetId);
+				group.RetreatTarget = IsEnemyTarget(target) ? target : null;
+				foreach (var savedDestination in saved.Destinations)
+				{
+					var unit = world.GetActorById(savedDestination.Key);
+					if (!IsEligible(unit) || !reserved.Contains(savedDestination.Key) ||
+						!group.Units.Contains(unit))
+					{
+						droppedMembers++;
+						continue;
+					}
+
+					if (StealthTankSquadPolicy.IsSameStrategicCell(unit.Location,
+						savedDestination.Value, StrategicCellSize))
+						continue;
+
+					var savedDestinationValid = ValidateRestoredRetreatDestination(unit, savedDestination.Value);
+					var destination = savedDestinationValid ? savedDestination.Value :
+						group.RetreatTarget == null ? (CPos?)null :
+						FindStrategicRetreatDestination(unit, group.RetreatTarget.Location);
+					if (destination == null)
+					{
+						droppedMembers++;
+						continue;
+					}
+
+					group.RetreatDestinations.Add(unit.ActorID, destination.Value);
+					if (!savedDestinationValid)
+						fallbackMembers++;
+					restoredMembers++;
+				}
+
+				if (StealthTankSquadPolicy.ShouldBlockReassessment(group.RetreatDestinations.Count))
+				{
+					group.Target = null;
+					group.SuspendedEngagementTarget = null;
+					ClearRetainedPlan(group);
+					restoredGroups++;
+				}
+				else
+					group.RetreatTarget = null;
+			}
+
+			if (Info.DebugLogging)
+				Log.Write("debug", "AI stealth retreat restore {0} [{1}] tick={2}: version={3} groups={4} members={5} dropped={6} fallback={7} barrier={8} targets={9} destinations={10}.",
+					Info.SquadLabel, player.PlayerName, world.WorldTick,
+					StealthTankSquadPolicy.RetreatSaveVersion, restoredGroups, restoredMembers,
+					droppedMembers, fallbackMembers,
+					groups.Any(g => StealthTankSquadPolicy.ShouldBlockReassessment(g.RetreatDestinations.Count)),
+					string.Join(",", groups.Where(g => g.RetreatDestinations.Count > 0)
+						.Select(g => g.Index + ":" + (g.RetreatTarget?.ActorID.ToString() ?? "none"))),
+					string.Join(",", groups.SelectMany(g => g.RetreatDestinations.OrderBy(pair => pair.Key)
+						.Select(pair => g.Index + ":" + pair.Key + ":" + pair.Value))));
+			pendingRetreatRestore = null;
+		}
+
+		bool ValidateRestoredRetreatDestination(Actor unit, CPos destination)
+		{
+			var mobile = unit.TraitOrDefault<Mobile>();
+			if (mobile == null || !world.Map.Contains(destination) || !mobile.CanEnterCell(destination) ||
+				(domainIndex != null && !domainIndex.IsPassable(unit.Location, destination, mobile.Locomotor)))
+				return false;
+
+			var from = StealthTankSquadPolicy.StrategicCell(unit.Location, StrategicCellSize);
+			var to = StealthTankSquadPolicy.StrategicCell(destination, StrategicCellSize);
+			return Math.Max(Math.Abs(to.X - from.X), Math.Abs(to.Y - from.Y)) == 1;
 		}
 
 		bool IsEnemyTarget(Actor actor)
@@ -1065,7 +1176,7 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (activeUnits.Length == 0)
 				return;
-			if (group.RetreatDestinations.Count > 0)
+			if (StealthTankSquadPolicy.ShouldBlockReassessment(group.RetreatDestinations.Count))
 				return;
 
 			// Engagement-local safety owns this short hold and checks it every 25 ticks.
