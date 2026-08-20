@@ -44,59 +44,59 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
-		public void SecondaryQueueProtectsSiloAndConfiguredDefenseAfterFourWalls()
+		public void SecondaryQueueProtectsSiloAndConfiguredDefenseAfterInitialEnclosure()
 		{
-			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, 3, 4,
+			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, true,
 				true, false, true, false, true, false, true, false), Is.EqualTo(SecondaryQueueOpeningChoice.Wall));
-			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, 4, 4,
+			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, false,
 				true, false, true, false, true, false, true, false), Is.EqualTo(SecondaryQueueOpeningChoice.Silo));
-			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, 4, 4,
+			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, false,
 				false, true, false, false, true, false, true, false), Is.EqualTo(SecondaryQueueOpeningChoice.FirstDefense));
-			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, 4, 4,
+			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, false,
 				false, true, false, false, true, true, true, false), Is.EqualTo(SecondaryQueueOpeningChoice.None));
 		}
 
 		[Test]
-		public void SecondaryQueueKeepsFourWallPhaseActiveDuringFirstRefineryRecovery()
+		public void SecondaryQueueKeepsInitialEnclosureActiveDuringFirstRefineryRecovery()
 		{
 			Assert.That(OpeningPolicyLogic.HoldOptionalConstructionForFirstRefinery(true, 0, true, false), Is.True,
 				"The primary construction queue may still be serializing its first Refinery.");
-			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, 0, 4,
+			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, true,
 				true, false, true, false, true, false, true, false),
 				Is.EqualTo(SecondaryQueueOpeningChoice.Wall),
-				"The protected secondary queue must keep polling and completing its four-wall prefix independently.");
+				"The protected secondary queue must keep polling until the bound enclosure phase releases.");
 			Assert.That(OpeningPolicyLogic.KeepsEmptySecondaryQueueActive(SecondaryQueueOpeningChoice.Wall), Is.True,
 				"A transiently empty wall planner must retain the short active poll delay.");
 			Assert.That(OpeningPolicyLogic.KeepsEmptySecondaryQueueActive(SecondaryQueueOpeningChoice.Hold), Is.False,
 				"A deliberate post-wall policy hold must not spin at the active poll rate.");
-			Assert.That(OpeningPolicyLogic.SecondaryOpeningPollDelay(130, 30, true, 3, 4), Is.EqualTo(30),
-				"The wall prefix must override an inactive empty-queue delay.");
-			Assert.That(OpeningPolicyLogic.SecondaryOpeningPollDelay(130, 30, true, 4, 4), Is.EqualTo(130),
-				"The short poll override must end at the four-wall boundary.");
+			Assert.That(OpeningPolicyLogic.SecondaryOpeningPollDelay(130, 30, true, true), Is.EqualTo(30),
+				"The enclosure retry phase must override an inactive empty-queue delay.");
+			Assert.That(OpeningPolicyLogic.SecondaryOpeningPollDelay(130, 30, true, false), Is.EqualTo(130),
+				"The short poll override must end only when the initial enclosure phase releases.");
 		}
 
 		[Test]
 		public void SecondaryQueueHoldsBoundaryWithoutClaimingImpossibleWork()
 		{
-			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, 4, 4,
+			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, false,
 				false, false, true, false, true, false, true, false), Is.EqualTo(SecondaryQueueOpeningChoice.Hold));
-			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, 4, 4,
+			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, false,
 				true, false, false, false, true, false, true, false), Is.EqualTo(SecondaryQueueOpeningChoice.Hold));
-			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, 4, 4,
+			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, false,
 				true, false, false, true, true, false, true, false), Is.EqualTo(SecondaryQueueOpeningChoice.Hold));
-			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, 4, 4,
+			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, false,
 				false, true, false, false, true, false, false, false), Is.EqualTo(SecondaryQueueOpeningChoice.Hold));
-			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, 4, 4,
+			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, false,
 				false, true, false, false, true, false, false, true), Is.EqualTo(SecondaryQueueOpeningChoice.Hold));
 		}
 
 		[Test]
 		public void SecondaryQueueReleasesPermanentlyUnavailableConfiguredDefense()
 		{
-			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, 4, 4,
+			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, false,
 				false, true, false, false, false, false, false, false), Is.EqualTo(SecondaryQueueOpeningChoice.None),
 				"A defense goal skipped by the existing opening policy must not strand the secondary queue.");
-			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, 4, 4,
+			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, false,
 				false, true, false, false, true, false, false, false), Is.EqualTo(SecondaryQueueOpeningChoice.Hold),
 				"A configured defense that is only temporarily unavailable must retain the boundary.");
 		}
@@ -108,7 +108,7 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(target, Is.EqualTo(2),
 				"The four-wall boundary must capture the next live Silo even when another queue owns it.");
 			Assert.That(OpeningPolicyLogic.SecondaryQueueSiloTargetCompleted(target, 1), Is.False);
-			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, 4, 4,
+			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, false,
 				false, false, false, true, true, false, false, false), Is.EqualTo(SecondaryQueueOpeningChoice.Hold));
 
 			Assert.That(OpeningPolicyLogic.SecondaryQueueSiloTargetCompleted(target, 0), Is.False,
@@ -116,7 +116,7 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(OpeningPolicyLogic.SecondaryQueueSiloTargetCompleted(target, 1), Is.False,
 				"Replacing only the lost baseline Silo is not completion of the committed target.");
 			Assert.That(OpeningPolicyLogic.SecondaryQueueSiloTargetCompleted(target, 2), Is.True);
-			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, 4, 4,
+			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, false,
 				false, true, false, false, true, false, true, false),
 				Is.EqualTo(SecondaryQueueOpeningChoice.FirstDefense),
 				"The configured defense must release immediately after the first queue completes the Silo target.");
@@ -125,10 +125,10 @@ namespace OpenRA.Test.Mods.Common
 		[Test]
 		public void SecondaryBoundaryDoesNotClaimLowCashOrPowerWorkDuringRecovery()
 		{
-			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, 4, 4,
+			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, false,
 				true, false, false, false, true, false, true, false), Is.EqualTo(SecondaryQueueOpeningChoice.Hold),
 				"An unaffordable or low-power Silo is held without creating a production claim.");
-			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, 4, 4,
+			Assert.That(OpeningPolicyLogic.ChooseSecondaryQueueOpening(true, false,
 				false, true, false, false, true, false, false, false), Is.EqualTo(SecondaryQueueOpeningChoice.Hold),
 				"An unaffordable or low-power defense is held without creating a production claim.");
 			Assert.That(OpeningPolicyLogic.HoldOptionalConstructionForFirstRefinery(true, 0, true, false), Is.True,

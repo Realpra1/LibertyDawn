@@ -447,5 +447,33 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(ConstructionYardEnclosurePolicy.QueuePollDelay(
 				normalDelay, maintenanceInterval, enclosureActive), Is.EqualTo(expected));
 		}
+
+		[Test]
+		public void InitialRetryCountSaturatesAtEightWithoutDuplicateGrowth()
+		{
+			var retries = 0;
+			for (var i = 0; i < 20; i++)
+				retries = ConstructionYardEnclosurePolicy.NextInitialRetryCount(retries);
+
+			Assert.That(retries, Is.EqualTo(8));
+			Assert.That(ConstructionYardEnclosurePolicy.InitialRetryLimitReached(7), Is.False);
+			Assert.That(ConstructionYardEnclosurePolicy.InitialRetryLimitReached(8), Is.True);
+			Assert.That(ConstructionYardEnclosurePolicy.InitialRetryLimitReached(80), Is.True,
+				"Malformed or repeated observations must not reopen an exhausted retry phase.");
+			Assert.That(ConstructionYardEnclosurePolicy.IssuedCellRetryDue(349, 100, 250), Is.False,
+				"A competing queue poll must not consume a retry while placement confirmation is in flight.");
+			Assert.That(ConstructionYardEnclosurePolicy.IssuedCellRetryDue(350, 100, 250), Is.True,
+				"One missing issued endpoint becomes retryable only at the bounded maintenance edge.");
+		}
+
+		[Test]
+		public void TerrainSealedHoleCompletesWithoutInventingAPlacement()
+		{
+			Assert.That(ConstructionYardEnclosurePolicy.IsSatisfiedCell(true, false), Is.True);
+			Assert.That(ConstructionYardEnclosurePolicy.IsSatisfiedCell(false, true), Is.True,
+				"Impassable terrain physically closes a perimeter cell without a duplicate wall order.");
+			Assert.That(ConstructionYardEnclosurePolicy.IsSatisfiedCell(false, false), Is.False,
+				"A merely missing or transiently blocked cell must remain in the retry phase.");
+		}
 	}
 }

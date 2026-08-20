@@ -102,6 +102,28 @@ namespace OpenRA.Mods.Common.Traits
 	/// <summary>Deterministic, world-independent policy for the bounded first-Fact enclosure.</summary>
 	public static class ConstructionYardEnclosurePolicy
 	{
+		public const int MaximumInitialRetries = 8;
+
+		public static int NextInitialRetryCount(int currentCount)
+		{
+			return Math.Min(MaximumInitialRetries, Math.Max(0, currentCount) + 1);
+		}
+
+		public static bool InitialRetryLimitReached(int retryCount)
+		{
+			return retryCount >= MaximumInitialRetries;
+		}
+
+		public static bool IssuedCellRetryDue(int currentTick, int issuedTick, int retryInterval)
+		{
+			return currentTick - issuedTick >= Math.Max(1, retryInterval);
+		}
+
+		public static bool IsSatisfiedCell(bool hasWall, bool terrainSealsCell)
+		{
+			return hasWall || terrainSealsCell;
+		}
+
 		public static ConstructionYardEnclosurePlan CreatePlan(CPos topLeft, CVec dimensions, int margin, int accessWidth)
 		{
 			var corners = BotWallGeometry.EnclosureCorners(topLeft, dimensions, margin);

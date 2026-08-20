@@ -32,9 +32,9 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		public static int SecondaryOpeningPollDelay(int normalDelay, int activeDelay,
-			bool enabled, int completedWalls, int requiredWalls)
+			bool enabled, bool initialEnclosurePending)
 		{
-			if (!enabled || completedWalls >= Math.Max(0, requiredWalls))
+			if (!enabled || !initialEnclosurePending)
 				return Math.Max(1, normalDelay);
 
 			return Math.Min(Math.Max(1, normalDelay), Math.Max(1, activeDelay));
@@ -54,14 +54,14 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		public static SecondaryQueueOpeningChoice ChooseSecondaryQueueOpening(
-			bool enabled, int completedWalls, int requiredWalls,
+			bool enabled, bool initialEnclosurePending,
 			bool siloNeeded, bool siloCompleted, bool siloActionable, bool siloCommitted,
 			bool firstDefenseRequired, bool firstDefenseCompleted,
 			bool firstDefenseActionable, bool firstDefenseCommitted)
 		{
 			if (!enabled)
 				return SecondaryQueueOpeningChoice.None;
-			if (completedWalls < Math.Max(0, requiredWalls))
+			if (initialEnclosurePending)
 				return SecondaryQueueOpeningChoice.Wall;
 
 			if (!siloCompleted)
