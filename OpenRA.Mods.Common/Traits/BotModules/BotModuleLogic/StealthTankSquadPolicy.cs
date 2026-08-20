@@ -39,12 +39,73 @@ namespace OpenRA.Mods.Common.Traits
 		public KeyValuePair<uint, CPos>[] Destinations;
 	}
 
+	public sealed class StealthTankReinforcementSaveGroup
+	{
+		public int GroupIndex;
+		public uint[] Members;
+	}
+
 	public static class StealthTankSquadPolicy
 	{
 		public const int MaximumSquadCount = 4;
 		public const int RequiredStrategicCellSize = 6;
 		public const int NearbyReactionMaximumLatencyTicks = 25;
 		public const int RetreatSaveVersion = 1;
+		public const int ReinforcementSaveVersion = 1;
+
+		public static MiniYamlNode SaveReinforcementState(
+			IEnumerable<StealthTankReinforcementSaveGroup> groups)
+		{
+			var nodes = new List<MiniYamlNode>
+			{
+				new MiniYamlNode("Version", FieldSaver.FormatValue(ReinforcementSaveVersion))
+			};
+			nodes.AddRange(groups.OrderBy(g => g.GroupIndex).Select(group =>
+				new MiniYamlNode("Group", "", new List<MiniYamlNode>
+				{
+					new MiniYamlNode("Index", FieldSaver.FormatValue(group.GroupIndex)),
+					new MiniYamlNode("Members", FieldSaver.FormatValue(group.Members.OrderBy(id => id).ToArray()))
+				})));
+			return new MiniYamlNode("StealthTankReinforcementState", "", nodes);
+		}
+
+		public static bool TryLoadReinforcementState(MiniYamlNode state,
+			out StealthTankReinforcementSaveGroup[] groups)
+		{
+			groups = Array.Empty<StealthTankReinforcementSaveGroup>();
+			if (state == null)
+				return false;
+
+			try
+			{
+				var version = state.Value.Nodes.Single(n => n.Key == "Version");
+				if (FieldLoader.GetValue<int>(version.Key, version.Value.Value) != ReinforcementSaveVersion)
+					return false;
+
+				var loaded = state.Value.Nodes.Where(n => n.Key == "Group").Select(groupNode =>
+				{
+					var indexNode = groupNode.Value.Nodes.Single(n => n.Key == "Index");
+					var membersNode = groupNode.Value.Nodes.Single(n => n.Key == "Members");
+					return new StealthTankReinforcementSaveGroup
+					{
+						GroupIndex = FieldLoader.GetValue<int>(indexNode.Key, indexNode.Value.Value),
+						Members = FieldLoader.GetValue<uint[]>(membersNode.Key, membersNode.Value.Value)
+					};
+				}).ToArray();
+				if (loaded.Any(g => g.GroupIndex < 0 || g.Members.Length == 0 ||
+					g.Members.Distinct().Count() != g.Members.Length) ||
+					loaded.Select(g => g.GroupIndex).Distinct().Count() != loaded.Length ||
+					loaded.SelectMany(g => g.Members).Distinct().Count() != loaded.Sum(g => g.Members.Length))
+					return false;
+
+				groups = loaded;
+				return true;
+			}
+			catch (InvalidOperationException) { return false; }
+			catch (FormatException) { return false; }
+			catch (OverflowException) { return false; }
+			catch (YamlException) { return false; }
+		}
 
 		public static MiniYamlNode SaveRetreatState(IEnumerable<StealthTankRetreatSaveGroup> groups)
 		{
@@ -159,6 +220,43 @@ namespace OpenRA.Mods.Common.Traits
 		public static bool IsSameStrategicCell(CPos a, CPos b, int strategicCellSize)
 		{
 			return StrategicCell(a, strategicCellSize) == StrategicCell(b, strategicCellSize);
+		}
+
+		public static bool IsSameOrAdjacentStrategicCell(CPos a, CPos b, int strategicCellSize)
+		{
+			var ac = StrategicCell(a, strategicCellSize);
+			var bc = StrategicCell(b, strategicCellSize);
+			return Math.Max(Math.Abs(ac.X - bc.X), Math.Abs(ac.Y - bc.Y)) <= 1;
+		}
+
+		public static bool ShouldStageReinforcement(bool hasEstablishedCore,
+			bool wasPreviouslyAssigned)
+		{
+			return hasEstablishedCore && !wasPreviouslyAssigned;
+		}
+
+		public static int ReinforcementGroup(int proposedGroup,
+			IReadOnlyList<int> establishedCoreCounts)
+		{
+			if (proposedGroup >= 0 && proposedGroup < establishedCoreCounts.Count &&
+				establishedCoreCounts[proposedGroup] > 0)
+				return proposedGroup;
+
+			return Enumerable.Range(0, establishedCoreCounts.Count)
+				.Where(i => establishedCoreCounts[i] > 0)
+				.OrderBy(i => establishedCoreCounts[i]).ThenBy(i => i)
+				.DefaultIfEmpty(proposedGroup).First();
+		}
+
+		public static bool CanAdvanceReinforcement(bool active, bool retreatResponsibilityPending)
+		{
+			return active && !retreatResponsibilityPending;
+		}
+
+		public static uint? RecoveryCore(IEnumerable<uint> members, ISet<uint> reinforcements)
+		{
+			var ordered = members.OrderBy(id => id).ToArray();
+			return ordered.Length > 0 && ordered.All(reinforcements.Contains) ? ordered[0] : (uint?)null;
 		}
 
 		public static CPos OneStrategicCellRetreat(CPos unit, CPos target, int strategicCellSize,

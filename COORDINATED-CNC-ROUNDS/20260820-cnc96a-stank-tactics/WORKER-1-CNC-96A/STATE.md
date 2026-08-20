@@ -366,6 +366,14 @@
 
 ## Amendment acceptance: Air-style reinforcement staging and joining
 
+## User reinforcement lifecycle amendment (recorded verbatim before further code decisions)
+
+- Do NOT separate reinforcement behavior by profile. Chemical Tank squads use the same StealthTankSquadBotModule lifecycle and should differ from Stealth Tank squads only through configuration. Implement the shared Air-style reinforcement staging/joining lifecycle for both profiles; preserve any intended differences solely as config values.
+
+## Publication handoff
+
+- This worker does not push, open a PR, or merge. After the clean reviewed handoff, the coordinator will integrate the complete hotfix and publish a PR targeting `bleed` as explicitly requested.
+
 - Add Air-style reinforcement staging/joining to the Stealth Tank squad module.
 - Preserve the surviving/core squad and its current mission while produced,
   captured, or repaired Stealth Tanks travel to join it.
@@ -377,9 +385,54 @@
 - Audit Air squad AI for directly useful lifecycle behavior, but do not broaden
   implementation without a concrete compatibility benefit. Chemical Tanks use
   the same `StealthTankSquadBotModule` class under a separate `@chemical`
-  profile in `mods/cnc/rules/ai.yaml`, not a separate module; preserve Chemical
-  behavior unless shared ownership necessarily makes this correction common.
+  profile in `mods/cnc/rules/ai.yaml`, not a separate module. Chemical Tanks
+  must share this reinforcement staging/joining lifecycle; differences belong
+  only in profile configuration. Do not preserve an old Chemical lifecycle or
+  make this correction Stealth-only.
 - Preserve all prior CNC-96A requirements and prove reinforcement staging,
   joining, safe-hold/retry, core mission continuity, ownership, repair/rejoin,
   and no ordinary leakage in focused checks and the existing two-game evidence
   contract.
+
+## Reinforcement amendment completion receipt
+
+- Root cause: every strategic `Rebalance` cleared and repartitioned all claimed
+  specialists, so a produced/captured/repaired unit immediately entered core
+  formation calculations and could invalidate the survivor squad's mission.
+- Product: both Stealth and Chemical profiles now share one Air-style staged
+  reinforcement lifecycle. Existing core membership is retained; incoming and
+  fully repaired members remain reserved but excluded from formation, safety,
+  target, retreat, and route calculations. Each gets a bounded individual
+  hazard/resource-safe route, safe-holds and retries when none exists, and is
+  promoted only in the same/adjacent configured strategic cell as the core or
+  destination. Promotion never marks core membership changed or issues a core
+  Stop. Staged state is versioned across save/load; invalid members drop, a
+  staged-only restored group deterministically recovers one lowest-ID core, and
+  pending retreat responsibility remains authoritative before rejoin routing.
+- Exact Chemical finding/disposition: Chemical Tanks are the `ctnk` UnitTypes
+  profile `StealthTankSquadBotModule@chemical` of the same class, not a separate
+  module. The lifecycle is shared exactly as amended; profile differences
+  remain configuration values (including configured strategic size).
+- Focused `StealthTankSquadPolicyTest` PASS 105/105. Protected `make check`
+  PASS 0 warnings/errors; full CNC YAML and both final custom-map YAML checks
+  PASS; `git diff --check` PASS.
+- Final Game 1 `/tmp/cnc96a-reinforcement-game1-accept`: ordinary all-module
+  Brutalis vs VIKI seed9671, PID575004, PASS exit0 tick3000 in 15.017s. STNK
+  core3/reserved3/ordinary0 retained its mission while unit526 staged and routed
+  individually ticks226-675; it joined tick700 only near-core=True at exact
+  strategic-size6, with stop/cancel/idle-gap false. Later four-member retreats,
+  hazard missions, and no-safe-repair active behavior continued. Fresh Luna
+  narrator PASS; separate fresh policy review PASS/no blocker.
+- Final Game 2 `/tmp/cnc96a-reinforcement-game2-accept`: distinct ordinary
+  all-module Brutalis vs VIKI seed9672, PID575128, PASS exit0 tick3500 in
+  15.012s. Shared Chemical core2/reserved2/ordinary0 claimed CTNK530; it
+  safe-held at ticks226/301/376/451, routed from tick526 after hazard clearance,
+  and joined tick1276 near core/destination with configured strategic-size4,
+  no unsafe direct route, core Stop, cancellation, or idle gap. Reservations
+  remained 3/3/0 and later no-safe-repair activity continued. Fresh Luna
+  narrator PASS; separate fresh policy review PASS/no blocker. Its optional
+  future positive-safe-repair telemetry suggestion requires no product change.
+- Pre-engine missing-content launch, topology/actor-sequence/config
+  calibrations, and all pre-final-code matches are disclosed and uncounted.
+  Only the two final acceptance games above count. No fixture or save-byte
+  mutation was used. Publication remains the coordinator's post-review handoff.

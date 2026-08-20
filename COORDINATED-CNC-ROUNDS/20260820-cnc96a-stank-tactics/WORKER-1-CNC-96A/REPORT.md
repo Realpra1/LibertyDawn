@@ -463,3 +463,87 @@ one custom inherited actor lacked its sprite-sequence alias; and one otherwise
 passing short leg exited before its save footer completed. The strict pair above
 used corrected full-engine custom scenarios and an engine-created save only; no
 fixture or save-byte mutation occurred.
+
+## Reinforcement amendment investigation (recorded before code decisions)
+
+- Exact Chemical finding: Chemical Tanks use the same
+  `StealthTankSquadBotModule` implementation under a distinct `@chemical`
+  profile in `mods/cnc/rules/ai.yaml`; there is no separate Chemical squad
+  module. Shared implementation changes must therefore be profile-compatible.
+- Current Stealth root cause under investigation: deterministic `Rebalance`
+  immediately repartitions every claimed eligible unit into core groups. A
+  newly produced/captured/repaired unit can consequently set
+  `MembershipChanged`, replace/refresh the core plan, and participate from a
+  distant cell instead of traveling independently to the established core.
+- Air reference under audit: incoming members remain owned but excluded from
+  formation calculations; each has an individual safe route and is promoted
+  only after reaching the formation/target coarse neighborhood. Missing routes
+  clear the reinforcement route target and hold for retry without redirecting
+  the core.
+
+## User reinforcement lifecycle amendment
+
+- Do NOT separate reinforcement behavior by profile. Chemical Tank squads use the same StealthTankSquadBotModule lifecycle and should differ from Stealth Tank squads only through configuration. Implement the shared Air-style reinforcement staging/joining lifecycle for both profiles; preserve any intended differences solely as config values.
+
+## Publication handoff
+
+- This worker will not push, open a PR, or merge. After the clean reviewed handoff, the coordinator will integrate the complete hotfix and publish the requested PR targeting `bleed`.
+
+## Reinforcement amendment implementation and evidence
+
+`Rebalance` was the root cause: it cleared and repartitioned every claimed
+specialist on each scan, so any produced, captured, or repaired unit immediately
+altered core membership and could invalidate the established mission. The shared
+Stealth/Chemical module now preserves established group membership and owns new
+members in a staged set. Staged members are excluded from core target, safety,
+retreat, formation, and shared-route calculations. Each receives a bounded
+individual route through the existing threat/resource influence map. A missing
+route issues an Air-style current-cell safe hold and retries at the next scan;
+same/adjacent configured strategic-cell admission snapshots the core and mission
+destination before promotion and never stops or invalidates the core.
+
+Staged group/member IDs are persisted in versioned save data. Restore validates
+group, membership, ownership/reservation, and duplicates; invalid entries drop.
+A staged-only restored group recovers its lowest-ID member as a deterministic
+core. A repaired staged member with an unresolved persisted retreat destination
+must complete that responsibility before reinforcement routing resumes. Route
+destination trials are bounded at 16. The exact Chemical finding is that `ctnk`
+uses `StealthTankSquadBotModule@chemical` on the same class; per user amendment,
+both profiles share this lifecycle and differ only through existing config.
+
+Checks:
+
+- `StealthTankSquadPolicyTest`: PASS 105/105, including stage boundary,
+  established-group selection, exact adjacency, retreat-before-rejoin, staged
+  save/load uniqueness, and staged-only recovery.
+- `make check`: PASS, 0 warnings/errors.
+- Full CNC YAML, both final custom maps, and `git diff --check`: PASS.
+
+Final qualifying games:
+
+1. `/tmp/cnc96a-reinforcement-game1-accept/game1-routed-join`: ordinary
+   all-module Brutalis Nod vs VIKI GDI, seed9671, PID575004, PASS exit0 tick3000
+   in 15.017s. Core STNK actors began total3/reserved3/ordinary0. Unit526 stayed
+   staged with individual safe routes at ticks226-675 while core mission markers
+   remained true/core-stop false, then joined tick700 only near core at exact
+   strategic-size6 with stop/cancel/idle-gap false. Post-join four-member
+   retreats/missions and no-safe-repair active behavior continued. Fresh Luna
+   factual narrator PASS; separate policy PASS/no blocker.
+2. `/tmp/cnc96a-reinforcement-game2-accept/game2-chemical-hold-retry`: distinct
+   ordinary all-module shared-Chemical game, seed9672, PID575128, PASS exit0
+   tick3500 in 15.012s. Core began2/reserved2/ordinary0; delayed CTNK530 was
+   safe-held/retried ticks226/301/376/451 with unsafe-direct/core-stop false,
+   routed individually from tick526 after hazard clearance, then joined tick1276
+   near core and destination at configured strategic-size4 with no cancel/gap.
+   Reservations remained fully claimed and later no-safe-repair missions
+   continued. Fresh Luna factual narrator PASS; separate policy PASS/no blocker.
+
+Both policy reviewers accepted the games. Optional future regression/telemetry
+suggestions (additional delayed joins and a positive safe-repair case) were
+classified non-blocking and require no amendment-cycle product change.
+
+Uncounted setup/calibration: one pre-engine content-path miss; one pre-final run
+that exposed empty-topology new-core promotion; one custom detector missing its
+render alias; one Chemical half-reserve selection calibration; and earlier
+pre-final-code passes/reviews. They are not acceptance games. No fixture or
+save-byte mutation was used; only the two final runs above count.

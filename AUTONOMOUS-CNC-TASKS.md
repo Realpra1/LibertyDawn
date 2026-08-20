@@ -1,5 +1,16 @@
 # Autonomous CNC Task Sheet
 
+## CNC-96A amendment — shared Chemical reinforcement lifecycle
+
+Chemical Tanks use the same `StealthTankSquadBotModule` class under the
+separate `@chemical` profile, so they must share the Air-style reinforcement
+staging/joining lifecycle added by the existing reinforcement amendment.
+Differences between Stealth and Chemical squads belong only in profile
+configuration. Remove any instruction to preserve the old Chemical lifecycle
+or make reinforcement staging Stealth-only. Preserve all other CNC-96A scope,
+PR #125 behavior, no new task/PR, no balance changes, no unrelated Air changes,
+and no merge to bleed.
+
 ## CNC-96A amendment — Air-style reinforcement staging and joining
 
 Add Air-style reinforcement staging/joining to the Stealth Tank squad module.

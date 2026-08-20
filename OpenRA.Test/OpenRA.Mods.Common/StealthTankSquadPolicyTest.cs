@@ -130,6 +130,45 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
+		public void ReinforcementsStageOnlyAfterAFormationExistsAndJoinAtAdjacentSixCells()
+		{
+			Assert.That(StealthTankSquadPolicy.ShouldStageReinforcement(true, false), Is.True);
+			Assert.That(StealthTankSquadPolicy.ShouldStageReinforcement(false, false), Is.False);
+			Assert.That(StealthTankSquadPolicy.ShouldStageReinforcement(true, true), Is.False);
+			Assert.That(StealthTankSquadPolicy.ReinforcementGroup(1, new[] { 3, 0, 0 }), Is.Zero,
+				"A topology slot without a core must not turn an incoming tank into a new mission.");
+			Assert.That(StealthTankSquadPolicy.ReinforcementGroup(1, new[] { 3, 1, 0 }), Is.EqualTo(1));
+			Assert.That(StealthTankSquadPolicy.ReinforcementGroup(2, new[] { 3, 1, 0 }), Is.EqualTo(1));
+			Assert.That(StealthTankSquadPolicy.CanAdvanceReinforcement(true, false), Is.True);
+			Assert.That(StealthTankSquadPolicy.CanAdvanceReinforcement(true, true), Is.False,
+				"A repaired staged member must finish its retained retreat responsibility first.");
+			Assert.That(StealthTankSquadPolicy.RecoveryCore(new uint[] { 14, 12 },
+				new System.Collections.Generic.HashSet<uint> { 12, 14 }), Is.EqualTo(12),
+				"A staged-only restored group must deterministically recover one core member.");
+			Assert.That(StealthTankSquadPolicy.RecoveryCore(new uint[] { 12, 14 },
+				new System.Collections.Generic.HashSet<uint> { 14 }), Is.Null);
+			Assert.That(StealthTankSquadPolicy.IsSameOrAdjacentStrategicCell(
+				new CPos(0, 0), new CPos(11, 11), 6), Is.True);
+			Assert.That(StealthTankSquadPolicy.IsSameOrAdjacentStrategicCell(
+				new CPos(0, 0), new CPos(12, 0), 6), Is.False);
+		}
+
+		[Test]
+		public void StagedReinforcementOwnershipSurvivesSaveLoadWithoutDuplicates()
+		{
+			var saved = StealthTankSquadPolicy.SaveReinforcementState(new[]
+			{
+				new StealthTankReinforcementSaveGroup { GroupIndex = 0, Members = new uint[] { 14, 12 } },
+				new StealthTankReinforcementSaveGroup { GroupIndex = 2, Members = new uint[] { 18 } }
+			});
+
+			Assert.That(StealthTankSquadPolicy.TryLoadReinforcementState(saved, out var restored), Is.True);
+			Assert.That(restored.Select(g => g.GroupIndex), Is.EqualTo(new[] { 0, 2 }));
+			Assert.That(restored[0].Members, Is.EqualTo(new uint[] { 12, 14 }));
+			Assert.That(restored.SelectMany(g => g.Members), Is.Unique);
+		}
+
+		[Test]
 		public void MobileTargetInsideMissionCellDoesNotCauseImmediateOrderChurn()
 		{
 			var movedInsideCell = !StealthTankSquadPolicy.IsSameStrategicCell(

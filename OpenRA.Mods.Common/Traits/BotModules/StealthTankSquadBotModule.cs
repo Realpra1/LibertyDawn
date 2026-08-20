@@ -133,6 +133,7 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			public readonly int Index;
 			public readonly List<Actor> Units = new List<Actor>();
+			public readonly HashSet<uint> Reinforcements = new HashSet<uint>();
 			public Actor Target;
 			public long TargetScore;
 			public int LastOrderTick;
@@ -213,6 +214,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly Dictionary<uint, bool> lastCloaked = new Dictionary<uint, bool>();
 		readonly Dictionary<CPos, bool> resourceHazardCache = new Dictionary<CPos, bool>();
 		StealthTankRetreatSaveGroup[] pendingRetreatRestore;
+		StealthTankReinforcementSaveGroup[] pendingReinforcementRestore;
 		readonly SpecialistGroup[] groups;
 		readonly StrategicView strategicView = new StrategicView();
 		SpecialistInfluenceMap influenceMap;
@@ -301,10 +303,12 @@ namespace OpenRA.Mods.Common.Traits
 			nextRepairEvaluation.Clear();
 			lastCloaked.Clear();
 			pendingRetreatRestore = null;
+			pendingReinforcementRestore = null;
 			lastEligibleCount = -1;
 			foreach (var group in groups)
 			{
 				group.Units.Clear();
+				group.Reinforcements.Clear();
 				group.Target = null;
 				group.SuspendedEngagementTarget = null;
 				group.RetreatTarget = null;
@@ -456,7 +460,7 @@ namespace OpenRA.Mods.Common.Traits
 					group.RetreatDestinations.Count))
 					continue;
 
-				var active = group.Units.Where(IsActiveSpecialist).ToArray();
+				var active = group.Units.Where(a => IsActiveCoreSpecialist(group, a)).ToArray();
 				if (active.Length == 0)
 					continue;
 
@@ -514,7 +518,7 @@ namespace OpenRA.Mods.Common.Traits
 					continue;
 				}
 
-				var activeSpecialists = group.Units.Where(IsActiveSpecialist).OrderBy(a => a.ActorID).ToArray();
+				var activeSpecialists = group.Units.Where(a => IsActiveCoreSpecialist(group, a)).OrderBy(a => a.ActorID).ToArray();
 				var newlyRevealed = activeSpecialists.Where(WasNewlyRevealed).ToArray();
 				if (Info.RetreatAfterReveal && newlyRevealed.Length > 0 && IsEnemyTarget(group.Target))
 				{
@@ -523,10 +527,10 @@ namespace OpenRA.Mods.Common.Traits
 				}
 
 				var wasSuspended = group.SuspendedEngagementTarget != null;
-				var engaged = group.Units.Where(a => IsActiveSpecialist(a) && a.CurrentActivity != null &&
+				var engaged = group.Units.Where(a => IsActiveCoreSpecialist(group, a) && a.CurrentActivity != null &&
 					a.CurrentActivity.ActivitiesImplementing<IActivityNotifyStanceChanged>().Any()).ToArray();
 				if (wasSuspended)
-					engaged = group.Units.Where(IsActiveSpecialist).ToArray();
+					engaged = group.Units.Where(a => IsActiveCoreSpecialist(group, a)).ToArray();
 				if (engaged.Length == 0)
 					continue;
 
@@ -591,7 +595,7 @@ namespace OpenRA.Mods.Common.Traits
 				if (StealthTankSquadPolicy.ShouldResumeSuspendedEngagement(wasSuspended, validSuspendedTarget,
 					suspendedThreatRemains, suspendedResourceHazard))
 				{
-					var units = group.Units.Where(IsActiveSpecialist).ToArray();
+					var units = group.Units.Where(a => IsActiveCoreSpecialist(group, a)).ToArray();
 					if (units.Length == 0)
 						continue;
 					bot.QueueOrder(new Order("Attack", null, Target.FromActor(suspendedTarget), false,
@@ -747,7 +751,14 @@ namespace OpenRA.Mods.Common.Traits
 				repairTargets.Remove(unit.ActorID);
 				nextRepairEvaluation.Remove(unit.ActorID);
 				foreach (var group in groups.Where(g => g.Units.Contains(unit)))
-					group.MembershipChanged = true;
+				{
+					if (group.Units.Any(a => a != unit &&
+						IsActiveCoreSpecialist(group, a)))
+						group.Reinforcements.Add(unit.ActorID);
+					else
+						group.MembershipChanged = true;
+				}
+
 				if (Info.DebugLogging)
 					Log.Write("debug", "AI stealth repair {0} [{1}] {2}#{3}: fully repaired; rejoined active squad.",
 						Info.SquadLabel, player.PlayerName, unit.Info.Name, unit.ActorID);
@@ -877,6 +888,11 @@ namespace OpenRA.Mods.Common.Traits
 			return IsEligible(actor) && !repairing.Contains(actor.ActorID);
 		}
 
+		bool IsActiveCoreSpecialist(SpecialistGroup group, Actor actor)
+		{
+			return IsActiveSpecialist(actor) && !group.Reinforcements.Contains(actor.ActorID);
+		}
+
 		bool HasLocalThreatExposure(Actor unit, out Actor detector, out int detectorRange,
 			out Actor armedSupport, out int armedRange, out bool engagedWeaponExposure)
 		{
@@ -970,7 +986,11 @@ namespace OpenRA.Mods.Common.Traits
 
 		void Rebalance()
 		{
-			var previousGroups = groups.Select(g => g.Units.Select(a => a.ActorID).ToArray()).ToArray();
+			var previousCoreGroups = groups.Select(g => g.Units.Where(a =>
+				!g.Reinforcements.Contains(a.ActorID)).Select(a => a.ActorID).ToArray()).ToArray();
+			var previousMembership = groups.SelectMany(g => g.Units.Select(a =>
+				new { a.ActorID, g.Index, Reinforcement = g.Reinforcements.Contains(a.ActorID) }))
+				.ToDictionary(x => x.ActorID);
 			var eligible = world.Actors.Where(IsEligible).OrderBy(a => a.ActorID).ToList();
 			var selectedIds = StealthTankSquadPolicy.SelectSpecialistIds(
 				eligible.Select(a => a.ActorID), reserved, Info.ReserveOpeningPair, Info.ClaimAllEligible);
@@ -994,18 +1014,48 @@ namespace OpenRA.Mods.Common.Traits
 				unassignedCombatUnits?.ClaimActors(new[] { actor });
 			}
 
+			var hasEstablishedCore = previousCoreGroups.Any(ids => ids.Any(selectedIds.Contains));
 			foreach (var group in groups)
+			{
 				group.Units.Clear();
+				group.Reinforcements.Clear();
+			}
+
 			for (var i = 0; i < selected.Count; i++)
 			{
-				var groupIndex = StealthTankSquadPolicy.GroupForIndex(i, selected.Count,
-					Info.MaximumHarassmentGroups, Info.IncludeAttackGroup);
+				var wasPreviouslyAssigned = previousMembership.TryGetValue(selected[i].ActorID, out var membership);
+				var groupIndex = wasPreviouslyAssigned ? membership.Index :
+					StealthTankSquadPolicy.GroupForIndex(i, selected.Count,
+						Info.MaximumHarassmentGroups, Info.IncludeAttackGroup);
+				if (!wasPreviouslyAssigned && hasEstablishedCore)
+					groupIndex = StealthTankSquadPolicy.ReinforcementGroup(groupIndex,
+						previousCoreGroups.Select(ids => ids.Count(selectedIds.Contains)).ToArray());
 				if (groupIndex >= 0)
+				{
 					groups[groupIndex].Units.Add(selected[i]);
+					if ((wasPreviouslyAssigned && membership.Reinforcement) ||
+						StealthTankSquadPolicy.ShouldStageReinforcement(
+							hasEstablishedCore, wasPreviouslyAssigned))
+						groups[groupIndex].Reinforcements.Add(selected[i].ActorID);
+				}
+			}
+
+			ApplyPendingReinforcementRestore();
+
+			// A group whose complete core was destroyed needs one survivor/replacement to
+			// establish a formation that the remaining staged units can safely join. Run
+			// this after restore so a staged-only saved group cannot wait forever.
+			foreach (var group in groups)
+			{
+				var recoveryCore = StealthTankSquadPolicy.RecoveryCore(
+					group.Units.Select(a => a.ActorID), group.Reinforcements);
+				if (recoveryCore != null)
+					group.Reinforcements.Remove(recoveryCore.Value);
 			}
 
 			for (var i = 0; i < groups.Length; i++)
-				groups[i].MembershipChanged = !previousGroups[i].SequenceEqual(groups[i].Units.Select(a => a.ActorID));
+				groups[i].MembershipChanged = !previousCoreGroups[i].SequenceEqual(groups[i].Units
+					.Where(a => !groups[i].Reinforcements.Contains(a.ActorID)).Select(a => a.ActorID));
 
 			ApplyPendingRetreatRestore();
 
@@ -1031,6 +1081,105 @@ namespace OpenRA.Mods.Common.Traits
 			lastEligibleCount = eligible.Count;
 		}
 
+		void UpdateReinforcements(SpecialistGroup group, List<Threat> threats)
+		{
+			var core = group.Units.Where(a => IsActiveCoreSpecialist(group, a))
+				.OrderBy(a => a.ActorID).ToArray();
+			if (core.Length == 0 || group.Reinforcements.Count == 0)
+				return;
+
+			// Snapshot before promotion so one arrival cannot pull the join boundary toward
+			// another. This mirrors Air's stable formation/destination admission test.
+			var coreLocation = new CPos((int)core.Average(a => a.Location.X),
+				(int)core.Average(a => a.Location.Y));
+			var missionLocation = IsEnemyTarget(group.Target) ? group.Target.Location :
+				group.HasPlan ? group.PlannedTargetLocation : (CPos?)null;
+			foreach (var unit in group.Units.Where(a => group.Reinforcements.Contains(a.ActorID) &&
+				StealthTankSquadPolicy.CanAdvanceReinforcement(IsActiveSpecialist(a),
+					group.RetreatDestinations.ContainsKey(a.ActorID))).OrderBy(a => a.ActorID).ToArray())
+			{
+				var nearCore = StealthTankSquadPolicy.IsSameOrAdjacentStrategicCell(
+					unit.Location, coreLocation, StrategicCellSize);
+				var nearMission = missionLocation != null &&
+					StealthTankSquadPolicy.IsSameOrAdjacentStrategicCell(
+						unit.Location, missionLocation.Value, StrategicCellSize);
+				if (nearCore || nearMission)
+				{
+					group.Reinforcements.Remove(unit.ActorID);
+					if (IsEnemyTarget(group.Target))
+					{
+						bot.QueueOrder(new Order("Attack", unit, Target.FromActor(group.Target), false));
+						scanQueuedOrders++;
+					}
+
+					if (Info.DebugLogging)
+						Log.Write("debug", "AI stealth reinforcement {0} [{1}:{2}] tick={3}: unit={4} joined=True near-core={5} near-destination={6} strategic-size={7} core-mission-preserved=True target={8} stop=false cancel=false idle-gap=false.",
+							Info.SquadLabel, player.PlayerName, group.Index, world.WorldTick,
+							unit.ActorID, nearCore, nearMission, StrategicCellSize,
+							group.Target == null ? "none" : group.Target.Info.Name + "#" + group.Target.ActorID);
+					continue;
+				}
+
+				var destinationAnchor = missionLocation ?? coreLocation;
+				var route = FindReinforcementRoute(unit, destinationAnchor, threats);
+				if (route == null || route.Count == 0)
+				{
+					// Air's safe hold is an order to the unit's current location. It cancels no
+					// core activity and naturally retries at the next strategic scan.
+					bot.QueueOrder(new Order("Move", unit, Target.FromCell(world, unit.Location), false));
+					scanQueuedOrders++;
+					if (Info.DebugLogging)
+						Log.Write("debug", "AI stealth reinforcement {0} [{1}:{2}] tick={3}: unit={4} staged=True routed=False safe-hold=True retry={5} core-mission-preserved=True target={6} unsafe-direct=false core-stop=false.",
+							Info.SquadLabel, player.PlayerName, group.Index, world.WorldTick,
+							unit.ActorID, Info.ScanInterval,
+							group.Target == null ? "none" : group.Target.Info.Name + "#" + group.Target.ActorID);
+					continue;
+				}
+
+				var queued = false;
+				for (var i = Math.Min(Info.HazardRouteWaypointSpacing, route.Count - 1);
+					i < route.Count; i += Info.HazardRouteWaypointSpacing)
+				{
+					bot.QueueOrder(new Order("Move", unit, Target.FromCell(world, route[i]), queued));
+					queued = true;
+					scanQueuedOrders++;
+				}
+
+				if (route.Count > 1 && (route.Count - 1) % Info.HazardRouteWaypointSpacing != 0)
+				{
+					bot.QueueOrder(new Order("Move", unit,
+						Target.FromCell(world, route[route.Count - 1]), queued));
+					scanQueuedOrders++;
+				}
+
+				if (Info.DebugLogging)
+					Log.Write("debug", "AI stealth reinforcement {0} [{1}:{2}] tick={3}: unit={4} staged=True routed=True waypoints={5} destination={6} core-cell={7} mission-cell={8} core-mission-preserved=True core-stop=false.",
+						Info.SquadLabel, player.PlayerName, group.Index, world.WorldTick,
+						unit.ActorID, route.Count, route[route.Count - 1],
+						StealthTankSquadPolicy.StrategicCell(coreLocation, StrategicCellSize),
+						missionLocation == null ? "none" :
+							StealthTankSquadPolicy.StrategicCell(missionLocation.Value, StrategicCellSize).ToString());
+			}
+		}
+
+		List<CPos> FindReinforcementRoute(Actor unit, CPos anchor, List<Threat> threats)
+		{
+			var mobile = unit.TraitOrDefault<Mobile>();
+			if (mobile == null)
+				return null;
+
+			var map = GetInfluenceMap(threats);
+			return world.Map.FindTilesInAnnulus(anchor, 0, StrategicCellSize * 2)
+				.Where(c => StealthTankSquadPolicy.IsSameOrAdjacentStrategicCell(
+					c, anchor, StrategicCellSize) && mobile.CanEnterCell(c) &&
+					!IsResourceHazard(c) && !IsInfluencedCell(map, c) &&
+					(domainIndex == null || domainIndex.IsPassable(unit.Location, c, mobile.Locomotor)))
+				.OrderBy(c => (c - unit.Location).LengthSquared).ThenBy(c => c.Y).ThenBy(c => c.X)
+				.Take(16)
+				.Select(c => FindCoarseSafeRoute(unit.Location, c, map))
+				.FirstOrDefault(route => route != null && route.Count > 0);
+		}
+
 		List<MiniYamlNode> IGameSaveTraitData.IssueTraitData(Actor self)
 		{
 			if (IsTraitDisabled)
@@ -1048,6 +1197,13 @@ namespace OpenRA.Mods.Common.Traits
 					GroupIndex = group.Index,
 					TargetId = group.RetreatTarget?.ActorID ?? 0,
 					Destinations = group.RetreatDestinations.OrderBy(pair => pair.Key).ToArray()
+				})));
+			data.Add(StealthTankSquadPolicy.SaveReinforcementState(groups
+				.Where(group => group.Reinforcements.Count > 0)
+				.Select(group => new StealthTankReinforcementSaveGroup
+				{
+					GroupIndex = group.Index,
+					Members = group.Reinforcements.OrderBy(id => id).ToArray()
 				})));
 			return data;
 		}
@@ -1072,7 +1228,46 @@ namespace OpenRA.Mods.Common.Traits
 			var retreatNode = data.FirstOrDefault(n => n.Key == "StealthTankRetreatState");
 			pendingRetreatRestore = StealthTankSquadPolicy.TryLoadRetreatState(retreatNode, out var restored) ?
 				restored : Array.Empty<StealthTankRetreatSaveGroup>();
+			var reinforcementNode = data.FirstOrDefault(n => n.Key == "StealthTankReinforcementState");
+			pendingReinforcementRestore = StealthTankSquadPolicy.TryLoadReinforcementState(
+				reinforcementNode, out var restoredReinforcements) ? restoredReinforcements :
+				Array.Empty<StealthTankReinforcementSaveGroup>();
 			scanTicks = 1;
+		}
+
+		void ApplyPendingReinforcementRestore()
+		{
+			if (pendingReinforcementRestore == null)
+				return;
+
+			var restored = 0;
+			var dropped = 0;
+			foreach (var saved in pendingReinforcementRestore)
+			{
+				if (saved.GroupIndex < 0 || saved.GroupIndex >= groups.Length)
+				{
+					dropped += saved.Members.Length;
+					continue;
+				}
+
+				var group = groups[saved.GroupIndex];
+				foreach (var actorId in saved.Members)
+					if (group.Units.Any(a => a.ActorID == actorId) && reserved.Contains(actorId))
+					{
+						group.Reinforcements.Add(actorId);
+						restored++;
+					}
+					else
+						dropped++;
+			}
+
+			if (Info.DebugLogging)
+				Log.Write("debug", "AI stealth reinforcement restore {0} [{1}] tick={2}: version={3} restored={4} dropped={5} staged={6}.",
+					Info.SquadLabel, player.PlayerName, world.WorldTick,
+					StealthTankSquadPolicy.ReinforcementSaveVersion, restored, dropped,
+					string.Join(",", groups.SelectMany(g => g.Reinforcements.OrderBy(id => id)
+						.Select(id => g.Index + ":" + id))));
+			pendingReinforcementRestore = null;
 		}
 
 		void ApplyPendingRetreatRestore()
@@ -1216,7 +1411,9 @@ namespace OpenRA.Mods.Common.Traits
 		void UpdateGroup(SpecialistGroup group, List<Actor> enemies, List<Threat> threats)
 		{
 			group.Units.RemoveAll(a => !IsEligible(a) || !reserved.Contains(a.ActorID));
-			var activeUnits = group.Units.Where(IsActiveSpecialist).ToArray();
+			group.Reinforcements.RemoveWhere(id => !group.Units.Any(a => a.ActorID == id));
+			UpdateReinforcements(group, threats);
+			var activeUnits = group.Units.Where(a => IsActiveCoreSpecialist(group, a)).ToArray();
 			if (group.Units.Count == 0)
 			{
 				group.Target = null;
@@ -1621,7 +1818,7 @@ namespace OpenRA.Mods.Common.Traits
 		bool HasUnsafeRetainedRoute(SpecialistGroup group, Actor target, List<Threat> threats, int ownRange)
 		{
 			var lookahead = Math.Max(1, Info.HazardRouteWaypointSpacing * 3);
-			foreach (var unit in group.Units.Where(IsActiveSpecialist))
+			foreach (var unit in group.Units.Where(a => IsActiveCoreSpecialist(group, a)))
 			{
 				if (!group.RetainedRoutes.TryGetValue(unit.ActorID, out var route) || route.Count == 0)
 					continue;
@@ -1656,7 +1853,7 @@ namespace OpenRA.Mods.Common.Traits
 				(!force && world.WorldTick < group.LastOrderTick + Info.ResourceWaitingOrderInterval))
 				return;
 
-			var first = group.Units.FirstOrDefault(IsActiveSpecialist);
+			var first = group.Units.FirstOrDefault(a => IsActiveCoreSpecialist(group, a));
 			var mobile = first?.TraitOrDefault<Mobile>();
 			if (first == null || mobile == null)
 				return;
@@ -1679,7 +1876,7 @@ namespace OpenRA.Mods.Common.Traits
 
 				group.LastOrderTick = world.WorldTick;
 				bot.QueueOrder(new Order("Move", null, Target.FromCell(world, cell), false,
-					groupedActors: group.Units.Where(IsActiveSpecialist).ToArray()));
+					groupedActors: group.Units.Where(a => IsActiveCoreSpecialist(group, a)).ToArray()));
 				scanQueuedOrders++;
 				if (Info.DebugLogging)
 					Log.Write("debug", "AI stealth squad {0} [{1}:{2}] waiting near harvester field at {3} from anchor {4}#{5}.",
@@ -1694,7 +1891,7 @@ namespace OpenRA.Mods.Common.Traits
 			if (resourceLayer == null || ownRange <= 0)
 				return false;
 
-			var units = group.Units.Where(IsActiveSpecialist).OrderBy(a => a.ActorID).ToArray();
+			var units = group.Units.Where(a => IsActiveCoreSpecialist(group, a)).OrderBy(a => a.ActorID).ToArray();
 			if (units.Length == 0)
 				return true;
 
@@ -1779,7 +1976,7 @@ namespace OpenRA.Mods.Common.Traits
 		bool HasHazardAwareRoute(SpecialistGroup group, Actor target, List<Threat> threats, int ownRange,
 			bool crush, int minimumAttackRangeCells, bool ignoreTargetDetector)
 		{
-			var unit = group.Units.FirstOrDefault(IsActiveSpecialist);
+			var unit = group.Units.FirstOrDefault(a => IsActiveCoreSpecialist(group, a));
 			var path = unit == null ? null : HazardAwarePath(unit, target, threats, ownRange, crush, false,
 				minimumAttackRangeCells, ignoreTargetDetector);
 			return path != null && path.Count > 0;
