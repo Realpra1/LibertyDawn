@@ -407,6 +407,29 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
+		public void BoundaryReassessmentIncludesIncumbentBeyondCandidateCapWithoutDisplacingChallengers()
+		{
+			var ranked = Enumerable.Range(0, 60).ToArray();
+			var bounded = StealthTankSquadPolicy.BoundCandidatesWithIncumbent(
+				ranked, 48, true, candidate => candidate == 55);
+
+			Assert.That(bounded.Take(48), Is.EqualTo(Enumerable.Range(0, 48)),
+				"The ordinary challenger cap and ordering must remain unchanged.");
+			Assert.That(bounded, Has.Count.EqualTo(49));
+			Assert.That(bounded[48], Is.EqualTo(55));
+			Assert.That(StealthTankSquadPolicy.ReassessMovedTarget(
+				bounded.Contains(55), true, 100, true, true, 124, 25),
+				Is.EqualTo(StealthTankTargetReassessment.RetainIncumbent));
+
+			Assert.That(StealthTankSquadPolicy.BoundCandidatesWithIncumbent(
+				ranked, 48, false, candidate => candidate == 55),
+				Is.EqualTo(Enumerable.Range(0, 48)), "Non-boundary scans must remain capped.");
+			Assert.That(StealthTankSquadPolicy.BoundCandidatesWithIncumbent(
+				ranked, 48, true, candidate => candidate == 5), Has.Count.EqualTo(48),
+				"An incumbent already inside the cap must not be duplicated.");
+		}
+
+		[Test]
 		public void InfantryClusterBonusIsBoundedAndImprovesTargetScore()
 		{
 			Assert.That(StealthTankSquadPolicy.InfantryClusterMultiplier(0, 50, 300), Is.EqualTo(100));

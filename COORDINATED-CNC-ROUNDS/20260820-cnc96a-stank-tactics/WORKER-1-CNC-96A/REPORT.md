@@ -404,3 +404,62 @@ old manifest expected the superseded second-cross tick1400; both games actually
 reached tick3500/exit0 and informed the tightened post-amendment scenarios. Only
 the two final reviewed games above count. No fixture or save-byte mutation was
 used.
+
+## Cycle-6 Terra correction (recorded before code decisions)
+
+Terra found that boundary reassessment discovers the incumbent only after
+`MaximumTargetCandidates` truncation. A live valid incumbent ranked 49th or
+later is therefore treated as invalid and may switch/abandon without the Air
+25% decision. Cycle 6 will explicitly evaluate that incumbent outside the cap
+for boundary reassessment while leaving challenger selection capped and
+preserving raw scores/categories/thresholds and all prior wall, lifecycle,
+repair, save, and ownership behavior. Acceptance requires an over-cap focused
+regression and two new reviewed full-engine games covering retained over-cap and
+valid switch-control paths.
+
+## Cycle-6 implementation and checks
+
+- Added a bounded policy helper that preserves the first 48 ranked candidates
+  and appends the live incumbent only for a moved-target boundary reassessment
+  when it lies beyond that cap. Non-boundary scans and challengers remain capped;
+  inside-cap incumbents are not duplicated.
+- The boundary diagnostic now records cap, actual count, outside-cap status,
+  and incumbent/challenger defended categories. No Air code/configuration,
+  Stealth priority, raw score, switch threshold, route, or lifecycle policy was
+  changed.
+- Focused Stealth/Air/config tests PASS 174/174. Protected `make check` PASS
+  with 0 warnings/errors. Full CNC YAML, both final map YAML checks,
+  `git diff --check`, and path audit PASS.
+
+## Exactly two qualifying cycle-6 games
+
+1. `cycle6-game1-strict-leg` + `cycle6-game1-strict-load`: ordinary all-module
+   Brutalis Nod versus VIKI GDI, seed9663. Initial PASS/exit0 tick1500/12.013s;
+   active-retreat continuation PASS/exit0 tick3500/16.028s. At tick1100, 55
+   armed HTNK candidates activated. At the live HARV's tick1125 boundary move,
+   the log showed valid undefended incumbent score2500000, defended HTNK
+   challenger45454545, cap48/count49, outside-cap true, RetainIncumbent,
+   refreshed Attack, and target-loss/Stop/cancel/idle-gap false. Tick1402 load
+   restored retreat barrier=True before completion. Exact size6/delta1 retreat,
+   repair/rejoin, ownership5/reserved5/ordinary0, and Air valuable1550 versus
+   wall1 continued. Fresh Luna narrative completed. Its first policy verdict
+   misread the explicitly stated Air category precedence; a bounded correction
+   reread produced PASS/classification none and no product change.
+2. `cycle6-game2-final`: distinct ordinary all-module threshold-switch control,
+   seed9664, PASS/exit0 tick3500/17.027s. Tick1130 fresh reassessment switched
+   valid HARV282051 to qualifying SHARV547619 over threshold25 with
+   cap48/count24/outside-cap false, immediate routed Harass, and no
+   loss/Stop/cancel/idle gap. Exact multi-unit retreat, repair/rejoin,
+   ownership3/reserved3/ordinary0, and Air HARV5550 versus wall1 continued.
+   Fresh Luna narrative and policy PASS/classification none.
+
+Cycle-6 reviews are under
+`.build/20260820-cnc96a-stank-tactics/cycle6-reviews/`.
+
+## Cycle-6 exclusions
+
+Calibration/setup runs are uncounted. One initial map gave Attack no incumbent;
+one custom inherited actor lacked its sprite-sequence alias; and one otherwise
+passing short leg exited before its save footer completed. The strict pair above
+used corrected full-engine custom scenarios and an engine-created save only; no
+fixture or save-byte mutation occurred.

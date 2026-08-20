@@ -339,6 +339,33 @@ namespace OpenRA.Mods.Common.Traits
 				StealthTankTargetReassessment.RetainIncumbent;
 		}
 
+		public static List<T> BoundCandidatesWithIncumbent<T>(IEnumerable<T> rankedCandidates,
+			int maximumCandidates, bool includeIncumbent, Func<T, bool> isIncumbent)
+		{
+			var bounded = new List<T>(Math.Max(0, maximumCandidates) + (includeIncumbent ? 1 : 0));
+			var incumbentFound = false;
+			var incumbent = default(T);
+			foreach (var candidate in rankedCandidates)
+			{
+				if (bounded.Count < maximumCandidates)
+					bounded.Add(candidate);
+
+				if (includeIncumbent && isIncumbent(candidate))
+				{
+					incumbentFound = true;
+					incumbent = candidate;
+				}
+
+				if (bounded.Count >= maximumCandidates && (!includeIncumbent || incumbentFound))
+					break;
+			}
+
+			if (incumbentFound && !bounded.Any(isIncumbent))
+				bounded.Add(incumbent);
+
+			return bounded;
+		}
+
 		public static int InfantryClusterMultiplier(int nearbyInfantry, int bonusPercentPerActor,
 			int maximumMultiplierPercent)
 		{
