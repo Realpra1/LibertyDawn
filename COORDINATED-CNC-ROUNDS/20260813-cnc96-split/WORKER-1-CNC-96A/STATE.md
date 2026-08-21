@@ -500,26 +500,29 @@ CNC-96A task. Successor PR #127 targets `bleed` at exact head
 `2572c6c4f65a31fe195fbf20098eabc7e7ce04d3` and is draft. Update PR #127 only;
 do not create another task, round, or PR, and do not merge `bleed`.
 
-Stealth and Chemical specialist squads must finish their selected target before
-retreating. Commit fire until the target is destroyed or otherwise invalid;
-only then retreat exactly one strategic/coarse cell before selecting the next
-mission. They must not shoot once, retreat, return, and repeat. Diagnose the
-root cause before editing and preserve reinforcement, repair/no-repair,
+Stealth and Chemical specialist squads should generally finish their selected
+target before the post-mission retreat. Commit fire while the target remains
+valid and useful, then retreat one strategic/coarse cell before selecting the
+next mission; do not oscillate after every shot. Diagnose the root cause before
+editing and preserve reinforcement, repair/no-repair,
 save/load, genuinely-invalid or meaningfully-superior target switching, shared
 Stealth/Chemical lifecycle with configuration-only differences, wall priority,
 and CNC-101 behavior unless the smallest root-cause correction requires change.
 
-Acceptance requires direct evidence in a sustained ordinary 1-VIKI-versus-2-
-allied-Brutalis game of target-completion-before-retreat ordering, no
-shot/retreat oscillation, unique harvester kill counts, Stealth veterancy
-progression through successful kills, and tank survivorship (ordinary accidents
-and enemy action may still destroy individual tanks). Correct behavior should
-defeat both allied Brutalis opponents or accumulate at least 40 harvester kills.
-Run a materially distinct second adversarial ordinary-AI/all-module game, with
-separate native Luna factual narration and policy review per counted game.
-Require focused/protected checks, Terra review, release integration, PR #127
-update, and refreshed CI. No external Codex. Stop at manual policy gates and
-record any unproved ordering, kill, veterancy, or survivorship blocker.
+Acceptance requires sustained natural ordinary 1-VIKI-versus-2-allied-Brutalis
+games showing many unique harvester kills, repeated target completion followed
+by retreat, continued specialist operations, and veterancy progression where
+engine/config permits it. Reject the old near-zero-kill/shot-retreat oscillation
+behavior, but allow ordinary accidents, losses, seed variance, pressure, and a
+non-winning bounded result. Defeating both Brutalis opponents or reaching
+roughly 40+ harvester kills is a strong expected quality signal in sufficiently
+long favorable games, not an unconditional automated gate. Run a materially
+distinct second adversarial ordinary-AI/all-module game, with separate native
+Luna factual narration and policy review per counted game. Require
+focused/protected checks, Terra review, release integration, PR #127 update,
+refreshed CI, and explicit policy evaluation of this calibrated standard. No
+external Codex. Stop at manual policy gates and record any unproved ordering,
+kill, veterancy, or survivorship blocker.
 
 ## Prior authoritative amendment: natural combat inactivity (2026-08-21)
 
