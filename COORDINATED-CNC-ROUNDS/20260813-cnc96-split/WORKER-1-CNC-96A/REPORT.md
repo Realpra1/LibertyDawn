@@ -1245,3 +1245,48 @@ not register WorldLoaded targets. Exactly the two final artifacts above form the
 acceptance count. Proposed status: natural-combat correction complete and ready
 for fresh Terra review. No push, PR or merge was performed; the coordinator owns
 the successor hotfix publication.
+
+## Exceptional finish-target correction
+
+The unmodified reproduction showed reveal-triggered retreat before completion:
+retreat tick 225 preceded hit 246, retreat 400 preceded kill 428, and retreats
+600/800 preceded kill 876. `RunEngagementSafety` treated each reveal as an
+immediate strategic-retreat trigger. The narrow correction retains a valid
+selected target through reveal and invokes the existing exact one-strategic-cell
+retreat after target invalidation/completion. All earlier safety, repair,
+ownership, reinforcement, persistence, configuration, Air, and balance behavior
+is preserved. The new pure regression covers live/completed/absent/disabled cases.
+
+Game 1 (`.build/cnc96a-finish-target/final-game1-v2/cnc96a-finish-game1`, seed
+96301) reached tick 5500 in 25.035 seconds, exit 0. At tick 5000 it recorded 29
+unique Harvester kills, 78 damage events, 1,225,614 damage, three survivors,
+Level 2/672000 XP, 15 completion retreats, 34 retained reveals, exact one-cell
+geometry, and no stop/cancel/idle gap. Its fresh Luna `NARRATIVE.md` and separate
+`POLICY-REVIEW.md` both PASS/no blocker.
+
+Game 2 (`.build/cnc96a-finish-target/final-game2-v4/cnc96a-finish-game2`, seed
+96302) used a distinct two-sided open corridor and reached tick 6500 in 30.03
+seconds, exit 0. At tick 6000 it recorded 26 unique Harvester kills, 65 damage
+events, 1,173,828 damage, eight survivors, Level 3/675000 XP, 16 completion
+retreats, 24 retained reveals, exact geometry and continued operations. Fresh
+Luna `NARRATIVE.md` and separate `POLICY-REVIEW.md` both PASS/no blocker.
+Per-actor attribution and terminal roster detail are bounded advice. Exactly
+these two ordinary/all-module games count; all calibration attempts are excluded.
+
+The supplemental replay was frozen at PR120 head
+`9dbd02cd85caed85e99de89ee8642fd7b122a4e5`, blob
+`d276947fe3e9acc3227ec241e5339a2e7ce487d2`, SHA-256
+`becb5ead52faab4e83b789a79fbeb742ed2feb62655aac6d79887030fc7f8584`.
+Deterministic playback passed FinalGameTick 16853 to world tick 17196, exit 0,
+without OOS/desync. Temporary instrumentation was fully restored. Durable neutral
+evidence is `.build/cnc96a-finish-target/human-calibration/ENRICHED-TIMELINE.md`;
+the superseding blind Luna narration is sibling `ENRICHED-NARRATIVE.md`. It
+records six directly credited Harvester kills, six crushes, tank/structure kills,
+continued victory operations, Level 3/675000 XP, and three observed slot-0 STNK
+losses in ticks 8495-16856. It therefore does not support the informal one-loss/
+all-harvester claim while strongly supporting sustained finish-target combat.
+
+After probe restoration, Release build passed with zero warnings/errors, focused
+policy tests passed 107/107, full CNC MiniYAML passed, and `git diff --check`
+passed. Proposed status: complete and ready for fresh Terra review. No push, PR,
+merge, or external process was used.
