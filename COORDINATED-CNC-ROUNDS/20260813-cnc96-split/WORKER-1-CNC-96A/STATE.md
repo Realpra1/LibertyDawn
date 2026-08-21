@@ -10,9 +10,9 @@ sheet, coordinator state, other skills, or other worker specs. Read applicable
 - Worker/task: `WORKER-1` / `CNC-96A — Stealth squad performance using AirSquad as gold standard`
 - Change category: `AI performance and bounded architecture, with player-visible tactical behavior preservation`
 - Balance authority: `Frozen. Do not change cost, HP, damage, armor, speed, timing, power, prerequisites, probabilities, resources, production fractions, squad composition, target priorities, threat buffers, scan/order cadence, or candidate/group bounds.`
-- Status: `First iteration - testing; shared-threat blocker fixed; Chemical full-health repair and lone-survivor/replacement ownership proved; explicit route/order and combat rejoin unproved`
-- Base branch/SHA: `agent/round-20260812-cnc96-periodic-stalls` / `0c9a5c187d6bd3c354921855f19a4fb3590d6f06`
-- Task branch / PR base: `agent/round-20260813-cnc96a-stealth-performance` / `bleed`
+- Status: `in progress — amended for natural-combat inactivity; prior reinforcement/lifecycle acceptance preserved`
+- Base branch/SHA: `bleed` / `4c496940ee500e00b32a2f8e7d49932045f2bc04`
+- Task branch / PR base: `successor CNC-96A hotfix branch (to be created by coordinator)` / `bleed`; PR #126 merged 2026-08-21 and is not to be reopened or refreshed
 - Current cycle: `11`; cycles used: `5/5 primary`, `5 exceptional Sol-medium acceptance cycles`, `1 bounded final-review fix cycle`
 - Required model: cycle 1 `Sol high`; cycles 2-5 `Terra medium`; cycles 6-15
   `Luna medium` only when coordinator authorizes minor obvious work; at most two
@@ -492,6 +492,38 @@ old-control and direct Air comparisons, diagnostics, performance, checks/CI,
 deferred work, and risks.
 
 ## Cycle journal
+
+## Fresh authoritative amendment: natural combat inactivity (2026-08-21)
+
+This amendment is the current acceptance authority for the existing CNC-96A
+task. PR #126, previously published for the reinforcement release, merged into
+`bleed` on 2026-08-21; do not reopen, refresh, merge, or create a replacement
+PR for it. The coordinator must create one successor hotfix branch and PR
+targeting the current `bleed` head above after implementation and release gates.
+
+The user reports that Stealth and Chemical squads appear inactive in ordinary
+play: they may drive into an enemy base without firing, then leave after a unit
+dies. Diagnose the root cause before editing. Reproduce with a real sustained
+ordinary game containing one VIKI against two allied Brutalis players separated
+by meaningful map distance. Under those conditions specialist squads must issue
+actual attacks, deal damage, and achieve meaningful target kills; movement and
+order telemetry alone is insufficient. VIKI may win unless overwhelmed.
+
+Run a distinct adversarial second native full-engine game with ordinary enemy
+AIs, all modules/features enabled, and a different pressure/topology/timing or
+resource assumption. Each counted game requires its own native Luna factual
+narrative and separate native Luna policy review. Preserve the existing
+reinforcement staging, targeting, retreat, repair, save/load, ownership,
+Chemical shared-lifecycle/config-only, wall-priority, and CNC-101 behavior
+unless the diagnosed root cause demands the narrowest correction. Preserve all
+balance values and do not use movement/order telemetry as a substitute for
+combat evidence.
+
+Require focused/protected checks, root-cause evidence, Terra review, cumulative
+release integration, and refreshed successor-PR CI. Do not create a new task,
+round, or unrelated PR; do not merge `bleed`; do not use external Codex. The
+worker must stop at the existing manual policy gates after each cycle and record
+the blocker precisely if natural combat acceptance remains unproved.
 
 | Cycle/model | Commit/change | Scenario 1 hypothesis/result/narrative | Scenario 2 hypothesis/result/narrative | Checks | Manual policy decision |
 |---|---|---|---|---|---|
