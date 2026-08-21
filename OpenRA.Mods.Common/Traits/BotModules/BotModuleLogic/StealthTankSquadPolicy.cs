@@ -32,6 +32,13 @@ namespace OpenRA.Mods.Common.Traits
 		Abandon
 	}
 
+	public enum StealthTankRetreatCompletion
+	{
+		ContinueRetreat,
+		ReassessWithIncumbent,
+		ReassessWithoutIncumbent
+	}
+
 	public sealed class StealthTankRetreatSaveGroup
 	{
 		public int GroupIndex;
@@ -196,6 +203,16 @@ namespace OpenRA.Mods.Common.Traits
 		public static bool ShouldBlockReassessment(int retreatDestinationCount)
 		{
 			return retreatDestinationCount > 0;
+		}
+
+		public static StealthTankRetreatCompletion CompleteRetreat(int retreatDestinationCount,
+			bool targetIsValid)
+		{
+			if (ShouldBlockReassessment(retreatDestinationCount))
+				return StealthTankRetreatCompletion.ContinueRetreat;
+
+			return targetIsValid ? StealthTankRetreatCompletion.ReassessWithIncumbent :
+				StealthTankRetreatCompletion.ReassessWithoutIncumbent;
 		}
 
 		public static bool IsRetreatResponsibilityResolved(bool eligible, bool repairing,

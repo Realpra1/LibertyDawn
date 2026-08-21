@@ -703,13 +703,19 @@ namespace OpenRA.Mods.Common.Traits
 					group.RetreatDestinations.Remove(actorId);
 			}
 
-			if (StealthTankSquadPolicy.ShouldBlockReassessment(group.RetreatDestinations.Count))
+			var retreatTarget = group.RetreatTarget;
+			var completion = StealthTankSquadPolicy.CompleteRetreat(
+				group.RetreatDestinations.Count, IsEnemyTarget(retreatTarget));
+			if (completion == StealthTankRetreatCompletion.ContinueRetreat)
 				return true;
 
+			group.Target = completion == StealthTankRetreatCompletion.ReassessWithIncumbent ?
+				retreatTarget : null;
 			if (Info.DebugLogging)
-				Log.Write("debug", "AI stealth squad {0} [{1}:{2}] retreat complete tick={3}: strategic-size={4}; reassessment enabled target={5}.",
+				Log.Write("debug", "AI stealth squad {0} [{1}:{2}] retreat complete tick={3}: strategic-size={4}; reassessment enabled incumbent={5} completion={6} target-loss=false stop=false cancel=false idle-gap=false.",
 					Info.SquadLabel, player.PlayerName, group.Index, world.WorldTick, StrategicCellSize,
-					group.RetreatTarget == null ? "none" : group.RetreatTarget.Info.Name + "#" + group.RetreatTarget.ActorID);
+					group.Target == null ? "none" : group.Target.Info.Name + "#" + group.Target.ActorID,
+					completion);
 			group.RetreatTarget = null;
 			scanTicks = 1;
 			return false;
