@@ -216,6 +216,29 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
+		public void NearbyReactionKeepsDistantIncumbentInFreshSwitchDecision()
+		{
+			var candidates = StealthTankSquadPolicy.NearbyReassessmentCandidates(
+				new[] { 11, 12 }, 99, (a, b) => a == b);
+
+			Assert.That(candidates, Is.EqualTo(new[] { 11, 12, 99 }),
+				"A valid distant incumbent must remain available for the same thresholded switch decision as Air.");
+			Assert.That(StealthTankSquadPolicy.ReassessMovedTarget(true, true, 100,
+				true, true, 124, 25), Is.EqualTo(StealthTankTargetReassessment.RetainIncumbent));
+			Assert.That(StealthTankSquadPolicy.ReassessMovedTarget(true, true, 100,
+				true, true, 125, 25), Is.EqualTo(StealthTankTargetReassessment.SwitchToChallenger));
+		}
+
+		[Test]
+		public void NearbyReactionDoesNotDuplicateAlreadyNearbyIncumbent()
+		{
+			var candidates = StealthTankSquadPolicy.NearbyReassessmentCandidates(
+				new[] { 11, 12 }, 12, (a, b) => a == b);
+
+			Assert.That(candidates, Is.EqualTo(new[] { 11, 12 }));
+		}
+
+		[Test]
 		public void VersionedMultiUnitRetreatSaveRestoresBarrierUntilEveryMemberCompletes()
 		{
 			var saved = StealthTankSquadPolicy.SaveRetreatState(new[]

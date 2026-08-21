@@ -485,19 +485,29 @@ namespace OpenRA.Mods.Common.Traits
 					continue;
 				}
 
-				if (group.Target != null)
-					continue;
-
 				var previousTarget = group.Target;
 				var view = strategicViewOwner.GetStrategicView(out _);
-				UpdateGroup(group, nearby, view.Threats);
-				if (previousTarget == null && group.Target != null && Info.DebugLogging)
+				var localCandidates = StealthTankSquadPolicy.NearbyReassessmentCandidates(
+					nearby, IsEnemyTarget(group.Target) ? group.Target : null, (a, b) => a == b);
+				UpdateGroup(group, localCandidates, view.Threats);
+				var currentTarget = group.Target;
+				if (previousTarget == null && currentTarget != null && Info.DebugLogging)
 					Log.Write("debug", "AI stealth squad {0} [{1}:{2}] nearby reaction tick={3}: target={4}#{5} distance={6} radius={7} bounded-latency={8}.",
 						Info.SquadLabel, player.PlayerName, group.Index, world.WorldTick,
-						group.Target.Info.Name, group.Target.ActorID,
-						(group.Target.CenterPosition - center).Length / 1024,
+						currentTarget.Info.Name, currentTarget.ActorID,
+						(currentTarget.CenterPosition - center).Length / 1024,
 						Info.NearbyTargetReactionRadiusCells,
 						StealthTankSquadPolicy.NearbyReactionMaximumLatencyTicks);
+				else if (previousTarget != null && currentTarget != null &&
+					currentTarget != previousTarget && Info.DebugLogging)
+					Log.Write("debug", "AI stealth squad {0} [{1}:{2}] nearby reaction tick={3}: switched incumbent={4}#{5} to target={6}#{7} distance={8} radius={9} bounded-latency={10} threshold={11}% stop=false cancel=false idle-gap=false.",
+						Info.SquadLabel, player.PlayerName, group.Index, world.WorldTick,
+						previousTarget.Info.Name, previousTarget.ActorID,
+						currentTarget.Info.Name, currentTarget.ActorID,
+						(currentTarget.CenterPosition - center).Length / 1024,
+						Info.NearbyTargetReactionRadiusCells,
+						StealthTankSquadPolicy.NearbyReactionMaximumLatencyTicks,
+						Info.TargetSwitchImprovementPercent);
 			}
 
 			return scanQueuedOrders - ordersBefore;

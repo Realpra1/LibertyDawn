@@ -10,9 +10,9 @@ sheet, coordinator state, other skills, or other worker specs. Read applicable
 - Worker/task: `WORKER-1` / `CNC-96A — Stealth squad performance using AirSquad as gold standard`
 - Change category: `AI performance and bounded architecture, with player-visible tactical behavior preservation`
 - Balance authority: `Frozen. Do not change cost, HP, damage, armor, speed, timing, power, prerequisites, probabilities, resources, production fractions, squad composition, target priorities, threat buffers, scan/order cadence, or candidate/group bounds.`
-- Status: `finish-target correction complete — exactly two final games and supplemental replay calibration passed; pending fresh Terra review; prior lifecycle/safety acceptance preserved`
-- Base branch/SHA: `bleed` / `2572c6c4f65a31fe195fbf20098eabc7e7ce04d3`
-- Task branch / PR base: `successor CNC-96A PR #127` / `bleed`; PR #127 is draft and must be updated, not replaced
+- Status: `in progress — natural nearby-acquisition diagnosis/amendment; PR #127 merged; successor PR required`
+- Base branch/SHA: `bleed` / `17835e8da1a45b80e9e0675d28df8dbdb22ddf29`
+- Task branch / PR base: `successor CNC-96A hotfix PR (to be created)` / `bleed`; PR #127 merged and must not be reopened
 - Current cycle: `13`; cycles used: `5/5 primary`, `7 exceptional Sol-medium acceptance cycles`, `1 bounded final-review fix cycle`
 - Required model: cycle 1 `Sol high`; cycles 2-5 `Terra medium`; cycles 6-15
   `Luna medium` only when coordinator authorizes minor obvious work; at most two
@@ -540,6 +540,44 @@ deferred work, and risks.
   profile intentionally disables reveal retreat; its 31 kills/Level 3 preserve the
   shared Chemical lifecycle but cannot directly prove this correction.
 
+## Fresh authoritative amendment: natural nearby target acquisition (2026-08-21)
+
+PR #127 (`Finish CNC specialist targets before retreat`) merged into `bleed`.
+Its successor must target `bleed` at exact head
+`17835e8da1a45b80e9e0675d28df8dbdb22ddf29`; do not reopen PR #127 or create a
+new task or round. The human reports ordinary enemy harvesters harvesting beside
+Stealth Tanks while tanks stand idle. Prior preplaced groups/timed waves proved
+firing and retreat mechanics but not spontaneous natural acquisition.
+
+Diagnose on current `bleed` before editing, tracing every rejection layer:
+owned/eligible/claimed/grouped state, nearby scan, category, hostility/
+visibility/range, threat/safety, route, order issuance, and weapon viability.
+Use Air squad AI target acquisition as the golden reference for scan cadence,
+nearby acquisition, visibility/hostility/category filtering, safety rejection,
+route availability, retention, and order issuance. Align where justified, but
+preserve ground/weapon differences and Stealth-specific priorities; never copy
+Air scoring/config blindly.
+
+Counted natural game: sustained ordinary 1-VIKI versus 2 allied Brutalis at
+meaningful distance, AI-produced specialists and normally harvesting AI
+economies. No preplaced/injected specialist groups, timed target waves,
+scripted combat orders, passive bots, or forced targets. Require spontaneous
+specialist acquisition, attacks, damage, many unique Harvester/valuable kills,
+continued missions, and veterancy where available. A distinct controlled
+proximity game may preplace uncommanded specialists solely to isolate the
+defect; harvesters remain normal and unscripted, and the game must show bounded
+nearby reaction/attack/damage/kill plus safe rejection of adverse threats.
+
+Preserve finish-target-before-retreat, exact post-completion strategic retreat,
+reinforcement, repair/no-repair, save/load, target switching, shared
+Stealth/Chemical lifecycle/config-only differences, wall priority, and CNC-101
+behavior unless the smallest root-cause correction requires otherwise. Near-zero
+kills or prolonged idling beside valid ordinary harvesters fails; victory, 40+
+kills, and zero losses are not absolute gates. Require separate native Luna
+narrator/policy per counted game, focused/protected checks, Terra review,
+release integration, successor PR and fresh CI. No merge to `bleed`, unrelated
+work, or external Codex.
+
 ## Fresh authoritative amendment: finish target, then retreat (2026-08-21)
 
 This amendment supersedes conflicting earlier retreat timing for the existing
@@ -742,3 +780,96 @@ the blocker precisely if natural combat acceptance remains unproved.
 - Final protected checks after restoration: Release build zero warnings/errors;
   focused policy suite 107/107; full CNC MiniYAML and `git diff --check` passed.
   Ready for fresh Terra review. No push, PR, merge, or external process.
+
+### Final authorized natural-acquisition cycle pre-record (2026-08-21)
+
+- Authority: native Sol-medium final allowed acquisition cycle from clean head
+  `b4411db7e5`. Reproduce current bleed before editing, trace every acquisition
+  rejection, compare Air acquisition as golden reference, make the smallest
+  evidence-driven correction, run exactly two final games and separate fresh
+  Luna narration/policy per game, update this STATE/REPORT, commit once, and stop.
+- Required natural Game 1: one ordinary VIKI versus two allied ordinary Brutalis,
+  all modules and normal economies. Specialists must be AI-produced; no injected
+  squads, target waves, combat orders, passive bots, or forced targets. Failure is
+  prolonged valid-nearby idling/near-zero kills. Pass is spontaneous acquisition,
+  attacks, damage, many unique Harvester/valuable kills, continued missions and
+  veterancy where exposed.
+- Required Game 2: distinct proximity isolation may preplace only uncommanded
+  specialists. Harvesters remain ordinary AI-produced/controlled and are not
+  choreographed. Require bounded nearby reaction, attack/damage/kill and an unsafe
+  adverse-threat rejection control without ownership leakage.
+- Preservation table: actor eligibility/claiming/group assignment; shared
+  Stealth/Chemical lifecycle with config-only differences; Stealth target classes,
+  raw priorities and wall priority; Air 25% switch policy but not Air scoring;
+  target completion before exact one-cell retreat; invalid/superior target
+  switching; detector plus armed-threat safety; Blue/pending-resource safety;
+  ground weapon viability, locomotor/domain/passability and hazard-aware route;
+  48-candidate/group bounds; 75-tick strategy, 25-tick nearby/safety cadence;
+  reinforcement staging/joining; repair/no-repair; save/load; reservation ownership
+  and ordinary-army exclusion; CNC-101; all balance/config values; Air output.
+- Diagnostic ladder: trace owned→eligible→reserved→grouped; nearby scan visibility/
+  hostility/category; priority/candidate cap; threat/safety rejection; route
+  availability; order issuance/retention; weapon viability; then contrast Air's
+  bounded nearby acquisition and order submission. Temporary detailed diagnostics
+  must be removed or reduced to bounded opt-in summaries before the single commit.
+
+
+### Final natural-acquisition cycle result (2026-08-21)
+
+- Unmodified reproduction: the ordinary one-VIKI/two-allied-Brutalis baseline
+  exited 0 at tick 18100 in 76.082 seconds. Naturally produced specialists
+  acquired targets and submitted 59 hazard routes/orders, but the first sustained
+  window contained 28/28 then 30/30 nearby samples without new attributed damage.
+  Seven scans rejected all candidates as unsafe. Product logs eventually recorded
+  four Harvester target completions, confirming that eligibility, reservation,
+  grouping, category, hostility, routing, ordering, and weapon execution all
+  functioned; the long local opportunity delay was the actionable defect.
+- Root cause and correction: `RunNearbyTargetReaction` detected nearby enemies
+  every 25 ticks but returned without evaluating them whenever any strategic
+  target was already assigned, even if that incumbent was distant. Air's golden
+  lifecycle instead keeps the live incumbent in fresh challenger evaluation.
+  The smallest correction adds the live incumbent once to the local candidate
+  set and calls the existing Stealth scoring/safety/route/order path. This reuses
+  the existing Air-shared 25% switch helper without copying Air priorities or
+  scoring. A retained nearby mission remains churn-free. Air, YAML, cadence,
+  balance, save/load, retreat, repair, reinforcement, ownership, and both-profile
+  shared lifecycle are otherwise unchanged.
+- Focused regressions prove a distant incumbent is included once in local fresh
+  reassessment, an already-nearby incumbent is not duplicated, and the existing
+  exact 124%-retain/125%-switch threshold remains intact.
+- Counted Game 1:
+  `.build/cnc96a-natural-acquisition/final-game1-strict2/cnc96a-natural-acquisition-final-game1-strict`,
+  seed 96501. Fully natural ordinary/all-module one VIKI versus two allied
+  Brutalis; no injected actors, waves, targets, orders, or passive bots. Exit 0
+  at tick 21100 in 113.154 seconds. AI-produced specialists recorded 119
+  attributed damage events, 309781 damage and five distinct ordinary Harvester
+  kills (STNK at ticks 14061/14284; CTNK at 17561/17575/20100), level-1
+  veterancy, repeated target-completion retreats, unsafe all-dangerous waits, and
+  continued production/missions through tick 21000.
+- Counted Game 2:
+  `.build/cnc96a-natural-acquisition/final-game2-close/cnc96a-natural-acquisition-final-game2`,
+  seed 96522. Distinct close-spawn ordinary/all-module economy with no preplaced
+  or injected actors; specialists and Harvesters were AI-produced/uncommanded.
+  Exit 0 at tick 16100 in 57.056 seconds. Chemical specialists recorded 201781
+  damage and four distinct Harvester kills; Stealth recorded bounded local
+  switches including distant `harv#1016` to nearby `harv#974` at tick 13575,
+  distance five, plus a completed Harvester retreat cycle. Four all-dangerous
+  waits/local-safety stops and 386 unsafe samples provide adverse control.
+- Durable independent receipts:
+  Game 1 `.build/cnc96a-natural-acquisition/reviews/game1/NARRATIVE.md` and
+  corrected `POLICY-REVIEW-CORRECTED.md`; Game 2 sibling `NARRATIVE.md` and
+  `POLICY-REVIEW.md`. Both corrected policy verdicts are PASS-WITH-NOTES with
+  no implementation blocker. The first Game 1 policy receipt is explicitly
+  uncounted because its context incorrectly called five an authored threshold;
+  the corrected fresh reviewer did not read it, applied no numeric threshold,
+  and independently judged the exact evidence sufficient. Notes retain loss-ledger,
+  exact geometry, per-opportunity latency/25%-qualification, and profile-specific
+  survival as evidence limits, not code recommendations.
+- Calibration/setup runs are uncounted: observer-memory/identity failures, the
+  diagnostic-log null dereference, the 24k timeout, the weaker two-kill natural
+  seed, and the unsafe preplacement layout.
+- Final protected checks: Release build and full CNC MiniYAML passed with zero
+  warnings/errors; focused `StealthTankSquadPolicyTest` passed 109/109;
+  `git diff --check` passed. Exactly the two final games above count. Ready for
+  fresh Terra review; no push, PR, merge, external process, task-sheet edit, or
+  unrelated change was performed.
