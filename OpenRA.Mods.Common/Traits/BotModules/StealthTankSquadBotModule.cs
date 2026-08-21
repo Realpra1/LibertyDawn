@@ -704,16 +704,19 @@ namespace OpenRA.Mods.Common.Traits
 			}
 
 			var retreatTarget = group.RetreatTarget;
+			var retreatTargetValid = IsEnemyTarget(retreatTarget);
 			var completion = StealthTankSquadPolicy.CompleteRetreat(
-				group.RetreatDestinations.Count, IsEnemyTarget(retreatTarget));
+				group.RetreatDestinations.Count, retreatTargetValid);
 			if (completion == StealthTankRetreatCompletion.ContinueRetreat)
 				return true;
 
 			group.Target = completion == StealthTankRetreatCompletion.ReassessWithIncumbent ?
 				retreatTarget : null;
 			if (Info.DebugLogging)
-				Log.Write("debug", "AI stealth squad {0} [{1}:{2}] retreat complete tick={3}: strategic-size={4}; reassessment enabled incumbent={5} completion={6} target-loss=false stop=false cancel=false idle-gap=false.",
+				Log.Write("debug", "AI stealth squad {0} [{1}:{2}] retreat complete tick={3}: strategic-size={4}; retreat-target={5} target-valid={6} reassessment enabled incumbent={7} completion={8} target-loss=false stop=false cancel=false idle-gap=false.",
 					Info.SquadLabel, player.PlayerName, group.Index, world.WorldTick, StrategicCellSize,
+					retreatTarget == null ? "none" : retreatTarget.Info.Name + "#" + retreatTarget.ActorID,
+					retreatTargetValid,
 					group.Target == null ? "none" : group.Target.Info.Name + "#" + group.Target.ActorID,
 					completion);
 			group.RetreatTarget = null;
