@@ -1467,3 +1467,12 @@ zero-warning claim. The review is preserved at
 normalizes those formatting locations; no product behavior or game evidence
 changed. A true clean Release rebuild now reports 0 warnings and 0 errors, and
 the focused suite passes 121/121.
+
+## Replacement CI SA1115 correction
+
+Replacement Linux Check Code found SA1115 twice because the retained-plan
+explanation separated the `false` argument from the preceding argument. Moving
+the comment above the invocation leaves the argument list and runtime behavior
+unchanged. The exact clean CI command `make clean && make check` now passes with
+0 warnings and 0 errors, including both interface checks. Release `make all`,
+the focused 121-test suite, full CNC YAML, and `git diff --check` also pass.

@@ -1864,12 +1864,12 @@ namespace OpenRA.Mods.Common.Traits
 			var routeUnsafe = group.HasPlan && group.RetainedRoutes.Count > 0 &&
 				HasUnsafeRetainedRoute(group, selected, threats, ownRange);
 			scanRetainedSafetyTicks += Stopwatch.GetTimestamp() - phaseStarted;
+
+			// Like Air, retaining a live moving actor retains its one-shot mission orders.
+			// Attack follows the actor after the precomputed approach; a route is only
+			// refreshed for a real switch, membership/safety change, or bounded stall.
 			var invalidation = StealthTankSquadPolicy.ClassifyPlanInvalidation(group.HasPlan,
 				changed, group.MembershipChanged,
-
-				// Like Air, retaining a live moving actor retains its one-shot mission orders.
-				// Attack follows the actor after the precomputed approach; a route is only
-				// refreshed for a real switch, membership/safety change, or bounded stall.
 				false,
 				routeUnsafe, world.WorldTick, group.LastProgressTick,
 				Info.MissionRetryInterval > 0 ? Info.MissionRetryInterval : Info.OrderInterval);

@@ -1037,3 +1037,14 @@ the blocker precisely if natural combat acceptance remains unproved.
   product behavior, tests, scenarios, and counted evidence are unchanged. A true
   `dotnet clean` followed by the focused Release test rebuilt with 0 warnings,
   0 errors, and 121/121 passing tests.
+
+### Replacement CI SA1115 correction (2026-08-22)
+
+- Replacement Linux Check Code reported SA1115 twice at the `false` retained-
+  plan argument because its explanatory comment separated it from the preceding
+  argument. The comment was moved above the call; arguments and behavior are
+  byte-for-byte unchanged apart from whitespace/comment placement.
+- Exact clean CI reproduction `make clean && make check` now passes the Debug
+  warnings-as-errors build with 0 warnings and 0 errors plus both interface
+  checks. Release `make all`, full CNC YAML, focused 121-test suite, and
+  `git diff --check` also pass.
