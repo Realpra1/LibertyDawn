@@ -1377,3 +1377,82 @@ zero warnings/errors; focused `StealthTankSquadPolicyTest` 109/109; clean
 `git diff --check`. Proposed status: correction complete and ready for fresh
 Terra review. No push, PR, merge, external agent/process, task-sheet edit, or
 unrelated change was performed.
+
+## PR128 Air-parity and hostile-acquisition correction
+
+Audit of the prior PR128 evidence confirmed that the natural run was bounded at
+tick 21100 rather than terminal victory, ordinary rescans could drop a valid
+rank-49+ incumbent, and only boundary reassessment used the exact Air switch
+helper. The human replay's six attributed Harvester kills exhausted the available
+enemy economy because both opponents were defeated; its greater-than-20 total was
+all target categories. This correction therefore reports opportunity-normalized
+outcomes and does not invent a numeric kill gate.
+
+The specialist target pipeline now ports the applicable Air lifecycle and
+performance structure: explicit attackable-incumbent injection, shared bounded
+closest/value strategic-cell selection with a required incumbent cell, exact
+`AirThreatGeometry.ShouldSwitchTarget` for every reassessment, route feasibility
+and route distance before selection, scan-local coarse-goal route caching,
+125-tick specialist influence caching, and one-shot application/retention. A
+candidate with no ground-safe route is skipped in favor of the next candidate;
+retained actor missions are not reissued merely because the actor moves, while
+membership, route safety and the configured 300-tick no-progress retry remain
+authoritative. Air output and Stealth/Chemical priorities are unchanged. The
+ground-only differences remain 6x6 cells, locomotor/domain/passability, exact
+firing annulus, Blue/pending-resource hazards, detectors and armed threats,
+repair/retreat/reinforcement and ownership.
+
+The hostile natural topology exposed one further direct Air-fallback mismatch.
+A bounded pool split between defended and unroutable candidates reset
+`ConsecutiveNoSafeTargetScans`, and the selected defender blocked its own
+clearance route. The final correction ages the configured fallback when
+dangerous plus unroutable candidates exhaust the pool, and excludes only the
+deliberately selected crush/snipe/unarmed-detector defender from its route map;
+all other package threats and Blue/detector safety remain. A multi-defender
+infantry package may nominate an edge infantry crush only after configured
+patience and whole-package overmatch, and the other defenders still veto an
+unsafe approach.
+
+Matched performance calibration passed tick 12100 in 48.034 seconds
+(251.891 valid ticks/s), improving the first cell-port result of 51.043 seconds /
+237.039 ticks/s and the pre-port approximately 211 ticks/s. Final scans use a
+representative actor and cached coarse goals rather than per-actor A*. Focused
+policy tests pass 121/121; Release compilation passes with no warnings/errors;
+full CNC MiniYAML and `git diff --check` pass.
+
+Final Game 1 is the same hostile ordinary/all-module seed 96501 match, preserved
+through exact engine saves at ticks 18000 and 22000:
+`.build/cnc96a-pr128-correction/final4-game1-leg1`, sibling `leg2`, and sibling
+`leg3`. The legs exited 0 at ticks 19000/22500/24600 in
+74.082/61.071/72.076 seconds without OOS. By tick 24000, 63 enemy Harvesters had
+been produced and 35 remained (enemy 1: 1; enemy 2: 34); specialists directly
+attributed 16 Harvester kills (14 CTNK, 2 STNK), 429 damage events and 694251
+damage. Forty-two specialists were observed, 16 lost, 26 alive, with level 2 /
+510000 XP. The maximum nearby no-damage run was 26 samples. Logs directly show
+unarmed-detector and infantry-crush weakest-defender selections after persisted
+all-defended scans, plus repeated target-completion one-cell retreats. Both
+opponents remained alive: enemy 1's Harvester economy was nearly exhausted while
+enemy 2 still produced faster than it was suppressed, the documented hard reason
+this resource-bounded match was not naturally terminal. Fresh final Luna
+`reviews/game1/NARRATIVE.md` and `POLICY-REVIEW.md` verdict PASS-WITH-NOTES.
+
+Final Game 2 is
+`.build/cnc96a-pr128-correction/final5-game2/cnc96a-pr128-game2-proximity-far-route`
+(seed 96522), a distinct ordinary/all-module normal-economy scenario. Five
+AI-owned specialists were preplaced uncommanded at VIKI's normal base solely to
+guarantee feature exercise; no targets, waves or orders were injected and all
+Harvesters remained ordinary AI-controlled. It exited 0 at tick 17100 in 64.093
+seconds. At tick 17000, 11 enemy Harvesters had been produced and none remained;
+specialists recorded seven attributed kills (STNK 5, CTNK 2), 42 damage events /
+273945 damage, 18 specialists observed, four lost, and level 3 / 675000 XP.
+Enemy 1 was defeated; enemy 2 remained alive without Harvesters. Logs show
+retained nearby targets with `order-churn=false`, target-completion retreats,
+configured weakest-defender crush/detector fallbacks, and defended/unroutable/
+Blue controls. Fresh final Game 2 narrative/policy paths are the sibling
+`reviews/game2/NARRATIVE.md` and `POLICY-REVIEW.md`; policy verdict
+PASS-WITH-NOTES, with the long nearby no-damage interval and surviving enemy
+retained as nonblocking evidence limits rather than hidden.
+
+All pre-final timeout, no-specialist, pre-fallback and diagnostic artifacts are
+explicitly uncounted. Exactly the two final matches above count. No push, PR,
+merge, external process, Air/config change, or unrelated edit was performed.

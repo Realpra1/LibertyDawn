@@ -180,6 +180,20 @@ namespace OpenRA.Test.Mods.Common
 				false, movedInsideCell, false, 300, 0, 300), Is.EqualTo(StealthTankPlanInvalidation.NoProgress));
 		}
 
+		[Test]
+		public void RetainedMovingTargetAcrossStrategicCellKeepsAirStyleOneShotOrdersUntilStall()
+		{
+			Assert.That(StealthTankSquadPolicy.IsSameStrategicCell(
+				new CPos(5, 5), new CPos(6, 6), 6), Is.False);
+			// The caller has already reassessed and retained this live actor, so its
+			// movement is not an order invalidation. Attack follows the actor and the
+			// bounded no-progress path remains the route-refresh authority.
+			Assert.That(StealthTankSquadPolicy.ClassifyPlanInvalidation(true, false,
+				false, false, false, 299, 0, 300), Is.EqualTo(StealthTankPlanInvalidation.None));
+			Assert.That(StealthTankSquadPolicy.ClassifyPlanInvalidation(true, false,
+				false, false, false, 300, 0, 300), Is.EqualTo(StealthTankPlanInvalidation.NoProgress));
+		}
+
 		[TestCase(18, 18, 6, 6, 27, 27)]
 		[TestCase(18, 18, 30, 18, 15, 15)]
 		[TestCase(1, 1, 8, 1, 3, 9)]
@@ -223,10 +237,18 @@ namespace OpenRA.Test.Mods.Common
 
 			Assert.That(candidates, Is.EqualTo(new[] { 11, 12, 99 }),
 				"A valid distant incumbent must remain available for the same thresholded switch decision as Air.");
-			Assert.That(StealthTankSquadPolicy.ReassessMovedTarget(true, true, 100,
+			Assert.That(StealthTankSquadPolicy.ReassessTarget(true, true, 100,
 				true, true, 124, 25), Is.EqualTo(StealthTankTargetReassessment.RetainIncumbent));
-			Assert.That(StealthTankSquadPolicy.ReassessMovedTarget(true, true, 100,
+			Assert.That(StealthTankSquadPolicy.ReassessTarget(true, true, 100,
 				true, true, 125, 25), Is.EqualTo(StealthTankTargetReassessment.SwitchToChallenger));
+		}
+
+		[Test]
+		public void NearbyReactionPreservesRankFortyNineIncumbentBeyondChallengerCap()
+		{
+			var reassessment = StealthTankSquadPolicy.NearbyReassessmentCandidates(
+				Enumerable.Range(0, 60), 99, (a, b) => a == b);
+			Assert.That(reassessment.Last(), Is.EqualTo(99));
 		}
 
 		[Test]
@@ -470,15 +492,30 @@ namespace OpenRA.Test.Mods.Common
 				Is.LessThan(baseline));
 		}
 
+		[Test]
+		public void GroundTargetScoreUsesRoutableTravelCostInsteadOfStraightLineDistance()
+		{
+			var direct = StealthTankSquadPolicy.RouteDistanceCells(new CPos(0, 0),
+				new[] { new CPos(6, 0) });
+			var detour = StealthTankSquadPolicy.RouteDistanceCells(new CPos(0, 0),
+				new[] { new CPos(0, 6), new CPos(6, 6), new CPos(6, 0) });
+
+			Assert.That(direct, Is.EqualTo(6));
+			Assert.That(detour, Is.EqualTo(18));
+			Assert.That(StealthTankSquadPolicy.OptimisticApproachDistance(20, 6), Is.EqualTo(14));
+			Assert.That(StealthTankSquadPolicy.TargetScore(1000, 1000, detour, 100),
+				Is.LessThan(StealthTankSquadPolicy.TargetScore(1000, 1000, direct, 100)));
+		}
+
 		[TestCase(true, 100, true, true, 124, 25, StealthTankTargetReassessment.RetainIncumbent)]
 		[TestCase(true, 100, true, true, 125, 25, StealthTankTargetReassessment.SwitchToChallenger)]
 		[TestCase(true, 10000, true, false, 100000, 0, StealthTankTargetReassessment.RetainIncumbent)]
 		[TestCase(false, 10000, true, true, 1, 100, StealthTankTargetReassessment.SwitchToChallenger)]
-		public void MovedTargetReassessmentUsesExactAirSwitchPolicy(bool incumbentUndefended,
+		public void EveryTargetReassessmentUsesExactAirSwitchPolicy(bool incumbentUndefended,
 			long incumbentScore, bool challengerValid, bool challengerUndefended, long challengerScore,
 			int improvementPercent, StealthTankTargetReassessment expected)
 		{
-			Assert.That(StealthTankSquadPolicy.ReassessMovedTarget(true, incumbentUndefended,
+			Assert.That(StealthTankSquadPolicy.ReassessTarget(true, incumbentUndefended,
 				incumbentScore, challengerValid, challengerUndefended, challengerScore, improvementPercent),
 				Is.EqualTo(expected));
 			Assert.That(expected == StealthTankTargetReassessment.SwitchToChallenger,
@@ -487,35 +524,49 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
-		public void InvalidMovedTargetSwitchesOrAbandonsWithoutApplyingThreshold()
+		public void InvalidTargetSwitchesOrAbandonsWithoutApplyingThreshold()
 		{
-			Assert.That(StealthTankSquadPolicy.ReassessMovedTarget(false, false, 10000,
+			Assert.That(StealthTankSquadPolicy.ReassessTarget(false, false, 10000,
 				true, false, 1, 100), Is.EqualTo(StealthTankTargetReassessment.SwitchToChallenger));
-			Assert.That(StealthTankSquadPolicy.ReassessMovedTarget(false, false, 10000,
+			Assert.That(StealthTankSquadPolicy.ReassessTarget(false, false, 10000,
 				false, false, 0, 100), Is.EqualTo(StealthTankTargetReassessment.Abandon));
 		}
 
 		[Test]
-		public void BoundaryReassessmentIncludesIncumbentBeyondCandidateCapWithoutDisplacingChallengers()
+		public void GlobalAndNearbyCellPoolsUseAirRequiredIncumbentBeyondCandidateCap()
 		{
-			var ranked = Enumerable.Range(0, 60).ToArray();
-			var bounded = StealthTankSquadPolicy.BoundCandidatesWithIncumbent(
-				ranked, 48, true, candidate => candidate == 55);
+			var distances = Enumerable.Range(0, 60).Select(i => (long)i).ToArray();
+			var utilities = Enumerable.Range(0, 60).Select(i => i >= 24 && i < 48 ? 1000 - i : 0).ToArray();
+			var ordinary = AirThreatGeometry.SelectTargetCandidates(distances, utilities, 24, 24);
+			var bounded = AirThreatGeometry.SelectTargetCandidates(distances, utilities, 24, 24, 55);
 
-			Assert.That(bounded.Take(48), Is.EqualTo(Enumerable.Range(0, 48)),
-				"The ordinary challenger cap and ordering must remain unchanged.");
-			Assert.That(bounded, Has.Count.EqualTo(49));
-			Assert.That(bounded[48], Is.EqualTo(55));
-			Assert.That(StealthTankSquadPolicy.ReassessMovedTarget(
+			Assert.That(ordinary, Has.No.Member(55));
+			Assert.That(bounded.Take(ordinary.Count), Is.EqualTo(ordinary),
+				"The Air closest/highest-value strategic-cell pool must remain unchanged.");
+			Assert.That(bounded.Last(), Is.EqualTo(55));
+			Assert.That(StealthTankSquadPolicy.ReassessTarget(
 				bounded.Contains(55), true, 100, true, true, 124, 25),
 				Is.EqualTo(StealthTankTargetReassessment.RetainIncumbent));
+		}
 
-			Assert.That(StealthTankSquadPolicy.BoundCandidatesWithIncumbent(
-				ranked, 48, false, candidate => candidate == 55),
-				Is.EqualTo(Enumerable.Range(0, 48)), "Non-boundary scans must remain capped.");
-			Assert.That(StealthTankSquadPolicy.BoundCandidatesWithIncumbent(
-				ranked, 48, true, candidate => candidate == 5), Has.Count.EqualTo(48),
-				"An incumbent already inside the cap must not be duplicated.");
+		[Test]
+		public void UnroutableIncumbentIsNotRetainedAndStalledRoutableMissionRetries()
+		{
+			Assert.That(StealthTankSquadPolicy.ReassessTarget(
+				false, false, 0, true, true, 1, 25),
+				Is.EqualTo(StealthTankTargetReassessment.SwitchToChallenger),
+				"A no-route incumbent is invalid for this scan, so the next routable target must be tried.");
+			Assert.That(StealthTankSquadPolicy.ReassessTarget(
+				false, false, 0, false, false, 0, 25),
+				Is.EqualTo(StealthTankTargetReassessment.Abandon),
+				"No unroutable target may be installed as a retained plan.");
+			Assert.That(StealthTankSquadPolicy.ClassifyPlanInvalidation(
+				true, false, false, false, false, 299, 0, 300),
+				Is.EqualTo(StealthTankPlanInvalidation.None));
+			Assert.That(StealthTankSquadPolicy.ClassifyPlanInvalidation(
+				true, false, false, false, false, 300, 0, 300),
+				Is.EqualTo(StealthTankPlanInvalidation.NoProgress),
+				"A routable plan with no distance or damage progress must retry at the configured bound.");
 		}
 
 		[Test]
@@ -548,6 +599,17 @@ namespace OpenRA.Test.Mods.Common
 				squadValue, defendingValue, requiredRatio), Is.EqualTo(expected));
 		}
 
+		[TestCase(39, 34, 5, true, Description = "Defended and no-route candidates together exhaust the bounded pool.")]
+		[TestCase(39, 34, 4, false, Description = "One ordinary candidate remains available.")]
+		[TestCase(3, 0, 3, true, Description = "Blue or terrain may make every target unroutable without inventing a defender.")]
+		[TestCase(0, 0, 0, false)]
+		public void DefenderFallbackAgesWhenDangerAndRouteFailureExhaustCandidatePool(
+			int candidates, int dangerous, int unroutable, bool expected)
+		{
+			Assert.That(StealthTankSquadPolicy.AreAllCandidatesUnavailable(
+				candidates, dangerous, unroutable), Is.EqualTo(expected));
+		}
+
 		[Test]
 		public void DefenderClearingChoosesBestUnlockFromWeakestPackages()
 		{
@@ -558,7 +620,7 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[TestCase(true, false, true, 1, 8, 2, 0, 1, SpecialistDefenderClearAction.CrushInfantry)]
-		[TestCase(true, false, true, 2, 8, 2, 0, 1, SpecialistDefenderClearAction.None)]
+		[TestCase(true, false, true, 2, 8, 2, 0, 1, SpecialistDefenderClearAction.CrushInfantry)]
 		[TestCase(true, false, false, 1, 8, 2, 0, 1, SpecialistDefenderClearAction.None)]
 		[TestCase(true, false, true, 1, 8, 2, 2, 1, SpecialistDefenderClearAction.None)]
 		[TestCase(false, true, true, 3, 8, 5, 0, 3, SpecialistDefenderClearAction.SnipeTank)]
@@ -574,6 +636,17 @@ namespace OpenRA.Test.Mods.Common
 		{
 			Assert.That(StealthTankSquadPolicy.DefenderClearAction(infantry, tank, canCrush,
 				packageCount, ownRange, weaponRange, detectorRange, kiteMargin), Is.EqualTo(expected));
+		}
+
+		[TestCase(SpecialistDefenderClearAction.CrushInfantry, true)]
+		[TestCase(SpecialistDefenderClearAction.SnipeTank, true)]
+		[TestCase(SpecialistDefenderClearAction.AttackUnarmedDetector, true)]
+		[TestCase(SpecialistDefenderClearAction.None, false)]
+		public void SelectedClearDefenderDoesNotBlockItsOwnOtherwiseSafeApproach(
+			SpecialistDefenderClearAction action, bool expected)
+		{
+			Assert.That(StealthTankSquadPolicy.ShouldIgnoreSelectedDefenderInfluence(action),
+				Is.EqualTo(expected));
 		}
 
 		[TestCase(true, false, false, false, SpecialistRepairDisposition.Active,
