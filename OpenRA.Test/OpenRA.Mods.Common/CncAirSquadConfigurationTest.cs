@@ -41,6 +41,13 @@ namespace OpenRA.Test.Mods.Common
 				.ToDictionary(n => n.Key, n => n.Value);
 		}
 
+		static MiniYamlNode LoadPlayer()
+		{
+			var path = Path.GetFullPath(Path.Combine(TestContext.CurrentContext.TestDirectory,
+				"..", "mods", "cnc", "rules", "ai.yaml"));
+			return MiniYaml.FromFile(path).Single(n => n.Key == "Player");
+		}
+
 		static bool IsAirPolicyNode(MiniYamlNode node)
 		{
 			return node.Key.StartsWith("Air", StringComparison.Ordinal) ||
@@ -81,6 +88,28 @@ namespace OpenRA.Test.Mods.Common
 				Assert.That(info.AirSafetyCheckInterval, Is.EqualTo(25), manager.Key);
 				Assert.That(info.AirRouteThreatPenalty, Is.EqualTo(200), manager.Key);
 			}
+		}
+
+		[Test]
+		public void StealthAndAirKeepDistinctScoringWithExplicitLowestWallPriority()
+		{
+			var player = LoadPlayer();
+			var stealth = FieldLoader.Load<StealthTankSquadBotModuleInfo>(
+				player.Value.Nodes.Single(n => n.Key == "StealthTankSquadBotModule").Value);
+			Assert.That(stealth.WallTargetPriority, Is.EqualTo(1));
+			Assert.That(stealth.HarassmentTargetPriorities["harv"], Is.GreaterThan(stealth.WallTargetPriority));
+
+			foreach (var manager in LoadSquadManagers())
+			{
+				var air = FieldLoader.Load<SquadManagerBotModuleInfo>(manager.Value);
+				Assert.That(air.AirTargetWallValue, Is.EqualTo(1), manager.Key);
+				Assert.That(air.AirTargetHarvesterValue, Is.GreaterThan(air.AirTargetWallValue), manager.Key);
+			}
+
+			Assert.That(stealth.HarassmentTargetPriorities["harv"],
+				Is.Not.EqualTo(FieldLoader.Load<SquadManagerBotModuleInfo>(
+					LoadSquadManagers()["SquadManagerBotModule@brutalis"]).AirTargetHarvesterValue),
+				"Stealth scoring must remain distinct from Air; only the switch decision is shared.");
 		}
 	}
 }

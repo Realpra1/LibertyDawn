@@ -116,6 +116,183 @@ namespace OpenRA.Test.Mods.Common
 				Is.EqualTo(expected));
 		}
 
+		[Test]
+		public void StealthStrategicGeometryUsesExactSixBySixCells()
+		{
+			Assert.That(StealthTankSquadPolicy.RequiredStrategicCellSize, Is.EqualTo(6));
+			Assert.That(StealthTankSquadPolicy.StrategicCell(new CPos(0, 0), 6), Is.EqualTo(new CPos(0, 0)));
+			Assert.That(StealthTankSquadPolicy.StrategicCell(new CPos(5, 5), 6), Is.EqualTo(new CPos(0, 0)));
+			Assert.That(StealthTankSquadPolicy.StrategicCell(new CPos(6, 6), 6), Is.EqualTo(new CPos(1, 1)));
+			Assert.That(StealthTankSquadPolicy.IsSameStrategicCell(
+				new CPos(6, 6), new CPos(11, 11), 6), Is.True);
+			Assert.That(StealthTankSquadPolicy.IsSameStrategicCell(
+				new CPos(5, 5), new CPos(6, 6), 6), Is.False);
+		}
+
+		[Test]
+		public void ReinforcementsStageOnlyAfterAFormationExistsAndJoinAtAdjacentSixCells()
+		{
+			Assert.That(StealthTankSquadPolicy.ShouldStageReinforcement(true, false), Is.True);
+			Assert.That(StealthTankSquadPolicy.ShouldStageReinforcement(false, false), Is.False);
+			Assert.That(StealthTankSquadPolicy.ShouldStageReinforcement(true, true), Is.False);
+			Assert.That(StealthTankSquadPolicy.ReinforcementGroup(1, new[] { 3, 0, 0 }), Is.Zero,
+				"A topology slot without a core must not turn an incoming tank into a new mission.");
+			Assert.That(StealthTankSquadPolicy.ReinforcementGroup(1, new[] { 3, 1, 0 }), Is.EqualTo(1));
+			Assert.That(StealthTankSquadPolicy.ReinforcementGroup(2, new[] { 3, 1, 0 }), Is.EqualTo(1));
+			Assert.That(StealthTankSquadPolicy.CanAdvanceReinforcement(true, false), Is.True);
+			Assert.That(StealthTankSquadPolicy.CanAdvanceReinforcement(true, true), Is.False,
+				"A repaired staged member must finish its retained retreat responsibility first.");
+			Assert.That(StealthTankSquadPolicy.RecoveryCore(new uint[] { 14, 12 },
+				new System.Collections.Generic.HashSet<uint> { 12, 14 }), Is.EqualTo(12),
+				"A staged-only restored group must deterministically recover one core member.");
+			Assert.That(StealthTankSquadPolicy.RecoveryCore(new uint[] { 12, 14 },
+				new System.Collections.Generic.HashSet<uint> { 14 }), Is.Null);
+			Assert.That(StealthTankSquadPolicy.IsSameOrAdjacentStrategicCell(
+				new CPos(0, 0), new CPos(11, 11), 6), Is.True);
+			Assert.That(StealthTankSquadPolicy.IsSameOrAdjacentStrategicCell(
+				new CPos(0, 0), new CPos(12, 0), 6), Is.False);
+		}
+
+		[Test]
+		public void StagedReinforcementOwnershipSurvivesSaveLoadWithoutDuplicates()
+		{
+			var saved = StealthTankSquadPolicy.SaveReinforcementState(new[]
+			{
+				new StealthTankReinforcementSaveGroup { GroupIndex = 0, Members = new uint[] { 14, 12 } },
+				new StealthTankReinforcementSaveGroup { GroupIndex = 2, Members = new uint[] { 18 } }
+			});
+
+			Assert.That(StealthTankSquadPolicy.TryLoadReinforcementState(saved, out var restored), Is.True);
+			Assert.That(restored.Select(g => g.GroupIndex), Is.EqualTo(new[] { 0, 2 }));
+			Assert.That(restored[0].Members, Is.EqualTo(new uint[] { 12, 14 }));
+			Assert.That(restored.SelectMany(g => g.Members), Is.Unique);
+		}
+
+		[Test]
+		public void MobileTargetInsideMissionCellDoesNotCauseImmediateOrderChurn()
+		{
+			var movedInsideCell = !StealthTankSquadPolicy.IsSameStrategicCell(
+				new CPos(7, 8), new CPos(10, 11), 6);
+			Assert.That(movedInsideCell, Is.False);
+			Assert.That(StealthTankSquadPolicy.ClassifyPlanInvalidation(true, false,
+				false, movedInsideCell, false, 299, 0, 300), Is.EqualTo(StealthTankPlanInvalidation.None));
+			Assert.That(StealthTankSquadPolicy.ClassifyPlanInvalidation(true, false,
+				false, movedInsideCell, false, 300, 0, 300), Is.EqualTo(StealthTankPlanInvalidation.NoProgress));
+		}
+
+		[TestCase(18, 18, 6, 6, 27, 27)]
+		[TestCase(18, 18, 30, 18, 15, 15)]
+		[TestCase(1, 1, 8, 1, 3, 9)]
+		public void RevealRetreatMovesExactlyOneAdjacentSixCellStrategicCell(
+			int unitX, int unitY, int targetX, int targetY, int expectedX, int expectedY)
+		{
+			var start = StealthTankSquadPolicy.StrategicCell(new CPos(unitX, unitY), 6);
+			var destination = StealthTankSquadPolicy.OneStrategicCellRetreat(
+				new CPos(unitX, unitY), new CPos(targetX, targetY), 6, 96, 96);
+			var destinationCell = StealthTankSquadPolicy.StrategicCell(destination, 6);
+
+			Assert.That(destination, Is.EqualTo(new CPos(expectedX, expectedY)));
+			Assert.That(System.Math.Max(System.Math.Abs(destinationCell.X - start.X),
+				System.Math.Abs(destinationCell.Y - start.Y)), Is.EqualTo(1));
+		}
+
+		[Test]
+		public void NearbyUndefendedReactionHasATwentyFiveTickBound()
+		{
+			Assert.That(StealthTankSquadPolicy.NearbyReactionMaximumLatencyTicks, Is.EqualTo(25));
+		}
+
+		[Test]
+		public void VersionedMultiUnitRetreatSaveRestoresBarrierUntilEveryMemberCompletes()
+		{
+			var saved = StealthTankSquadPolicy.SaveRetreatState(new[]
+			{
+				new StealthTankRetreatSaveGroup
+				{
+					GroupIndex = 0,
+					TargetId = 91,
+					Destinations = new[]
+					{
+						new System.Collections.Generic.KeyValuePair<uint, CPos>(11, new CPos(27, 21)),
+						new System.Collections.Generic.KeyValuePair<uint, CPos>(12, new CPos(33, 27))
+					}
+				}
+			});
+
+			Assert.That(StealthTankSquadPolicy.TryLoadRetreatState(saved, out var restored), Is.True);
+			Assert.That(restored, Has.Length.EqualTo(1));
+			Assert.That(restored[0].TargetId, Is.EqualTo(91));
+			Assert.That(restored[0].Destinations.Select(d => d.Key), Is.EqualTo(new uint[] { 11, 12 }));
+
+			var remaining = restored[0].Destinations.ToDictionary(d => d.Key, d => d.Value);
+			Assert.That(StealthTankSquadPolicy.ShouldBlockReassessment(remaining.Count), Is.True);
+			remaining.Remove(11);
+			Assert.That(StealthTankSquadPolicy.ShouldBlockReassessment(remaining.Count), Is.True,
+				"One completed member must not release the restored multi-unit retreat barrier.");
+			remaining.Remove(12);
+			Assert.That(StealthTankSquadPolicy.ShouldBlockReassessment(remaining.Count), Is.False);
+		}
+
+		[Test]
+		public void MalformedOrFutureRetreatSaveFallsBackWithoutState()
+		{
+			var malformed = new MiniYamlNode("StealthTankRetreatState", "", new[]
+			{
+				new MiniYamlNode("Version", FieldSaver.FormatValue(
+					StealthTankSquadPolicy.RetreatSaveVersion + 1))
+			}.ToList());
+
+			Assert.That(StealthTankSquadPolicy.TryLoadRetreatState(malformed, out var restored), Is.False);
+			Assert.That(restored, Is.Empty);
+		}
+
+		[Test]
+		public void RestoredRetreatRecomputesAwayFromLiveTargetThatMovedAcrossUnit()
+		{
+			var unit = new CPos(18, 18);
+			var originalTarget = new CPos(30, 18);
+			var movedTarget = new CPos(6, 18);
+			var savedDestination = StealthTankSquadPolicy.OneStrategicCellRetreat(
+				unit, originalTarget, 6, 96, 96);
+			var saved = StealthTankSquadPolicy.SaveRetreatState(new[]
+			{
+				new StealthTankRetreatSaveGroup
+				{
+					GroupIndex = 0,
+					TargetId = 91,
+					Destinations = new[]
+					{
+						new System.Collections.Generic.KeyValuePair<uint, CPos>(11, savedDestination)
+					}
+				}
+			});
+
+			Assert.That(StealthTankSquadPolicy.TryLoadRetreatState(saved, out var restored), Is.True);
+			Assert.That(StealthTankSquadPolicy.IsRetreatDestinationAwayFromTarget(unit,
+				restored[0].Destinations[0].Value, movedTarget, 6, 96, 96), Is.False,
+				"The saved westward destination now points toward the moved live target.");
+
+			var recomputed = StealthTankSquadPolicy.OneStrategicCellRetreat(unit, movedTarget, 6, 96, 96);
+			Assert.That(StealthTankSquadPolicy.IsRetreatDestinationAwayFromTarget(
+				unit, recomputed, movedTarget, 6, 96, 96), Is.True);
+			Assert.That(recomputed.X, Is.GreaterThan(unit.X),
+				"Restore must resume east, away from the target that moved west of the unit.");
+		}
+
+		[Test]
+		public void RepairingMemberDoesNotResolveRetreatResponsibilityBeforeArrival()
+		{
+			Assert.That(StealthTankSquadPolicy.IsRetreatResponsibilityResolved(
+				true, true, false), Is.False,
+				"Entering repair must not silently release the group retreat barrier.");
+			Assert.That(StealthTankSquadPolicy.IsRetreatResponsibilityResolved(
+				true, true, true), Is.True,
+				"Physical arrival completes the responsibility even if repair starts afterward.");
+			Assert.That(StealthTankSquadPolicy.IsRetreatResponsibilityResolved(
+				false, true, false), Is.True,
+				"A dead or otherwise ineligible actor cannot retain an impossible responsibility.");
+		}
+
 		[TestCase(0, 0)]
 		[TestCase(1, 0)]
 		[TestCase(2, 2)]
@@ -241,6 +418,54 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(StealthTankSquadPolicy.TargetScore(1000, 1000, 20, 125), Is.GreaterThan(baseline));
 			Assert.That(StealthTankSquadPolicy.TargetScore(1000, 1000, 20, 100, 100, 3),
 				Is.LessThan(baseline));
+		}
+
+		[TestCase(true, 100, true, true, 124, 25, StealthTankTargetReassessment.RetainIncumbent)]
+		[TestCase(true, 100, true, true, 125, 25, StealthTankTargetReassessment.SwitchToChallenger)]
+		[TestCase(true, 10000, true, false, 100000, 0, StealthTankTargetReassessment.RetainIncumbent)]
+		[TestCase(false, 10000, true, true, 1, 100, StealthTankTargetReassessment.SwitchToChallenger)]
+		public void MovedTargetReassessmentUsesExactAirSwitchPolicy(bool incumbentUndefended,
+			long incumbentScore, bool challengerValid, bool challengerUndefended, long challengerScore,
+			int improvementPercent, StealthTankTargetReassessment expected)
+		{
+			Assert.That(StealthTankSquadPolicy.ReassessMovedTarget(true, incumbentUndefended,
+				incumbentScore, challengerValid, challengerUndefended, challengerScore, improvementPercent),
+				Is.EqualTo(expected));
+			Assert.That(expected == StealthTankTargetReassessment.SwitchToChallenger,
+				Is.EqualTo(AirThreatGeometry.ShouldSwitchTarget(incumbentUndefended, incumbentScore,
+					challengerValid, challengerUndefended, challengerScore, improvementPercent)));
+		}
+
+		[Test]
+		public void InvalidMovedTargetSwitchesOrAbandonsWithoutApplyingThreshold()
+		{
+			Assert.That(StealthTankSquadPolicy.ReassessMovedTarget(false, false, 10000,
+				true, false, 1, 100), Is.EqualTo(StealthTankTargetReassessment.SwitchToChallenger));
+			Assert.That(StealthTankSquadPolicy.ReassessMovedTarget(false, false, 10000,
+				false, false, 0, 100), Is.EqualTo(StealthTankTargetReassessment.Abandon));
+		}
+
+		[Test]
+		public void BoundaryReassessmentIncludesIncumbentBeyondCandidateCapWithoutDisplacingChallengers()
+		{
+			var ranked = Enumerable.Range(0, 60).ToArray();
+			var bounded = StealthTankSquadPolicy.BoundCandidatesWithIncumbent(
+				ranked, 48, true, candidate => candidate == 55);
+
+			Assert.That(bounded.Take(48), Is.EqualTo(Enumerable.Range(0, 48)),
+				"The ordinary challenger cap and ordering must remain unchanged.");
+			Assert.That(bounded, Has.Count.EqualTo(49));
+			Assert.That(bounded[48], Is.EqualTo(55));
+			Assert.That(StealthTankSquadPolicy.ReassessMovedTarget(
+				bounded.Contains(55), true, 100, true, true, 124, 25),
+				Is.EqualTo(StealthTankTargetReassessment.RetainIncumbent));
+
+			Assert.That(StealthTankSquadPolicy.BoundCandidatesWithIncumbent(
+				ranked, 48, false, candidate => candidate == 55),
+				Is.EqualTo(Enumerable.Range(0, 48)), "Non-boundary scans must remain capped.");
+			Assert.That(StealthTankSquadPolicy.BoundCandidatesWithIncumbent(
+				ranked, 48, true, candidate => candidate == 5), Has.Count.EqualTo(48),
+				"An incumbent already inside the cap must not be duplicated.");
 		}
 
 		[Test]

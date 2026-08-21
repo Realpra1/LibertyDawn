@@ -245,8 +245,8 @@ namespace OpenRA.Mods.Common.Traits
 				LocalAaClearResponse.Continue : LocalAaClearResponse.Recalculate;
 		}
 
-		public static bool ShouldSwitchTarget(bool currentUndefended, int currentScore,
-			bool challengerValid, bool challengerUndefended, int challengerScore, int minimumImprovementPercent)
+		public static bool ShouldSwitchTarget(bool currentUndefended, long currentScore,
+			bool challengerValid, bool challengerUndefended, long challengerScore, int minimumImprovementPercent)
 		{
 			if (!challengerValid)
 				return false;
@@ -254,8 +254,9 @@ namespace OpenRA.Mods.Common.Traits
 			if (currentUndefended != challengerUndefended)
 				return challengerUndefended;
 
-			var requiredScore = (long)Math.Max(0, currentScore) * (100 + Math.Max(0, minimumImprovementPercent));
-			return (long)Math.Max(0, challengerScore) * 100 >= requiredScore;
+			var requiredScore = (decimal)Math.Max(0, currentScore) *
+				(100L + Math.Max(0, minimumImprovementPercent));
+			return (decimal)Math.Max(0, challengerScore) * 100 >= requiredScore;
 		}
 
 		public static bool ShouldRescanStalledTarget(int ticksSinceProgress, int stallTicks, bool hasArmedUnit)

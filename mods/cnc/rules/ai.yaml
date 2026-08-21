@@ -344,6 +344,7 @@ Player:
 		MinimumLateHarassmentGroupSize: 3
 		TargetSwitchImprovementPercent: 25
 		HarassmentDistancePenalty: 3
+		WallTargetPriority: 1
 		HarvesterTypes: harv, sharv
 		HarvesterWaitingAnchorTypes: proc, resonator
 		ResourceWaitingSearchRadius: 20
@@ -351,6 +352,10 @@ Player:
 		AvoidResourceTypes: BlueTiberium
 		PendingResourceExplosionAvoidanceRadius: 1
 		HazardRouteWaypointSpacing: 4
+		StrategicCellSize: 6
+		MissionRetryInterval: 300
+		NearbyTargetReactionRadiusCells: 12
+		RetreatAfterReveal: true
 		# Match AirSquad's three strategic scans of patience before a safe blocker clear.
 		DefenderClearFallbackScans: 3
 		DefenderClearValueRatio: 1
@@ -770,6 +775,7 @@ Player:
 		AirTargetUnitValue: 450
 		AirTargetProductionValue: 300
 		AirTargetBuildingValue: 100
+		AirTargetWallValue: 1
 		AirTargetDefencelessBonus: 250
 		AirTargetAntiAirPenalty: 700
 		AirTargetDistancePenalty: 12
@@ -981,6 +987,7 @@ Player:
 		AirTargetUnitValue: 450
 		AirTargetProductionValue: 300
 		AirTargetBuildingValue: 100
+		AirTargetWallValue: 1
 		AirTargetDefencelessBonus: 250
 		AirTargetAntiAirPenalty: 700
 		AirTargetDistancePenalty: 12
@@ -1192,6 +1199,7 @@ Player:
 		AirTargetUnitValue: 450
 		AirTargetProductionValue: 300
 		AirTargetBuildingValue: 100
+		AirTargetWallValue: 1
 		AirTargetDefencelessBonus: 250
 		AirTargetAntiAirPenalty: 700
 		AirTargetDistancePenalty: 12
@@ -1485,6 +1493,7 @@ Player:
 		AirTargetUnitValue: 450
 		AirTargetProductionValue: 300
 		AirTargetBuildingValue: 100
+		AirTargetWallValue: 1
 		AirTargetDefencelessBonus: 250
 		AirTargetAntiAirPenalty: 700
 		AirTargetDistancePenalty: 12
@@ -1608,6 +1617,7 @@ Player:
 		AirTargetUnitValue: 450
 		AirTargetProductionValue: 300
 		AirTargetBuildingValue: 100
+		AirTargetWallValue: 1
 		AirTargetDefencelessBonus: 250
 		AirTargetAntiAirPenalty: 700
 		AirTargetDistancePenalty: 12
@@ -1916,6 +1926,7 @@ Player:
 		AirTargetUnitValue: 450
 		AirTargetProductionValue: 300
 		AirTargetBuildingValue: 100
+		AirTargetWallValue: 1
 		AirTargetDefencelessBonus: 250
 		AirTargetAntiAirPenalty: 700
 		AirTargetDistancePenalty: 12
@@ -2250,6 +2261,7 @@ Player:
 		AirTargetUnitValue: 450
 		AirTargetProductionValue: 300
 		AirTargetBuildingValue: 100
+		AirTargetWallValue: 1
 		AirTargetDefencelessBonus: 250
 		AirTargetAntiAirPenalty: 700
 		AirTargetDistancePenalty: 12
@@ -2605,6 +2617,7 @@ Player:
 		AirTargetUnitValue: 450
 		AirTargetProductionValue: 300
 		AirTargetBuildingValue: 100
+		AirTargetWallValue: 1
 		AirTargetDefencelessBonus: 250
 		AirTargetAntiAirPenalty: 700
 		AirTargetDistancePenalty: 12
@@ -2900,6 +2913,7 @@ Player:
 		AirTargetUnitValue: 450
 		AirTargetProductionValue: 300
 		AirTargetBuildingValue: 100
+		AirTargetWallValue: 1
 		AirTargetDefencelessBonus: 250
 		AirTargetAntiAirPenalty: 700
 		AirTargetDistancePenalty: 12
@@ -3161,6 +3175,7 @@ Player:
 		AirTargetUnitValue: 450
 		AirTargetProductionValue: 300
 		AirTargetBuildingValue: 100
+		AirTargetWallValue: 1
 		AirTargetDefencelessBonus: 250
 		AirTargetAntiAirPenalty: 700
 		AirTargetDistancePenalty: 12
