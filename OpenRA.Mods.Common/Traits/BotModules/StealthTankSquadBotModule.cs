@@ -1515,11 +1515,11 @@ namespace OpenRA.Mods.Common.Traits
 			var rankedCandidates = enemies.Select(a => new
 			{
 				Actor = a,
-					Priority = Priority(role, a, activeUnits.Length),
-					Attackable = activeUnits.Any(u => CanAttackTarget(u, a)),
-					Distance = (a.CenterPosition - center).Length / 1024,
-					ClusterMultiplier = InfantryClusterMultiplier(role, a)
-				}).Where(c => c.Priority > 0 && c.Attackable)
+				Priority = Priority(role, a, activeUnits.Length),
+				Attackable = activeUnits.Any(u => CanAttackTarget(u, a)),
+				Distance = (a.CenterPosition - center).Length / 1024,
+				ClusterMultiplier = InfantryClusterMultiplier(role, a)
+			}).Where(c => c.Priority > 0 && c.Attackable)
 				.OrderByDescending(c => StealthTankSquadPolicy.TargetScore(c.Priority,
 					c.Actor.Info.TraitInfoOrDefault<ValuedInfo>()?.Cost ?? 1, c.Distance,
 					c.Actor == group.Target ? 100 + Info.TargetSwitchImprovementPercent : 100,
@@ -1692,7 +1692,6 @@ namespace OpenRA.Mods.Common.Traits
 					freshWall = candidate.Actor;
 					freshWallScore = freshScore;
 				}
-
 			}
 
 			scanCandidateThreatTicks += Stopwatch.GetTimestamp() - phaseStarted;
@@ -1867,6 +1866,7 @@ namespace OpenRA.Mods.Common.Traits
 			scanRetainedSafetyTicks += Stopwatch.GetTimestamp() - phaseStarted;
 			var invalidation = StealthTankSquadPolicy.ClassifyPlanInvalidation(group.HasPlan,
 				changed, group.MembershipChanged,
+
 				// Like Air, retaining a live moving actor retains its one-shot mission orders.
 				// Attack follows the actor after the precomputed approach; a route is only
 				// refreshed for a real switch, membership/safety change, or bounded stall.
@@ -2127,6 +2127,7 @@ namespace OpenRA.Mods.Common.Traits
 					c.Y * map.CoarseSize + map.CoarseSize / 2))).ToList();
 				routeCache?.Add(routeKey, new List<CPos>(result));
 			}
+
 			if (result.Count == 0 || result[result.Count - 1] != destination)
 				result.Add(destination);
 

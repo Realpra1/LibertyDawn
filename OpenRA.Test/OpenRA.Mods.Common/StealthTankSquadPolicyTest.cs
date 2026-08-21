@@ -185,6 +185,7 @@ namespace OpenRA.Test.Mods.Common
 		{
 			Assert.That(StealthTankSquadPolicy.IsSameStrategicCell(
 				new CPos(5, 5), new CPos(6, 6), 6), Is.False);
+
 			// The caller has already reassessed and retained this live actor, so its
 			// movement is not an order invalidation. Attack follows the actor and the
 			// bounded no-progress path remains the route-refresh authority.

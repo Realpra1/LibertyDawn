@@ -1025,3 +1025,15 @@ the blocker precisely if natural combat acceptance remains unproved.
 - Exactly those two final matches count. All timeouts, no-specialist launches,
   pre-fallback games, diagnostic continuations, and superseded reviews are
   uncounted. No push/new PR/merge/external process/unrelated edit was performed.
+
+### Terra formatting correction (2026-08-22)
+
+- Fresh Terra review of `7715b88ffe911cf9cd697912a7c8d42f4a47de67`
+  accepted the product behavior and both final-game evidence, but blocked the
+  release because a clean focused rebuild exposed StyleCop formatting warnings
+  in changed files. Durable review:
+  `.build/cnc96a-pr128-correction/reviews/TERRA-FINAL.md`.
+- Disposition: accepted. Only the reported formatting locations were normalized;
+  product behavior, tests, scenarios, and counted evidence are unchanged. A true
+  `dotnet clean` followed by the focused Release test rebuilt with 0 warnings,
+  0 errors, and 121/121 passing tests.

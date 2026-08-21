@@ -1456,3 +1456,14 @@ retained as nonblocking evidence limits rather than hidden.
 All pre-final timeout, no-specialist, pre-fallback and diagnostic artifacts are
 explicitly uncounted. Exactly the two final matches above count. No push, PR,
 merge, external process, Air/config change, or unrelated edit was performed.
+
+## Terra formatting correction
+
+Fresh Terra review of `7715b88ffe911cf9cd697912a7c8d42f4a47de67`
+accepted the implementation and final-game evidence, but found that a clean
+focused rebuild emitted StyleCop warnings in changed files despite the earlier
+zero-warning claim. The review is preserved at
+`.build/cnc96a-pr128-correction/reviews/TERRA-FINAL.md`. The correction only
+normalizes those formatting locations; no product behavior or game evidence
+changed. A true clean Release rebuild now reports 0 warnings and 0 errors, and
+the focused suite passes 121/121.
