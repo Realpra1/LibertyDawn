@@ -234,6 +234,20 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
+		public void CompletedRevealRetreatReassessesWithTheLiveTargetAsIncumbent()
+		{
+			Assert.That(StealthTankSquadPolicy.CompleteRetreat(1, true),
+				Is.EqualTo(StealthTankRetreatCompletion.ContinueRetreat),
+				"No target decision may release a pending multi-unit retreat barrier.");
+			Assert.That(StealthTankSquadPolicy.CompleteRetreat(0, true),
+				Is.EqualTo(StealthTankRetreatCompletion.ReassessWithIncumbent),
+				"A live attacked target must remain the incumbent after the safety move.");
+			Assert.That(StealthTankSquadPolicy.CompleteRetreat(0, false),
+				Is.EqualTo(StealthTankRetreatCompletion.ReassessWithoutIncumbent),
+				"A dead, stale, or captured target must never be resumed.");
+		}
+
+		[Test]
 		public void MalformedOrFutureRetreatSaveFallsBackWithoutState()
 		{
 			var malformed = new MiniYamlNode("StealthTankRetreatState", "", new[]

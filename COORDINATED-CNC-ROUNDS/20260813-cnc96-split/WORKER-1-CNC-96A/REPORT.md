@@ -1160,3 +1160,88 @@ Facility for VIKI, place a Stealth specialist below an explicitly active authore
 retreat threshold, and prove Repair health increase, full repair, rejoin, and
 continued same-object action. Use a distinct no-repair active-fallback leg if the
 integration game budget permits; do not tune product balance to activate repair.
+
+## Exceptional natural-combat correction
+
+The release-blocking ordinary-play report was reproduced before editing. An
+unmodified one-VIKI-versus-two-allied-Brutalis Empire Earth game reached tick
+15100 in 76.072 seconds. VIKI had two STNK and one CTNK by tick 15000, yet no
+specialist achieved a meaningful kill; the first STNK damage callback arrived
+only at tick 15027. The trace showed roughly 3000 ticks of target churn after
+the first STNK assignment. Once it began firing, every reveal correctly caused
+one six-cell strategic retreat, but completion discarded the attacked target and
+the next scan frequently chose a different Harvester, SAM, infantry or structure.
+
+The exact defect was a broken handoff between two already-existing lifecycle
+fields. `BeginStrategicRetreat` stored the attacked actor in `RetreatTarget`, but
+`UpdateStrategicRetreat` unconditionally nulled it when the last member reached
+its destination. The correction classifies retreat completion and places a
+still-live enemy back into `group.Target` as the incumbent for the forced fresh
+scan. That scan still owns route safety, scoring and the existing switch threshold.
+Dead, captured and stale actors are not restored. Six-cell geometry, multi-member
+barrier, save/load, repair, reinforcement, ownership, Stealth/Chemical configuration,
+target priorities, Air and all balance values are unchanged.
+
+The focused regression covers all three outcomes: a pending member continues the
+barrier, a completed live target is reassessed as incumbent, and an invalid target
+is omitted. Final filtered `StealthTankSquadPolicyTest` passed 106/106. Final
+Release compilation and full CNC MiniYAML lint passed with zero warnings/errors;
+`git diff --check` passed.
+
+### Final Game 1 — Stealth sustained combat
+
+Artifact: `.build/cnc96a-natural-cycle/final-game1-strict3` (seed 96215). The
+ordinary/all-module game used VIKI spawn 1 against allied Brutalis spawns 20 and
+18. Two uncommanded VIKI STNK and two enemy Harvesters began 12-17 cells apart;
+all subsequent specialist decisions/orders came from the ordinary bot modules.
+The engine reached tick 5100 under the 120-second launcher bound with exit 0 and
+no exception, fatal Lua error or desync.
+
+The first attributed STNK hit occurred at tick 246. The exact injected Harvesters
+died at ticks 428 and 876. Totals at tick 5000 were 6 attributed damage events,
+105700 damage and 2 meaningful/valuable kills; both STNK remained alive. The
+first attacked Harvester survived retreat completion at tick 300 as the incumbent,
+then was correctly absent after its death at tick 500. The second survived
+completions at ticks 700 and 875 before dying. Later natural targets also remained
+incumbents across repeated safety retreats, demonstrating sustained engagement
+rather than movement telemetry alone.
+
+- Luna narrative: `.build/cnc96a-natural-cycle/final-game1-strict3/NARRATIVE.md`
+  — PASS.
+- Separate Luna policy review:
+  `.build/cnc96a-natural-cycle/final-game1-strict3/POLICY-REVIEW.md` — PASS,
+  medium-high confidence, no blocker. Provenance and lack of a terminal winner are
+  non-blocking evidence limits: raw engine Lua/debug logs and bounded completion
+  directly support the claimed combat outcome.
+
+### Final Game 2 — distinct Chemical crossfire
+
+Artifact: `.build/cnc96a-natural-cycle/final-game2-strict1` (seed 96220). This
+distinct ordinary/all-module topology placed VIKI at spawn 10 against allied
+Brutalis at spawns 11 and 12. Two uncommanded CTNK and two enemy Harvesters used
+the opposite central corridor. The shared Chemical-profile module reserved one
+specialist while leaving one for the ordinary army, preserving the ownership
+split. The engine reached tick 5100 under the 120-second bound with exit 0 and no
+integrity fault.
+
+The first attributed CTNK hit occurred at tick 342; the two meaningful Harvesters
+died at ticks 427 and 649. Exact tick-5000 totals were 17 damage events, 72257
+damage and 2 meaningful/valuable kills, with both CTNK alive. The module continued
+ordinary missions afterward. This independently proves that the shared Chemical
+lifecycle remains active and its configuration-only distinction was not regressed.
+
+- Luna narrative: `.build/cnc96a-natural-cycle/final-game2-strict1/NARRATIVE.md`
+  — PASS.
+- Separate Luna policy review:
+  `.build/cnc96a-natural-cycle/final-game2-strict1/POLICY-REVIEW.md` — PASS,
+  medium/high confidence, no blocker. The unticked first ownership snapshot,
+  scratchpad omission note and absence of a winner claim are non-blocking; the
+  direct damage/kills and ordinary/all-module distinction satisfy this cycle.
+
+Calibration/setup artifacts were not counted: pre-engine content/Lua misses, a
+bounded observer-memory diagnostic, the unmodified reproduction, a duplicated-
+callback observer run, one tick-0 unsupported-ActorID run, and one run that did
+not register WorldLoaded targets. Exactly the two final artifacts above form the
+acceptance count. Proposed status: natural-combat correction complete and ready
+for fresh Terra review. No push, PR or merge was performed; the coordinator owns
+the successor hotfix publication.

@@ -10,10 +10,10 @@ sheet, coordinator state, other skills, or other worker specs. Read applicable
 - Worker/task: `WORKER-1` / `CNC-96A — Stealth squad performance using AirSquad as gold standard`
 - Change category: `AI performance and bounded architecture, with player-visible tactical behavior preservation`
 - Balance authority: `Frozen. Do not change cost, HP, damage, armor, speed, timing, power, prerequisites, probabilities, resources, production fractions, squad composition, target priorities, threat buffers, scan/order cadence, or candidate/group bounds.`
-- Status: `First iteration - testing; shared-threat blocker fixed; Chemical full-health repair and lone-survivor/replacement ownership proved; explicit route/order and combat rejoin unproved`
-- Base branch/SHA: `agent/round-20260812-cnc96-periodic-stalls` / `0c9a5c187d6bd3c354921855f19a4fb3590d6f06`
-- Task branch / PR base: `agent/round-20260813-cnc96a-stealth-performance` / `bleed`
-- Current cycle: `11`; cycles used: `5/5 primary`, `5 exceptional Sol-medium acceptance cycles`, `1 bounded final-review fix cycle`
+- Status: `natural-combat correction complete — pending fresh Terra review; prior reinforcement/lifecycle acceptance preserved`
+- Base branch/SHA: `bleed` / `4c496940ee500e00b32a2f8e7d49932045f2bc04`
+- Task branch / PR base: `successor CNC-96A hotfix branch (to be created by coordinator)` / `bleed`; PR #126 merged 2026-08-21 and is not to be reopened or refreshed
+- Current cycle: `12`; cycles used: `5/5 primary`, `6 exceptional Sol-medium acceptance cycles`, `1 bounded final-review fix cycle`
 - Required model: cycle 1 `Sol high`; cycles 2-5 `Terra medium`; cycles 6-15
   `Luna medium` only when coordinator authorizes minor obvious work; at most two
   exceptional `Sol medium` escalation cycles may follow only a critical blocker
@@ -24,7 +24,7 @@ sheet, coordinator state, other skills, or other worker specs. Read applicable
 - Design: `.agents/references/LIBERTY-DAWN-DESIGN.md`
 - Policy scratchpad/lock: `/root/github/LibertyDawn/.agents/references/LIBERTY-DAWN-POLICY-SCRATCHPAD.md` /
   `/root/github/LibertyDawn/.agents/locks`
-- Games completed: `cycle 1: 2 distinct changed-build scenarios plus matched exact-base controls; cycle 2: 2 distinct changed-build scenarios; cycle 3: 2 distinct final-source changed-build scenarios; cycle 4: 2 valid bounded changed-build scenarios plus 2 tick-0 fixture failures excluded from the game count; cycle 5: exactly 2 valid bounded changed-build scenarios plus 1 tick-0 fixture failure excluded from the game count; cycle 6: exactly 2 valid bounded changed-build scenarios plus 1 tick-0 Lua fixture failure excluded from the game count; cycle 7: exactly 2 valid bounded changed-build scenarios plus 1 tick-accounting-0 Lua telemetry failure excluded from the game count; cycle 8: exactly 2 valid bounded changed-build scenarios; cycle 9: exactly 2 valid bounded changed-build scenarios; cycle 10: exactly 2 valid bounded changed-build scenarios plus one pre-completion Lua telemetry failure excluded from the game count`;
+- Games completed: `cycle 1: 2 distinct changed-build scenarios plus matched exact-base controls; cycle 2: 2 distinct changed-build scenarios; cycle 3: 2 distinct final-source changed-build scenarios; cycle 4: 2 valid bounded changed-build scenarios plus 2 tick-0 fixture failures excluded from the game count; cycle 5: exactly 2 valid bounded changed-build scenarios plus 1 tick-0 fixture failure excluded from the game count; cycle 6: exactly 2 valid bounded changed-build scenarios plus 1 tick-0 Lua fixture failure excluded from the game count; cycle 7: exactly 2 valid bounded changed-build scenarios plus 1 tick-accounting-0 Lua telemetry failure excluded from the game count; cycle 8: exactly 2 valid bounded changed-build scenarios; cycle 9: exactly 2 valid bounded changed-build scenarios; cycle 10: exactly 2 valid bounded changed-build scenarios plus one pre-completion Lua telemetry failure excluded from the game count; cycle 11: exactly 2 valid bounded changed-build scenarios; cycle 12: exactly 2 valid bounded changed-build scenarios plus setup/observer calibration attempts explicitly excluded`;
   cycle-3 review: `one advisory, partly adopted`; PR: `none`
 
 Each worker invocation performs only the current authorized cycle, updates this
@@ -493,6 +493,112 @@ deferred work, and risks.
 
 ## Cycle journal
 
+## Fresh authoritative amendment: natural combat inactivity (2026-08-21)
+
+This amendment is the current acceptance authority for the existing CNC-96A
+task. PR #126, previously published for the reinforcement release, merged into
+`bleed` on 2026-08-21; do not reopen, refresh, merge, or create a replacement
+PR for it. The coordinator must create one successor hotfix branch and PR
+targeting the current `bleed` head above after implementation and release gates.
+
+The user reports that Stealth and Chemical squads appear inactive in ordinary
+play: they may drive into an enemy base without firing, then leave after a unit
+dies. Diagnose the root cause before editing. Reproduce with a real sustained
+ordinary game containing one VIKI against two allied Brutalis players separated
+by meaningful map distance. Under those conditions specialist squads must issue
+actual attacks, deal damage, and achieve meaningful target kills; movement and
+order telemetry alone is insufficient. VIKI may win unless overwhelmed.
+
+Run a distinct adversarial second native full-engine game with ordinary enemy
+AIs, all modules/features enabled, and a different pressure/topology/timing or
+resource assumption. Each counted game requires its own native Luna factual
+narrative and separate native Luna policy review. Preserve the existing
+reinforcement staging, targeting, retreat, repair, save/load, ownership,
+Chemical shared-lifecycle/config-only, wall-priority, and CNC-101 behavior
+unless the diagnosed root cause demands the narrowest correction. Preserve all
+balance values and do not use movement/order telemetry as a substitute for
+combat evidence.
+
+Require focused/protected checks, root-cause evidence, Terra review, cumulative
+release integration, and refreshed successor-PR CI. Do not create a new task,
+round, or unrelated PR; do not merge `bleed`; do not use external Codex. The
+worker must stop at the existing manual policy gates after each cycle and record
+the blocker precisely if natural combat acceptance remains unproved.
+
+### Exceptional natural-combat correction cycle (2026-08-21)
+
+- Authority: native Sol-medium release-blocking human-failure correction from
+  clean head `d2b128f696`; reproduce before editing, then make only the smallest
+  root-cause correction. Exactly two final <=120-second full-engine games each
+  receive separate fresh native Luna factual narration and policy review as the
+  newer explicit cycle contract requires.
+- Required first reproduction/final pressure: one ordinary VIKI versus two allied
+  ordinary Brutalis players, all modules/features enabled, meaningful map distance,
+  sustained combat. Count only specialist-attributed attacks, damage, and meaningful
+  Harvester/valuable-target kills; movement/order telemetry is diagnostic only.
+- Preservation table: actor eligibility; deterministic group assignment and roles;
+  Stealth/Chemical distinct targeting and configuration-only differences; all target
+  priorities including wall priority; detector/armed-threat, resource, pending-
+  explosion, route/passability, and weakest-defender safety; 48-candidate/group
+  bounds; 75-tick scan/order and 25-tick local-safety cadences; Air switch semantics;
+  reinforcement staging/joining/save state; retreat/save/repair/rejoin; ownership and
+  ordinary-army exclusion; CNC-101 behavior; all balance values; and Air output remain
+  unchanged unless the reproduced root cause demands the narrowest compatible guard.
+- Diagnostic sequence: run the sustained natural reproduction on unmodified head;
+  correlate specialist target/route/Stop/wait telemetry with Lua-attributed attacks,
+  health loss, and kills; state the exact root cause; only then edit product/tests.
+- Publication: update only this STATE and REPORT, commit once, and return for Terra;
+  no push, PR, merge, external agent, or unrelated task.
+
+### Natural-combat correction result
+
+- Unmodified reproduction: the accepted ordinary VIKI-versus-two-allied-Brutalis
+  baseline reached tick 15100 in 76.072 seconds. VIKI had produced two STNK and
+  one CTNK by tick 15000, but no specialist achieved a meaningful kill. The first
+  STNK damage callback arrived only at tick 15027. Debug telemetry showed target
+  churn for roughly 3000 ticks after the first STNK assignment, followed by an
+  immediate six-cell retreat after each revealed shot and a different target after
+  most completions.
+- Root cause: `BeginStrategicRetreat` intentionally saved the attacked actor in
+  `RetreatTarget`, but `UpdateStrategicRetreat` unconditionally discarded it when
+  the multi-member barrier completed. The forced fresh scan therefore had no
+  incumbent and could replace the target after every shot. The correction keeps a
+  still-live enemy as the incumbent for the fresh normal scan; existing scoring,
+  safety and switch thresholds still decide retention. Dead, captured or stale
+  targets remain discarded. Retreat geometry, barrier, persistence, repair,
+  reinforcement, ownership, profile configuration and Air are unchanged.
+- Focused regression: pending destinations return `ContinueRetreat`; a completed
+  retreat with a live enemy returns `ReassessWithIncumbent`; invalid targets return
+  `ReassessWithoutIncumbent`. Final filtered policy suite passed 106/106.
+- Counted Game 1: `.build/cnc96a-natural-cycle/final-game1-strict3`, seed 96215,
+  tick 5100 under the 120-second bound, ordinary/all-module VIKI spawn 1 versus
+  allied Brutalis spawns 20/18. Two uncommanded VIKI STNK began 12-17 cells from
+  two enemy Harvesters. First attributed hit was tick 246; meaningful Harvester
+  kills were ticks 428 and 876. Final exact totals were 6 damage events, 105700
+  damage and 2 valuable kills, with both STNK alive at tick 5000. Live incumbents
+  survived retreat completion at ticks 300, 700 and 875; the killed target was
+  correctly absent at tick 500. Fresh Luna narrative `NARRATIVE.md`: PASS. Separate
+  Luna `POLICY-REVIEW.md`: PASS, medium-high, no blocker; provenance/terminal-victory
+  comments are non-blocking because raw engine Lua/debug logs and the bounded tick
+  completion directly support the claimed combat outcome.
+- Counted Game 2: `.build/cnc96a-natural-cycle/final-game2-strict1`, seed 96220,
+  tick 5100 under the 120-second bound, distinct Chemical crossfire topology with
+  VIKI spawn 10 versus allied Brutalis spawns 11/12. Two uncommanded CTNK were
+  reserved by the shared Chemical profile; first attributed hit was tick 342 and
+  meaningful Harvester kills were ticks 427 and 649. Final exact totals were 17
+  damage events, 72257 damage and 2 valuable kills, with both CTNK alive at tick
+  5000. Fresh Luna narrative `NARRATIVE.md`: PASS. Separate Luna
+  `POLICY-REVIEW.md`: PASS, medium/high, no blocker; snapshot/scratchpad/terminal-
+  winner comments are evidence advisories, not behavioral failures.
+- Exclusions: pre-engine content/Lua setup attempts, one bounded Lua-memory
+  diagnostic, the unmodified reproduction, calibration, duplicated-callback
+  observer output, one tick-0 unsupported-ActorID attempt, and one run whose
+  WorldLoaded targets were not registered are diagnostic/setup-only and not part
+  of the exactly-two final count.
+- Final checks: Release compilation and full CNC MiniYAML passed with zero
+  warnings/errors; focused suite passed 106/106; `git diff --check` passed.
+  Ready for one fresh Terra review; no push, PR or merge was performed.
+
 | Cycle/model | Commit/change | Scenario 1 hypothesis/result/narrative | Scenario 2 hypothesis/result/narrative | Checks | Manual policy decision |
 |---|---|---|---|---|---|
 | 1 / Sol high | One shared same-tick factual view; per-group retained safe/progressing plan with explicit invalidation; state-change orders; shared-path/profile parity tests; one cycle-closing commit on `agent/round-20260813-cnc96a-stealth-performance` | Saturated 331-mobile-per-side IronReaper paced game plus exact-base control: both profiles and AirSquad selected the isolated `nuk2`; changed profiles retained progressing plans rather than rebuilding every 75 ticks. Combined Stealth CPU `24177.159 -> 5675.048ms`, orders `778 -> 189`; tick p99 `414 -> 196ms`, >=50ms ticks `65 -> 45`. Fresh narrative: `analysis/20260813-cnc96-split/worker-1-cnc-96a/commenters/scenario-a/NARRATIVE.md`. Damage/kill outcome is not proved. | Scripted Archipelago target move/death, detector/attacker and route close/open, membership replacement, late-target sequence: all markers and final 12/12 specialist counts per player passed, Chemical remained active, but Stealth issued zero plans/paths/orders in both base and changed runs. Safe stale-order absence passed; reachable-opening recovery was not proved. Fresh narrative: `analysis/20260813-cnc96-split/worker-1-cnc-96a/commenters/scenario-b/NARRATIVE.md`. | Protected `make all` passed with 0 warnings/errors; focused policy/parity suite 42/42; diff check passed. | Pending. User amendment that both profiles use exactly the same control code was implemented. User must decide retained-plan invalidation policy, whether Scenario B is a valid safe hold or passive-idling failure, and whether explicit damage/loss/direct-Air evidence is cycle-2 priority. |
@@ -506,17 +612,18 @@ deferred work, and risks.
 | 9 / Sol medium exceptional acceptance | Strict safe-primary tier; after Air-matched 3 all-defended scans, an isolated unarmed detector may be the reachable weakest blocker. Per-member opportunistic repair uses compatible safe reachable `fix` routes; full repair rejoins; no path stays active with 125-tick reevaluation. | Game A tick 1800/6.005s: lone MHQ allowed STNK damage; exact MHQ Multi1/range18 + MTNK Multi1/range7 Stops occurred. Shooter removal tick676 resumed exact harv#38 immediately with MHQ alive, but Lua recorded armed-window damage and first post-removal damage tick743 (+67), failing literal safety and <=25 damage. Luna FAIL/high. | Game B tick 1900/5.004s: after exactly 3 all-defended scans, VIKI selected MHQ#33 by AttackUnarmedDetector, damaged254/killed278, reassessed harv#32 tick301, damaged376, and ultimately killed it. Luna bounded PASS/moderate-high. | Protected Release build 0 warnings/errors; full CNC lint; focused 79/79; Lua/ActorID/diff clean. Exactly two valid games; no Air/exception/fatal/desync. | First iteration. Blocker ordering passes, but Game A fails armed-window and <=25 damage acceptance. Repair/no-repair has focused static coverage only. Not ready for Terra final review. |
 | 10 / Sol medium exceptional acceptance | Added exact opt-in Stop/resume tick, activity, reload/delay/burst telemetry. Fixed the concrete repair-route omission by queuing the compatible facility's engine `Repair` order after safe waypoints. | Game A tick 1900/6.006s: armed injection601, exact Stops625 while both activities were Attack and weapons already reloading/mid-burst; only committed missile impacts650/651/660/661, none later. Extended armed phase killed both STNKs (assignment 2→1→0), so shooter removal801 had no survivor and exact resume failed. Fresh Luna: stop/in-flight partial pass, resume fail. | Game B tick 2200/6.006s: exact named damaged no-repair actor remained in reserved pair and repeatedly damaged Harvester until scripted death451 (last committed impact465). `ReserveOpeningPair` then handed the lone survivor to ordinary AI (`total=1 reserved=0`), so compatible fix/rejoin was not exercised and health stayed 6000/15000. Fresh Luna: no-repair pass; repair fixture-conflicted/unproved. | Strict Release CNC compile 0 warnings/errors; full CNC lint; focused 79/79; Lua/diff clean. Exactly two valid games plus one excluded Lua-property failure; no Air/exception/fatal/desync in valid games. | First iteration. Stop causality and no-repair-active are resolved. Surviving <=25 resume and reserved repair/full-rejoin remain literal gaps at exact cap; not ready for Terra final review/publication. |
 | 11 / bounded final-review fix | Repair consumes owner shared facts through caller-private influence/cache. Air-shaped survivor ownership retains one eligible reserved member, recruits a replacement deterministically, and persists reserved IDs. | Chemical tick1800/5.004s: exact non-owner CTNK rose 9000→10250 tick126→25000 tick1001 with live fix; no direct route/order or post-full damage. Luna policy mixed/high, repaired-but-rejoin-unproved. | Stealth tick2200/6.005s: exact STNK damaged targets before/after partner death; `total=1 reserved=1 groups=1/0/0 ordinary=0`, then replacement `total=2 reserved=2 groups=2/0/0 ordinary=0`. VIKI threshold zero meant repair did not activate. Luna accepts ownership invariant; repair insufficient/high. | Strict Release/full lint; focused 85/85; map/Lua/JSON/ActorID/diff clean; exactly two valid games, no Air/integrity faults. | Final-review code blocker fixed; stop for fresh Terra rereview with route/order and combat rejoin accurately limited. |
+| 12 / exceptional Sol medium natural combat | Preserve the still-live reveal-retreat target as incumbent for the forced fresh scan; invalid targets remain discarded. No config/Air/balance change. | STNK natural pressure tick5100: hit246; Harvester kills428/876; 6 events/105700 damage/2 valuable kills; repeated live-incumbent retreat completion. Luna narrative PASS; policy PASS medium-high/no blocker. | Distinct Chemical crossfire tick5100: hit342; Harvester kills427/649; 17 events/72257 damage/2 valuable kills; both CTNK survive tick5000. Luna narrative PASS; policy PASS medium-high/no blocker. | Strict Release build/full CNC lint 0 warnings/errors; focused 106/106; diff check clean; exactly two final games under 120 seconds. | Ready for fresh Terra review. Reviewer advisories are evidence-provenance/terminal-outcome limits only; natural-combat acceptance passes. |
 
 ## Handoff receipt
 
-- Proposed status: `First iteration - testing; shared-threat blocker fixed; Chemical full-health repair and lone-survivor/replacement ownership proved; explicit route/order and combat rejoin unproved`
-- Branch/head and PR/checks: `agent/round-20260813-cnc96a-air-squad-stealth` / cycle-11 final-review-fix commit pending below; PR `none`; strict Release build/full CNC MiniYAML 0 warnings/errors; focused specialist policy suite 85/85; map/Lua/JSON/ActorID/diff clean.
-- Cycles/models used: `cycle 1 Sol high, cycle 2 Terra medium, cycles 3-4 explicitly authorized Sol high, cycle 5 Terra medium, cycles 6-10 explicitly authorized exceptional Sol medium, cycle 11 bounded final-review fix`
+- Proposed status: `Natural-combat correction complete; exactly two final ordinary/all-module games prove attributed specialist damage and meaningful kills; ready for fresh Terra review.`
+- Branch/head and PR/checks: `agent/20260821-cnc96a-natural-combat` / this cycle-12 single handoff commit; PR `none`; strict Release build/full CNC MiniYAML 0 warnings/errors; focused specialist policy suite 106/106; diff clean.
+- Cycles/models used: `cycle 1 Sol high, cycle 2 Terra medium, cycles 3-4 explicitly authorized Sol high, cycle 5 Terra medium, cycles 6-10 explicitly authorized exceptional Sol medium, cycle 11 bounded final-review fix, cycle 12 explicitly authorized exceptional natural-combat Sol medium`
 - Acceptance/adversarial/final-regression evidence: `Cycle 3 proved useful routes, damage/kills, turnover recovery and the large performance correction. Cycle 5 proved infantry-blocker death followed by Harvester damage. Cycle 6 proved Blue adjacency Stops. Cycle 7 proved the unarmed self-detecting Harvester attack. Cycle 8 proved continued engagement under lone MHQ and exact detector-plus-armed Stop/no armed-phase damage; final shooter-removal recovery remains unplayed.`
 - Old-control and direct AirSquad comparative result: `Cycle 1 exact-base remains old-policy evidence. Cycle 3 versus cycle 2 changed-head direct Stealth strategy fell 7790.150 -> 222.997ms over the same 24 heavy scans (-97.1%); tick max fell 6357.828 -> 1643.235ms. Cycle-3 Air strategy was 1316.446ms/84 and local safety 23.157ms/144; specialist strategy was 299.722ms/48 and local safety 10.884ms/144. Denominators and nested route/build timing are explicit in the report.`
-- Per-game Luna narrative/policy paths: `cycle11/reviews/game-a-narrator/NARRATIVE.md and game-a-policy/POLICY-REVIEW.md; cycle11/reviews/game-b-narrator/NARRATIVE.md and game-b-policy/POLICY-REVIEW.md.`
-- User policy-review decision and next boundary: `Cycle 9 implemented the directed Air-shaped safe-primary -> weakest blocker -> reassess and opportunistic repair mapping. Game B passes. Game A proves immediate exact assignment release, but its armed-window boolean has no shot tick and first post-removal damage is +67. Cycle 10 must diagnose pending missile/order latency versus cadence before any correction. This worker must not implement cycle 10.`
+- Per-game Luna narrative/policy paths: `.build/cnc96a-natural-cycle/final-game1-strict3/NARRATIVE.md and POLICY-REVIEW.md; .build/cnc96a-natural-cycle/final-game2-strict1/NARRATIVE.md and POLICY-REVIEW.md.`
+- User policy-review decision and next boundary: `Both fresh Luna policy reviews PASS with no blocker. Evidence-provenance and non-terminal-victory advisories are documented and do not contradict direct attributed damage/kills. Stop for fresh Terra review; do not implement another cycle.`
 - Cycle-9 review/disposition: `Both fresh Luna narratives/reviews were fact-checked. Game A verdict FAIL/high; no post-game correction was permitted. Game B verdict bounded PASS/moderate-high; retain strict tiering, three-scan patience, armed veto, exact-primary reassessment, and bounded observability advice.`
 - Spec-policy recommendations/disposition: `Adopted the AirSquad-shaped bounded-strategy/live-safety/stable-plan/state-change-order direction and its preservation constraints. Deferred shared framework extraction; this cycle instead uses one existing specialist control implementation for both configured profiles. No recommendation rejected.`
 - Diagnostic/performance result: `Game A mean/p50/p95/p99/max 0.496/0.223/0.691/5.206/1065.649ms, two >=50ms; Game B p50/p95/p99/max 1/2/7/1054.289ms, three >=50ms. Startup owned maxima. Strategy remained 75 ticks, safety 25 ticks, grid 4 cells/cache125; no Air identity appeared.`
-- Deferred work and known risks: `Fresh Terra must rereview the shared-threat correction. Cumulative Sol-medium integration should pre-spawn a reachable compatible Repair Facility for VIKI, damage Stealth below an explicitly active authored retreat threshold, and prove Repair health increase/full repair/rejoin/continued same-object action; use a distinct no-repair active-fallback leg if capacity permits. Surviving <=25 detector-plus-armed release, explicit SnipeTank/Crush attribution, remaining personalities, blocked/reservation cases, controls, paced agreement, loaded-save engine proof, final regression, PR/CI, and cleanup remain.`
+- Deferred work and known risks: `Fresh Terra must review the narrow retreat-incumbent handoff and direct natural-combat evidence. The counted games prove bounded specialist combat, not a terminal VIKI win. Prior detector/repair/save/reinforcement limits remain as already documented; this correction does not broaden them. Coordinator owns integration, successor PR/CI, and cleanup.`
