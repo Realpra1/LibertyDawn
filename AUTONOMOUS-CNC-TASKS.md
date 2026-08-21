@@ -11,6 +11,31 @@ or make reinforcement staging Stealth-only. Preserve all other CNC-96A scope,
 PR #125 behavior, no new task/PR, no balance changes, no unrelated Air changes,
 and no merge to bleed.
 
+## CNC-96A existing-task amendment — finish target, then retreat (2026-08-21)
+
+This amends existing CNC-96A only. Successor PR #127 targets `bleed` at exact
+head `2572c6c4f65a31fe195fbf20098eabc7e7ce04d3` and is draft; update PR #127,
+create no task/round/PR, and do not merge `bleed`.
+
+Stealth and Chemical specialist squads must finish the selected target before
+retreating. Commit fire until the target is destroyed or otherwise invalid,
+then retreat exactly one strategic/coarse cell before selecting the next
+mission. Never shoot once, retreat, return, and repeat. Diagnose before editing.
+Preserve reinforcement, repair/no-repair, save/load, genuinely-invalid or
+meaningfully-superior target switching, shared Stealth/Chemical lifecycle with
+configuration-only differences, wall priority, CNC-101 behavior, and frozen
+balance unless the smallest root-cause correction requires change.
+
+Require direct evidence in a sustained ordinary 1-VIKI-versus-2-allied-Brutalis
+game of completion-before-retreat ordering, no shot/retreat oscillation, unique
+harvester kills, Stealth veterancy progression from successful kills, and tank
+survivorship; ordinary accidents/enemy action may still destroy individual
+tanks. Correct behavior should defeat both Brutalis opponents or reach 40+
+harvester kills. Run a materially distinct second adversarial ordinary-AI/all-
+module game, with separate native Luna factual narration and policy review per
+counted game. Require focused/protected checks, Terra review, release
+integration, PR #127 update, and refreshed CI. No external Codex.
+
 ## CNC-96A existing-task amendment — natural combat inactivity (2026-08-21)
 
 This amends existing CNC-96A; it creates no task or round. PR #126 merged into

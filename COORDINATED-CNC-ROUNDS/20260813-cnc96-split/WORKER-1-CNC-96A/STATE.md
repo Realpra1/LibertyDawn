@@ -10,9 +10,9 @@ sheet, coordinator state, other skills, or other worker specs. Read applicable
 - Worker/task: `WORKER-1` / `CNC-96A — Stealth squad performance using AirSquad as gold standard`
 - Change category: `AI performance and bounded architecture, with player-visible tactical behavior preservation`
 - Balance authority: `Frozen. Do not change cost, HP, damage, armor, speed, timing, power, prerequisites, probabilities, resources, production fractions, squad composition, target priorities, threat buffers, scan/order cadence, or candidate/group bounds.`
-- Status: `natural-combat correction complete — pending fresh Terra review; prior reinforcement/lifecycle acceptance preserved`
-- Base branch/SHA: `bleed` / `4c496940ee500e00b32a2f8e7d49932045f2bc04`
-- Task branch / PR base: `successor CNC-96A hotfix branch (to be created by coordinator)` / `bleed`; PR #126 merged 2026-08-21 and is not to be reopened or refreshed
+- Status: `natural-combat correction complete — finish-then-retreat calibrated; pending fresh Terra review; prior reinforcement/lifecycle acceptance preserved`
+- Base branch/SHA: `bleed` / `2572c6c4f65a31fe195fbf20098eabc7e7ce04d3`
+- Task branch / PR base: `successor CNC-96A PR #127` / `bleed`; PR #127 is draft and must be updated, not replaced
 - Current cycle: `12`; cycles used: `5/5 primary`, `6 exceptional Sol-medium acceptance cycles`, `1 bounded final-review fix cycle`
 - Required model: cycle 1 `Sol high`; cycles 2-5 `Terra medium`; cycles 6-15
   `Luna medium` only when coordinator authorizes minor obvious work; at most two
@@ -493,7 +493,35 @@ deferred work, and risks.
 
 ## Cycle journal
 
-## Fresh authoritative amendment: natural combat inactivity (2026-08-21)
+## Fresh authoritative amendment: finish target, then retreat (2026-08-21)
+
+This amendment supersedes conflicting earlier retreat timing for the existing
+CNC-96A task. Successor PR #127 targets `bleed` at exact head
+`2572c6c4f65a31fe195fbf20098eabc7e7ce04d3` and is draft. Update PR #127 only;
+do not create another task, round, or PR, and do not merge `bleed`.
+
+Stealth and Chemical specialist squads must finish their selected target before
+retreating. Commit fire until the target is destroyed or otherwise invalid;
+only then retreat exactly one strategic/coarse cell before selecting the next
+mission. They must not shoot once, retreat, return, and repeat. Diagnose the
+root cause before editing and preserve reinforcement, repair/no-repair,
+save/load, genuinely-invalid or meaningfully-superior target switching, shared
+Stealth/Chemical lifecycle with configuration-only differences, wall priority,
+and CNC-101 behavior unless the smallest root-cause correction requires change.
+
+Acceptance requires direct evidence in a sustained ordinary 1-VIKI-versus-2-
+allied-Brutalis game of target-completion-before-retreat ordering, no
+shot/retreat oscillation, unique harvester kill counts, Stealth veterancy
+progression through successful kills, and tank survivorship (ordinary accidents
+and enemy action may still destroy individual tanks). Correct behavior should
+defeat both allied Brutalis opponents or accumulate at least 40 harvester kills.
+Run a materially distinct second adversarial ordinary-AI/all-module game, with
+separate native Luna factual narration and policy review per counted game.
+Require focused/protected checks, Terra review, release integration, PR #127
+update, and refreshed CI. No external Codex. Stop at manual policy gates and
+record any unproved ordering, kill, veterancy, or survivorship blocker.
+
+## Prior authoritative amendment: natural combat inactivity (2026-08-21)
 
 This amendment is the current acceptance authority for the existing CNC-96A
 task. PR #126, previously published for the reinforcement release, merged into
