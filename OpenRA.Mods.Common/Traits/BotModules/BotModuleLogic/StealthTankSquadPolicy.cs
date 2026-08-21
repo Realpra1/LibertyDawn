@@ -460,6 +460,16 @@ namespace OpenRA.Mods.Common.Traits
 				StealthTankTargetReassessment.RetainIncumbent;
 		}
 
+		public static List<T> NearbyReassessmentCandidates<T>(IEnumerable<T> nearbyCandidates,
+			T incumbent, Func<T, T, bool> sameCandidate)
+		{
+			var candidates = nearbyCandidates.ToList();
+			if (incumbent != null && !candidates.Any(candidate => sameCandidate(candidate, incumbent)))
+				candidates.Add(incumbent);
+
+			return candidates;
+		}
+
 		public static List<T> BoundCandidatesWithIncumbent<T>(IEnumerable<T> rankedCandidates,
 			int maximumCandidates, bool includeIncumbent, Func<T, bool> isIncumbent)
 		{

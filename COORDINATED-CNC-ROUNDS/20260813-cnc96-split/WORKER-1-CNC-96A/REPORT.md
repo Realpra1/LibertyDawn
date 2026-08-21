@@ -1290,3 +1290,90 @@ After probe restoration, Release build passed with zero warnings/errors, focused
 policy tests passed 107/107, full CNC MiniYAML passed, and `git diff --check`
 passed. Proposed status: complete and ready for fresh Terra review. No push, PR,
 merge, or external process was used.
+
+
+## Final natural-acquisition correction
+
+The unmodified ordinary economy reproduced the reported acquisition gap before
+editing. It reached tick 18100 in 76.082 seconds and naturally produced both
+specialist profiles. Eligibility, ownership, grouping, target categories,
+hostility, routes and orders were all active: the Stealth module submitted 59
+Harass targets/hazard routes and logged seven all-dangerous rejection scans.
+Nevertheless, the first sustained proximity window recorded 28/28 and then
+30/30 samples without new attributed damage.
+
+The exact defect was in the 25-tick local scanner. It found nearby candidates,
+but if the group already held any strategic target it skipped fresh evaluation
+unless that same target was nearby. A far incumbent could therefore suppress a
+strong local Harvester opportunity. Air's target lifecycle keeps the incumbent
+in challenger evaluation and applies the configured meaningful-improvement
+threshold. The correction does exactly that for the local Stealth/Chemical
+scanner: nearby candidates plus one live incumbent pass through the existing
+Stealth priority, safety, route, order and Air-shared 25% switch policy. It does
+not copy Air target priorities/scoring, change Air output, or change configuration,
+cadence, balance, weapon/ground rules, save/load, retreat, repair, reinforcement
+or ownership behavior.
+
+Two focused regressions cover distant-incumbent inclusion, no duplication, and
+the exact existing 124%-retain/125%-switch boundary.
+
+### Counted final Game 1 — sustained natural economy
+
+Artifact:
+`.build/cnc96a-natural-acquisition/final-game1-strict2/cnc96a-natural-acquisition-final-game1-strict`
+(seed 96501). This was one ordinary VIKI versus two allied ordinary Brutalis on
+normal economies with all modules. Specialists and Harvesters were AI-produced;
+there were no injected actors, waves, combat orders, passive bots, forced targets
+or scripted combat. It exited 0 at tick 21100 in 113.154 seconds without
+exception, Lua failure or desync.
+
+At tick 21000 the identity-stable observer recorded 119 attributed specialist
+damage events, 309781 damage and five distinct ordinary Harvester kills. STNK
+kills occurred at ticks 14061 and 14284; CTNK kills occurred at 17561, 17575 and
+20100. Product logs independently record the two STNK Harvester
+target-completion→exact-retreat cycles, 89 nearby observations, 17 retained
+reveals, eight all-dangerous waits, later missions/production, and level-1
+veterancy. Five is reported as the exact observation, not an authored minimum.
+
+Fresh blind Luna narrative:
+`.build/cnc96a-natural-acquisition/reviews/game1/NARRATIVE.md`.
+The usable fresh policy receipt is
+`.build/cnc96a-natural-acquisition/reviews/game1/POLICY-REVIEW-CORRECTED.md`:
+PASS-WITH-NOTES, no implementation change required. An earlier policy receipt is
+uncounted because worker-authored context incorrectly declared five a threshold;
+the corrected reviewer did not read it and explicitly applied no numeric gate.
+
+### Counted final Game 2 — distinct close-economy isolation/control
+
+Artifact:
+`.build/cnc96a-natural-acquisition/final-game2-close/cnc96a-natural-acquisition-final-game2`
+(seed 96522). VIKI spawn 1 faced allied Brutalis close spawns 2/4. The ordinary
+all-module economies produced and controlled all specialists and Harvesters; no
+actor was preplaced or injected and no target/combat choreography ran. It exited
+0 at tick 16100 in 57.056 seconds with clean runtime integrity.
+
+Chemical specialists recorded first Harvester damage at tick 10918, 201781 total
+damage and four distinct Harvester kills. Stealth completed one Harvester mission
+and retreat, issued 29 nearby reactions, and switched a distant
+`harv#1016` incumbent to nearby `harv#974` at tick 13575 (distance five)
+without Stop/cancel/idle-gap telemetry. Four all-dangerous waits, repeated local
+safety Stops, 78 safe-nearby and 386 unsafe samples provide the defended adverse
+control. The end roster had no surviving STNK and no attributed STNK damage, so
+the profile-specific combat/survival limit is retained explicitly.
+
+Fresh blind Luna narrative and separate policy receipt:
+`.build/cnc96a-natural-acquisition/reviews/game2/NARRATIVE.md` and
+`POLICY-REVIEW.md`. Policy verdict PASS-WITH-NOTES/no blocker. It recommends
+future stronger per-opportunity latency/threshold, exact incumbent-distance and
+Stealth loss-ledger evidence; these are evidence improvements and were not used
+to broaden product code.
+
+All observer/setup failures, the diagnostic-log NRE, timed-out extension,
+weaker natural seed, and unsafe preplacement calibration are excluded. Exactly
+the two artifacts above count.
+
+Final protected checks passed: Release compilation and full CNC MiniYAML with
+zero warnings/errors; focused `StealthTankSquadPolicyTest` 109/109; clean
+`git diff --check`. Proposed status: correction complete and ready for fresh
+Terra review. No push, PR, merge, external agent/process, task-sheet edit, or
+unrelated change was performed.
