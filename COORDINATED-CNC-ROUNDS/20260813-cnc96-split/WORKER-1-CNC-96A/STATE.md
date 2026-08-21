@@ -10,9 +10,9 @@ sheet, coordinator state, other skills, or other worker specs. Read applicable
 - Worker/task: `WORKER-1` / `CNC-96A — Stealth squad performance using AirSquad as gold standard`
 - Change category: `AI performance and bounded architecture, with player-visible tactical behavior preservation`
 - Balance authority: `Frozen. Do not change cost, HP, damage, armor, speed, timing, power, prerequisites, probabilities, resources, production fractions, squad composition, target priorities, threat buffers, scan/order cadence, or candidate/group bounds.`
-- Status: `finish-target correction complete — exactly two final games and supplemental replay calibration passed; pending fresh Terra review; prior lifecycle/safety acceptance preserved`
-- Base branch/SHA: `bleed` / `2572c6c4f65a31fe195fbf20098eabc7e7ce04d3`
-- Task branch / PR base: `successor CNC-96A PR #127` / `bleed`; PR #127 is draft and must be updated, not replaced
+- Status: `in progress — natural nearby-acquisition diagnosis/amendment; PR #127 merged; successor PR required`
+- Base branch/SHA: `bleed` / `17835e8da1a45b80e9e0675d28df8dbdb22ddf29`
+- Task branch / PR base: `successor CNC-96A hotfix PR (to be created)` / `bleed`; PR #127 merged and must not be reopened
 - Current cycle: `13`; cycles used: `5/5 primary`, `7 exceptional Sol-medium acceptance cycles`, `1 bounded final-review fix cycle`
 - Required model: cycle 1 `Sol high`; cycles 2-5 `Terra medium`; cycles 6-15
   `Luna medium` only when coordinator authorizes minor obvious work; at most two
@@ -539,6 +539,44 @@ deferred work, and risks.
   integrity fault. A preceding CTNK calibration was excluded because its frozen
   profile intentionally disables reveal retreat; its 31 kills/Level 3 preserve the
   shared Chemical lifecycle but cannot directly prove this correction.
+
+## Fresh authoritative amendment: natural nearby target acquisition (2026-08-21)
+
+PR #127 (`Finish CNC specialist targets before retreat`) merged into `bleed`.
+Its successor must target `bleed` at exact head
+`17835e8da1a45b80e9e0675d28df8dbdb22ddf29`; do not reopen PR #127 or create a
+new task or round. The human reports ordinary enemy harvesters harvesting beside
+Stealth Tanks while tanks stand idle. Prior preplaced groups/timed waves proved
+firing and retreat mechanics but not spontaneous natural acquisition.
+
+Diagnose on current `bleed` before editing, tracing every rejection layer:
+owned/eligible/claimed/grouped state, nearby scan, category, hostility/
+visibility/range, threat/safety, route, order issuance, and weapon viability.
+Use Air squad AI target acquisition as the golden reference for scan cadence,
+nearby acquisition, visibility/hostility/category filtering, safety rejection,
+route availability, retention, and order issuance. Align where justified, but
+preserve ground/weapon differences and Stealth-specific priorities; never copy
+Air scoring/config blindly.
+
+Counted natural game: sustained ordinary 1-VIKI versus 2 allied Brutalis at
+meaningful distance, AI-produced specialists and normally harvesting AI
+economies. No preplaced/injected specialist groups, timed target waves,
+scripted combat orders, passive bots, or forced targets. Require spontaneous
+specialist acquisition, attacks, damage, many unique Harvester/valuable kills,
+continued missions, and veterancy where available. A distinct controlled
+proximity game may preplace uncommanded specialists solely to isolate the
+defect; harvesters remain normal and unscripted, and the game must show bounded
+nearby reaction/attack/damage/kill plus safe rejection of adverse threats.
+
+Preserve finish-target-before-retreat, exact post-completion strategic retreat,
+reinforcement, repair/no-repair, save/load, target switching, shared
+Stealth/Chemical lifecycle/config-only differences, wall priority, and CNC-101
+behavior unless the smallest root-cause correction requires otherwise. Near-zero
+kills or prolonged idling beside valid ordinary harvesters fails; victory, 40+
+kills, and zero losses are not absolute gates. Require separate native Luna
+narrator/policy per counted game, focused/protected checks, Terra review,
+release integration, successor PR and fresh CI. No merge to `bleed`, unrelated
+work, or external Codex.
 
 ## Fresh authoritative amendment: finish target, then retreat (2026-08-21)
 
