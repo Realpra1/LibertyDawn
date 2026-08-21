@@ -197,6 +197,19 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
+		public void PostMissionRetreatWaitsForSelectedTargetCompletion()
+		{
+			Assert.That(StealthTankSquadPolicy.ShouldBeginPostMissionRetreat(true, true, true), Is.False,
+				"A firing reveal must retain the still-valid selected target until mission completion.");
+			Assert.That(StealthTankSquadPolicy.ShouldBeginPostMissionRetreat(true, true, false), Is.True,
+				"A completed, captured, or stale selected target must start the post-mission retreat.");
+			Assert.That(StealthTankSquadPolicy.ShouldBeginPostMissionRetreat(true, false, false), Is.False,
+				"An idle group has no completed mission to retreat from.");
+			Assert.That(StealthTankSquadPolicy.ShouldBeginPostMissionRetreat(false, true, false), Is.False,
+				"Profiles without configured reveal retreat retain their existing lifecycle.");
+		}
+
+		[Test]
 		public void NearbyUndefendedReactionHasATwentyFiveTickBound()
 		{
 			Assert.That(StealthTankSquadPolicy.NearbyReactionMaximumLatencyTicks, Is.EqualTo(25));
@@ -231,6 +244,20 @@ namespace OpenRA.Test.Mods.Common
 				"One completed member must not release the restored multi-unit retreat barrier.");
 			remaining.Remove(12);
 			Assert.That(StealthTankSquadPolicy.ShouldBlockReassessment(remaining.Count), Is.False);
+		}
+
+		[Test]
+		public void CompletedRevealRetreatReassessesWithTheLiveTargetAsIncumbent()
+		{
+			Assert.That(StealthTankSquadPolicy.CompleteRetreat(1, true),
+				Is.EqualTo(StealthTankRetreatCompletion.ContinueRetreat),
+				"No target decision may release a pending multi-unit retreat barrier.");
+			Assert.That(StealthTankSquadPolicy.CompleteRetreat(0, true),
+				Is.EqualTo(StealthTankRetreatCompletion.ReassessWithIncumbent),
+				"A live attacked target must remain the incumbent after the safety move.");
+			Assert.That(StealthTankSquadPolicy.CompleteRetreat(0, false),
+				Is.EqualTo(StealthTankRetreatCompletion.ReassessWithoutIncumbent),
+				"A dead, stale, or captured target must never be resumed.");
 		}
 
 		[Test]

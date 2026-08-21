@@ -519,12 +519,22 @@ namespace OpenRA.Mods.Common.Traits
 				}
 
 				var activeSpecialists = group.Units.Where(a => IsActiveCoreSpecialist(group, a)).OrderBy(a => a.ActorID).ToArray();
-				var newlyRevealed = activeSpecialists.Where(WasNewlyRevealed).ToArray();
-				if (Info.RetreatAfterReveal && newlyRevealed.Length > 0 && IsEnemyTarget(group.Target))
+				var missionTarget = group.Target;
+				var missionTargetValid = IsEnemyTarget(missionTarget);
+				if (StealthTankSquadPolicy.ShouldBeginPostMissionRetreat(Info.RetreatAfterReveal,
+					missionTarget != null, missionTargetValid))
 				{
-					orders += BeginStrategicRetreat(group, activeSpecialists, group.Target, newlyRevealed);
+					orders += BeginStrategicRetreat(group, activeSpecialists, missionTarget,
+						Array.Empty<Actor>(), "target-complete");
 					continue;
 				}
+
+				var newlyRevealed = activeSpecialists.Where(WasNewlyRevealed).ToArray();
+				if (Info.RetreatAfterReveal && newlyRevealed.Length > 0 && missionTargetValid && Info.DebugLogging)
+					Log.Write("debug", "AI stealth squad {0} [{1}:{2}] reveal retained tick={3}: target={4}#{5} revealed={6} finish-target=true retreat-deferred=true stop=false cancel=false idle-gap=false.",
+						Info.SquadLabel, player.PlayerName, group.Index, world.WorldTick,
+						missionTarget.Info.Name, missionTarget.ActorID,
+						string.Join(",", newlyRevealed.Select(a => a.ActorID)));
 
 				var wasSuspended = group.SuspendedEngagementTarget != null;
 				var engaged = group.Units.Where(a => IsActiveCoreSpecialist(group, a) && a.CurrentActivity != null &&
@@ -644,7 +654,8 @@ namespace OpenRA.Mods.Common.Traits
 			return hadPrevious && previous && !cloaked;
 		}
 
-		int BeginStrategicRetreat(SpecialistGroup group, Actor[] units, Actor target, Actor[] revealed)
+		int BeginStrategicRetreat(SpecialistGroup group, Actor[] units, Actor target,
+			Actor[] triggeringUnits, string reason)
 		{
 			group.RetreatTarget = target;
 			group.RetreatDestinations.Clear();
@@ -674,9 +685,9 @@ namespace OpenRA.Mods.Common.Traits
 					var delta = Math.Max(Math.Abs(to.X - from.X), Math.Abs(to.Y - from.Y));
 					return kv.Key + ":" + from + ">" + to + ":delta=" + delta;
 				}).ToArray();
-				Log.Write("debug", "AI stealth squad {0} [{1}:{2}] reveal retreat tick={3}: target={4}#{5} revealed={6} ordered={7} strategic-size={8} all-one-cell={9} geometry={10} destinations={11}.",
+				Log.Write("debug", "AI stealth squad {0} [{1}:{2}] post-mission retreat tick={3}: target={4}#{5} reason={6} trigger-units={7} ordered={8} strategic-size={9} all-one-cell={10} geometry={11} destinations={12}.",
 					Info.SquadLabel, player.PlayerName, group.Index, world.WorldTick, target.Info.Name, target.ActorID,
-					string.Join(",", revealed.Select(a => a.ActorID)), orders, StrategicCellSize,
+					reason, string.Join(",", triggeringUnits.Select(a => a.ActorID)), orders, StrategicCellSize,
 					geometry.Length == orders && geometry.All(g => g.EndsWith("delta=1")),
 					string.Join(",", geometry),
 					string.Join(",", group.RetreatDestinations.OrderBy(kv => kv.Key)
@@ -703,13 +714,22 @@ namespace OpenRA.Mods.Common.Traits
 					group.RetreatDestinations.Remove(actorId);
 			}
 
-			if (StealthTankSquadPolicy.ShouldBlockReassessment(group.RetreatDestinations.Count))
+			var retreatTarget = group.RetreatTarget;
+			var retreatTargetValid = IsEnemyTarget(retreatTarget);
+			var completion = StealthTankSquadPolicy.CompleteRetreat(
+				group.RetreatDestinations.Count, retreatTargetValid);
+			if (completion == StealthTankRetreatCompletion.ContinueRetreat)
 				return true;
 
+			group.Target = completion == StealthTankRetreatCompletion.ReassessWithIncumbent ?
+				retreatTarget : null;
 			if (Info.DebugLogging)
-				Log.Write("debug", "AI stealth squad {0} [{1}:{2}] retreat complete tick={3}: strategic-size={4}; reassessment enabled target={5}.",
+				Log.Write("debug", "AI stealth squad {0} [{1}:{2}] retreat complete tick={3}: strategic-size={4}; retreat-target={5} target-valid={6} reassessment enabled incumbent={7} completion={8} target-loss=false stop=false cancel=false idle-gap=false.",
 					Info.SquadLabel, player.PlayerName, group.Index, world.WorldTick, StrategicCellSize,
-					group.RetreatTarget == null ? "none" : group.RetreatTarget.Info.Name + "#" + group.RetreatTarget.ActorID);
+					retreatTarget == null ? "none" : retreatTarget.Info.Name + "#" + retreatTarget.ActorID,
+					retreatTargetValid,
+					group.Target == null ? "none" : group.Target.Info.Name + "#" + group.Target.ActorID,
+					completion);
 			group.RetreatTarget = null;
 			scanTicks = 1;
 			return false;
