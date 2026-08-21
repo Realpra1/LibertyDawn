@@ -60,6 +60,12 @@ namespace OpenRA.Mods.Common.Traits
 		public const int RetreatSaveVersion = 1;
 		public const int ReinforcementSaveVersion = 1;
 
+		public static bool ShouldBeginPostMissionRetreat(bool enabled, bool hasTarget,
+			bool targetIsValid)
+		{
+			return enabled && hasTarget && !targetIsValid;
+		}
+
 		public static MiniYamlNode SaveReinforcementState(
 			IEnumerable<StealthTankReinforcementSaveGroup> groups)
 		{

@@ -197,6 +197,19 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
+		public void PostMissionRetreatWaitsForSelectedTargetCompletion()
+		{
+			Assert.That(StealthTankSquadPolicy.ShouldBeginPostMissionRetreat(true, true, true), Is.False,
+				"A firing reveal must retain the still-valid selected target until mission completion.");
+			Assert.That(StealthTankSquadPolicy.ShouldBeginPostMissionRetreat(true, true, false), Is.True,
+				"A completed, captured, or stale selected target must start the post-mission retreat.");
+			Assert.That(StealthTankSquadPolicy.ShouldBeginPostMissionRetreat(true, false, false), Is.False,
+				"An idle group has no completed mission to retreat from.");
+			Assert.That(StealthTankSquadPolicy.ShouldBeginPostMissionRetreat(false, true, false), Is.False,
+				"Profiles without configured reveal retreat retain their existing lifecycle.");
+		}
+
+		[Test]
 		public void NearbyUndefendedReactionHasATwentyFiveTickBound()
 		{
 			Assert.That(StealthTankSquadPolicy.NearbyReactionMaximumLatencyTicks, Is.EqualTo(25));

@@ -11,6 +11,34 @@ or make reinforcement staging Stealth-only. Preserve all other CNC-96A scope,
 PR #125 behavior, no new task/PR, no balance changes, no unrelated Air changes,
 and no merge to bleed.
 
+## CNC-96A existing-task amendment — finish target, then retreat (2026-08-21)
+
+This amends existing CNC-96A only. Successor PR #127 targets `bleed` at exact
+head `2572c6c4f65a31fe195fbf20098eabc7e7ce04d3` and is draft; update PR #127,
+create no task/round/PR, and do not merge `bleed`.
+
+Stealth and Chemical specialist squads should generally finish the selected
+target before the post-mission retreat. Commit fire while the target remains
+valid and useful, then retreat one strategic/coarse cell before selecting the
+next mission; do not oscillate after every shot. Diagnose before editing.
+Preserve reinforcement, repair/no-repair, save/load, genuinely-invalid or
+meaningfully-superior target switching, shared Stealth/Chemical lifecycle with
+configuration-only differences, wall priority, CNC-101 behavior, and frozen
+balance unless the smallest root-cause correction requires change.
+
+Require direct evidence in sustained natural ordinary 1-VIKI-versus-2-allied-
+Brutalis games of many unique harvester kills, repeated target completion then
+retreat, continued specialist operations, and veterancy progression where the
+engine/config permits it. Reject the old near-zero-kill/shot-retreat
+oscillation, but allow ordinary accidents, losses, seed variance, pressure, and
+a non-winning bounded result. Defeating both Brutalis opponents or reaching
+roughly 40+ harvester kills is a strong expected quality signal in sufficiently
+long favorable games, not an unconditional gate. Run a materially distinct
+second adversarial ordinary-AI/all-module game, with separate native Luna
+factual narration and policy review per counted game. Require focused/protected
+checks, Terra review, release integration, PR #127 update, refreshed CI, and an
+explicit policy evaluation of this calibrated standard. No external Codex.
+
 ## CNC-96A existing-task amendment — natural combat inactivity (2026-08-21)
 
 This amends existing CNC-96A; it creates no task or round. PR #126 merged into

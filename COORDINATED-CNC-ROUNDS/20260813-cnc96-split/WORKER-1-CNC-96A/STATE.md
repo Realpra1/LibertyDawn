@@ -10,10 +10,10 @@ sheet, coordinator state, other skills, or other worker specs. Read applicable
 - Worker/task: `WORKER-1` / `CNC-96A — Stealth squad performance using AirSquad as gold standard`
 - Change category: `AI performance and bounded architecture, with player-visible tactical behavior preservation`
 - Balance authority: `Frozen. Do not change cost, HP, damage, armor, speed, timing, power, prerequisites, probabilities, resources, production fractions, squad composition, target priorities, threat buffers, scan/order cadence, or candidate/group bounds.`
-- Status: `natural-combat correction complete — pending fresh Terra review; prior reinforcement/lifecycle acceptance preserved`
-- Base branch/SHA: `bleed` / `4c496940ee500e00b32a2f8e7d49932045f2bc04`
-- Task branch / PR base: `successor CNC-96A hotfix branch (to be created by coordinator)` / `bleed`; PR #126 merged 2026-08-21 and is not to be reopened or refreshed
-- Current cycle: `12`; cycles used: `5/5 primary`, `6 exceptional Sol-medium acceptance cycles`, `1 bounded final-review fix cycle`
+- Status: `finish-target correction complete — exactly two final games and supplemental replay calibration passed; pending fresh Terra review; prior lifecycle/safety acceptance preserved`
+- Base branch/SHA: `bleed` / `2572c6c4f65a31fe195fbf20098eabc7e7ce04d3`
+- Task branch / PR base: `successor CNC-96A PR #127` / `bleed`; PR #127 is draft and must be updated, not replaced
+- Current cycle: `13`; cycles used: `5/5 primary`, `7 exceptional Sol-medium acceptance cycles`, `1 bounded final-review fix cycle`
 - Required model: cycle 1 `Sol high`; cycles 2-5 `Terra medium`; cycles 6-15
   `Luna medium` only when coordinator authorizes minor obvious work; at most two
   exceptional `Sol medium` escalation cycles may follow only a critical blocker
@@ -493,7 +493,85 @@ deferred work, and risks.
 
 ## Cycle journal
 
-## Fresh authoritative amendment: natural combat inactivity (2026-08-21)
+### Exceptional finish-target correction cycle (2026-08-21)
+
+- Authority: native Sol-medium second/final exceptional release-blocking cycle
+  from clean head `334189f2c4`. Diagnose before editing, make only the smallest
+  correction, run exactly two distinct final full-engine games under 120 seconds,
+  and give each counted game its own fresh native Luna factual narrative and
+  separate serialized policy review.
+- Required correction: specialist squads should generally finish the selected
+  target before the one-strategic-cell post-mission retreat instead of retreating
+  after each revealed shot. The calibrated natural 1-VIKI-versus-2-allied-Brutalis
+  acceptance requires many unique Harvester kills, repeated target-completion then
+  retreat cycles, continued operations, and veterancy where the engine/profile
+  exposes it. Victory, 40+ kills, and zero losses are quality signals rather than
+  unconditional gates. A materially distinct second game must exercise the same
+  corrected lifecycle under different pressure/topology/timing.
+- Diagnostic plan: reproduce the inherited reveal-to-retreat sequence on the
+  unmodified head with direct specialist attack/damage/kill and decision timestamps;
+  identify the exact trigger and target lifecycle before product edits. Movement
+  and order telemetry remain diagnostic, not combat acceptance.
+- Preservation table: actor eligibility, deterministic assignment/groups/roles,
+  Stealth/Chemical shared lifecycle and configuration-only target differences,
+  wall/value priorities, Air switch threshold, target-invalid and superior-target
+  switching, detector/armed/resource/pending-explosion/local-safety vetoes, ground
+  passability/routes, candidate/group bounds, 75/25-tick cadences, reinforcement
+  staging/joining/save state, retreat geometry/barrier/persistence, repair/rejoin,
+  reservation ownership/ordinary-army exclusion, CNC-101 behavior, Air output, and
+  every balance/configuration value remain unchanged.
+- Publication boundary: update only this STATE and REPORT, commit once, and return
+  for Terra. No push, PR, merge, external agent, unrelated task, or task-sheet/
+  coordinator edit. A human replay supplied during this cycle is calibration only
+  and does not block current work.
+- Game 1 pre-record: ordinary VIKI versus two allied Brutalis, all modules, six
+  uncommanded STNK at meaningful distance from a 36-Harvester moving target field.
+  Hypothesis: finish-target should replace per-shot oscillation with repeated real
+  target-kill then one-cell retreat cycles. Failure is any retreat before a selected
+  target's kill, fewer than ten unique attributed Harvester kills, no survivor/
+  continued operation, or no veterancy progression where exposed. Pass evidence is
+  direct hit/kill/retreat ordering, unique kills, survivor and Level/Experience logs.
+- Game 2 pre-record: materially distinct two-sided crossfire geometry and different
+  spawns/timing, with uncommanded STNK between separate Harvester waves owned by the
+  two allied Brutalis players. Hypothesis/failure is the same lifecycle invariant
+  under opposing target directions; require attributed combat, repeated completion-
+  retreat cycles, ten unique kills, continued operation, and no safety/ownership/
+  integrity fault. A preceding CTNK calibration was excluded because its frozen
+  profile intentionally disables reveal retreat; its 31 kills/Level 3 preserve the
+  shared Chemical lifecycle but cannot directly prove this correction.
+
+## Fresh authoritative amendment: finish target, then retreat (2026-08-21)
+
+This amendment supersedes conflicting earlier retreat timing for the existing
+CNC-96A task. Successor PR #127 targets `bleed` at exact head
+`2572c6c4f65a31fe195fbf20098eabc7e7ce04d3` and is draft. Update PR #127 only;
+do not create another task, round, or PR, and do not merge `bleed`.
+
+Stealth and Chemical specialist squads should generally finish their selected
+target before the post-mission retreat. Commit fire while the target remains
+valid and useful, then retreat one strategic/coarse cell before selecting the
+next mission; do not oscillate after every shot. Diagnose the root cause before
+editing and preserve reinforcement, repair/no-repair,
+save/load, genuinely-invalid or meaningfully-superior target switching, shared
+Stealth/Chemical lifecycle with configuration-only differences, wall priority,
+and CNC-101 behavior unless the smallest root-cause correction requires change.
+
+Acceptance requires sustained natural ordinary 1-VIKI-versus-2-allied-Brutalis
+games showing many unique harvester kills, repeated target completion followed
+by retreat, continued specialist operations, and veterancy progression where
+engine/config permits it. Reject the old near-zero-kill/shot-retreat oscillation
+behavior, but allow ordinary accidents, losses, seed variance, pressure, and a
+non-winning bounded result. Defeating both Brutalis opponents or reaching
+roughly 40+ harvester kills is a strong expected quality signal in sufficiently
+long favorable games, not an unconditional automated gate. Run a materially
+distinct second adversarial ordinary-AI/all-module game, with separate native
+Luna factual narration and policy review per counted game. Require
+focused/protected checks, Terra review, release integration, PR #127 update,
+refreshed CI, and explicit policy evaluation of this calibrated standard. No
+external Codex. Stop at manual policy gates and record any unproved ordering,
+kill, veterancy, or survivorship blocker.
+
+## Prior authoritative amendment: natural combat inactivity (2026-08-21)
 
 This amendment is the current acceptance authority for the existing CNC-96A
 task. PR #126, previously published for the reinforcement release, merged into
@@ -627,3 +705,40 @@ the blocker precisely if natural combat acceptance remains unproved.
 - Spec-policy recommendations/disposition: `Adopted the AirSquad-shaped bounded-strategy/live-safety/stable-plan/state-change-order direction and its preservation constraints. Deferred shared framework extraction; this cycle instead uses one existing specialist control implementation for both configured profiles. No recommendation rejected.`
 - Diagnostic/performance result: `Game A mean/p50/p95/p99/max 0.496/0.223/0.691/5.206/1065.649ms, two >=50ms; Game B p50/p95/p99/max 1/2/7/1054.289ms, three >=50ms. Startup owned maxima. Strategy remained 75 ticks, safety 25 ticks, grid 4 cells/cache125; no Air identity appeared.`
 - Deferred work and known risks: `Fresh Terra must review the narrow retreat-incumbent handoff and direct natural-combat evidence. The counted games prove bounded specialist combat, not a terminal VIKI win. Prior detector/repair/save/reinforcement limits remain as already documented; this correction does not broaden them. Coordinator owns integration, successor PR/CI, and cleanup.`
+
+### Cycle 13 finish-target result
+
+- Unmodified reproduction confirmed the defect: reveal-triggered retreats at
+  ticks 225/400/600/800 preceded hits or kills at 246/428/876. The root cause was
+  `RunEngagementSafety` starting strategic retreat on every newly revealed shot.
+  The smallest correction retains a valid selected target through reveal and
+  starts the existing exact one-cell post-mission retreat only after the target
+  is invalid/completed. Existing detector/armed/resource/repair/ownership safety,
+  Chemical configuration, Air output, and balance remain unchanged. The new pure
+  regression covers enabled/live, completed, no-target, and disabled outcomes.
+- Counted Game 1: `.build/cnc96a-finish-target/final-game1-v2/cnc96a-finish-game1`,
+  seed 96301, ordinary/all-module VIKI versus allied Brutalis, exit 0 at tick 5500
+  in 25.035 seconds. Tick 5000: 29 unique Harvester kills, 78 damage events,
+  1,225,614 damage, three survivors, Level 2/672000 XP, 15 completion-triggered
+  retreats and 34 retained reveals. Fresh Luna narrative and separate policy
+  review PASS/no blocker; terminal roster attribution is bounded advice.
+- Counted Game 2: `.build/cnc96a-finish-target/final-game2-v4/cnc96a-finish-game2`,
+  seed 96302, distinct two-sided open-corridor crossfire, exit 0 at tick 6500 in
+  30.03 seconds. Tick 6000: 26 unique Harvester kills, 65 damage events,
+  1,173,828 damage, eight survivors, Level 3/675000 XP, 16 completion-triggered
+  retreats and 24 retained reveals. Fresh Luna narrative and separate policy
+  review PASS/no blocker; per-actor damage attribution is bounded advice. Exactly
+  these two final games count; all setup/static/CTNK/wide/blocked calibrations do not.
+- Supplemental frozen replay: PR120 head `9dbd02cd85caed85e99de89ee8642fd7b122a4e5`,
+  blob `d276947fe3e9acc3227ec241e5339a2e7ce487d2`, SHA-256
+  `becb5ead52faab4e83b789a79fbeb742ed2feb62655aac6d79887030fc7f8584`.
+  Playback reached world tick 17196 past FinalGameTick 16853, exit 0 with no
+  OOS/desync. Temporary analysis probes were fully restored. Neutral
+  `human-calibration/ENRICHED-TIMELINE.md` and blind Luna
+  `human-calibration/ENRICHED-NARRATIVE.md` record six Harvester kills, six
+  crushes, defensive/structure completions, victory operations, Level 3/675000
+  XP, and three observed slot-0 STNK losses in ticks 8495-16856. This does not
+  support the informal one-loss/all-harvester claim, but supports sustained combat.
+- Final protected checks after restoration: Release build zero warnings/errors;
+  focused policy suite 107/107; full CNC MiniYAML and `git diff --check` passed.
+  Ready for fresh Terra review. No push, PR, merge, or external process.
