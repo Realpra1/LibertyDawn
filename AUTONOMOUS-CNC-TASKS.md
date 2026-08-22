@@ -11,6 +11,39 @@ or make reinforcement staging Stealth-only. Preserve all other CNC-96A scope,
 PR #125 behavior, no new task/PR, no balance changes, no unrelated Air changes,
 and no merge to bleed.
 
+## CNC-96A existing-task amendment — natural nearby target acquisition (2026-08-21)
+
+PR #127 (`Finish CNC specialist targets before retreat`) merged into `bleed`.
+Create no new task or round and do not reopen PR #127; the successor hotfix must
+target current `bleed` at `17835e8da1a45b80e9e0675d28df8dbdb22ddf29`.
+
+Diagnose before editing: enemy harvesters have been observed harvesting beside
+idle Stealth Tanks, while prior preplaced groups/timed waves did not prove
+spontaneous natural acquisition. Trace owned/eligible/claimed/grouped state,
+nearby scan, category, hostility/visibility/range, threat/safety, route,
+orders, and weapon viability. Use Air squad AI acquisition as the golden
+reference for scan cadence, nearby acquisition, filtering, safety rejection,
+route availability, retention, and order issuance; align justified behavior,
+but preserve ground/weapon differences and Stealth priorities rather than
+copying Air scoring/config blindly.
+
+Require a sustained ordinary 1-VIKI-versus-2-allied-Brutalis game at meaningful
+distance with AI-produced specialists and normal harvesting economies: no
+preplaced/injected specialists, timed waves, scripted combat orders, passive
+bots, or forced targets. Prove spontaneous acquisition, attacks, damage, many
+unique Harvester/valuable kills, continued missions, and veterancy where
+available. A distinct controlled proximity game may preplace uncommanded
+specialists only to isolate the defect; harvesters stay normal/unscripted and
+unsafe targets must remain rejected. Preserve finish-before-retreat, strategic
+retreat, reinforcement, repair/no-repair, save/load, switching, shared
+Stealth/Chemical lifecycle/config-only behavior, wall priority, CNC-101, and
+frozen balance unless the smallest root-cause correction requires otherwise.
+Near-zero kills or prolonged idling beside valid harvesters fails; victory, 40+
+kills, and zero losses are not absolute gates. Require separate native Luna
+narrator/policy per counted game, focused/protected checks, Terra review,
+release integration, successor PR, and fresh CI. No `bleed` merge, unrelated
+work, or external Codex.
+
 ## CNC-96A existing-task amendment — finish target, then retreat (2026-08-21)
 
 This amends existing CNC-96A only. Successor PR #127 targets `bleed` at exact

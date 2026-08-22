@@ -446,7 +446,25 @@ namespace OpenRA.Mods.Common.Traits
 				Math.Max(100, clusterMultiplierPercent) / 100;
 		}
 
-		public static StealthTankTargetReassessment ReassessMovedTarget(bool incumbentValid,
+		public static int RouteDistanceCells(CPos start, IEnumerable<CPos> route)
+		{
+			var distance = 0d;
+			var previous = start;
+			foreach (var cell in route)
+			{
+				distance += Math.Sqrt((cell - previous).LengthSquared);
+				previous = cell;
+			}
+
+			return (int)Math.Ceiling(distance);
+		}
+
+		public static int OptimisticApproachDistance(int targetDistanceCells, int weaponRangeCells)
+		{
+			return Math.Max(0, targetDistanceCells - Math.Max(0, weaponRangeCells));
+		}
+
+		public static StealthTankTargetReassessment ReassessTarget(bool incumbentValid,
 			bool incumbentUndefended, long incumbentScore, bool challengerValid,
 			bool challengerUndefended, long challengerScore, int minimumImprovementPercent)
 		{
@@ -460,31 +478,14 @@ namespace OpenRA.Mods.Common.Traits
 				StealthTankTargetReassessment.RetainIncumbent;
 		}
 
-		public static List<T> BoundCandidatesWithIncumbent<T>(IEnumerable<T> rankedCandidates,
-			int maximumCandidates, bool includeIncumbent, Func<T, bool> isIncumbent)
+		public static List<T> NearbyReassessmentCandidates<T>(IEnumerable<T> nearbyCandidates,
+			T incumbent, Func<T, T, bool> sameCandidate)
 		{
-			var bounded = new List<T>(Math.Max(0, maximumCandidates) + (includeIncumbent ? 1 : 0));
-			var incumbentFound = false;
-			var incumbent = default(T);
-			foreach (var candidate in rankedCandidates)
-			{
-				if (bounded.Count < maximumCandidates)
-					bounded.Add(candidate);
+			var candidates = nearbyCandidates.ToList();
+			if (incumbent != null && !candidates.Any(candidate => sameCandidate(candidate, incumbent)))
+				candidates.Add(incumbent);
 
-				if (includeIncumbent && isIncumbent(candidate))
-				{
-					incumbentFound = true;
-					incumbent = candidate;
-				}
-
-				if (bounded.Count >= maximumCandidates && (!includeIncumbent || incumbentFound))
-					break;
-			}
-
-			if (incumbentFound && !bounded.Any(isIncumbent))
-				bounded.Add(incumbent);
-
-			return bounded;
+			return candidates;
 		}
 
 		public static int InfantryClusterMultiplier(int nearbyInfantry, int bonusPercentPerActor,
@@ -507,6 +508,13 @@ namespace OpenRA.Mods.Common.Traits
 				CanCarefullyClear(squadValue, defendingValue, requiredValueRatio);
 		}
 
+		public static bool AreAllCandidatesUnavailable(int candidateCount, int dangerousCandidates,
+			int unroutableCandidates)
+		{
+			return candidateCount > 0 && Math.Max(0, dangerousCandidates) +
+				Math.Max(0, unroutableCandidates) >= candidateCount;
+		}
+
 		public static int SelectDefenderClearOpportunity(int[] defendingValues, long[] unlockedScores, int weakestCount)
 		{
 			if (defendingValues == null || unlockedScores == null || weakestCount <= 0 ||
@@ -526,7 +534,11 @@ namespace OpenRA.Mods.Common.Traits
 			bool canCrushInfantry, int packageDefenderCount, int ownRangeCells,
 			int defenderWeaponRangeCells, int defenderDetectorRangeCells, int safetyMarginCells)
 		{
-			if (isInfantry && canCrushInfantry && packageDefenderCount == 1 && defenderDetectorRangeCells <= 0)
+			// The selected infantry is removed from the route influence map, while every
+			// other package defender remains authoritative. This permits a patient
+			// overmatching squad to crush a reachable edge defender without pretending
+			// that the rest of a multi-defender package is safe.
+			if (isInfantry && canCrushInfantry && packageDefenderCount > 0 && defenderDetectorRangeCells <= 0)
 				return SpecialistDefenderClearAction.CrushInfantry;
 
 			if (isTank && defenderWeaponRangeCells > 0 && defenderDetectorRangeCells <= 0 &&
@@ -541,6 +553,11 @@ namespace OpenRA.Mods.Common.Traits
 				return SpecialistDefenderClearAction.AttackUnarmedDetector;
 
 			return SpecialistDefenderClearAction.None;
+		}
+
+		public static bool ShouldIgnoreSelectedDefenderInfluence(SpecialistDefenderClearAction action)
+		{
+			return action != SpecialistDefenderClearAction.None;
 		}
 
 		public static SpecialistRepairDisposition RepairDisposition(bool damagedBelowThreshold,
