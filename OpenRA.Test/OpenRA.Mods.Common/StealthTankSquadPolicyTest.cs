@@ -153,6 +153,31 @@ namespace OpenRA.Test.Mods.Common
 				new CPos(0, 0), new CPos(12, 0), 6), Is.False);
 		}
 
+		[TestCase(true, false, false, true, false, false)]
+		[TestCase(true, false, false, true, true, false)]
+		[TestCase(true, false, true, true, false, true)]
+		[TestCase(true, true, false, false, false, false)]
+		[TestCase(true, true, true, false, false, false)]
+		[TestCase(true, true, false, true, false, true)]
+		[TestCase(false, false, false, true, false, true)]
+		public void ReinforcementOrdersRetainAirStylePlanOwnership(bool retainedPlanMatches,
+			bool retainedSafeHold, bool isIdle, bool routeAvailable, bool issuedThisTick, bool expected)
+		{
+			Assert.That(StealthTankSquadPolicy.ShouldIssueReinforcementOrder(retainedPlanMatches,
+				retainedSafeHold, isIdle, routeAvailable, issuedThisTick), Is.EqualTo(expected));
+		}
+
+		[TestCase(true, true, false, true)]
+		[TestCase(true, false, true, true)]
+		[TestCase(true, false, false, false)]
+		[TestCase(false, true, true, false)]
+		public void SafetyStopOwnsHoldUntilItsReasonClears(bool hasValidTarget,
+			bool localThreatExposure, bool resourceHazard, bool expected)
+		{
+			Assert.That(StealthTankSquadPolicy.ShouldOwnSafetyHold(hasValidTarget,
+				localThreatExposure, resourceHazard), Is.EqualTo(expected));
+		}
+
 		[Test]
 		public void StagedReinforcementOwnershipSurvivesSaveLoadWithoutDuplicates()
 		{

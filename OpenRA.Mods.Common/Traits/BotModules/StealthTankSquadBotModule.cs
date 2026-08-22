@@ -134,6 +134,9 @@ namespace OpenRA.Mods.Common.Traits
 			public readonly int Index;
 			public readonly List<Actor> Units = new List<Actor>();
 			public readonly HashSet<uint> Reinforcements = new HashSet<uint>();
+			public readonly Dictionary<uint, uint> ReinforcementPlanTargets = new Dictionary<uint, uint>();
+			public readonly Dictionary<uint, int> ReinforcementLastOrderTicks = new Dictionary<uint, int>();
+			public readonly HashSet<uint> ReinforcementSafeHolds = new HashSet<uint>();
 			public Actor Target;
 			public long TargetScore;
 			public int LastOrderTick;
@@ -212,6 +215,10 @@ namespace OpenRA.Mods.Common.Traits
 		readonly Dictionary<uint, uint> repairTargets = new Dictionary<uint, uint>();
 		readonly Dictionary<uint, int> nextRepairEvaluation = new Dictionary<uint, int>();
 		readonly Dictionary<uint, bool> lastCloaked = new Dictionary<uint, bool>();
+		readonly Dictionary<uint, OpenRA.Activities.Activity> diagnosticActivities =
+			new Dictionary<uint, OpenRA.Activities.Activity>();
+		readonly Dictionary<uint, string> diagnosticActivitySignatures = new Dictionary<uint, string>();
+		readonly Dictionary<uint, CPos> diagnosticLocations = new Dictionary<uint, CPos>();
 		readonly Dictionary<CPos, bool> resourceHazardCache = new Dictionary<CPos, bool>();
 		StealthTankRetreatSaveGroup[] pendingRetreatRestore;
 		StealthTankReinforcementSaveGroup[] pendingReinforcementRestore;
@@ -248,6 +255,7 @@ namespace OpenRA.Mods.Common.Traits
 		int scanInfluenceHits;
 		long scanPathTicks;
 		long scanOrderTicks;
+		string diagnosticPlanningProducer = "strategic";
 
 		public StealthTankSquadBotModule(Actor self, StealthTankSquadBotModuleInfo info)
 			: base(info)
@@ -309,6 +317,9 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				group.Units.Clear();
 				group.Reinforcements.Clear();
+				group.ReinforcementPlanTargets.Clear();
+				group.ReinforcementLastOrderTicks.Clear();
+				group.ReinforcementSafeHolds.Clear();
 				group.Target = null;
 				group.SuspendedEngagementTarget = null;
 				group.RetreatTarget = null;
@@ -368,6 +379,8 @@ namespace OpenRA.Mods.Common.Traits
 			if (IsTraitDisabled || !advancedBehaviorEnabled)
 				return;
 
+			TraceDiagnosticActivities();
+
 			RunFailsafeTestPressure();
 
 			// Dispatch is O(1) except at the explicit 25-tick engagement-safety or
@@ -411,6 +424,7 @@ namespace OpenRA.Mods.Common.Traits
 			scanPathTicks = 0;
 			scanOrderTicks = 0;
 			var view = strategicViewOwner.GetStrategicView(out var viewHit);
+			diagnosticPlanningProducer = "strategic";
 			foreach (var group in groups)
 				UpdateGroup(group, view.Enemies, view.Threats);
 
@@ -440,6 +454,66 @@ namespace OpenRA.Mods.Common.Traits
 					Milliseconds(scanThreatMapTicks), Milliseconds(scanPathTicks), Milliseconds(scanOrderTicks),
 					scanCandidateThreatTests, scanInfluenceCellTests, scanResourceCellTests,
 					scanInfluenceBuilds, scanInfluenceHits, influenceMap?.Width ?? 0, influenceMap?.Height ?? 0);
+		}
+
+		void TraceDiagnosticActivities()
+		{
+			if (!Info.DebugLogging)
+				return;
+
+			foreach (var unit in reserved.Select(world.GetActorById).Where(IsEligible).OrderBy(a => a.ActorID))
+			{
+				var activity = unit.CurrentActivity;
+				var signature = ActivitySignature(activity);
+				var hadActivity = diagnosticActivities.TryGetValue(unit.ActorID, out var previousActivity);
+				var hadSignature = diagnosticActivitySignatures.TryGetValue(unit.ActorID, out var previousSignature);
+				var activityReplaced = hadActivity && !ReferenceEquals(previousActivity, activity);
+				var signatureChanged = !hadSignature || previousSignature != signature;
+				var previousLocation = diagnosticLocations.TryGetValue(unit.ActorID, out var location) ? location : unit.Location;
+				if (activityReplaced || signatureChanged)
+				{
+					var group = groups.FirstOrDefault(g => g.Units.Contains(unit));
+					var routeHash = group != null && group.RetainedRoutes.TryGetValue(unit.ActorID, out var route) ?
+						DiagnosticRouteHash(route) : 0;
+					Log.Write("debug", "AI stealth lifecycle activity {0} [{1}:{2}] tick={3}: unit={4}#{5} previous={6} current={7} same-type-replaced={8} moved={9} location={10} target={11} route-hash={12} has-plan={13} progress-age={14} membership-changed={15} reinforcement={16} repairing={17} retreat={18}.",
+						Info.SquadLabel, player.PlayerName, group?.Index ?? -1, world.WorldTick,
+						unit.Info.Name, unit.ActorID, hadSignature ? previousSignature : "unobserved", signature,
+						activityReplaced && previousActivity?.GetType() == activity?.GetType(),
+						unit.Location != previousLocation, unit.Location,
+						group?.Target == null ? "none" : group.Target.Info.Name + "#" + group.Target.ActorID,
+						routeHash, group?.HasPlan ?? false,
+						group?.HasPlan == true ? world.WorldTick - group.LastProgressTick : -1,
+						group?.MembershipChanged ?? false,
+						group?.Reinforcements.Contains(unit.ActorID) ?? false,
+						repairing.Contains(unit.ActorID), group?.RetreatDestinations.ContainsKey(unit.ActorID) ?? false);
+				}
+
+				diagnosticActivities[unit.ActorID] = activity;
+				diagnosticActivitySignatures[unit.ActorID] = signature;
+				diagnosticLocations[unit.ActorID] = unit.Location;
+			}
+		}
+
+		static string ActivitySignature(OpenRA.Activities.Activity activity)
+		{
+			if (activity == null)
+				return "idle";
+
+			var chain = new List<string>();
+			for (var current = activity; current != null && chain.Count < 12; current = current.NextActivity)
+				chain.Add(current.GetType().Name + ":" + current.State);
+			return string.Join(">", chain);
+		}
+
+		static int DiagnosticRouteHash(IEnumerable<CPos> route)
+		{
+			unchecked
+			{
+				var hash = 17;
+				foreach (var cell in route ?? Enumerable.Empty<CPos>())
+					hash = hash * 31 + cell.GetHashCode();
+				return hash;
+			}
 		}
 
 		void RecordPhase(string phase, long ticks, int orders = 0)
@@ -489,7 +563,9 @@ namespace OpenRA.Mods.Common.Traits
 				var view = strategicViewOwner.GetStrategicView(out _);
 				var localCandidates = StealthTankSquadPolicy.NearbyReassessmentCandidates(
 					nearby, IsEnemyTarget(group.Target) ? group.Target : null, (a, b) => a == b);
+				diagnosticPlanningProducer = "nearby";
 				UpdateGroup(group, localCandidates, view.Threats);
+				diagnosticPlanningProducer = "strategic";
 				var currentTarget = group.Target;
 				if (previousTarget == null && currentTarget != null && Info.DebugLogging)
 					Log.Write("debug", "AI stealth squad {0} [{1}:{2}] nearby reaction tick={3}: target={4}#{5} distance={6} radius={7} bounded-latency={8}.",
@@ -598,7 +674,8 @@ namespace OpenRA.Mods.Common.Traits
 							armedSupport == null ? "none" : armedSupport.Owner.InternalName, armedRange);
 					}
 
-					if (detectorExposure && armedCoverage)
+					if (StealthTankSquadPolicy.ShouldOwnSafetyHold(IsEnemyTarget(group.Target),
+						localThreatExposure, blueAdjacent))
 					{
 						group.SuspendedEngagementTarget = group.Target;
 						ClearRetainedPlan(group);
@@ -1113,6 +1190,14 @@ namespace OpenRA.Mods.Common.Traits
 
 		void UpdateReinforcements(SpecialistGroup group, List<Threat> threats)
 		{
+			foreach (var actorId in group.ReinforcementPlanTargets.Keys
+				.Where(id => !group.Reinforcements.Contains(id)).ToArray())
+			{
+				group.ReinforcementPlanTargets.Remove(actorId);
+				group.ReinforcementLastOrderTicks.Remove(actorId);
+				group.ReinforcementSafeHolds.Remove(actorId);
+			}
+
 			var core = group.Units.Where(a => IsActiveCoreSpecialist(group, a))
 				.OrderBy(a => a.ActorID).ToArray();
 			if (core.Length == 0 || group.Reinforcements.Count == 0)
@@ -1136,6 +1221,9 @@ namespace OpenRA.Mods.Common.Traits
 				if (nearCore || nearMission)
 				{
 					group.Reinforcements.Remove(unit.ActorID);
+					group.ReinforcementPlanTargets.Remove(unit.ActorID);
+					group.ReinforcementLastOrderTicks.Remove(unit.ActorID);
+					group.ReinforcementSafeHolds.Remove(unit.ActorID);
 					if (IsEnemyTarget(group.Target))
 					{
 						bot.QueueOrder(new Order("Attack", unit, Target.FromActor(group.Target), false));
@@ -1151,20 +1239,45 @@ namespace OpenRA.Mods.Common.Traits
 				}
 
 				var destinationAnchor = missionLocation ?? coreLocation;
+				var desiredPlanTarget = IsEnemyTarget(group.Target) ? group.Target.ActorID : 0;
+				var desiredPlanCell = StealthTankSquadPolicy.StrategicCell(
+					destinationAnchor, StrategicCellSize);
+				// Match Air's reinforcement latch exactly: the mission target owns the in-flight
+				// activity. A moving target changes its coarse cell, but does not invalidate and
+				// replace a busy reinforcement route. Idle units are replanned from their current
+				// location below, as in AirAttackState.
+				var matchesRetainedPlan = group.ReinforcementPlanTargets.TryGetValue(
+					unit.ActorID, out var retainedTarget) && retainedTarget == desiredPlanTarget;
+				var issuedThisTick = group.ReinforcementLastOrderTicks.TryGetValue(
+					unit.ActorID, out var lastOrderTick) && lastOrderTick == world.WorldTick;
 				var route = FindReinforcementRoute(unit, destinationAnchor, threats);
 				if (route == null || route.Count == 0)
 				{
+					if (!StealthTankSquadPolicy.ShouldIssueReinforcementOrder(matchesRetainedPlan,
+						group.ReinforcementSafeHolds.Contains(unit.ActorID), unit.IsIdle,
+						false, issuedThisTick))
+						continue;
+
 					// Air's safe hold is an order to the unit's current location. It cancels no
 					// core activity and naturally retries at the next strategic scan.
 					bot.QueueOrder(new Order("Move", unit, Target.FromCell(world, unit.Location), false));
 					scanQueuedOrders++;
+					group.ReinforcementPlanTargets[unit.ActorID] = desiredPlanTarget;
+					group.ReinforcementLastOrderTicks[unit.ActorID] = world.WorldTick;
+					group.ReinforcementSafeHolds.Add(unit.ActorID);
 					if (Info.DebugLogging)
-						Log.Write("debug", "AI stealth reinforcement {0} [{1}:{2}] tick={3}: unit={4} staged=True routed=False safe-hold=True retry={5} core-mission-preserved=True target={6} unsafe-direct=false core-stop=false.",
+						Log.Write("debug", "AI stealth reinforcement {0} [{1}:{2}] tick={3}: producer={4} unit={5} staged=True routed=False safe-hold=True plan-cell={6} activity={7} retry={8} core-mission-preserved=True target={9} unsafe-direct=false core-stop=false.",
 							Info.SquadLabel, player.PlayerName, group.Index, world.WorldTick,
-							unit.ActorID, Info.ScanInterval,
+							diagnosticPlanningProducer, unit.ActorID, desiredPlanCell,
+							ActivitySignature(unit.CurrentActivity), Info.ScanInterval,
 							group.Target == null ? "none" : group.Target.Info.Name + "#" + group.Target.ActorID);
 					continue;
 				}
+
+				if (!StealthTankSquadPolicy.ShouldIssueReinforcementOrder(matchesRetainedPlan,
+					group.ReinforcementSafeHolds.Contains(unit.ActorID), unit.IsIdle,
+					true, issuedThisTick))
+					continue;
 
 				var queued = false;
 				for (var i = Math.Min(Info.HazardRouteWaypointSpacing, route.Count - 1);
@@ -1182,10 +1295,16 @@ namespace OpenRA.Mods.Common.Traits
 					scanQueuedOrders++;
 				}
 
+				group.ReinforcementPlanTargets[unit.ActorID] = desiredPlanTarget;
+				group.ReinforcementLastOrderTicks[unit.ActorID] = world.WorldTick;
+				group.ReinforcementSafeHolds.Remove(unit.ActorID);
+
 				if (Info.DebugLogging)
-					Log.Write("debug", "AI stealth reinforcement {0} [{1}:{2}] tick={3}: unit={4} staged=True routed=True waypoints={5} destination={6} core-cell={7} mission-cell={8} core-mission-preserved=True core-stop=false.",
+					Log.Write("debug", "AI stealth reinforcement {0} [{1}:{2}] tick={3}: producer={4} unit={5} staged=True routed=True waypoints={6} route-hash={7} destination={8} plan-cell={9} activity={10} core-cell={11} mission-cell={12} core-mission-preserved=True core-stop=false.",
 						Info.SquadLabel, player.PlayerName, group.Index, world.WorldTick,
-						unit.ActorID, route.Count, route[route.Count - 1],
+						diagnosticPlanningProducer, unit.ActorID, route.Count,
+						DiagnosticRouteHash(route), route[route.Count - 1], desiredPlanCell,
+						ActivitySignature(unit.CurrentActivity),
 						StealthTankSquadPolicy.StrategicCell(coreLocation, StrategicCellSize),
 						missionLocation == null ? "none" :
 							StealthTankSquadPolicy.StrategicCell(missionLocation.Value, StrategicCellSize).ToString());
@@ -1883,6 +2002,8 @@ namespace OpenRA.Mods.Common.Traits
 
 			scanPlanInvalidations++;
 
+			var progressAgeBeforeInvalidation = group.HasPlan ? world.WorldTick - group.LastProgressTick : -1;
+			var membershipChangedBeforeInvalidation = group.MembershipChanged;
 			group.LastOrderTick = world.WorldTick;
 			ClearRetainedPlan(group);
 			var crush = selectedClearAction == SpecialistDefenderClearAction.CrushInfantry ||
@@ -1894,9 +2015,12 @@ namespace OpenRA.Mods.Common.Traits
 			BeginRetainedPlan(group, selected, center);
 
 			if (Info.DebugLogging)
-				Log.Write("debug", "AI stealth squad {0} [{1}:{2}] {3} target {4}#{5}: units={6} score={7} defended-value={8} order={9}.",
-					Info.SquadLabel, player.PlayerName, group.Index, role, selected.Info.Name, selected.ActorID, activeUnits.Length,
-					selectedScore, selectedDanger, crush ? "crush" : "hazard-routed attack");
+				Log.Write("debug", "AI stealth lifecycle order {0} [{1}:{2}] tick={3}: producer={4} invalidation={5} target={6}#{7} units={8} route-hash={9} route-cells={10} progress-age={11} membership-changed={12} action={13} score={14} defended-value={15}.",
+					Info.SquadLabel, player.PlayerName, group.Index, world.WorldTick,
+					diagnosticPlanningProducer, invalidation, selected.Info.Name, selected.ActorID,
+					activeUnits.Length, DiagnosticRouteHash(selectedRoute), selectedRoute?.Count ?? 0,
+					progressAgeBeforeInvalidation, membershipChangedBeforeInvalidation,
+					crush ? "crush" : "hazard-routed attack", selectedScore, selectedDanger);
 		}
 
 		SpecialistDefenderClearAction DefenderClearAction(Threat defender, int packageDefenderCount,

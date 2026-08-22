@@ -1457,6 +1457,79 @@ All pre-final timeout, no-specialist, pre-fallback and diagnostic artifacts are
 explicitly uncounted. Exactly the two final matches above count. No push, PR,
 merge, external process, Air/config change, or unrelated edit was performed.
 
+## Merged-PR128 live-human order-stall correction
+
+The unmodified merged head reproduced the order churn in the natural seed96501
+one-VIKI/two-allied-Brutalis match (`.build/cnc96a-order-churn/baseline-run`),
+exit 0 at tick 19000/77.101 seconds. At tick16925 engagement safety stopped
+active `stnk#1063` under armed `obli#1271`, cleared its target/plan, and the
+same-tick nearby reaction immediately reacquired the identical `harv#1207` and
+submitted identical route hash `114325775`. Reinforcement staging independently
+submitted 1,385 orders, including 1,328 repeated no-route current-cell holds;
+telemetry captured 71 reinforcing cancellations and 55 same-type Move
+replacements. Unlike Air, these paths have no persisted safety owner and no
+same-target/busy reinforcement latch. This directly identifies the producers and
+cancellers without changing scoring, cadence, or balance.
+
+The correction ports Air's activity ownership at both collisions. A valid
+engagement stopped for armed/resource safety is persisted as suspended, so the
+nearby producer cannot reacquire it in the same tick and the exact target resumes
+only after the safety reason clears. Ground reinforcements now latch the mission
+target ActorID exactly like `AirReinforcementTargets`: moving target cells do not
+replace a busy route, while changed targets and idle routed actors replan from the
+actor's current position. No-route feasibility is still checked every scan, but
+an unchanged current-cell hold is not reissued; the first available route replaces
+it.
+
+The matched corrected diagnostic at
+`.build/cnc96a-order-churn/corrected-air-latch` exited 0 at tick19000 in 75.072s.
+Same-type reinforcement replacements fell from 55 to 0, cancellations from 71
+to 8 (all initial default-activity-to-first-route transitions), and submissions
+from 1385 to 310. It recorded three safety stop/resume cycles and zero ticks that
+combined a safety stop with a nearby order. Focused Release tests pass 131/131;
+`make all` passes with zero warnings/errors. This diagnostic is uncounted because
+its natural match recorded damage but no attributed kill; final sustained-combat
+games remain required.
+
+The first far-topology final candidate is preserved as an uncounted limitation at
+`.build/cnc96a-order-churn/final2-game1`: tick21000/102.981s, 31 specialists
+produced/15 lost, nine damage events but no kill. Its lone distant mission began
+tick11776, suffered early core attrition, and replacements did not join/attack
+until ticks20182-20257. Only one core lifecycle order occurred, so this was not
+the reported reissue loop; its fresh Luna policy verdict was nevertheless
+insufficient combat evidence.
+
+Counted replacement Game 1 is the natural close-topology seed96533 artifact at
+`.build/cnc96a-order-churn/final3-game1`. It ended naturally at tick17536 in
+52.845s: 13 specialists produced/zero lost; 24 enemy Harvesters produced and zero
+remaining; 166 CTNK events/221740 damage/six Harvester kills; level3/450000 XP.
+STNK logs independently show five completed building/Harvester missions and five
+completion-retreat-reassessment cycles. Nearby no-damage was bounded to six
+samples; 21 reinforcement records and four Blue stops had no producer-tick
+same-type replacement and no stop/nearby collision. Fresh Luna factual narrative
+is sibling `NARRATIVE.md`; separate policy `POLICY-REVIEW.md` is PASS WITH
+ADVISORY, retaining the CTNK-only combat attribution and direct ownership-
+transition proof as evidence limits.
+
+Counted candidate Game 2 is the distinct alternate-topology seed96522 artifact
+at `.build/cnc96a-order-churn/final2-game2`: exit0 tick21000/87.990s, 22
+specialists produced/11 lost, 173 CTNK events/211640 damage/two Harvester kills,
+and maximum nearby no-damage 16 samples. Twelve reinforcement records yielded no
+same-type reinforcing transition; one safety stop resumed without a same-tick
+nearby order. Both opponents survived and no STNK damage was attributed; that is
+an explicit evidence limit. Its enriched Luna narrative is sibling
+`NARRATIVE.md`; fresh corrected policy `POLICY-REVIEW-CORRECTED.md`
+conditionally supports the correction with a validation advisory, not a safety
+blocker. The first insufficient review remains preserved and superseded.
+
+Final protected checks pass: exact clean `make clean && make check`; focused
+Release policy suite 132/132; Release `make all` with zero warnings/errors; full
+CNC MiniYAML; and `git diff --check`. Exactly the close natural Game 1 and
+alternate natural Game 2 count. Earlier matched and far-route diagnostics are
+uncounted. The correction is ready for fresh Terra review and the required user
+manual gate; no push, PR, merge, balance/config/cadence/Air change, or unrelated
+edit was made.
+
 ## Terra formatting correction
 
 Fresh Terra review of `7715b88ffe911cf9cd697912a7c8d42f4a47de67`

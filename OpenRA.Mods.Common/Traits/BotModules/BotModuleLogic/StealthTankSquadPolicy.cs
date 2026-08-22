@@ -276,6 +276,18 @@ namespace OpenRA.Mods.Common.Traits
 			return active && !retreatResponsibilityPending;
 		}
 
+		public static bool ShouldIssueReinforcementOrder(bool retainedPlanMatches,
+			bool retainedSafeHold, bool isIdle, bool routeAvailable, bool issuedThisTick)
+		{
+			if (issuedThisTick)
+				return false;
+
+			if (!routeAvailable)
+				return !retainedPlanMatches || !retainedSafeHold;
+
+			return !retainedPlanMatches || retainedSafeHold || isIdle;
+		}
+
 		public static uint? RecoveryCore(IEnumerable<uint> members, ISet<uint> reinforcements)
 		{
 			var ordered = members.OrderBy(id => id).ToArray();
@@ -608,6 +620,12 @@ namespace OpenRA.Mods.Common.Traits
 			bool localThreatExposure, bool resourceHazard)
 		{
 			return wasAlreadySuspended && hasValidTarget && !localThreatExposure && !resourceHazard;
+		}
+
+		public static bool ShouldOwnSafetyHold(bool hasValidTarget,
+			bool localThreatExposure, bool resourceHazard)
+		{
+			return hasValidTarget && (localThreatExposure || resourceHazard);
 		}
 
 		public static bool ShouldRetainActiveEngagement(bool hasValidTarget, bool isEngaged,
