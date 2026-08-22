@@ -1530,6 +1530,28 @@ uncounted. The correction is ready for fresh Terra review and the required user
 manual gate; no push, PR, merge, balance/config/cadence/Air change, or unrelated
 edit was made.
 
+## Superseding Air-local-safety/save-latch cycle
+
+The user rejected the ground Stop-based safety lifecycle. The authorized
+replacement directly ports applicable Air local-safety behavior so specialists
+normally keep moving by rerouting, evading or retreating and then continue;
+Blue Tiberium is only a higher route cost/small danger and never a hard veto;
+completion retreat avoids both Blue and Red Tiberium. Fresh Terra also found
+that save/load drops the reinforcement target/safe-hold latch and permits a
+first-scan busy-Move replacement. Both corrections were recorded before the new
+code decision; commit `8895aa17` is superseded.
+
+The Air mapping is structural: keep the live local exposure scan; preserve an
+already active escape route; invalidate stale influence; route once to the
+nearest lower-exposure ground cell; use a one-cell passable retreat only as the
+fallback; and resume the valid incumbent after the route barrier completes.
+Ground divergences are locomotor/domain, detector+armed meaning, cloak/reveal,
+repair, and Stealth/Chemical priorities. Blue receives a soft route cost below
+the hard threat threshold; pending explosions and armed/detector exposure stay
+hard. Completion-retreat endpoints reject all resource types. Reinforcement save
+state will version and validate members, target IDs and safe-hold ownership before
+the first post-load scan, while accepting older member-only saves.
+
 ## Terra formatting correction
 
 Fresh Terra review of `7715b88ffe911cf9cd697912a7c8d42f4a47de67`
@@ -1549,3 +1571,59 @@ the comment above the invocation leaves the argument list and runtime behavior
 unchanged. The exact clean CI command `make clean && make check` now passes with
 0 warnings and 0 errors, including both interface checks. Release `make all`,
 the focused 121-test suite, full CNC YAML, and `git diff --check` also pass.
+
+## Air-local-safety/save-latch final cycle evidence
+
+The correction removes Stop as the specialist module's ordinary response to local
+armed/detector danger. It instead invalidates stale influence, applies one nearest-
+safe ground route under the existing retreat barrier, and falls back to a passable
+one-strategic-cell away move when necessary. Blue Tiberium contributes a `0.05`
+soft route cost rather than a veto; live armed/detector and pending-explosion cells
+remain hard at `1.0`. Completion and restored retreat endpoints reject all resource
+types. Ground locomotor/passability, detection, cloak/reveal, repair, reinforcement,
+retreat, and Stealth/Chemical priorities remain unchanged.
+
+The reinforcement save schema is backward-compatible v2 and records staged actor,
+per-member target ID, and safe-hold ownership. Load validates owner/eligibility/
+reservation/target/hold coherence and restores before the first scan. A full-engine
+calibration found that post-load Rebalance could first move the actor to another
+group, causing `restored=0`; the final restore reattaches a valid selected actor to
+its saved group before applying the validated latch. Invalid entries use normal
+planning. Focused v1/v2 roundtrip, malformed, ownership and reattachment coverage is
+included.
+
+Exactly two distinct final ordinary-AI/all-module matches count. Game 1 continued
+`.build/cnc96a-air-safety/final2-game1-initial/cnc96a-air-safety-game1-final-initial`
+(save tick15550, exit tick15600/67.054s) at
+`.build/cnc96a-air-safety/final2-game1-load/cnc96a-air-safety-game1-final-load`
+(exit tick18000/49.045s). Restore was `restored=4 reattached=3 dropped=0 plans=4`
+before scanning; armed reactions routed with no Stop and later resource-free
+retreats/operations continued. Its blind Luna narrative is
+`.build/cnc96a-air-safety/reviews/game1/NARRATIVE.md`; separate Luna policy is
+`.build/cnc96a-air-safety/reviews/game1/POLICY-REVIEW.md`, `PASS-WITH-NOTES` with
+nonblocking audit follow-ups only.
+
+Game 2 continued the distinct alternate topology from
+`.build/cnc96a-air-safety/final-game2-initial/cnc96a-air-safety-game2-initial`
+(save tick15175, exit tick15225/62.048s) at
+`.build/cnc96a-air-safety/final-game2-load/cnc96a-air-safety-game2-load`
+(exit tick17000/41.034s). Tick15178 restore was `restored=2 reattached=2 dropped=0
+plans=2`; there were zero Stop markers. The group resumed combat, completed
+`proc#1139`, then logged two exact delta-1, `resource=none` completion retreats at
+tick16702 before acquiring later targets. Its blind Luna narrative is
+`.build/cnc96a-air-safety/reviews/game2/NARRATIVE.md`; separate policy is
+`.build/cnc96a-air-safety/reviews/game2/POLICY-REVIEW.md`, verdict `Release`, with
+numeric cost/endpoint auditability recommendations explicitly nonblocking.
+
+The stale-save, missing-support-map, unbounded restore-diagnostic, pre-reattach and
+no-local-danger timing runs are preserved as uncounted diagnostics. Final checks:
+focused Release 152/152; exact clean `make clean && make check` PASS 0/0; Release
+`make all` PASS 0/0; full CNC YAML PASS; `git diff --check` PASS; no module Stop
+order remains. Fresh Terra review is the remaining gate. No push, PR, merge,
+external process, Air/config/balance or unrelated product change was made.
+
+Fresh Terra independently reviewed the final diff and both final-game receipt
+pairs at `.build/cnc96a-air-safety/reviews/TERRA-FINAL.md`: `RELEASE — no
+release blockers`. Its independent 145-test policy subset and clean Release build
+passed. The remaining continuity, numeric route/resource audit and per-plan
+restore-disposition suggestions are evidence-only follow-ups, not product defects.

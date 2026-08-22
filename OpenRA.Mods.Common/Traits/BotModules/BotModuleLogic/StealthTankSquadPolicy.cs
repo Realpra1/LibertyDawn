@@ -50,6 +50,8 @@ namespace OpenRA.Mods.Common.Traits
 	{
 		public int GroupIndex;
 		public uint[] Members;
+		public KeyValuePair<uint, uint>[] PlanTargets = Array.Empty<KeyValuePair<uint, uint>>();
+		public uint[] SafeHolds = Array.Empty<uint>();
 	}
 
 	public static class StealthTankSquadPolicy
@@ -57,8 +59,10 @@ namespace OpenRA.Mods.Common.Traits
 		public const int MaximumSquadCount = 4;
 		public const int RequiredStrategicCellSize = 6;
 		public const int NearbyReactionMaximumLatencyTicks = 25;
+		public const float HardRouteDangerThreshold = 1f;
+		public const float SoftResourceRouteCost = 0.05f;
 		public const int RetreatSaveVersion = 1;
-		public const int ReinforcementSaveVersion = 1;
+		public const int ReinforcementSaveVersion = 2;
 
 		public static bool ShouldBeginPostMissionRetreat(bool enabled, bool hasTarget,
 			bool targetIsValid)
@@ -77,7 +81,14 @@ namespace OpenRA.Mods.Common.Traits
 				new MiniYamlNode("Group", "", new List<MiniYamlNode>
 				{
 					new MiniYamlNode("Index", FieldSaver.FormatValue(group.GroupIndex)),
-					new MiniYamlNode("Members", FieldSaver.FormatValue(group.Members.OrderBy(id => id).ToArray()))
+					new MiniYamlNode("Members", FieldSaver.FormatValue(group.Members.OrderBy(id => id).ToArray())),
+					new MiniYamlNode("PlanTargets", "", group.PlanTargets.OrderBy(pair => pair.Key)
+						.Select(pair => new MiniYamlNode("Plan", "", new List<MiniYamlNode>
+						{
+							new MiniYamlNode("Member", FieldSaver.FormatValue(pair.Key)),
+							new MiniYamlNode("Target", FieldSaver.FormatValue(pair.Value))
+						})).ToList()),
+					new MiniYamlNode("SafeHolds", FieldSaver.FormatValue(group.SafeHolds.OrderBy(id => id).ToArray()))
 				})));
 			return new MiniYamlNode("StealthTankReinforcementState", "", nodes);
 		}
@@ -92,21 +103,43 @@ namespace OpenRA.Mods.Common.Traits
 			try
 			{
 				var version = state.Value.Nodes.Single(n => n.Key == "Version");
-				if (FieldLoader.GetValue<int>(version.Key, version.Value.Value) != ReinforcementSaveVersion)
+				var loadedVersion = FieldLoader.GetValue<int>(version.Key, version.Value.Value);
+				if (loadedVersion != 1 && loadedVersion != ReinforcementSaveVersion)
 					return false;
 
 				var loaded = state.Value.Nodes.Where(n => n.Key == "Group").Select(groupNode =>
 				{
 					var indexNode = groupNode.Value.Nodes.Single(n => n.Key == "Index");
 					var membersNode = groupNode.Value.Nodes.Single(n => n.Key == "Members");
+					var targetsNode = groupNode.Value.Nodes.FirstOrDefault(n => n.Key == "PlanTargets");
+					var holdsNode = groupNode.Value.Nodes.FirstOrDefault(n => n.Key == "SafeHolds");
+					if (loadedVersion >= 2 && (targetsNode == null || holdsNode == null))
+						throw new InvalidOperationException();
+
 					return new StealthTankReinforcementSaveGroup
 					{
 						GroupIndex = FieldLoader.GetValue<int>(indexNode.Key, indexNode.Value.Value),
-						Members = FieldLoader.GetValue<uint[]>(membersNode.Key, membersNode.Value.Value)
+						Members = FieldLoader.GetValue<uint[]>(membersNode.Key, membersNode.Value.Value),
+						PlanTargets = loadedVersion >= 2 && targetsNode != null ?
+							targetsNode.Value.Nodes.Where(n => n.Key == "Plan").Select(plan =>
+							{
+								var memberNode = plan.Value.Nodes.Single(n => n.Key == "Member");
+								var targetNode = plan.Value.Nodes.Single(n => n.Key == "Target");
+								return new KeyValuePair<uint, uint>(
+									FieldLoader.GetValue<uint>(memberNode.Key, memberNode.Value.Value),
+									FieldLoader.GetValue<uint>(targetNode.Key, targetNode.Value.Value));
+							}).ToArray() :
+							Array.Empty<KeyValuePair<uint, uint>>(),
+						SafeHolds = loadedVersion >= 2 && holdsNode != null ?
+							FieldLoader.GetValue<uint[]>(holdsNode.Key, holdsNode.Value.Value) : Array.Empty<uint>()
 					};
 				}).ToArray();
 				if (loaded.Any(g => g.GroupIndex < 0 || g.Members.Length == 0 ||
-					g.Members.Distinct().Count() != g.Members.Length) ||
+					g.Members.Distinct().Count() != g.Members.Length ||
+					g.PlanTargets.Select(pair => pair.Key).Distinct().Count() != g.PlanTargets.Length ||
+					g.PlanTargets.Any(pair => !g.Members.Contains(pair.Key)) ||
+					g.SafeHolds.Distinct().Count() != g.SafeHolds.Length ||
+					g.SafeHolds.Any(id => !g.PlanTargets.Any(pair => pair.Key == id))) ||
 					loaded.Select(g => g.GroupIndex).Distinct().Count() != loaded.Length ||
 					loaded.SelectMany(g => g.Members).Distinct().Count() != loaded.Sum(g => g.Members.Length))
 					return false;
@@ -286,6 +319,34 @@ namespace OpenRA.Mods.Common.Traits
 				return !retainedPlanMatches || !retainedSafeHold;
 
 			return !retainedPlanMatches || retainedSafeHold || isIdle;
+		}
+
+		public static bool ShouldRestoreReinforcementPlan(bool validMember,
+			bool validTarget, bool ownsActivity)
+		{
+			return validMember && validTarget && ownsActivity;
+		}
+
+		public static bool ShouldRestoreReinforcementMember(bool eligible,
+			bool reserved, bool selected)
+		{
+			return eligible && reserved && selected;
+		}
+
+		public static bool ShouldEvadeLocalDanger(bool localThreatExposure, bool blueAdjacent)
+		{
+			return localThreatExposure;
+		}
+
+		public static bool IsHardRouteDanger(float danger)
+		{
+			return danger >= HardRouteDangerThreshold;
+		}
+
+		public static bool IsRetreatDestinationSafe(bool passable, bool hasResource,
+			bool hardDanger)
+		{
+			return passable && !hasResource && !hardDanger;
 		}
 
 		public static uint? RecoveryCore(IEnumerable<uint> members, ISet<uint> reinforcements)
@@ -614,18 +675,6 @@ namespace OpenRA.Mods.Common.Traits
 			// Keep the existing immediate response to a weapon that is already engaged, and
 			// otherwise require detector and ground-weapon coverage to overlap the firing cell.
 			return engagedWeaponExposure || (detectorExposure && armedCoverage);
-		}
-
-		public static bool ShouldResumeSuspendedEngagement(bool wasAlreadySuspended, bool hasValidTarget,
-			bool localThreatExposure, bool resourceHazard)
-		{
-			return wasAlreadySuspended && hasValidTarget && !localThreatExposure && !resourceHazard;
-		}
-
-		public static bool ShouldOwnSafetyHold(bool hasValidTarget,
-			bool localThreatExposure, bool resourceHazard)
-		{
-			return hasValidTarget && (localThreatExposure || resourceHazard);
 		}
 
 		public static bool ShouldRetainActiveEngagement(bool hasValidTarget, bool isEngaged,

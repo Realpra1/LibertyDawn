@@ -1188,3 +1188,128 @@ the blocker precisely if natural combat acceptance remains unproved.
   count. The far-route and earlier matched diagnostics remain explicitly
   uncounted. No push, PR, merge, external process, cadence/config/balance/Air
   change, or unrelated edit was performed.
+## User hotfix amendment 2 — ground safety, Tiberium routing, and save/load latch (2026-08-22)
+
+- Status: `in progress — reproduce/diagnose/correct; no implementation started`
+- Exact authorized candidate: branch `agent/20260822-cnc96a-order-churn` at
+  `8895aa17bfe452a8ab671bb854f49eec9fecf47f`; underlying `bleed` base is
+  `24404606a28522a0a7e66bb5460abd718b5247e1`. This is an amendment to existing
+  CNC-96A only; do not create a task or round.
+- Ground safety contract: inspect and port the Air local-safety logic while
+  preserving required ground/Stealth/terrain/passability/detector/hazard rules.
+  Specialists must normally keep moving, reroute, evade, retreat, or continue
+  under danger/route pressure. Do not make Stop/hold the ordinary response or
+  allow Stop-and-oscillate loops; a safe hold is allowed only for a genuinely
+  justified, bounded reason that is recorded in telemetry. Blue Tiberium must be
+  a higher route cost or small danger, never a hard route/show-stopper. Completion
+  retreat destinations must avoid both Blue and Red Tiberium.
+- Fresh Terra blocker: on the exact candidate, save/load drops the new
+  reinforcement target/safe-hold latch. The first post-load scan can therefore
+  replace a busy Move route and reintroduce order flicker. Persist and restore
+  this latch safely, retaining valid target/activity ownership across load and
+  allowing replacement only for a genuine invalidation or bounded retry.
+- Required evidence remains direct per-unit accounting of every order producer and
+  canceller, activity, target/route, latch state, invalidation reason,
+  cancellation/replacement, movement progress, firing, and stall interval. Use
+  natural ordinary-AI/full-engine games with ordinary economies and no scripted
+  target/order choreography. Prove sustained firing/progress, no repeated Move
+  cancel/reissue flicker, correct genuine invalidation recovery, safe post-load
+  continuity, preserved ground/stealth/terrain behavior, and completion retreats
+  clear of Blue and Red Tiberium. Balance is frozen; do not modify Air behavior,
+  use cadence/tuning workarounds, or merge.
+## Superseding Air-local-safety and save-latch correction (2026-08-22)
+
+- User amendment, recorded before code decisions: **current ground safety Stop
+  logic is horrible. Inspect/port Air local-safety logic directly. Specialists
+  should normally keep moving/reroute/evade/retreat/continue, not Stop/oscillate.
+  Blue Tiberium becomes higher route cost/small danger, never a hard veto or
+  show-stopper. Completion retreat destinations must avoid both Blue and Red
+  Tiberium. Preserve necessary ground/stealth considerations.**
+- Fresh Terra blocker, recorded before code decisions: the current reinforcement
+  target/safe-hold latch is transient; save/load drops it, so the first post-load
+  scan may replace a busy Move and reintroduce the visible flicker. Persist and
+  restore a validated latch compatibly.
+- Required approach: map Air local-AA safety line by line; reproduce current
+  Blue/armed Stop behavior; make the smallest structural ground adaptation;
+  preserve locomotor/passability, detectors/armed threats, cloak/reveal,
+  repair/reinforcement/ownership and deterministic save compatibility. Add
+  focused safety/resource-retreat and save/load regressions, then rerun two
+  distinct ordinary/all-module games with direct movement/no-Stop, route-cost,
+  resource-free completion-retreat, and restored-latch evidence. The prior
+  `8895aa17` candidate is superseded and must not be published as-is.
+
+### Air local-safety source mapping before implementation
+
+| Air source behavior | Ground specialist port | Required divergence |
+|---|---|---|
+| `AirStates` local scan derives live AA exposure and does nothing when exposure clears. | Keep the existing 25-tick live `HasLocalThreatExposure`, but remove ordinary Blue adjacency from the emergency trigger. | Ground exposure remains engaged weapon or overlapping detector+armed coverage; cloak/reveal rules remain specialist-specific. |
+| An already active `AirEscapingLocalAa` route owns the lifecycle and is not replaced while busy. | Existing retreat-destination barrier owns a local safety move until reached; nearby/strategic producers cannot replace it. | Ground actors use passable cells and ground activity/repair eligibility. |
+| `BeginRoutedLocalAaEscape` invalidates stale influence, then routes toward a lower-exposure target or the nearest safe coarse cell. | Invalidate specialist influence, build a fresh live threat map, and queue a bounded nearest-safe ground route while preserving the former target as the post-evade incumbent. | Do not copy Air target priorities/domain; ground target selection resumes afterward with Stealth/Chemical scoring. |
+| Air falls back to a local evade only when the strategic safe router has no usable route. | Fall back to a passable one-strategic-cell retreat that is away from the encounter and resource-free; do not Stop. | Ground fallback must respect locomotor/domain and exact retreat geometry. |
+| Air applies the selected route once and changes to an exclusive attack/flee state. | Queue the safe route once, persist it in the existing reassessment barrier, then resume/reassess the valid incumbent only after completion. | Repair responsibilities remain authoritative and can pause/rejoin the barrier. |
+| Air influence uses weighted exposure rather than treating every nonzero cost as impossible. | Mark configured Blue resource cells with a sub-hard-threshold route cost; route search prefers clean cells but may cross Blue. Armed/detector/pending-explosion danger remains hard. | Completion-retreat endpoints explicitly reject every resource type, including Blue and Red. |
+
+- Save mapping: bump reinforcement state to a backward-compatible version that
+  records staged members plus per-member target-ID latch and safe-hold bit. On
+  restore, require valid group/member/reservation, a live enemy target (or target
+  ID zero for formation staging), and coherent safe-hold membership. Restore the
+  common valid mission target and latch before the first `UpdateReinforcements`;
+  discard stale/malformed ownership and let ordinary planning reissue once.
+
+## Superseding Air-local-safety/save-latch implementation receipt (2026-08-22)
+
+- Status: `implementation and two final games complete; protected checks pass; fresh Terra pending`.
+- Smallest structural correction completed: ordinary local exposure no longer emits
+  `Stop`; armed/detector exposure invalidates stale influence and submits one shared
+  nearest-safe ground route, with a passable one-strategic-cell away fallback when
+  no route exists. The existing retreat barrier owns that move until resolution.
+  Blue Tiberium is marked with a `0.05` soft route cost below the `1.0` hard-danger
+  threshold, so it is preferred against but remains traversable. Pending explosions
+  and live armed/detector exposure remain hard. Completion and restored retreat
+  destinations reject every resource type, including Blue and Red.
+- Reinforcement state is backward-compatibly versioned to v2. It serializes staged
+  members, each member's mission target ID, and safe-hold membership. Load validates
+  ownership, eligibility, reservation, target liveness and coherent holds before the
+  first ordinary scan. A full-engine calibration exposed post-load Rebalance moving
+  saved staged actors to a different group; restore now reattaches valid selected
+  actors to the saved group before restoring the latch. Malformed/stale entries fall
+  back to normal planning. Focused v1/v2/malformed/ownership tests cover this path.
+- Final counted Game 1 is one close-topology match continued through save/load:
+  `.build/cnc96a-air-safety/final2-game1-initial/cnc96a-air-safety-game1-final-initial`
+  (exit0 tick15600/67.054s; save tick15550) and
+  `.build/cnc96a-air-safety/final2-game1-load/cnc96a-air-safety-game1-final-load`
+  (exit0 tick18000/49.045s). Restore reported `version=2 restored=4 reattached=3
+  dropped=0 plans=4` before the first scan. Armed local-safety reactions rerouted,
+  no Stop was issued, and completion retreats recorded resource-free endpoints.
+  Fresh blind narrative: `.build/cnc96a-air-safety/reviews/game1/NARRATIVE.md`;
+  separate policy: `.build/cnc96a-air-safety/reviews/game1/POLICY-REVIEW.md`,
+  `PASS-WITH-NOTES`, with evidence-only follow-ups and no behavior blocker.
+- Final counted Game 2 is the distinct alternate topology:
+  `.build/cnc96a-air-safety/final-game2-initial/cnc96a-air-safety-game2-initial`
+  (exit0 tick15225/62.048s; save tick15175) and
+  `.build/cnc96a-air-safety/final-game2-load/cnc96a-air-safety-game2-load`
+  (exit0 tick17000/41.034s). Restore at tick15178 reported `version=2 restored=2
+  reattached=2 dropped=0 plans=2`; no Stop was logged. It resumed operations,
+  completed `proc#1139`, and at tick16702 recorded two exact delta-1 retreats with
+  `resource=none`, then acquired later targets. Fresh blind narrative:
+  `.build/cnc96a-air-safety/reviews/game2/NARRATIVE.md`; separate policy:
+  `.build/cnc96a-air-safety/reviews/game2/POLICY-REVIEW.md`, verdict `Release`, no
+  behavior blocker. Numeric Blue-cost and endpoint audit assertions are accepted as
+  nonblocking evidence follow-ups because focused tests and raw authoritative logs
+  directly cover them.
+- Uncounted setup/calibration artifacts remain disclosed: a stale-at-save Game1,
+  a missing-support-map Game1 load, an unbounded load that exposed the Rebalance
+  restore defect, superseded pre-reattach legs, and a Game2 timing rerun that did not
+  encounter local danger. They are diagnostics only and do not replace the two final
+  distinct matches above.
+- Protected checks on the final source: combined focused Release suite 152/152;
+  exact clean `make clean && make check` PASS with zero warnings/errors after three
+  formatting-only StyleCop corrections; Release `make all` PASS with zero
+  warnings/errors; full `./utility.sh cnc --check-yaml` PASS; `git diff --check`
+  PASS; module contains no `new Order("Stop"...)` call. No Air/config/balance edit,
+  external process, push, PR or merge was performed.
+- Fresh Terra final gate: `.build/cnc96a-air-safety/reviews/TERRA-FINAL.md`,
+  verdict `RELEASE — no release blockers`. Terra independently passed the
+  145-test policy subset and a clean Release build, and retained only three
+  evidence-audit recommendations (continuity assertion, numeric route/resource
+  flags, and per-plan restore disposition). They are explicitly nonblocking.

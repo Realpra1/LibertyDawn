@@ -6,6 +6,7 @@
  */
 #endregion
 
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
@@ -167,15 +168,36 @@ namespace OpenRA.Test.Mods.Common
 				retainedSafeHold, isIdle, routeAvailable, issuedThisTick), Is.EqualTo(expected));
 		}
 
-		[TestCase(true, true, false, true)]
-		[TestCase(true, false, true, true)]
-		[TestCase(true, false, false, false)]
-		[TestCase(false, true, true, false)]
-		public void SafetyStopOwnsHoldUntilItsReasonClears(bool hasValidTarget,
-			bool localThreatExposure, bool resourceHazard, bool expected)
+		[TestCase(true, false, true)]
+		[TestCase(true, true, true)]
+		[TestCase(false, true, false,
+			Description = "Blue Tiberium is route cost, not an emergency movement veto.")]
+		[TestCase(false, false, false)]
+		public void LocalSafetyEvadesThreatButNeverBlueAlone(bool localThreatExposure,
+			bool blueAdjacent, bool expected)
 		{
-			Assert.That(StealthTankSquadPolicy.ShouldOwnSafetyHold(hasValidTarget,
-				localThreatExposure, resourceHazard), Is.EqualTo(expected));
+			Assert.That(StealthTankSquadPolicy.ShouldEvadeLocalDanger(localThreatExposure,
+				blueAdjacent), Is.EqualTo(expected));
+		}
+
+		[TestCase(0f, false)]
+		[TestCase(StealthTankSquadPolicy.SoftResourceRouteCost, false)]
+		[TestCase(StealthTankSquadPolicy.HardRouteDangerThreshold, true)]
+		[TestCase(5f, true)]
+		public void BlueCostRemainsBelowHardRouteDanger(float danger, bool expected)
+		{
+			Assert.That(StealthTankSquadPolicy.IsHardRouteDanger(danger), Is.EqualTo(expected));
+		}
+
+		[TestCase(true, false, false, true)]
+		[TestCase(true, true, false, false, Description = "Both Blue and Red endpoints are rejected.")]
+		[TestCase(true, false, true, false)]
+		[TestCase(false, false, false, false)]
+		public void CompletionRetreatRequiresPassableResourceFreeSafeEndpoint(bool passable,
+			bool hasResource, bool hardDanger, bool expected)
+		{
+			Assert.That(StealthTankSquadPolicy.IsRetreatDestinationSafe(passable,
+				hasResource, hardDanger), Is.EqualTo(expected));
 		}
 
 		[Test]
@@ -183,14 +205,88 @@ namespace OpenRA.Test.Mods.Common
 		{
 			var saved = StealthTankSquadPolicy.SaveReinforcementState(new[]
 			{
-				new StealthTankReinforcementSaveGroup { GroupIndex = 0, Members = new uint[] { 14, 12 } },
+				new StealthTankReinforcementSaveGroup
+				{
+					GroupIndex = 0,
+					Members = new uint[] { 14, 12 },
+					PlanTargets = new[]
+					{
+						new KeyValuePair<uint, uint>(14, 701),
+						new KeyValuePair<uint, uint>(12, 701)
+					},
+					SafeHolds = new uint[] { 14 }
+				},
 				new StealthTankReinforcementSaveGroup { GroupIndex = 2, Members = new uint[] { 18 } }
 			});
 
 			Assert.That(StealthTankSquadPolicy.TryLoadReinforcementState(saved, out var restored), Is.True);
 			Assert.That(restored.Select(g => g.GroupIndex), Is.EqualTo(new[] { 0, 2 }));
 			Assert.That(restored[0].Members, Is.EqualTo(new uint[] { 12, 14 }));
+			Assert.That(restored[0].PlanTargets, Is.EqualTo(new[]
+			{
+				new KeyValuePair<uint, uint>(12, 701),
+				new KeyValuePair<uint, uint>(14, 701)
+			}));
+			Assert.That(restored[0].SafeHolds, Is.EqualTo(new uint[] { 14 }));
 			Assert.That(restored.SelectMany(g => g.Members), Is.Unique);
+		}
+
+		[Test]
+		public void LegacyReinforcementSaveLoadsWithoutTransientPlanOwnership()
+		{
+			var legacy = new MiniYamlNode("StealthTankReinforcementState", "", new List<MiniYamlNode>
+			{
+				new MiniYamlNode("Version", FieldSaver.FormatValue(1)),
+				new MiniYamlNode("Group", "", new List<MiniYamlNode>
+				{
+					new MiniYamlNode("Index", FieldSaver.FormatValue(0)),
+					new MiniYamlNode("Members", FieldSaver.FormatValue(new uint[] { 12, 14 }))
+				})
+			});
+
+			Assert.That(StealthTankSquadPolicy.TryLoadReinforcementState(legacy, out var restored), Is.True);
+			Assert.That(restored[0].Members, Is.EqualTo(new uint[] { 12, 14 }));
+			Assert.That(restored[0].PlanTargets, Is.Empty);
+			Assert.That(restored[0].SafeHolds, Is.Empty);
+		}
+
+		[Test]
+		public void ReinforcementSaveRejectsLatchOwnershipOutsideStagedMembers()
+		{
+			var malformed = StealthTankSquadPolicy.SaveReinforcementState(new[]
+			{
+				new StealthTankReinforcementSaveGroup
+				{
+					GroupIndex = 0,
+					Members = new uint[] { 12 },
+					PlanTargets = new[] { new KeyValuePair<uint, uint>(14, 701) },
+					SafeHolds = new uint[] { 14 }
+				}
+			});
+
+			Assert.That(StealthTankSquadPolicy.TryLoadReinforcementState(malformed, out _), Is.False);
+		}
+
+		[TestCase(true, true, true, true)]
+		[TestCase(false, true, true, false)]
+		[TestCase(true, false, true, false)]
+		[TestCase(true, true, false, false)]
+		public void RestoredReinforcementLatchRequiresLiveOwnership(bool validMember,
+			bool validTarget, bool ownsActivity, bool expected)
+		{
+			Assert.That(StealthTankSquadPolicy.ShouldRestoreReinforcementPlan(validMember,
+				validTarget, ownsActivity), Is.EqualTo(expected));
+		}
+
+		[TestCase(true, true, true, true)]
+		[TestCase(false, true, true, false)]
+		[TestCase(true, false, true, false)]
+		[TestCase(true, true, false, false)]
+		public void SavedStagedMemberReattachesBeforeLatchValidation(bool eligible,
+			bool reserved, bool selected, bool expected)
+		{
+			Assert.That(StealthTankSquadPolicy.ShouldRestoreReinforcementMember(eligible,
+				reserved, selected), Is.EqualTo(expected));
 		}
 
 		[Test]
@@ -752,20 +848,6 @@ namespace OpenRA.Test.Mods.Common
 		{
 			Assert.That(StealthTankSquadPolicy.IsEngagementThreat(detectorExposure,
 				armedCoverage, engagedWeaponExposure), Is.EqualTo(expected));
-		}
-
-		[TestCase(true, true, true, false, false)]
-		[TestCase(true, true, false, true, false)]
-		[TestCase(true, false, false, false, false)]
-		[TestCase(false, true, false, false, false,
-			Description = "A target first suspended by this safety check cannot resume in that same check.")]
-		[TestCase(true, true, false, false, true)]
-		public void SuspendedEngagementResumesOnlyAfterShooterOrHazardClears(bool wasAlreadySuspended,
-			bool hasValidTarget,
-			bool localThreatExposure, bool resourceHazard, bool expected)
-		{
-			Assert.That(StealthTankSquadPolicy.ShouldResumeSuspendedEngagement(wasAlreadySuspended, hasValidTarget,
-				localThreatExposure, resourceHazard), Is.EqualTo(expected));
 		}
 
 		[TestCase(true, true, false, false, true)]
