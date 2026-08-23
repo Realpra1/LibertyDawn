@@ -23,6 +23,28 @@ namespace OpenRA.Mods.Common.Traits
 		DirectionalProgress
 	}
 
+	public enum SpecialistRetreatMaintenanceAction
+	{
+		Pending,
+		Completed,
+		RetryUnavailable,
+		RetryQueued
+	}
+
+	public sealed class SpecialistRetreatRetryPlan
+	{
+		public readonly CPos Endpoint;
+		public readonly List<CPos> Route;
+		public readonly string Reason;
+
+		public SpecialistRetreatRetryPlan(CPos endpoint, List<CPos> route, string reason)
+		{
+			Endpoint = endpoint;
+			Route = route;
+			Reason = reason;
+		}
+	}
+
 	public enum SpecialistRepairDisposition { Active, Repair, Rejoin }
 	public enum StealthTankPlanInvalidation
 	{
@@ -392,6 +414,12 @@ namespace OpenRA.Mods.Common.Traits
 				return !retainedPlanMatches || !retainedSafeHold;
 
 			return !retainedPlanMatches || retainedSafeHold || isIdle;
+		}
+
+		public static bool ShouldRetryFailedReinforcementSearch(bool sameTarget,
+			bool sameOrigin, bool sameAnchor, bool sameRouteContext)
+		{
+			return !(sameTarget && sameOrigin && sameAnchor && sameRouteContext);
 		}
 
 		public static bool ShouldRestoreReinforcementPlan(bool validMember,
@@ -774,6 +802,72 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			return (candidate.X - current.X) * Math.Sign(requiredDestination.X - current.X) +
 				(candidate.Y - current.Y) * Math.Sign(requiredDestination.Y - current.Y);
+		}
+
+		public static bool ShouldRejectImmediateRetreatReverse(bool stagedRouteApplies,
+			CPos candidate, CPos stagedOrigin)
+		{
+			return stagedRouteApplies && candidate == stagedOrigin;
+		}
+
+		public static CPos RetreatResponsibilityAfterRetry(CPos requiredDestination,
+			CPos selectedEndpoint, int strategicCellSize)
+		{
+			// A ground-only directional fallback is an intermediate route. It may
+			// advance around an unavailable away cell, but cannot replace the
+			// original one-cell retreat responsibility until it actually reaches
+			// that required strategic cell.
+			return IsSameStrategicCell(requiredDestination, selectedEndpoint,
+				strategicCellSize) ? selectedEndpoint : requiredDestination;
+		}
+
+		public static SpecialistRetreatMaintenanceAction MaintainRetreatResponsibility(
+			IDictionary<uint, CPos> responsibilities, uint actorId, CPos? current,
+			bool eligible, bool repairing, bool idle, int currentTick,
+			int lastRetreatOrderTick, int retryInterval, int strategicCellSize,
+			Func<CPos, SpecialistRetreatRetryPlan> findRetryPlan,
+			Action<List<CPos>> queueRoute, Action cleanup,
+			out CPos requiredDestination, out SpecialistRetreatRetryPlan retryPlan)
+		{
+			retryPlan = null;
+			if (!responsibilities.TryGetValue(actorId, out requiredDestination))
+				return SpecialistRetreatMaintenanceAction.Pending;
+
+			if (!eligible)
+			{
+				responsibilities.Remove(actorId);
+				cleanup?.Invoke();
+				return SpecialistRetreatMaintenanceAction.Completed;
+			}
+
+			var reachedDestination = current.HasValue && IsSameStrategicCell(
+				current.Value, requiredDestination, strategicCellSize);
+			if (IsRetreatResponsibilityResolved(eligible, repairing, reachedDestination))
+			{
+				responsibilities.Remove(actorId);
+				cleanup?.Invoke();
+				return SpecialistRetreatMaintenanceAction.Completed;
+			}
+
+			if (!idle || repairing || findRetryPlan == null ||
+				!CanRetryRetreat(currentTick, lastRetreatOrderTick, retryInterval))
+				return SpecialistRetreatMaintenanceAction.Pending;
+
+			retryPlan = findRetryPlan(requiredDestination);
+			if (retryPlan?.Route == null || retryPlan.Route.Count == 0)
+				return SpecialistRetreatMaintenanceAction.RetryUnavailable;
+
+			responsibilities[actorId] = RetreatResponsibilityAfterRetry(
+				requiredDestination, retryPlan.Endpoint, strategicCellSize);
+			queueRoute?.Invoke(retryPlan.Route);
+			return SpecialistRetreatMaintenanceAction.RetryQueued;
+		}
+
+		public static string RetreatIneligibleCleanupTelemetry(uint actorId, CPos destination)
+		{
+			return $"unit={actorId} current=none selected-endpoint={destination} " +
+				"eligible=false responsibility=completed reason=ineligible-cleanup " +
+				"stop=false cancel=false reassess=false";
 		}
 
 		public static bool ShouldRetryUnavailableRetreatSearch(bool sameTarget,

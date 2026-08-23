@@ -71,6 +71,28 @@ namespace OpenRA.Test
 		}
 
 		[Test]
+		public void DirectionalSafeCandidatesPreserveAirCostAndUseDirectionOnlyAsTieBreak()
+		{
+			var symmetricDanger = new[] { 0f, 5f, 5f, 5f, 5f, 5f, 0f };
+			var directional = ThreatAwareRoutePlanner.FindNearestSafeRouteCandidates(
+				symmetricDanger, 7, 1, 3, 0, 100, 6, 0, 2);
+			Assert.That(directional, Has.Count.EqualTo(2));
+			Assert.That(directional[0][directional[0].Count - 1], Is.EqualTo(new CPos(6, 0)),
+				"Equal-cost safe exits use retreat-direction progress as the deterministic tie-break.");
+
+			var asymmetricDanger = new[] { 0f, 5f, 5f, 5f, 20f, 20f, 0f };
+			var lowestCost = ThreatAwareRoutePlanner.FindNearestSafeRouteCandidates(
+				asymmetricDanger, 7, 1, 3, 0, 100, 6, 0, 2);
+			Assert.That(lowestCost[0][lowestCost[0].Count - 1], Is.EqualTo(new CPos(0, 0)),
+				"Direction preference must not override Air's graduated danger-cost ordering.");
+
+			var noSafeCell = ThreatAwareRoutePlanner.FindNearestSafeRouteCandidates(
+				new[] { 1f, 1f, 1f }, 3, 1, 1, 0, 100, 2, 0, 2);
+			Assert.That(noSafeCell, Is.Empty,
+				"The finite full-map search returns no candidate when no safe coarse cell exists.");
+		}
+
+		[Test]
 		public void SmoothRouteCollapsesSafeGridPathToStraightFlight()
 		{
 			var danger = new float[25];

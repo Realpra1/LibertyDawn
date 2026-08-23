@@ -1678,3 +1678,282 @@ the blocker precisely if natural combat acceptance remains unproved.
   `git diff --check` pass. Raw game/review artifacts remain ignored. Amend the
   existing single commit, verify clean, then require fresh native Terra-4. No push,
   PR, merge, external process, Air/config/balance or unrelated change is authorized.
+
+## Terra-4 directional-responsibility correction and final17 evidence
+
+- Terra-4 at `.build/cnc96a-stall-watchdog/TERRA-FINAL-4.md` blocked candidate
+  `f7db9c48a75c1391397c23811dc3fe642bf3c3b3` because a positive-projection
+  directional staging endpoint outside the original required away strategic cell
+  replaced the stored responsibility and could release the barrier in the wrong
+  cell. `RetreatResponsibilityAfterRetry` now updates to an alternate endpoint only
+  when it belongs to the original required strategic cell. An outside-cell
+  directional route remains intermediate: the original destination stays stored,
+  physical arrival outside it cannot complete responsibility, and the next
+  dedicated retreat interval continues maintenance. The regression uses current
+  `91,27`, required `87,39`, and positive-projection wrong-cell `78,40`, proving the
+  original responsibility remains; an in-required-cell endpoint may update.
+- Terra-4 also identified that the accumulated Task Maker cherry-picks produced an
+  unintended net rewrite of `AUTONOMOUS-CNC-TASKS.md`. No worker-authored sheet fix
+  was retained. Authorized Task Maker commit `491a1c5ff3` restores the sheet exactly
+  to merged base `c8388e9b0c80d95dc7931868adac7f7bd8786527`; net task-sheet diff is
+  zero while all amendments remain durable in this STATE/REPORT. Preserve that
+  separate Task Maker commit/history and never stage the sheet in the product fix.
+- Final17 Game 1 (`.build/cnc96a-stall-watchdog/final17-techstart-game1/
+  symmetric-techstart-top-one-direction`) exits0 in 50 seconds and reaches natural
+  END tick12881 with both Brutalis defeated, 17 harvesters produced/zero remaining,
+  19 specialists/3 losses, watchdog0/max93, 19 exact-root shot-confirmed firing
+  starts, and no repair exemption. One pre-END same-endpoint exact retreat retry is
+  followed by physical-arrival completion. Fresh narrator
+  `review-context/NARRATIVE.md` classifies all53 transitions as36 ordinary and17
+  observer identity, zero confirmed/ambiguous. Crossed independent
+  `policy-context/POLICY-REVIEW.md` is PASS/high/advisory.
+- Distinct final17 Game 2 (`.build/cnc96a-stall-watchdog/final17-techstart-game2/
+  symmetric-techstart-bottom-one-direction`) exits0 in53 seconds and reaches natural
+  END14163 with both Brutalis defeated, 28 harvesters/zero remaining,27 specialists/
+  13 losses, STNK3 damage events/1 kill, CTNK21/1, watchdog0/max370,21 exact-root
+  shot-confirmed starts, and one valid repair exemption with HP14885->15000 (+115).
+  Fresh narrator classifies all60 transitions as46 ordinary and14 observer identity,
+  zero confirmed/ambiguous. Five unavailable searches for #1080 are strictly after
+  natural END, select no endpoint/route/order, and record stop=false/cancel=false/
+  reassess=false; endpoint safety/displacement/arrival fields are therefore
+  inapplicable. The first policy BLOCK on missing endpoint fields is superseded by a
+  bounded factual addendum and fresh crossed `policy-context/POLICY-REVIEW.md` PASS/
+  high/none under the coordinator's explicit gate: no pre-END failure/unavailable
+  retry may be waived; post-END no-order searches do not alter the terminal result.
+- Product source was unchanged between the two final17 games and their reviews.
+  Focused Release163/163, exact `make check`, Release `make all`, full CNC YAML and
+  `git diff --check` pass. Raw game/review artifacts remain ignored. Fresh Terra-5
+  against the exact net diff remains the release gate; no publication is authorized.
+
+## Terra-5 coverage correction
+
+- Terra-5 at `.build/cnc96a-stall-watchdog/TERRA-FINAL-5.md` confirms the source
+  correction is semantically correct and the task-sheet net diff is zero, but blocks
+  because the initial regression asserted only the update helper rather than the
+  subsequent completion transition. Product behavior and final17 evidence remain
+  unchanged.
+- `DirectionalRetryArrivalOutsideRequiredCellKeepsLifecycleBarrier` now drives the
+  exact production policy sequence over a representative responsibility dictionary:
+  directional retry selects positive-projection endpoint `78,40`; the stored
+  responsibility remains `87,39`; physical arrival at the wrong-cell endpoint fails
+  `IsSameStrategicCell` and `IsRetreatResponsibilityResolved`, so the barrier remains;
+  dedicated cadence permits the next retry; only arrival at `87,36` inside the
+  original required cell resolves that member. A second busy peer's destination is
+  unchanged throughout, `stop=false`/`cancel=false` is asserted, and the group barrier
+  remains for that peer. Fresh focused/protected checks and Terra-6 are required; no
+  game rerun is needed for this test-only coverage correction unless review finds a
+  behavior change.
+
+## Terra-6 production seam, dead-member cleanup, and bounded detour
+
+- Terra-6 at `.build/cnc96a-stall-watchdog/TERRA-FINAL-6.md` accepted the
+  directional-responsibility semantics and zero task-sheet net diff, but blocked
+  the helper-only lifecycle regression. The reviewed test could pass while the
+  real `UpdateStrategicRetreat` caller overwrote responsibility, submitted a busy
+  peer, or used different arrival cleanup; it also lacked durable exact-head check
+  receipts. The correction extracts
+  `StealthTankSquadPolicy.MaintainRetreatResponsibility` and calls that same seam
+  from both production arrival and dedicated retry loops. The seam owns
+  eligibility/death cleanup, same-cell/repair completion, busy exclusion, cadence,
+  retry selection, responsibility persistence/update, route queue handoff, and
+  completion cleanup. The regression invokes this shared seam for wrong-cell
+  staging, busy-peer exclusion, dead-member cleanup, dedicated retry, and final
+  required-cell arrival; it no longer duplicates the transition in test code.
+- A first binary rerun exposed and did not waive a concrete dead-member defect:
+  a retreat responsibility could outlive its actor and the caller dereferenced a
+  null actor location. Missing/ineligible actors now remove only their own
+  responsibility and run retained/failure/staged-route cleanup exactly once before
+  any position, idleness, or route work. The focused regression proves null current
+  position, no retry factory or queue call, and an unchanged busy/live peer.
+- The next hostile natural discriminator exposed STNK #814 at tick8703: after
+  target completion it reached a wrong-cell intermediate endpoint, but every
+  positive-projection required-cell candidate was unavailable; the unchanged null
+  search was memoized and the unit reached the hard 750-tick watchdog. The bounded
+  ground-only correction preserves same-endpoint, same-required-cell, and positive-
+  projection routes as strict preferences. If none exists, it considers at most
+  `MaximumTargetCandidates` nonzero exact routes satisfying the same locomotor/
+  domain, hard-threat, detector, pending-hazard, and resource-free constraints;
+  ranks greatest projection first; and queues one intermediate route while retaining
+  the original away-cell responsibility. Per-responsibility staged origin/endpoint
+  and target/destination/influence context reject an immediate reverse. A null search
+  is memoized only when no bounded safe exact route exists. Busy peers remain
+  untouched and no Stop, cancel, reassessment, unbounded A*, scoring, profile,
+  balance, Air, or unrelated change was added.
+- The shared-seam regression proves a supplied negative-projection detour queues
+  once, wrong-cell arrival remains pending, immediate reverse to the staged origin
+  is rejected, a later required-cell route updates responsibility, and only physical
+  required-cell arrival completes/cleans that member. Current focused Release is
+  164/164; exact `make check` and Release `make all` both pass with zero warnings/
+  errors; `git diff --check` passes. Final exact-head receipt files will be generated
+  after the single amended commit, as Terra-6 requested.
+- Supplemental disclosed injected-setup evidence is ignored at
+  `.build/cnc96a-stall-watchdog/targeted-directional-final20/run`. Actual production
+  callbacks record tick90 blocking required cell19,9; tick150 idle #536 queues a
+  hard-safe/resource-free/detector-safe/domain-passable exact
+  `directional-cross-cell` route 119,53 -> 106,68 while retaining the original
+  responsibility and issuing no Stop/cancel/reassessment; independent #535
+  completes its own responsibility. After tick390 unblock, tick450 #536 receives
+  an exact same-endpoint route into 117,57 in the original required cell and tick675
+  physically completes at 116,58. This targeted scenario is supplemental only.
+- Final20 ordinary/all-module natural Game 1 at
+  `.build/cnc96a-stall-watchdog/final20-techstart-game1/symmetric-techstart-top-one-direction`
+  exits0 at natural END13771 with both Brutalis defeated, 19 enemy harvesters
+  produced/zero remaining, specialists22/7 losses, STNK1 damage event/1 kill and
+  CTNK41/1, watchdog0/max132 pre-END, 68 actual discharges, no Repair exemption,
+  two exact retries to physical arrival, and zero confirmed still-busy matching
+  replacement across all39 classified transitions.
+- Distinct Final20 Game 2 at
+  `.build/cnc96a-stall-watchdog/final20-techstart-game2/symmetric-techstart-bottom-one-direction`
+  exits0 at natural END15038 with both Brutalis defeated, 24 harvesters/zero,
+  specialists18/10, STNK3 events/1 kill and CTNK11/0, watchdog0/max171, 95 actual
+  discharges, no Repair exemption, four exact retries to physical arrival, and zero
+  confirmed still-busy matching replacement across all78 classified transitions.
+  Product source was unchanged across the targeted scenario and both games. Initial
+  independent policies correctly blocked omissions in the factual narratives, not
+  product behavior: explicit 52s/57s wall durations, assigned 1 VIKI versus 2 allied
+  Brutalis composition, root-Attack continuity, no-Repair-exemption disposition,
+  and per-retry safety/projection/displacement fields. Bounded addenda from the
+  original narrators and fresh independent policies are required before commit.
+
+## Kill-time firing closure and final21 evidence
+
+- Final20 Game 1 policy was superseded by a corrected canonical narrative and
+  fresh PASS policy after explicitly recording its 52-second wall time, assigned
+  composition, no Repair exemption, exact-root firing closures, and both retries'
+  safety/projection/displacement. Final20 Game 2 exposed a real diagnostic gap:
+  four live exact-root firing actors were lost at tick14643 and never ticked again,
+  so their watchdog traits emitted no episode/exemption closure. This was not
+  waived or treated as gameplay failure. `BotOwnedStationaryWatchdog` now implements
+  `INotifyKilled`; only a live confirmed-discharge episode emits
+  `reason=actor-killed`, then the existing exemption-end start/duration record and
+  state clear. A killed actor without a live episode emits nothing. The shared
+  `ActorKilledFiringEpisodeEndReason` production decision is covered for exact
+  `actor-killed` and null. Watchdog threshold/cadence/accumulation, firing and repair
+  predicates, activities, orders, simulation and gameplay behavior are unchanged.
+- Focused Release now passes 165/165; exact `make check` and Release `make all`
+  pass with zero warnings/errors. Supplemental directional final21 at
+  `.build/cnc96a-stall-watchdog/targeted-directional-final21/run` intentionally
+  exits124 after45s but records internal END3000, watchdog0/NRE0, and reproduces
+  block90 -> #536 directional-cross-cell150 -> unblock390 -> same-endpoint450 ->
+  required-cell physical completion675, with #535 independent and unchanged.
+- The separate disclosed kill probe at
+  `.build/cnc96a-stall-watchdog/targeted-kill-closure-final21/run` uses an injected
+  AI-owned STNK/harvester only for supplemental runtime evidence. Actual discharge
+  damage is observed at tick79; kill callback emits
+  `last-discharge=67 cadence=82 reason=actor-killed nonexempt-age=56`, immediately
+  followed by `exemption-end ... Firing start=57 duration=22`; watchdog0 and no
+  exception. Separate fresh factual receipt for both probes is
+  `.build/cnc96a-stall-watchdog/final21-supplemental-review/NARRATIVE.md`; it is not
+  blended into natural acceptance.
+- Final21 natural Game 1 at
+  `.build/cnc96a-stall-watchdog/final21-techstart-game1/symmetric-techstart-top-one-direction`
+  exits0 in55s at natural END17034 with both opponents defeated,21 harvesters/
+  zero remaining,30 specialists/7 losses, STNK1 event/5100 damage/zero kills,
+  watchdog0/max394,14 exact-root actual-discharge episodes all closed, no Repair
+  exemption, and five safe exact retries to physical arrival. Fresh narrator
+  `review-context/NARRATIVE.md` exhaustively records all195 observer transitions,
+  including18 post-END, and finds zero confirmed module replacement of a still-busy
+  matching root; unpaired observer lines remain explicit evidence limitations.
+- Distinct Final21 natural Game 2 at
+  `.build/cnc96a-stall-watchdog/final21-techstart-game2/symmetric-techstart-bottom-one-direction`
+  exits0 in61s at natural END15942 with both opponents defeated,27 harvesters/
+  zero remaining,33 specialists/8 losses, STNK zero attributed events/kills and
+  CTNK35/2, watchdog0/max96,26 exact-root episodes/110 discharges/26 closures, and
+  no Repair exemption. The fresh narrative exhaustively records42 transitions and
+  zero confirmed busy matching replacement. Its tick6650 live local-safety route
+  does not falsely complete by arrival: the sole observed STNK #785 is followed by
+  the sole STNK loss at6668, empty squad at6675, and stnk=0 at7000, supporting
+  death/ineligibility cleanup; the loss record's missing actor serial is retained as
+  a provenance limitation. Sparse/zero attributed STNK damage is reported without
+  an invented threshold. Product source and binary were unchanged between the
+  targeted probes and both natural games. Fresh independent policies are pending.
+
+## Final22 hard-watchdog failure and authorized full-map retreat fallback
+
+- The diagnostic-only ineligible-cleanup telemetry is now actor-specific and is
+  asserted through the actual shared maintenance seam. Focused Release passes
+  165/165 and exact `make check`/Release `make all` pass with zero warnings or
+  errors. The targeted final22 lifecycle smoke retains the prior production path:
+  internal END3000, block90, directional-cross-cell150, unblock390,
+  same-endpoint450, physical completion675, watchdog0 and no exception.
+- The unchanged final22 natural Game 1 is invalid and uncounted. It terminated on
+  the hard watchdog at tick8501: eligible VIKI STNK #886 was idle at cell99,69
+  with nonexempt age750 while retaining retreat responsibility99,87 against
+  harv#769. Its first retreat Move completed at tick7751. Every dedicated 75-tick
+  maintenance pass from7775 through8450 returned the unchanged memoized null
+  `unavailable-directional-search-memoized`/`memoized-unavailable-retreat-search`,
+  with stop=false, cancel=false and reassess=false; peer #821 continued safe
+  barrier regroup. No death/ineligible cleanup occurred before the failure.
+- Exact reproduced defect: after same-endpoint, same required-cell, positive local
+  progress, and nonpositive local detour tiers all fail, the retry search is
+  limited to the 20-cell local annulus. It can therefore memoize null indefinitely
+  even though Air's bounded finite coarse-map nearest-safe escape machinery has not
+  been tried. The authorized correction directly maps that final Air fallback:
+  one bounded cached coarse-map search, direction-aware among equal-cost reachable
+  safe results, followed by exact ground route/locomotor/domain, detector,
+  hard-threat, pending-hazard and resource-free validation. It retains the original
+  away-cell responsibility until physical required-cell arrival, rejects immediate
+  staged reverse, excludes busy peers, and memoizes null only after the full-map
+  fallback also finds no valid route. Blue remains soft route cost. No watchdog,
+  scoring, profile, balance, retreat barrier, repair, reinforcement or Air output
+  change is authorized.
+
+## Full-map Air-parity completion and final24 release evidence
+
+- The final retreat tier now directly reuses Air's finite coarse-map
+  lowest-cost search machinery through `FindNearestSafeRouteCandidates` after
+  all exact local tiers fail. The existing Air `FindNearestSafeRoute` overload
+  and representative output remain unchanged. The new ground overload performs
+  one Dijkstra, retains graduated danger/Blue cost, orders by route cost first
+  and preferred retreat/core/mission direction only as an equal-cost tie, and
+  returns at most `MaximumTargetCandidates` alternatives for exact specialist
+  locomotor/domain, detector, submitted-waypoint hard-threat, pending-hazard and
+  resource-free validation. Retreat keeps the original away-cell responsibility,
+  staged anti-reverse state and barrier until physical required-cell arrival.
+- First post-port seed96601 discriminator was invalid and uncounted at tick13066:
+  VIKI STNK #1248 was a live idle reinforcement at40,39. Its mission, stable-core
+  and local mobility tiers returned null; `UpdateReinforcements` then cleared its
+  latch and repeated `routed=False` every scan until nonexempt age750. This was a
+  distinct Air-parity caller gap, not the earlier retreat path, and was not waived.
+  The final truly-idle reinforcement tier now calls the same one-search full-map
+  helper with core/mission direction as a cost tie. Busy actors are excluded before
+  search/order. Success establishes normal one-shot plan/tick ownership. A true
+  miss retains plan/safe-hold and memoizes target, origin, anchor and influence/
+  resource context; identical scans issue/search nothing, while literal movement,
+  target/anchor motion or context change permits one retry. The watchdog remains
+  authoritative if the finite map truly has no safe exact route.
+- Focused Release passes 175/175. Exact `make check` and Release `make all` pass
+  with zero warnings/errors. Regressions preserve the old Air route/result; prove
+  direction only breaks equal costs; cover far safe corridor and no-safe full-map
+  results through the shared retreat seam; prove safe-start Air-empty/local-null
+  reinforcement can select a farther exact candidate; and cover busy exclusion,
+  identical no-route memoization and all retry invalidators.
+- Supplemental final24 targeted evidence at
+  `.build/cnc96a-stall-watchdog/targeted-directional-final24` passes exit0/internal
+  END3000 in16.0s: block90; #536 cross-cell retry150 retaining responsibility;
+  unblock390; same-endpoint exact450; physical required-cell completion675;
+  watchdog0, no exception, Stop or cancel.
+- Final24 natural Game 1 at
+  `.build/cnc96a-stall-watchdog/final24-discriminator-game1/symmetric-techstart-top-one-direction`
+  passes exit0/52.142s at natural END12833 with both Brutalis defeated,13 enemy
+  harvesters produced/zero remaining,23 specialists/5 losses, STNK4 damage events/
+  2 kills, CTNK22/1, watchdog0/max sampled nonexempt211,34 actual-discharge firing
+  episodes all closed, no Repair exemption, five exact safe retries physically
+  completed and zero confirmed replacement of a still-busy matching activity.
+  Fresh factual `review-context/NARRATIVE.md`; fresh independent policy
+  `policy-context/POLICY-REVIEW.md`: PASS, severity none, confidence high.
+- Distinct Final24 Game 2 at
+  `.build/cnc96a-stall-watchdog/final24-game2/symmetric-techstart-bottom-one-direction`
+  passes exit0/55.064s at natural END12511 with both opponents defeated,21 enemy
+  harvesters/zero remaining,14 specialists/zero losses, STNK34000 attributed
+  damage/1 kill, CTNK89848/3, watchdog0/max explicit nonexempt127, six exact-root
+  actual-discharge episodes all closed, no Repair exemption, all listed retreats/
+  local-safety responsibilities physically completed, and zero confirmed busy
+  matching replacement. Fresh factual `review-context/NARRATIVE.md`; fresh policy
+  `policy-context/POLICY-REVIEW.md`: PASS, severity none, confidence high.
+- Game1 policy's only advisory is to label exact-root Attack continuity explicitly
+  in future firing tables. Accepted as a receipt-format practice: current Game2
+  already does so and current Game1 directly records unit/root, actual discharge
+  and closure. It does not justify a product/test change. Both hard-gate verdicts
+  are unwaived. Final exact-head protected receipts, clean commit and fresh Terra
+  review remain before release handoff.

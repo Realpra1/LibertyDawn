@@ -156,6 +156,80 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		/// <summary>
+		/// Finds bounded lowest-cost routes to safe coarse cells, preferring progress toward a requested
+		/// direction only when route costs are equal. This retains the graduated danger-cost semantics of
+		/// <see cref="FindNearestSafeRoute"/>, but returns alternatives so ground callers can apply exact
+		/// locomotor and endpoint validation without repeating the coarse-map search.
+		/// </summary>
+		public static List<List<CPos>> FindNearestSafeRouteCandidates(
+			float[] danger, int width, int height, int startX, int startY, float dangerCost,
+			int preferredGoalX, int preferredGoalY, int maximumResults)
+		{
+			if (danger == null || width <= 0 || height <= 0 || danger.Length != width * height ||
+				startX < 0 || startY < 0 || startX >= width || startY >= height || maximumResults <= 0)
+				return null;
+
+			var start = startY * width + startX;
+			var cost = Enumerable.Repeat(float.MaxValue, danger.Length).ToArray();
+			var previous = Enumerable.Repeat(-1, danger.Length).ToArray();
+			var open = new List<int> { start };
+			cost[start] = 0;
+			while (open.Count > 0)
+			{
+				var bestOpen = 0;
+				for (var i = 1; i < open.Count; i++)
+					if (cost[open[i]] < cost[open[bestOpen]] ||
+						(cost[open[i]] == cost[open[bestOpen]] && open[i] < open[bestOpen]))
+						bestOpen = i;
+
+				var current = open[bestOpen];
+				open.RemoveAt(bestOpen);
+				var cx = current % width;
+				var cy = current / width;
+				for (var d = 0; d < 4; d++)
+				{
+					var nx = cx + (d == 0 ? -1 : d == 1 ? 1 : 0);
+					var ny = cy + (d == 2 ? -1 : d == 3 ? 1 : 0);
+					if (nx < 0 || ny < 0 || nx >= width || ny >= height)
+						continue;
+
+					var next = ny * width + nx;
+					var nextCost = cost[current] + 1 +
+						Math.Max(0, danger[next]) * Math.Max(0, dangerCost);
+					if (nextCost >= cost[next])
+						continue;
+
+					cost[next] = nextCost;
+					previous[next] = current;
+					if (!open.Contains(next))
+						open.Add(next);
+				}
+			}
+
+			var preferredDx = preferredGoalX - startX;
+			var preferredDy = preferredGoalY - startY;
+			var goals = Enumerable.Range(0, danger.Length)
+				.Where(i => i != start && danger[i] <= 0 && cost[i] < float.MaxValue)
+				.OrderBy(i => cost[i])
+				.ThenByDescending(i => (i % width - startX) * preferredDx +
+					(i / width - startY) * preferredDy)
+				.ThenBy(i => i)
+				.Take(maximumResults);
+			var results = new List<List<CPos>>();
+			foreach (var goal in goals)
+			{
+				var route = new List<CPos>();
+				for (var at = goal; at != start && at >= 0; at = previous[at])
+					route.Add(new CPos(at % width, at / width));
+
+				route.Reverse();
+				results.Add(route);
+			}
+
+			return results;
+		}
+
+		/// <summary>
 		/// Removes unnecessary coarse-grid turns without cutting across threatened cells. The returned
 		/// route excludes the start and includes the original destination.
 		/// </summary>

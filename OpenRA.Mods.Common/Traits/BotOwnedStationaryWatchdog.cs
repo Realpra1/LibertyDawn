@@ -36,7 +36,7 @@ namespace OpenRA.Mods.Common.Traits
 		}
 	}
 
-	public sealed class BotOwnedStationaryWatchdog : ITick, INotifyAttack, INotifyBeingResupplied
+	public sealed class BotOwnedStationaryWatchdog : ITick, INotifyAttack, INotifyBeingResupplied, INotifyKilled
 	{
 		readonly BotOwnedStationaryWatchdogInfo info;
 		WPos lastCenterPosition;
@@ -206,6 +206,28 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		void INotifyAttack.PreparingAttack(Actor self, in Target target, Armament a, Barrel barrel) { }
+
+		void INotifyKilled.Killed(Actor self, AttackInfo e)
+		{
+			var reason = ActorKilledFiringEpisodeEndReason(lastDischargeTick);
+			if (reason == null)
+				return;
+
+			Log.Write("debug", "AI stationary watchdog firing-episode-end owner={0} unit={1}#{2} tick={3}: target={4} last-discharge={5} cadence={6} reason={7} nonexempt-age={8}.",
+				self.Owner.PlayerName, self.Info.Name, self.ActorID, self.World.WorldTick,
+				firingTarget == null ? "none" : firingTarget.Info.Name + "#" + firingTarget.ActorID,
+				lastDischargeTick, firingCadenceTicks, reason, stationaryAge);
+			lastDischargeTick = int.MinValue;
+			firingTarget = null;
+			firingActivity = null;
+			firingArmament = null;
+			UpdateExemption(self, BotStationaryWatchdogExemption.None);
+		}
+
+		public static string ActorKilledFiringEpisodeEndReason(int lastConfirmedDischargeTick)
+		{
+			return lastConfirmedDischargeTick == int.MinValue ? null : "actor-killed";
+		}
 
 		void INotifyBeingResupplied.StartingResupply(Actor self, Actor host)
 		{
