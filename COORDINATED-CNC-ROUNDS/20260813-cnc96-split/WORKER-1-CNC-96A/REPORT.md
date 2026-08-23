@@ -1627,3 +1627,197 @@ pairs at `.build/cnc96a-air-safety/reviews/TERRA-FINAL.md`: `RELEASE — no
 release blockers`. Its independent 145-test policy subset and clean Release build
 passed. The remaining continuity, numeric route/resource audit and per-plan
 restore-disposition suggestions are evidence-only follow-ups, not product defects.
+
+## Stationary-watchdog / activity-ownership successor
+
+The merged PR129 behavior was reproduced with exact per-STNK telemetry and a hard
+750-tick stationary watchdog. The failures were lifecycle ownership gaps, not a
+target-priority defect: no-route reinforcement hold, completed-member retreat
+barrier idle, damaged/no-repair anchor-route failure, and a retained valid mission
+whose idle member received no continuation while moving-target group progress hid
+it. An earlier watchdog also falsely counted ordinary reload/burst time after real
+shots.
+
+The correction ports the applicable Air activity lifecycle while preserving
+ground passability, hazards/resources/detectors, Stealth/Chemical priorities,
+retreat, repair, reinforcement/save ownership, and one-shot busy order ownership.
+Truly idle members receive one safe continuation; active matching activities are
+preserved. A shot-confirmed firing episode is narrowly tied to the same live target,
+exact root Attack activity, armament and weapon cadence; observed HP restoration is
+the only repair exemption. Neither exemption resets accumulated stationary time.
+Focused tests cover stale/shotless attacks, cadence, closure, false repair orders,
+idle-only LostActivity selection/telemetry, damaged/no-repair fallback and busy
+preservation.
+
+The two final games use user-authorized symmetric ordinary tech starts with equal
+standard production/economy prerequisites for VIKI and both allied Brutalis, but no
+injected specialists, combat actors, targets, waves, orders, callbacks, passive
+bots, or balance/profile override. Game 1 at
+`.build/cnc96a-stall-watchdog/final4-techstart-game1/symmetric-techstart-top-one-direction`
+ended naturally at tick12389 in 46.067s: both enemies defeated; 15 harvesters
+produced/0 remaining; 13 specialists produced/4 lost; STNK 37 attributed damage
+events/6 kills; maximum level3/675000 XP; zero watchdog failures, max nonexempt
+240/750. Game 2 at
+`.build/cnc96a-stall-watchdog/final4-techstart-game2/symmetric-techstart-bottom-one-direction`
+ended naturally at tick14230 in 56.093s: both enemies defeated; 26 harvesters
+produced/0 remaining; 24 specialists produced/16 lost; STNK 14 damage events/3
+kills; zero watchdog failures, max90/750.
+
+Game 2 directly records LostActivity tick9975 applying only idle `1061` while
+preserving busy `797,1077,1122`, and tick12875 applying only idle `1324` while
+preserving busy `1322`. Observer activity-head identity transitions were separated
+from module order issuance: Canceling/head-retention and the exact applied/preserved
+sets prove zero confirmed replacements of a still-busy matching activity. Game 1
+did not encounter LostActivity and showed zero confirmed busy matching replacement.
+Corrected fresh blind narratives and superseding independent policy reviews are at
+each game's `review-context/NARRATIVE.md` and `policy-context/POLICY-REVIEW.md`;
+both policies PASS. Exact Lua END snapshots are terminal; later shutdown records
+do not alter match facts.
+
+Final checks pass: exact `make check` 0 warnings/errors; focused Release 155/155;
+Release `make all` 0 warnings/errors; full CNC YAML; `git diff --check`. Ignored
+scenario/log/review artifacts remain out of Git. No push, PR or merge was performed;
+fresh Terra review is the remaining gate before coordinator publication.
+
+### Terra root-activity and per-member handoff correction
+
+Fresh Terra blocked the first commit because a real discharge could open a firing
+episode under a non-Attack root. The final predicate requires the exact root
+`Attack` type when opening and sustaining an episode; a non-Attack discharge is
+logged and ignored, while normal same-activity burst/reload cadence remains exempt.
+A direct runtime-seam regression covers accepted Attack and rejected non-Attack/null.
+
+The first corrected Game 2 then exposed module-issued replacement of busy Move
+roots on retreat-complete TargetChanged. Air records a new plan without submitting
+it over traveling/busy formation activities, then services idle joiners. Ground now
+does the same per member: TargetChanged applies only to idle actors, records exact
+busy/pending IDs, and existing LostActivity hands each actor the current mission
+once idle. A scan-tick latch prevents nearby+strategic duplicate submission. An
+initial rerun correctly failed #799 at the hard watchdog because group-wide active
+engagement still suppressed its handoff; the final narrow mapping bypasses only
+that group return for an idle pending member and leaves attacking peers untouched.
+
+Final Game 1 at `final7-techstart-game1/symmetric-techstart-top-one-direction`
+reached natural END15323 in64.209s with both enemies defeated, 40 specialists
+produced/14 lost, STNK3 damage events/2 kills, watchdog0/max517, and 27/27 exact-root
+firing episodes. Final Game 2 at
+`final7-techstart-game2/symmetric-techstart-bottom-one-direction` reached natural
+END14532 in50.089s with both enemies defeated, 20 specialists produced/7 lost,
+STNK6 damage events/3 kills, watchdog0/max320, and29/29 exact-root firing episodes.
+Both record zero ignored non-Attack discharge and zero confirmed module replacement
+of still-busy matching activity. Game 2 directly preserves busy952,1029,1058 at
+tick10725 then hands off idle1029,1058 at11075 while preserving952; tick11250/11325
+provides the complementary idle1058 then pending952,1029 sequence. Fresh independent
+narrator and policy receipts under each `final7-techstart-game*/{review-context,
+policy-context}` PASS. Focused157/157 and exact make check/all0/0 pass; full YAML,
+diff, amended hash and fresh Terra gate complete the handoff.
+
+### Terra-2 latch and member-specific ground route correction
+
+Terra-2 (`.build/cnc96a-stall-watchdog/TERRA-FINAL-2.md`) found that
+TargetChanged cleared `LastOrderTick` before testing the nearby/strategic scan
+latch. The final implementation captures the old tick first. A first producer may
+submit idle members; a same-tick second producer updates retained target/route
+ownership without submitting; the latest pending target is handed off once on a
+later idle scan. The focused two-target regression covers all three steps.
+
+The first corrected natural rerun is uncounted because `stnk#810` repeatedly
+collapsed Move/Attack to idle without progress or discharge and hard-failed at
+watchdog tick9369. Temporary diagnostics then proved seven representative-route
+cases where a dispersed ground member could not exactly reach the shared first
+waypoint, although it could exactly reach the same selected firing endpoint. This
+is a ground formation/path seam absent for Air, not a target-scoring change.
+Temporary engine instrumentation was fully restored.
+
+LostActivity now checks hard threat/resource policy only at submitted coarse
+waypoints and checks exact sequential locomotor reachability between them. It does
+not reapply threat policy to the engine pathfinder's internal refinement cells,
+which would contradict the established coarse-route semantics. An idle member with
+an invalid shared waypoint first receives one cached exact route to the same target
+and firing endpoint. Only an unreachable endpoint or memoized identical
+zero-progress actor/target/origin/endpoint/route signature selects a bounded
+alternate safe firing-annulus endpoint. Busy peers are untouched. A superseded
+internal-cell-veto build is also uncounted because `stnk#891` reached750 while valid
+routes were withheld. Focused tests cover same-endpoint, alternate, memoized-none,
+unsafe submitted waypoint, exact-unreachable segment, allowed private refinement,
+and busy exclusion; final result160/160.
+
+Final Game1 is
+`.build/cnc96a-stall-watchdog/final10-techstart-game1/symmetric-techstart-top-one-direction`:
+natural END12530/53.055s, both opponents defeated,12 specialists produced/5 lost,
+watchdog0/max123, nine exact-root shot-confirmed firing episodes, STNK1 attributed
+damage event/0 kills and CTNK45/0. Fresh narrative and superseding policy are its
+`review-context/NARRATIVE.md` and `policy-context/POLICY-REVIEW.md`; policy PASS/low.
+The launcher tick10000/natural END12530 metadata difference and sparse STNK
+contribution remain disclosed evidence limitations, not behavior recommendations.
+
+Distinct final Game2 is
+`.build/cnc96a-stall-watchdog/final10-techstart-game2/symmetric-techstart-bottom-one-direction`:
+natural END17267/61.246s, both opponents defeated,30 enemy harvesters produced/0
+remaining,29 specialists produced/8 lost,90 events/310992 damage/8 kills, with STNK
+13 events/4 kills and CTNK77/4. Watchdog0/max445;24 shot-confirmed exact-root firing
+episodes. At tick6675 `stnk#860` used a cached exact member route to the same target
+`harv#736` and same endpoint76,156 after shared-first rejection, with no Stop or
+cancel. Its fresh narrative classified all191 same-type transitions as125 ordinary
+post-Canceling,53 other ordinary queue/head progressions,13 observer identity
+transitions, zero confirmed busy replacements and zero ambiguous. Fresh independent
+policy PASS/low. The review's narrow manifest-provenance recommendation is met by
+the preserved ignored manifest and completion artifacts; no code or gate change.
+
+Final protected checks pass: exact `make check`0/0, focused Release160/160,
+Release `make all`0/0, full CNC YAML, and diff check. Raw artifacts remain ignored.
+Amend the single candidate commit and require fresh native Terra-3; no push, PR,
+merge, external process, Air/config/balance or unrelated change is authorized.
+
+### Terra-3 through final retreat maintenance gate
+
+Terra-3 blocked the prior candidate because a withheld LostActivity fallback lost
+its failure signature, permitting the identical search/order on a later scan. The
+signature now survives unsuccessful scans and is invalidated only by its explicit
+actor/target/location/route key. Regression coverage proves no identical second
+search/order and permits a changed origin/target/route.
+
+Three hard watchdog failures then exposed the retreat maintenance path rather than
+being waived. `final11` Game2 STNK #987 showed zero-progress direct retreat Moves;
+`final12` STNK #915 showed unrelated group orders starving retreat maintenance;
+`final14` Game1 STNK #736 showed an unavailable required cell being rejected after
+the unit had already displaced. The final lifecycle uses exact same-endpoint routes,
+bounded same-required-cell alternatives, a dedicated 75-tick retreat cadence, and a
+bounded directional ground fallback when the required cell is genuinely unavailable.
+Directional candidates retain all hard threat, detector, pending hazard, resource,
+domain and exact-path constraints. Same-cell staging keeps responsibility pending;
+cross-cell progress changes only that member's endpoint and responsibility completes
+only on physical arrival. Identical unavailable candidate sets are memoized by actor,
+target, destination and route-context state. Busy members are excluded throughout.
+
+Diagnostic-only evidence was tightened without changing orders: repair exemptions
+log exact positive HP-before/after/delta; each retreat retry logs route existence,
+safety/resource/detector/domain results, required/selected strategic cells, projection,
+displacement and retained ownership, followed by a physical-arrival completion record.
+Focused Release is163/163.
+
+Final Game1 path:
+`.build/cnc96a-stall-watchdog/final16-techstart-game1/symmetric-techstart-top-one-direction`.
+It ends naturally at tick10746 in47.045s with both Brutalis defeated,15 harvesters
+produced/zero remaining,6 specialists/2 losses,75 damage events/3 kills (STNK2/1,
+CTNK73/2), watchdog0/max386, seven exact-root actual weapon-discharge starts, and no
+repair exemption. Fresh factual review classifies6 transitions as3 ordinary
+Canceling/head and3 observer identity, zero confirmed busy replacement/ambiguous.
+Fresh crossed policy PASS/sensible, high confidence, advisory.
+
+Distinct Game2 path:
+`.build/cnc96a-stall-watchdog/final16b-techstart-game2/symmetric-techstart-bottom-one-direction`.
+It ends naturally at tick16250 in58.158s with both opponents defeated,31 harvesters/
+zero remaining,25 specialists/8 losses,75 events/8 kills (STNK16/5,CTNK59/3),
+watchdog0/max96,39 exact-root shot-confirmed firing starts and no repair exemption.
+Tick9450 #907 proves exact route, no hard threat/resource, detector-safe/domain-
+passable endpoint, projection9/displacement1 and retained responsibility; tick9500
+proves physical-arrival completion. Fresh narrative classifies115 transitions as88
+ordinary Canceling/head/queue and27 observer identity, zero confirmed/ambiguous.
+Fresh crossed policy PASS/high confidence/advisory. Both advisory recommendations are
+accepted as evidence-preservation practice; no behavior or acceptance gate changes.
+
+Final exact `make check`, Release `make all`, full CNC YAML and diff checks pass; all
+builds have zero warnings/errors and focused is163/163. Raw maps/logs/replays/reviews
+remain ignored. Amend the one candidate commit and obtain fresh native Terra-4 before
+publication; coordinator owns the later successor PR handoff.

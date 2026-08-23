@@ -14,6 +14,15 @@ namespace OpenRA.Mods.Common.Traits
 {
 	public enum StealthTankSquadRole { Harass, Attack }
 	public enum SpecialistDefenderClearAction { None, CrushInfantry, SnipeTank, AttackUnarmedDetector }
+	public enum SpecialistLostActivityRouteDecision { None, RetainShared, SameEndpointMemberRoute, AlternateEndpoint }
+	public enum SpecialistRetreatRetryRouteDecision
+	{
+		None,
+		SameEndpointExactRoute,
+		SameAwayCellAlternate,
+		DirectionalProgress
+	}
+
 	public enum SpecialistRepairDisposition { Active, Repair, Rejoin }
 	public enum StealthTankPlanInvalidation
 	{
@@ -22,6 +31,7 @@ namespace OpenRA.Mods.Common.Traits
 		MembershipChanged,
 		TargetMoved,
 		RouteUnsafe,
+		LostActivity,
 		NoProgress
 	}
 
@@ -37,6 +47,13 @@ namespace OpenRA.Mods.Common.Traits
 		ContinueRetreat,
 		ReassessWithIncumbent,
 		ReassessWithoutIncumbent
+	}
+
+	public enum BotStationaryWatchdogExemption
+	{
+		None,
+		Firing,
+		Repairing
 	}
 
 	public sealed class StealthTankRetreatSaveGroup
@@ -63,6 +80,62 @@ namespace OpenRA.Mods.Common.Traits
 		public const float SoftResourceRouteCost = 0.05f;
 		public const int RetreatSaveVersion = 1;
 		public const int ReinforcementSaveVersion = 2;
+
+		public static BotStationaryWatchdogExemption StationaryWatchdogExemption(
+			bool weaponDischargedThisTick, bool activeRepair)
+		{
+			if (activeRepair)
+				return BotStationaryWatchdogExemption.Repairing;
+
+			return weaponDischargedThisTick ? BotStationaryWatchdogExemption.Firing :
+				BotStationaryWatchdogExemption.None;
+		}
+
+		public static int ObservedRepairAmount(int previousHealth, int currentHealth)
+		{
+			return Math.Max(0, currentHealth - previousHealth);
+		}
+
+		public static int FiringExemptionTicks(bool burstContinues, int nextFireDelay)
+		{
+			return burstContinues ? Math.Max(1, nextFireDelay) : 1;
+		}
+
+		public static int FiringEpisodeCadenceTicks(int reloadDelay,
+			IEnumerable<int> burstDelays, int toleranceTicks)
+		{
+			if (reloadDelay < 0)
+				throw new ArgumentOutOfRangeException(nameof(reloadDelay));
+			if (toleranceTicks < 0)
+				throw new ArgumentOutOfRangeException(nameof(toleranceTicks));
+
+			return Math.Max(1, reloadDelay + (burstDelays?.Sum() ?? 0) + toleranceTicks);
+		}
+
+		public static bool IsSustainedFiringEpisode(int lastDischargeTick, int currentTick,
+			int cadenceTicks, bool sameTarget, bool sameAttackActivity, bool targetValid)
+		{
+			return lastDischargeTick != int.MinValue && cadenceTicks > 0 &&
+				currentTick >= lastDischargeTick && currentTick - lastDischargeTick <= cadenceTicks &&
+				sameTarget && sameAttackActivity && targetValid;
+		}
+
+		public static int NextStationaryWatchdogAge(int currentAge, bool moved,
+			BotStationaryWatchdogExemption exemption)
+		{
+			if (currentAge < 0)
+				throw new ArgumentOutOfRangeException(nameof(currentAge));
+
+			if (moved)
+				return 0;
+
+			return exemption == BotStationaryWatchdogExemption.None ? currentAge + 1 : currentAge;
+		}
+
+		public static bool StationaryWatchdogFailed(int stationaryAge, int maximumStationaryTicks)
+		{
+			return maximumStationaryTicks > 0 && stationaryAge >= maximumStationaryTicks;
+		}
 
 		public static bool ShouldBeginPostMissionRetreat(bool enabled, bool hasTarget,
 			bool targetIsValid)
@@ -425,7 +498,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		public static StealthTankPlanInvalidation ClassifyPlanInvalidation(bool hasPlan,
 			bool targetChanged, bool membershipChanged, bool targetMoved, bool routeUnsafe,
-			int currentTick, int lastProgressTick, int retryInterval)
+			bool lostActivity, int currentTick, int lastProgressTick, int retryInterval)
 		{
 			if (!hasPlan || targetChanged)
 				return StealthTankPlanInvalidation.TargetChanged;
@@ -435,6 +508,8 @@ namespace OpenRA.Mods.Common.Traits
 				return StealthTankPlanInvalidation.TargetMoved;
 			if (routeUnsafe)
 				return StealthTankPlanInvalidation.RouteUnsafe;
+			if (lostActivity)
+				return StealthTankPlanInvalidation.LostActivity;
 			if (currentTick >= lastProgressTick + Math.Max(1, retryInterval))
 				return StealthTankPlanInvalidation.NoProgress;
 
@@ -644,6 +719,139 @@ namespace OpenRA.Mods.Common.Traits
 			// No compatible reachable facility is never a parking state. A damaged
 			// specialist remains owned by, and active in, its combat squad.
 			return SpecialistRepairDisposition.Active;
+		}
+
+		public static bool ShouldUseNearestSafeMobilityFallback(bool isIdle,
+			bool hasAnchorDirectedRoute, bool hasNearestSafeRoute)
+		{
+			// Match Air's second-stage escape without replacing a busy order. Damage and
+			// an unavailable repair facility do not turn an active squad member into a hold.
+			return isIdle && !hasAnchorDirectedRoute && hasNearestSafeRoute;
+		}
+
+		public static SpecialistLostActivityRouteDecision LostActivityRouteDecision(
+			bool sharedRouteUsable, bool sameEndpointMemberRouteUsable,
+			bool alternateEndpointRouteUsable)
+		{
+			if (sharedRouteUsable)
+				return SpecialistLostActivityRouteDecision.RetainShared;
+			if (sameEndpointMemberRouteUsable)
+				return SpecialistLostActivityRouteDecision.SameEndpointMemberRoute;
+			if (alternateEndpointRouteUsable)
+				return SpecialistLostActivityRouteDecision.AlternateEndpoint;
+
+			return SpecialistLostActivityRouteDecision.None;
+		}
+
+		public static bool FailedMemberRouteRemainsApplicable(bool sameTarget,
+			bool sameTargetLocation, bool sameOrigin)
+		{
+			return sameTarget && sameTargetLocation && sameOrigin;
+		}
+
+		public static bool ShouldRecomputeSameEndpointMemberRoute(
+			bool failedRouteMatchesSharedRoute)
+		{
+			return !failedRouteMatchesSharedRoute;
+		}
+
+		public static SpecialistRetreatRetryRouteDecision RetreatRetryRouteDecision(
+			bool sameEndpointExactRouteUsable, bool sameAwayCellAlternateUsable,
+			bool directionalProgressRouteUsable = false)
+		{
+			if (sameEndpointExactRouteUsable)
+				return SpecialistRetreatRetryRouteDecision.SameEndpointExactRoute;
+			if (sameAwayCellAlternateUsable)
+				return SpecialistRetreatRetryRouteDecision.SameAwayCellAlternate;
+			if (directionalProgressRouteUsable)
+				return SpecialistRetreatRetryRouteDecision.DirectionalProgress;
+
+			return SpecialistRetreatRetryRouteDecision.None;
+		}
+
+		public static int RetreatProgressProjection(CPos current, CPos requiredDestination,
+			CPos candidate)
+		{
+			return (candidate.X - current.X) * Math.Sign(requiredDestination.X - current.X) +
+				(candidate.Y - current.Y) * Math.Sign(requiredDestination.Y - current.Y);
+		}
+
+		public static bool ShouldRetryUnavailableRetreatSearch(bool sameTarget,
+			bool sameTargetLocation, bool sameOrigin, bool sameDestination, bool sameRouteContext)
+		{
+			return !(sameTarget && sameTargetLocation && sameOrigin && sameDestination && sameRouteContext);
+		}
+
+		public static string RetreatRetryTelemetry(CPos start, CPos selectedEndpoint,
+			CPos requiredDestination, int strategicCellSize, bool exactRoute,
+			bool endpointHardThreat, bool endpointResource, bool endpointDetectorSafe,
+			bool domainPassable, bool responsibilityRetained)
+		{
+			var requiredCell = StrategicCell(requiredDestination, strategicCellSize);
+			var selectedCell = StrategicCell(selectedEndpoint, strategicCellSize);
+			var startCell = StrategicCell(start, strategicCellSize);
+			var strategicDisplacement = Math.Max(Math.Abs(selectedCell.X - startCell.X),
+				Math.Abs(selectedCell.Y - startCell.Y));
+			return string.Format("start={0} current={0} selected-endpoint={1} required-cell={2} " +
+				"required-bounds={3}-{4},{5}-{6} selected-cell={7} exact-route={8} " +
+				"endpoint-hard-threat={9} endpoint-resource={10} endpoint-detector-safe={11} " +
+				"domain-passable={12} directional-projection={13} strategic-displacement={14} " +
+				"responsibility={15} completed=false reason=route-issued stop=false cancel=false",
+				start, selectedEndpoint, requiredCell,
+				requiredCell.X * strategicCellSize,
+				requiredCell.X * strategicCellSize + strategicCellSize - 1,
+				requiredCell.Y * strategicCellSize,
+				requiredCell.Y * strategicCellSize + strategicCellSize - 1,
+				selectedCell, exactRoute, endpointHardThreat, endpointResource,
+				endpointDetectorSafe, domainPassable,
+				RetreatProgressProjection(start, requiredDestination, selectedEndpoint),
+				strategicDisplacement, responsibilityRetained ? "retained-until-arrival" : "missing");
+		}
+
+		public static bool CanRetryRetreat(int currentTick, int lastRetreatOrderTick,
+			int retryInterval)
+		{
+			return currentTick >= lastRetreatOrderTick + retryInterval;
+		}
+
+		public static bool SubmittedGroundWaypointIsUsable(bool waypointIsHardSafe,
+			bool exactSegmentReachable, bool internalEngineRefinementIsHardSafe)
+		{
+			// The cached coarse route owns threat and soft-resource costs at submitted
+			// waypoints. Ground pathfinding only proves locomotor reachability between
+			// them; re-vetoing its private refinement cells would invent a second route
+			// policy and can reject every otherwise valid coarse plan.
+			return waypointIsHardSafe && exactSegmentReachable;
+		}
+
+		public static T[] LostActivityPlanMembers<T>(IEnumerable<T> activeMembers,
+			Func<T, bool> isIdle)
+		{
+			return activeMembers.Where(isIdle).ToArray();
+		}
+
+		public static T[] TargetChangedPlanMembers<T>(IEnumerable<T> activeMembers,
+			Func<T, bool> isIdle, bool canSubmitThisTick)
+		{
+			// Air records the new target immediately but does not replace a formation
+			// member's busy activity. LostActivity submits the pending mission when
+			// the old activity completes and that member becomes idle. The submission
+			// latch is shared by nearby and strategic producers in the same world tick.
+			return canSubmitThisTick ? activeMembers.Where(isIdle).ToArray() : Array.Empty<T>();
+		}
+
+		public static bool CanApplyPendingTargetPlan(int currentTick, int lastOrderTick)
+		{
+			return currentTick > lastOrderTick;
+		}
+
+		public static bool ShouldRetainWholeGroupEngagement(bool retainActiveEngagement,
+			bool hasPendingIdleMember)
+		{
+			// Air preserves each busy attacker independently, but still services an
+			// idle joiner. A group-wide early return is only valid when no member is
+			// waiting for its deferred target-change handoff.
+			return retainActiveEngagement && !hasPendingIdleMember;
 		}
 
 		public static TInfluence ResolveRepairInfluence<TFacts, TInfluence>(TFacts sharedThreatFacts,
