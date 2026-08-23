@@ -17,6 +17,8 @@ namespace OpenRA.Test.Mods.Common
 	[TestFixture]
 	public sealed class StealthTankSquadPolicyTest
 	{
+		sealed class NonAttackDischargeActivity : OpenRA.Activities.Activity { }
+
 		sealed class RepairInfluenceState
 		{
 			public readonly string Profile;
@@ -53,9 +55,9 @@ namespace OpenRA.Test.Mods.Common
 		{
 			Assert.That(profile, Is.Not.Empty);
 			Assert.That(StealthTankSquadPolicy.ClassifyPlanInvalidation(true, false,
-				false, false, false, 149, 75, 75), Is.EqualTo(StealthTankPlanInvalidation.None));
+				false, false, false, false, 149, 75, 75), Is.EqualTo(StealthTankPlanInvalidation.None));
 			Assert.That(StealthTankSquadPolicy.ClassifyPlanInvalidation(true, false,
-				false, false, true, 149, 75, 75), Is.EqualTo(StealthTankPlanInvalidation.RouteUnsafe));
+				false, false, true, false, 149, 75, 75), Is.EqualTo(StealthTankPlanInvalidation.RouteUnsafe));
 		}
 
 		[Test]
@@ -101,19 +103,20 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(specialistCache.FieldType, Is.Not.EqualTo(airCaches.FieldType));
 		}
 
-		[TestCase(false, false, false, false, false, 75, 75, StealthTankPlanInvalidation.TargetChanged)]
-		[TestCase(true, true, false, false, false, 75, 75, StealthTankPlanInvalidation.TargetChanged)]
-		[TestCase(true, false, true, false, false, 75, 75, StealthTankPlanInvalidation.MembershipChanged)]
-		[TestCase(true, false, false, true, false, 75, 75, StealthTankPlanInvalidation.TargetMoved)]
-		[TestCase(true, false, false, false, true, 75, 75, StealthTankPlanInvalidation.RouteUnsafe)]
-		[TestCase(true, false, false, false, false, 149, 75, StealthTankPlanInvalidation.None)]
-		[TestCase(true, false, false, false, false, 150, 75, StealthTankPlanInvalidation.NoProgress)]
+		[TestCase(false, false, false, false, false, false, 75, 75, StealthTankPlanInvalidation.TargetChanged)]
+		[TestCase(true, true, false, false, false, false, 75, 75, StealthTankPlanInvalidation.TargetChanged)]
+		[TestCase(true, false, true, false, false, false, 75, 75, StealthTankPlanInvalidation.MembershipChanged)]
+		[TestCase(true, false, false, true, false, false, 75, 75, StealthTankPlanInvalidation.TargetMoved)]
+		[TestCase(true, false, false, false, true, false, 75, 75, StealthTankPlanInvalidation.RouteUnsafe)]
+		[TestCase(true, false, false, false, false, false, 149, 75, StealthTankPlanInvalidation.None)]
+		[TestCase(true, false, false, false, false, false, 150, 75, StealthTankPlanInvalidation.NoProgress)]
+		[TestCase(true, false, false, false, false, true, 76, 75, StealthTankPlanInvalidation.LostActivity)]
 		public void StablePlansRetryOnlyOnExplicitInvalidation(bool hasPlan, bool targetChanged,
-			bool membershipChanged, bool targetMoved, bool routeUnsafe, int currentTick,
+			bool membershipChanged, bool targetMoved, bool routeUnsafe, bool lostActivity, int currentTick,
 			int lastProgressTick, StealthTankPlanInvalidation expected)
 		{
 			Assert.That(StealthTankSquadPolicy.ClassifyPlanInvalidation(hasPlan, targetChanged,
-				membershipChanged, targetMoved, routeUnsafe, currentTick, lastProgressTick, 75),
+				membershipChanged, targetMoved, routeUnsafe, lostActivity, currentTick, lastProgressTick, 75),
 				Is.EqualTo(expected));
 		}
 
@@ -166,6 +169,42 @@ namespace OpenRA.Test.Mods.Common
 		{
 			Assert.That(StealthTankSquadPolicy.ShouldIssueReinforcementOrder(retainedPlanMatches,
 				retainedSafeHold, isIdle, routeAvailable, issuedThisTick), Is.EqualTo(expected));
+		}
+
+		[Test]
+		public void IdleReinforcementUsesFullMapFallbackAndMemoizesOnlyIdenticalNoRouteContext()
+		{
+			var safeStart = new float[8];
+			var candidates = ThreatAwareRoutePlanner.FindNearestSafeRouteCandidates(
+				safeStart, 8, 1, 0, 0, 100, 7, 0, 8);
+			Assert.That(ThreatAwareRoutePlanner.FindNearestSafeRoute(
+				safeStart, 8, 1, 0, 0, 100), Is.Empty,
+				"The existing Air helper intentionally stays put at an already-safe start.");
+			Assert.That(candidates, Has.Count.EqualTo(7));
+			var firstExactGroundReachable = candidates.First(route =>
+				route[route.Count - 1].X >= 5);
+			Assert.That(firstExactGroundReachable[firstExactGroundReachable.Count - 1],
+				Is.EqualTo(new CPos(5, 0)),
+				"Ground can reject local candidates and select a farther safe corridor from the one full-map search.");
+			Assert.That(StealthTankSquadPolicy.ShouldIssueReinforcementOrder(
+				true, true, true, true, false), Is.True,
+				"A newly available far route leaves the retained no-route hold exactly once.");
+			Assert.That(StealthTankSquadPolicy.ShouldIssueReinforcementOrder(
+				true, false, false, true, false), Is.False,
+				"A busy matching reinforcement remains untouched.");
+
+			Assert.That(StealthTankSquadPolicy.ShouldRetryFailedReinforcementSearch(
+				true, true, true, true), Is.False,
+				"An identical full-map miss is memoized instead of recomputed each scan.");
+			Assert.That(StealthTankSquadPolicy.ShouldRetryFailedReinforcementSearch(
+				true, false, true, true), Is.True, "Literal member movement permits retry.");
+			Assert.That(StealthTankSquadPolicy.ShouldRetryFailedReinforcementSearch(
+				false, true, true, true), Is.True, "Target change permits retry.");
+			Assert.That(StealthTankSquadPolicy.ShouldRetryFailedReinforcementSearch(
+				true, true, false, true), Is.True, "Core or mission anchor movement permits retry.");
+			Assert.That(StealthTankSquadPolicy.ShouldRetryFailedReinforcementSearch(
+				true, true, true, false), Is.True,
+				"Threat, detector, resource or pending-hazard context change permits retry.");
 		}
 
 		[TestCase(true, false, true)]
@@ -296,9 +335,9 @@ namespace OpenRA.Test.Mods.Common
 				new CPos(7, 8), new CPos(10, 11), 6);
 			Assert.That(movedInsideCell, Is.False);
 			Assert.That(StealthTankSquadPolicy.ClassifyPlanInvalidation(true, false,
-				false, movedInsideCell, false, 299, 0, 300), Is.EqualTo(StealthTankPlanInvalidation.None));
+				false, movedInsideCell, false, false, 299, 0, 300), Is.EqualTo(StealthTankPlanInvalidation.None));
 			Assert.That(StealthTankSquadPolicy.ClassifyPlanInvalidation(true, false,
-				false, movedInsideCell, false, 300, 0, 300), Is.EqualTo(StealthTankPlanInvalidation.NoProgress));
+				false, movedInsideCell, false, false, 300, 0, 300), Is.EqualTo(StealthTankPlanInvalidation.NoProgress));
 		}
 
 		[Test]
@@ -311,9 +350,9 @@ namespace OpenRA.Test.Mods.Common
 			// movement is not an order invalidation. Attack follows the actor and the
 			// bounded no-progress path remains the route-refresh authority.
 			Assert.That(StealthTankSquadPolicy.ClassifyPlanInvalidation(true, false,
-				false, false, false, 299, 0, 300), Is.EqualTo(StealthTankPlanInvalidation.None));
+				false, false, false, false, 299, 0, 300), Is.EqualTo(StealthTankPlanInvalidation.None));
 			Assert.That(StealthTankSquadPolicy.ClassifyPlanInvalidation(true, false,
-				false, false, false, 300, 0, 300), Is.EqualTo(StealthTankPlanInvalidation.NoProgress));
+				false, false, false, false, 300, 0, 300), Is.EqualTo(StealthTankPlanInvalidation.NoProgress));
 		}
 
 		[TestCase(18, 18, 6, 6, 27, 27)]
@@ -683,10 +722,10 @@ namespace OpenRA.Test.Mods.Common
 				Is.EqualTo(StealthTankTargetReassessment.Abandon),
 				"No unroutable target may be installed as a retained plan.");
 			Assert.That(StealthTankSquadPolicy.ClassifyPlanInvalidation(
-				true, false, false, false, false, 299, 0, 300),
+				true, false, false, false, false, false, 299, 0, 300),
 				Is.EqualTo(StealthTankPlanInvalidation.None));
 			Assert.That(StealthTankSquadPolicy.ClassifyPlanInvalidation(
-				true, false, false, false, false, 300, 0, 300),
+				true, false, false, false, false, false, 300, 0, 300),
 				Is.EqualTo(StealthTankPlanInvalidation.NoProgress),
 				"A routable plan with no distance or damage progress must retry at the configured bound.");
 		}
@@ -820,6 +859,423 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
+		public void DamagedIdleMemberWithoutRepairOrAnchorRouteUsesNearestSafeMobility()
+		{
+			Assert.That(StealthTankSquadPolicy.RepairDisposition(true, false, false, false),
+				Is.EqualTo(SpecialistRepairDisposition.Active));
+			Assert.That(StealthTankSquadPolicy.ShouldUseNearestSafeMobilityFallback(
+				true, false, true), Is.True,
+				"Air's nearest-safe second stage must keep an idle active member moving.");
+			Assert.That(StealthTankSquadPolicy.ShouldUseNearestSafeMobilityFallback(
+				false, false, true), Is.False,
+				"A busy matching activity retains ownership and must not be replaced.");
+			Assert.That(StealthTankSquadPolicy.ShouldUseNearestSafeMobilityFallback(
+				true, true, true), Is.False,
+				"The anchor-directed safe route remains the preferred first stage.");
+		}
+
+		[Test]
+		public void LostActivityContinuationAndTelemetryUseOnlyIdleAppliedMembers()
+		{
+			var active = new[] { 989, 1104, 1183, 1234, 1250 };
+			var idle = StealthTankSquadPolicy.LostActivityPlanMembers(active, id => id == 1250);
+
+			Assert.That(idle, Is.EqualTo(new[] { 1250 }),
+				"The same applied set is passed to one-shot plan submission and diagnostic telemetry.");
+			Assert.That(active.Except(idle), Is.EqualTo(new[] { 989, 1104, 1183, 1234 }),
+				"Busy matching members remain outside both the order and continued-idle telemetry set.");
+		}
+
+		[Test]
+		public void LostActivityUsesBoundedMemberRouteBeforeChangingFiringEndpoint()
+		{
+			Assert.That(StealthTankSquadPolicy.LostActivityRouteDecision(
+				true, true, true), Is.EqualTo(SpecialistLostActivityRouteDecision.RetainShared),
+				"A reachable representative route remains the one-shot plan.");
+			Assert.That(StealthTankSquadPolicy.LostActivityRouteDecision(
+				false, true, true), Is.EqualTo(SpecialistLostActivityRouteDecision.SameEndpointMemberRoute),
+				"An invalid shared waypoint uses an exact member route to the same selected firing endpoint.");
+			Assert.That(StealthTankSquadPolicy.LostActivityRouteDecision(
+				false, false, true), Is.EqualTo(SpecialistLostActivityRouteDecision.AlternateEndpoint),
+				"An unreachable or memoized zero-progress member route advances to a different bounded endpoint.");
+			Assert.That(StealthTankSquadPolicy.LostActivityRouteDecision(
+				false, false, false), Is.EqualTo(SpecialistLostActivityRouteDecision.None),
+				"The planner never periodically reissues an identical failed route as a fallback.");
+		}
+
+		[Test]
+		public void FailedLostActivityRouteSurvivesAnUnsuccessfulSecondScan()
+		{
+			Assert.That(StealthTankSquadPolicy.FailedMemberRouteRemainsApplicable(
+				true, true, true), Is.True,
+				"An unchanged actor, target and target location retain the failed signature after no fallback was queued.");
+			Assert.That(StealthTankSquadPolicy.ShouldRecomputeSameEndpointMemberRoute(true), Is.False,
+				"The next scan neither recomputes nor queues the identical failed shared/member route.");
+			Assert.That(StealthTankSquadPolicy.LostActivityRouteDecision(
+				false, false, false), Is.EqualTo(SpecialistLostActivityRouteDecision.None));
+
+			Assert.That(StealthTankSquadPolicy.FailedMemberRouteRemainsApplicable(
+				false, true, true), Is.False, "A changed target invalidates the signature.");
+			Assert.That(StealthTankSquadPolicy.FailedMemberRouteRemainsApplicable(
+				true, false, true), Is.False, "Target movement invalidates the signature.");
+			Assert.That(StealthTankSquadPolicy.FailedMemberRouteRemainsApplicable(
+				true, true, false), Is.False, "Member movement invalidates the signature.");
+			Assert.That(StealthTankSquadPolicy.ShouldRecomputeSameEndpointMemberRoute(false), Is.True,
+				"A distinct route revision remains eligible for one bounded exact-path calculation.");
+			Assert.That(StealthTankSquadPolicy.LostActivityRouteDecision(
+				false, false, true), Is.EqualTo(SpecialistLostActivityRouteDecision.AlternateEndpoint),
+				"A distinct alternate endpoint remains eligible while the identical route stays memoized.");
+		}
+
+		[Test]
+		public void IdleRetreatRetryUsesExactRouteOrSameAwayCellWithoutDuplicateReissue()
+		{
+			Assert.That(StealthTankSquadPolicy.RetreatRetryRouteDecision(
+				true, true), Is.EqualTo(SpecialistRetreatRetryRouteDecision.SameEndpointExactRoute),
+				"A reachable original resource-free retreat responsibility remains preferred.");
+			Assert.That(StealthTankSquadPolicy.RetreatRetryRouteDecision(
+				false, true), Is.EqualTo(SpecialistRetreatRetryRouteDecision.SameAwayCellAlternate),
+				"An unreachable endpoint may change only within its required away strategic cell.");
+			Assert.That(StealthTankSquadPolicy.RetreatRetryRouteDecision(
+				false, false), Is.EqualTo(SpecialistRetreatRetryRouteDecision.None),
+				"No identical failed direct Move is periodically reissued when no exact route exists.");
+			Assert.That(StealthTankSquadPolicy.FailedMemberRouteRemainsApplicable(
+				true, true, true), Is.True,
+				"The #821/#983/#987 zero-progress signature survives unchanged retry scans.");
+			Assert.That(StealthTankSquadPolicy.ShouldRecomputeSameEndpointMemberRoute(true), Is.False,
+				"A literal identical failed retreat route is not recomputed or reissued.");
+			Assert.That(StealthTankSquadPolicy.FailedMemberRouteRemainsApplicable(
+				true, true, false), Is.False,
+				"Movement changes the signature and permits one new exact retry.");
+			Assert.That(StealthTankSquadPolicy.CanRetryRetreat(10425, 9650, 75), Is.True,
+				"Unrelated group orders cannot postpone the pending member's retreat maintenance.");
+			Assert.That(StealthTankSquadPolicy.CanRetryRetreat(9724, 9650, 75), Is.False);
+			Assert.That(StealthTankSquadPolicy.CanRetryRetreat(9725, 9650, 75), Is.True,
+				"A member becoming idle waits at most one dedicated retreat interval.");
+		}
+
+		[Test]
+		public void UnavailableRetreatCellUsesBoundedDirectionalProgressWithoutSearchChurn()
+		{
+			var current = new CPos(91, 27);
+			var requiredDestination = new CPos(87, 39);
+			var staged = new CPos(90, 29);
+			var crossedCell = new CPos(87, 36);
+			var crossedWrongCell = new CPos(78, 40);
+			var backward = new CPos(94, 25);
+
+			Assert.That(StealthTankSquadPolicy.RetreatProgressProjection(
+				current, requiredDestination, staged), Is.GreaterThan(0));
+			Assert.That(StealthTankSquadPolicy.RetreatProgressProjection(
+				current, requiredDestination, crossedCell), Is.GreaterThan(
+					StealthTankSquadPolicy.RetreatProgressProjection(
+						current, requiredDestination, staged)));
+			Assert.That(StealthTankSquadPolicy.RetreatProgressProjection(
+				current, requiredDestination, backward), Is.LessThan(0));
+			Assert.That(StealthTankSquadPolicy.RetreatProgressProjection(
+				current, requiredDestination, crossedWrongCell), Is.GreaterThan(0),
+				"A positive projection alone does not prove arrival in the required away cell.");
+			Assert.That(StealthTankSquadPolicy.RetreatResponsibilityAfterRetry(
+				requiredDestination, crossedWrongCell, 6), Is.EqualTo(requiredDestination),
+				"Directional staging in another cell must retain the original completion responsibility.");
+			Assert.That(StealthTankSquadPolicy.RetreatResponsibilityAfterRetry(
+				requiredDestination, crossedCell, 6), Is.EqualTo(crossedCell),
+				"An alternate endpoint inside the required away cell remains a valid physical-arrival responsibility.");
+			Assert.That(StealthTankSquadPolicy.RetreatRetryRouteDecision(
+				false, false, true), Is.EqualTo(
+					SpecialistRetreatRetryRouteDecision.DirectionalProgress),
+				"A hard-safe exact route makes staged progress when the original away cell is unavailable.");
+
+			Assert.That(StealthTankSquadPolicy.ShouldRetryUnavailableRetreatSearch(
+				true, true, true, true, true), Is.False,
+				"An identical null candidate set is memoized instead of rerunning bounded A* or orders.");
+			Assert.That(StealthTankSquadPolicy.ShouldRetryUnavailableRetreatSearch(
+				true, true, false, true, true), Is.True, "Literal member movement permits retry.");
+			Assert.That(StealthTankSquadPolicy.ShouldRetryUnavailableRetreatSearch(
+				false, true, true, true, true), Is.True, "Target identity change permits retry.");
+			Assert.That(StealthTankSquadPolicy.ShouldRetryUnavailableRetreatSearch(
+				true, true, true, false, true), Is.True, "Responsibility change permits retry.");
+			Assert.That(StealthTankSquadPolicy.ShouldRetryUnavailableRetreatSearch(
+				true, true, true, true, false), Is.True, "Threat/resource context change permits retry.");
+
+			var evidence = StealthTankSquadPolicy.RetreatRetryTelemetry(
+				current, crossedCell, requiredDestination, 6, true,
+				false, false, true, true, true);
+			Assert.That(evidence, Does.Contain("start=91,27 current=91,27"));
+			Assert.That(evidence, Does.Contain("required-cell=14,6"));
+			Assert.That(evidence, Does.Contain("required-bounds=84-89,36-41"));
+			Assert.That(evidence, Does.Contain("selected-cell=14,6 exact-route=True"));
+			Assert.That(evidence, Does.Contain("endpoint-hard-threat=False endpoint-resource=False"));
+			Assert.That(evidence, Does.Contain("endpoint-detector-safe=True domain-passable=True"));
+			Assert.That(evidence, Does.Contain("directional-projection=13 strategic-displacement=2"));
+			Assert.That(evidence, Does.Contain("responsibility=retained-until-arrival completed=false"));
+		}
+
+		[Test]
+		public void DirectionalRetryArrivalOutsideRequiredCellKeepsLifecycleBarrier()
+		{
+			const uint actorId = 7;
+			const uint busyPeerId = 8;
+			var current = new CPos(91, 27);
+			var requiredDestination = new CPos(87, 39);
+			var busyPeerDestination = new CPos(93, 39);
+			var wrongCellEndpoint = new CPos(78, 40);
+			var detourEndpoint = new CPos(76, 42);
+			var requiredCellEndpoint = new CPos(87, 36);
+			var responsibilities = new Dictionary<uint, CPos>
+			{
+				{ actorId, requiredDestination },
+				{ busyPeerId, busyPeerDestination }
+			};
+			var queuedRoutes = new List<List<CPos>>();
+			var cleanedActors = 0;
+
+			Assert.That(StealthTankSquadPolicy.RetreatRetryRouteDecision(
+				false, false, true), Is.EqualTo(
+					SpecialistRetreatRetryRouteDecision.DirectionalProgress));
+			var staged = StealthTankSquadPolicy.MaintainRetreatResponsibility(
+				responsibilities, actorId, current, true, false, true,
+				1075, 1000, 75, 6,
+				required => new SpecialistRetreatRetryPlan(wrongCellEndpoint,
+					new List<CPos> { wrongCellEndpoint }, "directional-staged-progress"),
+				route => queuedRoutes.Add(route), () => cleanedActors++,
+				out var stagedRequired, out var stagedPlan);
+			Assert.That(staged, Is.EqualTo(SpecialistRetreatMaintenanceAction.RetryQueued));
+			Assert.That(stagedRequired, Is.EqualTo(requiredDestination));
+			Assert.That(stagedPlan.Endpoint, Is.EqualTo(wrongCellEndpoint));
+			Assert.That(queuedRoutes, Has.Count.EqualTo(1));
+			Assert.That(queuedRoutes[0], Is.EqualTo(new[] { wrongCellEndpoint }));
+			Assert.That(responsibilities[actorId], Is.EqualTo(requiredDestination),
+				"Issuing an intermediate wrong-cell route must retain the original responsibility.");
+
+			var busyRetryFactoryCalled = false;
+			var busy = StealthTankSquadPolicy.MaintainRetreatResponsibility(
+				responsibilities, busyPeerId, current, true, false, false,
+				1075, 1000, 75, 6,
+				required =>
+				{
+					busyRetryFactoryCalled = true;
+					return new SpecialistRetreatRetryPlan(wrongCellEndpoint,
+						new List<CPos> { wrongCellEndpoint }, "must-not-run");
+				},
+				route => queuedRoutes.Add(route), () => cleanedActors++, out _, out _);
+			Assert.That(busy, Is.EqualTo(SpecialistRetreatMaintenanceAction.Pending));
+			Assert.That(busyRetryFactoryCalled, Is.False,
+				"The production seam excludes a busy peer before route search or queueing.");
+			Assert.That(queuedRoutes, Has.Count.EqualTo(1));
+			Assert.That(responsibilities[busyPeerId], Is.EqualTo(busyPeerDestination),
+				"Retrying one idle member must not alter a busy peer's responsibility.");
+
+			var deadActorId = 9u;
+			responsibilities.Add(deadActorId, new CPos(93, 39));
+			var deadCleanup = 0;
+			var deadRouteFactoryCalled = false;
+			var deadQueueCalled = false;
+			var dead = StealthTankSquadPolicy.MaintainRetreatResponsibility(
+				responsibilities, deadActorId, null, false, false, false,
+				1075, 1000, 75, 6,
+				required =>
+				{
+					deadRouteFactoryCalled = true;
+					return new SpecialistRetreatRetryPlan(required,
+						new List<CPos> { required }, "must-not-run");
+				},
+				route => deadQueueCalled = true, () => deadCleanup++, out _, out _);
+			Assert.That(dead, Is.EqualTo(SpecialistRetreatMaintenanceAction.Completed));
+			Assert.That(responsibilities.ContainsKey(deadActorId), Is.False,
+				"A dead member must release its responsibility without dereferencing an actor.");
+			Assert.That(deadCleanup, Is.EqualTo(1));
+			Assert.That(deadRouteFactoryCalled, Is.False);
+			Assert.That(deadQueueCalled, Is.False);
+			Assert.That(StealthTankSquadPolicy.RetreatIneligibleCleanupTelemetry(
+				deadActorId, new CPos(93, 39)), Is.EqualTo(
+				"unit=9 current=none selected-endpoint=93,39 eligible=false " +
+				"responsibility=completed reason=ineligible-cleanup stop=false " +
+				"cancel=false reassess=false"));
+			Assert.That(responsibilities[busyPeerId], Is.EqualTo(busyPeerDestination));
+			Assert.That(StealthTankSquadPolicy.RetreatRetryTelemetry(
+				current, wrongCellEndpoint, requiredDestination, 6, true,
+				false, false, true, true, true), Does.Contain("stop=false cancel=false"));
+
+			var wrongCellArrival = StealthTankSquadPolicy.MaintainRetreatResponsibility(
+				responsibilities, actorId, wrongCellEndpoint, true, false, true,
+				1076, 1075, 75, 6, null, null, () => cleanedActors++, out _, out _);
+			Assert.That(wrongCellArrival, Is.EqualTo(SpecialistRetreatMaintenanceAction.Pending),
+				"Physical arrival at the intermediate endpoint must not release the group barrier.");
+			Assert.That(cleanedActors, Is.Zero);
+			Assert.That(responsibilities[actorId], Is.EqualTo(requiredDestination));
+			Assert.That(StealthTankSquadPolicy.CanRetryRetreat(1075, 1000, 75), Is.True,
+				"The retained responsibility is serviced again on the dedicated retreat cadence.");
+
+			Assert.That(StealthTankSquadPolicy.RetreatProgressProjection(
+				wrongCellEndpoint, requiredDestination, detourEndpoint), Is.LessThan(0));
+			var detourRetry = StealthTankSquadPolicy.MaintainRetreatResponsibility(
+				responsibilities, actorId, wrongCellEndpoint, true, false, true,
+				1150, 1075, 75, 6,
+				required => new SpecialistRetreatRetryPlan(detourEndpoint,
+					new List<CPos> { detourEndpoint }, "hard-safe-directional-detour"),
+				route => queuedRoutes.Add(route), () => cleanedActors++, out _, out _);
+			Assert.That(detourRetry, Is.EqualTo(SpecialistRetreatMaintenanceAction.RetryQueued));
+			Assert.That(responsibilities[actorId], Is.EqualTo(requiredDestination));
+			Assert.That(queuedRoutes, Has.Count.EqualTo(2));
+			Assert.That(StealthTankSquadPolicy.ShouldRejectImmediateRetreatReverse(
+				true, wrongCellEndpoint, wrongCellEndpoint), Is.True,
+				"Arrival at a detour cannot immediately queue the route back to its staged origin.");
+			Assert.That(StealthTankSquadPolicy.ShouldRejectImmediateRetreatReverse(
+				true, requiredCellEndpoint, wrongCellEndpoint), Is.False);
+
+			var detourArrival = StealthTankSquadPolicy.MaintainRetreatResponsibility(
+				responsibilities, actorId, detourEndpoint, true, false, true,
+				1151, 1150, 75, 6, null, null, () => cleanedActors++, out _, out _);
+			Assert.That(detourArrival, Is.EqualTo(SpecialistRetreatMaintenanceAction.Pending));
+			Assert.That(responsibilities[actorId], Is.EqualTo(requiredDestination));
+
+			var requiredCellRetry = StealthTankSquadPolicy.MaintainRetreatResponsibility(
+				responsibilities, actorId, detourEndpoint, true, false, true,
+				1225, 1150, 75, 6,
+				required => new SpecialistRetreatRetryPlan(requiredCellEndpoint,
+					new List<CPos> { requiredCellEndpoint }, "same-away-cell-alternate"),
+				route => queuedRoutes.Add(route), () => cleanedActors++, out _, out _);
+			Assert.That(requiredCellRetry,
+				Is.EqualTo(SpecialistRetreatMaintenanceAction.RetryQueued));
+			Assert.That(responsibilities[actorId], Is.EqualTo(requiredCellEndpoint));
+			Assert.That(queuedRoutes, Has.Count.EqualTo(3));
+
+			var requiredCellArrival = StealthTankSquadPolicy.MaintainRetreatResponsibility(
+				responsibilities, actorId, requiredCellEndpoint, true, false, true,
+				1151, 1150, 75, 6, null, null, () => cleanedActors++, out _, out _);
+			Assert.That(requiredCellArrival, Is.EqualTo(
+				SpecialistRetreatMaintenanceAction.Completed),
+				"Only physical arrival in the original required cell resolves responsibility.");
+			Assert.That(cleanedActors, Is.EqualTo(1),
+				"Production arrival cleanup runs exactly once for the resolved member.");
+			Assert.That(responsibilities, Has.Count.EqualTo(1));
+			Assert.That(responsibilities[busyPeerId], Is.EqualTo(busyPeerDestination),
+				"Only the arrived member resolves; the busy peer and group barrier remain untouched.");
+		}
+
+		[Test]
+		public void FullMapSafeFallbackFlowsThroughSharedRetreatMaintenanceSeam()
+		{
+			const uint actorId = 21;
+			const uint busyPeerId = 22;
+			var current = new CPos(4, 0);
+			var requiredDestination = new CPos(18, 0);
+			var responsibilities = new Dictionary<uint, CPos>
+			{
+				{ actorId, requiredDestination },
+				{ busyPeerId, new CPos(19, 0) }
+			};
+			var danger = new[] { 1f, 1f, 1f, 1f, 1f, 1f, 1f, 1f, 1f, 1f, 0f };
+			var fullMapRoutes = ThreatAwareRoutePlanner.FindNearestSafeRouteCandidates(
+				danger, 11, 1, current.X, current.Y, 100, 10, 0, 4);
+			Assert.That(fullMapRoutes, Has.Count.EqualTo(1),
+				"The finite coarse-map fallback finds the farther safe corridor after local tiers fail.");
+			var fullMapEndpoint = fullMapRoutes[0][fullMapRoutes[0].Count - 1];
+			var queued = new List<List<CPos>>();
+			var maintained = StealthTankSquadPolicy.MaintainRetreatResponsibility(
+				responsibilities, actorId, current, true, false, true,
+				1075, 1000, 75, 6,
+				required => new SpecialistRetreatRetryPlan(fullMapEndpoint,
+					fullMapRoutes[0], "full-map-nearest-safe-progress"),
+				route => queued.Add(route), null, out _, out _);
+			Assert.That(maintained, Is.EqualTo(SpecialistRetreatMaintenanceAction.RetryQueued));
+			Assert.That(queued, Has.Count.EqualTo(1));
+			Assert.That(queued[0][queued[0].Count - 1], Is.EqualTo(fullMapEndpoint));
+			Assert.That(responsibilities[actorId], Is.EqualTo(requiredDestination),
+				"A full-map safe staging route must retain the original away-cell responsibility.");
+
+			var busyFactoryCalled = false;
+			var busy = StealthTankSquadPolicy.MaintainRetreatResponsibility(
+				responsibilities, busyPeerId, current, true, false, false,
+				1075, 1000, 75, 6,
+				required =>
+				{
+					busyFactoryCalled = true;
+					return new SpecialistRetreatRetryPlan(fullMapEndpoint,
+						fullMapRoutes[0], "must-not-run");
+				},
+				route => queued.Add(route), null, out _, out _);
+			Assert.That(busy, Is.EqualTo(SpecialistRetreatMaintenanceAction.Pending));
+			Assert.That(busyFactoryCalled, Is.False);
+			Assert.That(queued, Has.Count.EqualTo(1), "A busy peer remains completely untouched.");
+
+			var noSafeRoutes = ThreatAwareRoutePlanner.FindNearestSafeRouteCandidates(
+				new[] { 1f, 1f, 1f }, 3, 1, 1, 0, 100, 2, 0, 4);
+			var unavailable = StealthTankSquadPolicy.MaintainRetreatResponsibility(
+				responsibilities, actorId, current, true, false, true,
+				1150, 1075, 75, 6,
+				required => noSafeRoutes.Count == 0 ? null :
+					new SpecialistRetreatRetryPlan(noSafeRoutes[0][0], noSafeRoutes[0], "unexpected"),
+				route => queued.Add(route), null, out _, out _);
+			Assert.That(unavailable, Is.EqualTo(SpecialistRetreatMaintenanceAction.RetryUnavailable));
+			Assert.That(queued, Has.Count.EqualTo(1),
+				"A true full-map miss does not fabricate or periodically reissue an order.");
+		}
+
+		[Test]
+		public void ExactMemberRouteChecksSubmittedWaypointsWithoutInventingASecondThreatVeto()
+		{
+			Assert.That(StealthTankSquadPolicy.SubmittedGroundWaypointIsUsable(
+				false, true, true), Is.False,
+				"A hard-threat or pending-resource submitted waypoint remains rejected.");
+			Assert.That(StealthTankSquadPolicy.SubmittedGroundWaypointIsUsable(
+				true, false, true), Is.False,
+				"A safe submitted waypoint still needs an exact locomotor path.");
+			Assert.That(StealthTankSquadPolicy.SubmittedGroundWaypointIsUsable(
+				true, true, false), Is.True,
+				"Private engine refinement cells do not override the established coarse waypoint policy.");
+		}
+
+		[Test]
+		public void TargetChangedPreservesBusyMoveUntilIdleHandoff()
+		{
+			var members = new[]
+			{
+				new KeyValuePair<int, bool>(872, false),
+				new KeyValuePair<int, bool>(967, false)
+			};
+			var initiallyApplied = StealthTankSquadPolicy.TargetChangedPlanMembers(
+				members, member => member.Value, true);
+
+			Assert.That(initiallyApplied, Is.Empty,
+				"TargetChanged records the new mission without replacing either busy Move root.");
+
+			var afterCompletion = members.Select(member =>
+				new KeyValuePair<int, bool>(member.Key, true));
+			var handedOff = StealthTankSquadPolicy.LostActivityPlanMembers(
+				afterCompletion, member => member.Value);
+
+			Assert.That(handedOff.Select(member => member.Key), Is.EqualTo(new[] { 872, 967 }),
+				"Each actor receives the pending mission exactly once after its old activity completes.");
+			Assert.That(StealthTankSquadPolicy.CanApplyPendingTargetPlan(11250, 11250), Is.False,
+				"A second scanner in the same tick cannot duplicate a just-queued handoff.");
+			Assert.That(StealthTankSquadPolicy.CanApplyPendingTargetPlan(11251, 11250), Is.True);
+			Assert.That(StealthTankSquadPolicy.ShouldRetainWholeGroupEngagement(true, true), Is.False,
+				"Busy squadmates keep their Attack roots while the idle member receives its pending mission.");
+			Assert.That(StealthTankSquadPolicy.ShouldRetainWholeGroupEngagement(true, false), Is.True);
+		}
+
+		[Test]
+		public void NearbyAndStrategicTargetChangesSubmitAtMostOncePerWorldTick()
+		{
+			var idle = new[] { 799 };
+			var pendingTarget = "nearby-harvester";
+			var nearbyApplied = StealthTankSquadPolicy.TargetChangedPlanMembers(
+				idle, _ => true, StealthTankSquadPolicy.CanApplyPendingTargetPlan(8375, 8300));
+			pendingTarget = "strategic-refinery";
+			var strategicApplied = StealthTankSquadPolicy.TargetChangedPlanMembers(
+				idle, _ => true, StealthTankSquadPolicy.CanApplyPendingTargetPlan(8375, 8375));
+
+			Assert.That(nearbyApplied, Is.EqualTo(new[] { 799 }),
+				"The first producer submits the idle actor's selected target.");
+			Assert.That(strategicApplied, Is.Empty,
+				"A different target selected by the second producer remains pending instead of replacing the same-tick batch.");
+			Assert.That(pendingTarget, Is.EqualTo("strategic-refinery"),
+				"The latest selected target remains the retained plan for the next idle handoff.");
+		}
+
+		[Test]
 		public void SafetyBufferDoesNotInventAThreatCapability()
 		{
 			Assert.That(StealthTankSquadPolicy.BufferedRange(0, 2), Is.Zero);
@@ -872,6 +1328,109 @@ namespace OpenRA.Test.Mods.Common
 		{
 			Assert.That(StealthTankSquadPolicy.TransitThreatRange(detectorRange, weaponRange,
 				weaponIsEngaged, canKiteTarget), Is.EqualTo(expected));
+		}
+
+		[Test]
+		public void StationaryWatchdogDoesNotExemptAttackActivityWithoutWeaponDischarge()
+		{
+			var exemption = StealthTankSquadPolicy.StationaryWatchdogExemption(false, false);
+			var age = 0;
+			for (var tick = 0; tick < 750; tick++)
+				age = StealthTankSquadPolicy.NextStationaryWatchdogAge(age, false, exemption);
+
+			Assert.That(exemption, Is.EqualTo(BotStationaryWatchdogExemption.None));
+			Assert.That(StealthTankSquadPolicy.StationaryWatchdogFailed(age, 750), Is.True,
+				"Target assignment, aiming, Attack activity and weapon cooldown are not discharge evidence.");
+		}
+
+		[Test]
+		public void StationaryWatchdogOnlyRecordsDischargeFromExactRootAttackActivity()
+		{
+			var attack = (OpenRA.Activities.Activity)System.Runtime.Serialization.FormatterServices
+				.GetUninitializedObject(typeof(OpenRA.Mods.Common.Activities.Attack));
+
+			Assert.That(BotOwnedStationaryWatchdog.IsExactRootAttackActivity(attack), Is.True);
+			Assert.That(BotOwnedStationaryWatchdog.IsExactRootAttackActivity(
+				new NonAttackDischargeActivity()), Is.False,
+				"A real discharge from a non-Attack root activity must remain nonexempt.");
+			Assert.That(BotOwnedStationaryWatchdog.IsExactRootAttackActivity(null), Is.False);
+		}
+
+		[Test]
+		public void StationaryWatchdogDoesNotExemptRepairOrderOrTravelBeforeActiveResupply()
+		{
+			var exemption = StealthTankSquadPolicy.StationaryWatchdogExemption(false, false);
+			Assert.That(StealthTankSquadPolicy.NextStationaryWatchdogAge(749, false, exemption),
+				Is.EqualTo(750), "A queued repair order, travel or depot wait is not active repair.");
+			Assert.That(StealthTankSquadPolicy.ObservedRepairAmount(400, 400), Is.Zero);
+			Assert.That(StealthTankSquadPolicy.ObservedRepairAmount(400, 399), Is.Zero);
+			Assert.That(StealthTankSquadPolicy.ObservedRepairAmount(400, 405), Is.EqualTo(5),
+				"The repair exemption and its evidence require an observed positive HP delta.");
+		}
+
+		[Test]
+		public void StationaryWatchdogPausesForSustainedShotConfirmedFiringAndActiveRepair()
+		{
+			var age = 400;
+			var cadence = StealthTankSquadPolicy.FiringEpisodeCadenceTicks(70, new[] { 10 }, 2);
+			var lastShot = 0;
+			for (var tick = 0; tick < 800; tick++)
+			{
+				if (tick % 80 == 0)
+					lastShot = tick;
+				var sustained = StealthTankSquadPolicy.IsSustainedFiringEpisode(
+					lastShot, tick, cadence, true, true, true);
+				age = StealthTankSquadPolicy.NextStationaryWatchdogAge(age, false,
+					StealthTankSquadPolicy.StationaryWatchdogExemption(sustained, false));
+			}
+
+			var repairing = StealthTankSquadPolicy.StationaryWatchdogExemption(false, true);
+			for (var tick = 0; tick < 200; tick++)
+				age = StealthTankSquadPolicy.NextStationaryWatchdogAge(age, false, repairing);
+
+			Assert.That(age, Is.EqualTo(400));
+			Assert.That(StealthTankSquadPolicy.NextStationaryWatchdogAge(age, true,
+				BotStationaryWatchdogExemption.None), Is.Zero);
+			Assert.That(cadence, Is.EqualTo(82),
+				"The sustained episode tolerance is bounded by the declared weapon cycle.");
+		}
+
+		[Test]
+		public void StationaryWatchdogStaleSingleShotResumesAndEventuallyFails()
+		{
+			var cadence = StealthTankSquadPolicy.FiringEpisodeCadenceTicks(70, new[] { 10 }, 2);
+			var age = 0;
+			for (var tick = 0; tick <= cadence + 750; tick++)
+			{
+				var sustained = StealthTankSquadPolicy.IsSustainedFiringEpisode(
+					0, tick, cadence, true, true, true);
+				age = StealthTankSquadPolicy.NextStationaryWatchdogAge(age, false,
+					StealthTankSquadPolicy.StationaryWatchdogExemption(sustained, false));
+			}
+
+			Assert.That(StealthTankSquadPolicy.StationaryWatchdogFailed(age, 750), Is.True,
+				"One old discharge must not exempt a stale Attack indefinitely.");
+		}
+
+		[TestCase(false, true, true)]
+		[TestCase(true, false, true)]
+		[TestCase(true, true, false)]
+		public void StationaryWatchdogTargetActivityOrValidityChangeEndsFiringEpisode(
+			bool sameTarget, bool sameActivity, bool targetValid)
+		{
+			Assert.That(StealthTankSquadPolicy.IsSustainedFiringEpisode(
+				100, 101, 82, sameTarget, sameActivity, targetValid), Is.False);
+		}
+
+		[Test]
+		public void StationaryWatchdogActorKilledClosesOnlyLiveFiringEpisode()
+		{
+			Assert.That(BotOwnedStationaryWatchdog.ActorKilledFiringEpisodeEndReason(1234),
+				Is.EqualTo("actor-killed"),
+				"A killed actor with an actual confirmed discharge must close its live episode exactly.");
+			Assert.That(BotOwnedStationaryWatchdog.ActorKilledFiringEpisodeEndReason(int.MinValue),
+				Is.Null,
+				"A killed actor without a confirmed discharge must not emit a false closure.");
 		}
 	}
 }
