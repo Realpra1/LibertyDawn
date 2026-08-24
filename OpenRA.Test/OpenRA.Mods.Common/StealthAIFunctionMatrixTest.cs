@@ -135,6 +135,7 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(yaml.Split("chemical:").Length - 1, Is.EqualTo(10));
 			Assert.That(yaml.Split("UnitTypes: stnk").Length - 1, Is.EqualTo(10));
 			Assert.That(yaml.Split("UnitTypes: ctnk").Length - 1, Is.EqualTo(10));
+			Assert.That(yaml.Split("StrategicCellSize: 6").Length - 1, Is.EqualTo(20));
 			Assert.That(yaml, Does.Not.Contain("StealthAISpecialistModule@"));
 
 			Assert.That(StealthAISpecialistPolicy.MaximumSquadCount, Is.EqualTo(4));
@@ -143,6 +144,23 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(manager, Does.Contain("RebalanceStealthSquads();"));
 			Assert.That(manager.IndexOf("RebalanceStealthSquads();", StringComparison.Ordinal),
 				Is.LessThan(manager.IndexOf("RecruitUnassignedCombatUnits(bot);", StringComparison.Ordinal)));
+			Assert.That(new StealthSquadDefinition(new MiniYaml("", new List<MiniYamlNode>())).StrategicCellSize,
+				Is.EqualTo(6));
+		}
+
+		[Test]
+		public void StealthPlanningUsesCachedSixCellRoutesAndIndependentSafety()
+		{
+			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
+			Assert.That(states, Does.Contain("StealthInfluenceCaches"));
+			Assert.That(states, Does.Contain("SelectTargetCandidates("));
+			Assert.That(states, Does.Contain("foreach (var selectedIndex in selectedIndices)"));
+			Assert.That(states, Does.Contain("TickStealthSafety(Squad owner)"));
+			Assert.That(states, Does.Contain("NearestSafeStealthNeighbor"));
+			Assert.That(states, Does.Contain("resourceType == \"BlueTiberium\""));
+			Assert.That(states, Does.Contain("resourceType == \"RedTiberium\""));
+			Assert.That(StealthAISpecialistPolicy.IsEngagementThreat(true, true, false), Is.True);
+			Assert.That(StealthAISpecialistPolicy.IsEngagementThreat(false, true, false), Is.False);
 		}
 
 		[Test]

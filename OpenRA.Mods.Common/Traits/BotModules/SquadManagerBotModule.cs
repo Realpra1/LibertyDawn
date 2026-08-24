@@ -814,7 +814,7 @@ namespace OpenRA.Mods.Common.Traits
 			foreach (var s in Squads)
 			{
 				s.Units.RemoveAll(a => unitCannotBeOrdered(a) || IsReservedForSpecialBehavior(a));
-				if (s.Type == SquadType.Air)
+				if (s.Type == SquadType.Air || s.Type == SquadType.Stealth)
 					s.CleanAirMembership();
 				else if (s.Type == SquadType.GeneralAttack)
 					s.CleanGroundMembership();

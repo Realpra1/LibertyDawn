@@ -130,7 +130,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 						return;
 				}
 
-				if (Type == SquadType.Air && Game.IsBenchmarking)
+				if ((Type == SquadType.Air || Type == SquadType.Stealth) && Game.IsBenchmarking)
 					BenchmarkAirWork("strategy", () => FuzzyStateMachine.Update(this));
 				else
 					FuzzyStateMachine.Update(this);
@@ -143,10 +143,18 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		/// </summary>
 		public void TickAirSafety()
 		{
-			if (IsValid && Type == SquadType.Air)
+			if (IsValid && (Type == SquadType.Air || Type == SquadType.Stealth))
 			{
 				if (Game.IsBenchmarking)
-					BenchmarkAirWork("local-safety", () => AirStateBase.TickAirSafety(this));
+					BenchmarkAirWork("local-safety", () =>
+					{
+						if (Type == SquadType.Stealth)
+							StealthAIStateBase.TickStealthSafety(this);
+						else
+							AirStateBase.TickAirSafety(this);
+					});
+				else if (Type == SquadType.Stealth)
+					StealthAIStateBase.TickStealthSafety(this);
 				else
 					AirStateBase.TickAirSafety(this);
 			}
@@ -162,8 +170,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			{
 				var elapsed = 1000.0 * Math.Max(0, Stopwatch.GetTimestamp() - start) / Stopwatch.Frequency;
 				var addedOrders = modularBot == null ? 0 : modularBot.QueuedOrderCount - queuedOrders;
+				var category = Type == SquadType.Stealth ? "StealthSquad" : "AirSquad";
 				Game.RecordBotModuleSample(Bot.Player.ClientIndex,
-					$"AirSquad/{AirProfile}/{phase}", elapsed, Math.Max(0, addedOrders));
+					$"{category}/{AirProfile}/{phase}", elapsed, Math.Max(0, addedOrders));
 			}
 		}
 

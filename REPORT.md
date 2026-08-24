@@ -1,4 +1,48 @@
-# CNC-96A Air-verbatim integration cycle 4 report
+# CNC-96A PR132 corrective cycle report
+
+PR132 had regressed the prior live `StrategicCellSize: 6` configuration while
+Air remained 6x6. The copied Stealth target branch consequently fell back to
+the old four-cell waypoint spacing, rebuilt all world threat/resource facts,
+and ran A* once for each of up to 48 actors.
+
+This cycle restores one explicit and default 6x6 Stealth grid for every STNK
+and CTNK profile. It adapts Air's manager/profile caching and bounded
+strategic-cell shortlist: current-health utility is refreshed, incumbents are
+injected and retained for reassessment, harvester slots are preserved, and A*
+runs once per selected cell. The cached ground grid treats detector coverage,
+terrain and red tiberium as hard danger, while ordinary ground weapons and blue
+tiberium remain finite route costs.
+
+Stealth squads now join Air's independent safety cadence. Every 25 ticks a
+single bounded live scan checks detectors and ground weapons. A genuinely
+unsafe or red-tiberium position produces one move to the nearest safe
+neighboring 6x6 cell. That active move is preserved until arrival, after which
+the squad immediately returns to Idle and replans. There is no completion
+retreat. Repair routing now interprets ground/detector threats and the shared
+Stealth terrain/resource grid, uses ground Mobile speed, and coordinates repair
+facility claims across both Air and Stealth squads.
+
+Validation on the exact final source:
+
+- `make check`: PASS, 0 warnings/errors.
+- `./utility.sh cnc --check-yaml`: PASS.
+- `StealthAIFunctionMatrixTest`: 7/7 PASS.
+- `git diff --check`: PASS.
+- Two distinct full-engine games: 2/2 PASS at world tick 3000 under
+  `.build/cnc96a-air-cache-safety/results-final/`.
+- Game 1 observed a live Stealth safety escape exactly one 6x6 strategic cell
+  plus subsequent route activity.
+- Game 2 observed explicit coarse=6 caches for both `stealth-tank` and
+  `chemical`, and live arriving reinforcements joining both formations.
+- Benchmark evidence records independent Stealth phases. STNK cache
+  hits/rebuilds were 812/268 in Game 1 and 857/261 in Game 2.
+
+Raw maps, logs, replays and benchmarks remain ignored under `.build`. This
+worker did not push, publish, merge, edit the task sheet, or edit coordinator
+state. Fresh narration/policy review and final Terra review remain coordinator
+gates.
+
+# Prior CNC-96A Air-verbatim integration cycle 4 report
 
 ## Cycle 4 CI correction
 

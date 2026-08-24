@@ -1,4 +1,18 @@
-# CNC-96A Air-verbatim integration cycle 4
+# CNC-96A PR132 corrective cycle: 6x6 cache and local safety
+
+- Status: implementation and worker validation complete; fresh Luna narration/policy and Terra review pending coordinator routing
+- Base: `71fcbb102cf5ef09e548be50995bcf285a88c427` (published PR132 head)
+- Branch: `agent/20260825-cnc96a-air-cache-safety`
+- Worktree: `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260824-cnc96a-air-verbatim/repair4`
+- Correction: restored explicit and default 6x6 Stealth strategic cells; cached one manager/profile/locomotor influence map; Air-style bounded cell shortlist and incumbent retention; one A* per selected cell
+- Safety: independent 25-tick live bounded ground/detector scan; blue tiberium finite cost, red avoided; sparse non-detecting weapons finite; one neighboring 6x6-cell escape retained until arrival, then immediate replan; no completion retreat
+- Repair: ground/detector influence, terrain/resource grid, Mobile speed, and shared Air+Stealth facility claims
+- Validation: `make check` PASS 0 warnings/errors; CNC YAML PASS; focused tests 7/7; `git diff --check` PASS
+- Final games: 2/2 PASS at tick 3000 under `.build/cnc96a-air-cache-safety/results-final/`; summaries prove 6x6 influence, live safety escape, both profiles, and arriving reinforcement joins
+- Performance evidence: final benchmark reports cache hits exceeding rebuilds for STNK (812/268 and 857/261); separate Stealth strategy/local-safety/coarse-route samples emitted
+- No push, publication, merge, task-sheet edit, or coordinator-state edit
+
+# Prior CNC-96A Air-verbatim integration cycle 4
 
 - Status: complete; committed CI correction pending fresh Terra rereview
 - Base: `0f807a81cf8e9be1b8f6b4c3abd7ad4314223fea`

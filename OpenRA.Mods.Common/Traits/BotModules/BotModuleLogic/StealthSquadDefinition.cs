@@ -40,7 +40,7 @@ namespace OpenRA.Mods.Common.Traits
 		public readonly HashSet<string> AvoidResourceTypes = new HashSet<string>();
 		public readonly int PendingResourceExplosionAvoidanceRadius;
 		public readonly int HazardRouteWaypointSpacing = 4;
-		public readonly int StrategicCellSize;
+		public readonly int StrategicCellSize = StealthAISpecialistPolicy.RequiredStrategicCellSize;
 		public readonly int MissionRetryInterval;
 		public readonly int NearbyTargetReactionRadiusCells;
 		public readonly int DefenderClearFallbackScans = 20;
