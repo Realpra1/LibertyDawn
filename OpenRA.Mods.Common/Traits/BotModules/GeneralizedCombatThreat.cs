@@ -93,6 +93,48 @@ namespace OpenRA.Mods.Common.Traits
 			}
 		}
 
+		public readonly struct AmmoPoolProfile
+		{
+			public readonly string Name;
+			public readonly double Capacity;
+			public readonly double ReloadPerTick;
+
+			public AmmoPoolProfile(string name, double capacity, double reloadPerTick)
+			{
+				Name = name;
+				Capacity = capacity;
+				ReloadPerTick = reloadPerTick;
+			}
+		}
+
+		public readonly struct AmmoArmamentProfile
+		{
+			public readonly double DamagePerTick;
+			public readonly double AmmoPerTick;
+			public readonly IReadOnlyList<string> AmmoPools;
+
+			public AmmoArmamentProfile(double damagePerTick, double ammoPerTick, params string[] ammoPools)
+			{
+				DamagePerTick = damagePerTick;
+				AmmoPerTick = ammoPerTick;
+				AmmoPools = ammoPools ?? Array.Empty<string>();
+			}
+		}
+
+		public readonly struct AmmoDamageProfile
+		{
+			public readonly double FullDamagePerTick;
+			public readonly double FullAmmoTicks;
+			public readonly double ReloadingDamagePerTick;
+
+			public AmmoDamageProfile(double fullDamagePerTick, double fullAmmoTicks, double reloadingDamagePerTick)
+			{
+				FullDamagePerTick = fullDamagePerTick;
+				FullAmmoTicks = fullAmmoTicks;
+				ReloadingDamagePerTick = reloadingDamagePerTick;
+			}
+		}
+
 		public sealed class DirectionalThreat
 		{
 			public string Attacker { get; internal set; }
@@ -113,6 +155,8 @@ namespace OpenRA.Mods.Common.Traits
 			public double DamagePerCycle { get; internal set; }
 			public double CycleTicks { get; internal set; }
 			public double DamagePerTick { get; internal set; }
+			public double FullAmmoTicks { get; internal set; } = double.PositiveInfinity;
+			public double ReloadingDamagePerTick { get; internal set; }
 			public double DefenderHealingPerTick { get; internal set; }
 			public double TimeToKillTicks { get; internal set; }
 			public IReadOnlyList<HealingProfile> DefenderHealingProfiles { get; internal set; } = Array.Empty<HealingProfile>();
@@ -481,12 +525,14 @@ namespace OpenRA.Mods.Common.Traits
 
 			var forward = pair.Forward;
 			var reverse = pair.Reverse;
-			var defenderTimeToKill = HealingAdjustedTimeToKill(forward.DefenderHitPoints,
-				forward.DamagePerTick * unitCount, forward.DefenderHealingProfiles);
+			var defenderTimeToKill = AmmoAdjustedTimeToKill(forward.DefenderHitPoints,
+				new AmmoDamageProfile(forward.DamagePerTick * unitCount, forward.FullAmmoTicks,
+					forward.ReloadingDamagePerTick * unitCount), forward.DefenderHealingProfiles);
 			var groupHealing = reverse.DefenderHealingProfiles.Select(h => new HealingProfile(
 				h.HealingPerTick * unitCount, h.StartsBelowHitPoints * unitCount));
-			var groupTimeToKill = HealingAdjustedTimeToKill(reverse.DefenderHitPoints * (double)unitCount,
-				reverse.DamagePerTick, groupHealing);
+			var groupTimeToKill = AmmoAdjustedTimeToKill(reverse.DefenderHitPoints * (double)unitCount,
+				new AmmoDamageProfile(reverse.DamagePerTick, reverse.FullAmmoTicks,
+					reverse.ReloadingDamagePerTick), groupHealing);
 			var groupKillRate = KillRate(defenderTimeToKill);
 			var defenderKillRate = KillRate(groupTimeToKill);
 			var defenderThreat = RangeAdjustedThreatEquivalent(defenderKillRate, groupKillRate,
@@ -610,12 +656,24 @@ namespace OpenRA.Mods.Common.Traits
 
 			var applicable = attacker.TraitInfos<ArmamentInfo>()
 				.Where(a => a.WeaponInfo != null && a.WeaponInfo.IsValidTarget(targetTypes))
-				.Select(a => CalculateArmament(a, armor, hitRadius, a.ModifiedRange,
+				.Select(a => (Info: a, Threat: CalculateArmament(a, armor, hitRadius, a.ModifiedRange,
 					Array.Empty<int>(), Array.Empty<int>(), Array.Empty<int>(), null, null,
-					targetSpeed, targetEngagementRange, targetTypes))
+					targetSpeed, targetEngagementRange, targetTypes)))
 				.ToArray();
+			var ammoPools = attacker.TraitInfos<AmmoPoolInfo>().ToArray();
+			var reloadRates = attacker.TraitInfos<ReloadAmmoPoolInfo>()
+				.Where(r => r.EnabledByDefault && !r.PausedByDefault && r.Delay > 0 && r.Count > 0)
+				.GroupBy(r => r.AmmoPool)
+				.ToDictionary(g => g.Key, g => g.Sum(r => r.Count / (double)r.Delay));
+			var ammoProfile = CalculateAmmoDamageProfile(applicable.Select(a => new AmmoArmamentProfile(
+				a.Threat.DamagePerTick,
+				a.Info.AmmoUsage * Math.Max(1, a.Info.WeaponInfo.Burst) / a.Threat.CycleTicks,
+				ammoPools.Where(p => p.Armaments.Contains(a.Info.Name)).Select(p => p.Name).ToArray())),
+				ammoPools.Select(p => new AmmoPoolProfile(p.Name, Math.Max(0, p.Ammo),
+					reloadRates.TryGetValue(p.Name, out var rate) ? rate : 0)));
 
-			return CombineDirections(attacker.Name, defender.Name, hp, armor, hitRadius, applicable, healing);
+			return CombineDirections(attacker.Name, defender.Name, hp, armor, hitRadius,
+				applicable.Select(a => a.Threat).ToArray(), healing, ammoProfile);
 		}
 
 		static DirectionalThreat CalculateLiveDirection(Actor attacker, Actor defender)
@@ -648,11 +706,14 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		static DirectionalThreat CombineDirections(string attacker, string defender, int hp, string armor,
-			double hitRadius, DirectionalThreat[] applicable, HealingProfile[] healing)
+			double hitRadius, DirectionalThreat[] applicable, HealingProfile[] healing,
+			AmmoDamageProfile? cachedAmmoProfile = null)
 		{
 			var totalDpt = applicable.Sum(a => a.DamagePerTick);
+			var ammoProfile = cachedAmmoProfile ??
+				new AmmoDamageProfile(totalDpt, double.PositiveInfinity, totalDpt);
 			var weight = applicable.Sum(a => a.DamagePerCycle);
-			var timeToKill = HealingAdjustedTimeToKill(hp, totalDpt, healing);
+			var timeToKill = AmmoAdjustedTimeToKill(hp, ammoProfile, healing);
 			return new DirectionalThreat
 			{
 				Attacker = attacker,
@@ -673,6 +734,8 @@ namespace OpenRA.Mods.Common.Traits
 				DamagePerCycle = applicable.Sum(a => a.DamagePerCycle),
 				CycleTicks = Weighted(applicable, a => a.CycleTicks, weight),
 				DamagePerTick = totalDpt,
+				FullAmmoTicks = ammoProfile.FullAmmoTicks,
+				ReloadingDamagePerTick = ammoProfile.ReloadingDamagePerTick,
 				DefenderHealingPerTick = healing.Sum(h => h.HealingPerTick),
 				TimeToKillTicks = timeToKill,
 				DefenderHealingProfiles = healing,
@@ -701,6 +764,93 @@ namespace OpenRA.Mods.Common.Traits
 			var healingPerStep = info.Step + info.PercentageStep * (long)maximumHitPoints / 100d;
 			return new HealingProfile(Math.Max(0, healingPerStep / info.Delay),
 				maximumHitPoints * info.StartIfBelow.Clamp(0, 100) / 100d);
+		}
+
+		public static AmmoDamageProfile CalculateAmmoDamageProfile(
+			IEnumerable<AmmoArmamentProfile> armaments, IEnumerable<AmmoPoolProfile> pools)
+		{
+			var armamentProfiles = armaments.ToArray();
+			var poolProfiles = pools.GroupBy(p => p.Name).ToDictionary(g => g.Key,
+				g => new AmmoPoolProfile(g.Key, g.Max(p => Math.Max(0, p.Capacity)),
+					g.Sum(p => Math.Max(0, p.ReloadPerTick))));
+			var fullDamagePerTick = armamentProfiles.Sum(a => Math.Max(0, a.DamagePerTick));
+
+			// Treat discrete fire and reload events as continuous rates. This keeps the cached
+			// model bounded while preserving both the opening magazine and sustained throughput.
+			var poolScales = new Dictionary<string, double>();
+			var fullAmmoTicks = double.PositiveInfinity;
+			foreach (var pool in poolProfiles.Values)
+			{
+				var consumption = armamentProfiles.Where(a =>
+					(a.AmmoPools ?? Array.Empty<string>()).Contains(pool.Name))
+					.Sum(a => Math.Max(0, a.AmmoPerTick));
+				if (consumption <= 0)
+				{
+					poolScales.Add(pool.Name, 1);
+					continue;
+				}
+
+				var reload = Math.Max(0, pool.ReloadPerTick);
+				poolScales.Add(pool.Name, (reload / consumption).Clamp(0, 1));
+				if (consumption > reload)
+					fullAmmoTicks = Math.Min(fullAmmoTicks, pool.Capacity / (consumption - reload));
+			}
+
+			var reloadingDamagePerTick = armamentProfiles.Sum(a =>
+			{
+				var ammoPools = a.AmmoPools ?? Array.Empty<string>();
+				var scales = ammoPools.Where(poolScales.ContainsKey).Select(p => poolScales[p]).ToArray();
+				var scale = scales.Length > 0 ? scales.Min() : 1;
+				return Math.Max(0, a.DamagePerTick) * scale;
+			});
+
+			return new AmmoDamageProfile(fullDamagePerTick, fullAmmoTicks, reloadingDamagePerTick);
+		}
+
+		public static double AmmoAdjustedTimeToKill(double currentHitPoints, AmmoDamageProfile ammo,
+			IEnumerable<HealingProfile> healingProfiles)
+		{
+			var fullAmmoTimeToKill = HealingAdjustedTimeToKill(
+				currentHitPoints, ammo.FullDamagePerTick, healingProfiles);
+			if (double.IsPositiveInfinity(ammo.FullAmmoTicks) || fullAmmoTimeToKill <= ammo.FullAmmoTicks)
+				return fullAmmoTimeToKill;
+
+			var remainingHitPoints = HitPointsAfterTicks(
+				currentHitPoints, ammo.FullDamagePerTick, ammo.FullAmmoTicks, healingProfiles);
+			var reloadingTimeToKill = HealingAdjustedTimeToKill(
+				remainingHitPoints, ammo.ReloadingDamagePerTick, healingProfiles);
+			return double.IsPositiveInfinity(reloadingTimeToKill) ?
+				double.PositiveInfinity : ammo.FullAmmoTicks + reloadingTimeToKill;
+		}
+
+		static double HitPointsAfterTicks(double currentHitPoints, double damagePerTick, double ticks,
+			IEnumerable<HealingProfile> healingProfiles)
+		{
+			if (currentHitPoints <= 0 || damagePerTick <= 0 || ticks <= 0)
+				return Math.Max(0, currentHitPoints);
+
+			var profiles = healingProfiles.Where(h => h.HealingPerTick > 0).ToArray();
+			var boundaries = profiles.Select(h => h.StartsBelowHitPoints.Clamp(0, currentHitPoints))
+				.Append(currentHitPoints).Append(0).Distinct().OrderByDescending(h => h).ToArray();
+			var remainingTicks = ticks;
+			for (var i = 0; i < boundaries.Length - 1; i++)
+			{
+				var upper = boundaries[i];
+				var lower = boundaries[i + 1];
+				var midpoint = (upper + lower) / 2;
+				var healingPerTick = profiles.Where(h => midpoint < h.StartsBelowHitPoints).Sum(h => h.HealingPerTick);
+				var netDamagePerTick = damagePerTick - healingPerTick;
+				if (netDamagePerTick <= 0)
+					return upper;
+
+				var ticksToBoundary = (upper - lower) / netDamagePerTick;
+				if (remainingTicks < ticksToBoundary)
+					return upper - remainingTicks * netDamagePerTick;
+
+				remainingTicks -= ticksToBoundary;
+			}
+
+			return 0;
 		}
 
 		public static double HealingAdjustedTimeToKill(double currentHitPoints, double damagePerTick,

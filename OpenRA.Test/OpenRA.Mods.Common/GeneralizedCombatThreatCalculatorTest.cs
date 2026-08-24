@@ -152,6 +152,89 @@ namespace OpenRA.Test
 		}
 
 		[Test]
+		public void CachedAmmoUsesFullMagazineThenReloadLimitedDamage()
+		{
+			var ammo = GeneralizedCombatThreatCalculator.CalculateAmmoDamageProfile(new[]
+			{
+				new GeneralizedCombatThreatCalculator.AmmoArmamentProfile(250, 0.1, "primary")
+			}, new[]
+			{
+				new GeneralizedCombatThreatCalculator.AmmoPoolProfile("primary", 20, 2d / 105)
+			});
+
+			Assert.That(ammo.FullDamagePerTick, Is.EqualTo(250));
+			Assert.That(ammo.FullAmmoTicks, Is.EqualTo(4200d / 17).Within(0.000001));
+			Assert.That(ammo.ReloadingDamagePerTick, Is.EqualTo(1000d / 21).Within(0.000001));
+			Assert.That(GeneralizedCombatThreatCalculator.AmmoAdjustedTimeToKill(4500, ammo,
+				System.Array.Empty<GeneralizedCombatThreatCalculator.HealingProfile>()), Is.EqualTo(18));
+			Assert.That(GeneralizedCombatThreatCalculator.AmmoAdjustedTimeToKill(100000, ammo,
+				System.Array.Empty<GeneralizedCombatThreatCalculator.HealingProfile>()), Is.EqualTo(1050).Within(0.000001));
+		}
+
+		[Test]
+		public void CachedAmmoWithoutReloadCannotDamagePastMagazineCapacity()
+		{
+			var ammo = GeneralizedCombatThreatCalculator.CalculateAmmoDamageProfile(new[]
+			{
+				new GeneralizedCombatThreatCalculator.AmmoArmamentProfile(10, 1, "primary")
+			}, new[]
+			{
+				new GeneralizedCombatThreatCalculator.AmmoPoolProfile("primary", 5, 0)
+			});
+
+			Assert.That(ammo.FullAmmoTicks, Is.EqualTo(5));
+			Assert.That(ammo.ReloadingDamagePerTick, Is.Zero);
+			Assert.That(GeneralizedCombatThreatCalculator.AmmoAdjustedTimeToKill(50, ammo,
+				System.Array.Empty<GeneralizedCombatThreatCalculator.HealingProfile>()), Is.EqualTo(5));
+			Assert.That(GeneralizedCombatThreatCalculator.AmmoAdjustedTimeToKill(51, ammo,
+				System.Array.Empty<GeneralizedCombatThreatCalculator.HealingProfile>()), Is.EqualTo(double.PositiveInfinity));
+		}
+
+		[Test]
+		public void CachedAmmoLeavesUnlimitedAndSelfSustainingArmamentsAtFullDamage()
+		{
+			var ammo = GeneralizedCombatThreatCalculator.CalculateAmmoDamageProfile(new[]
+			{
+				new GeneralizedCombatThreatCalculator.AmmoArmamentProfile(20, 0),
+				new GeneralizedCombatThreatCalculator.AmmoArmamentProfile(30, 0.5, "primary")
+			}, new[]
+			{
+				new GeneralizedCombatThreatCalculator.AmmoPoolProfile("primary", 4, 0.5)
+			});
+
+			Assert.That(ammo.FullDamagePerTick, Is.EqualTo(50));
+			Assert.That(ammo.FullAmmoTicks, Is.EqualTo(double.PositiveInfinity));
+			Assert.That(ammo.ReloadingDamagePerTick, Is.EqualTo(50));
+		}
+
+		[Test]
+		public void CachedAmmoAggregatesArmamentsSharingOnePool()
+		{
+			var ammo = GeneralizedCombatThreatCalculator.CalculateAmmoDamageProfile(new[]
+			{
+				new GeneralizedCombatThreatCalculator.AmmoArmamentProfile(40, 0.5, "primary"),
+				new GeneralizedCombatThreatCalculator.AmmoArmamentProfile(20, 0.25, "primary")
+			}, new[]
+			{
+				new GeneralizedCombatThreatCalculator.AmmoPoolProfile("primary", 15, 0.25)
+			});
+
+			Assert.That(ammo.FullDamagePerTick, Is.EqualTo(60));
+			Assert.That(ammo.FullAmmoTicks, Is.EqualTo(30));
+			Assert.That(ammo.ReloadingDamagePerTick, Is.EqualTo(20));
+		}
+
+		[Test]
+		public void CachedAmmoCarriesRemainingHealthAndHealingIntoReloadPhase()
+		{
+			var ammo = new GeneralizedCombatThreatCalculator.AmmoDamageProfile(10, 5, 6);
+			var healing = new[] { new GeneralizedCombatThreatCalculator.HealingProfile(2, 50) };
+
+			Assert.That(GeneralizedCombatThreatCalculator.AmmoAdjustedTimeToKill(100, ammo, healing),
+				Is.EqualTo(17.5));
+		}
+
+		[Test]
 		public void CachedAircraftUseAirborneTargetTypeInsteadOfConditionalGroundUnion()
 		{
 			var types = GeneralizedCombatThreatCalculator.CachedTargetTypes(true, new[]
