@@ -258,7 +258,7 @@ namespace OpenRA.Test
 		}
 
 		[Test]
-		public void CrossoverEstimateUsesDiscreteActorPotentialInConstantEvaluations()
+		public void CrossoverPercentageSearchFindsExactDiscreteEstimate()
 		{
 			const double rifleThreatToTower = 1d / 2100;
 			var result = GeneralizedCombatThreatCalculator.FindCrossover(rifleThreatToTower, count =>
@@ -271,7 +271,71 @@ namespace OpenRA.Test
 			Assert.That(result.Found, Is.True);
 			Assert.That(result.InitialEstimate, Is.EqualTo(65));
 			Assert.That(result.UnitCount, Is.EqualTo(65));
-			Assert.That(result.Evaluations, Is.EqualTo(2));
+			Assert.That(result.Evaluations, Is.EqualTo(7));
+		}
+
+		[Test]
+		public void CrossoverPercentageSearchBracketsOverestimateBeforeBinarySearch()
+		{
+			const double baseThreat = 1d / 2100;
+			var result = GeneralizedCombatThreatCalculator.FindCrossover(baseThreat, count =>
+				new GeneralizedCombatThreatCalculator.GroupThreat(count,
+					count >= 38 ? 0.9 : 1.1, count >= 38 ? 1.1 : 0.9));
+
+			Assert.That(result.Found, Is.True);
+			Assert.That(result.InitialEstimate, Is.EqualTo(65));
+			Assert.That(result.UnitCount, Is.EqualTo(38));
+			Assert.That(result.Evaluations, Is.EqualTo(7));
+		}
+
+		[Test]
+		public void CrossoverPercentageSearchExpandsUnderestimateBeforeBinarySearch()
+		{
+			const double baseThreat = 1d / 55;
+			var result = GeneralizedCombatThreatCalculator.FindCrossover(baseThreat, count =>
+				new GeneralizedCombatThreatCalculator.GroupThreat(count,
+					count >= 38 ? 0.9 : 1.1, count >= 38 ? 1.1 : 0.9));
+
+			Assert.That(result.Found, Is.True);
+			Assert.That(result.InitialEstimate, Is.EqualTo(10));
+			Assert.That(result.UnitCount, Is.EqualTo(38));
+			Assert.That(result.Evaluations, Is.EqualTo(10));
+		}
+
+		[Test]
+		public void CrossoverPercentageSearchStopsAtMaximumWithoutCrossover()
+		{
+			var result = GeneralizedCombatThreatCalculator.FindCrossover(1, count =>
+				new GeneralizedCombatThreatCalculator.GroupThreat(count, 1.1, 0.9), 100);
+
+			Assert.That(result.Found, Is.False);
+			Assert.That(result.UnitCount, Is.EqualTo(100));
+			Assert.That(result.Evaluations, Is.EqualTo(15));
+		}
+
+		[Test]
+		public void CrossoverWithoutBaseThreatStartsAtMaximum()
+		{
+			var result = GeneralizedCombatThreatCalculator.FindCrossover(0, count =>
+				new GeneralizedCombatThreatCalculator.GroupThreat(count, 1.1, 0.9), 100);
+
+			Assert.That(result.Found, Is.False);
+			Assert.That(result.InitialEstimate, Is.EqualTo(100));
+			Assert.That(result.UnitCount, Is.EqualTo(100));
+			Assert.That(result.Evaluations, Is.EqualTo(1));
+		}
+
+		[Test]
+		public void CrossoverWithoutBaseThreatCanBinarySearchDownFromMaximum()
+		{
+			var result = GeneralizedCombatThreatCalculator.FindCrossover(0, count =>
+				new GeneralizedCombatThreatCalculator.GroupThreat(count,
+					count >= 38 ? 0.9 : 1.1, count >= 38 ? 1.1 : 0.9), 100);
+
+			Assert.That(result.Found, Is.True);
+			Assert.That(result.InitialEstimate, Is.EqualTo(100));
+			Assert.That(result.UnitCount, Is.EqualTo(38));
+			Assert.That(result.Evaluations, Is.EqualTo(8));
 		}
 
 		[Test]

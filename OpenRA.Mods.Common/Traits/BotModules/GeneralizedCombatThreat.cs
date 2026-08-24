@@ -27,6 +27,9 @@ namespace OpenRA.Mods.Common.Traits
 		public const int MixedGroupLookupBudget = 9;
 		public const int MixedGroupMaximumAttackerTypes = 3;
 
+		// Minimized evaluations in a sweep of all mutually targetable cached CNC matchups.
+		const double CrossoverSearchStep = 0.33;
+
 		public readonly struct GroupTypeCount
 		{
 			public readonly string ActorType;
@@ -470,8 +473,9 @@ namespace OpenRA.Mods.Common.Traits
 			if (maximumUnitCount < 1)
 				throw new ArgumentOutOfRangeException(nameof(maximumUnitCount));
 
-			var estimateValue = baseGroupThreatRating > 0 && double.IsFinite(baseGroupThreatRating) ?
-				ActorCountForDiscreteCombatPotential(1 / baseGroupThreatRating) : 1;
+			var estimateValue = double.IsPositiveInfinity(baseGroupThreatRating) ? 1 :
+				baseGroupThreatRating > 0 && double.IsFinite(baseGroupThreatRating) ?
+				ActorCountForDiscreteCombatPotential(1 / baseGroupThreatRating) : maximumUnitCount;
 			var estimate = estimateValue >= maximumUnitCount ? maximumUnitCount :
 				(int)Math.Ceiling(estimateValue).Clamp(1, maximumUnitCount);
 			var evaluations = 0;
@@ -481,52 +485,72 @@ namespace OpenRA.Mods.Common.Traits
 				return evaluate(candidateCount);
 			}
 
-			var count = estimate;
-			var threat = Evaluate(count);
-			if (threat.CrossesOver)
+			CrossoverResult Result(bool found, int unitCount, GroupThreat resultThreat)
 			{
-				while (count > 1)
-				{
-					var previous = Evaluate(count - 1);
-					if (!previous.CrossesOver)
-						break;
-
-					count--;
-					threat = previous;
-				}
-
 				return new CrossoverResult
 				{
-					Found = true,
-					UnitCount = count,
+					Found = found,
+					UnitCount = unitCount,
 					InitialEstimate = estimate,
 					Evaluations = evaluations,
-					Threat = threat
+					Threat = resultThreat
 				};
 			}
 
-			while (count < maximumUnitCount)
+			CrossoverResult BinarySearch(int lowerCount, int upperCount, GroupThreat upperThreat)
 			{
-				threat = Evaluate(++count);
-				if (threat.CrossesOver)
-					return new CrossoverResult
+				while (upperCount - lowerCount > 1)
+				{
+					var middleCount = lowerCount + (upperCount - lowerCount) / 2;
+					var middleThreat = Evaluate(middleCount);
+					if (middleThreat.CrossesOver)
 					{
-						Found = true,
-						UnitCount = count,
-						InitialEstimate = estimate,
-						Evaluations = evaluations,
-						Threat = threat
-					};
+						upperCount = middleCount;
+						upperThreat = middleThreat;
+					}
+					else
+						lowerCount = middleCount;
+				}
+
+				return Result(true, upperCount, upperThreat);
 			}
 
-			return new CrossoverResult
+			var threat = Evaluate(estimate);
+			if (threat.CrossesOver)
 			{
-				Found = false,
-				UnitCount = maximumUnitCount,
-				InitialEstimate = estimate,
-				Evaluations = evaluations,
-				Threat = threat
-			};
+				var passedCount = estimate;
+				while (passedCount > 1)
+				{
+					var failedCandidate = Math.Max(1,
+						(int)Math.Floor(passedCount * (1 - CrossoverSearchStep)));
+					if (failedCandidate >= passedCount)
+						failedCandidate = passedCount - 1;
+
+					var candidateThreat = Evaluate(failedCandidate);
+					if (!candidateThreat.CrossesOver)
+						return BinarySearch(failedCandidate, passedCount, threat);
+
+					passedCount = failedCandidate;
+					threat = candidateThreat;
+				}
+
+				return Result(true, 1, threat);
+			}
+
+			var failedCount = estimate;
+			while (failedCount < maximumUnitCount)
+			{
+				var candidateValue = Math.Ceiling(failedCount * (1 + CrossoverSearchStep));
+				var passedCandidate = candidateValue >= maximumUnitCount ? maximumUnitCount :
+					Math.Max(failedCount + 1, (int)candidateValue);
+				threat = Evaluate(passedCandidate);
+				if (threat.CrossesOver)
+					return BinarySearch(failedCount, passedCandidate, threat);
+
+				failedCount = passedCandidate;
+			}
+
+			return Result(false, maximumUnitCount, threat);
 		}
 
 		public CrossoverResult CalculateCrossover(PairThreat pair, int maximumUnitCount = 10000)
