@@ -903,9 +903,22 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			if (owner.AirEscapingLocalAa)
 			{
 				if (AirDecisionUnits(owner).Any(a => !a.IsIdle && !BusyAttack(a)))
+				{
+					if (owner.SquadManager.Info.AirTargetDebugLogging)
+						owner.StealthEscapeSafetyChecks++;
 					return;
+				}
 
 				owner.AirEscapingLocalAa = false;
+				if (owner.SquadManager.Info.AirTargetDebugLogging)
+					Log.Write("debug", "Stealth safety [{0}] arrival-replan: tick={1} issued-tick={2} " +
+						"destination={3} preserved-checks={4} order-batches=1 next-state=Idle.",
+						owner.StealthProfile, owner.World.WorldTick, owner.StealthEscapeIssuedTick,
+						owner.StealthEscapeDestination?.ToString() ?? "none", owner.StealthEscapeSafetyChecks);
+
+				owner.StealthEscapeIssuedTick = -1;
+				owner.StealthEscapeSafetyChecks = 0;
+				owner.StealthEscapeDestination = null;
 				owner.FuzzyStateMachine.ChangeState(owner, new StealthAIIdleState(), true);
 				return;
 			}
@@ -959,10 +972,20 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			owner.AirRouteQueued = false;
 			owner.AirEscapingLocalAa = true;
 			if (owner.SquadManager.Info.AirTargetDebugLogging)
-				Log.Write("debug", "Stealth safety [{0}] escaping one 6x6 strategic cell to {1}: " +
-					"detector={2} weapon={3} revealed={4} red-tiberium={5}.",
-					owner.StealthProfile, destination.Value, detectorExposure, weaponExposure,
-					revealed, resourceHazard);
+			{
+				owner.StealthEscapeIssuedTick = owner.World.WorldTick;
+				owner.StealthEscapeSafetyChecks = 0;
+				owner.StealthEscapeDestination = destination;
+				var from = new CPos(representative.Location.X / StealthCoarseSize(owner),
+					representative.Location.Y / StealthCoarseSize(owner));
+				var to = new CPos(destination.Value.X / StealthCoarseSize(owner),
+					destination.Value.Y / StealthCoarseSize(owner));
+				Log.Write("debug", "Stealth safety [{0}] escaping one 6x6 strategic cell: tick={1} " +
+					"from={2} to={3} delta={4},{5} destination={6} detector={7} weapon={8} " +
+					"revealed={9} red-tiberium={10} order-batches=1.",
+					owner.StealthProfile, owner.World.WorldTick, from, to, to.X - from.X, to.Y - from.Y,
+					destination.Value, detectorExposure, weaponExposure, revealed, resourceHazard);
+			}
 
 			foreach (var unit in AirDecisionUnits(owner))
 				owner.Bot.QueueOrder(new Order("Move", unit,
@@ -1017,6 +1040,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			selectedIndices = selectedIndices.Concat(harvesterCells).Distinct().OrderBy(i => i).ToList();
 
 			AirTargetPlan best = null;
+			var debugPlans = owner.SquadManager.Info.AirTargetDebugLogging ? new List<AirTargetPlan>() : null;
 			foreach (var selectedIndex in selectedIndices)
 			{
 				var cell = cells[selectedIndex];
@@ -1033,12 +1057,29 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 						(distance * Math.Max(1, owner.StealthDefinition.HarassmentDistancePenalty) + 6));
 					var score = CurrentTargetUtility(actor, Math.Max(1, baseScore));
 					var plan = new AirTargetPlan(actor, score, true, route);
+					debugPlans?.Add(plan);
 					if (actor == incumbent)
 						incumbentPlan = plan;
 					if (best == null || plan.Score > best.Score ||
 						(plan.Score == best.Score && actor.ActorID < best.Actor.ActorID))
 						best = plan;
 				}
+			}
+
+			if (debugPlans != null)
+			{
+				var ranked = debugPlans.OrderByDescending(plan => plan.Score)
+					.ThenBy(plan => plan.Actor.ActorID).Take(2).ToArray();
+				var ranking = ranked.Select(plan =>
+				{
+					var health = plan.Actor.TraitOrDefault<IHealth>();
+					return $"{plan.Actor.Info.Name}#{plan.Actor.ActorID}:score={plan.Score}:" +
+						$"hp={health?.HP ?? 0}/{health?.MaxHP ?? 0}";
+				}).JoinWith(",");
+				Log.Write("debug", "Stealth target evidence [{0}] tick={1}: incumbent={2} top-two={3}.",
+					owner.StealthProfile, owner.World.WorldTick,
+					incumbent == null ? "none" : incumbent.Info.Name + "#" + incumbent.ActorID,
+					ranking);
 			}
 
 			return best;
@@ -3263,8 +3304,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					if (switchTarget)
 					{
 						if (info.AirTargetDebugLogging)
-							Log.Write("debug", "Air target [{0}] switching building {1}#{2} score={3} to {4} score={5}: improvement threshold={6}%.",
-								owner.AirProfile, incumbent.Info.Name, incumbent.ActorID, previousScore,
+							Log.Write("debug", "Air target [{0}] switching building at tick={1}: {2}#{3} score={4} to {5} score={6}: improvement threshold={7}%.",
+								owner.AirProfile, owner.World.WorldTick,
+								incumbent.Info.Name, incumbent.ActorID, previousScore,
 								challenger == null ? "none" : challenger.Actor.Info.Name + "#" + challenger.Actor.ActorID,
 								challenger?.Score ?? int.MinValue,
 								StealthSwitchImprovement(owner));
@@ -3288,8 +3330,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 						owner.AirAaClearProtectedCell = recalculatedIncumbent.ClearsAa ?
 							recalculatedIncumbent.AaProtectedCell : null;
 						if (info.AirTargetDebugLogging)
-							Log.Write("debug", "Air target [{0}] retaining building {1}#{2}: challenger={3} old-score={4} recalculated-score={5} challenger-score={6} clears-aa={7} protected-cell={8}.",
-								owner.AirProfile, incumbent.Info.Name, incumbent.ActorID,
+							Log.Write("debug", "Air target [{0}] retaining building at tick={1}: {2}#{3}: challenger={4} old-score={5} recalculated-score={6} challenger-score={7} clears-aa={8} protected-cell={9}.",
+								owner.AirProfile, owner.World.WorldTick, incumbent.Info.Name, incumbent.ActorID,
 								challenger == null ? "none" : challenger.Actor.Info.Name + "#" + challenger.Actor.ActorID,
 								previousScore, recalculatedIncumbent.Score,
 								challenger?.Score ?? int.MinValue, recalculatedIncumbent.ClearsAa,

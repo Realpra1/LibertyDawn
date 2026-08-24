@@ -1,3 +1,36 @@
+# CNC-96A PR132 policy evidence follow-up
+
+This follow-up changes no target, route, safety, balance, or production policy.
+It adds narrowly debug-gated provenance to the existing default-false
+`AirTargetDebugLogging` path. Release-default execution does not build the
+ranked evidence list or maintain escape counters.
+
+The adversarial target scenario produced both required discriminators. At tick
+119, the incumbent `proc#59` and newcomer `proc#50` were both full health and
+both scored 500000; the existing 25% switch threshold retained `proc#59`. At
+tick 309, a newly visible `proc#61` at 5000/100000 HP scored 25714280, versus
+the incumbent's 750000, and the squad switched to the genuinely better damaged
+target.
+
+The local-safety scenario records the chosen strategic coordinates as well as
+their delta. At tick 258 the squad moved from coarse cell `5,5` to neighboring
+cell `4,6` (`delta=-1,1`) with `order-batches=1`. It preserved that escape
+through five subsequent 25-tick safety checks without reissuing it. Arrival at
+tick 408 records the same destination and immediately changes to Idle, which is
+the normal target-replanning state. Additional squads independently produced
+the same one-neighbor/preserved-arrival sequence.
+
+Exact-final real-engine artifacts are under
+`.build/cnc96a-policy-followup/results-exact-final/`: `target-retention-switch` and
+`neighbor-safety` both passed at tick 1600. `make check` passed with 0 warnings
+and errors, CNC YAML validation passed, `StealthAIFunctionMatrixTest` passed
+7/7, and `git diff --check` passed. The standalone test-project build retained
+four unrelated pre-existing analyzer warnings.
+
+Raw scenario maps, logs, summaries, and replays remain ignored under `.build`.
+This worker did not push, publish, merge, edit the task sheet, or edit
+coordinator state.
+
 # CNC-96A PR132 corrective cycle report
 
 PR132 had regressed the prior live `StrategicCellSize: 6` configuration while

@@ -1,3 +1,15 @@
+# CNC-96A PR132 policy evidence follow-up
+
+- Status: debug-gated evidence implementation and exact-final worker validation complete; coordinator policy routing pending
+- Base: `15d0bee25ddf5f008bbf01e515fe18de38b9e05a` (clean corrective-cycle commit)
+- Branch/worktree: unchanged `agent/20260825-cnc96a-air-cache-safety` in `repair4`
+- Product behavior: unchanged; release-default `AirTargetDebugLogging: false` incurs no evidence scan/list/counter work
+- Target evidence: at tick 119 equal-score/full-HP processors score 500000 and incumbent `proc#59` is retained over comparable `proc#50`; at tick 309 damaged `proc#61` (5000/100000 HP) scores 25714280 and replaces the incumbent
+- Safety evidence: tick 258 selects adjacent coarse delta `-1,1`, issues one order batch, preserves it across five 25-tick safety checks, and at tick 408 arrival transitions directly to Idle for immediate replan
+- Exact-final games: 2/2 PASS at tick 1600 under `.build/cnc96a-policy-followup/results-exact-final/`
+- Exact-final gates: `make check` PASS 0 warnings/errors; CNC YAML PASS; focused tests 7/7; `git diff --check` PASS
+- No push, publication, merge, task-sheet edit, or coordinator-state edit
+
 # CNC-96A PR132 corrective cycle: 6x6 cache and local safety
 
 - Status: implementation and worker validation complete; fresh Luna narration/policy and Terra review pending coordinator routing

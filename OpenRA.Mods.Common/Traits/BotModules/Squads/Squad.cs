@@ -75,6 +75,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		internal float AirLocalThreatWeight;
 		internal int AirNextTargetReviewTick;
 		internal bool AirEscapingLocalAa;
+		internal int StealthEscapeIssuedTick = -1;
+		internal int StealthEscapeSafetyChecks;
+		internal CPos? StealthEscapeDestination;
 
 		// General-attack reinforcements remain squad-owned while traveling, but do not pull the
 		// established formation center home or inflate its strategic strength before they arrive.
