@@ -28,7 +28,9 @@ namespace OpenRA.Mods.Common.Traits
 		public const int MixedGroupMaximumAttackerTypes = 3;
 
 		// Minimized evaluations in a sweep of all mutually targetable cached CNC matchups.
-		const double CrossoverSearchStep = 0.33;
+		const double CrossoverEstimateBias = 0.99837;
+		const int CrossoverMaximumSearchStart = 31;
+		const double CrossoverSearchStep = 0.0935;
 
 		public readonly struct GroupTypeCount
 		{
@@ -475,9 +477,11 @@ namespace OpenRA.Mods.Common.Traits
 
 			var estimateValue = double.IsPositiveInfinity(baseGroupThreatRating) ? 1 :
 				baseGroupThreatRating > 0 && double.IsFinite(baseGroupThreatRating) ?
-				ActorCountForDiscreteCombatPotential(1 / baseGroupThreatRating) : maximumUnitCount;
-			var estimate = estimateValue >= maximumUnitCount ? maximumUnitCount :
+				ActorCountForDiscreteCombatPotential(1 / baseGroupThreatRating) * CrossoverEstimateBias :
+				maximumUnitCount;
+			var initialEstimate = estimateValue >= maximumUnitCount ? maximumUnitCount :
 				(int)Math.Ceiling(estimateValue).Clamp(1, maximumUnitCount);
+			var estimate = initialEstimate;
 			var evaluations = 0;
 			GroupThreat Evaluate(int candidateCount)
 			{
@@ -491,7 +495,7 @@ namespace OpenRA.Mods.Common.Traits
 				{
 					Found = found,
 					UnitCount = unitCount,
-					InitialEstimate = estimate,
+					InitialEstimate = initialEstimate,
 					Evaluations = evaluations,
 					Threat = resultThreat
 				};
@@ -515,7 +519,20 @@ namespace OpenRA.Mods.Common.Traits
 				return Result(true, upperCount, upperThreat);
 			}
 
-			var threat = Evaluate(estimate);
+			GroupThreat knownMaximumThreat = null;
+			GroupThreat threat;
+			if (estimate == maximumUnitCount)
+			{
+				knownMaximumThreat = Evaluate(maximumUnitCount);
+				if (!knownMaximumThreat.CrossesOver)
+					return Result(false, maximumUnitCount, knownMaximumThreat);
+
+				estimate = Math.Min(CrossoverMaximumSearchStart, maximumUnitCount);
+				threat = estimate == maximumUnitCount ? knownMaximumThreat : Evaluate(estimate);
+			}
+			else
+				threat = Evaluate(estimate);
+
 			if (threat.CrossesOver)
 			{
 				var passedCount = estimate;
@@ -543,7 +560,8 @@ namespace OpenRA.Mods.Common.Traits
 				var candidateValue = Math.Ceiling(failedCount * (1 + CrossoverSearchStep));
 				var passedCandidate = candidateValue >= maximumUnitCount ? maximumUnitCount :
 					Math.Max(failedCount + 1, (int)candidateValue);
-				threat = Evaluate(passedCandidate);
+				threat = passedCandidate == maximumUnitCount && knownMaximumThreat != null ?
+					knownMaximumThreat : Evaluate(passedCandidate);
 				if (threat.CrossesOver)
 					return BinarySearch(failedCount, passedCandidate, threat);
 

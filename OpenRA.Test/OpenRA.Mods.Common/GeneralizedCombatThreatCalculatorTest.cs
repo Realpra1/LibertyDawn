@@ -271,7 +271,21 @@ namespace OpenRA.Test
 			Assert.That(result.Found, Is.True);
 			Assert.That(result.InitialEstimate, Is.EqualTo(65));
 			Assert.That(result.UnitCount, Is.EqualTo(65));
-			Assert.That(result.Evaluations, Is.EqualTo(7));
+			Assert.That(result.Evaluations, Is.EqualTo(5));
+		}
+
+		[Test]
+		public void CrossoverEstimateBiasCanCorrectAHighDiscreteEstimate()
+		{
+			const double unroundedEstimate = 100.1;
+			var baseThreat = 1 / GeneralizedCombatThreatCalculator.DiscreteCombatPotential(unroundedEstimate);
+			var result = GeneralizedCombatThreatCalculator.FindCrossover(baseThreat, count =>
+				new GeneralizedCombatThreatCalculator.GroupThreat(count,
+					count >= 100 ? 0.9 : 1.1, count >= 100 ? 1.1 : 0.9));
+
+			Assert.That(result.Found, Is.True);
+			Assert.That(result.InitialEstimate, Is.EqualTo(100));
+			Assert.That(result.UnitCount, Is.EqualTo(100));
 		}
 
 		[Test]
@@ -285,7 +299,7 @@ namespace OpenRA.Test
 			Assert.That(result.Found, Is.True);
 			Assert.That(result.InitialEstimate, Is.EqualTo(65));
 			Assert.That(result.UnitCount, Is.EqualTo(38));
-			Assert.That(result.Evaluations, Is.EqualTo(7));
+			Assert.That(result.Evaluations, Is.EqualTo(9));
 		}
 
 		[Test]
@@ -299,7 +313,7 @@ namespace OpenRA.Test
 			Assert.That(result.Found, Is.True);
 			Assert.That(result.InitialEstimate, Is.EqualTo(10));
 			Assert.That(result.UnitCount, Is.EqualTo(38));
-			Assert.That(result.Evaluations, Is.EqualTo(10));
+			Assert.That(result.Evaluations, Is.EqualTo(15));
 		}
 
 		[Test]
@@ -310,7 +324,7 @@ namespace OpenRA.Test
 
 			Assert.That(result.Found, Is.False);
 			Assert.That(result.UnitCount, Is.EqualTo(100));
-			Assert.That(result.Evaluations, Is.EqualTo(15));
+			Assert.That(result.Evaluations, Is.EqualTo(32));
 		}
 
 		[Test]
@@ -326,16 +340,21 @@ namespace OpenRA.Test
 		}
 
 		[Test]
-		public void CrossoverWithoutBaseThreatCanBinarySearchDownFromMaximum()
+		public void CrossoverWithoutBaseThreatChecksMaximumThenRestartsFromTunedEstimate()
 		{
+			var evaluated = new System.Collections.Generic.List<int>();
 			var result = GeneralizedCombatThreatCalculator.FindCrossover(0, count =>
-				new GeneralizedCombatThreatCalculator.GroupThreat(count,
-					count >= 38 ? 0.9 : 1.1, count >= 38 ? 1.1 : 0.9), 100);
+			{
+				evaluated.Add(count);
+				return new GeneralizedCombatThreatCalculator.GroupThreat(count,
+					count >= 38 ? 0.9 : 1.1, count >= 38 ? 1.1 : 0.9);
+			}, 100);
 
 			Assert.That(result.Found, Is.True);
 			Assert.That(result.InitialEstimate, Is.EqualTo(100));
 			Assert.That(result.UnitCount, Is.EqualTo(38));
-			Assert.That(result.Evaluations, Is.EqualTo(8));
+			Assert.That(result.Evaluations, Is.EqualTo(6));
+			Assert.That(evaluated, Is.EqualTo(new[] { 100, 31, 34, 38, 36, 37 }));
 		}
 
 		[Test]
