@@ -98,6 +98,17 @@ namespace OpenRA.Test
 				Is.EqualTo(4 * 1.25 / 2.44).Within(0.000001));
 		}
 
+		[TestCase(0, 0)]
+		[TestCase(1, 1)]
+		[TestCase(2, 3)]
+		[TestCase(10, 55)]
+		public void DiscreteCombatPotentialSumsSurvivingActorCounts(double actorCount, double expected)
+		{
+			Assert.That(GeneralizedCombatThreatCalculator.DiscreteCombatPotential(actorCount), Is.EqualTo(expected));
+			Assert.That(GeneralizedCombatThreatCalculator.ActorCountForDiscreteCombatPotential(expected),
+				Is.EqualTo(actorCount).Within(0.000001));
+		}
+
 		[Test]
 		public void EffectiveRangeFindsProjectileFlightAndTargetDisplacementIntersection()
 		{
@@ -247,16 +258,19 @@ namespace OpenRA.Test
 		}
 
 		[Test]
-		public void CrossoverEstimateFindsRifleGuardTowerBoundaryInConstantEvaluations()
+		public void CrossoverEstimateUsesDiscreteActorPotentialInConstantEvaluations()
 		{
 			const double rifleThreatToTower = 1d / 2100;
 			var result = GeneralizedCombatThreatCalculator.FindCrossover(rifleThreatToTower, count =>
-				new GeneralizedCombatThreatCalculator.GroupThreat(count,
-					2100d / (count * count), rifleThreatToTower * count * count));
+			{
+				var potential = GeneralizedCombatThreatCalculator.DiscreteCombatPotential(count);
+				return new GeneralizedCombatThreatCalculator.GroupThreat(count,
+					2100d / potential, rifleThreatToTower * potential);
+			});
 
 			Assert.That(result.Found, Is.True);
-			Assert.That(result.InitialEstimate, Is.EqualTo(46));
-			Assert.That(result.UnitCount, Is.EqualTo(46));
+			Assert.That(result.InitialEstimate, Is.EqualTo(65));
+			Assert.That(result.UnitCount, Is.EqualTo(65));
 			Assert.That(result.Evaluations, Is.EqualTo(2));
 		}
 
@@ -295,7 +309,10 @@ namespace OpenRA.Test
 				});
 
 			Assert.That(lookups, Is.EqualTo(9));
-			Assert.That(crossover, Is.EqualTo(System.Math.Sqrt(558d / 156)).Within(0.000001));
+			var threat = 558d / 156;
+			var requiredPotential = threat * GeneralizedCombatThreatCalculator.DiscreteCombatPotential(109);
+			var expected = GeneralizedCombatThreatCalculator.ActorCountForDiscreteCombatPotential(requiredPotential) / 109;
+			Assert.That(crossover, Is.EqualTo(expected).Within(0.000001));
 		}
 
 		[Test]
@@ -320,7 +337,10 @@ namespace OpenRA.Test
 				});
 
 			Assert.That(lookups, Is.EqualTo(2));
-			Assert.That(crossover, Is.EqualTo(System.Math.Sqrt(13d / 4)).Within(0.000001));
+			var threat = 13d / 4;
+			var requiredPotential = threat * GeneralizedCombatThreatCalculator.DiscreteCombatPotential(4);
+			var expected = GeneralizedCombatThreatCalculator.ActorCountForDiscreteCombatPotential(requiredPotential) / 4;
+			Assert.That(crossover, Is.EqualTo(expected).Within(0.000001));
 		}
 
 		[Test]
@@ -434,8 +454,8 @@ namespace OpenRA.Test
 				new[] { new GeneralizedCombatThreatCalculator.GroupTypeCount("e1", count, 120) }, theirs,
 				(ourType, theirType) => { lookups++; return ratings[theirType]; });
 
-			Assert.That(EngageWithRifles(130), Is.False);
-			Assert.That(EngageWithRifles(131), Is.True);
+			Assert.That(EngageWithRifles(133), Is.False);
+			Assert.That(EngageWithRifles(134), Is.True);
 			Assert.That(lookups, Is.EqualTo(8));
 		}
 	}

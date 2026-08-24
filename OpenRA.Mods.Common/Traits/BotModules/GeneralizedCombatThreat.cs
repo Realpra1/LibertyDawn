@@ -250,7 +250,8 @@ namespace OpenRA.Mods.Common.Traits
 		/// <summary>
 		/// Estimates the multiplier needed for our mixed group to cross over against theirs.
 		/// The largest economic masses are selected under a fixed nine-lookup budget: up to
-		/// 1x9, 2x4, or 3x3 types. The result is policy-free: callers own any margin.
+		/// 1x9, 2x4, or 3x3 types. Discrete combat potential accounts for both groups losing
+		/// actors. The result is policy-free: callers own any margin.
 		/// </summary>
 		public double EstimateMixedGroupCrossover(IEnumerable<GroupTypeCount> ourGroup,
 			IEnumerable<GroupTypeCount> theirGroup)
@@ -343,6 +344,8 @@ namespace OpenRA.Mods.Common.Traits
 			if (normalizedTheirs.Length == 0)
 				return 0;
 
+			var theirCount = normalizedTheirs.Sum(t => (double)t.Count);
+
 			var ours = RepresentativeTypes(ourGroup, MixedGroupMaximumAttackerTypes);
 			if (ours.Length == 0)
 				return double.PositiveInfinity;
@@ -361,7 +364,8 @@ namespace OpenRA.Mods.Common.Traits
 				}
 
 			var theirGroupThreat = totalWeight > 0 ? weightedThreat / totalWeight : 0;
-			return Math.Sqrt(Math.Max(0, theirGroupThreat));
+			var requiredPotential = Math.Max(0, theirGroupThreat) * DiscreteCombatPotential(theirCount);
+			return ActorCountForDiscreteCombatPotential(requiredPotential) / theirCount;
 		}
 
 		static GroupTypeCount[] RepresentativeTypes(IEnumerable<GroupTypeCount> group, int maximumTypes)
@@ -439,6 +443,24 @@ namespace OpenRA.Mods.Common.Traits
 			return Math.Min(MaximumThreatRating, baseline * subjectFactor / opponentFactor);
 		}
 
+		public static double DiscreteCombatPotential(double actorCount)
+		{
+			if (!double.IsFinite(actorCount) || actorCount < 0)
+				throw new ArgumentOutOfRangeException(nameof(actorCount));
+
+			return actorCount * (actorCount + 1) / 2;
+		}
+
+		public static double ActorCountForDiscreteCombatPotential(double potential)
+		{
+			if (double.IsNaN(potential) || potential < 0)
+				throw new ArgumentOutOfRangeException(nameof(potential));
+			if (double.IsPositiveInfinity(potential))
+				return double.PositiveInfinity;
+
+			return (Math.Sqrt(1 + 8 * potential) - 1) / 2;
+		}
+
 		public static CrossoverResult FindCrossover(double baseGroupThreatRating,
 			Func<int, GroupThreat> evaluate, int maximumUnitCount = 10000)
 		{
@@ -448,9 +470,10 @@ namespace OpenRA.Mods.Common.Traits
 			if (maximumUnitCount < 1)
 				throw new ArgumentOutOfRangeException(nameof(maximumUnitCount));
 
-			var estimate = baseGroupThreatRating > 0 && !double.IsInfinity(baseGroupThreatRating) ?
-				(int)Math.Ceiling(Math.Sqrt(1 / baseGroupThreatRating)) : 1;
-			estimate = estimate.Clamp(1, maximumUnitCount);
+			var estimateValue = baseGroupThreatRating > 0 && double.IsFinite(baseGroupThreatRating) ?
+				ActorCountForDiscreteCombatPotential(1 / baseGroupThreatRating) : 1;
+			var estimate = estimateValue >= maximumUnitCount ? maximumUnitCount :
+				(int)Math.Ceiling(estimateValue).Clamp(1, maximumUnitCount);
 			var evaluations = 0;
 			GroupThreat Evaluate(int candidateCount)
 			{
@@ -525,9 +548,13 @@ namespace OpenRA.Mods.Common.Traits
 
 			var forward = pair.Forward;
 			var reverse = pair.Reverse;
+
+			// Each destroyed actor removes one weapon. The average number firing while a
+			// homogeneous group is eliminated is its discrete combat potential divided by count.
+			var averageActiveUnitCount = DiscreteCombatPotential(unitCount) / unitCount;
 			var defenderTimeToKill = AmmoAdjustedTimeToKill(forward.DefenderHitPoints,
-				new AmmoDamageProfile(forward.DamagePerTick * unitCount, forward.FullAmmoTicks,
-					forward.ReloadingDamagePerTick * unitCount), forward.DefenderHealingProfiles);
+				new AmmoDamageProfile(forward.DamagePerTick * averageActiveUnitCount, forward.FullAmmoTicks,
+					forward.ReloadingDamagePerTick * averageActiveUnitCount), forward.DefenderHealingProfiles);
 			var groupHealing = reverse.DefenderHealingProfiles.Select(h => new HealingProfile(
 				h.HealingPerTick * unitCount, h.StartsBelowHitPoints * unitCount));
 			var groupTimeToKill = AmmoAdjustedTimeToKill(reverse.DefenderHitPoints * (double)unitCount,
