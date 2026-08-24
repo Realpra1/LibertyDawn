@@ -1,7 +1,6 @@
 // Copyright 2007-2021 The OpenRA Developers (see AUTHORS)
 // This file is licensed under the GNU General Public License version 3 or later.
 
-using System;
 using System.Collections.Generic;
 using OpenRA.Primitives;
 using OpenRA.Traits;

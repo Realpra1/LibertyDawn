@@ -1,4 +1,35 @@
-# CNC-96A Air-verbatim integration cycle 3 report
+# CNC-96A Air-verbatim integration cycle 4 report
+
+## Cycle 4 CI correction
+
+Linux CI reported IDE0005 at
+`OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthSquadDefinition.cs:4`.
+The correction removes only the unused `using System;` directive. There is no
+behavior, configuration, balance, architecture, or refactor change.
+
+The corrected final source passes the exact Linux `make check` gate with 0
+warnings and 0 errors. It also passes `dotnet build OpenRA.sln --no-restore`
+with 0 warnings and 0 errors, the 6/6 focused provenance tests, the Air-copy
+checker, CNC YAML validation, and `git diff --check`.
+
+The unchanged cycle-3 HP/detector and reinforcement scenarios were rerun against
+the corrected final source with the same maps, seeds, lobby commands, tick-3000
+bound, and required/forbidden patterns. A sequential accepted batch passed 2/2
+under `/tmp/cnc96a-cycle4-games-final-rerun`. An earlier concurrent attempt had
+Game 1 reach natural game-over after satisfying every task-specific pattern but
+before tick 3000; it was rejected under the manifest contract and the same pair
+was rerun sequentially without source or scenario changes.
+
+Fresh separate Luna narrators and serialized fresh Luna policy reviewers passed
+each accepted game:
+
+- `/root/github/LibertyDawn/analysis/20260824-cnc96a-air-verbatim/cycle4/game1/{NARRATIVE.md,POLICY-REVIEW.md}`
+- `/root/github/LibertyDawn/analysis/20260824-cnc96a-air-verbatim/cycle4/game2/{NARRATIVE.md,POLICY-REVIEW.md}`
+
+Game 1's recommendation to retain the HP/detector regression is satisfied by the
+unchanged scenario. Game 2's suggestion for future no-valid-target/route coverage
+is recorded as advisory; scenario expansion is rejected for this expressly
+nonbehavioral, one-line CI correction.
 
 ## Result
 
@@ -77,4 +108,5 @@ evidence-only gap. Debug-only route provenance, gated behind the existing
 default-false `AirTargetDebugLogging`, resolved that gap without changing algorithms
 or balance; a fresh Terra provenance audit and both final games/reviews were rerun.
 
-No push or pull request was created.
+Draft PR 132 was already published at the cycle-3 head. Cycle 4 did not push or
+update it pending a fresh Terra rereview of the corrected commit.
