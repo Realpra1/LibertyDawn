@@ -18,13 +18,15 @@ using OpenRA.Traits;
 
 namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 {
-	public enum SquadType { Assault, Air, Rush, Protection, Naval, GeneralAttack }
+	public enum SquadType { Assault, Air, Rush, Protection, Naval, GeneralAttack, Stealth }
 
 	public class Squad
 	{
 		public List<Actor> Units = new List<Actor>();
 		public SquadType Type;
 		public string AirSquadDefinition;
+		public string StealthSquadDefinition;
+		public int StealthSquadIndex;
 
 		internal IBot Bot;
 		internal World World;
@@ -104,6 +106,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					break;
 				case SquadType.Air:
 					FuzzyStateMachine.ChangeState(this, new AirIdleState(), true);
+					break;
+				case SquadType.Stealth:
+					FuzzyStateMachine.ChangeState(this, new StealthAIIdleState(), true);
 					break;
 				case SquadType.Protection:
 					FuzzyStateMachine.ChangeState(this, new UnitsForProtectionIdleState(), true);
@@ -346,9 +351,16 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			}
 		}
 
-		internal string AirProfile => AirSquadDefinition != null &&
+		internal string AirProfile => Type == SquadType.Stealth ? StealthProfile :
+			AirSquadDefinition != null &&
 			SquadManager.Info.AirSquadDefinitions.TryGetValue(AirSquadDefinition, out var definition) ?
 			definition.Profile : "Generic";
+
+		internal string StealthProfile => StealthSquadDefinition ?? "stealth-tank";
+
+		internal StealthSquadDefinition StealthDefinition => StealthSquadDefinition != null &&
+			SquadManager.Info.StealthSquadDefinitions.TryGetValue(StealthSquadDefinition, out var definition) ?
+			definition : null;
 
 		internal List<Actor> GroundFormationUnits(bool bootstrapIfEmpty = false)
 		{
@@ -464,6 +476,13 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			if (AirSquadDefinition != null)
 				nodes.Nodes.Add(new MiniYamlNode("AirSquadDefinition", AirSquadDefinition));
 
+			if (StealthSquadDefinition != null)
+			{
+				nodes.Nodes.Add(new MiniYamlNode("StealthSquadDefinition", StealthSquadDefinition));
+				nodes.Nodes.Add(new MiniYamlNode("StealthSquadIndex",
+					FieldSaver.FormatValue(StealthSquadIndex)));
+			}
+
 			if (AirUnitsRepairing.Count > 0)
 				nodes.Nodes.Add(new MiniYamlNode("AirUnitsRepairing",
 					FieldSaver.FormatValue(AirUnitsRepairing.OrderBy(id => id).ToArray())));
@@ -502,6 +521,16 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var definitionNode = yaml.Nodes.FirstOrDefault(n => n.Key == "AirSquadDefinition");
 			if (definitionNode != null)
 				squad.AirSquadDefinition = definitionNode.Value.Value;
+
+			var stealthDefinitionNode = yaml.Nodes.FirstOrDefault(n => n.Key == "StealthSquadDefinition");
+			if (stealthDefinitionNode != null)
+			{
+				squad.StealthSquadDefinition = stealthDefinitionNode.Value.Value;
+				var stealthIndexNode = yaml.Nodes.FirstOrDefault(n => n.Key == "StealthSquadIndex");
+				if (stealthIndexNode != null)
+					squad.StealthSquadIndex = FieldLoader.GetValue<int>(
+						"StealthSquadIndex", stealthIndexNode.Value.Value);
+			}
 
 			var unitsNode = yaml.Nodes.FirstOrDefault(n => n.Key == "Units");
 			if (unitsNode != null)

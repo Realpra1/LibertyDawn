@@ -28,3 +28,18 @@ The mechanically renamed Air copies are checked by
 `scripts/check-stealth-ai-air-copy.py`. That check reverses only the declared
 type-identity substitutions and requires exact full-file equality with each Air
 source.
+
+## Ownership correction
+
+`air-derived-nonowning-reference/StealthAIModule.cs.inspiration` and
+`air-derived-nonowning-reference/StealthAISquad.cs.inspiration` preserve the two
+mechanical copies that were initially staged as possible live owners. They are
+deliberately outside compilation: the existing `SquadManagerBotModule` remains
+the sole manager and owner of its `List<Squad>`, and specialist groups are
+ordinary `Squad` instances. Only the Air-derived states and threat geometry are
+adapted for live use against those original owner types.
+
+`FINAL-MATRIX.json` is the immutable 184-function disposition matrix used by
+the integration. `live-provenance/` preserves the independent post-integration
+audit and its per-ID live-body map: all 98 restore IDs are mapped, the 51 Air
+bodies remain authoritative, and all 35 retreat bodies remain excluded.

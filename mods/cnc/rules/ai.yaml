@@ -691,6 +691,40 @@ Player:
 			fix: 1
 			hpad: 2
 	SquadManagerBotModule@cabal:
+		StealthSquadDefinitions:
+			stealth-tank:
+				UnitTypes: stnk
+				SquadLabel: stealth-tank
+				ClaimAllEligible: true
+				HarvesterTypes: harv, sharv
+				HarassmentTargetPriorities:
+					harv: 5000
+					sharv: 5000
+					proc: 6000
+				AttackTargetPriorities:
+					htnk: 10000
+					mtnk: 8500
+					ctnk: 8000
+					ltnk: 7000
+			chemical:
+				UnitTypes: ctnk
+				SquadLabel: chemical
+				MaximumHarassmentGroups: 1
+				IncludeAttackGroup: false
+				ReserveOpeningPair: false
+				ExcludedHarassmentTargetTypes: Tank
+				InfantryTargetPriority: 5000
+				StructureTargetPriority: 0
+				TankTargetPriority: 0
+				CrushInfantryTargets: false
+				HarassmentTargetPriorities:
+					harv: 10000
+					sharv: 10000
+					vice: 10000
+					pvice: 10000
+				HarassmentArmorPriorities:
+					TiberiumWood: 6000
+					Tiberium: 6000
 		AirTargetHarvesterValue: 1000
 		AirTargetUnitValue: 450
 		AirTargetProductionValue: 300
@@ -903,6 +937,40 @@ Player:
 			sam: 7
 			fix: 1
     SquadManagerBotModule@watson:
+		StealthSquadDefinitions:
+			stealth-tank:
+				UnitTypes: stnk
+				SquadLabel: stealth-tank
+				ClaimAllEligible: true
+				HarvesterTypes: harv, sharv
+				HarassmentTargetPriorities:
+					harv: 5000
+					sharv: 5000
+					proc: 6000
+				AttackTargetPriorities:
+					htnk: 10000
+					mtnk: 8500
+					ctnk: 8000
+					ltnk: 7000
+			chemical:
+				UnitTypes: ctnk
+				SquadLabel: chemical
+				MaximumHarassmentGroups: 1
+				IncludeAttackGroup: false
+				ReserveOpeningPair: false
+				ExcludedHarassmentTargetTypes: Tank
+				InfantryTargetPriority: 5000
+				StructureTargetPriority: 0
+				TankTargetPriority: 0
+				CrushInfantryTargets: false
+				HarassmentTargetPriorities:
+					harv: 10000
+					sharv: 10000
+					vice: 10000
+					pvice: 10000
+				HarassmentArmorPriorities:
+					TiberiumWood: 6000
+					Tiberium: 6000
 		AirTargetHarvesterValue: 1000
 		AirTargetUnitValue: 450
 		AirTargetProductionValue: 300
@@ -1115,6 +1183,40 @@ Player:
 			sam: 7
 			fix: 1
 	SquadManagerBotModule@hal9001:
+		StealthSquadDefinitions:
+			stealth-tank:
+				UnitTypes: stnk
+				SquadLabel: stealth-tank
+				ClaimAllEligible: true
+				HarvesterTypes: harv, sharv
+				HarassmentTargetPriorities:
+					harv: 5000
+					sharv: 5000
+					proc: 6000
+				AttackTargetPriorities:
+					htnk: 10000
+					mtnk: 8500
+					ctnk: 8000
+					ltnk: 7000
+			chemical:
+				UnitTypes: ctnk
+				SquadLabel: chemical
+				MaximumHarassmentGroups: 1
+				IncludeAttackGroup: false
+				ReserveOpeningPair: false
+				ExcludedHarassmentTargetTypes: Tank
+				InfantryTargetPriority: 5000
+				StructureTargetPriority: 0
+				TankTargetPriority: 0
+				CrushInfantryTargets: false
+				HarassmentTargetPriorities:
+					harv: 10000
+					sharv: 10000
+					vice: 10000
+					pvice: 10000
+				HarassmentArmorPriorities:
+					TiberiumWood: 6000
+					Tiberium: 6000
 		AirTargetHarvesterValue: 1000
 		AirTargetUnitValue: 450
 		AirTargetProductionValue: 300
@@ -1409,6 +1511,40 @@ Player:
 			hpad: 1
             resonator: 5
     SquadManagerBotModule@brutalis:
+		StealthSquadDefinitions:
+			stealth-tank:
+				UnitTypes: stnk
+				SquadLabel: stealth-tank
+				ClaimAllEligible: true
+				HarvesterTypes: harv, sharv
+				HarassmentTargetPriorities:
+					harv: 5000
+					sharv: 5000
+					proc: 6000
+				AttackTargetPriorities:
+					htnk: 10000
+					mtnk: 8500
+					ctnk: 8000
+					ltnk: 7000
+			chemical:
+				UnitTypes: ctnk
+				SquadLabel: chemical
+				MaximumHarassmentGroups: 1
+				IncludeAttackGroup: false
+				ReserveOpeningPair: false
+				ExcludedHarassmentTargetTypes: Tank
+				InfantryTargetPriority: 5000
+				StructureTargetPriority: 0
+				TankTargetPriority: 0
+				CrushInfantryTargets: false
+				HarassmentTargetPriorities:
+					harv: 10000
+					sharv: 10000
+					vice: 10000
+					pvice: 10000
+				HarassmentArmorPriorities:
+					TiberiumWood: 6000
+					Tiberium: 6000
 		AirTargetHarvesterValue: 1000
 		AirTargetUnitValue: 450
 		AirTargetProductionValue: 300
@@ -1533,6 +1669,40 @@ Player:
         AirUnitsTypes: heli, orca
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
     SquadManagerBotModule@wavemaker:
+		StealthSquadDefinitions:
+			stealth-tank:
+				UnitTypes: stnk
+				SquadLabel: stealth-tank
+				ClaimAllEligible: true
+				HarvesterTypes: harv, sharv
+				HarassmentTargetPriorities:
+					harv: 5000
+					sharv: 5000
+					proc: 6000
+				AttackTargetPriorities:
+					htnk: 10000
+					mtnk: 8500
+					ctnk: 8000
+					ltnk: 7000
+			chemical:
+				UnitTypes: ctnk
+				SquadLabel: chemical
+				MaximumHarassmentGroups: 1
+				IncludeAttackGroup: false
+				ReserveOpeningPair: false
+				ExcludedHarassmentTargetTypes: Tank
+				InfantryTargetPriority: 5000
+				StructureTargetPriority: 0
+				TankTargetPriority: 0
+				CrushInfantryTargets: false
+				HarassmentTargetPriorities:
+					harv: 10000
+					sharv: 10000
+					vice: 10000
+					pvice: 10000
+				HarassmentArmorPriorities:
+					TiberiumWood: 6000
+					Tiberium: 6000
 		AirTargetHarvesterValue: 1000
 		AirTargetUnitValue: 450
 		AirTargetProductionValue: 300
@@ -1842,6 +2012,40 @@ Player:
 			tmpl: 1
 			fix: 1
     SquadManagerBotModule@viki:
+		StealthSquadDefinitions:
+			stealth-tank:
+				UnitTypes: stnk
+				SquadLabel: stealth-tank
+				ClaimAllEligible: true
+				HarvesterTypes: harv, sharv
+				HarassmentTargetPriorities:
+					harv: 5000
+					sharv: 5000
+					proc: 6000
+				AttackTargetPriorities:
+					htnk: 10000
+					mtnk: 8500
+					ctnk: 8000
+					ltnk: 7000
+			chemical:
+				UnitTypes: ctnk
+				SquadLabel: chemical
+				MaximumHarassmentGroups: 1
+				IncludeAttackGroup: false
+				ReserveOpeningPair: false
+				ExcludedHarassmentTargetTypes: Tank
+				InfantryTargetPriority: 5000
+				StructureTargetPriority: 0
+				TankTargetPriority: 0
+				CrushInfantryTargets: false
+				HarassmentTargetPriorities:
+					harv: 10000
+					sharv: 10000
+					vice: 10000
+					pvice: 10000
+				HarassmentArmorPriorities:
+					TiberiumWood: 6000
+					Tiberium: 6000
 		AirTargetHarvesterValue: 1000
 		AirTargetUnitValue: 450
 		AirTargetProductionValue: 300
@@ -2166,6 +2370,40 @@ Player:
 			hpad: 10
 			brik: 25
     SquadManagerBotModule@skynet:
+		StealthSquadDefinitions:
+			stealth-tank:
+				UnitTypes: stnk
+				SquadLabel: stealth-tank
+				ClaimAllEligible: true
+				HarvesterTypes: harv, sharv
+				HarassmentTargetPriorities:
+					harv: 5000
+					sharv: 5000
+					proc: 6000
+				AttackTargetPriorities:
+					htnk: 10000
+					mtnk: 8500
+					ctnk: 8000
+					ltnk: 7000
+			chemical:
+				UnitTypes: ctnk
+				SquadLabel: chemical
+				MaximumHarassmentGroups: 1
+				IncludeAttackGroup: false
+				ReserveOpeningPair: false
+				ExcludedHarassmentTargetTypes: Tank
+				InfantryTargetPriority: 5000
+				StructureTargetPriority: 0
+				TankTargetPriority: 0
+				CrushInfantryTargets: false
+				HarassmentTargetPriorities:
+					harv: 10000
+					sharv: 10000
+					vice: 10000
+					pvice: 10000
+				HarassmentArmorPriorities:
+					TiberiumWood: 6000
+					Tiberium: 6000
 		RequiresCondition: enable-skynet-ai
 		SquadSize: 10
 		AttackForceInterval: 50
@@ -2533,6 +2771,40 @@ Player:
 		StatusLogInterval: 750
 		DebugLogging: false
     SquadManagerBotModule@ironreaper:
+		StealthSquadDefinitions:
+			stealth-tank:
+				UnitTypes: stnk
+				SquadLabel: stealth-tank
+				ClaimAllEligible: true
+				HarvesterTypes: harv, sharv
+				HarassmentTargetPriorities:
+					harv: 5000
+					sharv: 5000
+					proc: 6000
+				AttackTargetPriorities:
+					htnk: 10000
+					mtnk: 8500
+					ctnk: 8000
+					ltnk: 7000
+			chemical:
+				UnitTypes: ctnk
+				SquadLabel: chemical
+				MaximumHarassmentGroups: 1
+				IncludeAttackGroup: false
+				ReserveOpeningPair: false
+				ExcludedHarassmentTargetTypes: Tank
+				InfantryTargetPriority: 5000
+				StructureTargetPriority: 0
+				TankTargetPriority: 0
+				CrushInfantryTargets: false
+				HarassmentTargetPriorities:
+					harv: 10000
+					sharv: 10000
+					vice: 10000
+					pvice: 10000
+				HarassmentArmorPriorities:
+					TiberiumWood: 6000
+					Tiberium: 6000
 		AirTargetHarvesterValue: 1000
 		AirTargetUnitValue: 450
 		AirTargetProductionValue: 300
@@ -2829,6 +3101,40 @@ Player:
 			fix: 1
 			hpad: 1
     SquadManagerBotModule@Easy:
+		StealthSquadDefinitions:
+			stealth-tank:
+				UnitTypes: stnk
+				SquadLabel: stealth-tank
+				ClaimAllEligible: true
+				HarvesterTypes: harv, sharv
+				HarassmentTargetPriorities:
+					harv: 5000
+					sharv: 5000
+					proc: 6000
+				AttackTargetPriorities:
+					htnk: 10000
+					mtnk: 8500
+					ctnk: 8000
+					ltnk: 7000
+			chemical:
+				UnitTypes: ctnk
+				SquadLabel: chemical
+				MaximumHarassmentGroups: 1
+				IncludeAttackGroup: false
+				ReserveOpeningPair: false
+				ExcludedHarassmentTargetTypes: Tank
+				InfantryTargetPriority: 5000
+				StructureTargetPriority: 0
+				TankTargetPriority: 0
+				CrushInfantryTargets: false
+				HarassmentTargetPriorities:
+					harv: 10000
+					sharv: 10000
+					vice: 10000
+					pvice: 10000
+				HarassmentArmorPriorities:
+					TiberiumWood: 6000
+					Tiberium: 6000
 		AirTargetHarvesterValue: 1000
 		AirTargetUnitValue: 450
 		AirTargetProductionValue: 300
@@ -3091,6 +3397,40 @@ Player:
 			fix: 1
 			hpad: 1
     SquadManagerBotModule@Easiest:
+		StealthSquadDefinitions:
+			stealth-tank:
+				UnitTypes: stnk
+				SquadLabel: stealth-tank
+				ClaimAllEligible: true
+				HarvesterTypes: harv, sharv
+				HarassmentTargetPriorities:
+					harv: 5000
+					sharv: 5000
+					proc: 6000
+				AttackTargetPriorities:
+					htnk: 10000
+					mtnk: 8500
+					ctnk: 8000
+					ltnk: 7000
+			chemical:
+				UnitTypes: ctnk
+				SquadLabel: chemical
+				MaximumHarassmentGroups: 1
+				IncludeAttackGroup: false
+				ReserveOpeningPair: false
+				ExcludedHarassmentTargetTypes: Tank
+				InfantryTargetPriority: 5000
+				StructureTargetPriority: 0
+				TankTargetPriority: 0
+				CrushInfantryTargets: false
+				HarassmentTargetPriorities:
+					harv: 10000
+					sharv: 10000
+					vice: 10000
+					pvice: 10000
+				HarassmentArmorPriorities:
+					TiberiumWood: 6000
+					Tiberium: 6000
 		AirTargetHarvesterValue: 1000
 		AirTargetUnitValue: 450
 		AirTargetProductionValue: 300

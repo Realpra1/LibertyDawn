@@ -25,6 +25,14 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 	{
 		static readonly BitSet<TargetableType> AirTargetTypes = new BitSet<TargetableType>("Air");
 
+		// BEGIN CNC96A GROUND EXTENSION
+		#pragma warning disable SA1512, SA1513, SA1515
+		static readonly BitSet<TargetableType> GroundTargetTypes = new BitSet<TargetableType>("Ground");
+		static readonly BitSet<TargetableType> TankTargetTypes = new BitSet<TargetableType>("Tank");
+		static readonly BitSet<TargetableType> InfantryTargetTypes = new BitSet<TargetableType>("Infantry");
+		static readonly BitSet<TargetableType> StructureTargetTypes = new BitSet<TargetableType>("Structure");
+		// END CNC96A GROUND EXTENSION
+
 		sealed class AirInfluenceCache
 		{
 			public int Tick;
@@ -54,8 +62,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 		// Bot logic is host-only. Sharing one cache per manager/profile prevents two same-type squads
 		// rebuilding the same world influence map during the configured strategic cache interval.
-		static readonly Dictionary<StealthAIModule, Dictionary<string, AirInfluenceCache>> InfluenceCaches =
-			new Dictionary<StealthAIModule, Dictionary<string, AirInfluenceCache>>();
+		static readonly Dictionary<SquadManagerBotModule, Dictionary<string, AirInfluenceCache>> InfluenceCaches =
+			new Dictionary<SquadManagerBotModule, Dictionary<string, AirInfluenceCache>>();
 
 		protected const int MissileUnitMultiplier = 3;
 		const float ApacheMobileThreatMultiplier = 4f;
@@ -82,7 +90,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		}
 
 		/// <summary>Sum of <see cref="StealthAIThreatGeometry.AaEffectiveness"/> weights, not a raw headcount.</summary>
-		protected static float CountAntiAirUnits(StealthAISquad owner, IEnumerable<Actor> units)
+		protected static float CountAntiAirUnits(Squad owner, IEnumerable<Actor> units)
 		{
 			var weight = 0f;
 			foreach (var unit in units)
@@ -94,13 +102,13 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			return weight;
 		}
 
-		static float ConfiguredThreatWeight(StealthAISquad owner, Actor actor, float derivedWeight)
+		static float ConfiguredThreatWeight(Squad owner, Actor actor, float derivedWeight)
 		{
 			return StealthAIThreatGeometry.ConfiguredThreatWeight(actor.Info.Name, derivedWeight,
 				owner.SquadManager.Info.AirThreatWeightOverrides);
 		}
 
-		static float StoppingThreatWeight(StealthAISquad owner, Actor actor, float derivedWeight)
+		static float StoppingThreatWeight(Squad owner, Actor actor, float derivedWeight)
 		{
 			var weight = ConfiguredThreatWeight(owner, actor, derivedWeight);
 			if (owner.AirProfile.Equals("Apache", StringComparison.OrdinalIgnoreCase) && weight >= .75f)
@@ -110,7 +118,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			return weight;
 		}
 
-		static float AaClearReferenceThreatWeight(StealthAISquad owner)
+		static float AaClearReferenceThreatWeight(Squad owner)
 		{
 			// Normalize clearing strength against the canonical building SAM. This preserves the authored
 			// 10x requirement for a full-strength SAM site, while proportionally reducing the aircraft value
@@ -123,7 +131,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			return Math.Max(.01f, samWeight);
 		}
 
-		static float TransitThreatWeight(StealthAISquad owner, Actor actor,
+		static float TransitThreatWeight(Squad owner, Actor actor,
 			(float Weight, float RangeCells, float BaseRangeCells, int FastestProjectileSpeed) profile, int aircraftSpeed)
 		{
 			var weight = StoppingThreatWeight(owner, actor, profile.Weight);
@@ -134,18 +142,18 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			return weight;
 		}
 
-		protected static List<Actor> AirDecisionUnits(StealthAISquad owner)
+		protected static List<Actor> AirDecisionUnits(Squad owner)
 		{
 			return owner.AirFormationUnits(bootstrapIfEmpty: true);
 		}
 
-		static CPos CoarseCell(StealthAISquad owner, CPos cell)
+		static CPos CoarseCell(Squad owner, CPos cell)
 		{
 			var coarseSize = owner.SquadManager.Info.AirInfluenceCellSize;
 			return new CPos(cell.X / coarseSize, cell.Y / coarseSize);
 		}
 
-		static void RecordAirPhase(StealthAISquad owner, string phase, long started)
+		static void RecordAirPhase(Squad owner, string phase, long started)
 		{
 			if (!Game.IsBenchmarking)
 				return;
@@ -155,7 +163,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				$"AirSquad/{owner.AirProfile}/{phase}", elapsed, 0);
 		}
 
-		static List<CPos> FindAirRoute(StealthAISquad owner, float[] danger, int width, int height,
+		static List<CPos> FindAirRoute(Squad owner, float[] danger, int width, int height,
 			int startX, int startY, int goalX, int goalY, float dangerCost)
 		{
 			var started = Stopwatch.GetTimestamp();
@@ -170,7 +178,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			}
 		}
 
-		protected static void PromoteArrivedAirReinforcements(StealthAISquad owner)
+		protected static void PromoteArrivedAirReinforcements(Squad owner)
 		{
 			if (owner.AirReinforcements.Count == 0)
 				return;
@@ -518,12 +526,12 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			public readonly bool IsUndefended;
 			public readonly List<CPos> Route;
 			public readonly bool ClearsAa;
-			public readonly List<StealthAISquad> SupportSquads;
+			public readonly List<Squad> SupportSquads;
 			public readonly CPos? AaProtectedCell;
 			public readonly IReadOnlyCollection<uint> AaThreatIds;
 
 			public AirTargetPlan(Actor actor, int score, bool isUndefended, List<CPos> route,
-				bool clearsAa = false, List<StealthAISquad> supportSquads = null, CPos? aaProtectedCell = null,
+				bool clearsAa = false, List<Squad> supportSquads = null, CPos? aaProtectedCell = null,
 				IReadOnlyCollection<uint> aaThreatIds = null)
 			{
 				Actor = actor;
@@ -537,11 +545,20 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			}
 		}
 
+		// BEGIN CNC96A GROUND EXTENSION
+		sealed class GroundThreat
+		{
+			public Actor Actor;
+			public int WeaponRange;
+			public int DetectorRange;
+		}
+		// END CNC96A GROUND EXTENSION
+
 		sealed class DefendedCellPlan
 		{
 			public StealthAIDefendedAirAction Action;
 			public Actor ClearTarget;
-			public List<StealthAISquad> SupportSquads;
+			public List<Squad> SupportSquads;
 			public List<uint> AaThreatIds;
 			public double DangerValue;
 			public long UnlockedValue;
@@ -552,12 +569,12 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			public float ClearReferenceWeight;
 		}
 
-		protected static AirTargetPlan FindDefenselessTarget(StealthAISquad owner)
+		protected static AirTargetPlan FindDefenselessTarget(Squad owner)
 		{
 			return FindBestAirTarget(owner);
 		}
 
-		static int BaseTargetUtility(Actor actor, StealthAIModuleInfo info,
+		static int BaseTargetUtility(Actor actor, SquadManagerBotModuleInfo info,
 			Dictionary<string, int> archetypePriority, float antiAirWeight, int? priorityOverride = null)
 		{
 			var value = (long)Math.Max(1, priorityOverride ?? TargetValue(actor, info, archetypePriority));
@@ -577,21 +594,257 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				: StealthAIThreatGeometry.RemainingHealthPriority(baseUtility, health.HP, health.MaxHP);
 		}
 
+		// BEGIN CNC96A GROUND EXTENSION
+		static int StealthPriority(Squad owner, Actor actor)
+		{
+			var definition = owner.StealthDefinition;
+			if (definition == null)
+				return 0;
+
+			var targetTypes = actor.GetEnabledTargetTypes();
+			var attackRole = definition.IncludeAttackGroup &&
+				owner.StealthSquadIndex == definition.MaximumHarassmentGroups;
+			if (!attackRole && targetTypes.Overlaps(definition.ExcludedHarassmentTargetTypes))
+				return 0;
+			if (!attackRole && actor.Info.HasTraitInfo<LineBuildNodeInfo>())
+				return definition.WallTargetPriority;
+
+			var configured = attackRole ? definition.AttackTargetPriorities :
+				definition.HarassmentTargetPriorities;
+			if (configured.TryGetValue(actor.Info.Name, out var priority))
+				return priority;
+			if (attackRole)
+				return targetTypes.Overlaps(TankTargetTypes) ? 8000 : 0;
+			if (targetTypes.Overlaps(InfantryTargetTypes))
+				return definition.InfantryTargetPriority;
+			if (targetTypes.Overlaps(StructureTargetTypes))
+			{
+				var armor = actor.Info.TraitInfoOrDefault<ArmorInfo>()?.Type;
+				if (armor != null && definition.HarassmentArmorPriorities.TryGetValue(armor, out priority))
+					return priority;
+				return definition.StructureTargetPriority;
+			}
+
+			return targetTypes.Overlaps(TankTargetTypes) ? definition.TankTargetPriority : 0;
+		}
+
+		static List<GroundThreat> StealthThreats(Squad owner)
+		{
+			var threats = new List<GroundThreat>();
+			foreach (var actor in owner.World.Actors.Where(owner.SquadManager.IsPreferredEnemyUnit)
+				.OrderBy(a => a.ActorID))
+			{
+				var weaponRange = actor.TraitsImplementing<Armament>()
+					.Where(a => !a.IsTraitDisabled && a.Weapon.IsValidTarget(GroundTargetTypes))
+					.Select(a => (int)Math.Ceiling(a.MaxRange().Length / 1024f)).DefaultIfEmpty().Max();
+				var detectorRange = actor.TraitsImplementing<DetectCloaked>().Where(d => !d.IsTraitDisabled)
+					.Select(d => (int)Math.Ceiling(d.Range.Length / 1024f)).DefaultIfEmpty().Max();
+				if (weaponRange > 0 || detectorRange > 0)
+					threats.Add(new GroundThreat
+					{
+						Actor = actor,
+						WeaponRange = weaponRange,
+						DetectorRange = detectorRange
+					});
+			}
+
+			return threats;
+		}
+
+		static void MarkStealthRange(Squad owner, float[] danger, int width, int height,
+			int coarseSize, Actor actor, int range, float influence)
+		{
+			if (range <= 0 || influence <= 0)
+				return;
+
+			var conservativeRange = range + coarseSize;
+			var minX = Math.Max(0, (actor.Location.X - conservativeRange) / coarseSize);
+			var maxX = Math.Min(width - 1, (actor.Location.X + conservativeRange) / coarseSize);
+			var minY = Math.Max(0, (actor.Location.Y - conservativeRange) / coarseSize);
+			var maxY = Math.Min(height - 1, (actor.Location.Y + conservativeRange) / coarseSize);
+			var rangeLength = conservativeRange * 1024;
+			for (var y = minY; y <= maxY; y++)
+				for (var x = minX; x <= maxX; x++)
+				{
+					var cell = owner.World.Map.Clamp(new CPos(x * coarseSize + coarseSize / 2,
+						y * coarseSize + coarseSize / 2));
+					if ((owner.World.Map.CenterOfCell(cell) - actor.CenterPosition).Length <= rangeLength)
+						danger[y * width + x] += influence;
+				}
+		}
+
+		static List<CPos> SafeRouteForStealth(Squad owner, Actor unit, Actor target)
+		{
+			var definition = owner.StealthDefinition;
+			var mobile = unit.TraitOrDefault<Mobile>();
+			if (definition == null || mobile == null || target == null)
+				return null;
+
+			var map = owner.World.Map;
+			var coarseSize = Math.Max(1, definition.StrategicCellSize > 0 ?
+				definition.StrategicCellSize : definition.HazardRouteWaypointSpacing);
+			var width = (map.MapSize.X + coarseSize - 1) / coarseSize;
+			var height = (map.MapSize.Y + coarseSize - 1) / coarseSize;
+			var danger = new float[width * height];
+			var threatFacts = StealthThreats(owner);
+			foreach (var threat in threatFacts)
+			{
+				var ignoreWeapon = threat.Actor.GetEnabledTargetTypes()
+					.Overlaps(definition.IgnoredHarassmentWeaponThreatTypes);
+				MarkStealthRange(owner, danger, width, height, coarseSize, threat.Actor,
+					StealthAISpecialistPolicy.BufferedRange(threat.DetectorRange,
+						definition.DetectorRangeBufferCells),
+					StealthAISpecialistPolicy.HardDetectorRouteInfluence);
+				MarkStealthRange(owner, danger, width, height, coarseSize, threat.Actor,
+					StealthAISpecialistPolicy.BufferedRange(ignoreWeapon ? 0 : threat.WeaponRange,
+						definition.ThreatRangeBufferCells),
+					StealthAISpecialistPolicy.OrdinaryWeaponRouteInfluence);
+			}
+
+			var resourceLayer = owner.World.WorldActor.TraitOrDefault<IResourceLayer>();
+			if (resourceLayer != null && definition.AvoidResourceTypes.Count > 0)
+				for (var y = 0; y < height; y++)
+					for (var x = 0; x < width; x++)
+					{
+						var cell = map.Clamp(new CPos(x * coarseSize + coarseSize / 2,
+							y * coarseSize + coarseSize / 2));
+						if (definition.AvoidResourceTypes.Contains(resourceLayer.GetResource(cell).Type))
+							danger[y * width + x] += StealthAISpecialistPolicy.SoftResourceRouteCost;
+						if (definition.PendingResourceExplosionAvoidanceRadius > 0 &&
+							map.FindTilesInAnnulus(cell, 0, definition.PendingResourceExplosionAvoidanceRadius + coarseSize)
+								.Any(resourceLayer.IsExplosionPending))
+							danger[y * width + x] += 1f;
+					}
+
+			var ownRange = unit.TraitsImplementing<Armament>()
+				.Where(a => !a.IsTraitDisabled && a.Weapon.IsValidTarget(GroundTargetTypes))
+				.Select(a => (int)Math.Ceiling(a.MaxRange().Length / 1024f)).DefaultIfEmpty(1).Max();
+			var crush = definition.CrushInfantryTargets &&
+				target.GetEnabledTargetTypes().Overlaps(InfantryTargetTypes);
+			var destination = (crush ? new[] { target.Location } :
+				map.FindTilesInAnnulus(target.Location, Math.Max(1, ownRange - 1), Math.Max(1, ownRange)))
+				.Where(cell => mobile.CanEnterCell(cell, target,
+					crush ? BlockedByActor.None : BlockedByActor.Immovable))
+				.OrderBy(cell => (cell - unit.Location).LengthSquared).ThenBy(cell => cell.Y).ThenBy(cell => cell.X)
+				.FirstOrDefault();
+			if (destination == CPos.Zero && target.Location != CPos.Zero)
+				return null;
+
+			var startX = Math.Clamp(unit.Location.X / coarseSize, 0, width - 1);
+			var startY = Math.Clamp(unit.Location.Y / coarseSize, 0, height - 1);
+			var goalX = Math.Clamp(destination.X / coarseSize, 0, width - 1);
+			var goalY = Math.Clamp(destination.Y / coarseSize, 0, height - 1);
+			var route = ThreatAwareRoutePlanner.FindRoute(danger, width, height,
+				startX, startY, goalX, goalY, definition.RouteThreatPenalty);
+			if (route == null || route.Any(cell => StealthAISpecialistPolicy.IsHardRouteDanger(
+				danger[cell.Y * width + cell.X])))
+				return null;
+
+			var result = ThreatAwareRoutePlanner.SmoothRoute(danger, width, height, startX, startY, route)
+				.Select(cell => map.Clamp(new CPos(cell.X * coarseSize + coarseSize / 2,
+					cell.Y * coarseSize + coarseSize / 2))).ToList();
+			if (result.Count == 0 || result[result.Count - 1] != destination)
+				result.Add(destination);
+
+			if (owner.SquadManager.Info.AirTargetDebugLogging)
+			{
+				var directDetectorExposed = false;
+				var delta = destination - unit.Location;
+				var steps = Math.Max(Math.Abs(delta.X), Math.Abs(delta.Y));
+				for (var step = 0; step <= steps && !directDetectorExposed; step++)
+				{
+					var directCell = new CPos(unit.Location.X + delta.X * step / Math.Max(1, steps),
+						unit.Location.Y + delta.Y * step / Math.Max(1, steps));
+					foreach (var detector in threatFacts.Where(threat => threat.DetectorRange > 0))
+					{
+						var bufferedRange = StealthAISpecialistPolicy.BufferedRange(detector.DetectorRange,
+							definition.DetectorRangeBufferCells);
+						if ((map.CenterOfCell(map.Clamp(directCell)) - detector.Actor.CenterPosition).Length <=
+							bufferedRange * 1024)
+						{
+							directDetectorExposed = true;
+							break;
+						}
+					}
+				}
+
+				Log.Write("debug", "Ground route [{0}] {1}#{2} to {3}#{4}: detector-facts={5} " +
+					"direct-detector-exposed={6} selected-hard-safe=True waypoints={7}.",
+					owner.StealthProfile, unit.Info.Name, unit.ActorID, target.Info.Name, target.ActorID,
+					threatFacts.Count(threat => threat.DetectorRange > 0), directDetectorExposed,
+					string.Join(";", result.Select(cell => cell.ToString())));
+			}
+
+			return result;
+		}
+
+		static AirTargetPlan FindBestStealthTarget(Squad owner, Actor incumbent,
+			out AirTargetPlan incumbentPlan, CPos? requiredStrategicCell)
+		{
+			incumbentPlan = null;
+			var representative = owner.AirFormationUnits(bootstrapIfEmpty: true)
+				.OrderBy(a => a.ActorID).FirstOrDefault();
+			if (representative == null)
+				return null;
+
+			AirTargetPlan best = null;
+			foreach (var actor in owner.World.Actors.Where(owner.SquadManager.IsPreferredEnemyUnit)
+				.Where(actor => owner.Units.Any(unit => CanAttackTarget(unit, actor)))
+				.OrderBy(actor => actor.ActorID).Take(owner.StealthDefinition.MaximumTargetCandidates))
+			{
+				var priority = StealthPriority(owner, actor);
+				if (priority <= 0)
+					continue;
+				if (requiredStrategicCell != null && new CPos(
+					actor.Location.X / owner.SquadManager.Info.AirInfluenceCellSize,
+					actor.Location.Y / owner.SquadManager.Info.AirInfluenceCellSize) != requiredStrategicCell)
+					continue;
+
+				var route = SafeRouteForStealth(owner, representative, actor);
+				if (route == null)
+					continue;
+				var economic = Math.Max(1, actor.Info.TraitInfoOrDefault<ValuedInfo>()?.Cost ?? 1);
+				var distance = Math.Max(1, route.Count);
+				var baseScore = (int)Math.Min(int.MaxValue,
+					priority * (long)economic / (distance * Math.Max(1,
+						owner.StealthDefinition.HarassmentDistancePenalty) + 6));
+				var score = CurrentTargetUtility(actor, Math.Max(1, baseScore));
+				if (owner.SquadManager.Info.AirTargetDebugLogging)
+				{
+					var health = actor.TraitOrDefault<IHealth>();
+					Log.Write("debug", "Ground target [{0}] {1}#{2}: hp={3}/{4} base-score={5} " +
+						"hp-aware-score={6} route-waypoints={7}.", owner.StealthProfile,
+						actor.Info.Name, actor.ActorID, health?.HP ?? 0, health?.MaxHP ?? 0,
+						baseScore, score, route.Count);
+				}
+
+				var plan = new AirTargetPlan(actor, score, true, route);
+				if (actor == incumbent)
+					incumbentPlan = plan;
+				if (best == null || plan.Score > best.Score ||
+					(plan.Score == best.Score && actor.ActorID < best.Actor.ActorID))
+					best = plan;
+			}
+
+			return best;
+		}
+		// END CNC96A GROUND EXTENSION
+
 		static bool ThreatCovers((Actor Actor, float StoppingWeight, int RangeCells) threat, Actor target)
 		{
 			return !threat.Actor.IsDead &&
 				(threat.Actor.CenterPosition - target.CenterPosition).Length / 1024 <= threat.RangeCells;
 		}
 
-		static List<StealthAISquad> NearbyAaSupportSquads(StealthAISquad owner, IEnumerable<Actor> aaTargets)
+		static List<Squad> NearbyAaSupportSquads(Squad owner, IEnumerable<Actor> aaTargets)
 		{
 			var radius = owner.SquadManager.Info.AirTargetAaClearSupportRadius;
 			if (radius <= 0)
-				return new List<StealthAISquad>();
+				return new List<Squad>();
 
 			var targets = aaTargets.ToList();
 			return owner.SquadManager.Squads
-				.Where(s => s != owner && s.IsValid && s.Type == StealthAISquadType.Air &&
+				.Where(s => s != owner && s.IsValid && s.Type == SquadType.Air &&
 					(s.AirFormationCenter - owner.AirFormationCenter).Length / 1024 <= radius &&
 					targets.Any(t =>
 					{
@@ -603,7 +856,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				.ToList();
 		}
 
-		static DefendedCellPlan EvaluateDefendedCell(StealthAISquad owner, CPos cell,
+		static DefendedCellPlan EvaluateDefendedCell(Squad owner, CPos cell,
 			List<int> actorIndices, List<(Actor Actor, int Utility, float ConfiguredWeight)> liveCandidates,
 			List<(Actor Actor, float StoppingWeight, int RangeCells)> threats, List<Actor> planningUnits)
 		{
@@ -677,7 +930,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		/// Unlike the strategic scan this deliberately ignores route utility so an aircraft already in
 		/// contact never retreats across the map merely because strategic planning found no good option.
 		/// </summary>
-		protected static Actor FindClosestAttackableEnemy(StealthAISquad owner)
+		protected static Actor FindClosestAttackableEnemy(Squad owner)
 		{
 			var decisionUnits = AirDecisionUnits(owner);
 			return owner.World.Actors
@@ -691,15 +944,20 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		/// best targets. Unlike the old random sampler this considers every known actor, can value a safe
 		/// detour, and keeps AA as a finite cost whose importance falls gradually as the squad grows.
 		/// </summary>
-		protected static AirTargetPlan FindBestAirTarget(StealthAISquad owner, bool relaxed = false, bool escapeFromAa = false)
+		protected static AirTargetPlan FindBestAirTarget(Squad owner, bool relaxed = false, bool escapeFromAa = false)
 		{
 			return FindBestAirTarget(owner, null, out _, null, relaxed, escapeFromAa, null);
 		}
 
-		protected static AirTargetPlan FindBestAirTarget(StealthAISquad owner, Actor incumbent,
+		protected static AirTargetPlan FindBestAirTarget(Squad owner, Actor incumbent,
 			out AirTargetPlan incumbentPlan, CPos? requiredStrategicCell = null, bool relaxed = false,
 			bool escapeFromAa = false, CPos? requiredAaProtectedCell = null)
 		{
+			// BEGIN CNC96A GROUND EXTENSION
+			if (owner.Type == SquadType.Stealth)
+				return FindBestStealthTarget(owner, incumbent, out incumbentPlan, requiredStrategicCell);
+			// END CNC96A GROUND EXTENSION
+
 			incumbentPlan = null;
 			var map = owner.World.Map;
 			var info = owner.SquadManager.Info;
@@ -812,7 +1070,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			List<CPos> bestRoute = null;
 			var bestIsUndefended = false;
 			var bestClearsAa = false;
-			List<StealthAISquad> bestSupportSquads = null;
+			List<Squad> bestSupportSquads = null;
 			CPos? bestAaProtectedCell = null;
 			IReadOnlyCollection<uint> bestAaThreatIds = null;
 			var bestEscapeExposure = float.MaxValue;
@@ -995,7 +1253,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 						defended.Value.UnlockedValue);
 			var foundUndefendedTarget = false;
 			var aaClearPlans = new List<(Actor Actor, double DangerValue, long UnlockedValue,
-				int Score, List<CPos> Route, List<StealthAISquad> SupportSquads, CPos ProtectedCell,
+				int Score, List<CPos> Route, List<Squad> SupportSquads, CPos ProtectedCell,
 				List<uint> ThreatIds)>();
 			foreach (var defended in defendedCellPlans.OrderBy(p => p.Key.Y).ThenBy(p => p.Key.X))
 			{
@@ -1304,7 +1562,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				bestClearsAa, bestSupportSquads, bestAaProtectedCell, bestAaThreatIds);
 		}
 
-		protected static void ApplyAirTargetPlan(StealthAISquad owner, AirTargetPlan plan)
+		protected static void ApplyAirTargetPlan(Squad owner, AirTargetPlan plan)
 		{
 			var info = owner.SquadManager.Info;
 			if (plan.ClearsAa)
@@ -1361,7 +1619,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			}
 		}
 
-		protected static void ClearAaTargetContext(StealthAISquad owner)
+		protected static void ClearAaTargetContext(Squad owner)
 		{
 			owner.AirTargetClearsAa = false;
 			owner.AirAaClearProtectedCell = null;
@@ -1369,13 +1627,18 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			owner.AirAaClearEngaged = false;
 		}
 
-		protected static List<CPos> SafeRouteForAircraft(StealthAISquad owner, Actor aircraft, Actor target,
+		protected static List<CPos> SafeRouteForAircraft(Squad owner, Actor aircraft, Actor target,
 			bool requireInfluenceCache = false)
 		{
+			// BEGIN CNC96A GROUND EXTENSION
+			if (owner.Type == SquadType.Stealth)
+				return SafeRouteForStealth(owner, aircraft, target);
+			// END CNC96A GROUND EXTENSION
+
 			return SafeRouteForAircraft(owner, aircraft, target.Location, requireInfluenceCache);
 		}
 
-		static List<CPos> SafeRouteForAircraft(StealthAISquad owner, Actor aircraft, CPos targetCell,
+		static List<CPos> SafeRouteForAircraft(Squad owner, Actor aircraft, CPos targetCell,
 			bool requireInfluenceCache = false)
 		{
 			var info = owner.SquadManager.Info;
@@ -1409,7 +1672,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		/// load or unload, so every live threat uses its full configured effectiveness. The route planner
 		/// uses finite costs and therefore returns the least-dangerous route when no threat-free path exists.
 		/// </summary>
-		internal static List<CPos> SafeIndependentAirRoute(StealthAIModule manager, Actor aircraft, CPos targetCell)
+		internal static List<CPos> SafeIndependentAirRoute(SquadManagerBotModule manager, Actor aircraft, CPos targetCell)
 		{
 			if (manager == null || aircraft == null || aircraft.IsDead || !aircraft.IsInWorld)
 				return null;
@@ -1469,7 +1732,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		/// weapon, veterancy-range, configured-effectiveness, safety-margin, and mobile-AA assumptions used
 		/// by independent carrier routing, but avoids constructing a full influence map for drop-site ranking.
 		/// </summary>
-		internal static float SafeIndependentAirThreatAt(StealthAIModule manager, CPos targetCell)
+		internal static float SafeIndependentAirThreatAt(SquadManagerBotModule manager, CPos targetCell)
 		{
 			if (manager == null)
 				return float.MaxValue;
@@ -1500,7 +1763,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			return danger;
 		}
 
-		static List<CPos> NearestSafeRouteFromFormation(StealthAISquad owner)
+		static List<CPos> NearestSafeRouteFromFormation(Squad owner)
 		{
 			var info = owner.SquadManager.Info;
 			var units = AirDecisionUnits(owner);
@@ -1529,7 +1792,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					p.X * coarseSize + coarseSize / 2, p.Y * coarseSize + coarseSize / 2))).ToList();
 		}
 
-		static bool BeginRoutedLocalAaEscape(StealthAISquad owner)
+		static bool BeginRoutedLocalAaEscape(Squad owner)
 		{
 			var info = owner.SquadManager.Info;
 
@@ -1595,7 +1858,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		// New and repaired aircraft remain reinforcements until they reach the target's coarse cell or one
 		// of its neighbors. They always receive a route from their own position and never inherit the
 		// formation's shared route while catching up.
-		protected static void QueueSafeRouteForReinforcement(StealthAISquad owner, Actor aircraft, Actor target)
+		protected static void QueueSafeRouteForReinforcement(Squad owner, Actor aircraft, Actor target)
 		{
 			var route = SafeRouteForAircraft(owner, aircraft, target);
 			if (route == null)
@@ -1627,7 +1890,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					owner.AirProfile, aircraft.Info.Name, aircraft.ActorID, route.Count, target.Info.Name, target.ActorID);
 		}
 
-		static void QueueSafeMoveForReinforcement(StealthAISquad owner, Actor aircraft, CPos destination)
+		static void QueueSafeMoveForReinforcement(Squad owner, Actor aircraft, CPos destination)
 		{
 			var route = SafeRouteForAircraft(owner, aircraft, destination);
 			var queued = false;
@@ -1655,7 +1918,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		/// for, or both tables are empty (the feature is off). Callers compute this once per scan, not
 		/// once per candidate: it only depends on the squad's own composition, not on the target.
 		/// </summary>
-		static Dictionary<string, int> ArchetypePriority(StealthAISquad owner)
+		static Dictionary<string, int> ArchetypePriority(Squad owner)
 		{
 			var info = owner.SquadManager.Info;
 			if (info.AirTargetPriorityOrca.Count == 0 && info.AirTargetPriorityHeli.Count == 0)
@@ -1680,7 +1943,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			return null;
 		}
 
-		static int TargetValue(Actor a, StealthAIModuleInfo info, Dictionary<string, int> archetypePriority)
+		static int TargetValue(Actor a, SquadManagerBotModuleInfo info, Dictionary<string, int> archetypePriority)
 		{
 			if (archetypePriority != null && archetypePriority.TryGetValue(a.Info.Name, out var overrideValue))
 				return overrideValue;
@@ -1712,7 +1975,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			return AirTargetClass.Building;
 		}
 
-		static bool TryContinueLiveAaClear(StealthAISquad owner, List<Actor> localThreats)
+		static bool TryContinueLiveAaClear(Squad owner, List<Actor> localThreats)
 		{
 			if (!owner.IsTargetValid || localThreats.Count == 0)
 				return false;
@@ -1729,7 +1992,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 			var targetId = owner.TargetActor.ActorID;
 			var participants = owner.SquadManager.Squads.Where(s =>
-				s.IsValid && s.Type == StealthAISquadType.Air && s.AirTargetClearsAa &&
+				s.IsValid && s.Type == SquadType.Air && s.AirTargetClearsAa &&
 				s.IsTargetValid && s.TargetActor.ActorID == targetId).ToList();
 			if (!participants.Contains(owner))
 				participants.Add(owner);
@@ -1786,7 +2049,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		}
 
 		/// <summary>
-		/// StealthAISquad-local anti-air awareness, driven by <see cref="StealthAIModuleInfo.AirSafetyCheckInterval"/>
+		/// Squad-local anti-air awareness, driven by <see cref="SquadManagerBotModuleInfo.AirSafetyCheckInterval"/>
 		/// rather than by the squad state machine. Because it looks around the squad's own position it covers
 		/// the whole harassment run - approach, attack and the way out - instead of only the moment a
 		/// target is chosen. Disabled (and behaviour unchanged) when the interval is zero.
@@ -1799,7 +2062,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		///
 		/// PERF: exactly one FindActorsInCircle per air squad per interval, bounded by AirThreatScanRadius.
 		/// </summary>
-		internal static void TickAirSafety(StealthAISquad owner)
+		internal static void TickAirSafety(Squad owner)
 		{
 			var info = owner.SquadManager.Info;
 			if (info.AirSafetyCheckInterval <= 0 || !owner.IsValid)
@@ -1976,17 +2239,17 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		}
 
 		/// <summary>
-		/// Breaks off a run. With <see cref="StealthAIModuleInfo.AirEvadeDistance"/> set this is a short
+		/// Breaks off a run. With <see cref="SquadManagerBotModuleInfo.AirEvadeDistance"/> set this is a short
 		/// hop directly away from the nearest anti-air the squad remembers, plus a random lateral wander, so
 		/// the squad stays next to the enemy base and can turn straight back in - rather than the flight all
 		/// the way home that the players (rightly) called out as enormous and stupid. Going home is reserved
 		/// for aircraft that actually need to rearm.
 		/// With AirEvadeDistance at zero this falls back to the stock retreat to an own building, so other
 		/// mods and bots are unaffected.
-		/// Rate limited by <see cref="StealthAIModuleInfo.AirRetreatOrderInterval"/>: within that window
+		/// Rate limited by <see cref="SquadManagerBotModuleInfo.AirRetreatOrderInterval"/>: within that window
 		/// it does nothing and the squad keeps flying the hop it was already given.
 		/// </summary>
-		protected static void Evade(StealthAISquad owner, string reason)
+		protected static void Evade(Squad owner, string reason)
 		{
 			var info = owner.SquadManager.Info;
 			var tick = owner.World.WorldTick;
@@ -2029,7 +2292,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		}
 
 		/// <summary>Picks the cell for a local evasion hop and keeps it on the map.</summary>
-		protected static CPos EvadeDestination(StealthAISquad owner)
+		protected static CPos EvadeDestination(Squad owner)
 		{
 			var info = owner.SquadManager.Info;
 			var map = owner.World.Map;
@@ -2054,7 +2317,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		/// Sends one aircraft home when it has run dry and cannot reload in the field. True when it did,
 		/// in which case the caller must not also give it a move order.
 		/// </summary>
-		static bool SendHomeToResupply(StealthAISquad owner, Actor a)
+		static bool SendHomeToResupply(Squad owner, Actor a)
 		{
 			var ammoPools = a.TraitsImplementing<AmmoPool>().ToArray();
 			if (ReloadsAutomatically(ammoPools, a.TraitOrDefault<Rearmable>()) || FullAmmo(ammoPools))
@@ -2067,7 +2330,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		}
 
 		/// <summary>
-		/// Sends one aircraft to repair when it drops below <see cref="StealthAIModuleInfo.HealthRetreatThreshold"/>.
+		/// Sends one aircraft to repair when it drops below <see cref="SquadManagerBotModuleInfo.HealthRetreatThreshold"/>.
 		/// True when it did (or is already en route), in which case the caller must not also give it a
 		/// move/attack order.
 		/// Scores safe owned repair actors and configured allied passive-repair auras. Owned actors receive
@@ -2076,7 +2339,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		/// have, but "Repair" (alongside "Enter"/"ForceEnter") accepts an explicit destination actor and is
 		/// gated on Repairable instead, which both of them do have.
 		/// </summary>
-		protected static bool SendHomeToRepair(StealthAISquad owner, Actor a)
+		protected static bool SendHomeToRepair(Squad owner, Actor a)
 		{
 			var threshold = owner.SquadManager.Info.HealthRetreatThreshold;
 			if (threshold <= 0)
@@ -2245,7 +2508,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			return false;
 		}
 
-		static List<(Actor Actor, float Weight, int RangeCells)> LiveRepairThreats(StealthAISquad owner)
+		static List<(Actor Actor, float Weight, int RangeCells)> LiveRepairThreats(Squad owner)
 		{
 			var threats = new List<(Actor Actor, float Weight, int RangeCells)>();
 			var info = owner.SquadManager.Info;
@@ -2280,7 +2543,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			return danger;
 		}
 
-		static WDist PassiveRepairRange(StealthAISquad owner, Actor building)
+		static WDist PassiveRepairRange(Squad owner, Actor building)
 		{
 			if (building == null || building.Owner == owner.Bot.Player ||
 				!building.Owner.IsAlliedWith(owner.Bot.Player) ||
@@ -2297,7 +2560,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		}
 
 		static AirRepairPlan FindSafestRepairBuilding(
-			StealthAISquad owner, Actor aircraft, RepairableInfo repairable,
+			Squad owner, Actor aircraft, RepairableInfo repairable,
 			List<(Actor Actor, float Weight, int RangeCells)> threats, bool requireAvailable)
 		{
 			var candidates = new List<(Actor Building, bool RepairAtEnd)>();
@@ -2313,7 +2576,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 				if (owned && requireAvailable)
 				{
-					var airSquads = owner.SquadManager.Squads.Where(s => s.Type == StealthAISquadType.Air).ToList();
+					var airSquads = owner.SquadManager.Squads.Where(s => s.Type == SquadType.Air).ToList();
 					var assignments = airSquads.SelectMany(s => s.AirRepairTargets)
 						.ToDictionary(a => a.Key, a => a.Value);
 					var repairing = new HashSet<uint>(airSquads.SelectMany(s => s.AirUnitsRepairing));
@@ -2390,9 +2653,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			};
 		}
 
-		static bool IsOldestReadyRepairWaiter(StealthAISquad owner, Actor aircraft, Actor facility)
+		static bool IsOldestReadyRepairWaiter(Squad owner, Actor aircraft, Actor facility)
 		{
-			var airSquads = owner.SquadManager.Squads.Where(s => s.Type == StealthAISquadType.Air).ToList();
+			var airSquads = owner.SquadManager.Squads.Where(s => s.Type == SquadType.Air).ToList();
 			var waitingSince = airSquads.SelectMany(s => s.AirRepairWaitingSince)
 				.ToDictionary(a => a.Key, a => a.Value);
 			var ready = airSquads.SelectMany(s => s.Units)
@@ -2402,13 +2665,13 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			return StealthAIThreatGeometry.IsOldestReadyRepairWaiter(waitingSince, ready, aircraft.ActorID);
 		}
 
-		static bool IsReadyRepairWaiter(StealthAISquad owner, Actor aircraft, Actor facility)
+		static bool IsReadyRepairWaiter(Squad owner, Actor aircraft, Actor facility)
 		{
 			var readyRange = WDist.FromCells(owner.SquadManager.Info.AirInfluenceCellSize * 2);
 			return (aircraft.CenterPosition - facility.CenterPosition).HorizontalLength <= readyRange.Length;
 		}
 
-		static float[] BuildRepairDangerGrid(StealthAISquad owner,
+		static float[] BuildRepairDangerGrid(Squad owner,
 			IEnumerable<(Actor Actor, float Weight, int RangeCells)> threats, out int width, out int height)
 		{
 			var info = owner.SquadManager.Info;
@@ -2436,7 +2699,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			return danger;
 		}
 
-		static AirRepairHoldingPlan FindSafeRepairHoldingLocation(StealthAISquad owner, Actor aircraft,
+		static AirRepairHoldingPlan FindSafeRepairHoldingLocation(Squad owner, Actor aircraft,
 			List<(Actor Actor, float Weight, int RangeCells)> threats)
 		{
 			var info = owner.SquadManager.Info;
@@ -2499,7 +2762,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		}
 
 		static void QueueRecoveryRoute(
-			StealthAISquad owner, Actor aircraft, List<CPos> route, Actor destination, bool repairAtEnd)
+			Squad owner, Actor aircraft, List<CPos> route, Actor destination, bool repairAtEnd)
 		{
 			var queued = false;
 			if (route != null)
@@ -2518,7 +2781,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					"Move", aircraft, Target.FromCell(owner.World, destination.Location), false));
 		}
 
-		static void QueueRepairHoldingRoute(StealthAISquad owner, Actor aircraft, List<CPos> route, CPos destination)
+		static void QueueRepairHoldingRoute(Squad owner, Actor aircraft, List<CPos> route, CPos destination)
 		{
 			var queued = false;
 			if (route != null)
@@ -2539,7 +2802,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		/// own buildings that sits furthest from the anti-air the squad remembers. Falls back to the
 		/// stock random building when nothing is remembered. Only reached when AirEvadeDistance is zero.
 		/// </summary>
-		protected static void Retreat(StealthAISquad owner)
+		protected static void Retreat(Squad owner)
 		{
 			var destination = SafeRetreatLocation(owner);
 
@@ -2555,7 +2818,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			}
 		}
 
-		static CPos SafeRetreatLocation(StealthAISquad owner)
+		static CPos SafeRetreatLocation(Squad owner)
 		{
 			var threats = owner.AirThreatPositions;
 			if (threats.Count == 0)
@@ -2584,12 +2847,12 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			return best;
 		}
 
-		protected static bool NearToPosSafely(StealthAISquad owner, WPos loc)
+		protected static bool NearToPosSafely(Squad owner, WPos loc)
 		{
 			return NearToPosSafely(owner, loc, out _);
 		}
 
-		protected static bool NearToPosSafely(StealthAISquad owner, WPos loc, out Actor detectedEnemyTarget)
+		protected static bool NearToPosSafely(Squad owner, WPos loc, out Actor detectedEnemyTarget)
 		{
 			detectedEnemyTarget = null;
 			var dangerRadius = owner.SquadManager.Info.DangerScanRadius;
@@ -2610,8 +2873,14 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		}
 
 		// Checks the number of anti air enemies around units
-		protected virtual bool ShouldFlee(StealthAISquad owner)
+		protected virtual bool ShouldFlee(Squad owner)
 		{
+			// BEGIN CNC96A GROUND EXTENSION
+			// Specialist ground squads retain the Air decision loop, but never enter its retreat state.
+			if (owner.Type == SquadType.Stealth)
+				return false;
+			// END CNC96A GROUND EXTENSION
+
 			return ShouldFlee(owner, enemies => CountAntiAirUnits(owner, enemies) * MissileUnitMultiplier >
 				AirDecisionUnits(owner).Count);
 		}
@@ -2619,9 +2888,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 	class StealthAIIdleState : StealthAIStateBase, IState
 	{
-		public void Activate(StealthAISquad owner) { }
+		public void Activate(Squad owner) { }
 
-		public void Tick(StealthAISquad owner)
+		public void Tick(Squad owner)
 		{
 			if (!owner.IsValid)
 				return;
@@ -2675,14 +2944,14 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			owner.FuzzyStateMachine.ChangeState(owner, new StealthAIAttackState(), true);
 		}
 
-		public void Deactivate(StealthAISquad owner) { }
+		public void Deactivate(Squad owner) { }
 	}
 
 	class StealthAIAttackState : StealthAIStateBase, IState
 	{
-		public void Activate(StealthAISquad owner) { }
+		public void Activate(Squad owner) { }
 
-		public void Tick(StealthAISquad owner)
+		public void Tick(Squad owner)
 		{
 			if (!owner.IsValid)
 				return;
@@ -2862,6 +3131,13 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 				if (nextTarget == null)
 				{
+					// BEGIN CNC96A GROUND EXTENSION
+					// Ground specialists never inherit Air's flee/retreat transition. They keep
+					// their current safe position until the next strategic rescan.
+					if (owner.Type == SquadType.Stealth)
+						return;
+					// END CNC96A GROUND EXTENSION
+
 					if (info.AirTargetDebugLogging)
 						Log.Write("debug", "Air evade [{0}] attack state found no eligible target with armed aircraft; entering flee state.",
 							owner.AirProfile);
@@ -3006,17 +3282,26 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			}
 		}
 
-		public void Deactivate(StealthAISquad owner) { }
+		public void Deactivate(Squad owner) { }
 	}
 
 	class StealthAIFleeState : StealthAIStateBase, IState
 	{
-		public void Activate(StealthAISquad owner) { }
+		public void Activate(Squad owner) { }
 
-		public void Tick(StealthAISquad owner)
+		public void Tick(Squad owner)
 		{
 			if (!owner.IsValid)
 				return;
+
+			// BEGIN CNC96A GROUND EXTENSION
+			// A loaded legacy state cannot turn a specialist plan into a retreat order.
+			if (owner.Type == SquadType.Stealth)
+			{
+				owner.FuzzyStateMachine.ChangeState(owner, new StealthAIIdleState(), true);
+				return;
+			}
+			// END CNC96A GROUND EXTENSION
 
 			if (owner.AirEscapingLocalAa)
 			{
@@ -3035,6 +3320,6 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			owner.FuzzyStateMachine.ChangeState(owner, new StealthAIIdleState(), true);
 		}
 
-		public void Deactivate(StealthAISquad owner) { }
+		public void Deactivate(Squad owner) { }
 	}
 }
