@@ -2312,3 +2312,92 @@ the blocker precisely if natural combat acceptance remains unproved.
   Disposition: no product change. Update the same single commit with these
   evidence receipts, rerun exact-head cleanliness/check receipt, then route a
   fresh Terra final rereview before publication.
+
+## Superseding verbatim-Air replacement audit (2026-08-24)
+
+- Superseding user authority requires retiring the live STNK/CTNK bespoke
+  specialist implementation into the repository's passive inspiration/reference
+  convention and replacing it with a mechanically renamed, behaviorally
+  verbatim copy of the Air AI. The interrupted selective HP/rescan successor had
+  no product edits; its sole local STATE appendix was removed from its original
+  clean worktree. PR131 is merged. This isolated successor is
+  `agent/20260824-cnc96a-air-verbatim` at exact refreshed `origin/bleed`
+  `609ebf92eeac565af51b2b6acd53de37bb3b39d2`.
+- Repository-wide tracked-tree and history inspection found no literal existing
+  `inspiration`, `archive`, or `attic` directory. The established passive,
+  noncompiled repository convention is `.agents/references/` (and
+  `.agents/old-skills/` for retired agent code); project wildcard compilation
+  applies only beneath project roots. No legacy file has been moved while the
+  direct-copy feasibility gate is unresolved.
+- The Air AI is not an independently instantiable module/file. Its configuration,
+  recruitment, save state and tick ownership are embedded in
+  `SquadManagerBotModule.cs`; its runtime state is embedded in `Squad.cs`; and
+  its behavioral state machine is the 3,040-line `Squads/States/AirStates.cs`.
+  `Squad` requires a concrete `SquadManagerBotModule`, `SquadType.Air` selects
+  `AirIdleState`, and every Air state reads `owner.SquadManager.Info` and the
+  Air-specific fields stored on `Squad`.
+- Identity-only file/class substitutions do not produce a runnable ground
+  specialist. The copied target scan takes the minimum `AircraftInfo.Speed` of
+  planning actors (`AirStates.cs:721-722` and `1510-1511`), which is an empty
+  sequence for STNK/CTNK. The same copied behavior derives anti-air target
+  types/threat maps (`:26`, `:64-130`, `:473-509`), issues aircraft repair and
+  ammo orders using `AmmoPool`, `Rearmable`, and literal `ReturnToBase`
+  (`:1950-2075`, `:2957-2966`), and keys routing/repair cost to
+  `AircraftInfo.Speed` (`:1382`, `:2337`, `:2449`). The manager recruits only
+  `AirUnitsTypes` into Air squads (`SquadManagerBotModule.cs:1198-1207`) and the
+  state constructor selects Air only through `SquadType.Air`
+  (`Squad.cs:98-107`).
+- Therefore a new `StealthAIModule` cannot instantiate a verbatim mechanically
+  renamed Air implementation. Making it operate on ground specialists requires
+  behavioral/domain substitutions (`AircraftInfo` to ground locomotion,
+  anti-air to detector/ground threats, flight route to exact ground pathing,
+  aircraft ammo/RTB to tank repair/reload, and new state/config ownership), all
+  explicitly outside the allowed identity/wiring-only changes. Adding STNK/CTNK
+  to `AirUnitsTypes` is not a valid mechanical wiring alternative: it reaches
+  the empty-speed failure and applies aircraft-only safety/repair semantics.
+- Decision gate: stop before archiving/removing the compiling specialist or
+  inventing an adapted algorithm. The smallest factual mapping is complete and
+  requires user/coordinator direction on whether to authorize a ground-domain
+  adaptation or instead reuse the existing Air squad in a way that necessarily
+  changes Air behavioral code. No build/game/review is valid until that product
+  architecture decision is authorized.
+
+## User-authorized nonbuilding Air-copy intermediate
+
+- The user explicitly overrode the feasibility stop and authorized a tracked,
+  intentionally nonbuilding filesystem intermediate. The new passive archive is
+  `.agents/inspiration/stealth-ai-pre-air-copy/`, pinned by README to source head
+  `609ebf92eeac565af51b2b6acd53de37bb3b39d2`. It preserves original relative
+  paths for `StealthTankSquadBotModule.cs`, `StealthTankSquadPolicy.cs`,
+  `BotOwnedStationaryWatchdog.cs`, and the dedicated
+  `StealthTankSquadPolicyTest.cs`. Specialist-only members formerly embedded in
+  the mixed CNC Air-configuration and route-planner fixtures are preserved as
+  adjacent snippet files. Shared Air, route-planner, mixed ownership tests,
+  engine code, and the broader CNC-100 scenario generator remain in place.
+- The archive also preserves the exact former STNK and chemical YAML trait
+  blocks and their repeated `AdvancedSquadModules` ownership declaration. Live
+  `mods/cnc/rules/ai.yaml` removes both bespoke trait blocks and all ten old
+  module ownership names. It deliberately does not attach the copied
+  `StealthAIModule`: a clear TODO records that a verbatim Air graph still has
+  aircraft-only primitives and lacks an authorized ground adapter. Chemical has
+  no separate implementation or attachment.
+- Complete full-file Air copies now exist in the live project tree:
+  `SquadManagerBotModule.cs -> StealthAIModule.cs`,
+  `Squads/Squad.cs -> Squads/StealthAISquad.cs`,
+  `Squads/States/AirStates.cs -> Squads/States/StealthAIStates.cs`, and
+  `BotModuleLogic/AirThreatGeometry.cs ->
+  BotModuleLogic/StealthAIThreatGeometry.cs`. Only deterministic whole-token
+  identity substitutions distinguish public/top-level manager, squad, state,
+  and threat-geometry types. Aircraft primitives, fields, methods, order
+  strings, target/threat logic, comments, whitespace, and algorithms are
+  untouched. Original Air sources have zero diff.
+- `scripts/check-stealth-ai-air-copy.py` reverses exactly the declared identity
+  substitutions and requires full-file equality. It PASSes all four pairs:
+  manager 1,719 lines SHA256 `bff7510eb3fd73bf7b9ed5b5eba6727fb3c079aec93af66dcabc5f7b55a778d0`;
+  squad 549 lines `c8800359fa781d0a015956c4c1abdfa8d97f39d558852a896fd33acb66932264`;
+  states 3,040 lines `6ad78ca13d3af0a57ec20e0ff8d6f47019d423c9da043b0ee7cd68b1b02e3d3b`;
+  geometry 549 lines `d1bf31bdb3230bf9c16dbde5a067fda6e6db1e3a875a247d952f686ee5378751`.
+- As expressly required, do not compile, test, run, adapt, review, or publish
+  this intermediate. Its expected unresolved type/wiring failures are the
+  preserved factual result, not a release candidate. Run only the identity
+  proof, Air-source unchanged audit, diff hygiene, and one clean commit.

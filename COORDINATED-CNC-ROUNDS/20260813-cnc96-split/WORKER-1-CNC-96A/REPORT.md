@@ -2111,3 +2111,42 @@ ownership/retreat/route evidence, and no product/balance change is warranted.
 
 The candidate product tree remains exact; only STATE/REPORT are amended with the
 matched-control disposition before final clean receipt and fresh Terra rereview.
+
+### Superseding verbatim-Air feasibility gate
+
+On refreshed bleed `609ebf92eeac565af51b2b6acd53de37bb3b39d2`, direct
+extraction found that the Air AI is structurally embedded across
+`SquadManagerBotModule.cs`, `Squad.cs`, and `Squads/States/AirStates.cs`, rather
+than existing as a separable trait. A mechanically renamed copy retains hard
+aircraft requirements: `AircraftInfo.Speed` minimums and cache keys, Air target
+types/anti-air influence, `AmmoPool`/`Rearmable`, and literal `ReturnToBase`.
+STNK/CTNK have no `AircraftInfo`, so merely wiring them into `SquadType.Air`
+fails before target planning and would retain incorrect aircraft repair/safety
+semantics. Converting those seams to ground locomotion, pathability, detectors,
+and tank repair is behavioral adaptation expressly prohibited by the
+superseding assignment. No legacy/live file was moved and no product code was
+edited. Work is stopped at the required factual architecture gate pending
+authority; build, games, review, and publication are consequently not started.
+
+### User-authorized nonbuilding copy receipt
+
+The user then explicitly authorized the nonbuilding intermediate despite that
+gate. The complete old bespoke module, policy, watchdog, dedicated test, mixed
+fixture specialist snippets, and original CNC YAML blocks now live passively
+under `.agents/inspiration/stealth-ai-pre-air-copy/`. The old live YAML traits
+and performance-ownership names are removed. Shared Air/engine code is not
+moved.
+
+Four complete Air sources are copied into mechanically renamed live files:
+`StealthAIModule.cs`, `StealthAISquad.cs`, `StealthAIStates.cs`, and
+`StealthAIThreatGeometry.cs`. Original Air sources remain byte-unchanged. The
+tracked `scripts/check-stealth-ai-air-copy.py` reverses only the allowed identity
+map and PASSes exact equality for all 5,857 copied lines, with source hashes
+`bff7510e...78d0`, `c8800359...2264`, `6ad78ca1...e3d3`, and
+`d1bf31bd...8751`. No ground adapter, aircraft-primitive change, selective
+algorithm port, separate chemical class, or live YAML attachment is invented.
+The YAML TODO states why attachment is not mechanically possible.
+
+Per explicit authority this is intentionally nonbuilding: compilation, games,
+policy/code review, and publication are not run. The bounded receipts are the
+four-pair identity proof, zero diff to original Air files, and `git diff --check`.
