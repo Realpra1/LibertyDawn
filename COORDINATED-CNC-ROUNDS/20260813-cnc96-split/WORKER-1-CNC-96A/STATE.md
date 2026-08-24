@@ -2401,3 +2401,47 @@ the blocker precisely if natural combat acceptance remains unproved.
   this intermediate. Its expected unresolved type/wiring failures are the
   preserved factual result, not a release candidate. Run only the identity
   proof, Air-source unchanged audit, diff hygiene, and one clean commit.
+
+## Archived-function review intake manifest
+
+- Intake is pinned to nonbuilding archive/copy commit
+  `a0df865591196be28e4b2d31404b2d1dbd7e2b0d`. A temporary ignored Roslyn
+  enumerator parsed only the archived bespoke module and policy and found 184
+  individual behavior bodies: 92 module and 92 policy; 177 methods, four
+  constructors, and three expression-bodied properties. There were no local
+  function or accessor bodies in these two sources. Tests and configuration are
+  excluded as function sources. The standalone archived watchdog trait is also
+  excluded as acceptance/debug instrumentation; watchdog-related helper bodies
+  physically within the policy remain enumerated and are flagged test-only.
+- Every body has one stable function ID, exact file/span/signature, neutral
+  body-derived purpose, syntax-derived direct dependency/caller IDs, up to three
+  syntax-ranked copied-Air candidates, category flags, and a SHA-256-pinned
+  immutable individual job at
+  `.build/cnc96a-air-copy-function-review/jobs/`. All 184 jobs require a
+  separate receipt under `.build/cnc96a-air-copy-function-review/receipts/` and
+  prohibit edits or cross-function judgments. No necessity/quality decision was
+  made during intake.
+- User-preclassified retreat/completion-retreat bodies total 35 and are closed
+  `LEAVE_OUT_RETREAT`; they remain in the per-function inventory but are not
+  dispatched in review batches. Eligible bodies total 149. Primary category
+  counts are 115 substantive, 21 constructor/config/plumbing, 13 test-only, and
+  35 retreat-excluded.
+- The 149 eligible bodies are packed by archived source adjacency/shared call
+  context into 17 immutable native Sol-medium batch envelopes, maximum ten
+  functions each. Distribution is fourteen batches of ten, one of six, one of
+  two, and one standalone 557-line `UpdateGroup` body. Every batch still
+  requires a distinct verdict/evidence/Air-coverage/dependency receipt for every
+  function and explicitly prohibits a group verdict. Syntax-derived cross-batch
+  prerequisites provide dependency ordering; mutually recursive call-graph
+  batches are recorded as same-component peers instead of an impossible cyclic
+  prerequisite. Canonical tracked indexes are
+  `.agents/inspiration/stealth-ai-pre-air-copy/function-review/MANIFEST.json`,
+  `MANIFEST.md`, `QUEUE.md`, `BATCH-MANIFEST.json`, and `BATCH-QUEUE.md`.
+- First dependency-ready function IDs are `CNC96A-FN-10862FD4BB80`,
+  `CNC96A-FN-0768E72D45A9`, and `CNC96A-FN-A4C4B07E8256`. First ready batches
+  are `.build/cnc96a-air-copy-function-review/batches/CNC96A-BATCH-001.md`,
+  `CNC96A-BATCH-002.md`, and `CNC96A-BATCH-003.md`. Exact coverage, unique IDs,
+  span bounds, hashes, read-only permissions, max-ten batching, absence of
+  retreat bodies from batches, and one-time coverage of all 149 eligible bodies
+  validate cleanly. This intake made no product edit and ran no product build,
+  game, review, or publication action.

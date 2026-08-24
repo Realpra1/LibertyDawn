@@ -2150,3 +2150,28 @@ The YAML TODO states why attachment is not mechanically possible.
 Per explicit authority this is intentionally nonbuilding: compilation, games,
 policy/code review, and publication are not run. The bounded receipts are the
 four-pair identity proof, zero diff to original Air files, and `git diff --check`.
+
+### Archived-function review intake
+
+Roslyn syntax enumeration of the archived module and policy at `a0df865591`
+produced exactly 184 stable per-body records: 92 per source, comprising 177
+methods, four constructors and three expression-bodied properties. Tests,
+config, and the standalone acceptance/debug watchdog trait are not function
+sources; policy-contained watchdog helpers remain represented as test-only.
+Each record carries its exact span/signature, neutral purpose, direct
+dependencies/callers, syntax-ranked copied-Air candidates, flags, and an
+immutable individual job/receipt contract. No review judgment was made.
+
+Thirty-five retreat/completion-retreat bodies are authoritatively closed
+`LEAVE_OUT_RETREAT`; 149 remain eligible. The eligible set is covered exactly
+once by 17 source-adjacent/shared-context batches of at most ten functions:
+fourteen batches of ten, one of six, one of two, and one standalone 557-line
+body. Each function still requires its own verdict/evidence/dependency receipt;
+batch verdicts are prohibited. Canonical tracked indexes live under
+`.agents/inspiration/stealth-ai-pre-air-copy/function-review/`; 184 individual
+jobs, 17 batch envelopes, and future receipts live durably but ignored under
+`.build/cnc96a-air-copy-function-review/`. Coverage, IDs, spans, hashes,
+permissions, batching, and retreat exclusion validate cleanly. Cross-batch
+dependencies are ordered by prerequisites, with mutually recursive references
+identified as same-component peers rather than cyclic prerequisites. No product
+code, build, game, review, or PR action is part of this intake.
