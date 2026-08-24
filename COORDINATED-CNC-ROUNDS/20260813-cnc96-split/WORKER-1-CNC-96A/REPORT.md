@@ -2175,3 +2175,26 @@ permissions, batching, and retreat exclusion validate cleanly. Cross-batch
 dependencies are ordered by prerequisites, with mutually recursive references
 identified as same-component peers rather than cyclic prerequisites. No product
 code, build, game, review, or PR action is part of this intake.
+
+### Contested-function rereview intake
+
+The immutable audit at function-manifest head `46110762da` contests exactly 37
+eligible receipts. Intake generated four read-only fresh Sol-medium envelopes of
+10, 10, 10, and 7 functions beneath
+`.build/cnc96a-air-copy-function-review/rereview-batches/`. Coverage is exactly
+once, no manifest-retreat body is dispatched, and every function retains an
+independent replacement receipt and verdict. Each envelope supplies only the
+exact archived/current spans and audit-required caller/dependency boundary spans,
+names the prior result and defect, enforces canonical verdict/confidence enums,
+and forbids all outside evidence.
+
+Retreat and completion-retreat remain excluded: dependencies must be directly
+left out, inseparable functions must return `LEAVE_OUT_RETREAT`, and any
+`RESTORE_*` result must state a precise retreat-free extraction boundary. Queue,
+index, and validation receipts are `rereview-batches/QUEUE.md`, `INDEX.json`, and
+`VALIDATION.md`. Validation passes all 37 IDs, batch bounds, span bounds, hashes,
+and mode `0444`. The 339 protected audit/manifest/job/original-receipt inputs are
+unchanged at aggregate SHA-256
+`54f135a065906a12085f2b8abb8dba07431af496b152a42f6012d48557e8f809`.
+No function judgment, product edit, build, game, review execution, or PR action
+was performed.

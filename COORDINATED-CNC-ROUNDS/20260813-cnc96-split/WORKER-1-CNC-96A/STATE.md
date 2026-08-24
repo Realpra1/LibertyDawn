@@ -2445,3 +2445,39 @@ the blocker precisely if natural combat acceptance remains unproved.
   retreat bodies from batches, and one-time coverage of all 149 eligible bodies
   validate cleanly. This intake made no product edit and ran no product build,
   game, review, or publication action.
+
+## Contested-function rereview intake
+
+- Intake is pinned to function-manifest head
+  `46110762dab4975a2213ca9b187093a62b9b8ca5` and the immutable audit at
+  `.build/cnc96a-air-copy-function-review/AUDIT.md`. The audit identifies exactly
+  37 distinct contested/invalid eligible function IDs across outside-envelope
+  evidence, invalid confidence, non-retreat `LEAVE_OUT_RETREAT`, excluded-retreat
+  dependency, and caller/dependency consistency findings. No function was
+  reviewed and no prior verdict was accepted or rejected during this intake.
+- Exactly four immutable fresh native Sol-medium envelopes were generated under
+  `.build/cnc96a-air-copy-function-review/rereview-batches/`, with sizes 10, 10,
+  10, and 7. They cover every contested ID exactly once and dispatch zero of the
+  35 manifest-retreat bodies. Each function section names the prior verdict and
+  confidence, exact audit defect(s), old archived body span, authorized current
+  copied-Air candidate spans, and only the audit-required caller/dependency
+  boundary spans. Original jobs, receipts, audit, manifests, whole files, and
+  unlisted evidence are forbidden.
+- Every function requires its own replacement receipt beneath
+  `.build/cnc96a-air-copy-function-review/rereview-receipts/`; group verdicts are
+  prohibited. Verdicts are limited to `KEEP_AIR`, `RESTORE_NECESSARY`,
+  `RESTORE_BETTER`, or `LEAVE_OUT_RETREAT`; confidence is limited to `high`,
+  `medium`, or `low`. Every receipt must directly disposition retreat
+  dependencies. User-excluded retreat/completion-retreat may never be restored:
+  an inseparable function must be `LEAVE_OUT_RETREAT`, while `RESTORE_*` requires
+  a precise retreat-free extraction boundary.
+- Durable queue/index/validation paths are
+  `.build/cnc96a-air-copy-function-review/rereview-batches/QUEUE.md`,
+  `INDEX.json`, and `VALIDATION.md`. Validation passes exact 37-ID coverage,
+  max-ten batching, span bounds, separate receipt contracts, immutable mode
+  `0444`, and restricted dependency authorization. All 339 protected inputs
+  (AUDIT, five tracked manifests/indexes, 184 original jobs, and 149 original
+  receipts) remained unchanged at aggregate SHA-256
+  `54f135a065906a12085f2b8abb8dba07431af496b152a42f6012d48557e8f809`.
+  This rereview intake made no product edit and ran no build, game, function
+  review, or publication action.
