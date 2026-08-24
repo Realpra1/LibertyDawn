@@ -207,6 +207,20 @@ namespace OpenRA.Test.Mods.Common
 				"Threat, detector, resource or pending-hazard context change permits retry.");
 		}
 
+		[Test]
+		public void UnlatchedBusyAttackMoveReinforcementReceivesOneAirStyleRouteOwnership()
+		{
+			Assert.That(StealthTankSquadPolicy.ShouldPreserveBusyReinforcement(false, false), Is.False,
+				"An unrelated pre-reservation AttackMove must not strand the reinforcement indefinitely.");
+			Assert.That(StealthTankSquadPolicy.ShouldIssueReinforcementOrder(
+				false, false, false, true, false), Is.True,
+				"Air establishes route ownership once for an unlatched busy reinforcement.");
+			Assert.That(StealthTankSquadPolicy.ShouldPreserveBusyReinforcement(true, false), Is.True,
+				"The resulting busy matching route remains untouched on later scans.");
+			Assert.That(StealthTankSquadPolicy.ShouldIssueReinforcementOrder(
+				true, false, false, true, false), Is.False);
+		}
+
 		[TestCase(true, false, true)]
 		[TestCase(true, true, true)]
 		[TestCase(false, true, false,
@@ -668,6 +682,133 @@ namespace OpenRA.Test.Mods.Common
 				Is.LessThan(StealthTankSquadPolicy.TargetScore(1000, 1000, direct, 100)));
 		}
 
+		[Test]
+		public void ValidNonWallTargetAlwaysOutranksWallFallbackAcrossSwitchThreshold()
+		{
+			Assert.That(StealthTankSquadPolicy.ReassessTargetWithWallFallback(
+				true, true, 1000000, true, true, 1, 25, true, false),
+				Is.EqualTo(StealthTankTargetReassessment.SwitchToChallenger),
+				"A reachable factory or economy target must displace a reachable wall regardless of distance score.");
+			Assert.That(StealthTankSquadPolicy.ReassessTargetWithWallFallback(
+				true, true, 1, true, true, 1000000, 25, false, true),
+				Is.EqualTo(StealthTankTargetReassessment.RetainIncumbent),
+				"A wall cannot displace a valid non-wall incumbent.");
+			Assert.That(StealthTankSquadPolicy.ReassessTargetWithWallFallback(
+				false, false, 0, true, true, 1, 25, false, true),
+				Is.EqualTo(StealthTankTargetReassessment.SwitchToChallenger),
+				"A wall remains a valid fallback after the valuable incumbent is invalid.");
+		}
+
+		[Test]
+		public void GraduatedGroundThreatKeepsSparseWeaponsSoftAndDetectorsOrDenseFrontsHard()
+		{
+			Assert.That(StealthTankSquadPolicy.IsHardRouteDanger(
+				StealthTankSquadPolicy.OrdinaryWeaponRouteInfluence), Is.False);
+			Assert.That(StealthTankSquadPolicy.IsHardRouteDanger(
+				4 * StealthTankSquadPolicy.OrdinaryWeaponRouteInfluence), Is.False);
+			Assert.That(StealthTankSquadPolicy.IsHardRouteDanger(
+				5 * StealthTankSquadPolicy.OrdinaryWeaponRouteInfluence), Is.True);
+			Assert.That(StealthTankSquadPolicy.IsHardRouteDanger(
+				StealthTankSquadPolicy.HardDetectorRouteInfluence), Is.True);
+		}
+
+		[Test]
+		public void DirectHardSafeRouteCapsDisproportionateSoftThreatDetour()
+		{
+			Assert.That(StealthTankSquadPolicy.RouteStretchIsDisproportionate(16, 10, 150), Is.True);
+			Assert.That(StealthTankSquadPolicy.RouteStretchIsDisproportionate(15, 10, 150), Is.False);
+		}
+
+		[Test]
+		public void PostMissionRetreatIsSixActualRouteCellsWithNarrowTolerance()
+		{
+			var source = new CPos(10, 10);
+			var forward = StealthTankSquadPolicy.ForwardExactGroundRoute(new[]
+			{
+				new CPos(16, 10), new CPos(15, 10), new CPos(14, 10),
+				new CPos(13, 10), new CPos(12, 10), new CPos(11, 10)
+			});
+			Assert.That(forward.First(), Is.EqualTo(new CPos(11, 10)));
+			Assert.That(forward.Last(), Is.EqualTo(new CPos(16, 10)));
+			Assert.That(StealthTankSquadPolicy.RouteDistanceCells(source, forward), Is.EqualTo(6),
+				"The engine's reversed exact path must be normalized before distance or order use.");
+			Assert.That(StealthTankSquadPolicy.IsPostMissionRetreatRouteDistance(5, 6, 1), Is.True);
+			Assert.That(StealthTankSquadPolicy.IsPostMissionRetreatRouteDistance(6, 6, 1), Is.True);
+			Assert.That(StealthTankSquadPolicy.IsPostMissionRetreatRouteDistance(7, 6, 1), Is.True);
+			Assert.That(StealthTankSquadPolicy.IsPostMissionRetreatRouteDistance(8, 6, 1), Is.False,
+				"A blocked endpoint cannot turn the bounded retreat into a map-scale detour.");
+			Assert.That(StealthTankSquadPolicy.ShouldRejectPostMissionRetreatRouteCell(
+				true, false, false, true), Is.False,
+				"The occupied attack-completion origin may be dangerous so the retreat can escape it.");
+			Assert.That(StealthTankSquadPolicy.ShouldRejectPostMissionRetreatRouteCell(
+				false, false, false, true), Is.True,
+				"Hard influence remains forbidden after leaving the occupied origin.");
+			Assert.That(StealthTankSquadPolicy.ShouldRejectPostMissionRetreatRouteCell(
+				false, true, false, false), Is.True,
+				"Resource cells remain forbidden after leaving the occupied origin.");
+		}
+
+		[Test]
+		public void BoundedPostMissionRetreatNeverExpandsOrBarrierDelaysIdlePeers()
+		{
+			Assert.That(StealthTankSquadPolicy.ShouldBlockTargetReassessment(2, true), Is.False,
+				"Busy retreating members retain their route, but completed peers immediately reacquire.");
+			Assert.That(StealthTankSquadPolicy.ShouldBlockTargetReassessment(2, false), Is.True,
+				"Local-safety escape retains the existing whole-group barrier.");
+			Assert.That(StealthTankSquadPolicy.ShouldInvalidateBoundedPostMissionRetreat(
+				true, true, true, false, false), Is.True,
+				"An idle blocked route is invalidated instead of entering staged/full-map retry.");
+			Assert.That(StealthTankSquadPolicy.ShouldInvalidateBoundedPostMissionRetreat(
+				true, true, false, false, false), Is.False,
+				"A busy member keeps its one-shot bounded route without replacement.");
+			Assert.That(StealthTankSquadPolicy.ShouldInvalidateBoundedPostMissionRetreat(
+				true, true, true, false, true), Is.False,
+				"Exact physical arrival completes normally rather than being classified as blockage.");
+		}
+
+		[Test]
+		public void SafeMobilityRejectsCollapsedExactRouteAndRetainsBusyActorOwnership()
+		{
+			Assert.That(StealthTankSquadPolicy.ShouldIssueSafeMobilityRoute(true, true, false), Is.True);
+			Assert.That(StealthTankSquadPolicy.ShouldIssueSafeMobilityRoute(false, true, false), Is.False,
+				"A still-busy matching activity remains untouched.");
+			Assert.That(StealthTankSquadPolicy.ShouldIssueSafeMobilityRoute(true, false, false), Is.False,
+				"A coarse candidate whose submitted segments are not exactly usable cannot be queued.");
+			Assert.That(StealthTankSquadPolicy.ShouldIssueSafeMobilityRoute(true, true, true), Is.False,
+				"The same zero-progress route cannot collapse and reissue every75 ticks.");
+
+			for (var tick = 75; tick <= 225; tick += 75)
+				Assert.That(StealthTankSquadPolicy.ShouldIssueSafeMobilityRoute(
+					true, true, identicalFailedRoute: true), Is.False,
+					"The memoized actor/origin/anchor/route/context remains rejected across scans.");
+		}
+
+		[Test]
+		public void FailedMobilitySearchRetriesOnlyAfterMovementAnchorOrHazardContextChange()
+		{
+			Assert.That(StealthTankSquadPolicy.ShouldRetryFailedMobilitySearch(true, true, true), Is.False);
+			Assert.That(StealthTankSquadPolicy.ShouldRetryFailedMobilitySearch(false, true, true), Is.True);
+			Assert.That(StealthTankSquadPolicy.ShouldRetryFailedMobilitySearch(true, false, true), Is.True);
+			Assert.That(StealthTankSquadPolicy.ShouldRetryFailedMobilitySearch(true, true, false), Is.True);
+		}
+
+		[Test]
+		public void ReinforcementCollapseMemoryUsesStableStrategicResponsibility()
+		{
+			var mission = StealthTankSquadPolicy.StrategicCell(new CPos(84, 6), 6);
+			var jitteredMission = StealthTankSquadPolicy.StrategicCell(new CPos(89, 11), 6);
+			var changedMission = StealthTankSquadPolicy.StrategicCell(new CPos(90, 11), 6);
+
+			Assert.That(jitteredMission, Is.EqualTo(mission),
+				"Sub-cell anchor jitter must not erase a collapsed reinforcement route.");
+			Assert.That(StealthTankSquadPolicy.ShouldRetryFailedMobilitySearch(
+				sameOrigin: true, sameAnchor: jitteredMission == mission, sameRouteContext: true), Is.False);
+			Assert.That(changedMission, Is.Not.EqualTo(mission));
+			Assert.That(StealthTankSquadPolicy.ShouldRetryFailedMobilitySearch(
+				sameOrigin: true, sameAnchor: changedMission == mission, sameRouteContext: true), Is.True,
+				"A genuine strategic responsibility change permits one bounded retry.");
+		}
+
 		[TestCase(true, 100, true, true, 124, 25, StealthTankTargetReassessment.RetainIncumbent)]
 		[TestCase(true, 100, true, true, 125, 25, StealthTankTargetReassessment.SwitchToChallenger)]
 		[TestCase(true, 10000, true, false, 100000, 0, StealthTankTargetReassessment.RetainIncumbent)]
@@ -915,9 +1056,11 @@ namespace OpenRA.Test.Mods.Common
 				false, false, false), Is.EqualTo(SpecialistLostActivityRouteDecision.None));
 
 			Assert.That(StealthTankSquadPolicy.FailedMemberRouteRemainsApplicable(
-				false, true, true), Is.False, "A changed target invalidates the signature.");
+				false, true, true), Is.True,
+				"Target cycling does not erase an actor-level collapsed route while the member remains stuck.");
 			Assert.That(StealthTankSquadPolicy.FailedMemberRouteRemainsApplicable(
-				true, false, true), Is.False, "Target movement invalidates the signature.");
+				true, false, true), Is.True,
+				"Target movement permits distinct endpoints without forgetting the member's collapsed route history.");
 			Assert.That(StealthTankSquadPolicy.FailedMemberRouteRemainsApplicable(
 				true, true, false), Is.False, "Member movement invalidates the signature.");
 			Assert.That(StealthTankSquadPolicy.ShouldRecomputeSameEndpointMemberRoute(false), Is.True,
@@ -925,6 +1068,20 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(StealthTankSquadPolicy.LostActivityRouteDecision(
 				false, false, true), Is.EqualTo(SpecialistLostActivityRouteDecision.AlternateEndpoint),
 				"A distinct alternate endpoint remains eligible while the identical route stays memoized.");
+		}
+
+		[Test]
+		public void IdleMemberRouteValidationCoversTargetChangeAndLostActivity()
+		{
+			Assert.That(StealthTankSquadPolicy.ShouldValidateIdleMemberRoute(
+				StealthTankPlanInvalidation.TargetChanged), Is.True,
+				"A newly selected shared route is exact-validated for each idle ground member.");
+			Assert.That(StealthTankSquadPolicy.ShouldValidateIdleMemberRoute(
+				StealthTankPlanInvalidation.LostActivity), Is.True,
+				"A collapsed retained plan receives the same member-specific validation and fallback.");
+			Assert.That(StealthTankSquadPolicy.ShouldValidateIdleMemberRoute(
+				StealthTankPlanInvalidation.None), Is.False,
+				"Retained busy ownership does not cause route reissue or validation churn.");
 		}
 
 		[Test]
@@ -1254,6 +1411,8 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(StealthTankSquadPolicy.ShouldRetainWholeGroupEngagement(true, true), Is.False,
 				"Busy squadmates keep their Attack roots while the idle member receives its pending mission.");
 			Assert.That(StealthTankSquadPolicy.ShouldRetainWholeGroupEngagement(true, false), Is.True);
+			Assert.That(StealthTankSquadPolicy.ShouldRetainWholeGroupEngagement(true, false, true), Is.False,
+				"A wall incumbent must not bypass the scan that records a newly available strategic mission.");
 		}
 
 		[Test]
@@ -1344,16 +1503,17 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
-		public void StationaryWatchdogOnlyRecordsDischargeFromExactRootAttackActivity()
+		public void StationaryWatchdogSustainsConfirmedDischargeAcrossAnyUnchangedAttackActivity()
 		{
-			var attack = (OpenRA.Activities.Activity)System.Runtime.Serialization.FormatterServices
-				.GetUninitializedObject(typeof(OpenRA.Mods.Common.Activities.Attack));
-
-			Assert.That(BotOwnedStationaryWatchdog.IsExactRootAttackActivity(attack), Is.True);
-			Assert.That(BotOwnedStationaryWatchdog.IsExactRootAttackActivity(
-				new NonAttackDischargeActivity()), Is.False,
-				"A real discharge from a non-Attack root activity must remain nonexempt.");
-			Assert.That(BotOwnedStationaryWatchdog.IsExactRootAttackActivity(null), Is.False);
+			var attackMove = new NonAttackDischargeActivity();
+			Assert.That(BotOwnedStationaryWatchdog.ContinuesConfirmedFiringActivity(
+				attackMove, attackMove), Is.True,
+				"Actual discharge under an unchanged AttackMove participates in the firing episode.");
+			Assert.That(BotOwnedStationaryWatchdog.ContinuesConfirmedFiringActivity(
+				attackMove, new NonAttackDischargeActivity()), Is.False,
+				"An order/activity transition closes the recorded episode until another discharge.");
+			Assert.That(BotOwnedStationaryWatchdog.ContinuesConfirmedFiringActivity(null, attackMove), Is.False,
+				"AttackMove without a prior confirmed shot remains nonexempt.");
 		}
 
 		[Test]

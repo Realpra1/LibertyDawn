@@ -69,17 +69,17 @@ namespace OpenRA.Mods.Common.Traits
 
 			var currentHealth = self.TraitOrDefault<IHealth>()?.HP ?? 0;
 			var firingTargetValid = firingTarget != null && firingTarget.IsInWorld && !firingTarget.IsDead;
-			var exactRootAttackActivity = IsExactRootAttackActivity(self.CurrentActivity);
+			var sameFiringActivity = ContinuesConfirmedFiringActivity(
+				firingActivity, self.CurrentActivity);
 			var sustainedFiring = StealthTankSquadPolicy.IsSustainedFiringEpisode(
 				lastDischargeTick, self.World.WorldTick, firingCadenceTicks,
 				firingTargetValid,
-				exactRootAttackActivity && ReferenceEquals(self.CurrentActivity, firingActivity),
+				sameFiringActivity,
 				firingTargetValid);
 			if (!sustainedFiring && lastDischargeTick != int.MinValue)
 			{
 				var reason = !firingTargetValid ? "target-invalid" :
-					!exactRootAttackActivity ? "non-attack-activity" :
-					!ReferenceEquals(self.CurrentActivity, firingActivity) ? "attack-activity-changed" :
+					!sameFiringActivity ? "firing-activity-changed" :
 					"cadence-missed";
 				Log.Write("debug", "AI stationary watchdog firing-episode-end owner={0} unit={1}#{2} tick={3}: target={4} last-discharge={5} cadence={6} reason={7} nonexempt-age={8}.",
 					self.Owner.PlayerName, self.Info.Name, self.ActorID, self.World.WorldTick,
@@ -160,27 +160,9 @@ namespace OpenRA.Mods.Common.Traits
 		void INotifyAttack.Attacking(Actor self, in Target target, Armament a, Barrel barrel)
 		{
 			var targetActor = target.Type == TargetType.Actor ? target.Actor : null;
-			if (!IsExactRootAttackActivity(self.CurrentActivity))
-			{
-				if (lastDischargeTick != int.MinValue)
-					Log.Write("debug", "AI stationary watchdog firing-episode-end owner={0} unit={1}#{2} tick={3}: target={4} last-discharge={5} cadence={6} reason=discharge-non-attack-activity nonexempt-age={7}.",
-						self.Owner.PlayerName, self.Info.Name, self.ActorID, self.World.WorldTick,
-						firingTarget == null ? "none" : firingTarget.Info.Name + "#" + firingTarget.ActorID,
-						lastDischargeTick, firingCadenceTicks, stationaryAge);
-
-				lastDischargeTick = int.MinValue;
-				firingTarget = null;
-				firingActivity = null;
-				firingArmament = null;
-				Log.Write("debug", "AI stationary watchdog weapon-discharge owner={0} unit={1}#{2} tick={3}: target={4} weapon={5} episode=ignored-non-attack-activity activity={6}.",
-					self.Owner.PlayerName, self.Info.Name, self.ActorID, self.World.WorldTick,
-					targetActor == null ? target.Type.ToString() : targetActor.Info.Name + "#" + targetActor.ActorID,
-					a.Info.Weapon, ActivitySignature(self.CurrentActivity));
-				return;
-			}
-
 			var sameEpisode = lastDischargeTick != int.MinValue && firingTarget == targetActor &&
-				ReferenceEquals(firingActivity, self.CurrentActivity) && ReferenceEquals(firingArmament, a);
+				ContinuesConfirmedFiringActivity(firingActivity, self.CurrentActivity) &&
+				ReferenceEquals(firingArmament, a);
 			if (!sameEpisode && lastDischargeTick != int.MinValue)
 				Log.Write("debug", "AI stationary watchdog firing-episode-end owner={0} unit={1}#{2} tick={3}: target={4} last-discharge={5} cadence={6} reason=discharge-context-changed nonexempt-age={7}.",
 					self.Owner.PlayerName, self.Info.Name, self.ActorID, self.World.WorldTick,
@@ -244,9 +226,10 @@ namespace OpenRA.Mods.Common.Traits
 				self.TraitOrDefault<IHealth>()?.HP ?? 0);
 		}
 
-		public static bool IsExactRootAttackActivity(OpenRA.Activities.Activity activity)
+		public static bool ContinuesConfirmedFiringActivity(
+			OpenRA.Activities.Activity recordedActivity, OpenRA.Activities.Activity currentActivity)
 		{
-			return activity != null && activity.GetType() == typeof(OpenRA.Mods.Common.Activities.Attack);
+			return recordedActivity != null && ReferenceEquals(recordedActivity, currentActivity);
 		}
 
 		static string ActivitySignature(OpenRA.Activities.Activity activity)

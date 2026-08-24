@@ -339,6 +339,8 @@ Player:
 		MaximumTargetCandidates: 48
 		ThreatRangeBufferCells: 2
 		DetectorRangeBufferCells: 2
+		RouteThreatPenalty: 4
+		MaximumRouteStretchPercent: 150
 		KiteRangeMarginCells: 1
 		CarefulClearValueRatio: 5
 		MinimumLateHarassmentGroupSize: 3
@@ -356,21 +358,23 @@ Player:
 		MissionRetryInterval: 300
 		NearbyTargetReactionRadiusCells: 12
 		RetreatAfterReveal: true
+		PostMissionRetreatDistanceCells: 6
+		PostMissionRetreatToleranceCells: 1
 		# Match AirSquad's three strategic scans of patience before a safe blocker clear.
 		DefenderClearFallbackScans: 3
 		DefenderClearValueRatio: 1
 		DefenderClearWeakestCandidates: 3
 		HarassmentTargetPriorities:
-			harv: 10000
-			sharv: 10000
+			mcv: 5000
+			harv: 5000
+			sharv: 5000
+			fact: 2500
 			nuk2: 8500
 			proc: 6000
 			eye: 5500
 			tmpl: 5500
 			hq: 4500
 			nuke: 1800
-		LateHarassmentTargetPriorities:
-			fact: 7000
 		AttackTargetPriorities:
 			htnk: 10000
 			mtnk: 8500

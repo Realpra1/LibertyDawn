@@ -1957,3 +1957,358 @@ the blocker precisely if natural combat acceptance remains unproved.
   and closure. It does not justify a product/test change. Both hard-gate verdicts
   are unwaived. Final exact-head protected receipts, clean commit and fresh Terra
   review remain before release handoff.
+
+## Post-merge wall-priority and honest-causal correction amendment (2026-08-24)
+
+- This is the existing CNC-96A task/round on isolated successor branch
+  `agent/20260824-cnc96a-wall-priority`, exact clean base
+  `02861b72221b9498405ed9660c1f8a3f4abce32e` (PR130 squash merge). Never edit,
+  push or merge `bleed` directly.
+- User authority: wall selection is an unconditional product correction regardless
+  of the prior v6 policy verdict. Target priorities must be `mcv` and every
+  configured harvester equivalent (`harv`, `sharv`, etc.) = 5000; `fact` about
+  2500; wall/sandbag/fence types = 1. Route cost, incumbent retention and switch
+  policy may not select a valid reachable wall over a valid reachable factory
+  unless that factory is invalid, unseen, unreachable or unsafe. Preserve only
+  justified existing priorities for other categories. Diagnose the complete
+  selection pipeline before editing; add focused policy and full-engine adversarial
+  target-choice coverage.
+- The exact-head v6 read-only audit found its production/watchdog/direct-event
+  evidence valid but its STNK-only efficacy claim insufficient: 146 early infantry
+  were factory-produced and their live/loss/damage/kill contribution was not
+  tracked; enemy production/death/deletion totals were not tracked; the 17 STNK
+  kills cover only scanned Enemy1/2 Health actors whose alive current VIKI STNK
+  attacker reached `OnKilled`; v6 used symmetric preplaced nuke/proc/afld/hq plus
+  covert1/2/3 and 20,000 cash per player; physical retreat route lengths were not
+  recorded. Nine target-complete cycles proved only adjacent six-cell strategic
+  destinations (`delta=1`) and resource-free endpoints, not traveled length.
+- Honest causal rerun boundary is superseded to tick 4,500 (three game minutes):
+  ticks 0-4,500 permit infantry and STNK, no other combat domain/type; after
+  tick4,500 STNK is the only VIKI combat production (optional infantry allowance
+  remains zero). Switch earlier only to drain ordinary queues while preserving
+  exact completion compliance. Instrument all three players' initial/produced/
+  acquired/captured/dead/live ledgers and every combat attacker's damage/kills by
+  type/category/phase, reporting observed STNK causal contribution without a
+  counterfactual victory claim. Record exact retreat start/end and route length
+  if making distance claims. Every supported in-scope finding is presumptively
+  actionable; policy reviewers may not broaden or weaken scope.
+
+## Game A v2 invalid harness and independent mobility blocker disposition
+
+- Game A v2 is uncounted because the tick3750 queue switch still produced 28
+  forbidden E1 after the exact tick4500 boundary. Its independent runtime finding
+  is nevertheless product evidence: VIKI STNK #978 became idle at cell11,34 and
+  `QueueSafeMobility` repeatedly submitted the same coarse regroup plan every75
+  ticks; each Move stack collapsed after0-9 ticks with zero center displacement,
+  culminating in the hard nonexempt watchdog failure at tick16127. Busy matching
+  activity replacement was not observed.
+- Fresh bounded factual receipt
+  `.build/cnc96a-wall-priority/reviews/gamea-v2-narrator/NARRATIVE.md` separates
+  the invalid late-E1 harness from #978. Fresh serialized policy receipt
+  `.build/cnc96a-wall-priority/reviews/gamea-v2-policy/POLICY-REVIEW.md` is
+  `FAIL`, non-waivable: the hard watchdog trigger independently requires an
+  in-scope exact-route/mobility correction. Disposition: accepted. Apply exact
+  submitted-segment validation to every idle `QueueSafeMobility` candidate and
+  memoize a failed zero-progress route by actor/origin/anchor/route/context so an
+  identical scan cannot reissue it; literal movement, anchor movement or hazard/
+  route-context change permits retry. Busy actors remain untouched. The harness
+  queue drain moves to tick3000 and zero-damage observer callbacks are suppressed
+  before the same-seed rerun.
+- Bounded engine/API inspection found no safe Lua production-queue cancellation
+  surface: script production exposes `Build`/`IsProducing`, not cancellation of
+  ordinary AI-owned queued items. Game A v4 proved revocation at tick3000 still
+  allowed queued E1 beyond tick4500. Per coordinator authority, both final harness
+  variants therefore enable the STNK-only late production module from world load.
+  Game A still receives the ordinary opening-garrison module's bounded 12 E1 plus
+  8 E3 request; Game A v5 proves all20 complete before tick4500 with no late
+  forbidden combat, so it satisfies the literal early allowance/late boundary.
+  Game B additionally filters that shared request for VIKI, making its combat
+  production STNK-only from world load, stricter than the permitted early maximum.
+  This guarantees exact boundary compliance without callbacks, free units, balance
+  changes or product AI override while retaining distinct topology/pressure. Husk actors
+  remain in the ledger but are excluded from Trigger attachment because husks lack
+  `ScriptTriggers`; zero-damage callbacks remain suppressed.
+- Corrected Game A v5 is exact-boundary compliant but uncounted because it hard
+  failed at tick11885: newly produced STNK #856 entered the specialist group as
+  an unlatched reinforcement while still carrying ordinary `AttackMoveActivity`.
+  It moved once at11109, then stayed at46,13 while continuing real discharges,
+  damage and infantry kills through11878. Those discharges were correctly not a
+  root-`Attack` exemption; age reached750. There was no busy matching replacement.
+  Fresh factual receipt `.build/cnc96a-wall-priority/reviews/gamea-v5-narrator/NARRATIVE.md`
+  and serialized policy `.build/cnc96a-wall-priority/reviews/gamea-v5-policy/POLICY-REVIEW.md`
+  both classify the hard trigger as non-waivable; policy verdict `FAIL`, high
+  confidence. Disposition: accepted. Direct Air mapping permits one route/target
+  ownership application when a reinforcement has no matching latch, even if it
+  still carries an unrelated busy activity; only a busy matching route is
+  preserved. Ground now does the same, so incidental AttackMove cannot remain
+  unowned indefinitely, while later matching Move/Attack activity is untouched.
+- User literal firing-contract correction supersedes the v5 reviewer's root-only
+  interpretation: shot-confirmed continuous firing is exempt during the declared
+  burst/reload cadence while the same valid target/activity continues, including
+  `AttackMoveActivity`. The activity/order by itself, aiming, approach or cooldown
+  before any discharge remains nonexempt; activity/target change, invalid target,
+  or missed cadence closes the episode, and a stale single shot cannot exempt
+  indefinitely. #856's continued discharges through tick11878 therefore expose a
+  watchdog false positive independently of its unlatched reinforcement lifecycle.
+  The watchdog now begins only from the real `INotifyAttack.Attacking` discharge
+  callback for any activity root and retains all target/activity/armament/cadence
+  closure checks. It does not turn `AttackMove` state into evidence by itself.
+- Game A v6 revealed the remaining harness producer precisely: the shared
+  `OpeningGarrisonBotModule`, not `UnitBuilderBotModule`, continued requesting E1
+  replacements after tick4500. This makes v6 uncounted even if product behavior
+  otherwise passes. Both final variants now exclude only VIKI from that module;
+  both Brutalis profiles remain unrestricted. VIKI therefore uses the STNK-only
+  builder from world load, which is the user-authorized stricter filter and is
+  verified by `OnAnyProduction`, rather than relying on queue drain or callbacks.
+
+## Targeted priority/retreat discriminator and exact-route correction
+
+- Targeted v7 is uncounted and its tick2988 hard watchdog is not waived by a
+  shorter receipt. Live `sharv#577` remained a valid mission target while all
+  three specialists repeatedly received a zero-progress/current-cell
+  `LostActivity` route. The failure was therefore an in-scope product mobility
+  defect, not merely a post-scenario empty-world artifact.
+- Source tracing confirmed that `IPathFinder.FindUnitPath` returns its cell list
+  from target to source. Two specialist call sites consumed that list as if it
+  were source to target: post-mission retreat route issuance and the exact-direct
+  replacement in attack routing. The smallest correction normalizes only those
+  consumed paths to forward source-to-target order; reachability-only calls are
+  unchanged. Focused policy/config coverage is 178/178 PASS after this change.
+- Targeted v10 at
+  `.build/cnc96a-wall-priority/batches/targeted-v10/targeted-v10` is a bounded
+  proving calibration: exit0 at tick3000 in13.023s, with no watchdog failure and
+  no v7-class `lost-activity member-route` signature. It records exact six-cell
+  physical retreat routes at ticks150,1275,1300,1775,2150 and2525, followed by
+  physical-arrival completion; exact arrivals log `immediate-replan=true`.
+  Detector/dense avoidance remains active (for example harvester direct25 vs
+  selected40 with `detector-or-dense-veto=true`), while unobstructed sparse/direct
+  cases remain within bound.
+- The wall incumbent pipeline now continues candidate evaluation when the
+  incumbent is a wall fallback. In v10 the strategic target switches from
+  `sbag#547` priority1 to `fact#554` priority2500 at tick225 while all currently
+  busy actors are preserved under one-shot ownership; the FACT is killed at719.
+  A pre-switch already-owned SBAG attack nevertheless completes and kills the
+  wall at366. This is not self-waived: the targeted factual narrator and policy
+  reviewer must directly decide whether Air-compatible busy ownership permits
+  that completion or whether wall-to-nonwall switching needs a narrow safe
+  cancellation exception.
+- Because exact-route normalization changes the product, prior natural Game A/B
+  are calibration only. Rerun both unchanged final-source natural games with a
+  fresh separate factual narrator and policy reviewer per game. Before release,
+  targeted final evidence must exercise MCV, HARV and SHARV at priority5000,
+  FACT2500 and SBAG/CYCL/BARB priority1 through the actual capped/routed/incumbent
+  pipeline, and must re-prove detector/dense avoidance and sparse soft passage.
+
+## Final-source Game A hard-gate failure after route normalization
+
+- The first final-source natural Game A attempt is uncounted. At tick19692 VIKI
+  `stnk#849` hard-failed the stationary watchdog at cell8,36 with nonexempt age
+  750 and idle activity; no natural game-over occurred. The last full tick19000
+  snapshot had39 STNK produced,29 live/10 lost,1,524,694 attributed damage and
+  12 kills, with both Brutalis opponents still alive.
+- Fresh factual receipt:
+  `.build/cnc96a-wall-priority/reviews/final-source-game-a-failed-narrator/NARRATIVE.md`.
+  Fresh serialized policy receipt:
+  `.build/cnc96a-wall-priority/reviews/final-source-game-a-failed-policy/POLICY-REVIEW.md`.
+  Policy verdict is FAIL/high confidence and non-waivable.
+- The exact failure is a staged reinforcement repeatedly receiving different
+  one/two-cell local mobility routes (cells7,34 through8,38) while the valid far
+  `proc#783` mission remains. It makes intermittent local moves, then all attempts
+  from tick18942 collapse at cell8,36 until the trigger. The varying hashes mean
+  this is not identical-route churn; raw same-type observer transitions do not
+  confirm replacement of a still-busy matching activity.
+- Disposition: accepted product correction. For an idle reinforcement with a
+  valid far mission, route failure memory must not reset merely because unrelated
+  full-map influence or exact moving-core jitter changes. Preserve a one-shot
+  exact safe route toward the stable mission/core strategic responsibility and
+  retry only for literal member movement or relevant local route/anchor/hazard/
+  target change. Busy matching activity remains untouched. Rerun both final
+  natural games and fresh reviews after the correction.
+
+## Final-source Game A v2 distinct hard-gate failure
+
+- The first reinforcement cache correction compiled cleanly and focused policy
+  coverage reached 179/179 PASS, but same-seed Game A v2 is also uncounted. It
+  terminated on the hard watchdog at tick11577 for VIKI `stnk#687`, idle at
+  cell8,37 with nonexempt age750; the last tick11000 snapshot had9 VIKI STNK
+  produced,6 live/3 lost,237094 attributed damage and7 kills, with both Brutalis
+  opponents still alive.
+- This trace is distinct from #849. The base-side half of a split six-member
+  mission group repeatedly receives one-cell shared strategic plans while the
+  far-side half remains productively busy. For #687, successive `TargetChanged`
+  and `LostActivity` plans against `proc#529`, `nuke#521/#568` and `fact#548`
+  collapse from Move/Attack to idle within1-11 ticks without position change.
+  The target identity and route hash change, so target-scoped member failure
+  memory is repeatedly discarded; no replacement of a still-busy matching
+  activity is confirmed. At failure the other three group members are still
+  moving/firing and a valid `proc#529` plan exists.
+- Product editing is paused pending the required fresh factual narration and
+  serialized policy review. Isolated narrator inputs are staged at
+  `.build/cnc96a-wall-priority/reviews/final-source-game-a-v2-failed-narrator/`.
+  Any correction will be limited to the review-supported idle-member exact-route
+  validation/failure-memory seam; busy one-shot ownership remains untouched.
+- Fresh factual receipt completed at that directory's `NARRATIVE.md`; fresh
+  serialized policy receipt completed at
+  `.build/cnc96a-wall-priority/reviews/final-source-game-a-v2-failed-policy/POLICY-REVIEW.md`.
+  Policy verdict is FAIL/high confidence, confirms zero still-busy matching
+  replacement, and supports exactly the bounded correction proposed above.
+- Disposition: accepted. Every idle target-plan member is now exact-validated on
+  both `TargetChanged` and `LostActivity`. A collapsed member route is accumulated
+  by actor and physical origin across strategic target cycling, so cycling
+  `proc`/`nuke`/`fact` cannot resurrect a route that already made zero progress;
+  literal member movement clears the applicable identity and distinct safe
+  endpoints remain eligible. Busy peers remain excluded under one-shot ownership.
+  Module build is clean and focused policy tests pass177/177 after this seam.
+  The earlier179 count was the combined policy+configuration selection: before
+  this regression it was176 policy+3 config; the exact combined filter is now
+  180/180 PASS. No route-normalization/stable-responsibility test was removed or
+  disabled.
+- Same-seed final-source Game A v3 had no watchdog failure, but is uncounted: the
+  launcher reached its120-second bound around tick23000 without natural game-over.
+  The last snapshot had90 compliant STNK produced,81 live/9 lost,2,172,989
+  attributed damage and37 kills; both opponents were still non-defeated. One
+  identical relaunch is warranted before classifying the long outcome as a
+  scenario/product discriminator.
+- Identical same-seed final-source Game A v4 is a valid counted candidate: exit0,
+  natural VIKI win at tick13838 (engine natural-game-over exit follows),24
+  compliant STNK produced,20 live/4 lost at END,243 attributed damage events for
+  1,928,437 damage and22 kills, maximum veterancy level3/675000. Both Brutalis
+  opponents are defeated with zero live mobile/harvester actors in the exact END
+  snapshot. There is no watchdog failure; raw samples show maximum pre-END
+  nonexempt age152. Fresh factual narration is active at
+  `.build/cnc96a-wall-priority/reviews/final-source-game-a-v4-narrator/`; serialized
+  policy review remains required before Game B or another code decision.
+- Game A v4 factual receipt:
+  `.build/cnc96a-wall-priority/reviews/final-source-game-a-v4-narrator/NARRATIVE.md`.
+  Fresh policy receipt:
+  `.build/cnc96a-wall-priority/reviews/final-source-game-a-v4-policy/POLICY-REVIEW.md`.
+  Policy verdict is mostly sensible/medium confidence; every supplied hard gate
+  passes, no busy matching replacement or actionable STNK defect is found.
+  Disposition: no product change. Its matched old-policy and deliberate detector
+  scenario suggestions are explicitly future validation recommendations, not
+  balance changes or in-scope blockers; this cycle's required targeted route/
+  detector discriminator remains the proper bounded supplemental evidence.
+- Distinct final-source natural Game B v4 is a valid counted candidate: exit0,
+  natural VIKI win at tick17705 within120 seconds,40 compliant STNK produced,36
+  live/4 lost at END,192 attributed damage events for1,489,764 damage and19
+  kills, maximum veterancy level3/675000. Both opponents are defeated with zero
+  mobile/harvester actors in the exact END snapshot. There is no watchdog failure;
+  exact raw samples show maximum pre-END nonexempt age122. Fresh factual narration
+  is active at `.build/cnc96a-wall-priority/reviews/final-source-game-b-v4-narrator/`;
+  serialized policy remains required before another code decision.
+- Game B v4 factual receipt:
+  `.build/cnc96a-wall-priority/reviews/final-source-game-b-v4-narrator/NARRATIVE.md`
+  (with bounded neutral launcher addendum: seed96602, exit0, ~60.34s). Fresh policy:
+  `.build/cnc96a-wall-priority/reviews/final-source-game-b-v4-policy/POLICY-REVIEW.md`.
+  Verdict PASS/mostly sensible/medium; all hard gates pass, no confirmed busy
+  replacement or actionable defect. Disposition: no product change; matched
+  old-policy/lifecycle capture suggestions are future validation only.
+- Tightened injected targeted v11 ran exact final binary to configured tick5000,
+  exit0/no watchdog. It explicitly kills MCV#555 at1343, HARV#580 at1468 and
+  SHARV#585 at1608 after each appears sequentially as priority5000. FACT#553
+  priority2500 becomes strategic target at225 while the already-owned SBAG#547
+  priority1 activity completes at366; the earlier independent targeted policy
+  already classified that one-shot completion as Air-compatible, not a wall
+  target-selection defect. Exact six-cell physical retreat arrivals with
+  `immediate-replan=true` recur, and attack-route logs retain both detector/dense
+  veto detours and hard-safe direct/sparse passages. Fresh factual narration and
+  serialized policy are required before disposition.
+
+## Successor final disposition and receipts
+
+- The counted final source is unchanged across both natural games and the final
+  targeted discriminator. Game A v4 is the ordinary STNK-only-production VIKI
+  versus two allied unrestricted Brutalis topology at seed96601: exit0/natural
+  VIKI game-over tick13838 within120 seconds;24 VIKI STNK produced,20 live/4
+  lost,1,928,437 attributed STNK damage and22 kills, maximum level3/675000; both
+  opponents have zero mobile/harvester actors at END; watchdog0/max pre-END152.
+  Its fresh narrator and policy receipts are
+  `.build/cnc96a-wall-priority/reviews/final-source-game-a-v4-narrator/NARRATIVE.md`
+  and `.../final-source-game-a-v4-policy/POLICY-REVIEW.md`; policy found every
+  hard gate passed and no actionable STNK defect or busy matching replacement.
+  Disposition: no further product change.
+- Distinct Game B v4 at seed96602 is exit0/natural VIKI game-over tick17705 in
+  about60.34 seconds;40 VIKI STNK produced,36 live/4 lost,1,489,764 attributed
+  STNK damage and19 kills, maximum level3/675000; both opponents have zero
+  mobile/harvester actors at END; watchdog0/max pre-END122. Fresh receipts are
+  `.build/cnc96a-wall-priority/reviews/final-source-game-b-v4-narrator/NARRATIVE.md`
+  and `.../final-source-game-b-v4-policy/POLICY-REVIEW.md`; policy PASSes every
+  hard gate with no confirmed busy replacement/actionable defect. Disposition:
+  no further product change. Both games retain honest all-actor production and
+  attribution ledgers; victory alone is not represented as STNK-only causality.
+- Final exact-binary targeted v14 is an injected supplemental, not a natural
+  acceptance game. It exits0 at configured tick3000 with watchdog0 and proves:
+  original priority1 SBAG activity may finish under Air one-shot ownership while
+  fresh idle #544 is assigned FACT2500 at tick250 and busy #545/#546 remain
+  owned; MCV5000, HARV5000 and SHARV5000 are selected and killed; FACT is killed
+  at2769; then `factory-invalid=true nonwall-live=0` with live priority1 SBAG,
+  CYCL and BARB, followed by actual wall-only SBAG kill and CYCL/BARB damage.
+  It records explicit detector/dense veto detours (for example nuke direct44 to
+  selected79) and sparse ordinary e1 soft near-direct passage (15 to17,
+  veto=false), plus every exact physical six-cell arrival/immediate replan and
+  every non-arrival separately.
+- Fresh factual receipt:
+  `.build/cnc96a-wall-priority/reviews/targeted-v14-narrator/NARRATIVE.md`.
+  The first policy pass requested exact facts that existed in the raw run but
+  were omitted from the initial narrative. The original narrator added a bounded
+  same-run factual addendum; the fresh serialized rereview at
+  `.build/cnc96a-wall-priority/reviews/targeted-v14-policy/POLICY-REVIEW.md`
+  returns `sensible`, high confidence, advisory priority. It explicitly PASSes
+  wall-only fallback, MCV/HARV/SHARV, busy-SBAG ownership, prompt fresh FACT
+  handoff, exact arrival/non-arrival handling, detector/dense versus sparse route
+  policy and watchdog. Prior required follow-up is satisfied; natural/control
+  comparison is a nonblocking supplemental limitation. Disposition: preserve the
+  narrow implementation; no product or balance change.
+- Final protected checks on the release tree: combined focused Release policy/
+  configuration suite180/180; exact `make check` PASS0 warnings/errors; Release
+  `make all` PASS0 warnings/errors; full `./utility.sh cnc --check-yaml` PASS;
+  `git diff --check` PASS; `AUTONOMOUS-CNC-TASKS.md` net diff is zero. Raw maps,
+  logs, reviews, support directories and check receipts remain ignored. Commit
+  once, write the exact-head ignored command/hash receipt, and route a fresh
+  native Terra review before any publication.
+
+## Matched recorded-base control disposition
+
+- First exact-head Terra final review at
+  `.build/cnc96a-wall-priority/reviews/terra-final/REVIEW.md` confirmed the
+  protected checks, natural/targeted receipts, clean/task-sheet/raw state, but
+  BLOCKed release solely because no matched old-behavior control had yet been
+  provided. Disposition: accepted without product change. A detached clean
+  control worktree at recorded base
+  `02861b72221b9498405ed9660c1f8a3f4abce32e` built Release0/0. The exact final
+  A/B map packages ran with the same seeds, lobby, starts, options, VIKI
+  STNK-only production, unrestricted allied Brutalis, economy, watchdog and
+  30,000-tick/120-second bounds. No control instrumentation backport was needed.
+- Matched Control A uses byte-identical map SHA256
+  `49e83b1214ff42d77623f8cb2524892dde533e82cb09a13be67d94ba7ae1578b`
+  and seed96601. Candidate wins naturally at13838. Base runs healthily to the
+  external120-second bound, exit124/nonterminal, last complete snapshot25000:
+  148 STNK produced/145 live/3 lost,2,180,821 damage/39 kills, both opponents
+  still not defeated; damage/kills are unchanged from tick24000 to25000. At
+  tick13000 candidate has21 produced/19 live/2 lost,1,716,897/20, Enemy1
+  defeated and Enemy2 zero harvesters; control has19/19/0,1,260,091/24, neither
+  defeated and Enemy2 four harvesters. Both watchdog0 (control max534).
+  Fresh factual comparison:
+  `.build/cnc96a-wall-priority/reviews/base-control-a-narrator/NARRATIVE.md`;
+  fresh policy:
+  `.build/cnc96a-wall-priority/reviews/base-control-a-policy/POLICY-REVIEW.md`.
+  Policy `mostly sensible`/medium finds credible candidate support and correctly
+  keeps timeout nonterminal; its sole required follow-up is distinct matched B.
+- Matched Control B uses byte-identical map SHA256
+  `550686bee0d0ea2edf9989b2f3337d9b69f91ef6d369f89dfd7ee739eacb64e0`
+  and seed96602. Both runs naturally win within120 seconds, but candidate ends
+  at17705 with40 produced/36 live/4 lost,1,489,764/19,max level3; base ends at
+  21846 with120/106/14,1,575,639/32,max level1. Candidate therefore ends4,141
+  ticks earlier using one third the production and under one third the losses;
+  descriptive damage/produced is37,244 versus13,130. Both watchdog0 (candidate
+  max125 in matched narrator table; base449). Fresh factual comparison:
+  `.build/cnc96a-wall-priority/reviews/base-control-b-narrator/NARRATIVE.md`;
+  fresh policy:
+  `.build/cnc96a-wall-priority/reviews/base-control-b-policy/POLICY-REVIEW.md`.
+  Policy `mostly sensible`/medium/advisory explicitly says paired A/B closes the
+  bounded old-behavior-control release gate; no balance change or invented
+  threshold. Its optional focused lifecycle trace is advisory and already
+  complemented by targeted v14 and the exact natural lifecycle receipts.
+  Disposition: no product change. Update the same single commit with these
+  evidence receipts, rerun exact-head cleanliness/check receipt, then route a
+  fresh Terra final rereview before publication.
