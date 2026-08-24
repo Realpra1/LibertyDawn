@@ -1,3 +1,14 @@
+# CNC-96A PR132 finite-safety policy evidence follow-up
+
+- Status: telemetry-only implementation and exact-final evidence validation complete; coordinator policy routing pending
+- Base: `dc26620de92934d0ffee25bfb0510869746e93f5`
+- Product behavior: unchanged; candidate enumeration mirrors the existing danger-ascending/clearance-descending decision only when default-false `AirTargetDebugLogging` is enabled
+- Debug Game A: six evaluated safe neighboring 6x6 candidates; selected `27,39` is externally recomputed rank-zero/minimum under the unchanged risk ordering; one issue at tick 208, one arrival at tick 308, three preserved checks, no later/in-flight escape at tick-800 horizon
+- Release Game B: equivalent map/seed with logging field omitted; ordinary game reaches configured tick 800; external verifier observes zero safety-candidate, safety-state, or target-evidence markers
+- Artifacts: `.build/cnc96a-safety-policy2/results-exact-final/`; verifier: `.build/cnc96a-safety-policy2/verify_evidence.py`
+- Gates: `make check` PASS 0 warnings/errors; CNC YAML PASS; focused tests 7/7; `git diff --check` PASS
+- No push, publication, merge, task-sheet edit, or coordinator-state edit
+
 # CNC-96A PR132 policy evidence follow-up
 
 - Status: debug-gated evidence implementation and exact-final worker validation complete; coordinator policy routing pending

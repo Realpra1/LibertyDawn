@@ -1,3 +1,42 @@
+# CNC-96A PR132 finite-safety policy evidence follow-up
+
+This second follow-up changes no safety or routing decision. When the existing
+default-false `AirTargetDebugLogging` flag is enabled, the nearest-safe helper
+now records every accepted neighboring 6x6 candidate's strategic cell,
+destination, squared travel distance, danger cost, and threat clearance. It
+also records the selected candidate's rank under the existing
+danger-ascending/clearance-descending ordering. Candidate collection, sorting,
+and logging are skipped when the flag is off.
+
+Game A applies one finite detector/ground-weapon pulse and removes both hazard
+actors at tick 300. Its exact-final log records six safe neighboring candidates
+at tick 208. All have danger 0.2; destination `27,39` has the greatest threat
+clearance (113), is selected as rank zero/minimum under the unchanged risk
+ordering, and receives exactly one order batch. The same escape arrives at tick
+308 after three preserved 25-tick checks, changes immediately to Idle/replan,
+and no second issue or unfinished escape exists at the tick-800 horizon.
+
+Game B uses the equivalent map, actors, hazard pulse, seed, bots, and horizon,
+but its map rules omit `AirTargetDebugLogging`. Ordinary gameplay reaches the
+configured tick-800 exit. The manifest forbids evidence markers, and the
+separate external verifier independently observes zero candidate, safety-state,
+and target-evidence telemetry in the release-default debug log.
+
+Both exact-final games passed under
+`.build/cnc96a-safety-policy2/results-exact-final/`. The external verifier
+`.build/cnc96a-safety-policy2/verify_evidence.py` reparses the debug candidate
+set, recomputes the minimum from raw danger/clearance values, requires exactly
+one issue and arrival before the horizon, and checks the release log. It reports
+`PASS candidates=6 selected=27,39 travel=61 issue=208 arrival=308
+release-telemetry=0`.
+
+`make check` passed with 0 warnings/errors, CNC YAML validation passed, the
+focused `StealthAIFunctionMatrixTest` passed 7/7, and `git diff --check` passed.
+The standalone test-project build retained four unrelated pre-existing analyzer
+warnings. Raw maps, logs, replays, summaries, and verifier inputs remain ignored
+under `.build`. This worker did not push, publish, merge, edit the task sheet,
+or edit coordinator state.
+
 # CNC-96A PR132 policy evidence follow-up
 
 This follow-up changes no target, route, safety, balance, or production policy.

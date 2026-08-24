@@ -850,6 +850,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			CPos? best = null;
 			var bestDanger = float.MaxValue;
 			var bestThreatDistance = long.MinValue;
+			var debugCandidates = owner.SquadManager.Info.AirTargetDebugLogging ?
+				new List<(CPos Cell, CPos Destination, long Travel, float Danger, long Clearance)>() : null;
 			for (var dy = -1; dy <= 1; dy++)
 				for (var dx = -1; dx <= 1; dx++)
 				{
@@ -875,6 +877,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 					var nearestThreatDistance = cache.Threats.Count == 0 ? long.MaxValue :
 						cache.Threats.Min(t => (t.Actor.Location - destination).LengthSquared);
+					debugCandidates?.Add((coarse, destination,
+						(representative.Location - destination).LengthSquared, danger, nearestThreatDistance));
 					if (danger < bestDanger ||
 						(danger == bestDanger && nearestThreatDistance > bestThreatDistance))
 					{
@@ -883,6 +887,21 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 						bestThreatDistance = nearestThreatDistance;
 					}
 				}
+
+			if (debugCandidates != null && best != null)
+			{
+				var ranked = debugCandidates.OrderBy(candidate => candidate.Danger)
+					.ThenByDescending(candidate => candidate.Clearance).ToArray();
+				var selectedRank = Array.FindIndex(ranked, candidate => candidate.Destination == best.Value);
+				var candidates = debugCandidates.Select(candidate =>
+					$"cell={candidate.Cell}|destination={candidate.Destination}|travel={candidate.Travel}|" +
+					$"danger={candidate.Danger}|clearance={candidate.Clearance}").JoinWith(";");
+				Log.Write("debug", "Stealth safety candidates [{0}] tick={1}: evaluated={2} " +
+					"selected={3} selected-rank={4} selected-minimum={5} " +
+					"selection=danger-ascending,clearance-descending.",
+					owner.StealthProfile, owner.World.WorldTick, candidates, best.Value, selectedRank,
+					selectedRank == 0);
+			}
 
 			return best;
 		}
