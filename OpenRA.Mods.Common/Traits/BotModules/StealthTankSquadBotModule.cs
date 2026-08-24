@@ -52,6 +52,10 @@ namespace OpenRA.Mods.Common.Traits
 		public readonly bool ClaimAllEligible = false;
 		public readonly int ThreatRangeBufferCells = 2;
 		public readonly int DetectorRangeBufferCells = 2;
+		[Desc("Coarse-route cost per unit of graduated specialist threat influence.")]
+		public readonly int RouteThreatPenalty = 4;
+		[Desc("Maximum routed distance versus a hard-safe exact direct route, as a percentage.")]
+		public readonly int MaximumRouteStretchPercent = 150;
 		public readonly int KiteRangeMarginCells = 1;
 		public readonly int CarefulClearValueRatio = 5;
 		public readonly int MinimumLateHarassmentGroupSize = 3;
@@ -75,6 +79,10 @@ namespace OpenRA.Mods.Common.Traits
 		public readonly int NearbyTargetReactionRadiusCells = 0;
 		[Desc("Retreat one strategic cell after a specialist fires and reveals itself.")]
 		public readonly bool RetreatAfterReveal = false;
+		[Desc("Requested physical route distance in map cells for post-mission specialist retreat.")]
+		public readonly int PostMissionRetreatDistanceCells = 6;
+		[Desc("Allowed route-distance tolerance for passability around the requested post-mission retreat distance.")]
+		public readonly int PostMissionRetreatToleranceCells = 1;
 		[Desc("Consecutive all-defended scans before a harassment group may clear a weak defender.")]
 		public readonly int DefenderClearFallbackScans = 20;
 		[Desc("Required specialist value multiple over the complete defended route package before clearing its weakest member.")]
@@ -106,11 +114,13 @@ namespace OpenRA.Mods.Common.Traits
 				StealthTankSquadPolicy.SquadCount(MaximumHarassmentGroups, IncludeAttackGroup) >
 					StealthTankSquadPolicy.MaximumSquadCount ||
 				ThreatRangeBufferCells < 0 || DetectorRangeBufferCells < 0 ||
+				RouteThreatPenalty < 0 || MaximumRouteStretchPercent < 100 ||
 				KiteRangeMarginCells < 0 || CarefulClearValueRatio <= 0 || MinimumLateHarassmentGroupSize <= 0 ||
 				TargetSwitchImprovementPercent < 0 || HarassmentDistancePenalty <= 0 ||
 				ResourceWaitingSearchRadius < 0 || ResourceWaitingOrderInterval <= 0 ||
 				PendingResourceExplosionAvoidanceRadius < 0 || HazardRouteWaypointSpacing <= 0 || StrategicCellSize < 0 ||
 				MissionRetryInterval < 0 || NearbyTargetReactionRadiusCells < 0 ||
+				PostMissionRetreatDistanceCells <= 0 || PostMissionRetreatToleranceCells < 0 ||
 				(RetreatAfterReveal && StrategicCellSize != StealthTankSquadPolicy.RequiredStrategicCellSize) ||
 				DefenderClearFallbackScans < 0 || DefenderClearValueRatio <= 0 ||
 				DefenderClearWeakestCandidates <= 0 ||
@@ -153,6 +163,10 @@ namespace OpenRA.Mods.Common.Traits
 				new Dictionary<uint, FailedRetreatSearch>();
 			public readonly Dictionary<uint, StagedRetreatRoute> StagedRetreatRoutes =
 				new Dictionary<uint, StagedRetreatRoute>();
+			public readonly Dictionary<uint, FailedMobilitySearch> FailedMobilitySearches =
+				new Dictionary<uint, FailedMobilitySearch>();
+			public readonly Dictionary<uint, CPos> MobilityPlanAnchors = new Dictionary<uint, CPos>();
+			public readonly Dictionary<uint, int> MobilityPlanContextHashes = new Dictionary<uint, int>();
 			public bool MembershipChanged;
 			public bool HasPlan;
 			public CPos PlannedTargetLocation;
@@ -161,8 +175,11 @@ namespace OpenRA.Mods.Common.Traits
 			public int LastTargetHp = int.MaxValue;
 			public Actor SuspendedEngagementTarget;
 			public Actor RetreatTarget;
+			public bool PostMissionRetreat;
 			public int LastRetreatOrderTick;
 			public readonly Dictionary<uint, CPos> RetreatDestinations = new Dictionary<uint, CPos>();
+			public readonly Dictionary<uint, CPos> RetreatOrigins = new Dictionary<uint, CPos>();
+			public readonly Dictionary<uint, int> RetreatRouteLengths = new Dictionary<uint, int>();
 
 			public SpecialistGroup(int index) { Index = index; }
 		}
@@ -174,6 +191,7 @@ namespace OpenRA.Mods.Common.Traits
 			public CPos Origin;
 			public CPos Endpoint;
 			public int RouteHash;
+			public readonly HashSet<int> RouteHashes = new HashSet<int>();
 		}
 
 		sealed class FailedReinforcementSearch
@@ -201,6 +219,16 @@ namespace OpenRA.Mods.Common.Traits
 			public CPos Origin;
 			public CPos Endpoint;
 			public int RouteContextHash;
+		}
+
+		sealed class FailedMobilitySearch
+		{
+			public uint TargetId;
+			public CPos Origin;
+			public CPos Anchor;
+			public int RouteContextHash;
+			public bool Exhausted;
+			public readonly HashSet<int> FailedRouteHashes = new HashSet<int>();
 		}
 
 		sealed class DefendedOpportunity
@@ -369,6 +397,9 @@ namespace OpenRA.Mods.Common.Traits
 				group.ReinforcementLastOrderTicks.Clear();
 				group.ReinforcementSafeHolds.Clear();
 				group.FailedReinforcementSearches.Clear();
+				group.FailedMobilitySearches.Clear();
+				group.MobilityPlanAnchors.Clear();
+				group.MobilityPlanContextHashes.Clear();
 				group.Target = null;
 				group.SuspendedEngagementTarget = null;
 				group.RetreatTarget = null;
@@ -582,8 +613,9 @@ namespace OpenRA.Mods.Common.Traits
 			var ordersBefore = scanQueuedOrders;
 			foreach (var group in groups)
 			{
-				if (group.SuspendedEngagementTarget != null || StealthTankSquadPolicy.ShouldBlockReassessment(
-					group.RetreatDestinations.Count))
+				if (group.SuspendedEngagementTarget != null ||
+					StealthTankSquadPolicy.ShouldBlockTargetReassessment(
+						group.RetreatDestinations.Count, group.PostMissionRetreat))
 					continue;
 
 				var active = group.Units.Where(a => IsActiveCoreSpecialist(group, a)).ToArray();
@@ -599,7 +631,8 @@ namespace OpenRA.Mods.Common.Traits
 
 				// A retained nearby mission already satisfies the bounded reaction policy.
 				// Observe it without replacing the target or reissuing its orders.
-				if (group.Target != null && nearby.Contains(group.Target))
+				if (group.Target != null && nearby.Contains(group.Target) &&
+					!group.Target.Info.HasTraitInfo<LineBuildNodeInfo>())
 				{
 					if (Info.DebugLogging)
 						Log.Write("debug", "AI stealth squad {0} [{1}:{2}] nearby reaction tick={3}: target={4}#{5} distance={6} radius={7} bounded-latency={8} retained=true order-churn=false.",
@@ -754,6 +787,7 @@ namespace OpenRA.Mods.Common.Traits
 			var orders = 0;
 
 			group.RetreatTarget = IsEnemyTarget(incumbent) ? incumbent : null;
+			group.PostMissionRetreat = false;
 			group.RetreatDestinations.Clear();
 			group.FailedRetreatSearches.Clear();
 			group.StagedRetreatRoutes.Clear();
@@ -798,6 +832,13 @@ namespace OpenRA.Mods.Common.Traits
 
 			group.LastOrderTick = world.WorldTick;
 			group.LastRetreatOrderTick = world.WorldTick;
+			if (group.RetreatDestinations.Count == 0)
+			{
+				group.PostMissionRetreat = false;
+				group.RetreatTarget = null;
+				scanTicks = 1;
+			}
+
 			if (Info.DebugLogging)
 				Log.Write("debug", "AI stealth local safety {0} [{1}:{2}] tick={3}: action=routed-evade exposed={4} danger-sources={5} incumbent={6} ordered={7} destinations={8} stop=false barrier={9}.",
 					Info.SquadLabel, player.PlayerName, group.Index, world.WorldTick,
@@ -833,41 +874,54 @@ namespace OpenRA.Mods.Common.Traits
 			Actor[] triggeringUnits, string reason)
 		{
 			group.RetreatTarget = target;
+			group.PostMissionRetreat = true;
 			group.RetreatDestinations.Clear();
+			group.RetreatOrigins.Clear();
+			group.RetreatRouteLengths.Clear();
 			group.FailedRetreatSearches.Clear();
 			group.StagedRetreatRoutes.Clear();
 			group.Target = null;
 			group.SuspendedEngagementTarget = null;
 			ClearRetainedPlan(group);
 			var orders = 0;
+			var view = strategicViewOwner.GetStrategicView(out _);
+			var safetyMap = GetInfluenceMap(view.Threats);
 			foreach (var unit in units)
 			{
-				var destination = FindStrategicRetreatDestination(unit, target.Location);
-				if (destination == null)
+				var route = FindPostMissionRetreatRoute(unit, target.Location, safetyMap,
+					out var destination);
+				if (route == null || route.Count == 0)
 					continue;
 
-				group.RetreatDestinations[unit.ActorID] = destination.Value;
-				bot.QueueOrder(new Order("Move", unit, Target.FromCell(world, destination.Value), false));
-				orders++;
+				group.RetreatDestinations[unit.ActorID] = destination;
+				group.RetreatOrigins[unit.ActorID] = unit.Location;
+				group.RetreatRouteLengths[unit.ActorID] =
+					StealthTankSquadPolicy.RouteDistanceCells(unit.Location, route);
+				orders += QueueRetreatRoute(group, unit, route);
 			}
 
 			group.LastOrderTick = world.WorldTick;
 			group.LastRetreatOrderTick = world.WorldTick;
+			if (group.RetreatDestinations.Count == 0)
+			{
+				group.PostMissionRetreat = false;
+				group.RetreatTarget = null;
+				scanTicks = 1;
+			}
+
 			if (Info.DebugLogging)
 			{
 				var geometry = group.RetreatDestinations.OrderBy(kv => kv.Key).Select(kv =>
 				{
-					var from = StealthTankSquadPolicy.StrategicCell(world.GetActorById(kv.Key).Location,
-						StrategicCellSize);
-					var to = StealthTankSquadPolicy.StrategicCell(kv.Value, StrategicCellSize);
-					var delta = Math.Max(Math.Abs(to.X - from.X), Math.Abs(to.Y - from.Y));
-					return kv.Key + ":" + from + ">" + to + ":delta=" + delta +
+					var from = group.RetreatOrigins[kv.Key];
+					return kv.Key + ":" + from + ">" + kv.Value + ":route-cells=" +
+						group.RetreatRouteLengths[kv.Key] +
 						":resource=" + (HasAnyResource(kv.Value) ? "present" : "none");
 				}).ToArray();
-				Log.Write("debug", "AI stealth squad {0} [{1}:{2}] post-mission retreat tick={3}: target={4}#{5} reason={6} trigger-units={7} ordered={8} strategic-size={9} all-one-cell={10} geometry={11} destinations={12}.",
+				Log.Write("debug", "AI stealth squad {0} [{1}:{2}] post-mission retreat tick={3}: target={4}#{5} reason={6} trigger-units={7} ordered={8} requested-route-cells={9} tolerance={10} geometry={11} destinations={12}.",
 					Info.SquadLabel, player.PlayerName, group.Index, world.WorldTick, target.Info.Name, target.ActorID,
-					reason, string.Join(",", triggeringUnits.Select(a => a.ActorID)), orders, StrategicCellSize,
-					geometry.Length == orders && geometry.All(g => g.Contains(":delta=1:resource=")),
+					reason, string.Join(",", triggeringUnits.Select(a => a.ActorID)), orders,
+					Info.PostMissionRetreatDistanceCells, Info.PostMissionRetreatToleranceCells,
 					string.Join(",", geometry),
 					string.Join(",", group.RetreatDestinations.OrderBy(kv => kv.Key)
 						.Select(kv => kv.Key + ":" + kv.Value)));
@@ -886,13 +940,17 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				var unit = world.GetActorById(actorId);
 				var responsibilityDestination = group.RetreatDestinations[actorId];
+				var recordedRouteLength = group.RetreatRouteLengths.TryGetValue(actorId,
+					out var routeLength) ? routeLength : -1;
 				var eligible = IsEligible(unit);
-				var reachedDestination = eligible && StealthTankSquadPolicy.IsSameStrategicCell(
-					unit.Location, responsibilityDestination, StrategicCellSize);
+				var reachedDestination = eligible && (group.PostMissionRetreat ?
+					unit.Location == responsibilityDestination : StealthTankSquadPolicy.IsSameStrategicCell(
+						unit.Location, responsibilityDestination, StrategicCellSize));
 				var maintenance = StealthTankSquadPolicy.MaintainRetreatResponsibility(
 					group.RetreatDestinations, actorId, eligible ? unit.Location : (CPos?)null, eligible,
 					repairing.Contains(actorId), eligible && unit.IsIdle, world.WorldTick,
-					group.LastRetreatOrderTick, Info.ScanInterval, StrategicCellSize,
+					group.LastRetreatOrderTick, Info.ScanInterval,
+					group.PostMissionRetreat ? 1 : StrategicCellSize,
 					findRetryPlan: null, queueRoute: null,
 					cleanup: () =>
 					{
@@ -902,6 +960,8 @@ namespace OpenRA.Mods.Common.Traits
 						group.FailedMemberRoutes.Remove(actorId);
 						group.FailedRetreatSearches.Remove(actorId);
 						group.StagedRetreatRoutes.Remove(actorId);
+						group.RetreatOrigins.Remove(actorId);
+						group.RetreatRouteLengths.Remove(actorId);
 					},
 					out _, out _);
 				if (maintenance == SpecialistRetreatMaintenanceAction.Completed)
@@ -912,15 +972,53 @@ namespace OpenRA.Mods.Common.Traits
 							StealthTankSquadPolicy.RetreatIneligibleCleanupTelemetry(
 								actorId, responsibilityDestination));
 					else if (Info.DebugLogging && reachedDestination)
-						Log.Write("debug", "AI stealth retreat responsibility {0} [{1}:{2}] tick={3}: unit={4} current={5} selected-endpoint={6} arrived-same-strategic-cell=true endpoint-resource={7} responsibility=completed reason=physical-arrival stop=false cancel=false.",
+						Log.Write("debug", "AI stealth retreat responsibility {0} [{1}:{2}] tick={3}: unit={4} current={5} selected-endpoint={6} arrived-responsibility=true exact-cell={7} endpoint-resource={8} responsibility=completed reason=physical-arrival route-cells={9} stop=false cancel=false immediate-replan={10}.",
 							Info.SquadLabel, player.PlayerName, group.Index, world.WorldTick,
 							actorId, unit.Location, responsibilityDestination,
-							HasAnyResource(responsibilityDestination));
+							unit.Location == responsibilityDestination,
+							HasAnyResource(responsibilityDestination), recordedRouteLength,
+							group.PostMissionRetreat);
 				}
 			}
 
 			var retreatTarget = group.RetreatTarget;
 			var retreatTargetValid = IsEnemyTarget(retreatTarget);
+			if (group.PostMissionRetreat && group.RetreatDestinations.Count > 0)
+			{
+				// A target-completion retreat owns at most its original seven-cell physical
+				// route. A route that later collapses is invalidated, never expanded through
+				// the legacy adjacent-cell/staged/full-map retry machinery. Idle peers can
+				// immediately resume target acquisition while still-busy members finish.
+				foreach (var actorId in group.RetreatDestinations.Keys.ToArray())
+				{
+					var unit = world.GetActorById(actorId);
+					if (!StealthTankSquadPolicy.ShouldInvalidateBoundedPostMissionRetreat(
+						group.PostMissionRetreat, IsEligible(unit), unit?.IsIdle ?? false,
+						repairing.Contains(actorId), unit != null && unit.Location ==
+							group.RetreatDestinations[actorId]))
+						continue;
+
+					var destination = group.RetreatDestinations[actorId];
+					group.RetreatDestinations.Remove(actorId);
+					group.RetainedRoutes.Remove(actorId);
+					group.RetainedRouteIndices.Remove(actorId);
+					group.RetainedRouteOrigins.Remove(actorId);
+					group.FailedMemberRoutes.Remove(actorId);
+					group.FailedRetreatSearches.Remove(actorId);
+					group.StagedRetreatRoutes.Remove(actorId);
+					group.RetreatOrigins.Remove(actorId);
+					group.RetreatRouteLengths.Remove(actorId);
+					if (Info.DebugLogging)
+						Log.Write("debug", "AI stealth post-mission retreat invalidated {0} [{1}:{2}] tick={3}: unit={4} destination={5} reason=idle-before-exact-arrival bounded-route-not-expanded stop=false cancel=false immediate-replan=true.",
+							Info.SquadLabel, player.PlayerName, group.Index, world.WorldTick,
+							actorId, destination);
+				}
+
+				scanTicks = 1;
+				if (group.RetreatDestinations.Count > 0)
+					return false;
+			}
+
 			var completion = StealthTankSquadPolicy.CompleteRetreat(
 				group.RetreatDestinations.Count, retreatTargetValid);
 			if (completion == StealthTankRetreatCompletion.ContinueRetreat)
@@ -946,7 +1044,7 @@ namespace OpenRA.Mods.Common.Traits
 							group.RetreatDestinations, pending.ActorID, pending.Location,
 							IsEligible(pending), repairing.Contains(pending.ActorID), pending.IsIdle,
 							world.WorldTick, group.LastRetreatOrderTick, Info.ScanInterval,
-							StrategicCellSize,
+							group.PostMissionRetreat ? 1 : StrategicCellSize,
 							findRetryPlan: required =>
 							{
 								RecordFailedRetreatRoute(group, pending, retreatTarget);
@@ -1033,6 +1131,7 @@ namespace OpenRA.Mods.Common.Traits
 					group.Target == null ? "none" : group.Target.Info.Name + "#" + group.Target.ActorID,
 					completion);
 			group.RetreatTarget = null;
+			group.PostMissionRetreat = false;
 			group.LastRetreatOrderTick = 0;
 			group.FailedRetreatSearches.Clear();
 			group.StagedRetreatRoutes.Clear();
@@ -1042,21 +1141,35 @@ namespace OpenRA.Mods.Common.Traits
 
 		void RecordFailedRetreatRoute(SpecialistGroup group, Actor unit, Actor retreatTarget)
 		{
+			RecordFailedMemberRoute(group, unit, retreatTarget);
+		}
+
+		void RecordFailedMemberRoute(SpecialistGroup group, Actor unit, Actor target)
+		{
 			if (group.RetainedRoutes.TryGetValue(unit.ActorID, out var route) && route.Count > 0 &&
 				group.RetainedRouteOrigins.TryGetValue(unit.ActorID, out var origin) &&
 				origin == unit.Location)
-				group.FailedMemberRoutes[unit.ActorID] = new FailedMemberRoute
+			{
+				if (!group.FailedMemberRoutes.TryGetValue(unit.ActorID, out var failure) ||
+					!StealthTankSquadPolicy.FailedMemberRouteRemainsApplicable(
+						failure.TargetId == (target?.ActorID ?? 0),
+						failure.TargetLocation == (target?.Location ?? CPos.Zero),
+						failure.Origin == origin))
 				{
-					TargetId = retreatTarget?.ActorID ?? 0,
-					TargetLocation = retreatTarget?.Location ?? CPos.Zero,
-					Origin = origin,
-					Endpoint = route[route.Count - 1],
-					RouteHash = DiagnosticRouteHash(route)
-				};
+					failure = new FailedMemberRoute { Origin = origin };
+					group.FailedMemberRoutes[unit.ActorID] = failure;
+				}
+
+				failure.TargetId = target?.ActorID ?? 0;
+				failure.TargetLocation = target?.Location ?? CPos.Zero;
+				failure.Endpoint = route[route.Count - 1];
+				failure.RouteHash = DiagnosticRouteHash(route);
+				failure.RouteHashes.Add(failure.RouteHash);
+			}
 			else if (group.FailedMemberRoutes.TryGetValue(unit.ActorID, out var previousFailure) &&
 				!StealthTankSquadPolicy.FailedMemberRouteRemainsApplicable(
-					previousFailure.TargetId == (retreatTarget?.ActorID ?? 0),
-					previousFailure.TargetLocation == (retreatTarget?.Location ?? CPos.Zero),
+					previousFailure.TargetId == (target?.ActorID ?? 0),
+					previousFailure.TargetLocation == (target?.Location ?? CPos.Zero),
 					previousFailure.Origin == unit.Location))
 				group.FailedMemberRoutes.Remove(unit.ActorID);
 
@@ -1327,6 +1440,93 @@ namespace OpenRA.Mods.Common.Traits
 			}
 
 			return orders;
+		}
+
+		List<CPos> FindPostMissionRetreatRoute(Actor unit, CPos target,
+			SpecialistInfluenceMap safetyMap, out CPos destination)
+		{
+			destination = CPos.Zero;
+			var mobile = unit.TraitOrDefault<Mobile>();
+			if (mobile == null || pathfinder == null)
+				return null;
+
+			var requested = Info.PostMissionRetreatDistanceCells;
+			var tolerance = Info.PostMissionRetreatToleranceCells;
+			var minimum = Math.Max(1, requested - tolerance);
+			var maximum = requested + tolerance;
+			var awayX = Math.Sign(unit.Location.X - target.X);
+			var awayY = Math.Sign(unit.Location.Y - target.Y);
+			if (awayX == 0 && awayY == 0)
+				awayX = 1;
+
+			var candidates = world.Map.FindTilesInAnnulus(unit.Location, minimum, maximum)
+				.Where(c => (c.X - unit.Location.X) * awayX + (c.Y - unit.Location.Y) * awayY > 0 &&
+					mobile.CanEnterCell(c) && !HasAnyResource(c) && !IsResourceHazard(c) &&
+					!IsInfluencedCell(safetyMap, c) &&
+					(domainIndex == null || domainIndex.IsPassable(unit.Location, c, mobile.Locomotor)))
+				.OrderByDescending(c => (c.X - unit.Location.X) * awayX +
+					(c.Y - unit.Location.Y) * awayY)
+				.ThenBy(c => Math.Abs((int)Math.Ceiling(Math.Sqrt((c - unit.Location).LengthSquared)) - requested))
+				.ThenBy(c => c.Y).ThenBy(c => c.X).Take(Info.MaximumTargetCandidates);
+			List<CPos> bestRoute = null;
+			var bestDelta = int.MaxValue;
+			var exactRoutes = 0;
+			var unsafeExactRoutes = 0;
+			var wrongDistanceRoutes = 0;
+			foreach (var candidate in candidates)
+			{
+				var route = StealthTankSquadPolicy.ForwardExactGroundRoute(pathfinder.FindUnitPath(
+					unit.Location, candidate, unit, null, BlockedByActor.Immovable));
+				if (route.Count == 0)
+					continue;
+				exactRoutes++;
+				if (route.Any(c => StealthTankSquadPolicy.ShouldRejectPostMissionRetreatRouteCell(
+					c == unit.Location, HasAnyResource(c), IsResourceHazard(c),
+					IsInfluencedCell(safetyMap, c))))
+				{
+					unsafeExactRoutes++;
+					continue;
+				}
+
+				var routeDistance = StealthTankSquadPolicy.RouteDistanceCells(unit.Location, route);
+				if (!StealthTankSquadPolicy.IsPostMissionRetreatRouteDistance(routeDistance,
+					requested, tolerance))
+				{
+					wrongDistanceRoutes++;
+					continue;
+				}
+
+				var delta = Math.Abs(routeDistance - requested);
+				if (bestRoute != null && delta >= bestDelta)
+					continue;
+
+				bestRoute = route;
+				bestDelta = delta;
+				destination = candidate;
+				if (delta == 0)
+					break;
+			}
+
+			if (bestRoute == null && Info.DebugLogging)
+			{
+				var annulus = world.Map.FindTilesInAnnulus(unit.Location, minimum, maximum).ToArray();
+				var directional = annulus.Where(c =>
+					(c.X - unit.Location.X) * awayX + (c.Y - unit.Location.Y) * awayY > 0).ToArray();
+				var enterable = directional.Where(c => mobile.CanEnterCell(c)).ToArray();
+				var resourceFree = enterable.Where(c => !HasAnyResource(c)).ToArray();
+				var hazardFree = resourceFree.Where(c => !IsResourceHazard(c)).ToArray();
+				var influenceFree = hazardFree.Where(c => !IsInfluencedCell(safetyMap, c)).ToArray();
+				var domainPassable = influenceFree.Where(c => domainIndex == null ||
+					domainIndex.IsPassable(unit.Location, c, mobile.Locomotor)).ToArray();
+				Log.Write("debug", "AI stealth post-mission retreat search {0} [{1}] tick={2}: unit={3} origin={4} target={5} requested={6} tolerance={7} annulus={8} directional={9} enterable={10} resource-free={11} hazard-free={12} influence-free={13} domain-passable={14} bounded-candidates={15} exact-routes={16} unsafe-exact-routes={17} wrong-distance-routes={18} result=none.",
+					Info.SquadLabel, player.PlayerName, world.WorldTick, unit.ActorID, unit.Location,
+					target, requested, tolerance, annulus.Length, directional.Length, enterable.Length,
+					resourceFree.Length, hazardFree.Length, influenceFree.Length, domainPassable.Length,
+					Math.Min(domainPassable.Length, Info.MaximumTargetCandidates), exactRoutes,
+					unsafeExactRoutes, wrongDistanceRoutes);
+			}
+
+			return bestRoute;
 		}
 
 		CPos? FindStrategicRetreatDestination(Actor unit, CPos target,
@@ -1758,19 +1958,24 @@ namespace OpenRA.Mods.Common.Traits
 				}
 
 				var destinationAnchor = missionLocation ?? coreLocation;
+				if (unit.IsIdle)
+					RecordCollapsedSafeMobilityRoute(group, unit);
+
 				var desiredPlanTarget = IsEnemyTarget(group.Target) ? group.Target.ActorID : 0;
 				var desiredPlanCell = StealthTankSquadPolicy.StrategicCell(
 					destinationAnchor, StrategicCellSize);
 
-				// Match Air's reinforcement latch exactly: the mission target owns the in-flight
-				// activity. A moving target changes its coarse cell, but does not invalidate and
-				// replace a busy reinforcement route. Idle units are replanned from their current
-				// location below, as in AirAttackState.
+				// Match Air's reinforcement latch exactly: an already-routed matching mission
+				// owns the in-flight activity. An unlatched reinforcement may still carry the
+				// ordinary squad's AttackMove from before reservation; Air establishes its route
+				// ownership once instead of preserving that unrelated activity indefinitely.
+				// Once latched, a busy matching route is never replaced.
 				var matchesRetainedPlan = group.ReinforcementPlanTargets.TryGetValue(
 					unit.ActorID, out var retainedTarget) && retainedTarget == desiredPlanTarget;
 				var issuedThisTick = group.ReinforcementLastOrderTicks.TryGetValue(
 					unit.ActorID, out var lastOrderTick) && lastOrderTick == world.WorldTick;
-				if (!unit.IsIdle)
+				if (StealthTankSquadPolicy.ShouldPreserveBusyReinforcement(
+					matchesRetainedPlan, unit.IsIdle))
 					continue;
 
 				var influence = GetInfluenceMap(threats);
@@ -1796,17 +2001,20 @@ namespace OpenRA.Mods.Common.Traits
 					continue;
 				}
 
-				var route = FindReinforcementRoute(unit, destinationAnchor, threats);
+				var route = FindReinforcementRoute(group, unit, destinationAnchor,
+					destinationAnchor, threats);
 				var routePurpose = "mission";
 				if ((route == null || route.Count == 0) && missionLocation != null)
 				{
-					route = FindReinforcementRoute(unit, coreLocation, threats);
+					route = FindReinforcementRoute(group, unit, coreLocation,
+						destinationAnchor, threats);
 					routePurpose = "core";
 				}
 
 				if (route == null || route.Count == 0)
 				{
-					route = FindSafeMobilityRoute(unit, coreLocation, threats);
+					route = FindSafeMobilityRoute(group, unit, coreLocation,
+						destinationAnchor, threats);
 					routePurpose = "mobility";
 				}
 
@@ -1847,6 +2055,13 @@ namespace OpenRA.Mods.Common.Traits
 					continue;
 
 				group.FailedReinforcementSearches.Remove(unit.ActorID);
+				group.RetainedRoutes[unit.ActorID] = route;
+				group.RetainedRouteIndices[unit.ActorID] = 0;
+				group.RetainedRouteOrigins[unit.ActorID] = unit.Location;
+				group.MobilityPlanAnchors[unit.ActorID] = StealthTankSquadPolicy.StrategicCell(
+					destinationAnchor, StrategicCellSize);
+				group.MobilityPlanContextHashes[unit.ActorID] =
+					MobilityRouteContextHash(unit.Location, GetInfluenceMap(threats));
 
 				var queued = false;
 				for (var i = Math.Min(Info.HazardRouteWaypointSpacing, route.Count - 1);
@@ -1880,13 +2095,38 @@ namespace OpenRA.Mods.Common.Traits
 			}
 		}
 
-		List<CPos> FindSafeMobilityRoute(Actor unit, CPos anchor, List<Threat> threats)
+		List<CPos> FindSafeMobilityRoute(SpecialistGroup group, Actor unit,
+			CPos anchor, CPos responsibilityAnchor, List<Threat> threats)
 		{
 			var mobile = unit.TraitOrDefault<Mobile>();
 			if (mobile == null)
 				return null;
 
 			var map = GetInfluenceMap(threats);
+			var stableAnchor = StealthTankSquadPolicy.StrategicCell(
+				responsibilityAnchor, StrategicCellSize);
+			var routeContextHash = MobilityRouteContextHash(unit.Location, map);
+			var targetId = IsEnemyTarget(group.Target) ? group.Target.ActorID : 0;
+			var failedSearch = group.FailedMobilitySearches.TryGetValue(unit.ActorID,
+				out var previousFailure) && !StealthTankSquadPolicy.ShouldRetryFailedMobilitySearch(
+					previousFailure.TargetId == targetId && previousFailure.Origin == unit.Location,
+					previousFailure.Anchor == stableAnchor,
+					previousFailure.RouteContextHash == routeContextHash) ? previousFailure : null;
+			if (failedSearch == null)
+			{
+				group.FailedMobilitySearches.Remove(unit.ActorID);
+				failedSearch = new FailedMobilitySearch
+				{
+					TargetId = targetId,
+					Origin = unit.Location,
+					Anchor = stableAnchor,
+					RouteContextHash = routeContextHash
+				};
+				group.FailedMobilitySearches[unit.ActorID] = failedSearch;
+			}
+			else if (failedSearch.Exhausted)
+				return null;
+
 			var anchorRoute = world.Map.FindTilesInAnnulus(unit.Location, 1, StrategicCellSize * 2)
 				.Where(c => mobile.CanEnterCell(c) && !IsResourceHazard(c) &&
 					!IsInfluencedCell(map, c) &&
@@ -1897,7 +2137,11 @@ namespace OpenRA.Mods.Common.Traits
 				.Take(16)
 				.Select(c => FindCoarseSafeRoute(unit.Location, c, map))
 				.FirstOrDefault(candidate => candidate != null && candidate.Count > 0 &&
-					candidate[candidate.Count - 1] != unit.Location);
+					candidate[candidate.Count - 1] != unit.Location &&
+					StealthTankSquadPolicy.ShouldIssueSafeMobilityRoute(unit.IsIdle,
+						RouteHasExactSafeSegments(unit, null, candidate, threats,
+							ignoreTargetDetector: false, allowDangerousEndpoint: false),
+						failedSearch.FailedRouteHashes.Contains(DiagnosticRouteHash(candidate))));
 			if (anchorRoute != null)
 				return anchorRoute;
 
@@ -1913,18 +2157,51 @@ namespace OpenRA.Mods.Common.Traits
 				!IsResourceHazard(nearestSafeDestination.Value) &&
 				!IsInfluencedCell(map, nearestSafeDestination.Value) &&
 				(domainIndex == null || domainIndex.IsPassable(unit.Location,
-					nearestSafeDestination.Value, mobile.Locomotor));
-			return StealthTankSquadPolicy.ShouldUseNearestSafeMobilityFallback(unit.IsIdle,
+					nearestSafeDestination.Value, mobile.Locomotor)) &&
+				StealthTankSquadPolicy.ShouldIssueSafeMobilityRoute(unit.IsIdle,
+					RouteHasExactSafeSegments(unit, null, nearestSafeRoute, threats,
+						ignoreTargetDetector: false, allowDangerousEndpoint: false),
+					failedSearch.FailedRouteHashes.Contains(DiagnosticRouteHash(nearestSafeRoute)));
+			var selected = StealthTankSquadPolicy.ShouldUseNearestSafeMobilityFallback(unit.IsIdle,
 				false, nearestSafeUsable) ? nearestSafeRoute : null;
+			if (selected == null)
+				failedSearch.Exhausted = true;
+
+			return selected;
 		}
 
-		List<CPos> FindReinforcementRoute(Actor unit, CPos anchor, List<Threat> threats)
+		List<CPos> FindReinforcementRoute(SpecialistGroup group, Actor unit,
+			CPos anchor, CPos responsibilityAnchor, List<Threat> threats)
 		{
 			var mobile = unit.TraitOrDefault<Mobile>();
 			if (mobile == null)
 				return null;
 
 			var map = GetInfluenceMap(threats);
+			var stableAnchor = StealthTankSquadPolicy.StrategicCell(
+				responsibilityAnchor, StrategicCellSize);
+			var routeContextHash = MobilityRouteContextHash(unit.Location, map);
+			var targetId = IsEnemyTarget(group.Target) ? group.Target.ActorID : 0;
+			var failedSearch = group.FailedMobilitySearches.TryGetValue(unit.ActorID,
+				out var previousFailure) && !StealthTankSquadPolicy.ShouldRetryFailedMobilitySearch(
+					previousFailure.TargetId == targetId && previousFailure.Origin == unit.Location,
+					previousFailure.Anchor == stableAnchor,
+					previousFailure.RouteContextHash == routeContextHash) ? previousFailure : null;
+			if (failedSearch == null)
+			{
+				group.FailedMobilitySearches.Remove(unit.ActorID);
+				failedSearch = new FailedMobilitySearch
+				{
+					TargetId = targetId,
+					Origin = unit.Location,
+					Anchor = stableAnchor,
+					RouteContextHash = routeContextHash
+				};
+				group.FailedMobilitySearches[unit.ActorID] = failedSearch;
+			}
+			else if (failedSearch.Exhausted)
+				return null;
+
 			return world.Map.FindTilesInAnnulus(anchor, 0, StrategicCellSize * 2)
 				.Where(c => StealthTankSquadPolicy.IsSameOrAdjacentStrategicCell(
 					c, anchor, StrategicCellSize) && mobile.CanEnterCell(c) &&
@@ -1933,7 +2210,11 @@ namespace OpenRA.Mods.Common.Traits
 				.OrderBy(c => (c - unit.Location).LengthSquared).ThenBy(c => c.Y).ThenBy(c => c.X)
 				.Take(16)
 				.Select(c => FindCoarseSafeRoute(unit.Location, c, map))
-				.FirstOrDefault(route => route != null && route.Count > 0);
+				.FirstOrDefault(route => route != null && route.Count > 0 &&
+					StealthTankSquadPolicy.ShouldIssueSafeMobilityRoute(unit.IsIdle,
+						RouteHasExactSafeSegments(unit, group.Target, route, threats,
+							ignoreTargetDetector: false, allowDangerousEndpoint: false),
+						failedSearch.FailedRouteHashes.Contains(DiagnosticRouteHash(route))));
 		}
 
 		List<MiniYamlNode> IGameSaveTraitData.IssueTraitData(Actor self)
@@ -1983,6 +2264,7 @@ namespace OpenRA.Mods.Common.Traits
 			foreach (var group in groups)
 			{
 				group.RetreatTarget = null;
+				group.PostMissionRetreat = false;
 				group.RetreatDestinations.Clear();
 				group.StagedRetreatRoutes.Clear();
 				group.LastRetreatOrderTick = world.WorldTick;
@@ -2261,6 +2543,14 @@ namespace OpenRA.Mods.Common.Traits
 			foreach (var actorId in group.StagedRetreatRoutes.Keys
 				.Where(id => !group.Units.Any(a => a.ActorID == id)).ToArray())
 				group.StagedRetreatRoutes.Remove(actorId);
+			foreach (var actorId in group.FailedMobilitySearches.Keys
+				.Where(id => !group.Units.Any(a => a.ActorID == id)).ToArray())
+			{
+				group.FailedMobilitySearches.Remove(actorId);
+				group.MobilityPlanAnchors.Remove(actorId);
+				group.MobilityPlanContextHashes.Remove(actorId);
+			}
+
 			UpdateReinforcements(group, threats);
 			var activeUnits = group.Units.Where(a => IsActiveCoreSpecialist(group, a)).ToArray();
 			if (group.Units.Count == 0)
@@ -2276,7 +2566,8 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (activeUnits.Length == 0)
 				return;
-			if (StealthTankSquadPolicy.ShouldBlockReassessment(group.RetreatDestinations.Count))
+			if (StealthTankSquadPolicy.ShouldBlockTargetReassessment(
+				group.RetreatDestinations.Count, group.PostMissionRetreat))
 				return;
 
 			var activeEngagement = group.Target != null && IsEnemyTarget(group.Target) &&
@@ -2295,7 +2586,8 @@ namespace OpenRA.Mods.Common.Traits
 			// an engagement veto; armed overlap and hazards still invalidate immediately.
 			if (StealthTankSquadPolicy.ShouldRetainWholeGroupEngagement(
 				StealthTankSquadPolicy.ShouldRetainActiveEngagement(activeEngagement,
-					activeEngagement, activeLocalThreat, false), hasPendingIdleMember))
+					activeEngagement, activeLocalThreat, false), hasPendingIdleMember,
+				group.Target != null && group.Target.Info.HasTraitInfo<LineBuildNodeInfo>()))
 			{
 				scanPlanRetentions++;
 				return;
@@ -2353,14 +2645,44 @@ namespace OpenRA.Mods.Common.Traits
 			var highestValueCellCount = Info.MaximumTargetCandidates - closestCellCount;
 			var ordinaryCellIndices = AirThreatGeometry.SelectTargetCandidates(cellDistances, cellUtilities,
 				closestCellCount, highestValueCellCount);
+			var nonWallCellIndices = candidateCells.Select((cell, index) => new { cell, index })
+				.Where(entry => entry.cell.Candidates.Any(candidate =>
+					!candidate.Actor.Info.HasTraitInfo<LineBuildNodeInfo>()))
+				.Select(entry => entry.index).ToArray();
 			var selectedCellIndices = AirThreatGeometry.SelectTargetCandidates(cellDistances, cellUtilities,
-				closestCellCount, highestValueCellCount, requiredCellIndex);
+				closestCellCount, highestValueCellCount, requiredCellIndex)
+				.Where(index => nonWallCellIndices.Contains(index)).ToList();
+			foreach (var index in nonWallCellIndices.OrderByDescending(i => cellUtilities[i])
+				.ThenBy(i => cellDistances[i]).ThenBy(i => i))
+				if (!selectedCellIndices.Contains(index) && selectedCellIndices.Count < Info.MaximumTargetCandidates)
+					selectedCellIndices.Add(index);
+
+			// A wall is evaluated only when every non-wall opportunity fits inside the
+			// bounded route pass. If valuable opportunities overflow the cap then holding
+			// the mission is safer than falsely declaring a wall the best reachable target.
+			if (nonWallCellIndices.Length <= Info.MaximumTargetCandidates)
+			{
+				var wallCellIndex = candidateCells.Select((cell, index) => new { cell, index })
+					.Where(entry => entry.cell.Candidates.Any(candidate =>
+						candidate.Actor.Info.HasTraitInfo<LineBuildNodeInfo>()))
+					.OrderByDescending(entry => cellUtilities[entry.index])
+					.ThenBy(entry => cellDistances[entry.index]).ThenBy(entry => entry.index)
+					.Select(entry => entry.index).DefaultIfEmpty(-1).First();
+				if (wallCellIndex >= 0 && !selectedCellIndices.Contains(wallCellIndex))
+					selectedCellIndices.Add(wallCellIndex);
+			}
+
+			if (requiredCellIndex >= 0 && !selectedCellIndices.Contains(requiredCellIndex))
+				selectedCellIndices.Add(requiredCellIndex);
 			var candidates = selectedCellIndices.SelectMany(i =>
 			{
 				var cell = candidateCells[i];
-				var bestChallenger = cell.Candidates.FirstOrDefault(candidate => candidate.Actor != incumbent);
+				var bestChallenger = cell.Candidates.FirstOrDefault(candidate => candidate.Actor != incumbent &&
+					!candidate.Actor.Info.HasTraitInfo<LineBuildNodeInfo>());
+				var bestWall = cell.Candidates.FirstOrDefault(candidate => candidate.Actor != incumbent &&
+					candidate.Actor.Info.HasTraitInfo<LineBuildNodeInfo>());
 				var cellIncumbent = cell.Candidates.FirstOrDefault(candidate => candidate.Actor == incumbent);
-				return new[] { bestChallenger, cellIncumbent }.Where(candidate => candidate != null);
+				return new[] { bestChallenger, bestWall, cellIncumbent }.Where(candidate => candidate != null);
 			}).Distinct().ToList();
 			var incumbentOutsideCandidateCap = requiredCellIndex >= 0 &&
 				!ordinaryCellIndices.Contains(requiredCellIndex);
@@ -2396,7 +2718,11 @@ namespace OpenRA.Mods.Common.Traits
 					StealthTankSquadPolicy.OptimisticApproachDistance(candidate.Distance, ownRange),
 					100, candidate.ClusterMultiplier,
 					role == StealthTankSquadRole.Harass ? Info.HarassmentDistancePenalty : 1);
-				if (candidate.Actor != incumbent && freshChallenger != null && freshChallengerDanger == 0 &&
+				var candidateIsWall = candidate.Actor.Info.HasTraitInfo<LineBuildNodeInfo>();
+				var challengerIsWall = freshChallenger != null &&
+					freshChallenger.Info.HasTraitInfo<LineBuildNodeInfo>();
+				if (candidate.Actor != incumbent && freshChallenger != null &&
+					(candidateIsWall || !challengerIsWall) && freshChallengerDanger == 0 &&
 					(upperScore < freshChallengerScore ||
 						(upperScore == freshChallengerScore && candidate.Actor.ActorID >= freshChallenger.ActorID)))
 					continue;
@@ -2480,9 +2806,13 @@ namespace OpenRA.Mods.Common.Traits
 				}
 
 				if (candidate.Actor != incumbent && (freshChallenger == null ||
-					(defendingValue == 0 && freshChallengerDanger > 0) ||
-					((defendingValue == 0) == (freshChallengerDanger == 0) && (freshScore > freshChallengerScore ||
-						(freshScore == freshChallengerScore && candidate.Actor.ActorID < freshChallenger.ActorID)))))
+					(!candidateIsWall && challengerIsWall) ||
+					(candidateIsWall == challengerIsWall &&
+						((defendingValue == 0 && freshChallengerDanger > 0) ||
+						((defendingValue == 0) == (freshChallengerDanger == 0) &&
+							(freshScore > freshChallengerScore ||
+								(freshScore == freshChallengerScore &&
+									candidate.Actor.ActorID < freshChallenger.ActorID)))))))
 				{
 					freshChallenger = candidate.Actor;
 					freshChallengerScore = freshScore;
@@ -2572,10 +2902,14 @@ namespace OpenRA.Mods.Common.Traits
 					challengerDanger = selectedDanger;
 				}
 
-				var reassessment = StealthTankSquadPolicy.ReassessTarget(
+				var incumbentIsWall = freshIncumbent != null &&
+					freshIncumbent.Info.HasTraitInfo<LineBuildNodeInfo>();
+				var challengerIsWall = challenger != null &&
+					challenger.Info.HasTraitInfo<LineBuildNodeInfo>();
+				var reassessment = StealthTankSquadPolicy.ReassessTargetWithWallFallback(
 					freshIncumbent != null, freshIncumbentDanger == 0, freshIncumbentScore,
 					challenger != null, challengerDanger == 0, challengerScore,
-					Info.TargetSwitchImprovementPercent);
+					Info.TargetSwitchImprovementPercent, incumbentIsWall, challengerIsWall);
 				if (reassessment == StealthTankTargetReassessment.RetainIncumbent)
 				{
 					selected = freshIncumbent;
@@ -2704,33 +3038,13 @@ namespace OpenRA.Mods.Common.Traits
 			var membershipChangedBeforeInvalidation = group.MembershipChanged;
 			var lastOrderTickBeforeInvalidation = group.LastOrderTick;
 			group.LastOrderTick = world.WorldTick;
-			if (invalidation == StealthTankPlanInvalidation.LostActivity)
-				foreach (var idle in idlePlanMembers)
-				{
-					if (group.RetainedRoutes.TryGetValue(idle.ActorID, out var failedRoute) &&
-						failedRoute.Count > 0 &&
-						group.RetainedRouteOrigins.TryGetValue(idle.ActorID, out var origin) &&
-						origin == idle.Location)
-						group.FailedMemberRoutes[idle.ActorID] = new FailedMemberRoute
-						{
-							TargetId = selected.ActorID,
-							TargetLocation = selected.Location,
-							Origin = origin,
-							Endpoint = failedRoute[failedRoute.Count - 1],
-							RouteHash = DiagnosticRouteHash(failedRoute)
-						};
-					else if (group.FailedMemberRoutes.TryGetValue(idle.ActorID, out var previousFailure) &&
-						!StealthTankSquadPolicy.FailedMemberRouteRemainsApplicable(
-							previousFailure.TargetId == selected.ActorID,
-							previousFailure.TargetLocation == selected.Location,
-							previousFailure.Origin == idle.Location))
-						group.FailedMemberRoutes.Remove(idle.ActorID);
+			var validateIdleMemberRoutes =
+				StealthTankSquadPolicy.ShouldValidateIdleMemberRoute(invalidation);
+			if (validateIdleMemberRoutes)
+				foreach (var idle in activeUnits.Where(a => a.IsIdle))
+					RecordFailedMemberRoute(group, idle, selected);
 
-					group.RetainedRoutes.Remove(idle.ActorID);
-					group.RetainedRouteIndices.Remove(idle.ActorID);
-					group.RetainedRouteOrigins.Remove(idle.ActorID);
-				}
-			else
+			if (invalidation != StealthTankPlanInvalidation.LostActivity)
 				ClearRetainedPlan(group);
 			var crush = selectedClearAction == SpecialistDefenderClearAction.CrushInfantry ||
 				(selectedClearAction == SpecialistDefenderClearAction.None && Info.CrushInfantryTargets &&
@@ -2743,7 +3057,7 @@ namespace OpenRA.Mods.Common.Traits
 					StealthTankSquadPolicy.CanApplyPendingTargetPlan(
 						world.WorldTick, lastOrderTickBeforeInvalidation)) : activeUnits;
 			ApplyHazardAwarePlan(group, selected, selectedRoute, crush, planUnits,
-				invalidation == StealthTankPlanInvalidation.LostActivity,
+				validateIdleMemberRoutes,
 				viewThreats: threats, ownRange: ownRange,
 				minimumAttackRangeCells: selectedMinimumAttackRange,
 				ignoreTargetDetector: StealthTankSquadPolicy.ShouldIgnoreSelectedDefenderInfluence(
@@ -2781,9 +3095,21 @@ namespace OpenRA.Mods.Common.Traits
 			var routes = new List<string>();
 			foreach (var unit in units.OrderBy(a => a.ActorID))
 			{
-				var route = FindSafeMobilityRoute(unit, anchor, threats);
+				if (!unit.IsIdle)
+					continue;
+
+				RecordCollapsedSafeMobilityRoute(group, unit);
+				var route = FindSafeMobilityRoute(group, unit, anchor, anchor, threats);
 				if (route == null || route.Count == 0)
 					continue;
+
+				group.RetainedRoutes[unit.ActorID] = route;
+				group.RetainedRouteIndices[unit.ActorID] = 0;
+				group.RetainedRouteOrigins[unit.ActorID] = unit.Location;
+				group.MobilityPlanAnchors[unit.ActorID] = StealthTankSquadPolicy.StrategicCell(
+					anchor, StrategicCellSize);
+				group.MobilityPlanContextHashes[unit.ActorID] =
+					MobilityRouteContextHash(unit.Location, GetInfluenceMap(threats));
 
 				var queued = false;
 				for (var i = Math.Min(Info.HazardRouteWaypointSpacing, route.Count - 1);
@@ -2817,6 +3143,43 @@ namespace OpenRA.Mods.Common.Traits
 			return orders;
 		}
 
+		void RecordCollapsedSafeMobilityRoute(SpecialistGroup group, Actor unit)
+		{
+			if (!unit.IsIdle || !group.RetainedRoutes.TryGetValue(unit.ActorID, out var route) ||
+				route.Count == 0 || !group.RetainedRouteOrigins.TryGetValue(unit.ActorID, out var origin) ||
+				origin != unit.Location || !group.MobilityPlanAnchors.TryGetValue(unit.ActorID, out var anchor) ||
+				!group.MobilityPlanContextHashes.TryGetValue(unit.ActorID, out var routeContextHash))
+				return;
+
+			if (!group.FailedMobilitySearches.TryGetValue(unit.ActorID, out var failure) ||
+				StealthTankSquadPolicy.ShouldRetryFailedMobilitySearch(
+					failure.TargetId == (IsEnemyTarget(group.Target) ? group.Target.ActorID : 0) &&
+					failure.Origin == origin, failure.Anchor == anchor,
+					failure.RouteContextHash == routeContextHash))
+			{
+				failure = new FailedMobilitySearch
+				{
+					TargetId = IsEnemyTarget(group.Target) ? group.Target.ActorID : 0,
+					Origin = origin,
+					Anchor = anchor,
+					RouteContextHash = routeContextHash
+				};
+				group.FailedMobilitySearches[unit.ActorID] = failure;
+			}
+
+			failure.FailedRouteHashes.Add(DiagnosticRouteHash(route));
+			failure.Exhausted = false;
+			group.RetainedRoutes.Remove(unit.ActorID);
+			group.RetainedRouteIndices.Remove(unit.ActorID);
+			group.RetainedRouteOrigins.Remove(unit.ActorID);
+			group.MobilityPlanAnchors.Remove(unit.ActorID);
+			group.MobilityPlanContextHashes.Remove(unit.ActorID);
+			if (Info.DebugLogging)
+				Log.Write("debug", "AI stealth mobility collapsed {0} [{1}] tick={2}: unit={3} origin={4} anchor={5} route-hash={6} context={7} memoized=true identical-reissue=false stop=false cancel=false.",
+					Info.SquadLabel, player.PlayerName, world.WorldTick, unit.ActorID, origin,
+					anchor, DiagnosticRouteHash(route), routeContextHash);
+		}
+
 		SpecialistDefenderClearAction DefenderClearAction(Threat defender, int packageDefenderCount,
 			int ownRange)
 		{
@@ -2832,6 +3195,9 @@ namespace OpenRA.Mods.Common.Traits
 			group.RetainedRoutes.Clear();
 			group.RetainedRouteIndices.Clear();
 			group.RetainedRouteOrigins.Clear();
+			group.FailedMobilitySearches.Clear();
+			group.MobilityPlanAnchors.Clear();
+			group.MobilityPlanContextHashes.Clear();
 			group.HasPlan = false;
 			group.LastTargetDistanceSquared = long.MaxValue;
 			group.LastTargetHp = int.MaxValue;
@@ -2934,7 +3300,7 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		void ApplyHazardAwarePlan(SpecialistGroup group, Actor target, List<CPos> path, bool crush,
-			IEnumerable<Actor> selectedUnits = null, bool validateLostActivityRoute = false,
+			IEnumerable<Actor> selectedUnits = null, bool validateIdleMemberRoute = false,
 			List<Threat> viewThreats = null, int ownRange = 0, int minimumAttackRangeCells = 0,
 			bool ignoreTargetDetector = false, bool allowDangerousEndpoint = false)
 		{
@@ -2951,9 +3317,9 @@ namespace OpenRA.Mods.Common.Traits
 			var memberRoutes = new List<(Actor Unit, List<CPos> Route, string Reason)>();
 			foreach (var unit in units)
 			{
-				var failedRouteMatchesShared = validateLostActivityRoute &&
+				var failedRouteMatchesShared = validateIdleMemberRoute &&
 					MatchesFailedMemberRoute(group, unit, target, path);
-				var sharedRouteUsable = !validateLostActivityRoute || (!failedRouteMatchesShared &&
+				var sharedRouteUsable = !validateIdleMemberRoute || (!failedRouteMatchesShared &&
 					MemberRouteIsUsable(
 					group, unit, target, path, viewThreats, ignoreTargetDetector,
 					allowDangerousEndpoint));
@@ -3067,10 +3433,34 @@ namespace OpenRA.Mods.Common.Traits
 				!group.FailedMemberRoutes.TryGetValue(unit.ActorID, out var failed))
 				return false;
 
-			return failed.TargetId == (target?.ActorID ?? 0) &&
-				failed.TargetLocation == (target?.Location ?? CPos.Zero) &&
-				failed.Origin == unit.Location && failed.Endpoint == route[route.Count - 1] &&
-				failed.RouteHash == DiagnosticRouteHash(route);
+			return failed.Origin == unit.Location &&
+				(failed.RouteHashes.Contains(DiagnosticRouteHash(route)) ||
+					(failed.Endpoint == route[route.Count - 1] &&
+						failed.RouteHash == DiagnosticRouteHash(route)));
+		}
+
+		int MobilityRouteContextHash(CPos origin, SpecialistInfluenceMap map)
+		{
+			// A failed short mobility route is invalidated only by danger/resource changes
+			// near that member. Hashing the whole battlefield made unrelated combat reset
+			// the finite failure set every scan and allowed endless local route cycling.
+			unchecked
+			{
+				var hash = 17;
+				var originX = Math.Clamp(origin.X / map.CoarseSize, 0, map.Width - 1);
+				var originY = Math.Clamp(origin.Y / map.CoarseSize, 0, map.Height - 1);
+				for (var y = Math.Max(0, originY - 2); y <= Math.Min(map.Height - 1, originY + 2); y++)
+					for (var x = Math.Max(0, originX - 2); x <= Math.Min(map.Width - 1, originX + 2); x++)
+					{
+						hash = hash * 31 + BitConverter.SingleToInt32Bits(map.Danger[y * map.Width + x]);
+						var representative = world.Map.Clamp(new CPos(
+							x * map.CoarseSize + map.CoarseSize / 2,
+							y * map.CoarseSize + map.CoarseSize / 2));
+						hash = hash * 31 + (IsResourceHazard(representative) ? 1 : 0);
+					}
+
+				return hash;
+			}
 		}
 
 		static int RetreatRouteContextHash(SpecialistInfluenceMap map)
@@ -3218,7 +3608,7 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				scanPathSearches++;
 				var route = ThreatAwareRoutePlanner.FindRoute(map.Danger, map.Width, map.Height,
-					startX, startY, goalX, goalY, map.Width * map.Height);
+					startX, startY, goalX, goalY, Info.RouteThreatPenalty);
 				if (route == null || route.Any(c => StealthTankSquadPolicy.IsHardRouteDanger(
 					map.Danger[c.Y * map.Width + c.X])))
 				{
@@ -3236,6 +3626,41 @@ namespace OpenRA.Mods.Common.Traits
 			if (result.Count == 0 || result[result.Count - 1] != destination)
 				result.Add(destination);
 
+			// Match Air's graduated influence routing without allowing a sparse ordinary
+			// front to buy a map-scale detour. An exact direct ground route may replace the
+			// coarse route only when every crossed coarse cell is free of detector/hard/dense
+			// influence; soft ordinary-fire and Blue-Tiberium cost remains advisory.
+			var selectedDistance = StealthTankSquadPolicy.RouteDistanceCells(unit.Location, result);
+			var directLowerBound = (int)Math.Ceiling(Math.Sqrt((destination - unit.Location).LengthSquared));
+			if (pathfinder != null && StealthTankSquadPolicy.RouteStretchIsDisproportionate(
+				selectedDistance, directLowerBound, Info.MaximumRouteStretchPercent))
+			{
+				var direct = StealthTankSquadPolicy.ForwardExactGroundRoute(pathfinder.FindUnitPath(
+					unit.Location, destination, unit, target,
+					crush ? BlockedByActor.None : BlockedByActor.Immovable));
+				var directHardSafe = direct.Count > 0 && direct.All(cell =>
+				{
+					var x = Math.Clamp(cell.X / map.CoarseSize, 0, map.Width - 1);
+					var y = Math.Clamp(cell.Y / map.CoarseSize, 0, map.Height - 1);
+					return !StealthTankSquadPolicy.IsHardRouteDanger(map.Danger[y * map.Width + x]);
+				});
+				var directDistance = StealthTankSquadPolicy.RouteDistanceCells(unit.Location, direct);
+				if (directHardSafe && StealthTankSquadPolicy.RouteStretchIsDisproportionate(
+					selectedDistance, directDistance, Info.MaximumRouteStretchPercent))
+					result = direct;
+
+				if (Info.DebugLogging)
+					Log.Write("debug", "AI stealth attack route {0} tick={1}: unit={2} target={3}#{4} direct={5} selected={6} stretch={7}% direct-hard-safe={8} detector-or-dense-veto={9}.",
+						Info.SquadLabel, world.WorldTick, unit.ActorID, target.Info.Name, target.ActorID,
+						directDistance, StealthTankSquadPolicy.RouteDistanceCells(unit.Location, result),
+						directDistance <= 0 ? 100 : selectedDistance * 100 / directDistance,
+						directHardSafe, !directHardSafe);
+			}
+			else if (Info.DebugLogging)
+				Log.Write("debug", "AI stealth attack route {0} tick={1}: unit={2} target={3}#{4} direct-lower-bound={5} selected={6} stretch-check=within-bound detector-or-dense-veto=false exact-direct-search=false.",
+					Info.SquadLabel, world.WorldTick, unit.ActorID, target.Info.Name, target.ActorID,
+					directLowerBound, selectedDistance);
+
 			return result;
 		}
 
@@ -3246,7 +3671,7 @@ namespace OpenRA.Mods.Common.Traits
 			var goalX = Math.Clamp(destination.X / map.CoarseSize, 0, map.Width - 1);
 			var goalY = Math.Clamp(destination.Y / map.CoarseSize, 0, map.Height - 1);
 			var route = ThreatAwareRoutePlanner.FindRoute(map.Danger, map.Width, map.Height,
-				startX, startY, goalX, goalY, map.Width * map.Height);
+				startX, startY, goalX, goalY, Info.RouteThreatPenalty);
 			if (route == null || route.Any(c => StealthTankSquadPolicy.IsHardRouteDanger(
 				map.Danger[c.Y * map.Width + c.X])))
 				return null;
@@ -3266,7 +3691,7 @@ namespace OpenRA.Mods.Common.Traits
 			var startX = Math.Clamp(unit.Location.X / map.CoarseSize, 0, map.Width - 1);
 			var startY = Math.Clamp(unit.Location.Y / map.CoarseSize, 0, map.Height - 1);
 			var route = ThreatAwareRoutePlanner.FindNearestSafeRoute(map.Danger, map.Width, map.Height,
-				startX, startY, map.Width * map.Height);
+				startX, startY, Info.RouteThreatPenalty);
 			if (route == null || route.Count == 0)
 				return null;
 
@@ -3351,7 +3776,10 @@ namespace OpenRA.Mods.Common.Traits
 				var weaponRange = StealthTankSquadPolicy.BufferedRange(
 					ignoreWeapon ? 0 : threat.WeaponRangeCells,
 					Info.ThreatRangeBufferCells);
-				MarkThreatRange(map, threat, Math.Max(detectorRange, weaponRange));
+				MarkThreatRange(map, threat, detectorRange,
+					StealthTankSquadPolicy.HardDetectorRouteInfluence);
+				MarkThreatRange(map, threat, weaponRange,
+					StealthTankSquadPolicy.OrdinaryWeaponRouteInfluence);
 			}
 
 			MarkSoftResourceCosts(map);
@@ -3408,9 +3836,9 @@ namespace OpenRA.Mods.Common.Traits
 				}
 		}
 
-		void MarkThreatRange(SpecialistInfluenceMap map, Threat threat, int range)
+		void MarkThreatRange(SpecialistInfluenceMap map, Threat threat, int range, float influence)
 		{
-			if (range <= 0)
+			if (range <= 0 || influence <= 0)
 				return;
 
 			// Mark any coarse cell whose footprint can intersect the live threat envelope.
@@ -3426,7 +3854,7 @@ namespace OpenRA.Mods.Common.Traits
 					var cell = world.Map.Clamp(new CPos(x * map.CoarseSize + map.CoarseSize / 2,
 						y * map.CoarseSize + map.CoarseSize / 2));
 					if ((world.Map.CenterOfCell(cell) - threat.Actor.CenterPosition).Length <= rangeLength)
-						map.Danger[y * map.Width + x] += 1;
+						map.Danger[y * map.Width + x] += influence;
 				}
 		}
 
@@ -3449,6 +3877,12 @@ namespace OpenRA.Mods.Common.Traits
 			if (role == StealthTankSquadRole.Harass && types.Overlaps(Info.ExcludedHarassmentTargetTypes))
 				return 0;
 
+			// Line-build actors are always the last-resort wall tier. Keep this ahead of
+			// authored actor priorities so cycl, sandbags, fences, or a map-specific wall
+			// alias cannot accidentally inherit a valuable-structure score.
+			if (role == StealthTankSquadRole.Harass && actor.Info.HasTraitInfo<LineBuildNodeInfo>())
+				return Info.WallTargetPriority;
+
 			if (role == StealthTankSquadRole.Harass && groupSize >= Info.MinimumLateHarassmentGroupSize &&
 				Info.LateHarassmentTargetPriorities.TryGetValue(actor.Info.Name, out var latePriority))
 				return latePriority;
@@ -3462,8 +3896,6 @@ namespace OpenRA.Mods.Common.Traits
 				return types.Overlaps(TankTargetTypes) ? 8000 : 0;
 			if (types.Overlaps(InfantryTargetTypes))
 				return Info.InfantryTargetPriority;
-			if (actor.Info.HasTraitInfo<LineBuildNodeInfo>())
-				return Info.WallTargetPriority;
 			if (types.Overlaps(StructureTargetTypes))
 			{
 				var armorType = actor.Info.TraitInfoOrDefault<ArmorInfo>()?.Type;

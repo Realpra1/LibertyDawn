@@ -2016,3 +2016,98 @@ Game1's sole advisory—make future firing tables label exact-root continuity—
 accepted for future evidence formatting; current evidence directly supports the
 gate and no product change is warranted. Final exact-head checks/receipt, clean
 commit and fresh Terra remain.
+
+## Post-merge priority, bounded-retreat, and honest-causal successor
+
+The successor is based on exact merged PR130 head
+`02861b72221b9498405ed9660c1f8a3f4abce32e`. It keeps one shared Stealth/Chemical
+implementation and preserves one-shot busy activity ownership, stealth/ground
+passability, repair/reinforcement, hard detector/resource/pending-hazard safety,
+and the mandatory stationary watchdog.
+
+The correction makes the user-authorized target policy literal: MCV and
+configured harvesters (`harv`/`sharv`) are5000, FACT2500 and walls/fences1. A
+wall incumbent can no longer suppress a valid routed higher category during
+global/nearby reassessment, while wall-only fallback remains valid. Post-target
+retreats now use exact forward ground paths and a bounded physical route of5–7
+cells (target6), retain per-member responsibility through physical arrival and
+immediately resume/replan rather than expanding into the old map-scale adjacent-
+coarse-cell lifecycle. Attack routing gives ordinary nondetector weapons soft
+density cost while detector/dense corridors remain hard/high avoidance and
+disproportionate detours are bounded. Idle-member exact-route validation and
+failure memory now cover TargetChanged, LostActivity and reinforcement mobility
+without replacing busy peers; failed zero-progress routes survive strategic
+target cycling until literal movement or relevant route context changes. The
+watchdog's firing episode starts only on a real discharge but correctly spans
+normal same-activity burst/reload cadence for Attack or AttackMove; stale,
+order-only, aiming or pre-shot activity is nonexempt.
+
+Focused regressions cover the exact priority tiers and wall-incumbent switch,
+Air configuration preservation, forward path normalization, 5–7-cell retreat
+initial/retry/no-route/immediate-replan semantics, sparse versus detector/dense
+routing, busy exclusion, failed-route memoization and context invalidation, and
+shot-confirmed firing closure. Combined focused Release result is180/180.
+
+Counted final natural Game A v4 at seed96601 exits0 at natural END13838:24
+compliant VIKI STNK produced,20 live/4 lost,1,928,437 attributed STNK damage/22
+kills, max level3, both allied Brutalis defeated with zero mobile/harvesters,
+watchdog0/max pre-END152. Distinct Game B v4 at seed96602 exits0 at natural
+END17705 in about60.34 seconds:40 produced,36 live/4 lost,1,489,764 attributed
+STNK damage/19 kills, max level3, both opponents defeated/zero mobile-harvesters,
+watchdog0/max122. Each has its own fresh factual narrator and policy receipt;
+both policies find every hard gate passed, zero confirmed still-busy matching
+replacement and no actionable STNK defect. The honest ledgers remain the causal
+evidence; victory alone is not described as STNK-only proof.
+
+Final injected targeted v14 exits0/tick3000/watchdog0 on the same binary. It
+proves priority1 SBAG ownership may finish while fresh idle work switches to
+FACT2500; sequential MCV/HARV/SHARV5000 kills; FACT completion; then an explicit
+`nonwall-live=0` phase with live SBAG/CYCL/BARB and actual wall-only attacks. It
+also records detector/dense veto detours, sparse-nondetector soft passage, exact
+six-cell physical arrivals with immediate replans, and bounded non-arrivals as
+failures rather than successes. Fresh narrative is
+`.build/cnc96a-wall-priority/reviews/targeted-v14-narrator/NARRATIVE.md`; corrected
+fresh policy is `.../targeted-v14-policy/POLICY-REVIEW.md`, verdict `sensible`,
+high confidence/advisory, with every prior evidence concern PASSed and no product
+blocker. Its paired/natural comparison advisory is accepted as future evidence
+formatting, not an in-scope product change.
+
+Final checks pass: focused180/180, `make check`, Release `make all`, full CNC
+YAML and `git diff --check`; no task-sheet net diff or tracked raw artifacts.
+Exact-head ignored receipts and a fresh native Terra review remain the sole
+release gates before publication.
+
+### Matched recorded-base control
+
+The first fresh Terra final review accepted the implementation/check evidence but
+blocked on one missing gate: a matched old-behavior control. That finding was
+adopted without a candidate code change. A detached worktree at exact recorded
+base `02861b72221b9498405ed9660c1f8a3f4abce32e` built Release cleanly and ran
+the byte-identical final A/B maps under the same seeds, lobby, starts, options,
+production rules, unrestricted Brutalis opponents, normal economy, watchdog and
+bounds. The existing map observer worked on base without a backport.
+
+Matched A (map SHA256 `49e83b...1578b`, seed96601): candidate naturally wins at
+13838; base reaches120 seconds/exit124 without natural game-over, last complete
+tick25000 with148 STNK produced/145 live/3 lost,2,180,821 damage/39 kills and
+both opponents still active. Base damage/kills plateau from24000 to25000 despite
+continued force growth. At tick13000 candidate has defeated Enemy1 and exhausted
+Enemy2 harvesters with1,716,897 damage; base has neither defeated and four Enemy2
+harvesters with1,260,091 damage. Neither triggers the watchdog. Fresh factual and
+policy receipts are under `reviews/base-control-a-{narrator,policy}`; policy keeps
+the timeout explicitly nonterminal and requests only the already-planned B pair.
+
+Matched B (map SHA256 `550686...b64e0`, seed96602): both naturally win, candidate
+at17705 versus base21846. Candidate uses40 produced/4 losses/36 live,
+1,489,764 damage/19 kills/max level3; base uses120/14/106,1,575,639/32/max
+level1. Candidate ends4,141 ticks earlier with descriptive37,244 damage per
+produced unit versus13,130. Both watchdogs remain below750 (candidate matched
+receipt max125, base449). Fresh receipts are under
+`reviews/base-control-b-{narrator,policy}`; B policy is `mostly sensible`, medium,
+advisory and explicitly says the paired A/B evidence closes the bounded
+old-behavior-control gate. Its causal-generalization and optional extra lifecycle
+trace caveats are accepted as advisory; targeted v14 supplies the authoritative
+ownership/retreat/route evidence, and no product/balance change is warranted.
+
+The candidate product tree remains exact; only STATE/REPORT are amended with the
+matched-control disposition before final clean receipt and fresh Terra rereview.

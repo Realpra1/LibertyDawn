@@ -100,6 +100,8 @@ namespace OpenRA.Mods.Common.Traits
 		public const int NearbyReactionMaximumLatencyTicks = 25;
 		public const float HardRouteDangerThreshold = 1f;
 		public const float SoftResourceRouteCost = 0.05f;
+		public const float OrdinaryWeaponRouteInfluence = 0.2f;
+		public const float HardDetectorRouteInfluence = 1f;
 		public const int RetreatSaveVersion = 1;
 		public const int ReinforcementSaveVersion = 2;
 
@@ -416,10 +418,27 @@ namespace OpenRA.Mods.Common.Traits
 			return !retainedPlanMatches || retainedSafeHold || isIdle;
 		}
 
+		public static bool ShouldPreserveBusyReinforcement(bool retainedPlanMatches, bool isIdle)
+		{
+			return retainedPlanMatches && !isIdle;
+		}
+
 		public static bool ShouldRetryFailedReinforcementSearch(bool sameTarget,
 			bool sameOrigin, bool sameAnchor, bool sameRouteContext)
 		{
 			return !(sameTarget && sameOrigin && sameAnchor && sameRouteContext);
+		}
+
+		public static bool ShouldRetryFailedMobilitySearch(bool sameOrigin,
+			bool sameAnchor, bool sameRouteContext)
+		{
+			return !(sameOrigin && sameAnchor && sameRouteContext);
+		}
+
+		public static bool ShouldIssueSafeMobilityRoute(bool isIdle,
+			bool exactSegmentsUsable, bool identicalFailedRoute)
+		{
+			return isIdle && exactSegmentsUsable && !identicalFailedRoute;
 		}
 
 		public static bool ShouldRestoreReinforcementPlan(bool validMember,
@@ -635,6 +654,49 @@ namespace OpenRA.Mods.Common.Traits
 			return (int)Math.Ceiling(distance);
 		}
 
+		public static List<CPos> ForwardExactGroundRoute(IEnumerable<CPos> reversedPathfinderRoute)
+		{
+			// IPathFinder.FindUnitPath returns target-to-source. Plans and submitted
+			// waypoints use source-to-target, matching the coarse/Air route contract.
+			return reversedPathfinderRoute.Reverse().ToList();
+		}
+
+		public static bool RouteStretchIsDisproportionate(int selectedDistance,
+			int directDistance, int maximumStretchPercent)
+		{
+			return directDistance > 0 && selectedDistance > 0 && maximumStretchPercent >= 100 &&
+				selectedDistance * 100L > directDistance * (long)maximumStretchPercent;
+		}
+
+		public static bool IsPostMissionRetreatRouteDistance(int routeDistance,
+			int requestedDistance, int tolerance)
+		{
+			return requestedDistance > 0 && tolerance >= 0 &&
+				routeDistance >= Math.Max(1, requestedDistance - tolerance) &&
+				routeDistance <= requestedDistance + tolerance;
+		}
+
+		public static bool ShouldRejectPostMissionRetreatRouteCell(bool isOrigin,
+			bool hasResource, bool hasPendingResourceHazard, bool hasHardInfluence)
+		{
+			// A retreat commonly begins inside the danger it must escape. Air escape
+			// routing permits that occupied origin, while every traversed cell after it
+			// must satisfy the ground safety contract.
+			return !isOrigin && (hasResource || hasPendingResourceHazard || hasHardInfluence);
+		}
+
+		public static bool ShouldBlockTargetReassessment(int retreatResponsibilities,
+			bool postMissionRetreat)
+		{
+			return !postMissionRetreat && ShouldBlockReassessment(retreatResponsibilities);
+		}
+
+		public static bool ShouldInvalidateBoundedPostMissionRetreat(bool postMissionRetreat,
+			bool eligible, bool idle, bool repairing, bool reachedExactEndpoint)
+		{
+			return postMissionRetreat && eligible && idle && !repairing && !reachedExactEndpoint;
+		}
+
 		public static int OptimisticApproachDistance(int targetDistanceCells, int weaponRangeCells)
 		{
 			return Math.Max(0, targetDistanceCells - Math.Max(0, weaponRangeCells));
@@ -652,6 +714,25 @@ namespace OpenRA.Mods.Common.Traits
 				challengerValid, challengerUndefended, challengerScore, minimumImprovementPercent) ?
 				StealthTankTargetReassessment.SwitchToChallenger :
 				StealthTankTargetReassessment.RetainIncumbent;
+		}
+
+		public static StealthTankTargetReassessment ReassessTargetWithWallFallback(bool incumbentValid,
+			bool incumbentUndefended, long incumbentScore, bool challengerValid,
+			bool challengerUndefended, long challengerScore, int minimumImprovementPercent,
+			bool incumbentIsWall, bool challengerIsWall)
+		{
+			if (!incumbentValid)
+				return challengerValid ? StealthTankTargetReassessment.SwitchToChallenger :
+					StealthTankTargetReassessment.Abandon;
+
+			if (!challengerValid)
+				return StealthTankTargetReassessment.RetainIncumbent;
+			if (incumbentIsWall != challengerIsWall)
+				return incumbentIsWall ? StealthTankTargetReassessment.SwitchToChallenger :
+					StealthTankTargetReassessment.RetainIncumbent;
+
+			return ReassessTarget(true, incumbentUndefended, incumbentScore,
+				true, challengerUndefended, challengerScore, minimumImprovementPercent);
 		}
 
 		public static List<T> NearbyReassessmentCandidates<T>(IEnumerable<T> nearbyCandidates,
@@ -774,7 +855,17 @@ namespace OpenRA.Mods.Common.Traits
 		public static bool FailedMemberRouteRemainsApplicable(bool sameTarget,
 			bool sameTargetLocation, bool sameOrigin)
 		{
-			return sameTarget && sameTargetLocation && sameOrigin;
+			// A physically stuck ground member must not forget a collapsed route merely
+			// because the strategic scanner cycles between live targets. Literal actor
+			// movement is the authoritative retry boundary; target-specific alternate
+			// endpoints remain independently eligible.
+			return sameOrigin;
+		}
+
+		public static bool ShouldValidateIdleMemberRoute(StealthTankPlanInvalidation invalidation)
+		{
+			return invalidation == StealthTankPlanInvalidation.TargetChanged ||
+				invalidation == StealthTankPlanInvalidation.LostActivity;
 		}
 
 		public static bool ShouldRecomputeSameEndpointMemberRoute(
@@ -940,12 +1031,14 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		public static bool ShouldRetainWholeGroupEngagement(bool retainActiveEngagement,
-			bool hasPendingIdleMember)
+			bool hasPendingIdleMember, bool incumbentIsWallFallback = false)
 		{
 			// Air preserves each busy attacker independently, but still services an
 			// idle joiner. A group-wide early return is only valid when no member is
-			// waiting for its deferred target-change handoff.
-			return retainActiveEngagement && !hasPendingIdleMember;
+			// waiting for its deferred target-change handoff. A last-resort wall
+			// incumbent must also rescan so that a newly available strategic target
+			// can replace the mission without replacing any busy actor activity.
+			return retainActiveEngagement && !hasPendingIdleMember && !incumbentIsWallFallback;
 		}
 
 		public static TInfluence ResolveRepairInfluence<TFacts, TInfluence>(TFacts sharedThreatFacts,

@@ -97,7 +97,14 @@ namespace OpenRA.Test.Mods.Common
 			var stealth = FieldLoader.Load<StealthTankSquadBotModuleInfo>(
 				player.Value.Nodes.Single(n => n.Key == "StealthTankSquadBotModule").Value);
 			Assert.That(stealth.WallTargetPriority, Is.EqualTo(1));
-			Assert.That(stealth.HarassmentTargetPriorities["harv"], Is.GreaterThan(stealth.WallTargetPriority));
+			Assert.That(stealth.HarassmentTargetPriorities["harv"], Is.EqualTo(5000));
+			Assert.That(stealth.HarassmentTargetPriorities["sharv"], Is.EqualTo(5000));
+			Assert.That(stealth.HarassmentTargetPriorities["mcv"], Is.EqualTo(5000));
+			Assert.That(stealth.HarassmentTargetPriorities["fact"], Is.EqualTo(2500));
+			Assert.That(stealth.PostMissionRetreatDistanceCells, Is.EqualTo(6));
+			Assert.That(stealth.PostMissionRetreatToleranceCells, Is.EqualTo(1));
+			Assert.That(stealth.RouteThreatPenalty, Is.EqualTo(4));
+			Assert.That(stealth.MaximumRouteStretchPercent, Is.EqualTo(150));
 
 			foreach (var manager in LoadSquadManagers())
 			{
