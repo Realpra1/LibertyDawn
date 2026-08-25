@@ -1930,6 +1930,7 @@ Player:
 		OpeningTechnologyUnitType: stnk
 		OpeningTechnologyUnitPrerequisites: upgrade.covert3
 		OpeningTechnologyUnitCount: 1
+		OpeningTechnologyResearchSequence: upgrade.covert2, upgrade.covert3
 		OpeningRequestRetryDelay: 250
 		OpeningDebugLogging: false
 		FirstTowerTypes: gtwr, gun, atwr, obli
@@ -2162,7 +2163,7 @@ Player:
 		ProtectionTypes: fact, fact.gdi, fact.nod, nuke, nuk2, proc, silo, pyle, hand, afld, weap, hpad, hq, fix, eye, tmpl, gun, sam, obli, gtwr, atwr, mcv, harv, miss
 	UnitBuilderBotModule@viki:
 		RequiresCondition: enable-viki-ai
-		ExternallyManagedTypes: tran, truck, mcv
+		ExternallyManagedTypes: tran, truck, mcv, upgrade.covert2, upgrade.covert3
 		TotalUnitLimit: 400
 		AdaptiveUnitCap: true
 		AdaptiveUnitCapMinimum: 300
@@ -2651,6 +2652,7 @@ Player:
 		OpeningTechnologyUnitType: stnk
 		OpeningTechnologyUnitPrerequisites: upgrade.covert3
 		OpeningTechnologyUnitCount: 1
+		OpeningTechnologyResearchSequence: upgrade.covert2, upgrade.covert3
 		OpeningRequestRetryDelay: 250
 		OpeningDebugLogging: false
 		AirRepairBuildingTypes: hpad
@@ -2745,7 +2747,7 @@ Player:
 		RequiresCondition: enable-ironreaper-tech-counter
 		ScanInterval: 125
 		SwitchDelay: 3000
-		InitialBranch: economy
+		InitialBranch: covert
 		CounterBranches:
 			covert: recon
 			recon: economy

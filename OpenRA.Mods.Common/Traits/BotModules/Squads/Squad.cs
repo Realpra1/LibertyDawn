@@ -79,6 +79,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		internal int StealthEscapeSafetyChecks;
 		internal CPos? StealthEscapeDestination;
 		internal bool StealthEscapePendingExplosion;
+		internal int StealthEscapeLastProgressTick = -1;
+		internal int StealthEscapeLastDistanceCells = int.MaxValue;
+		internal CPos? StealthKiteTargetCell;
 		internal StealthClearMode StealthClearMode;
 		internal readonly HashSet<uint> StealthClearPackage = new HashSet<uint>();
 		internal int StealthClearMembershipSignature;
@@ -166,6 +169,17 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				else
 					AirStateBase.TickAirSafety(this);
 			}
+		}
+
+		public void TickStealthBlueSafety()
+		{
+			if (!IsValid || Type != SquadType.Stealth)
+				return;
+
+			if (Game.IsBenchmarking)
+				BenchmarkAirWork("blue-safety", () => StealthAIStateBase.TickStealthSafety(this, true));
+			else
+				StealthAIStateBase.TickStealthSafety(this, true);
 		}
 
 		void BenchmarkAirWork(string phase, Action work)

@@ -156,11 +156,11 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(states, Does.Contain("StealthInfluenceCaches"));
 			Assert.That(states, Does.Contain("SelectTargetCandidates("));
 			Assert.That(states, Does.Contain("foreach (var selectedIndex in selectedIndices)"));
-			Assert.That(states, Does.Contain("TickStealthSafety(Squad owner)"));
+			Assert.That(states, Does.Contain("TickStealthSafety(Squad owner, bool pendingBlueOnly = false)"));
 			Assert.That(states, Does.Contain("NearestSafeStealthNeighbor"));
 			Assert.That(states, Does.Contain("resourceType == \"BlueTiberium\""));
 			Assert.That(states, Does.Contain("resourceType == \"RedTiberium\""));
-			Assert.That(states, Does.Contain("memberCoarseCells.Any(coarse =>"));
+			Assert.That(states, Does.Contain("PendingBlueExplosionInSquadCell(owner, activeMembers)"));
 			Assert.That(states, Does.Contain("resourceLayer.GetResource(cell).Type == \"BlueTiberium\" &&"));
 			Assert.That(states, Does.Contain("resourceLayer.IsExplosionPending(cell)"));
 			Assert.That(states, Does.Not.Contain("memberCoarseCells.Any(cache.PendingExplosionCells.Contains)"));
@@ -206,11 +206,17 @@ namespace OpenRA.Test.Mods.Common
 		[Test]
 		public void UndefendedTravelWindowIsPreferenceRatherThanEligibility()
 		{
-			Assert.That(StealthAISpecialistPolicy.IsWithinUndefendedTravelPreference(30000, 30), Is.True);
-			Assert.That(StealthAISpecialistPolicy.IsWithinUndefendedTravelPreference(30001, 30), Is.False);
+			Assert.That(StealthAISpecialistPolicy.IsWithinUndefendedTravelPreference(60000, 60), Is.True);
+			Assert.That(StealthAISpecialistPolicy.IsWithinUndefendedTravelPreference(60001, 60), Is.False);
 			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
-			Assert.That(states.IndexOf("best = clearPlans", StringComparison.Ordinal),
-				Is.LessThan(states.LastIndexOf("best = safePlans", StringComparison.Ordinal)));
+			var shortSafe = states.IndexOf("best = safePlans.Where", StringComparison.Ordinal);
+			var kite = states.IndexOf("best = clearPlans.Where", shortSafe, StringComparison.Ordinal);
+			var mass = states.IndexOf("best = clearPlans.Where", kite + 1, StringComparison.Ordinal);
+			var farSafe = states.IndexOf("best = bestSafe.Plan", mass, StringComparison.Ordinal);
+			Assert.That(shortSafe, Is.GreaterThanOrEqualTo(0));
+			Assert.That(kite, Is.GreaterThan(shortSafe));
+			Assert.That(mass, Is.GreaterThan(kite));
+			Assert.That(farSafe, Is.GreaterThan(mass));
 		}
 	}
 }

@@ -284,7 +284,9 @@ namespace OpenRA.Mods.Common.Traits
 			"behaviour of only checking when a target is selected.")]
 		public readonly int AirSafetyCheckInterval = 0;
 		[Desc("Ticks between lightweight local safety checks for ground stealth squads.")]
-		public readonly int StealthSafetyCheckInterval = 5;
+		public readonly int StealthSafetyCheckInterval = 25;
+		[Desc("Ticks between live pending-Blue-explosion checks for ground stealth squads.")]
+		public readonly int StealthBlueSafetyCheckInterval = 5;
 
 		[Desc("Radius in cells around an air squad that is scanned for anti-air by the safety check.")]
 		public readonly int AirThreatScanRadius = 12;
@@ -478,8 +480,8 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (AirSafetyCheckInterval > 0 && AirThreatScanRadius <= 0)
 				throw new YamlException("AirThreatScanRadius must be greater than zero when AirSafetyCheckInterval is set.");
-			if (StealthSafetyCheckInterval < 0)
-				throw new YamlException("StealthSafetyCheckInterval must not be negative.");
+			if (StealthSafetyCheckInterval < 0 || StealthBlueSafetyCheckInterval < 0)
+				throw new YamlException("Stealth safety intervals must not be negative.");
 
 			if (AirThreatFleeMultiplier <= 0)
 				throw new YamlException("AirThreatFleeMultiplier must be greater than zero.");
@@ -606,6 +608,7 @@ namespace OpenRA.Mods.Common.Traits
 		int minAttackForceDelayTicks;
 		int airSafetyTicks;
 		int stealthSafetyTicks;
+		int stealthBlueSafetyTicks;
 		int adaptiveAirRiskTicks;
 		int stealthRecruitTicks;
 		bool advancedBehaviorEnabled = true;
@@ -724,6 +727,8 @@ namespace OpenRA.Mods.Common.Traits
 				airSafetyTicks = World.LocalRandom.Next(0, Info.AirSafetyCheckInterval);
 			if (Info.StealthSafetyCheckInterval > 0)
 				stealthSafetyTicks = World.LocalRandom.Next(0, Info.StealthSafetyCheckInterval);
+			if (Info.StealthBlueSafetyCheckInterval > 0)
+				stealthBlueSafetyTicks = World.LocalRandom.Next(0, Info.StealthBlueSafetyCheckInterval);
 
 			if (Info.AirAdaptiveRiskInterval > 0)
 				adaptiveAirRiskTicks = Info.AirAdaptiveRiskInterval;
@@ -1131,6 +1136,13 @@ namespace OpenRA.Mods.Common.Traits
 				stealthSafetyTicks = Info.StealthSafetyCheckInterval;
 				foreach (var s in Squads.Where(s => s.Type == SquadType.Stealth))
 					s.TickAirSafety();
+			}
+
+			if (Info.StealthBlueSafetyCheckInterval > 0 && --stealthBlueSafetyTicks <= 0)
+			{
+				stealthBlueSafetyTicks = Info.StealthBlueSafetyCheckInterval;
+				foreach (var s in Squads.Where(s => s.Type == SquadType.Stealth))
+					s.TickStealthBlueSafety();
 			}
 
 			if (Info.AirAdaptiveRiskInterval > 0 && --adaptiveAirRiskTicks <= 0)
