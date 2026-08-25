@@ -1,3 +1,37 @@
+# CNC-96A pending-Blue stale-cache correction
+
+The five-tick Stealth safety path no longer uses the strategic influence cache to
+decide whether a squad is currently standing in a pending Blue explosion. It now
+deduplicates the current 6x6 cells of all live, in-world, non-repairing squad
+members and directly checks each in-map exact cell for both Blue Tiberium and
+`IResourceLayer.IsExplosionPending`. This is bounded to 36 resource reads per
+distinct occupied strategic cell and adds no actor or world threat scan. The
+cached pending grid remains available only to strategic route planning and
+destination validation.
+
+The test-only resource driver now supports a stale-cache phase: it fills the real
+non-lead member's strategic cell, waits 30 ticks (longer than the fixture's
+25-tick influence interval), then damages a currently unoccupied exact cell in
+that same 6x6. On exact corrected source under
+`.build/cnc96a-kiting/results20/blue-exit`, Blue was filled at tick 100, pending
+appeared at tick 133 in `stnk#151`'s cell at unoccupied exact cell `83,48`, and
+the safety path detected it at tick 136, within three ticks. It issued one
+pending-explosion whole-squad move to destination `77,54`, explicitly logged
+`Blue=false`, `Red=false`, and `pending=false`, arrived/replanned at tick 201,
+and reported zero stalls and deaths. A serialized repeat under `results21`
+detected the equivalent unoccupied-cell hazard within one tick and likewise
+completed one clean exit with zero stalls/deaths.
+
+Exact-source `make check` and the full solution build pass with zero warnings/errors,
+CNC YAML validation passes, the focused matrix passes 9/9, and `git diff --check`
+passes. The test project retains four unrelated pre-existing analyzer warnings.
+The earlier accepted tactical scenarios remain unchanged by
+this resource-read correction. Exact-source reruns retained the natural watchdog,
+mass-package wipe, and crossover-abort behaviors, but their intentionally natural
+combat attribution/mode markers vary between identical seeded launches; the
+impacted stale-cache scenario is the discriminating release gate for this bounded
+correction.
+
 # CNC-96A cached kiting and clearing successor
 
 This cycle replaces broad live ground-threat scans with an Air-derived bounded

@@ -1,3 +1,19 @@
+# CNC-96A pending-Blue stale-cache correction
+
+- Status: bounded implementation, discriminating engine evidence, and exact-source
+  validation complete; coordinator integration pending
+- Base: `c25ac3a8967f07f5c44b77f099bede2a43dee665`
+- Safety: every five-tick check deduplicates all live non-repairing member 6x6 cells
+  and live-reads all exact cells for Blue plus pending; cached pending remains route-only
+- Bound: at most 36 exact resource reads per distinct occupied coarse cell; no actor/threat scan
+- Engine: stale-cache non-lead/unoccupied-cell discriminator PASS in `results20/blue-exit`;
+  pending tick133, detected/move tick136, clean destination, arrival tick201, 0 stalls/deaths
+- Repeat: serialized `results21/blue-exit` detected pending within one tick with the same
+  one-batch clean exit and 0 stalls/deaths
+- Gates: `make check` PASS 0 warnings/errors; solution build PASS 0 warnings/errors;
+  CNC YAML PASS; focused matrix PASS 9/9; `git diff --check` PASS
+- No push, publication, merge, task-sheet/coordinator-state edit, or bleed mutation
+
 # CNC-96A successor: cached kiting and clearing
 
 - Status: bounded implementation and exact-source worker validation complete;

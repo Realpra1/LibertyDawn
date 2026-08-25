@@ -16,6 +16,8 @@ namespace OpenRA.Mods.Common.Traits
 		public readonly int ActorIndex;
 		public readonly bool RequireNonLeadSquadMember;
 		public readonly int TriggerTick = 100;
+		public readonly int PendingDelayAfterFill;
+		public readonly bool DamageOnlyNonOccupiedCell;
 		public readonly int StrategicCellSize = 6;
 		public readonly int Damage = 1000000;
 
@@ -30,8 +32,11 @@ namespace OpenRA.Mods.Common.Traits
 		readonly Actor self;
 		readonly StealthResourceExplosionTestDriverInfo info;
 		bool initialized;
+		bool damageIssued;
 		bool pendingRecorded;
+		int filledTick = -1;
 		CPos coarseCell;
+		CPos damageCell;
 		Actor subject;
 		Actor squadLeader;
 
@@ -88,27 +93,58 @@ namespace OpenRA.Mods.Common.Traits
 					}
 
 				initialized = true;
+				filledTick = self.World.WorldTick;
+				var occupied = self.World.Actors.Where(a => a.IsInWorld && !a.IsDead &&
+					a.Owner == subject.Owner && a.Info.Name == info.ActorType &&
+					a.Location.X / info.StrategicCellSize == coarseCell.X &&
+					a.Location.Y / info.StrategicCellSize == coarseCell.Y)
+					.Select(a => a.Location).ToHashSet();
+				damageCell = Enumerable.Range(0, info.StrategicCellSize)
+					.SelectMany(y => Enumerable.Range(0, info.StrategicCellSize).Select(x =>
+						new CPos(coarseCell.X * info.StrategicCellSize + x,
+							coarseCell.Y * info.StrategicCellSize + y)))
+					.Where(cell => self.World.Map.Contains(cell) &&
+						(!info.DamageOnlyNonOccupiedCell || !occupied.Contains(cell)))
+					.OrderByDescending(cell => (cell - subject.Location).LengthSquared)
+					.ThenBy(cell => cell.Y).ThenBy(cell => cell.X).First();
+				Log.Write("debug", "CNC96A_BLUE_FILLED tick={0} actor={1}#{2} coarse={3} " +
+					"damage-cell={4} occupied={5} pending-delay={6}.", self.World.WorldTick,
+					subject.Info.Name, subject.ActorID, coarseCell, damageCell,
+					occupied.Contains(damageCell), info.PendingDelayAfterFill);
 			}
 
-			for (var y = 0; y < info.StrategicCellSize; y++)
-				for (var x = 0; x < info.StrategicCellSize; x++)
-				{
-					var cell = new CPos(coarseCell.X * info.StrategicCellSize + x,
-						coarseCell.Y * info.StrategicCellSize + y);
-					if (!self.World.Map.Contains(cell))
-						continue;
-					if (resourceLayer.IsExplosionPending(cell))
-					{
-						pendingRecorded = true;
-						Log.Write("debug", "CNC96A_BLUE_PENDING tick={0} actor={1}#{2} index={3} " +
-							"leader={4} coarse={5} cell={6}.", self.World.WorldTick, subject.Info.Name,
-							subject.ActorID, info.ActorIndex, squadLeader == null ? "none" :
-							squadLeader.Info.Name + "#" + squadLeader.ActorID, coarseCell, cell);
-						return;
-					}
+			if (self.World.WorldTick < filledTick + info.PendingDelayAfterFill)
+				return;
+			if (!damageIssued && info.DamageOnlyNonOccupiedCell)
+			{
+				var occupiedNow = self.World.Actors.Where(a => a.IsInWorld && !a.IsDead &&
+					a.Owner == subject.Owner && a.Info.Name == info.ActorType)
+					.Select(a => a.Location).ToHashSet();
+				damageCell = Enumerable.Range(0, info.StrategicCellSize)
+					.SelectMany(y => Enumerable.Range(0, info.StrategicCellSize).Select(x =>
+						new CPos(coarseCell.X * info.StrategicCellSize + x,
+							coarseCell.Y * info.StrategicCellSize + y)))
+					.Where(cell => self.World.Map.Contains(cell) && !occupiedNow.Contains(cell))
+					.OrderByDescending(cell => (cell - subject.Location).LengthSquared)
+					.ThenBy(cell => cell.Y).ThenBy(cell => cell.X).First();
+			}
 
-					resourceLayer.DamageResource(self, cell, info.Damage);
-				}
+			if (resourceLayer.IsExplosionPending(damageCell))
+			{
+				var occupiedNow = self.World.Actors.Any(a => a.IsInWorld && !a.IsDead &&
+					a.Owner == subject.Owner && a.Info.Name == info.ActorType && a.Location == damageCell);
+				pendingRecorded = true;
+				Log.Write("debug", "CNC96A_BLUE_PENDING tick={0} actor={1}#{2} index={3} " +
+					"leader={4} coarse={5} cell={6} occupied={7} fill-delay={8}.",
+					self.World.WorldTick, subject.Info.Name, subject.ActorID, info.ActorIndex,
+					squadLeader == null ? "none" : squadLeader.Info.Name + "#" + squadLeader.ActorID,
+					coarseCell, damageCell, occupiedNow,
+					info.PendingDelayAfterFill);
+				return;
+			}
+
+			resourceLayer.DamageResource(self, damageCell, info.Damage);
+			damageIssued = true;
 		}
 	}
 

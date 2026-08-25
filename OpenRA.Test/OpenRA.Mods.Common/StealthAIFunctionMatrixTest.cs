@@ -160,6 +160,10 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(states, Does.Contain("NearestSafeStealthNeighbor"));
 			Assert.That(states, Does.Contain("resourceType == \"BlueTiberium\""));
 			Assert.That(states, Does.Contain("resourceType == \"RedTiberium\""));
+			Assert.That(states, Does.Contain("memberCoarseCells.Any(coarse =>"));
+			Assert.That(states, Does.Contain("resourceLayer.GetResource(cell).Type == \"BlueTiberium\" &&"));
+			Assert.That(states, Does.Contain("resourceLayer.IsExplosionPending(cell)"));
+			Assert.That(states, Does.Not.Contain("memberCoarseCells.Any(cache.PendingExplosionCells.Contains)"));
 			Assert.That(yaml, Does.Not.Contain("StealthResourceExplosionTestDriver"));
 			Assert.That(yaml, Does.Not.Contain("StealthCrushTestTelemetry"));
 			Assert.That(StealthAISpecialistPolicy.IsEngagementThreat(true, true, false), Is.True);

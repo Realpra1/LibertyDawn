@@ -1207,11 +1207,25 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var resourceLayer = owner.World.WorldActor.TraitOrDefault<IResourceLayer>();
 			var coarseSize = StealthCoarseSize(owner);
 			var liveMembers = owner.Units.Where(unit => !unit.IsDead && unit.IsInWorld).ToArray();
-			var memberCoarseCells = liveMembers.Select(unit => new CPos(
+			var activeMembers = liveMembers.Where(unit =>
+				!owner.AirUnitsRepairing.Contains(unit.ActorID)).ToArray();
+			var memberCoarseCells = activeMembers.Select(unit => new CPos(
 				unit.Location.X / coarseSize, unit.Location.Y / coarseSize)).Distinct().ToArray();
-			var pendingBlueExplosion = memberCoarseCells.Any(cache.PendingExplosionCells.Contains) ||
-				(resourceLayer != null && liveMembers.Take(36)
-					.Any(unit => resourceLayer.IsExplosionPending(unit.Location)));
+			var pendingBlueExplosion = resourceLayer != null && memberCoarseCells.Any(coarse =>
+			{
+				for (var y = 0; y < coarseSize; y++)
+					for (var x = 0; x < coarseSize; x++)
+					{
+						var cell = new CPos(coarse.X * coarseSize + x, coarse.Y * coarseSize + y);
+						if (!owner.World.Map.Contains(cell))
+							continue;
+						if (resourceLayer.GetResource(cell).Type == "BlueTiberium" &&
+							resourceLayer.IsExplosionPending(cell))
+							return true;
+					}
+
+				return false;
+			});
 
 			if (owner.AirEscapingLocalAa &&
 				(!pendingBlueExplosion || owner.StealthEscapePendingExplosion))
@@ -1299,7 +1313,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 						destinationResources.Pending);
 			}
 
-			foreach (var unit in liveMembers.Where(unit => !owner.AirUnitsRepairing.Contains(unit.ActorID)))
+			foreach (var unit in activeMembers)
 				owner.Bot.QueueOrder(new Order("Move", unit,
 					Target.FromCell(owner.World, destination.Value), false));
 		}
