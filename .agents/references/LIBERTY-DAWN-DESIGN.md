@@ -72,7 +72,10 @@ are strategic rules of thumb, not predictions of movement, terrain, focus fire,
 detection, or other live battle conditions. Only normally purchasable
 combat-capable units and defense towers receive matchup annotations; neutral,
 hidden, and support-power actors are omitted. Two immobile actors are not included
-in the individual matchup lists. Run
+in the individual matchup lists. An opponent's inability to retaliate is not
+treated as a best matchup; these categorical immunity cases are retained only
+when the subject itself cannot engage the opponent and therefore has a meaningful
+worst matchup. Range-based one-sided matchups remain listed as outranging. Run
 `./utility.sh cnc --combat-threat-annotations [ACTOR]` to regenerate the Markdown
 annotations from current rules; the command prints output and does not edit this
 document.
@@ -184,8 +187,8 @@ Mammoth Tanks can crush it, so an unsupported turret is not absolute. It cannot
 lose power.
 
 Cost-adjusted matchups — Cannot target: Air. Best against: Light Armor, Heavy
-Armor. Worst against: All air units. Best: Mobile S.A.M. (immune), Hum-Vee
-(x21), Nod Buggy (x24), APC (x11), Recon Bike (x9). Worst: Stealth Tank
+Armor. Worst against: All air units. Best: Hum-Vee (x21), Nod Buggy (x24), APC
+(x11), Recon Bike (x9), Light Tank (x5). Worst: Stealth Tank
 (outrange), Artillery (outrange), Rocket Launcher (outrange), Orca (cannot
 engage), Apache Longbow (cannot engage).
 
@@ -196,8 +199,8 @@ detection but only a small ammunition reserve before reloading. It turns infantr
 to mist and damages light vehicles quickly. It cannot lose power.
 
 Cost-adjusted matchups — Cannot target: Air. Best against: Infantry, Light
-Armor. Worst against: All air units. Best: Mobile S.A.M. (immune), Rocket
-Soldier (x26), Minigunner (x44), Engineer (x21), Commando (x5). Worst: Stealth
+Armor. Worst against: All air units. Best: Rocket Soldier (x26), Minigunner
+(x44), Engineer (x21), Commando (x5), Nod Buggy (x13). Worst: Stealth
 Tank (outrange), Artillery (outrange), Rocket Launcher (outrange), Orca (cannot
 engage), Apache Longbow (cannot engage).
 
@@ -209,9 +212,9 @@ strongest behind a frontline. Low power disables its weapon and detector. Large
 coverage areas make stealth assets difficult to slip through.
 
 Cost-adjusted matchups — Can target: Ground and Air. Best against: Infantry,
-Light Armor. Worst against: Buildings, Economy, Heavy Armor. Best: Mobile S.A.M.
-(immune), Apache Longbow (x8), Hum-Vee (x20), Nod Buggy (x23), Rocket Soldier
-(x27). Worst: Rocket Launcher (outrange), Mammoth Tank (/4), Medium Tank (x2),
+Light Armor. Worst against: Buildings, Economy, Heavy Armor. Best: Apache
+Longbow (x8), Hum-Vee (x20), Nod Buggy (x23), Rocket Soldier (x27), APC (x10).
+Worst: Rocket Launcher (outrange), Mammoth Tank (/4), Medium Tank (x2),
 Flamethrower (x14), Chemical Warrior (x15).
 
 ### SAM Site
@@ -235,8 +238,8 @@ time. Infantry can overwhelm it; artillery and Stealth Tanks outrange it. Severa
 Obelisks together remain a formidable barrier.
 
 Cost-adjusted matchups — Cannot target: Air. Best against: Buildings, Heavy
-Armor. Worst against: All air units. Best: Mobile S.A.M. (immune), APC (x20),
-Hum-Vee (x30), Light Tank (x12), Nod Buggy (x30). Worst: Stealth Tank
+Armor. Worst against: All air units. Best: APC (x20), Hum-Vee (x30), Light Tank
+(x12), Nod Buggy (x30), Medium Tank (x10). Worst: Stealth Tank
 (outrange), Artillery (outrange), Rocket Launcher (outrange), Orca (cannot
 engage), Apache Longbow (cannot engage).
 
@@ -310,8 +313,8 @@ the base. Even late, he protects tanks from anti-tank infantry.
 
 Cost-adjusted matchups — Cannot target: Air. Best against: Infantry, Light
 Armor. Worst against: Buildings, Economy, Heavy Armor. Best: Rocket Launcher
-(outrange), Engineer (immune), Mobile S.A.M. (immune), SAM Site (immune), Rocket
-Soldier (x4). Worst: Apache Longbow (cannot engage), Orca (cannot engage), Guard
+(outrange), Rocket Soldier (x4), Commando (/4), Stealth Tank (/5), Recon Bike
+(/3). Worst: Apache Longbow (cannot engage), Orca (cannot engage), Guard
 Tower (/44), Mammoth Tank (/93), Advanced Guard Tower (/48).
 
 ### Grenadier
@@ -323,8 +326,8 @@ Available at Covert I.
 
 Cost-adjusted matchups — Cannot target: Air. Best against: Infantry, Buildings,
 Economy. Worst against: Light Armor, Heavy Armor. Best: Rocket Launcher
-(outrange), Engineer (immune), Mobile S.A.M. (immune), SAM Site (immune), Rocket
-Soldier (x6). Worst: Apache Longbow (cannot engage), Orca (cannot engage), Guard
+(outrange), Rocket Soldier (x6), Recon Bike (x2), Medium Tank (/2), Light Tank
+(/2). Worst: Apache Longbow (cannot engage), Orca (cannot engage), Guard
 Tower (/12), Nod Buggy (/5), Hum-Vee (/5).
 
 ### Rocket Soldier
@@ -334,9 +337,9 @@ buildings, but inexpensive relative to the vehicles he can destroy. He carries
 anti-air rockets, though aircraft are not his preferred target.
 
 Cost-adjusted matchups — Can target: Ground and Air. Best against: Light Armor,
-Heavy Armor. Worst against: Infantry, Buildings, Economy. Best: Mobile S.A.M.
-(immune), Engineer (immune), SAM Site (immune), Light Tank (x2), Recon Bike
-(x2). Worst: Chemical Warrior (/6), Guard Tower (/26), Flamethrower (/5),
+Heavy Armor. Worst against: Infantry, Buildings, Economy. Best: Light Tank (x2),
+Recon Bike (x2), Medium Tank (/2), APC (/2), Orca (/5). Worst: Chemical Warrior
+(/6), Guard Tower (/26), Flamethrower (/5),
 Grenadier (/6), Minigunner (/4).
 
 ### Flamethrower
@@ -347,8 +350,8 @@ dense formations can chain-react.
 
 Cost-adjusted matchups — Cannot target: Air. Best against: Infantry, Buildings,
 Economy. Worst against: Light Armor, Heavy Armor. Best: Rocket Launcher
-(outrange), Engineer (immune), Mobile S.A.M. (immune), SAM Site (immune), Rocket
-Soldier (x5). Worst: Apache Longbow (cannot engage), Orca (cannot engage), Guard
+(outrange), Rocket Soldier (x5), Recon Bike (x2), Stealth Tank (/2), APC (/2).
+Worst: Apache Longbow (cannot engage), Orca (cannot engage), Guard
 Tower (/13), Mammoth Tank (/31), Chemical Warrior (/2).
 
 ### Chemical Warrior
@@ -360,8 +363,8 @@ Tiberium fields can become its safest route to bases or harvesters.
 
 Cost-adjusted matchups — Cannot target: Air. Best against: Infantry, Economy.
 Worst against: Light Armor, Heavy Armor. Best: Rocket Launcher (outrange),
-Engineer (immune), Mobile S.A.M. (immune), SAM Site (immune), Rocket Soldier
-(x6). Worst: Apache Longbow (cannot engage), Orca (cannot engage), Guard Tower
+Rocket Soldier (x6), Recon Bike (x2), Stealth Tank (/2), APC (/2). Worst: Apache
+Longbow (cannot engage), Orca (cannot engage), Guard Tower
 (/15), Mammoth Tank (/38), Advanced Guard Tower (/15).
 
 ### Engineer
@@ -371,8 +374,8 @@ repair bridges, and restore vehicle husks. Inside a transport, an Engineer is a
 threat far beyond his direct cost and may capture missing technology.
 
 Cost-adjusted matchups — Cannot target: Air. Best against: Structures. Worst
-against: All units. Best: SAM Site (immune), Obelisk of Light (/4), Turret (/3),
-Advanced Guard Tower (/16), Guard Tower (/21). Worst: Chemical Tank (cannot
+against: All units. Best: Obelisk of Light (/4), Turret (/3), Advanced Guard
+Tower (/16), Guard Tower (/21). Worst: Chemical Tank (cannot
 engage), Apache Longbow (cannot engage), Hum-Vee (cannot engage), Nod Buggy
 (cannot engage), Flame Tank (cannot engage).
 
@@ -383,8 +386,8 @@ and demolishes buildings after planting explosives. Vehicles counter him only if
 they find and reach him. Transports, terrain, and distractions multiply his value.
 
 Cost-adjusted matchups — Cannot target: Air. Best against: Buildings. Worst
-against: Light Armor, Heavy Armor. Best: SAM Site (immune), Engineer (immune),
-Turret (x23), Obelisk of Light (x8), Advanced Guard Tower (x11). Worst: Chemical
+against: Light Armor, Heavy Armor. Best: Turret (x23), Obelisk of Light (x8),
+Advanced Guard Tower (x11), Guard Tower (x5), Rocket Soldier (x10). Worst: Chemical
 Tank (cannot engage), Flame Tank (cannot engage), Mammoth Tank (cannot engage),
 Apache Longbow (cannot engage), Hum-Vee (cannot engage).
 
@@ -421,9 +424,9 @@ and killing infantry without wasting expensive tank shots.
 
 Cost-adjusted matchups — Cannot target: Air. Best against: Infantry, Light
 Armor. Worst against: Buildings, Economy, Heavy Armor. Best: Rocket Launcher
-(outrange), Engineer (immune), Commando (immune), Mobile S.A.M. (immune), SAM
-Site (immune). Worst: Orca (cannot engage), Apache Longbow (cannot engage),
-Turret (/21), Advanced Guard Tower (/20), Obelisk of Light (/30).
+(outrange), Artillery (x3), APC (x2), Recon Bike (x2), Rocket Soldier (x4).
+Worst: Orca (cannot engage), Apache Longbow (cannot engage), Turret (/21),
+Advanced Guard Tower (/20), Obelisk of Light (/30).
 
 ### Nod Buggy
 
@@ -433,9 +436,9 @@ defensive fire.
 
 Cost-adjusted matchups — Cannot target: Air. Best against: Infantry, Light
 Armor. Worst against: Buildings, Economy, Heavy Armor. Best: Rocket Launcher
-(outrange), Artillery (outrange), Engineer (immune), Commando (immune), Mobile
-S.A.M. (immune). Worst: Orca (cannot engage), Apache Longbow (cannot engage),
-Turret (/24), Advanced Guard Tower (/23), Guard Tower (/13).
+(outrange), Artillery (outrange), APC (x2), Rocket Soldier (x4), Minigunner
+(x7). Worst: Orca (cannot engage), Apache Longbow (cannot engage), Turret (/24),
+Advanced Guard Tower (/23), Guard Tower (/13).
 
 ### Recon Bike
 
@@ -445,9 +448,9 @@ low. Bikes win by choosing engagements, concentrating fire, and leaving quickly.
 
 Cost-adjusted matchups — Can target: Ground and Air. Best against: Light Armor,
 Heavy Armor. Worst against: Infantry, Buildings, Economy. Best: Rocket Launcher
-(outrange), Artillery (outrange), Engineer (immune), Mobile S.A.M. (immune),
-Commando (immune). Worst: Chemical Warrior (/2), Flamethrower (/2), Turret (/9),
-Advanced Guard Tower (/9), Guard Tower (/5).
+(outrange), Artillery (outrange), APC (x2), Nod Buggy (x2), Stealth Tank (/2).
+Worst: Chemical Warrior (/2), Flamethrower (/2), Turret (/9), Advanced Guard
+Tower (/9), Guard Tower (/5).
 
 ### APC
 
@@ -457,9 +460,9 @@ Chemical Warriors, or a Commando can turn one opening into a destroyed base.
 
 Cost-adjusted matchups — Cannot target: Air. Best against: Infantry, Light
 Armor. Worst against: Buildings, Economy, Heavy Armor. Best: Rocket Launcher
-(outrange), Engineer (immune), Commando (immune), Mobile S.A.M. (immune), SAM
-Site (immune). Worst: Orca (cannot engage), Apache Longbow (cannot engage),
-Turret (/11), Obelisk of Light (/20), Advanced Guard Tower (/10).
+(outrange), Artillery (x2), Recon Bike (x2), Minigunner (x5), Nod Buggy (x2).
+Worst: Orca (cannot engage), Apache Longbow (cannot engage), Turret (/11),
+Obelisk of Light (/20), Advanced Guard Tower (/10).
 
 ### Light Tank
 
@@ -469,9 +472,9 @@ light vehicles. Trading stationary shots like a Mammoth wastes it.
 
 Cost-adjusted matchups — Cannot target: Air. Best against: Buildings, Economy,
 Light Armor. Worst against: Infantry, Heavy Armor. Best: Rocket Launcher
-(outrange), Mobile S.A.M. (immune), Engineer (immune), Commando (immune), SAM
-Site (immune). Worst: Orca (cannot engage), Apache Longbow (cannot engage),
-Turret (/5), Obelisk of Light (/12), Rocket Soldier (/2).
+(outrange), Artillery (x7), Hum-Vee (x7), APC (x4), Nod Buggy (x8). Worst: Orca
+(cannot engage), Apache Longbow (cannot engage), Turret (/5), Obelisk of Light
+(/12), Rocket Soldier (/2).
 
 ### Medium Tank
 
@@ -481,9 +484,9 @@ to chase raiders, dynamically protect fields, or attack weak points.
 
 Cost-adjusted matchups — Cannot target: Air. Best against: Buildings, Economy,
 Light Armor. Worst against: Infantry, Heavy Armor. Best: Rocket Launcher
-(outrange), Mobile S.A.M. (immune), Engineer (immune), Commando (immune), SAM
-Site (immune). Worst: Orca (cannot engage), Apache Longbow (cannot engage),
-Obelisk of Light (/10), Turret (/3), Grenadier (x2).
+(outrange), Artillery (x7), Hum-Vee (x9), APC (x5), Nod Buggy (x10). Worst: Orca
+(cannot engage), Apache Longbow (cannot engage), Obelisk of Light (/10), Turret
+(/3), Grenadier (x2).
 
 ### Mammoth Tank
 
@@ -494,10 +497,10 @@ needs scouts, detectors, and cheaper screens. Enough Mammoths can overwhelm Reco
 economically.
 
 Cost-adjusted matchups — Can target: Ground and Air. Best against: Buildings,
-Economy, Light Armor. Worst against: Infantry, Heavy Armor. Best: Engineer
-(immune), Commando (immune), Mobile S.A.M. (immune), SAM Site (immune), Apache
-Longbow (x12). Worst: Obelisk of Light (/3), Turret (x2), Grenadier (x15),
-Stealth Tank (x3), Rocket Soldier (x11).
+Economy, Light Armor. Worst against: Infantry, Heavy Armor. Best: Apache Longbow
+(x12), Minigunner (x93), Hum-Vee (x28), Nod Buggy (x31), Artillery (x15). Worst:
+Obelisk of Light (/3), Turret (x2), Grenadier (x15), Stealth Tank (x3), Rocket
+Soldier (x11).
 
 ### Flame Tank
 
@@ -508,9 +511,9 @@ After aircraft clears an area, it removes buildings quickly.
 
 Cost-adjusted matchups — Cannot target: Air. Best against: Buildings, Economy.
 Worst against: Light Armor, Heavy Armor. Best: Rocket Launcher (outrange),
-Engineer (immune), Commando (immune), Mobile S.A.M. (immune), SAM Site (immune).
-Worst: Orca (cannot engage), Apache Longbow (cannot engage), Turret (/3),
-Mammoth Tank (/8), Obelisk of Light (/6).
+Artillery (x5), APC (x4), Stealth Tank (x2), Minigunner (x13). Worst: Orca
+(cannot engage), Apache Longbow (cannot engage), Turret (/3), Mammoth Tank (/8),
+Obelisk of Light (/6).
 
 ### Chemical Tank
 
@@ -521,9 +524,9 @@ infantry into Visceroids.
 
 Cost-adjusted matchups — Cannot target: Air. Best against: Infantry, Economy.
 Worst against: Light Armor, Heavy Armor. Best: Rocket Launcher (outrange),
-Engineer (immune), Commando (immune), Mobile S.A.M. (immune), SAM Site (immune).
-Worst: Orca (cannot engage), Apache Longbow (cannot engage), Mammoth Tank (/13),
-Turret (/4), Medium Tank (/4).
+Artillery (x4), APC (x3), Stealth Tank (x2), Recon Bike (x3). Worst: Orca
+(cannot engage), Apache Longbow (cannot engage), Mammoth Tank (/13), Turret
+(/4), Medium Tank (/4).
 
 ### Artillery
 
@@ -534,8 +537,8 @@ than it sees.
 
 Cost-adjusted matchups — Cannot target: Air. Best against: Buildings, Economy.
 Worst against: Infantry, Heavy Armor. Best: Rocket Launcher (outrange), Guard
-Tower (outrange), Turret (outrange), Obelisk of Light (outrange), Engineer
-(immune). Worst: Orca (cannot engage), Apache Longbow (cannot engage), Nod Buggy
+Tower (outrange), Turret (outrange), Obelisk of Light (outrange), Stealth Tank
+(x2). Worst: Orca (cannot engage), Apache Longbow (cannot engage), Nod Buggy
 (outrange), Recon Bike (outrange), Light Tank (/7).
 
 ### Rocket Launcher
@@ -547,8 +550,8 @@ base outside defensive range; unsupported, it may die before turning.
 Cost-adjusted matchups — Cannot target: Air. Best against: Buildings, Economy,
 Heavy Armor. Worst against: Infantry, Light Armor. Best: Guard Tower (outrange),
 Turret (outrange), Advanced Guard Tower (outrange), Obelisk of Light (outrange),
-Engineer (immune). Worst: Orca (cannot engage), Chemical Tank (outrange), Flame
-Tank (outrange), Apache Longbow (cannot engage), Light Tank (outrange).
+Rocket Soldier (x5). Worst: Orca (cannot engage), Chemical Tank (outrange),
+Flame Tank (outrange), Apache Longbow (cannot engage), Light Tank (outrange).
 
 ### Mobile SAM
 
@@ -571,7 +574,7 @@ run anti-armor raiding.
 Cost-adjusted matchups — Can target: Ground and Air. Best against: Buildings,
 Economy, Heavy Armor. Worst against: Infantry, Light Armor. Best: Rocket
 Launcher (outrange), Guard Tower (outrange), Turret (outrange), Obelisk of Light
-(outrange), Engineer (immune). Worst: Chemical Warrior (x2), Flamethrower (x2),
+(outrange), Artillery (x4). Worst: Chemical Warrior (x2), Flamethrower (x2),
 Advanced Guard Tower (/4), Orca (/6), Chemical Tank (/2).
 
 ### Mobile HQ
@@ -598,10 +601,10 @@ infantry, light vehicles, and aircraft but are weak against tanks. It clears lig
 units and harvesters but wastes ammunition on buildings.
 
 Cost-adjusted matchups — Can target: Ground and Air. Best against: Infantry,
-Light Armor. Worst against: Buildings, Heavy Armor. Best: Engineer (immune),
-Minigunner (immune), Grenadier (immune), Flamethrower (immune), Chemical Warrior
-(immune). Worst: SAM Site (/12), Advanced Guard Tower (/8), Mammoth Tank (/12),
-Mobile S.A.M. (/4), Orca (/2).
+Light Armor. Worst against: Buildings, Heavy Armor. Best: Rocket Soldier (x14),
+Stealth Tank (x3), Recon Bike (x4), Orca (/2), Mobile S.A.M. (/4). Worst: SAM
+Site (/12), Advanced Guard Tower (/8), Mammoth Tank (/12), Mobile S.A.M. (/4),
+Orca (/2).
 
 ### Orca
 
@@ -612,10 +615,10 @@ dodge missiles but remain vulnerable to splash; hovering empty over a base is
 fatal.
 
 Cost-adjusted matchups — Can target: Ground and Air. Best against: Light Armor,
-Heavy Armor. Worst against: Infantry, Buildings. Best: Rocket Launcher (immune),
-Artillery (immune), Nod Buggy (immune), Engineer (immune), Hum-Vee (immune).
-Worst: SAM Site (/6), Mobile S.A.M. (/2), Advanced Guard Tower (/3), Mammoth
-Tank (/2), Rocket Soldier (x5).
+Heavy Armor. Worst against: Infantry, Buildings. Best: Stealth Tank (x6), Recon
+Bike (x8), Apache Longbow (x2), Rocket Soldier (x5), Mammoth Tank (/2). Worst:
+SAM Site (/6), Mobile S.A.M. (/2), Advanced Guard Tower (/3), Mammoth Tank
+(/2), Rocket Soldier (x5).
 
 ### A-10 Bomber
 

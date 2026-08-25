@@ -147,17 +147,16 @@ namespace OpenRA.Mods.Common.UtilityCommands
 			else if (actor.IsImmobile && !canTargetAir && oneSidedWeaknesses.Any(matchup => matchup.Opponent.IsAir))
 				worstClasses = new[] { "All air units" };
 
+			// An opponent's inability to retaliate is not an offensive matchup strength.
+			// Keep genuine range advantages, but fill the remaining slots with economic crossovers.
 			var rangeStrengths = matchups.Where(matchup => matchup.IsOneSidedStrength && matchup.IsRangeOneSided)
-				.OrderBy(matchup => matchup.OneSidedTime)
-				.ThenBy(matchup => matchup.Opponent.Name, StringComparer.Ordinal);
-			var categoricalStrengths = matchups.Where(matchup => matchup.IsOneSidedStrength && !matchup.IsRangeOneSided)
 				.OrderBy(matchup => matchup.OneSidedTime)
 				.ThenBy(matchup => matchup.Opponent.Name, StringComparer.Ordinal);
 			var ordinaryBest = matchups.Where(matchup => !matchup.IsOneSidedStrength &&
 				!matchup.IsOneSidedWeakness)
 				.OrderByDescending(matchup => matchup.EconomicRatio)
 				.ThenBy(matchup => matchup.Opponent.Name, StringComparer.Ordinal);
-			var best = rangeStrengths.Concat(categoricalStrengths).Concat(ordinaryBest).Take(5).ToArray();
+			var best = rangeStrengths.Concat(ordinaryBest).Take(5).ToArray();
 			var ordinaryWorst = matchups.Where(matchup => !matchup.IsOneSidedWeakness &&
 				!double.IsPositiveInfinity(matchup.EconomicRatio))
 				.OrderBy(matchup => matchup.EconomicRatio)
