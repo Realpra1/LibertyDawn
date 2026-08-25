@@ -168,6 +168,7 @@ namespace OpenRA.Mods.Common.Traits
 			public double NominalRangeCells { get; internal set; }
 			public double MinimumRangeCells { get; internal set; }
 			public double ProjectileSpeedCellsPerTick { get; internal set; }
+			public double AttackerSpeedCellsPerTick { get; internal set; }
 			public double TargetSpeedCellsPerTick { get; internal set; }
 			public double DefenderHitRadiusCells { get; internal set; }
 			public double InaccuracyCells { get; internal set; }
@@ -180,6 +181,7 @@ namespace OpenRA.Mods.Common.Traits
 			public double FullAmmoTicks { get; internal set; } = double.PositiveInfinity;
 			public double ReloadingDamagePerTick { get; internal set; }
 			public double DefenderHealingPerTick { get; internal set; }
+			public double EngagementDelayTicks { get; internal set; }
 			public double TimeToKillTicks { get; internal set; }
 			public bool ContactAttack { get; internal set; }
 			public bool InstantDefeat { get; internal set; }
@@ -618,9 +620,10 @@ namespace OpenRA.Mods.Common.Traits
 			// Each destroyed sustained-fire actor removes one weapon. Consumed contact attackers
 			// instead apply their single opening action before the discrete attrition phase.
 			var attackerCountForDamage = AttackerCountForDamage(unitCount, forward.SingleUse);
-			var defenderTimeToKill = AmmoAdjustedTimeToKill(forward.DefenderHitPoints,
+			var defenderTimeToKill = EngagementAdjustedTimeToKill(AmmoAdjustedTimeToKill(forward.DefenderHitPoints,
 				new AmmoDamageProfile(forward.DamagePerTick * attackerCountForDamage, forward.FullAmmoTicks,
-					forward.ReloadingDamagePerTick * attackerCountForDamage), forward.DefenderHealingProfiles);
+					forward.ReloadingDamagePerTick * attackerCountForDamage), forward.DefenderHealingProfiles),
+				forward.EngagementDelayTicks);
 			var groupHealing = reverse.DefenderHealingProfiles.Select(h => new HealingProfile(
 				h.HealingPerTick * unitCount, h.StartsBelowHitPoints * unitCount));
 			var groupTimeToKill = AmmoAdjustedTimeToKill(reverse.DefenderHitPoints * (double)unitCount,
@@ -628,10 +631,13 @@ namespace OpenRA.Mods.Common.Traits
 					reverse.ReloadingDamagePerTick), groupHealing);
 			var groupKillRate = KillRate(defenderTimeToKill);
 			var defenderKillRate = KillRate(groupTimeToKill);
-			var defenderThreat = RangeAdjustedThreatEquivalent(defenderKillRate, groupKillRate,
-				ComparableRange(reverse, reverse.RangeCells), ComparableRange(forward, forward.NominalRangeCells));
-			var groupThreat = RangeAdjustedThreatEquivalent(groupKillRate, defenderKillRate,
-				ComparableRange(forward, forward.RangeCells), ComparableRange(reverse, reverse.NominalRangeCells));
+			var contactExchange = forward.ContactAttack || reverse.ContactAttack;
+			var defenderThreat = contactExchange ? ThreatEquivalent(defenderKillRate, groupKillRate) :
+				RangeAdjustedThreatEquivalent(defenderKillRate, groupKillRate,
+					ComparableRange(reverse, reverse.RangeCells), ComparableRange(forward, forward.NominalRangeCells));
+			var groupThreat = contactExchange ? ThreatEquivalent(groupKillRate, defenderKillRate) :
+				RangeAdjustedThreatEquivalent(groupKillRate, defenderKillRate,
+					ComparableRange(forward, forward.RangeCells), ComparableRange(reverse, reverse.NominalRangeCells));
 
 			return new GroupThreat(unitCount,
 				ScaleCachedExchange(defenderThreat, pair.DefenderVeterancyFactor, pair.AttackerVeterancyFactor),
@@ -695,27 +701,61 @@ namespace OpenRA.Mods.Common.Traits
 
 		static PairThreat CreatePair(DirectionalThreat forward, DirectionalThreat reverse)
 		{
-			forward.RangeMultiplier = EffectiveRangeFactor(ComparableRange(forward, forward.RangeCells),
+			ApplyContactApproach(forward, reverse);
+			ApplyContactApproach(reverse, forward);
+			var contactExchange = forward.ContactAttack || reverse.ContactAttack;
+			forward.RangeMultiplier = contactExchange ? 1 : EffectiveRangeFactor(ComparableRange(forward, forward.RangeCells),
 				ComparableRange(reverse, reverse.NominalRangeCells));
-			reverse.RangeMultiplier = EffectiveRangeFactor(ComparableRange(reverse, reverse.RangeCells),
+			reverse.RangeMultiplier = contactExchange ? 1 : EffectiveRangeFactor(ComparableRange(reverse, reverse.RangeCells),
 				ComparableRange(forward, forward.NominalRangeCells));
 
 			return new PairThreat
 			{
 				Forward = forward,
 				Reverse = reverse,
-				DefenderThreatInAttackerEquivalents = RangeAdjustedThreatEquivalent(
-					reverse.RawKillRate, forward.RawKillRate, ComparableRange(reverse, reverse.RangeCells),
-					ComparableRange(forward, forward.NominalRangeCells)),
-				AttackerThreatInDefenderEquivalents = RangeAdjustedThreatEquivalent(
-					forward.RawKillRate, reverse.RawKillRate, ComparableRange(forward, forward.RangeCells),
-					ComparableRange(reverse, reverse.NominalRangeCells))
+				DefenderThreatInAttackerEquivalents = contactExchange ?
+					ThreatEquivalent(reverse.RawKillRate, forward.RawKillRate) :
+					RangeAdjustedThreatEquivalent(reverse.RawKillRate, forward.RawKillRate,
+						ComparableRange(reverse, reverse.RangeCells), ComparableRange(forward, forward.NominalRangeCells)),
+				AttackerThreatInDefenderEquivalents = contactExchange ?
+					ThreatEquivalent(forward.RawKillRate, reverse.RawKillRate) :
+					RangeAdjustedThreatEquivalent(forward.RawKillRate, reverse.RawKillRate,
+						ComparableRange(forward, forward.RangeCells), ComparableRange(reverse, reverse.NominalRangeCells))
 			};
+		}
+
+		static void ApplyContactApproach(DirectionalThreat contact, DirectionalThreat defender)
+		{
+			if (!contact.ContactAttack)
+				return;
+
+			contact.EngagementDelayTicks = ContactApproachTicks(defender.RangeCells,
+				contact.DefenderHitRadiusCells, contact.AttackerSpeedCellsPerTick);
+			contact.TimeToKillTicks = EngagementAdjustedTimeToKill(
+				contact.TimeToKillTicks, contact.EngagementDelayTicks);
+			contact.RawKillRate = KillRate(contact.TimeToKillTicks);
 		}
 
 		public static double ComparableRange(bool contactAttack, double rangeCells, double defenderHitRadiusCells)
 		{
 			return contactAttack ? Math.Max(defenderHitRadiusCells, 1d / 1024) : rangeCells;
+		}
+
+		public static double ContactApproachTicks(double defenderEngagementRangeCells,
+			double defenderHitRadiusCells, double attackerSpeedCellsPerTick)
+		{
+			var approachDistance = defenderEngagementRangeCells -
+				ComparableRange(true, 0, defenderHitRadiusCells);
+			if (approachDistance <= 0)
+				return 0;
+
+			return attackerSpeedCellsPerTick > 0 ? approachDistance / attackerSpeedCellsPerTick :
+				double.PositiveInfinity;
+		}
+
+		public static double EngagementAdjustedTimeToKill(double timeToKillTicks, double engagementDelayTicks)
+		{
+			return timeToKillTicks + Math.Max(0, engagementDelayTicks);
 		}
 
 		static double ComparableRange(DirectionalThreat threat, double rangeCells)
@@ -767,6 +807,7 @@ namespace OpenRA.Mods.Common.Traits
 			var armor = defender.TraitInfos<ArmorInfo>().Select(a => a.Type).FirstOrDefault(a => a != null);
 			var hitRadius = defender.TraitInfos<HitShapeInfo>()
 				.Select(h => Cells(h.Type.OuterRadius)).DefaultIfEmpty(0.5).Max();
+			var attackerSpeed = MovementSpeedCellsPerTick(attacker);
 			var targetSpeed = MovementSpeedCellsPerTick(defender);
 			var targetEngagementRange = defender.TraitInfos<ArmamentInfo>()
 				.Where(a => a.WeaponInfo != null && a.WeaponInfo.IsValidTarget(attackerTargetTypes))
@@ -775,12 +816,12 @@ namespace OpenRA.Mods.Common.Traits
 			if (TryGetCachedContactAttack(attacker, defender,
 				out var damageFraction, out var instantDefeat, out var consumed))
 				return CreateContactAttackDirection(attacker.Name, defender.Name, hp, armor, hitRadius, targetSpeed,
-					hp * damageFraction, instantDefeat, consumed);
+					hp * damageFraction, instantDefeat, consumed, attackerSpeed);
 
 			var applicable = attacker.TraitInfos<ArmamentInfo>()
 				.Where(a => a.WeaponInfo != null && a.WeaponInfo.IsValidTarget(targetTypes))
 				.Select(a => (Info: a, Threat: CalculateArmament(a, hp, armor, hitRadius, sharesCell,
-					MovementSpeedCellsPerTick(attacker) <= 0, a.ModifiedRange,
+					attackerSpeed <= 0, a.ModifiedRange,
 					Array.Empty<int>(), Array.Empty<int>(), Array.Empty<int>(), null, null,
 					targetSpeed, targetEngagementRange, targetTypes)))
 				.ToArray();
@@ -811,6 +852,7 @@ namespace OpenRA.Mods.Common.Traits
 				.Where(a => !a.IsTraitDisabled).Select(a => a.Info.Type).FirstOrDefault(a => a != null);
 			var hitRadius = defender.TraitsImplementing<HitShape>()
 				.Where(h => !h.IsTraitDisabled).Select(h => Cells(h.Info.Type.OuterRadius)).DefaultIfEmpty(0.5).Max();
+			var attackerSpeed = MovementSpeedCellsPerTick(attacker);
 			var targetSpeed = MovementSpeedCellsPerTick(defender);
 			var targetEngagementRange = defender.TraitsImplementing<Armament>()
 				.Where(a => !a.IsTraitDisabled && !a.IsTraitPaused && a.Weapon.IsValidTarget(attackerTargetTypes))
@@ -819,7 +861,7 @@ namespace OpenRA.Mods.Common.Traits
 			if (TryGetLiveContactAttack(attacker, defender,
 				out var damageFraction, out var instantDefeat, out var consumed))
 				return CreateContactAttackDirection(attacker.Info.Name, defender.Info.Name, hp, armor, hitRadius, targetSpeed,
-					instantDefeat ? hp : Math.Min(hp, (health?.MaxHP ?? hp) * damageFraction), instantDefeat, consumed);
+					instantDefeat ? hp : Math.Min(hp, (health?.MaxHP ?? hp) * damageFraction), instantDefeat, consumed, attackerSpeed);
 
 			var firepowerModifiers = attacker.TraitsImplementing<IFirepowerModifier>().Select(m => m.GetFirepowerModifier()).ToArray();
 			var reloadModifiers = attacker.TraitsImplementing<IReloadModifier>().Select(m => m.GetReloadModifier()).ToArray();
@@ -830,7 +872,7 @@ namespace OpenRA.Mods.Common.Traits
 				.Where(a => ammoPools.Where(p => p.Info.Armaments.Contains(a.Info.Name))
 					.All(p => p.CurrentAmmoCount >= a.Info.AmmoUsage))
 				.Select(a => CalculateArmament(a.Info, hp, armor, hitRadius, sharesCell,
-					MovementSpeedCellsPerTick(attacker) <= 0, a.MaxRange(),
+					attackerSpeed <= 0, a.MaxRange(),
 					firepowerModifiers, reloadModifiers, inaccuracyModifiers, attacker, defender,
 					targetSpeed, targetEngagementRange, targetTypes))
 				.ToArray();
@@ -930,7 +972,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		static DirectionalThreat CreateContactAttackDirection(string attacker, string defender,
 			int hp, string armor, double hitRadius, double targetSpeed, double damage,
-			bool instantDefeat, bool consumed)
+			bool instantDefeat, bool consumed, double attackerSpeed)
 		{
 			var ammo = new AmmoDamageProfile(damage, consumed ? 1 : double.PositiveInfinity,
 				consumed ? 0 : damage);
@@ -946,6 +988,7 @@ namespace OpenRA.Mods.Common.Traits
 				NominalRangeCells = 0,
 				MinimumRangeCells = 0,
 				ProjectileSpeedCellsPerTick = double.PositiveInfinity,
+				AttackerSpeedCellsPerTick = attackerSpeed,
 				TargetSpeedCellsPerTick = targetSpeed,
 				DefenderHitRadiusCells = hitRadius,
 				ExpectedHitChance = 1,

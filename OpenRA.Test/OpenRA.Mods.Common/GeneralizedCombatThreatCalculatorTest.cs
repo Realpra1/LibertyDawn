@@ -173,7 +173,7 @@ namespace OpenRA.Test
 		}
 
 		[Test]
-		public void ImmobileAttackersCannotEngageLongerRangedTargets()
+		public void ImmobileAttackersRetainNormalRangeUnlessTargetOutrangesThem()
 		{
 			Assert.That(GeneralizedCombatThreatCalculator.EffectiveRangeCells(6, 0,
 				double.PositiveInfinity, 0, 0.5, true, false, 8, attackerIsImmobile: true), Is.Zero);
@@ -187,6 +187,17 @@ namespace OpenRA.Test
 			Assert.That(GeneralizedCombatThreatCalculator.ComparableRange(false, 0, 0.5), Is.Zero);
 			Assert.That(GeneralizedCombatThreatCalculator.ComparableRange(true, 0, 0.5), Is.EqualTo(0.5));
 			Assert.That(GeneralizedCombatThreatCalculator.ComparableRange(true, 0, 0), Is.EqualTo(1d / 1024));
+		}
+
+		[Test]
+		public void ContactAttackApproachAccountsForDefenderRangeAndAttackerSpeed()
+		{
+			Assert.That(GeneralizedCombatThreatCalculator.ContactApproachTicks(11, 0.75, 0.05),
+				Is.EqualTo(205).Within(0.000001));
+			Assert.That(GeneralizedCombatThreatCalculator.ContactApproachTicks(0.5, 0.75, 0.05), Is.Zero);
+			Assert.That(GeneralizedCombatThreatCalculator.ContactApproachTicks(11, 0.75, 0),
+				Is.EqualTo(double.PositiveInfinity));
+			Assert.That(GeneralizedCombatThreatCalculator.EngagementAdjustedTimeToKill(1, 205), Is.EqualTo(206));
 		}
 
 		[Test]

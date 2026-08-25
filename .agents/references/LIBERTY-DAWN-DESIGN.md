@@ -55,8 +55,10 @@ matched against each other.
 
 The cache treats Commando demolition as a zero-range instant defeat. Engineer
 sabotage is a zero-range, consumed attack capped at half the target's maximum
-health, so two surviving Engineers are needed before return fire is considered.
-An immobile actor cannot engage an opponent whose valid weapon outranges it.
+health, so two Engineers must survive to reach the target. Contact specialists'
+approach time accounts for exposure inside an armed defender's valid range. An
+immobile actor cannot engage an opponent only when that opponent's valid weapon
+outranges it; otherwise its normal range calculation is retained.
 
 ## Philosophy of Structures
 
@@ -169,7 +171,7 @@ detection but only a small ammunition reserve before reloading. It turns infantr
 to mist and damages light vehicles quickly. It cannot lose power.
 
 Cost-adjusted matchups — Best: Mobile S.A.M. (immune), Rocket Soldier (x26),
-Minigunner (x44), Nod Buggy (x13), Hum-Vee (x11). Worst: Apache Longbow (cannot
+Minigunner (x44), Engineer (x21), Commando (x5). Worst: Apache Longbow (cannot
 engage), Artillery (cannot engage), Orca (cannot engage), Rocket Launcher (cannot
 engage), Stealth Tank (cannot engage).
 
@@ -182,7 +184,8 @@ coverage areas make stealth assets difficult to slip through.
 
 Cost-adjusted matchups — Best: Mobile S.A.M. (immune), Apache Longbow (x8), Hum-Vee
 (x20), Nod Buggy (x23), Rocket Soldier (x27). Worst: Rocket Launcher (cannot
-engage), Commando (/3), Mammoth Tank (/4), Engineer (x2), Medium Tank (x2).
+engage), Mammoth Tank (/4), Medium Tank (x2), Flamethrower (x14), Chemical Warrior
+(x15).
 
 ### SAM Site
 
@@ -333,10 +336,10 @@ Unarmed but strategically devastating. Engineers capture or sabotage structures,
 repair bridges, and restore vehicle husks. Inside a transport, an Engineer is a
 threat far beyond his direct cost and may capture missing technology.
 
-Cost-adjusted matchups — Best: SAM Site (immune), Obelisk of Light (/2), Advanced
-Guard Tower (/2), Turret (/2), Guard Tower (/3). Worst: APC (cannot engage), Apache
-Longbow (cannot engage), Artillery (cannot engage), Chemical Tank (cannot engage),
-Chemical Warrior (cannot engage).
+Cost-adjusted matchups — Best: SAM Site (immune), Obelisk of Light (/4), Turret
+(/3), Advanced Guard Tower (/16), Guard Tower (/21). Worst: APC (cannot engage),
+Apache Longbow (cannot engage), Artillery (cannot engage), Chemical Tank (cannot
+engage), Chemical Warrior (cannot engage).
 
 ### Commando
 
@@ -344,10 +347,10 @@ An expensive Recon III sniper with enormous vision. He kills infantry at range
 and demolishes buildings after planting explosives. Vehicles counter him only if
 they find and reach him. Transports, terrain, and distractions multiply his value.
 
-Cost-adjusted matchups — Best: Engineer (immune), SAM Site (immune), Turret (x9),
-Obelisk of Light (x3), Advanced Guard Tower (x3). Worst: APC (cannot engage), Apache
-Longbow (cannot engage), Artillery (cannot engage), Chemical Tank (cannot engage),
-Flame Tank (cannot engage).
+Cost-adjusted matchups — Best: Engineer (immune), SAM Site (immune), Turret (x23),
+Obelisk of Light (x8), Advanced Guard Tower (x11). Worst: APC (cannot engage),
+Apache Longbow (cannot engage), Artillery (cannot engage), Chemical Tank (cannot
+engage), Flame Tank (cannot engage).
 
 ### Sheep
 
