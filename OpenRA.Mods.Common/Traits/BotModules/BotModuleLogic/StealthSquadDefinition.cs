@@ -33,6 +33,12 @@ namespace OpenRA.Mods.Common.Traits
 		public readonly int MinimumLateHarassmentGroupSize = 3;
 		public readonly int TargetSwitchImprovementPercent = 25;
 		public readonly int HarassmentDistancePenalty = 1;
+		[Desc("Preferred maximum driving time in seconds for an undefended target. Farther safe targets remain a fallback.")]
+		public readonly int MaximumUndefendedTargetTravelSeconds = 30;
+		public readonly bool EnableKiting = true;
+		public readonly int MinimumKiteSpeedPercent = 120;
+		public readonly int MassClearEntryCrossoverPercent = 200;
+		public readonly int MassClearAbortCrossoverPercent = 100;
 		public readonly HashSet<string> HarvesterTypes = new HashSet<string>();
 		public readonly HashSet<string> HarvesterWaitingAnchorTypes = new HashSet<string>();
 		public readonly int ResourceWaitingSearchRadius;
@@ -67,6 +73,9 @@ namespace OpenRA.Mods.Common.Traits
 				DetectorRangeBufferCells < 0 || RouteThreatPenalty < 0 || MaximumRouteStretchPercent < 100 ||
 				KiteRangeMarginCells < 0 || CarefulClearValueRatio <= 0 || MinimumLateHarassmentGroupSize <= 0 ||
 				TargetSwitchImprovementPercent < 0 || HarassmentDistancePenalty <= 0 ||
+				MaximumUndefendedTargetTravelSeconds <= 0 || MinimumKiteSpeedPercent < 100 ||
+				MassClearEntryCrossoverPercent <= MassClearAbortCrossoverPercent ||
+				MassClearAbortCrossoverPercent < 0 ||
 				ResourceWaitingSearchRadius < 0 || ResourceWaitingOrderInterval <= 0 ||
 				PendingResourceExplosionAvoidanceRadius < 0 || HazardRouteWaypointSpacing <= 0 ||
 				StrategicCellSize < 0 || MissionRetryInterval < 0 || NearbyTargetReactionRadiusCells < 0 ||

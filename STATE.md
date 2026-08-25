@@ -1,3 +1,33 @@
+# CNC-96A successor: cached kiting and clearing
+
+- Status: bounded implementation and exact-source worker validation complete;
+  coordinator review/integration pending
+- Base: `origin/bleed` / `1df25232a36a0aee73e5d9374bb1af1c30fab6de`
+- Branch/worktree: `agent/cnc96a-kiting-successor-cycle1` /
+  `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260825-cnc96a-kiting/worker`
+- Planner: Air-style bounded cached candidate ranking; capped 1-2x cost bonus,
+  inverse remaining HP, exact CNC priorities, route-time preference of 30 seconds,
+  and safe farther-target fallback
+- Clearing: exact target-centered 3x3 package of cached 6x6 cells; live-current-target
+  kiting first; configured cloaked infantry crushing; shared generalized crossover
+  calculator with strict `>2` entry and `<=1` abort; latched threat-first mass mode
+- Safety: ordinary revealing attacks excluded from cached local weapon coverage;
+  whole-squad one-cell pending-Blue escape with safe destination and arrival replan;
+  Green remains legal, Blue is finite route cost, Red/pending are forbidden
+- Profiles: STNK kiting/crushing enabled; CTNK kiting/crushing explicitly disabled;
+  exact configured target priorities applied without excluding harvesters as vehicles
+- Gates: `make check` PASS zero warnings/errors; focused matrix 9/9; CNC YAML PASS;
+  solution build PASS zero warnings/errors; `git diff --check` PASS
+- Real-engine scenarios: 4/4 PASS under `.build/cnc96a-kiting/results15`;
+  kiting/crush 0 stalls/deaths and exact crush callback; non-lead pending-Blue trigger
+  causes one whole-squad exit to explicit Blue/Red/pending-free destination; isolated
+  mass wipes the exact rifle+MTNK+MSAM+Harvester package highest-threat-first
+- Boundary evidence: focused tests prove strict no-entry at crossover 2, entry above 2,
+  continuation above 1, and abort at or below 1; engine fixtures prove >2 entry,
+  authoritative package completion despite moving economic targets, and one <=1 flee
+  after a fresh overwhelming package membership change, with no reissue/stall/death
+- No push, publication, merge, task-sheet/coordinator-state edit, or bleed mutation
+
 # CNC-96A successor: mandatory Covert III STNK
 
 - Status: bounded successor implementation and exact-source validation complete;

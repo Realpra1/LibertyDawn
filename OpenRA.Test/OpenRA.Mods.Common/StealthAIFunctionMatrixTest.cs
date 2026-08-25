@@ -152,6 +152,7 @@ namespace OpenRA.Test.Mods.Common
 		public void StealthPlanningUsesCachedSixCellRoutesAndIndependentSafety()
 		{
 			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
+			var yaml = Source("mods/cnc/rules/ai.yaml");
 			Assert.That(states, Does.Contain("StealthInfluenceCaches"));
 			Assert.That(states, Does.Contain("SelectTargetCandidates("));
 			Assert.That(states, Does.Contain("foreach (var selectedIndex in selectedIndices)"));
@@ -159,6 +160,8 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(states, Does.Contain("NearestSafeStealthNeighbor"));
 			Assert.That(states, Does.Contain("resourceType == \"BlueTiberium\""));
 			Assert.That(states, Does.Contain("resourceType == \"RedTiberium\""));
+			Assert.That(yaml, Does.Not.Contain("StealthResourceExplosionTestDriver"));
+			Assert.That(yaml, Does.Not.Contain("StealthCrushTestTelemetry"));
 			Assert.That(StealthAISpecialistPolicy.IsEngagementThreat(true, true, false), Is.True);
 			Assert.That(StealthAISpecialistPolicy.IsEngagementThreat(false, true, false), Is.False);
 		}
@@ -176,6 +179,28 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(StealthAISpecialistPolicy.CanAdvanceReinforcement(true), Is.True);
 			Assert.That(StealthAIThreatGeometry.RemainingHealthPriority(5000, 100, 1000), Is.EqualTo(50000));
 			Assert.That(StealthAISpecialistPolicy.ShouldPreserveBusyReinforcement(true, false), Is.True);
+		}
+
+		[Test]
+		public void StealthClearingPolicyUsesStrictKitingAndTwoToOneHysteresis()
+		{
+			Assert.That(StealthAISpecialistPolicy.CanKite(120, 100, 8, 5, 1, 120), Is.True);
+			Assert.That(StealthAISpecialistPolicy.CanKite(119, 100, 8, 5, 1, 120), Is.False);
+			Assert.That(StealthAISpecialistPolicy.CanKite(120, 100, 6, 5, 1, 120), Is.False);
+			Assert.That(StealthAISpecialistPolicy.ShouldEnterMassClear(2, 200), Is.False);
+			Assert.That(StealthAISpecialistPolicy.ShouldEnterMassClear(2.01, 200), Is.True);
+			Assert.That(StealthAISpecialistPolicy.ShouldAbortMassClear(1.01, 100), Is.False);
+			Assert.That(StealthAISpecialistPolicy.ShouldAbortMassClear(1, 100), Is.True);
+		}
+
+		[Test]
+		public void UndefendedTravelWindowIsPreferenceRatherThanEligibility()
+		{
+			Assert.That(StealthAISpecialistPolicy.IsWithinUndefendedTravelPreference(30000, 30), Is.True);
+			Assert.That(StealthAISpecialistPolicy.IsWithinUndefendedTravelPreference(30001, 30), Is.False);
+			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
+			Assert.That(states.IndexOf("best = clearPlans", StringComparison.Ordinal),
+				Is.LessThan(states.LastIndexOf("best = safePlans", StringComparison.Ordinal)));
 		}
 	}
 }

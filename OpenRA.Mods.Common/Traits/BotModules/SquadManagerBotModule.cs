@@ -13,7 +13,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using OpenRA.Mods.Common.Traits.BotModules;
 using OpenRA.Mods.Common.Traits.BotModules.Squads;
 using OpenRA.Primitives;
 using OpenRA.Traits;
@@ -284,6 +283,8 @@ namespace OpenRA.Mods.Common.Traits
 			"target, while attacking it and on the way home. Zero disables it and restores the stock",
 			"behaviour of only checking when a target is selected.")]
 		public readonly int AirSafetyCheckInterval = 0;
+		[Desc("Ticks between lightweight local safety checks for ground stealth squads.")]
+		public readonly int StealthSafetyCheckInterval = 5;
 
 		[Desc("Radius in cells around an air squad that is scanned for anti-air by the safety check.")]
 		public readonly int AirThreatScanRadius = 12;
@@ -477,6 +478,8 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (AirSafetyCheckInterval > 0 && AirThreatScanRadius <= 0)
 				throw new YamlException("AirThreatScanRadius must be greater than zero when AirSafetyCheckInterval is set.");
+			if (StealthSafetyCheckInterval < 0)
+				throw new YamlException("StealthSafetyCheckInterval must not be negative.");
 
 			if (AirThreatFleeMultiplier <= 0)
 				throw new YamlException("AirThreatFleeMultiplier must be greater than zero.");
@@ -572,11 +575,14 @@ namespace OpenRA.Mods.Common.Traits
 
 		public readonly World World;
 		public readonly Player Player;
+		internal readonly GeneralizedCombatThreatCalculator CombatThreatCalculator;
 
 		readonly Predicate<Actor> unitCannotBeOrdered;
 		readonly List<Actor> unitsHangingAroundTheBase = new List<Actor>();
 		readonly Dictionary<string, AdaptiveAirRiskController> adaptiveAirRisk =
 			new Dictionary<string, AdaptiveAirRiskController>(StringComparer.OrdinalIgnoreCase);
+		static readonly Dictionary<Ruleset, GeneralizedCombatThreatCalculator> CombatThreatCalculators =
+			new Dictionary<Ruleset, GeneralizedCombatThreatCalculator>();
 		readonly Dictionary<uint, int> airMarkedGroundTargets = new Dictionary<uint, int>();
 
 		// Units that the bot already knows about. Any unit not on this list needs to be given a role.
@@ -599,6 +605,7 @@ namespace OpenRA.Mods.Common.Traits
 		int attackForceTicks;
 		int minAttackForceDelayTicks;
 		int airSafetyTicks;
+		int stealthSafetyTicks;
 		int adaptiveAirRiskTicks;
 		int stealthRecruitTicks;
 		bool advancedBehaviorEnabled = true;
@@ -606,13 +613,20 @@ namespace OpenRA.Mods.Common.Traits
 		Actor fallbackTarget;
 		readonly HashSet<uint> fallbackOrderedActors = new HashSet<uint>();
 		readonly Dictionary<uint, CPos> fallbackOrderTargets = new Dictionary<uint, CPos>();
-		readonly AdvancedBotFallbackOwnership releasedFallbackOwnership = new AdvancedBotFallbackOwnership();
+		readonly BotModules.AdvancedBotFallbackOwnership releasedFallbackOwnership =
+			new BotModules.AdvancedBotFallbackOwnership();
 
 		public SquadManagerBotModule(Actor self, SquadManagerBotModuleInfo info)
 			: base(info)
 		{
 			World = self.World;
 			Player = self.Owner;
+			if (!CombatThreatCalculators.TryGetValue(World.Map.Rules, out CombatThreatCalculator))
+			{
+				CombatThreatCalculator = new GeneralizedCombatThreatCalculator(
+					World.Map.Rules, World.Map.Grid.SubCellOffsets);
+				CombatThreatCalculators.Add(World.Map.Rules, CombatThreatCalculator);
+			}
 
 			unitCannotBeOrdered = a => a == null || a.Owner != Player || a.IsDead || !a.IsInWorld;
 
@@ -708,6 +722,8 @@ namespace OpenRA.Mods.Common.Traits
 			// Spread the air safety checks of all the bots across the interval instead of spiking on one tick.
 			if (Info.AirSafetyCheckInterval > 0)
 				airSafetyTicks = World.LocalRandom.Next(0, Info.AirSafetyCheckInterval);
+			if (Info.StealthSafetyCheckInterval > 0)
+				stealthSafetyTicks = World.LocalRandom.Next(0, Info.StealthSafetyCheckInterval);
 
 			if (Info.AirAdaptiveRiskInterval > 0)
 				adaptiveAirRiskTicks = Info.AirAdaptiveRiskInterval;
@@ -1106,7 +1122,14 @@ namespace OpenRA.Mods.Common.Traits
 			if (Info.AirSafetyCheckInterval > 0 && --airSafetyTicks <= 0)
 			{
 				airSafetyTicks = Info.AirSafetyCheckInterval;
-				foreach (var s in Squads)
+				foreach (var s in Squads.Where(s => s.Type == SquadType.Air))
+					s.TickAirSafety();
+			}
+
+			if (Info.StealthSafetyCheckInterval > 0 && --stealthSafetyTicks <= 0)
+			{
+				stealthSafetyTicks = Info.StealthSafetyCheckInterval;
+				foreach (var s in Squads.Where(s => s.Type == SquadType.Stealth))
 					s.TickAirSafety();
 			}
 
@@ -1173,7 +1196,7 @@ namespace OpenRA.Mods.Common.Traits
 			var retainedGroups = releasedFallbackOwnership.Groups.Select(g => new KeyValuePair<string, Actor[]>(g.Key,
 				g.Value.Select(World.GetActorById).Where(a => !unitCannotBeOrdered(a)).OrderBy(a => a.ActorID).ToArray())).ToArray();
 			var releasedGroups = retainedGroups.Select(g => new KeyValuePair<string, Actor[]>(g.Key,
-				g.Value.Where(a => AdvancedBotFallbackOwnership.IsEligibleForGenericFallback(Info.FailsafeDirectCombatTypes,
+				g.Value.Where(a => BotModules.AdvancedBotFallbackOwnership.IsEligibleForGenericFallback(Info.FailsafeDirectCombatTypes,
 					a.Info.Name, a.Info.HasTraitInfo<AttackBaseInfo>()) && !IsReservedForSpecialBehavior(a) &&
 					!IsUnitProtectingBase(a) && !IsUnitTemporarilyControlled(a)).ToArray())).Where(g => g.Value.Length > 0).ToArray();
 			var releasedActorIds = new HashSet<uint>(releasedGroups.SelectMany(g => g.Value).Select(a => a.ActorID));
@@ -1255,18 +1278,18 @@ namespace OpenRA.Mods.Common.Traits
 				var preCodexAssaultAvailable = !Info.ExcludeFromSquadsTypes.Contains(actor.Info.Name) &&
 					!Info.AirUnitsTypes.Contains(actor.Info.Name) && !Info.NavalUnitsTypes.Contains(actor.Info.Name) &&
 					actor.Info.HasTraitInfo<AttackBaseInfo>();
-				var genericFallbackEligible = AdvancedBotFallbackOwnership.IsEligibleForGenericFallback(
+				var genericFallbackEligible = BotModules.AdvancedBotFallbackOwnership.IsEligibleForGenericFallback(
 					Info.FailsafeDirectCombatTypes, actor.Info.Name, actor.Info.HasTraitInfo<AttackBaseInfo>()) &&
 					!IsUnitProtectingBase(actor) && !IsUnitTemporarilyControlled(actor);
-				switch (UnassignedCombatUnitRecruitmentPolicy.SelectFallback(advancedBehaviorEnabled,
+				switch (BotModules.UnassignedCombatUnitRecruitmentPolicy.SelectFallback(advancedBehaviorEnabled,
 					preCodexAssaultAvailable, genericFallbackEligible))
 				{
-					case UnassignedCombatFallbackDisposition.PreCodexAssault:
+					case BotModules.UnassignedCombatFallbackDisposition.PreCodexAssault:
 						// GeneralAttack and Air are the disabled advanced paths. The closest pre-Codex
 						// owner for released ground combat is the ordinary assault squad.
 						legacyFallback.Add(actor);
 						continue;
-					case UnassignedCombatFallbackDisposition.GenericFallback:
+					case BotModules.UnassignedCombatFallbackDisposition.GenericFallback:
 						genericFallback.Add(actor);
 						continue;
 				}
