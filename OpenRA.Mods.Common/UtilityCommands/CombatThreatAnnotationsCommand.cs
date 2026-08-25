@@ -41,8 +41,11 @@ namespace OpenRA.Mods.Common.UtilityCommands
 			public RankedActor Opponent;
 			public string Description;
 			public double EconomicRatio;
-			public double IncomingKillTime;
+			public double OneSidedTime;
+			public bool IsOneSidedStrength;
+			public bool IsOneSidedWeakness;
 			public bool IsCategoricalWeakness;
+			public bool IsRangeOneSided;
 		}
 
 		static readonly string[] ClassOrder =
@@ -106,43 +109,60 @@ namespace OpenRA.Mods.Common.UtilityCommands
 		static CombatThreatAnnotation Generate(GeneralizedCombatThreatCalculator calculator,
 			IReadOnlyCollection<RankedActor> actors, IReadOnlyCollection<ActorInfo> targets, RankedActor actor)
 		{
-			var targeting = TargetingLabel(calculator, actors, actor);
+			var canTargetAir = CanTarget(calculator, actors.Where(target => target.IsAir), actor);
+			var canTargetGround = CanTarget(calculator, actors.Where(target => !target.IsAir), actor);
+			var targeting = TargetingLabel(canTargetAir, canTargetGround);
 			var profiles = ClassOrder.Select(targetClass => ClassProfile(calculator, actor,
 				targets.Where(target => target.Name != actor.Info.Name && ArmorClass(target) == targetClass),
 				targetClass)).Where(profile => profile.HasValue).Select(profile => profile.Value).ToArray();
-			var thirds = GeneralizedCombatThreatCalculator.RankClassKillTimeThirds(profiles);
-			var bestClasses = ClassOrder.Where(c => thirds.TryGetValue(c, out var third) &&
+			var bestThirds = GeneralizedCombatThreatCalculator.RankClassKillTimeThirds(profiles);
+			var bestClasses = ClassOrder.Where(c => bestThirds.TryGetValue(c, out var third) &&
 				third == GeneralizedCombatThreatCalculator.KillTimeThird.Best).ToArray();
-			var worstClasses = ClassOrder.Where(c => thirds.TryGetValue(c, out var third) &&
-				third == GeneralizedCombatThreatCalculator.KillTimeThird.Worst).ToArray();
 			var matchups = actors.Where(opponent => opponent.Info.Name != actor.Info.Name)
 				.Where(opponent => !actor.IsImmobile || !opponent.IsImmobile)
 				.Select(opponent => Matchup(calculator, actor, opponent))
 				.Where(matchup => matchup != null)
 				.ToArray();
-			var categorical = matchups.Where(matchup => matchup.IsCategoricalWeakness)
-				.OrderBy(matchup => matchup.IncomingKillTime)
+			var combinedProfiles = profiles.Concat(ClassOrder
+				.Where(targetClass => profiles.All(profile => profile.TargetClass != targetClass))
+				.Where(targetClass => matchups.Any(matchup => matchup.IsCategoricalWeakness &&
+					ArmorClass(matchup.Opponent.Info) == targetClass))
+				.Select(targetClass => new GeneralizedCombatThreatCalculator.ClassKillTimeProfile(
+					targetClass, double.PositiveInfinity, 1))).ToArray();
+			var worstThirds = GeneralizedCombatThreatCalculator.RankClassKillTimeThirds(combinedProfiles);
+			var worstClasses = ClassOrder.Where(c => worstThirds.TryGetValue(c, out var third) &&
+				third == GeneralizedCombatThreatCalculator.KillTimeThird.Worst).ToArray();
+			var oneSidedWeaknesses = matchups.Where(matchup => matchup.IsOneSidedWeakness)
+				.OrderBy(matchup => matchup.OneSidedTime)
 				.ThenBy(matchup => matchup.Opponent.Name, StringComparer.Ordinal)
 				.ToArray();
-			if (categorical.Length > 0)
+			var captureOnly = actor.Info.HasTraitInfo<CapturesInfo>() && !actor.Info.HasTraitInfo<ArmamentInfo>();
+			if (captureOnly)
 			{
-				var hasAir = categorical.Any(matchup => matchup.Opponent.IsAir);
-				var hasGround = categorical.Any(matchup => !matchup.Opponent.IsAir);
-				worstClasses = new[]
-				{
-					hasAir && hasGround ? "All ground and air units" :
-						hasAir ? "All air units" : "All ground units"
-				};
+				bestClasses = new[] { "Structures" };
+				worstClasses = new[] { "All units" };
 			}
+			else if (!canTargetGround && oneSidedWeaknesses.Any(matchup => !matchup.Opponent.IsAir))
+				worstClasses = new[] { "All ground units" };
+			else if (actor.IsImmobile && !canTargetAir && oneSidedWeaknesses.Any(matchup => matchup.Opponent.IsAir))
+				worstClasses = new[] { "All air units" };
 
-			var ordinary = matchups.Where(matchup => !matchup.IsCategoricalWeakness).ToArray();
-			var best = ordinary.Where(matchup => !double.IsNegativeInfinity(matchup.EconomicRatio))
+			var rangeStrengths = matchups.Where(matchup => matchup.IsOneSidedStrength && matchup.IsRangeOneSided)
+				.OrderBy(matchup => matchup.OneSidedTime)
+				.ThenBy(matchup => matchup.Opponent.Name, StringComparer.Ordinal);
+			var categoricalStrengths = matchups.Where(matchup => matchup.IsOneSidedStrength && !matchup.IsRangeOneSided)
+				.OrderBy(matchup => matchup.OneSidedTime)
+				.ThenBy(matchup => matchup.Opponent.Name, StringComparer.Ordinal);
+			var ordinaryBest = matchups.Where(matchup => !matchup.IsOneSidedStrength &&
+				!matchup.IsOneSidedWeakness)
 				.OrderByDescending(matchup => matchup.EconomicRatio)
-				.ThenBy(matchup => matchup.Opponent.Name, StringComparer.Ordinal).Take(5).ToArray();
-			var ordinaryWorst = ordinary.Where(matchup => !double.IsPositiveInfinity(matchup.EconomicRatio))
+				.ThenBy(matchup => matchup.Opponent.Name, StringComparer.Ordinal);
+			var best = rangeStrengths.Concat(categoricalStrengths).Concat(ordinaryBest).Take(5).ToArray();
+			var ordinaryWorst = matchups.Where(matchup => !matchup.IsOneSidedWeakness &&
+				!double.IsPositiveInfinity(matchup.EconomicRatio))
 				.OrderBy(matchup => matchup.EconomicRatio)
 				.ThenBy(matchup => matchup.Opponent.Name, StringComparer.Ordinal);
-			var worst = categorical.Cast<RankedMatchup>().Concat(ordinaryWorst)
+			var worst = oneSidedWeaknesses.Cast<RankedMatchup>().Concat(ordinaryWorst)
 				.GroupBy(matchup => matchup.Opponent.Info.Name).Select(group => group.First()).Take(5).ToArray();
 			var text = "Cost-adjusted matchups — " + targeting + ". Best against: " +
 				Label(bestClasses) + ". Worst against: " + Label(worstClasses) + ". Best: " +
@@ -151,13 +171,15 @@ namespace OpenRA.Mods.Common.UtilityCommands
 			return new CombatThreatAnnotation(actor.Info.Name, actor.HeadingName, Wrap(text));
 		}
 
-		static string TargetingLabel(GeneralizedCombatThreatCalculator calculator,
-			IEnumerable<RankedActor> actors, RankedActor actor)
+		static bool CanTarget(GeneralizedCombatThreatCalculator calculator,
+			IEnumerable<RankedActor> targets, RankedActor actor)
 		{
-			var canTargetAir = actors.Where(target => target.IsAir)
-				.Any(target => calculator.CalculateBaseline(actor.Info.Name, target.Info.Name).Forward.CanTarget);
-			var canTargetGround = actors.Where(target => !target.IsAir)
-				.Any(target => calculator.CalculateBaseline(actor.Info.Name, target.Info.Name).Forward.CanTarget);
+			return targets.Any(target =>
+				calculator.CalculateBaseline(actor.Info.Name, target.Info.Name).Forward.CanTarget);
+		}
+
+		static string TargetingLabel(bool canTargetAir, bool canTargetGround)
+		{
 			return !canTargetAir && !canTargetGround ? "Cannot target: Air or Ground" :
 				!canTargetAir ? "Cannot target: Air" : !canTargetGround ? "Cannot target: Ground" :
 				"Can target: Ground and Air";
@@ -169,8 +191,7 @@ namespace OpenRA.Mods.Common.UtilityCommands
 		{
 			var values = targets.Select(target => calculator.CalculateBaseline(actor.Info.Name, target.Name).Forward)
 				.Where(threat => threat.CanTarget)
-				.Select(threat => (CanEngage(threat) ? threat.TimeToKillTicks : double.PositiveInfinity) /
-					threat.DefenderHitPoints)
+				.Select(NormalizedKillTime)
 				.OrderBy(value => value)
 				.ToArray();
 			if (values.Length == 0)
@@ -181,39 +202,65 @@ namespace OpenRA.Mods.Common.UtilityCommands
 			return new GeneralizedCombatThreatCalculator.ClassKillTimeProfile(targetClass, median, 1);
 		}
 
+		static double NormalizedKillTime(GeneralizedCombatThreatCalculator.DirectionalThreat threat)
+		{
+			if (!CanEngage(threat))
+				return double.PositiveInfinity;
+			if (!double.IsPositiveInfinity(threat.TimeToKillTicks))
+				return threat.TimeToKillTicks / threat.DefenderHitPoints;
+			if (threat.ContactAttack && threat.SingleUse && threat.DamagePerCycle > 0)
+				return (threat.EngagementDelayTicks + Math.Max(1, threat.CycleTicks)) / threat.DefenderHitPoints;
+
+			return double.PositiveInfinity;
+		}
+
 		static RankedMatchup Matchup(GeneralizedCombatThreatCalculator calculator,
 			RankedActor actor, RankedActor opponent)
 		{
 			var pair = calculator.CalculateBaseline(opponent.Info.Name, actor.Info.Name);
 			var opponentCanEngage = CanEngage(pair.Forward);
 			var actorCanEngage = CanEngage(pair.Reverse);
-			if (actor.IsImmobile && !opponent.IsImmobile && opponentCanEngage && !pair.Reverse.CanTarget)
+			if (opponentCanEngage && !pair.Reverse.CanTarget)
 				return new RankedMatchup
 				{
 					Opponent = opponent,
 					Description = opponent.Name + " (cannot engage)",
 					EconomicRatio = double.NegativeInfinity,
-					IncomingKillTime = pair.Forward.TimeToKillTicks,
+					OneSidedTime = pair.Forward.TimeToKillTicks,
+					IsOneSidedWeakness = true,
 					IsCategoricalWeakness = true
+				};
+			if (actorCanEngage && !pair.Forward.CanTarget)
+				return new RankedMatchup
+				{
+					Opponent = opponent,
+					Description = opponent.Name + " (immune)",
+					EconomicRatio = double.PositiveInfinity,
+					OneSidedTime = pair.Reverse.TimeToKillTicks,
+					IsOneSidedStrength = true
 				};
 
 			if (!pair.Forward.CanTarget || !pair.Reverse.CanTarget || (!opponentCanEngage && !actorCanEngage))
-				return null;
-			if ((!opponentCanEngage || !actorCanEngage) && !actor.IsImmobile && !opponent.IsImmobile)
 				return null;
 			if (opponentCanEngage && !actorCanEngage)
 				return new RankedMatchup
 				{
 					Opponent = opponent,
-					Description = opponent.Name + " (cannot engage)",
-					EconomicRatio = double.NegativeInfinity
+					Description = opponent.Name + " (outrange)",
+					EconomicRatio = double.NegativeInfinity,
+					OneSidedTime = pair.Forward.TimeToKillTicks,
+					IsOneSidedWeakness = true,
+					IsRangeOneSided = true
 				};
 			if (!opponentCanEngage && actorCanEngage)
 				return new RankedMatchup
 				{
 					Opponent = opponent,
-					Description = opponent.Name + " (immune)",
-					EconomicRatio = double.PositiveInfinity
+					Description = opponent.Name + " (outrange)",
+					EconomicRatio = double.PositiveInfinity,
+					OneSidedTime = pair.Reverse.TimeToKillTicks,
+					IsOneSidedStrength = true,
+					IsRangeOneSided = true
 				};
 
 			var attackers = calculator.CalculateCrossover(pair);
