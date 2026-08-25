@@ -2312,3 +2312,172 @@ the blocker precisely if natural combat acceptance remains unproved.
   Disposition: no product change. Update the same single commit with these
   evidence receipts, rerun exact-head cleanliness/check receipt, then route a
   fresh Terra final rereview before publication.
+
+## Superseding verbatim-Air replacement audit (2026-08-24)
+
+- Superseding user authority requires retiring the live STNK/CTNK bespoke
+  specialist implementation into the repository's passive inspiration/reference
+  convention and replacing it with a mechanically renamed, behaviorally
+  verbatim copy of the Air AI. The interrupted selective HP/rescan successor had
+  no product edits; its sole local STATE appendix was removed from its original
+  clean worktree. PR131 is merged. This isolated successor is
+  `agent/20260824-cnc96a-air-verbatim` at exact refreshed `origin/bleed`
+  `609ebf92eeac565af51b2b6acd53de37bb3b39d2`.
+- Repository-wide tracked-tree and history inspection found no literal existing
+  `inspiration`, `archive`, or `attic` directory. The established passive,
+  noncompiled repository convention is `.agents/references/` (and
+  `.agents/old-skills/` for retired agent code); project wildcard compilation
+  applies only beneath project roots. No legacy file has been moved while the
+  direct-copy feasibility gate is unresolved.
+- The Air AI is not an independently instantiable module/file. Its configuration,
+  recruitment, save state and tick ownership are embedded in
+  `SquadManagerBotModule.cs`; its runtime state is embedded in `Squad.cs`; and
+  its behavioral state machine is the 3,040-line `Squads/States/AirStates.cs`.
+  `Squad` requires a concrete `SquadManagerBotModule`, `SquadType.Air` selects
+  `AirIdleState`, and every Air state reads `owner.SquadManager.Info` and the
+  Air-specific fields stored on `Squad`.
+- Identity-only file/class substitutions do not produce a runnable ground
+  specialist. The copied target scan takes the minimum `AircraftInfo.Speed` of
+  planning actors (`AirStates.cs:721-722` and `1510-1511`), which is an empty
+  sequence for STNK/CTNK. The same copied behavior derives anti-air target
+  types/threat maps (`:26`, `:64-130`, `:473-509`), issues aircraft repair and
+  ammo orders using `AmmoPool`, `Rearmable`, and literal `ReturnToBase`
+  (`:1950-2075`, `:2957-2966`), and keys routing/repair cost to
+  `AircraftInfo.Speed` (`:1382`, `:2337`, `:2449`). The manager recruits only
+  `AirUnitsTypes` into Air squads (`SquadManagerBotModule.cs:1198-1207`) and the
+  state constructor selects Air only through `SquadType.Air`
+  (`Squad.cs:98-107`).
+- Therefore a new `StealthAIModule` cannot instantiate a verbatim mechanically
+  renamed Air implementation. Making it operate on ground specialists requires
+  behavioral/domain substitutions (`AircraftInfo` to ground locomotion,
+  anti-air to detector/ground threats, flight route to exact ground pathing,
+  aircraft ammo/RTB to tank repair/reload, and new state/config ownership), all
+  explicitly outside the allowed identity/wiring-only changes. Adding STNK/CTNK
+  to `AirUnitsTypes` is not a valid mechanical wiring alternative: it reaches
+  the empty-speed failure and applies aircraft-only safety/repair semantics.
+- Decision gate: stop before archiving/removing the compiling specialist or
+  inventing an adapted algorithm. The smallest factual mapping is complete and
+  requires user/coordinator direction on whether to authorize a ground-domain
+  adaptation or instead reuse the existing Air squad in a way that necessarily
+  changes Air behavioral code. No build/game/review is valid until that product
+  architecture decision is authorized.
+
+## User-authorized nonbuilding Air-copy intermediate
+
+- The user explicitly overrode the feasibility stop and authorized a tracked,
+  intentionally nonbuilding filesystem intermediate. The new passive archive is
+  `.agents/inspiration/stealth-ai-pre-air-copy/`, pinned by README to source head
+  `609ebf92eeac565af51b2b6acd53de37bb3b39d2`. It preserves original relative
+  paths for `StealthTankSquadBotModule.cs`, `StealthTankSquadPolicy.cs`,
+  `BotOwnedStationaryWatchdog.cs`, and the dedicated
+  `StealthTankSquadPolicyTest.cs`. Specialist-only members formerly embedded in
+  the mixed CNC Air-configuration and route-planner fixtures are preserved as
+  adjacent snippet files. Shared Air, route-planner, mixed ownership tests,
+  engine code, and the broader CNC-100 scenario generator remain in place.
+- The archive also preserves the exact former STNK and chemical YAML trait
+  blocks and their repeated `AdvancedSquadModules` ownership declaration. Live
+  `mods/cnc/rules/ai.yaml` removes both bespoke trait blocks and all ten old
+  module ownership names. It deliberately does not attach the copied
+  `StealthAIModule`: a clear TODO records that a verbatim Air graph still has
+  aircraft-only primitives and lacks an authorized ground adapter. Chemical has
+  no separate implementation or attachment.
+- Complete full-file Air copies now exist in the live project tree:
+  `SquadManagerBotModule.cs -> StealthAIModule.cs`,
+  `Squads/Squad.cs -> Squads/StealthAISquad.cs`,
+  `Squads/States/AirStates.cs -> Squads/States/StealthAIStates.cs`, and
+  `BotModuleLogic/AirThreatGeometry.cs ->
+  BotModuleLogic/StealthAIThreatGeometry.cs`. Only deterministic whole-token
+  identity substitutions distinguish public/top-level manager, squad, state,
+  and threat-geometry types. Aircraft primitives, fields, methods, order
+  strings, target/threat logic, comments, whitespace, and algorithms are
+  untouched. Original Air sources have zero diff.
+- `scripts/check-stealth-ai-air-copy.py` reverses exactly the declared identity
+  substitutions and requires full-file equality. It PASSes all four pairs:
+  manager 1,719 lines SHA256 `bff7510eb3fd73bf7b9ed5b5eba6727fb3c079aec93af66dcabc5f7b55a778d0`;
+  squad 549 lines `c8800359fa781d0a015956c4c1abdfa8d97f39d558852a896fd33acb66932264`;
+  states 3,040 lines `6ad78ca13d3af0a57ec20e0ff8d6f47019d423c9da043b0ee7cd68b1b02e3d3b`;
+  geometry 549 lines `d1bf31bdb3230bf9c16dbde5a067fda6e6db1e3a875a247d952f686ee5378751`.
+- As expressly required, do not compile, test, run, adapt, review, or publish
+  this intermediate. Its expected unresolved type/wiring failures are the
+  preserved factual result, not a release candidate. Run only the identity
+  proof, Air-source unchanged audit, diff hygiene, and one clean commit.
+
+## Archived-function review intake manifest
+
+- Intake is pinned to nonbuilding archive/copy commit
+  `a0df865591196be28e4b2d31404b2d1dbd7e2b0d`. A temporary ignored Roslyn
+  enumerator parsed only the archived bespoke module and policy and found 184
+  individual behavior bodies: 92 module and 92 policy; 177 methods, four
+  constructors, and three expression-bodied properties. There were no local
+  function or accessor bodies in these two sources. Tests and configuration are
+  excluded as function sources. The standalone archived watchdog trait is also
+  excluded as acceptance/debug instrumentation; watchdog-related helper bodies
+  physically within the policy remain enumerated and are flagged test-only.
+- Every body has one stable function ID, exact file/span/signature, neutral
+  body-derived purpose, syntax-derived direct dependency/caller IDs, up to three
+  syntax-ranked copied-Air candidates, category flags, and a SHA-256-pinned
+  immutable individual job at
+  `.build/cnc96a-air-copy-function-review/jobs/`. All 184 jobs require a
+  separate receipt under `.build/cnc96a-air-copy-function-review/receipts/` and
+  prohibit edits or cross-function judgments. No necessity/quality decision was
+  made during intake.
+- User-preclassified retreat/completion-retreat bodies total 35 and are closed
+  `LEAVE_OUT_RETREAT`; they remain in the per-function inventory but are not
+  dispatched in review batches. Eligible bodies total 149. Primary category
+  counts are 115 substantive, 21 constructor/config/plumbing, 13 test-only, and
+  35 retreat-excluded.
+- The 149 eligible bodies are packed by archived source adjacency/shared call
+  context into 17 immutable native Sol-medium batch envelopes, maximum ten
+  functions each. Distribution is fourteen batches of ten, one of six, one of
+  two, and one standalone 557-line `UpdateGroup` body. Every batch still
+  requires a distinct verdict/evidence/Air-coverage/dependency receipt for every
+  function and explicitly prohibits a group verdict. Syntax-derived cross-batch
+  prerequisites provide dependency ordering; mutually recursive call-graph
+  batches are recorded as same-component peers instead of an impossible cyclic
+  prerequisite. Canonical tracked indexes are
+  `.agents/inspiration/stealth-ai-pre-air-copy/function-review/MANIFEST.json`,
+  `MANIFEST.md`, `QUEUE.md`, `BATCH-MANIFEST.json`, and `BATCH-QUEUE.md`.
+- First dependency-ready function IDs are `CNC96A-FN-10862FD4BB80`,
+  `CNC96A-FN-0768E72D45A9`, and `CNC96A-FN-A4C4B07E8256`. First ready batches
+  are `.build/cnc96a-air-copy-function-review/batches/CNC96A-BATCH-001.md`,
+  `CNC96A-BATCH-002.md`, and `CNC96A-BATCH-003.md`. Exact coverage, unique IDs,
+  span bounds, hashes, read-only permissions, max-ten batching, absence of
+  retreat bodies from batches, and one-time coverage of all 149 eligible bodies
+  validate cleanly. This intake made no product edit and ran no product build,
+  game, review, or publication action.
+
+## Contested-function rereview intake
+
+- Intake is pinned to function-manifest head
+  `46110762dab4975a2213ca9b187093a62b9b8ca5` and the immutable audit at
+  `.build/cnc96a-air-copy-function-review/AUDIT.md`. The audit identifies exactly
+  37 distinct contested/invalid eligible function IDs across outside-envelope
+  evidence, invalid confidence, non-retreat `LEAVE_OUT_RETREAT`, excluded-retreat
+  dependency, and caller/dependency consistency findings. No function was
+  reviewed and no prior verdict was accepted or rejected during this intake.
+- Exactly four immutable fresh native Sol-medium envelopes were generated under
+  `.build/cnc96a-air-copy-function-review/rereview-batches/`, with sizes 10, 10,
+  10, and 7. They cover every contested ID exactly once and dispatch zero of the
+  35 manifest-retreat bodies. Each function section names the prior verdict and
+  confidence, exact audit defect(s), old archived body span, authorized current
+  copied-Air candidate spans, and only the audit-required caller/dependency
+  boundary spans. Original jobs, receipts, audit, manifests, whole files, and
+  unlisted evidence are forbidden.
+- Every function requires its own replacement receipt beneath
+  `.build/cnc96a-air-copy-function-review/rereview-receipts/`; group verdicts are
+  prohibited. Verdicts are limited to `KEEP_AIR`, `RESTORE_NECESSARY`,
+  `RESTORE_BETTER`, or `LEAVE_OUT_RETREAT`; confidence is limited to `high`,
+  `medium`, or `low`. Every receipt must directly disposition retreat
+  dependencies. User-excluded retreat/completion-retreat may never be restored:
+  an inseparable function must be `LEAVE_OUT_RETREAT`, while `RESTORE_*` requires
+  a precise retreat-free extraction boundary.
+- Durable queue/index/validation paths are
+  `.build/cnc96a-air-copy-function-review/rereview-batches/QUEUE.md`,
+  `INDEX.json`, and `VALIDATION.md`. Validation passes exact 37-ID coverage,
+  max-ten batching, span bounds, separate receipt contracts, immutable mode
+  `0444`, and restricted dependency authorization. All 339 protected inputs
+  (AUDIT, five tracked manifests/indexes, 184 original jobs, and 149 original
+  receipts) remained unchanged at aggregate SHA-256
+  `54f135a065906a12085f2b8abb8dba07431af496b152a42f6012d48557e8f809`.
+  This rereview intake made no product edit and ran no build, game, function
+  review, or publication action.

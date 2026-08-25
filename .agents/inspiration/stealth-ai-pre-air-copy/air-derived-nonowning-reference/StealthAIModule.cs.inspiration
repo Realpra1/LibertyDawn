@@ -20,7 +20,7 @@ using OpenRA.Traits;
 
 namespace OpenRA.Mods.Common.Traits
 {
-	enum GeneralGroundMissionStatus
+	enum StealthAIGeneralGroundMissionStatus
 	{
 		MissingSquad,
 		InvalidTarget,
@@ -29,7 +29,7 @@ namespace OpenRA.Mods.Common.Traits
 	}
 
 	[Desc("Manages AI squads.")]
-	public class SquadManagerBotModuleInfo : ConditionalTraitInfo
+	public class StealthAIModuleInfo : ConditionalTraitInfo
 	{
 		public class AirSquadDefinition
 		{
@@ -59,22 +59,6 @@ namespace OpenRA.Mods.Common.Traits
 			if (definitions != null)
 				foreach (var d in definitions.Value.Nodes)
 					ret[d.Key] = new AirSquadDefinition(d.Value);
-
-			return ret;
-		}
-
-		[FieldLoader.LoadUsing(nameof(LoadStealthSquadDefinitions))]
-		[Desc("Named ground-specialist squad definitions owned by this manager.")]
-		public readonly Dictionary<string, StealthSquadDefinition> StealthSquadDefinitions =
-			new Dictionary<string, StealthSquadDefinition>();
-
-		static object LoadStealthSquadDefinitions(MiniYaml yaml)
-		{
-			var ret = new Dictionary<string, StealthSquadDefinition>();
-			var definitions = yaml.Nodes.FirstOrDefault(n => n.Key == "StealthSquadDefinitions");
-			if (definitions != null)
-				foreach (var definition in definitions.Value.Nodes)
-					ret[definition.Key] = new StealthSquadDefinition(definition.Value);
 
 			return ret;
 		}
@@ -429,14 +413,6 @@ namespace OpenRA.Mods.Common.Traits
 		public override void RulesetLoaded(Ruleset rules, ActorInfo ai)
 		{
 			base.RulesetLoaded(rules, ai);
-			foreach (var definition in StealthSquadDefinitions.Values)
-				definition.Validate(rules);
-
-			var specialistSquadCount = StealthSquadDefinitions.Values.Sum(definition =>
-				definition.MaximumHarassmentGroups + (definition.IncludeAttackGroup ? 1 : 0));
-			if (specialistSquadCount > StealthAISpecialistPolicy.MaximumSquadCount)
-				throw new YamlException($"StealthSquadDefinitions configure {specialistSquadCount} squads; " +
-					$"the aggregate maximum is {StealthAISpecialistPolicy.MaximumSquadCount}.");
 
 			if (DangerScanRadius <= 0)
 				throw new YamlException("DangerScanRadius must be greater than zero.");
@@ -555,10 +531,10 @@ namespace OpenRA.Mods.Common.Traits
 			}
 		}
 
-		public override object Create(ActorInitializer init) { return new SquadManagerBotModule(init.Self, this); }
+		public override object Create(ActorInitializer init) { return new StealthAIModule(init.Self, this); }
 	}
 
-	public class SquadManagerBotModule : ConditionalTrait<SquadManagerBotModuleInfo>, IBotEnabled, IBotTick, IBotRespondToAttack,
+	public class StealthAIModule : ConditionalTrait<StealthAIModuleInfo>, IBotEnabled, IBotTick, IBotRespondToAttack,
 		IBotPositionsUpdated, INotifyKilled, INotifyAppliedDamage, IGameSaveTraitData, IAdvancedBotTick
 	{
 		public CPos GetRandomBaseCenter()
@@ -582,7 +558,7 @@ namespace OpenRA.Mods.Common.Traits
 		// Units that the bot already knows about. Any unit not on this list needs to be given a role.
 		readonly List<Actor> activeUnits = new List<Actor>();
 
-		public List<Squad> Squads = new List<Squad>();
+		public List<StealthAISquad> Squads = new List<StealthAISquad>();
 
 		IBot bot;
 		IBotPositionsUpdated[] notifyPositionsUpdated;
@@ -600,7 +576,6 @@ namespace OpenRA.Mods.Common.Traits
 		int minAttackForceDelayTicks;
 		int airSafetyTicks;
 		int adaptiveAirRiskTicks;
-		int stealthRecruitTicks;
 		bool advancedBehaviorEnabled = true;
 		int fallbackReconsiderTicks;
 		Actor fallbackTarget;
@@ -608,7 +583,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly Dictionary<uint, CPos> fallbackOrderTargets = new Dictionary<uint, CPos>();
 		readonly AdvancedBotFallbackOwnership releasedFallbackOwnership = new AdvancedBotFallbackOwnership();
 
-		public SquadManagerBotModule(Actor self, SquadManagerBotModuleInfo info)
+		public StealthAIModule(Actor self, StealthAIModuleInfo info)
 			: base(info)
 		{
 			World = self.World;
@@ -716,20 +691,10 @@ namespace OpenRA.Mods.Common.Traits
 		void IBotEnabled.BotEnabled(IBot bot)
 		{
 			this.bot = bot;
-			EnsureStealthSquads(bot);
-			stealthRecruitTicks = 1;
 		}
 
 		void IBotTick.BotTick(IBot bot)
 		{
-			EnsureStealthSquads(bot);
-			if (advancedBehaviorEnabled && --stealthRecruitTicks <= 0)
-			{
-				RebalanceStealthSquads();
-				stealthRecruitTicks = Info.StealthSquadDefinitions.Count == 0 ? int.MaxValue :
-					Info.StealthSquadDefinitions.Values.Min(definition => definition.ScanInterval);
-			}
-
 			RecruitUnassignedCombatUnits(bot);
 			if (advancedBehaviorEnabled)
 			{
@@ -753,7 +718,7 @@ namespace OpenRA.Mods.Common.Traits
 			}
 		}
 
-		string IAdvancedBotTick.FailsafeModuleId => "SquadManagerBotModule";
+		string IAdvancedBotTick.FailsafeModuleId => "StealthAIModule";
 
 		void IAdvancedBotTick.SetAdvancedBehaviorEnabled(bool enabled)
 		{
@@ -765,17 +730,12 @@ namespace OpenRA.Mods.Common.Traits
 			fallbackTarget = null;
 			fallbackOrderedActors.Clear();
 			fallbackOrderTargets.Clear();
-			if (!enabled)
-				ReleaseStealthSquads("failsafe-degraded");
-			else
-				stealthRecruitTicks = 1;
-
 			if (enabled && Info.GroundTargetDebugLogging)
 			{
 				var retained = releasedFallbackOwnership.Groups.SelectMany(g => g.Value)
 					.Select(World.GetActorById).Where(a => !unitCannotBeOrdered(a)).OrderBy(a => a.ActorID).ToArray();
 				if (retained.Length > 0)
-					Log.Write("debug", "Squad failsafe handoff [{0}]: owner=SquadManagerBotModule state=ordinary-manager " +
+					Log.Write("debug", "StealthAISquad failsafe handoff [{0}]: owner=StealthAIModule state=ordinary-manager " +
 						"actors={1}.", Player.PlayerName,
 						string.Join(",", retained.Select(a => a.Info.Name + "#" + a.ActorID)));
 			}
@@ -788,7 +748,7 @@ namespace OpenRA.Mods.Common.Traits
 			releasedFallbackOwnership.Retain(source, released.Select(a => a.ActorID));
 			fallbackReconsiderTicks = 0;
 			if (Info.GroundTargetDebugLogging && released.Length > 0)
-				Log.Write("debug", "Squad failsafe handoff [{0}]: owner=SquadManagerBotModule source={1} retained={2} " +
+				Log.Write("debug", "StealthAISquad failsafe handoff [{0}]: owner=StealthAIModule source={1} retained={2} " +
 					"actors={3}.", Player.PlayerName, source, released.Length,
 					string.Join(",", released.Select(a => a.Info.Name + "#" + a.ActorID)));
 		}
@@ -810,88 +770,14 @@ namespace OpenRA.Mods.Common.Traits
 				.Select(m => m.Key).ToList())
 				airMarkedGroundTargets.Remove(id);
 
-			Squads.RemoveAll(s => !s.IsValid && s.Type != SquadType.Stealth);
+			Squads.RemoveAll(s => !s.IsValid);
 			foreach (var s in Squads)
 			{
 				s.Units.RemoveAll(a => unitCannotBeOrdered(a) || IsReservedForSpecialBehavior(a));
-				if (s.Type == SquadType.Air || s.Type == SquadType.Stealth)
+				if (s.Type == StealthAISquadType.Air)
 					s.CleanAirMembership();
-				else if (s.Type == SquadType.GeneralAttack)
+				else if (s.Type == StealthAISquadType.GeneralAttack)
 					s.CleanGroundMembership();
-			}
-		}
-
-		void EnsureStealthSquads(IBot enabledBot)
-		{
-			foreach (var configured in Info.StealthSquadDefinitions.OrderBy(entry => entry.Key))
-			{
-				var count = configured.Value.MaximumHarassmentGroups +
-					(configured.Value.IncludeAttackGroup ? 1 : 0);
-				var configuredSquads = Squads.Where(s => s.Type == SquadType.Stealth &&
-					s.StealthSquadDefinition == configured.Key).OrderBy(s => s.StealthSquadIndex).ToList();
-				for (var i = configuredSquads.Count; i < count; i++)
-				{
-					var squad = RegisterNewSquad(enabledBot, SquadType.Stealth);
-					squad.StealthSquadDefinition = configured.Key;
-					squad.StealthSquadIndex = i;
-					configuredSquads.Add(squad);
-				}
-			}
-		}
-
-		void RebalanceStealthSquads()
-		{
-			foreach (var configured in Info.StealthSquadDefinitions.OrderBy(entry => entry.Key))
-			{
-				var specialistSquads = Squads.Where(s => s.Type == SquadType.Stealth &&
-					s.StealthSquadDefinition == configured.Key).OrderBy(s => s.StealthSquadIndex).ToArray();
-				var previousMembership = specialistSquads.SelectMany(s => s.Units.Select(a =>
-					new { Actor = a, Squad = s })).ToDictionary(entry => entry.Actor.ActorID);
-				var eligible = World.Actors.Where(a => !unitCannotBeOrdered(a) &&
-					configured.Value.UnitTypes.Contains(a.Info.Name) && !IsReservedForTransport(a) &&
-					!IsUnitTemporarilyControlled(a)).OrderBy(a => a.ActorID).ToList();
-				foreach (var squad in specialistSquads)
-					squad.Units.Clear();
-
-				for (var i = 0; i < eligible.Count; i++)
-				{
-					var actor = eligible[i];
-					var groupIndex = previousMembership.TryGetValue(actor.ActorID, out var membership) ?
-						membership.Squad.StealthSquadIndex : specialistSquads
-							.OrderBy(candidateSquad => candidateSquad.Units.Count)
-							.ThenBy(candidateSquad => candidateSquad.StealthSquadIndex)
-							.First().StealthSquadIndex;
-					if (groupIndex < 0 || groupIndex >= specialistSquads.Length)
-						continue;
-
-					var assignedSquad = specialistSquads[groupIndex];
-					assignedSquad.Units.Add(actor);
-					if (!previousMembership.ContainsKey(actor.ActorID) && assignedSquad.Units.Count > 1)
-						assignedSquad.MarkAirReinforcement(actor);
-					foreach (var other in Squads.Where(other => other != assignedSquad))
-						other.Units.Remove(actor);
-					unitsHangingAroundTheBase.Remove(actor);
-					if (!activeUnits.Contains(actor))
-						activeUnits.Add(actor);
-					unassignedCombatUnits?.ClaimActors(new[] { actor });
-				}
-			}
-		}
-
-		bool IsManagerOwnedSpecialist(Actor actor)
-		{
-			return actor != null && Squads.Any(s => s.Type == SquadType.Stealth && s.Units.Contains(actor));
-		}
-
-		void ReleaseStealthSquads(string reason)
-		{
-			foreach (var squad in Squads.Where(s => s.Type == SquadType.Stealth))
-			{
-				var released = squad.Units.Where(a => !unitCannotBeOrdered(a)).OrderBy(a => a.ActorID).ToArray();
-				unassignedCombatUnits?.RegisterReleasedActors(released);
-				if (reason == "failsafe-degraded")
-					RetainFailsafeReleasedActors($"SquadManagerBotModule/{squad.StealthProfile}", released);
-				squad.Units.Clear();
 			}
 		}
 
@@ -908,7 +794,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		internal bool IsUnitProtectingBase(Actor actor)
 		{
-			return actor != null && Squads.Any(s => s.Type == SquadType.Protection && s.Units.Contains(actor));
+			return actor != null && Squads.Any(s => s.Type == StealthAISquadType.Protection && s.Units.Contains(actor));
 		}
 
 		internal bool IsUnitTemporarilyControlled(Actor actor)
@@ -921,20 +807,20 @@ namespace OpenRA.Mods.Common.Traits
 			out WPos formationCenter, out CPos objective, out bool urgent)
 		{
 			var status = GetGeneralGroundMissionStatus(actor, out target, out formationCenter, out objective);
-			urgent = status == GeneralGroundMissionStatus.Urgent;
-			return status == GeneralGroundMissionStatus.Ready || urgent;
+			urgent = status == StealthAIGeneralGroundMissionStatus.Urgent;
+			return status == StealthAIGeneralGroundMissionStatus.Ready || urgent;
 		}
 
-		internal GeneralGroundMissionStatus GetGeneralGroundMissionStatus(Actor actor, out Actor target,
+		internal StealthAIGeneralGroundMissionStatus GetGeneralGroundMissionStatus(Actor actor, out Actor target,
 			out WPos formationCenter, out CPos objective)
 		{
-			var squad = Squads.FirstOrDefault(s => s.Type == SquadType.GeneralAttack && s.Units.Contains(actor));
+			var squad = Squads.FirstOrDefault(s => s.Type == StealthAISquadType.GeneralAttack && s.Units.Contains(actor));
 			if (squad == null)
 			{
 				target = null;
 				formationCenter = WPos.Zero;
 				objective = CPos.Zero;
-				return GeneralGroundMissionStatus.MissingSquad;
+				return StealthAIGeneralGroundMissionStatus.MissingSquad;
 			}
 
 			formationCenter = squad.GroundFormationCenter;
@@ -942,18 +828,18 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				target = null;
 				objective = CPos.Zero;
-				return GeneralGroundMissionStatus.InvalidTarget;
+				return StealthAIGeneralGroundMissionStatus.InvalidTarget;
 			}
 
 			target = squad.TargetActor;
 			objective = target.Location;
 			return IsUnitProtectingBase(actor) || squad.FuzzyStateMachine.Is<GroundUnitsFleeState>() ?
-				GeneralGroundMissionStatus.Urgent : GeneralGroundMissionStatus.Ready;
+				StealthAIGeneralGroundMissionStatus.Urgent : StealthAIGeneralGroundMissionStatus.Ready;
 		}
 
 		internal CPos GroundRecoveryDestination()
 		{
-			var squad = Squads.FirstOrDefault(s => s.Type == SquadType.GeneralAttack);
+			var squad = Squads.FirstOrDefault(s => s.Type == StealthAISquadType.GeneralAttack);
 			if (squad?.IsTargetValid == true)
 				return squad.TargetActor.Location;
 
@@ -964,7 +850,7 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		// HACK: Use of this function requires that there is one squad of this type.
-		Squad GetSquadOfType(SquadType type)
+		StealthAISquad GetSquadOfType(StealthAISquadType type)
 		{
 			return Squads.FirstOrDefault(s => s.Type == type);
 		}
@@ -973,7 +859,7 @@ namespace OpenRA.Mods.Common.Traits
 		/// The compatible air squad a newly built aircraft should join. Named definitions are matched
 		/// most-specific-first and balanced by current size; without definitions the stock caps apply.
 		/// </summary>
-		Squad GetAirSquadWithRoom(IBot bot, Actor actor)
+		StealthAISquad GetAirSquadWithRoom(IBot bot, Actor actor)
 		{
 			if (Info.AirSquadDefinitions.Count > 0)
 			{
@@ -985,10 +871,10 @@ namespace OpenRA.Mods.Common.Traits
 					return null;
 
 				var selected = compatible[0];
-				var squads = Squads.Where(s => s.Type == SquadType.Air && s.AirSquadDefinition == selected.Key).ToList();
+				var squads = Squads.Where(s => s.Type == StealthAISquadType.Air && s.AirSquadDefinition == selected.Key).ToList();
 				if (squads.Count < selected.Value.SquadCount)
 				{
-					var created = RegisterNewSquad(bot, SquadType.Air);
+					var created = RegisterNewSquad(bot, StealthAISquadType.Air);
 					created.AirSquadDefinition = selected.Key;
 					return created;
 				}
@@ -1000,7 +886,7 @@ namespace OpenRA.Mods.Common.Traits
 			var squadCount = 0;
 			foreach (var s in Squads)
 			{
-				if (s.Type != SquadType.Air)
+				if (s.Type != StealthAISquadType.Air)
 					continue;
 
 				squadCount++;
@@ -1011,12 +897,12 @@ namespace OpenRA.Mods.Common.Traits
 			if (Info.MaximumAirSquads > 0 && squadCount >= Info.MaximumAirSquads)
 				return null;
 
-			return RegisterNewSquad(bot, SquadType.Air);
+			return RegisterNewSquad(bot, StealthAISquadType.Air);
 		}
 
-		Squad RegisterNewSquad(IBot bot, SquadType type, Actor target = null)
+		StealthAISquad RegisterNewSquad(IBot bot, StealthAISquadType type, Actor target = null)
 		{
-			var ret = new Squad(bot, this, type, target);
+			var ret = new StealthAISquad(bot, this, type, target);
 			Squads.Add(ret);
 			return ret;
 		}
@@ -1040,7 +926,7 @@ namespace OpenRA.Mods.Common.Traits
 
 			var target = IsPreferredEnemyUnit(preferredTarget) ? preferredTarget :
 				FindClosestEnemy(units.Select(a => a.CenterPosition).Average());
-			var assault = RegisterNewSquad(bot, SquadType.Assault, target);
+			var assault = RegisterNewSquad(bot, StealthAISquadType.Assault, target);
 			assault.Units.AddRange(units);
 			if (target != null)
 			{
@@ -1147,7 +1033,7 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				attackForceTicks = Info.AttackForceInterval;
 				foreach (var squad in Squads)
-					if (squad.Type != SquadType.GeneralAttack && squad.Type != SquadType.Air)
+					if (squad.Type != StealthAISquadType.GeneralAttack && squad.Type != StealthAISquadType.Air)
 						squad.Update();
 			}
 
@@ -1185,7 +1071,7 @@ namespace OpenRA.Mods.Common.Traits
 					var reserved = group.Value.Where(a => !protection.Contains(a) && IsReservedForSpecialBehavior(a)).ToArray();
 					var temporary = group.Value.Where(a => !protection.Contains(a) && !reserved.Contains(a) &&
 						IsUnitTemporarilyControlled(a)).ToArray();
-					Log.Write("debug", "Squad failsafe released control [{0}]: source={1} fallback={2} protection={3} " +
+					Log.Write("debug", "StealthAISquad failsafe released control [{0}]: source={1} fallback={2} protection={3} " +
 						"reserved={4} temporary={5} actors={6}.", Player.PlayerName, group.Key, fallback.Length,
 						protection.Length, reserved.Length, temporary.Length,
 						string.Join(",", group.Value.Select(a => a.Info.Name + "#" + a.ActorID)));
@@ -1285,7 +1171,7 @@ namespace OpenRA.Mods.Common.Traits
 
 			unassignedCombatUnits.ClaimActors(adopted);
 			if (Info.GroundTargetDebugLogging && adopted.Count <= 32)
-				Log.Write("debug", "Squad registry recruitment [{0}]: owner=SquadManagerBotModule advanced={1} " +
+				Log.Write("debug", "StealthAISquad registry recruitment [{0}]: owner=StealthAIModule advanced={1} " +
 					"actors={2}.", Player.PlayerName, advancedBehaviorEnabled,
 					string.Join(",", adopted.OrderBy(a => a.ActorID).Select(a => a.Info.Name + "#" + a.ActorID)));
 		}
@@ -1306,13 +1192,6 @@ namespace OpenRA.Mods.Common.Traits
 
 		bool AdoptCurrentSquadUnit(IBot bot, Actor actor, List<Actor> adoptedGroundActors)
 		{
-			if (IsManagerOwnedSpecialist(actor))
-			{
-				if (!activeUnits.Contains(actor))
-					activeUnits.Add(actor);
-				return true;
-			}
-
 			if (Info.ExcludeFromSquadsTypes.Contains(actor.Info.Name))
 				return false;
 
@@ -1328,13 +1207,13 @@ namespace OpenRA.Mods.Common.Traits
 			}
 			else if (Info.NavalUnitsTypes.Contains(actor.Info.Name))
 			{
-				var ships = GetSquadOfType(SquadType.Naval) ?? RegisterNewSquad(bot, SquadType.Naval);
+				var ships = GetSquadOfType(StealthAISquadType.Naval) ?? RegisterNewSquad(bot, StealthAISquadType.Naval);
 				ships.Units.Add(actor);
 			}
 			else if (Info.UseCohesiveGroundSquad)
 			{
 				adoptedGroundActors.Add(actor);
-				var ground = GetSquadOfType(SquadType.GeneralAttack);
+				var ground = GetSquadOfType(StealthAISquadType.GeneralAttack);
 				if (ground == null)
 					unitsHangingAroundTheBase.Add(actor);
 				else
@@ -1346,10 +1225,10 @@ namespace OpenRA.Mods.Common.Traits
 			else
 			{
 				adoptedGroundActors.Add(actor);
-				var assault = Squads.FirstOrDefault(s => s.Type == SquadType.Assault && s.IsValid);
+				var assault = Squads.FirstOrDefault(s => s.Type == StealthAISquadType.Assault && s.IsValid);
 				var target = FindClosestEnemy(actor.CenterPosition);
 				if (assault == null)
-					assault = RegisterNewSquad(bot, SquadType.Assault, target);
+					assault = RegisterNewSquad(bot, StealthAISquadType.Assault, target);
 				else if (target != null)
 					assault.TargetActor = target;
 
@@ -1361,7 +1240,7 @@ namespace OpenRA.Mods.Common.Traits
 						Target.FromCell(World, target.Location), false));
 					assault.FuzzyStateMachine.ChangeState(assault, new GroundUnitsAttackMoveState(), true);
 					if (Info.GroundTargetDebugLogging)
-						Log.Write("debug", "Squad immediate pre-Codex adoption [{0}]: actor={1}#{2} " +
+						Log.Write("debug", "StealthAISquad immediate pre-Codex adoption [{0}]: actor={1}#{2} " +
 							"target={3}#{4} stance=AttackAnything order=AttackMove.", Player.PlayerName,
 							actor.Info.Name, actor.ActorID, target.Info.Name, target.ActorID);
 				}
@@ -1374,10 +1253,10 @@ namespace OpenRA.Mods.Common.Traits
 		void AdoptLegacyFallbackAssault(IBot bot, List<Actor> actors, List<Actor> adopted)
 		{
 			var capabilityChecked = actors.All(a => a.Info.HasTraitInfo<AttackBaseInfo>());
-			var assault = Squads.FirstOrDefault(s => s.Type == SquadType.Assault && s.IsValid);
+			var assault = Squads.FirstOrDefault(s => s.Type == StealthAISquadType.Assault && s.IsValid);
 			var target = FindClosestEnemy(actors.Select(a => a.CenterPosition).Average());
 			if (assault == null)
-				assault = RegisterNewSquad(bot, SquadType.Assault, target);
+				assault = RegisterNewSquad(bot, StealthAISquadType.Assault, target);
 			else if (target != null)
 				assault.TargetActor = target;
 
@@ -1396,7 +1275,7 @@ namespace OpenRA.Mods.Common.Traits
 				groupedActors: actors.ToArray()));
 			assault.FuzzyStateMachine.ChangeState(assault, new GroundUnitsAttackMoveState(), true);
 			if (Info.GroundTargetDebugLogging)
-				Log.Write("debug", "Squad registry fallback [{0}]: owner=SquadManagerBotModule source=pre-codex-assault " +
+				Log.Write("debug", "StealthAISquad registry fallback [{0}]: owner=StealthAIModule source=pre-codex-assault " +
 					"accepted={1} actors={2} target={3}#{4} capability-checked={5} stance=AttackAnything " +
 					"order=AttackMove.", Player.PlayerName, actors.Count,
 					string.Join(",", actors.Select(a => a.Info.Name + "#" + a.ActorID)), target.Info.Name, target.ActorID,
@@ -1427,7 +1306,7 @@ namespace OpenRA.Mods.Common.Traits
 			}
 
 			if (Info.GroundTargetDebugLogging)
-				Log.Write("debug", "Squad failsafe fallback [{0}]: owner=SquadManagerBotModule source={1} accepted={2} " +
+				Log.Write("debug", "StealthAISquad failsafe fallback [{0}]: owner=StealthAIModule source={1} accepted={2} " +
 					"actors={3} target={4}#{5} order=AttackMove cadence={6}.", Player.PlayerName, source, orderable.Length,
 					string.Join(",", orderable.Select(a => a.Info.Name + "#" + a.ActorID)), fallbackTarget.Info.Name,
 					fallbackTarget.ActorID, Info.FailsafeReconsiderInterval);
@@ -1437,7 +1316,7 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			// activeUnits is bookkeeping, not proof of squad membership. Recover any live aircraft whose
 			// squad entry was lost so it can never remain permanently idle at the base.
-			var assignedAircraft = new HashSet<Actor>(Squads.Where(s => s.Type == SquadType.Air).SelectMany(s => s.Units));
+			var assignedAircraft = new HashSet<Actor>(Squads.Where(s => s.Type == StealthAISquadType.Air).SelectMany(s => s.Units));
 			activeUnits.RemoveAll(a => a != null && Info.AirUnitsTypes.Contains(a.Info.Name) && !assignedAircraft.Contains(a));
 
 			var newUnits = World.ActorsHavingTrait<IPositionable>()
@@ -1455,7 +1334,7 @@ namespace OpenRA.Mods.Common.Traits
 
 			// Keep actor-level evidence bounded: oversized initial rosters are not useful handoff telemetry.
 			if (Info.GroundTargetDebugLogging && adoptedGroundActors.Count > 0 && adoptedGroundActors.Count <= 32)
-				Log.Write("debug", "Squad ordinary adoption [{0}]: owner=SquadManagerBotModule actors={1}.",
+				Log.Write("debug", "StealthAISquad ordinary adoption [{0}]: owner=StealthAIModule actors={1}.",
 					Player.PlayerName, string.Join(",", adoptedGroundActors
 						.OrderBy(a => a.ActorID).Select(a => a.Info.Name + "#" + a.ActorID)));
 
@@ -1473,10 +1352,10 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (unitsHangingAroundTheBase.Count >= randomizedSquadSize)
 			{
-				var attackForce = Info.UseCohesiveGroundSquad ? GetSquadOfType(SquadType.GeneralAttack) : null;
+				var attackForce = Info.UseCohesiveGroundSquad ? GetSquadOfType(StealthAISquadType.GeneralAttack) : null;
 				if (attackForce == null)
 					attackForce = RegisterNewSquad(bot,
-						Info.UseCohesiveGroundSquad ? SquadType.GeneralAttack : SquadType.Assault);
+						Info.UseCohesiveGroundSquad ? StealthAISquadType.GeneralAttack : StealthAISquadType.Assault);
 
 				foreach (var a in unitsHangingAroundTheBase)
 					attackForce.Units.Add(a);
@@ -1507,9 +1386,9 @@ namespace OpenRA.Mods.Common.Traits
 				if (AttackOrFleeFuzzy.Rush.CanAttack(ownUnits, enemies))
 				{
 					var target = enemies.Any() ? enemies.Random(World.LocalRandom) : b;
-					var rush = GetSquadOfType(SquadType.Rush);
+					var rush = GetSquadOfType(StealthAISquadType.Rush);
 					if (rush == null)
-						rush = RegisterNewSquad(bot, SquadType.Rush, target);
+						rush = RegisterNewSquad(bot, StealthAISquadType.Rush, target);
 
 					foreach (var a3 in ownUnits)
 						rush.Units.Add(a3);
@@ -1521,9 +1400,9 @@ namespace OpenRA.Mods.Common.Traits
 
 		void ProtectOwn(IBot bot, Actor attacker)
 		{
-			var protectSq = GetSquadOfType(SquadType.Protection);
+			var protectSq = GetSquadOfType(StealthAISquadType.Protection);
 			if (protectSq == null)
-				protectSq = RegisterNewSquad(bot, SquadType.Protection, attacker);
+				protectSq = RegisterNewSquad(bot, StealthAISquadType.Protection, attacker);
 
 			if (!protectSq.IsTargetValid)
 				protectSq.TargetActor = attacker;
@@ -1539,14 +1418,14 @@ namespace OpenRA.Mods.Common.Traits
 				foreach (var a in ownUnits)
 				{
 					protectSq.Units.Add(a);
-					foreach (var ground in Squads.Where(s => s.Type == SquadType.GeneralAttack && s.Units.Contains(a)))
+					foreach (var ground in Squads.Where(s => s.Type == StealthAISquadType.GeneralAttack && s.Units.Contains(a)))
 						ground.MarkGroundReinforcement(a);
 				}
 
 				if (Info.GroundTargetDebugLogging && ownUnits.Count > 0)
 					Log.Write("debug", "Ground protection [{0}] activated against {1}#{2}: defenders={3} general-shared={4}.",
 						Player.PlayerName, attacker.Info.Name, attacker.ActorID, ownUnits.Count,
-						ownUnits.Count(a => Squads.Any(s => s.Type == SquadType.GeneralAttack && s.Units.Contains(a))));
+						ownUnits.Count(a => Squads.Any(s => s.Type == StealthAISquadType.GeneralAttack && s.Units.Contains(a))));
 			}
 		}
 
@@ -1562,7 +1441,7 @@ namespace OpenRA.Mods.Common.Traits
 			if (actor == null || !Info.AirUnitsTypes.Contains(actor.Info.Name))
 				return null;
 
-			var squad = Squads.FirstOrDefault(s => s.Type == SquadType.Air && s.Units.Contains(actor));
+			var squad = Squads.FirstOrDefault(s => s.Type == StealthAISquadType.Air && s.Units.Contains(actor));
 			if (squad != null)
 				return squad.AirProfile;
 
@@ -1615,7 +1494,7 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (Info.GroundTargetDebugLogging)
 			{
-				var groundSquad = Squads.FirstOrDefault(s => s.Type == SquadType.GeneralAttack &&
+				var groundSquad = Squads.FirstOrDefault(s => s.Type == StealthAISquadType.GeneralAttack &&
 					s.GroundFormationUnits().Contains(e.Attacker));
 				if (groundSquad != null)
 					Log.Write("debug", "Ground outcome [{0}] destroyed {1}#{2}: attacker={3}#{4} mission-target={5} formation={6} reinforcements={7}.",
@@ -1623,7 +1502,7 @@ namespace OpenRA.Mods.Common.Traits
 						e.Attacker.ActorID, groundSquad.TargetActor == damaged,
 						groundSquad.GroundFormationUnits().Count, groundSquad.GroundReinforcements.Count);
 
-				var protectionSquad = Squads.FirstOrDefault(s => s.Type == SquadType.Protection && s.Units.Contains(e.Attacker));
+				var protectionSquad = Squads.FirstOrDefault(s => s.Type == StealthAISquadType.Protection && s.Units.Contains(e.Attacker));
 				if (protectionSquad != null)
 					Log.Write("debug", "Ground protection outcome [{0}] destroyed {1}#{2}: defender={3}#{4}.",
 						Player.PlayerName, damaged.Info.Name, damaged.ActorID,
@@ -1684,7 +1563,7 @@ namespace OpenRA.Mods.Common.Traits
 			var releasedFallback = releasedFallbackOwnership.Export();
 			return new List<MiniYamlNode>()
 			{
-				new MiniYamlNode("Squads", "", Squads.Select(s => new MiniYamlNode("Squad", s.Serialize())).ToList()),
+				new MiniYamlNode("Squads", "", Squads.Select(s => new MiniYamlNode("StealthAISquad", s.Serialize())).ToList()),
 				new MiniYamlNode("InitialBaseCenter", FieldSaver.FormatValue(initialBaseCenter)),
 				new MiniYamlNode("UnitsHangingAroundTheBase", FieldSaver.FormatValue(unitsHangingAroundTheBase
 					.Where(a => !unitCannotBeOrdered(a))
@@ -1833,9 +1712,7 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				Squads.Clear();
 				foreach (var n in squadsNode.Value.Nodes)
-					Squads.Add(Squad.Deserialize(bot, this, n.Value));
-
-				EnsureStealthSquads(bot);
+					Squads.Add(StealthAISquad.Deserialize(bot, this, n.Value));
 			}
 		}
 	}

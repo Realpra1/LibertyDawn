@@ -2111,3 +2111,90 @@ ownership/retreat/route evidence, and no product/balance change is warranted.
 
 The candidate product tree remains exact; only STATE/REPORT are amended with the
 matched-control disposition before final clean receipt and fresh Terra rereview.
+
+### Superseding verbatim-Air feasibility gate
+
+On refreshed bleed `609ebf92eeac565af51b2b6acd53de37bb3b39d2`, direct
+extraction found that the Air AI is structurally embedded across
+`SquadManagerBotModule.cs`, `Squad.cs`, and `Squads/States/AirStates.cs`, rather
+than existing as a separable trait. A mechanically renamed copy retains hard
+aircraft requirements: `AircraftInfo.Speed` minimums and cache keys, Air target
+types/anti-air influence, `AmmoPool`/`Rearmable`, and literal `ReturnToBase`.
+STNK/CTNK have no `AircraftInfo`, so merely wiring them into `SquadType.Air`
+fails before target planning and would retain incorrect aircraft repair/safety
+semantics. Converting those seams to ground locomotion, pathability, detectors,
+and tank repair is behavioral adaptation expressly prohibited by the
+superseding assignment. No legacy/live file was moved and no product code was
+edited. Work is stopped at the required factual architecture gate pending
+authority; build, games, review, and publication are consequently not started.
+
+### User-authorized nonbuilding copy receipt
+
+The user then explicitly authorized the nonbuilding intermediate despite that
+gate. The complete old bespoke module, policy, watchdog, dedicated test, mixed
+fixture specialist snippets, and original CNC YAML blocks now live passively
+under `.agents/inspiration/stealth-ai-pre-air-copy/`. The old live YAML traits
+and performance-ownership names are removed. Shared Air/engine code is not
+moved.
+
+Four complete Air sources are copied into mechanically renamed live files:
+`StealthAIModule.cs`, `StealthAISquad.cs`, `StealthAIStates.cs`, and
+`StealthAIThreatGeometry.cs`. Original Air sources remain byte-unchanged. The
+tracked `scripts/check-stealth-ai-air-copy.py` reverses only the allowed identity
+map and PASSes exact equality for all 5,857 copied lines, with source hashes
+`bff7510e...78d0`, `c8800359...2264`, `6ad78ca1...e3d3`, and
+`d1bf31bd...8751`. No ground adapter, aircraft-primitive change, selective
+algorithm port, separate chemical class, or live YAML attachment is invented.
+The YAML TODO states why attachment is not mechanically possible.
+
+Per explicit authority this is intentionally nonbuilding: compilation, games,
+policy/code review, and publication are not run. The bounded receipts are the
+four-pair identity proof, zero diff to original Air files, and `git diff --check`.
+
+### Archived-function review intake
+
+Roslyn syntax enumeration of the archived module and policy at `a0df865591`
+produced exactly 184 stable per-body records: 92 per source, comprising 177
+methods, four constructors and three expression-bodied properties. Tests,
+config, and the standalone acceptance/debug watchdog trait are not function
+sources; policy-contained watchdog helpers remain represented as test-only.
+Each record carries its exact span/signature, neutral purpose, direct
+dependencies/callers, syntax-ranked copied-Air candidates, flags, and an
+immutable individual job/receipt contract. No review judgment was made.
+
+Thirty-five retreat/completion-retreat bodies are authoritatively closed
+`LEAVE_OUT_RETREAT`; 149 remain eligible. The eligible set is covered exactly
+once by 17 source-adjacent/shared-context batches of at most ten functions:
+fourteen batches of ten, one of six, one of two, and one standalone 557-line
+body. Each function still requires its own verdict/evidence/dependency receipt;
+batch verdicts are prohibited. Canonical tracked indexes live under
+`.agents/inspiration/stealth-ai-pre-air-copy/function-review/`; 184 individual
+jobs, 17 batch envelopes, and future receipts live durably but ignored under
+`.build/cnc96a-air-copy-function-review/`. Coverage, IDs, spans, hashes,
+permissions, batching, and retreat exclusion validate cleanly. Cross-batch
+dependencies are ordered by prerequisites, with mutually recursive references
+identified as same-component peers rather than cyclic prerequisites. No product
+code, build, game, review, or PR action is part of this intake.
+
+### Contested-function rereview intake
+
+The immutable audit at function-manifest head `46110762da` contests exactly 37
+eligible receipts. Intake generated four read-only fresh Sol-medium envelopes of
+10, 10, 10, and 7 functions beneath
+`.build/cnc96a-air-copy-function-review/rereview-batches/`. Coverage is exactly
+once, no manifest-retreat body is dispatched, and every function retains an
+independent replacement receipt and verdict. Each envelope supplies only the
+exact archived/current spans and audit-required caller/dependency boundary spans,
+names the prior result and defect, enforces canonical verdict/confidence enums,
+and forbids all outside evidence.
+
+Retreat and completion-retreat remain excluded: dependencies must be directly
+left out, inseparable functions must return `LEAVE_OUT_RETREAT`, and any
+`RESTORE_*` result must state a precise retreat-free extraction boundary. Queue,
+index, and validation receipts are `rereview-batches/QUEUE.md`, `INDEX.json`, and
+`VALIDATION.md`. Validation passes all 37 IDs, batch bounds, span bounds, hashes,
+and mode `0444`. The 339 protected audit/manifest/job/original-receipt inputs are
+unchanged at aggregate SHA-256
+`54f135a065906a12085f2b8abb8dba07431af496b152a42f6012d48557e8f809`.
+No function judgment, product edit, build, game, review execution, or PR action
+was performed.

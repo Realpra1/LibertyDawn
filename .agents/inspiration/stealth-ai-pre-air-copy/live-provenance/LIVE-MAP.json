@@ -1,0 +1,2668 @@
+{
+  "schema": 1,
+  "audit": "CNC-96A live-body provenance",
+  "status": "PASS",
+  "scope": {
+    "restore_ids": 98,
+    "keep_air_ids": 51,
+    "retreat_ids": 35
+  },
+  "counts": {
+    "EXACT_BODY": 47,
+    "RETREAT_FREE_EXTRACTION": 5,
+    "COMPOSED_INTO_AIR_BODY": 46,
+    "MISSING": 0,
+    "CONFLICTING_OLD_BODY": 0
+  },
+  "records": [
+    {
+      "id": "CNC96A-FN-0362E161B3C2",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          768,
+          773
+        ],
+        "signature": " public static bool AreAllCandidatesUnavailable(int candidateCount, int dangerousCandidates, int unroutableCandidates)",
+        "responsibility": "Implement are all candidates unavailable; directly invokes Max."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.AreAllCandidatesUnavailable",
+          "span": [
+            374,
+            379
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-039A14EF2BAE",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "RETREAT_FREE_EXTRACTION",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          2533,
+          3089
+        ],
+        "signature": " void UpdateGroup(SpecialistGroup group, List<Actor> enemies, List<Threat> threats)",
+        "responsibility": "Perform update group; directly invokes ActivitiesImplementing, Add, Any, ApplyHazardAwarePlan, AreAllCandidatesUnavailable."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs",
+          "member": "StealthAIAttackState.Tick",
+          "span": [
+            2954,
+            3283
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-03BDDBEB2140",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          705,
+          717
+        ],
+        "signature": " public static StealthTankTargetReassessment ReassessTarget(bool incumbentValid, bool incumbentUndefended, long incumbentScore, bool challengerValid, bool challengerUndefended, long challengerScore, int minimumImprovementPercent)",
+        "responsibility": "Implement reassess target; directly invokes ShouldSwitchTarget."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.ReassessTarget",
+          "span": [
+            311,
+            323
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-0E77729B1DD4",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          3822,
+          3837
+        ],
+        "signature": " void MarkPendingExplosionCells(SpecialistInfluenceMap map)",
+        "responsibility": "Perform mark pending explosion cells; directly invokes Any, Clamp, FindTilesInAnnulus, new:CPos."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs",
+          "member": "StealthAIStateBase.SafeRouteForStealth",
+          "span": [
+            676,
+            779
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-11E6F17DBDE4",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          1028,
+          1031
+        ],
+        "signature": " public static bool CanApplyPendingTargetPlan(int currentTick, int lastOrderTick)",
+        "responsibility": "Decide whether can apply pending target plan."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.CanApplyPendingTargetPlan",
+          "span": [
+            504,
+            507
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-1603A9B999EF",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          1754,
+          1757
+        ],
+        "signature": " static double Milliseconds(long ticks)",
+        "responsibility": "Implement milliseconds."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs",
+          "member": "StealthAIStateBase.SafeRouteForStealth",
+          "span": [
+            676,
+            779
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-163554C8C89D",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          3420,
+          3427
+        ],
+        "signature": " bool MemberRouteIsUsable(SpecialistGroup group, Actor unit, Actor target, List<CPos> route, List<Threat> threats, bool ignoreTargetDetector, bool allowDangerousEndpoint)",
+        "responsibility": "Implement member route is usable; directly invokes MatchesFailedMemberRoute, RouteHasExactSafeSegments."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs",
+          "member": "StealthAIStateBase.SafeRouteForStealth",
+          "span": [
+            676,
+            779
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-1675FD5BE194",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          1713,
+          1752
+        ],
+        "signature": " bool HasLocalThreatExposure(Actor unit, out Actor detector, out int detectorRange, out Actor armedSupport, out int armedRange, out bool engagedWeaponExposure)",
+        "responsibility": "Decide whether has local threat exposure; directly invokes BufferedRange, CreateThreat, FindActorsInCircle, FromCells, GetEnabledTargetTypes."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs",
+          "member": "StealthAIStateBase.SafeRouteForStealth",
+          "span": [
+            676,
+            779
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-1C0B2713C45B",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          3206,
+          3214
+        ],
+        "signature": " void BeginRetainedPlan(SpecialistGroup group, Actor target, WPos center)",
+        "responsibility": "Perform begin retained plan; directly invokes TraitOrDefault."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs",
+          "member": "StealthAIStateBase.SafeRouteForStealth",
+          "span": [
+            676,
+            779
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-1E655A319999",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          790,
+          813
+        ],
+        "signature": " public static SpecialistDefenderClearAction DefenderClearAction(bool isInfantry, bool isTank, bool canCrushInfantry, int packageDefenderCount, int ownRangeCells, int defenderWeaponRangeCells, int defenderDetectorRangeCells, int safetyMarginCells)",
+        "responsibility": "Implement defender clear action; directly invokes Max."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.DefenderClearAction",
+          "span": [
+            382,
+            405
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-1F603BEE6EE0",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          3429,
+          3440
+        ],
+        "signature": " bool MatchesFailedMemberRoute(SpecialistGroup group, Actor unit, Actor target, List<CPos> route)",
+        "responsibility": "Decide whether matches failed member route; directly invokes Contains, DiagnosticRouteHash, TryGetValue."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs",
+          "member": "StealthAIStateBase.SafeRouteForStealth",
+          "span": [
+            676,
+            779
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-21A541E3ACE9",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          1054,
+          1057
+        ],
+        "signature": " public static int BufferedRange(int rangeCells, int bufferCells)",
+        "responsibility": "Implement buffered range; directly invokes Max."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.BufferedRange",
+          "span": [
+            530,
+            533
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-262BF2229BEC",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          841,
+          853
+        ],
+        "signature": " public static SpecialistLostActivityRouteDecision LostActivityRouteDecision(bool sharedRouteUsable, bool sameEndpointMemberRouteUsable, bool alternateEndpointRouteUsable)",
+        "responsibility": "Implement lost activity route decision."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.LostActivityRouteDecision",
+          "span": [
+            433,
+            445
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-2B8A1C8B25A2",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          1066,
+          1073
+        ],
+        "signature": " public static bool IsEngagementThreat(bool detectorExposure, bool armedCoverage, bool engagedWeaponExposure)",
+        "responsibility": "Decide whether is engagement threat."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.IsEngagementThreat",
+          "span": [
+            542,
+            549
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-2DA8BDC4CE2A",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          2173,
+          2218
+        ],
+        "signature": " List<CPos> FindReinforcementRoute(SpecialistGroup group, Actor unit, CPos anchor, CPos responsibilityAnchor, List<Threat> threats)",
+        "responsibility": "Resolve find reinforcement route; directly invokes CanEnterCell, Contains, DiagnosticRouteHash, FindCoarseSafeRoute, FindTilesInAnnulus."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/Squad.cs",
+          "member": "Squad.UpdateGroundReinforcements",
+          "span": [
+            434,
+            463
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-309094B02BB8",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          367,
+          370
+        ],
+        "signature": " protected override void TraitDisabled(Actor self)",
+        "responsibility": "Implement trait disabled; directly invokes ReleaseSpecialists."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/SquadManagerBotModule.cs",
+          "member": "SquadManagerBotModule.EnsureStealthSquads",
+          "span": [
+            824,
+            840
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-30CDF3188FC4",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          664,
+          669
+        ],
+        "signature": " public static bool RouteStretchIsDisproportionate(int selectedDistance, int directDistance, int maximumStretchPercent)",
+        "responsibility": "Implement route stretch is disproportionate."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.RouteStretchIsDisproportionate",
+          "span": [
+            295,
+            300
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-370F3833E227",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          3518,
+          3570
+        ],
+        "signature": " List<CPos> FindLostActivityMemberRoute(SpecialistGroup group, Actor unit, Actor target, List<CPos> sharedRoute, List<Threat> threats, int ownRange, int minimumAttackRangeCells, bool crush, bool ignoreTargetDetector, bool allowDangerousEndpoint, bool failedRouteMatchesShared, out string reason)",
+        "responsibility": "Resolve find lost activity member route; directly invokes CanEnterCell, Clamp, FindCoarseSafeRoute, FindTilesInAnnulus, GetInfluenceMap."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs",
+          "member": "StealthAIStateBase.SafeRouteForStealth",
+          "span": [
+            676,
+            779
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-37C1BE7F8151",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          3689,
+          3703
+        ],
+        "signature": " List<CPos> FindNearestLocalSafetyRoute(Actor unit, SpecialistInfluenceMap map)",
+        "responsibility": "Resolve find nearest local safety route; directly invokes Clamp, FindNearestSafeRoute, new:CPos, Select, SmoothRoute."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs",
+          "member": "StealthAIStateBase.SafeRouteForStealth",
+          "span": [
+            676,
+            779
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-3C2AE0D876CC",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          3572,
+          3665
+        ],
+        "signature": " List<CPos> HazardAwarePath(Actor unit, Actor target, List<Threat> threats, int ownRange, bool crush, bool allowDangerousEndpoint, int minimumAttackRangeCells, bool ignoreTargetDetector = false, Dictionary<CPos, List<CPos>> routeCache = null, HashSet<CPos> unroutableCells = null)",
+        "responsibility": "Implement hazard aware path; directly invokes Add, All, Any, CanEnterCell, Ceiling."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs",
+          "member": "StealthAIStateBase.SafeRouteForStealth",
+          "span": [
+            676,
+            779
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-3D7D329646F9",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          1708,
+          1711
+        ],
+        "signature": " bool IsActiveCoreSpecialist(SpecialistGroup group, Actor actor)",
+        "responsibility": "Decide whether is active core specialist; directly invokes Contains, IsActiveSpecialist."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs",
+          "member": "StealthAIStateBase.SafeRouteForStealth",
+          "span": [
+            676,
+            779
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-3DD07AA039AE",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          2510,
+          2531
+        ],
+        "signature": " Threat CreateThreat(Actor actor)",
+        "responsibility": "Implement create threat; directly invokes ActivitiesImplementing, Any, Ceiling, DefaultIfEmpty, IsValidTarget."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs",
+          "member": "StealthAIStateBase.SafeRouteForStealth",
+          "span": [
+            676,
+            779
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-3E1BF7F96158",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          3667,
+          3687
+        ],
+        "signature": " List<CPos> FindCoarseSafeRoute(CPos start, CPos destination, SpecialistInfluenceMap map)",
+        "responsibility": "Resolve find coarse safe route; directly invokes Add, Any, Clamp, FindRoute, IsHardRouteDanger."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs",
+          "member": "StealthAIStateBase.SafeRouteForStealth",
+          "span": [
+            676,
+            779
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-3F3B0D7D81C8",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          865,
+          869
+        ],
+        "signature": " public static bool ShouldValidateIdleMemberRoute(StealthTankPlanInvalidation invalidation)",
+        "responsibility": "Decide whether should validate idle member route."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.ShouldValidateIdleMemberRoute",
+          "span": [
+            457,
+            461
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-3F9F9A5DC8B3",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          3760,
+          3790
+        ],
+        "signature": " SpecialistInfluenceMap BuildInfluenceMap(List<Threat> threats, Actor ignoredThreat)",
+        "responsibility": "Implement build influence map; directly invokes BufferedRange, GetEnabledTargetTypes, GetTimestamp, MarkPendingExplosionCells, MarkSoftResourceCosts."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs",
+          "member": "StealthAIStateBase.SafeRouteForStealth",
+          "span": [
+            676,
+            779
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-4099692E50BB",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "RETREAT_FREE_EXTRACTION",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          1904,
+          2096
+        ],
+        "signature": " void UpdateReinforcements(SpecialistGroup group, List<Threat> threats)",
+        "responsibility": "Perform update reinforcements; directly invokes ActivitySignature, Add, Average, CanAdvanceReinforcement, Contains."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/Squad.cs",
+          "member": "Squad.UpdateGroundReinforcements",
+          "span": [
+            434,
+            463
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-44B4F1A3CC3D",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "RETREAT_FREE_EXTRACTION",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          1804,
+          1902
+        ],
+        "signature": " void Rebalance()",
+        "responsibility": "Perform rebalance; directly invokes Add, Any, ApplyPendingReinforcementRestore, ApplyPendingRetreatRestore, ClaimActors."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/SquadManagerBotModule.cs",
+          "member": "SquadManagerBotModule.RebalanceStealthSquads",
+          "span": [
+            842,
+            879
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-46B5C83A8729",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          522,
+          525
+        ],
+        "signature": " public static bool ShouldReserveUnit(bool alreadyReserved, bool claimAllEligible, bool eligible)",
+        "responsibility": "Decide whether should reserve unit."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.ShouldReserveUnit",
+          "span": [
+            255,
+            258
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-4A18AAF662A5",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          719,
+          736
+        ],
+        "signature": " public static StealthTankTargetReassessment ReassessTargetWithWallFallback(bool incumbentValid, bool incumbentUndefended, long incumbentScore, bool challengerValid, bool challengerUndefended, long challengerScore, int minimumImprovementPercent, bool incumbentIsWall, bool challengerIsWall)",
+        "responsibility": "Implement reassess target with wall fallback; directly invokes ReassessTarget."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.ReassessTargetWithWallFallback",
+          "span": [
+            325,
+            342
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-4EC4985EF182",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          3230,
+          3259
+        ],
+        "signature": " bool HasUnsafeRetainedRoute(SpecialistGroup group, Actor target, List<Threat> threats, int ownRange)",
+        "responsibility": "Decide whether has unsafe retained route; directly invokes IsActiveCoreSpecialist, IsTransitThreatenedCell, Max, Min, TryGetValue."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs",
+          "member": "StealthAIStateBase.SafeRouteForStealth",
+          "span": [
+            676,
+            779
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-4EE38893644D",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          360,
+          365
+        ],
+        "signature": " protected override void TraitEnabled(Actor self)",
+        "responsibility": "Implement trait enabled."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/SquadManagerBotModule.cs",
+          "member": "SquadManagerBotModule.EnsureStealthSquads",
+          "span": [
+            824,
+            840
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-5020E8688F0A",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          536,
+          539
+        ],
+        "signature": " public static bool ShouldRefreshStrategicView(int cachedTick, int currentTick)",
+        "responsibility": "Decide whether should refresh strategic view."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.ShouldRefreshStrategicView",
+          "span": [
+            269,
+            272
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-587A04C0F70C",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          1002,
+          1010
+        ],
+        "signature": " public static bool SubmittedGroundWaypointIsUsable(bool waypointIsHardSafe, bool exactSegmentReachable, bool internalEngineRefinementIsHardSafe)",
+        "responsibility": "Implement submitted ground waypoint is usable."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.SubmittedGroundWaypointIsUsable",
+          "span": [
+            478,
+            486
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-5B79C698C9E6",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          738,
+          746
+        ],
+        "signature": " public static List<T> NearbyReassessmentCandidates<T>(IEnumerable<T> nearbyCandidates, T incumbent, Func<T, T, bool> sameCandidate)",
+        "responsibility": "Implement nearby reassessment candidates; directly invokes Add, Any, sameCandidate, ToList."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.NearbyReassessmentCandidates<T>",
+          "span": [
+            344,
+            352
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-5F94AED53553",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "RETREAT_FREE_EXTRACTION",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          2220,
+          2251
+        ],
+        "signature": " List<MiniYamlNode> IGameSaveTraitData.IssueTraitData(Actor self)",
+        "responsibility": "Decide whether issue trait data; directly invokes Add, Contains, FormatValue, new:List<MiniYamlNode>, new:MiniYamlNode."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/Squad.cs",
+          "member": "Squad.Serialize",
+          "span": [
+            465,
+            505
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-6231A086AAFB",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          444,
+          448
+        ],
+        "signature": " public static bool ShouldRestoreReinforcementPlan(bool validMember, bool validTarget, bool ownsActivity)",
+        "responsibility": "Decide whether should restore reinforcement plan."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.ShouldRestoreReinforcementPlan",
+          "span": [
+            227,
+            231
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-63DC8C643A2D",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          3193,
+          3204
+        ],
+        "signature": " void ClearRetainedPlan(SpecialistGroup group)",
+        "responsibility": "Perform clear retained plan; directly invokes Clear."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs",
+          "member": "StealthAIStateBase.SafeRouteForStealth",
+          "span": [
+            676,
+            779
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-64C6E112BC53",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          385,
+          389
+        ],
+        "signature": " public static bool ShouldStageReinforcement(bool hasEstablishedCore, bool wasPreviouslyAssigned)",
+        "responsibility": "Decide whether should stage reinforcement."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.ShouldStageReinforcement",
+          "span": [
+            180,
+            184
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-693AE3CC121A",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          748,
+          753
+        ],
+        "signature": " public static int InfantryClusterMultiplier(int nearbyInfantry, int bonusPercentPerActor, int maximumMultiplierPercent)",
+        "responsibility": "Implement infantry cluster multiplier; directly invokes Max, Min."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.InfantryClusterMultiplier",
+          "span": [
+            354,
+            359
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-6E2169D9F443",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          1044,
+          1052
+        ],
+        "signature": " public static TInfluence ResolveRepairInfluence<TFacts, TInfluence>(TFacts sharedThreatFacts, Func<TFacts, TInfluence> getPrivateInfluence)",
+        "responsibility": "Resolve resolve repair influence; directly invokes getPrivateInfluence."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.TInfluence>",
+          "span": [
+            520,
+            528
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-6EDD50846A63",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          3861,
+          3872
+        ],
+        "signature": " int InfantryClusterMultiplier(StealthTankSquadRole role, Actor actor)",
+        "responsibility": "Implement infantry cluster multiplier; directly invokes Count, FindActorsInCircle, FromCells, GetEnabledTargetTypes, InfantryClusterMultiplier."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs",
+          "member": "StealthAIStateBase.SafeRouteForStealth",
+          "span": [
+            676,
+            779
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-6EF96899F7C7",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          820,
+          831
+        ],
+        "signature": " public static SpecialistRepairDisposition RepairDisposition(bool damagedBelowThreshold, bool isRepairing, bool fullyRepaired, bool hasCompatibleReachableRepair)",
+        "responsibility": "Implement repair disposition."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.RepairDisposition",
+          "span": [
+            412,
+            423
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-6F037D735ACA",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          2503,
+          2508
+        ],
+        "signature": " static bool CanAttackTarget(Actor unit, Actor target)",
+        "responsibility": "Decide whether can attack target; directly invokes Any, GetEnabledTargetTypes, IsValidTarget, TraitsImplementing."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs",
+          "member": "StealthAIStateBase.SafeRouteForStealth",
+          "span": [
+            676,
+            779
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-72BD390EEAB1",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          3741,
+          3758
+        ],
+        "signature": " SpecialistInfluenceMap GetInfluenceMap(List<Threat> threats, Actor ignoredThreat = null)",
+        "responsibility": "Resolve get influence map; directly invokes BuildInfluenceMap, ShouldRefreshInfluenceMap."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs",
+          "member": "StealthAIStateBase.SafeRouteForStealth",
+          "span": [
+            676,
+            779
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-735BB1952F56",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          472,
+          476
+        ],
+        "signature": " public static uint? RecoveryCore(IEnumerable<uint> members, ISet<uint> reinforcements)",
+        "responsibility": "Implement recovery core; directly invokes All, OrderBy, ToArray."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.RecoveryCore",
+          "span": [
+            246,
+            250
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-7569FF5F3FB2",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          3183,
+          3191
+        ],
+        "signature": " SpecialistDefenderClearAction DefenderClearAction(Threat defender, int packageDefenderCount, int ownRange)",
+        "responsibility": "Implement defender clear action; directly invokes DefenderClearAction, GetEnabledTargetTypes, Overlaps."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs",
+          "member": "StealthAIStateBase.SafeRouteForStealth",
+          "span": [
+            676,
+            779
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-760611A2A6C7",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          2098,
+          2171
+        ],
+        "signature": " List<CPos> FindSafeMobilityRoute(SpecialistGroup group, Actor unit, CPos anchor, CPos responsibilityAnchor, List<Threat> threats)",
+        "responsibility": "Resolve find safe mobility route; directly invokes CanEnterCell, Contains, DiagnosticRouteHash, FindCoarseSafeRoute, FindNearestLocalSafetyRoute."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs",
+          "member": "StealthAIStateBase.SafeRouteForStealth",
+          "span": [
+            676,
+            779
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-769F757A3C2C",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          815,
+          818
+        ],
+        "signature": " public static bool ShouldIgnoreSelectedDefenderInfluence(SpecialistDefenderClearAction action)",
+        "responsibility": "Decide whether should ignore selected defender influence."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.ShouldIgnoreSelectedDefenderInfluence",
+          "span": [
+            407,
+            410
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-76EEBE996564",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          3911,
+          3963
+        ],
+        "signature": " bool DangerAlongRun(WPos start, Actor target, List<Threat> threats, int ownRange, bool stopAtFirstDanger, out int defendingValue, out Actor strongestDefender, out List<Threat> defenders)",
+        "responsibility": "Implement danger along run; directly invokes Add, BufferedRange, CanOutrangeTargetDetector, GetEnabledTargetTypes, new:List<Threat>."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs",
+          "member": "StealthAIStateBase.SafeRouteForStealth",
+          "span": [
+            676,
+            779
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-78896AE89AA2",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          3874,
+          3909
+        ],
+        "signature": " int Priority(StealthTankSquadRole role, Actor actor, int groupSize)",
+        "responsibility": "Implement priority; directly invokes GetEnabledTargetTypes, HasTraitInfo, Overlaps, TraitInfoOrDefault, TryGetValue."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs",
+          "member": "StealthAIStateBase.SafeRouteForStealth",
+          "span": [
+            676,
+            779
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-8587B2653EE0",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          409,
+          419
+        ],
+        "signature": " public static bool ShouldIssueReinforcementOrder(bool retainedPlanMatches, bool retainedSafeHold, bool isIdle, bool routeAvailable, bool issuedThisTick)",
+        "responsibility": "Decide whether should issue reinforcement order."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.ShouldIssueReinforcementOrder",
+          "span": [
+            192,
+            202
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-8AAF95C08BEC",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          3369,
+          3418
+        ],
+        "signature": " int QueueHazardRoute(SpecialistGroup group, IReadOnlyCollection<Actor> units, Actor target, List<CPos> path, bool crush)",
+        "responsibility": "Perform queue hazard route; directly invokes FromActor, FromCell, Min, new:Order, QueueOrder."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs",
+          "member": "StealthAIStateBase.SafeRouteForStealth",
+          "span": [
+            676,
+            779
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-8CF0395F4F4A",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          461,
+          464
+        ],
+        "signature": " public static bool IsHardRouteDanger(float danger)",
+        "responsibility": "Decide whether is hard route danger."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.IsHardRouteDanger",
+          "span": [
+            240,
+            243
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-8FE742AE85D9",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          871,
+          875
+        ],
+        "signature": " public static bool ShouldRecomputeSameEndpointMemberRoute(bool failedRouteMatchesSharedRoute)",
+        "responsibility": "Decide whether should recompute same endpoint member route."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.ShouldRecomputeSameEndpointMemberRoute",
+          "span": [
+            463,
+            467
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-90E25B8D7663",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          1059,
+          1064
+        ],
+        "signature": " public static bool CanOutrangeTargetDetector(bool threatIsTarget, int weaponRangeCells, int detectorRangeCells, int ownRangeCells)",
+        "responsibility": "Decide whether can outrange target detector."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.CanOutrangeTargetDetector",
+          "span": [
+            535,
+            540
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-926B1857FCAB",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          1033,
+          1042
+        ],
+        "signature": " public static bool ShouldRetainWholeGroupEngagement(bool retainActiveEngagement, bool hasPendingIdleMember, bool incumbentIsWallFallback = false)",
+        "responsibility": "Decide whether should retain whole group engagement."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.ShouldRetainWholeGroupEngagement",
+          "span": [
+            509,
+            518
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-929DFA9E156E",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          373,
+          376
+        ],
+        "signature": " public static bool IsSameStrategicCell(CPos a, CPos b, int strategicCellSize)",
+        "responsibility": "Decide whether is same strategic cell; directly invokes StrategicCell."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.IsSameStrategicCell",
+          "span": [
+            162,
+            165
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-956A6252395D",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          527,
+          534
+        ],
+        "signature": " public static bool ShouldRunStrategicScan(ref int countdown, int interval)",
+        "responsibility": "Decide whether should run strategic scan; directly invokes Max."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.ShouldRunStrategicScan",
+          "span": [
+            260,
+            267
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-98208303E890",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          855,
+          863
+        ],
+        "signature": " public static bool FailedMemberRouteRemainsApplicable(bool sameTarget, bool sameTargetLocation, bool sameOrigin)",
+        "responsibility": "Implement failed member route remains applicable."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.FailedMemberRouteRemainsApplicable",
+          "span": [
+            447,
+            455
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-9A8AA0DFB343",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          3216,
+          3228
+        ],
+        "signature": " void ObserveProgress(SpecialistGroup group, Actor target, WPos center)",
+        "responsibility": "Perform observe progress; directly invokes TraitOrDefault."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs",
+          "member": "StealthAIStateBase.SafeRouteForStealth",
+          "span": [
+            676,
+            779
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-9AAF88E48173",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          184,
+          184
+        ],
+        "signature": " public SpecialistGroup(int index)",
+        "responsibility": "Initialize SpecialistGroup state."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/SquadManagerBotModule.cs",
+          "member": "SquadManagerBotModule.EnsureStealthSquads",
+          "span": [
+            824,
+            840
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-A0B176AD444A",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          345,
+          358
+        ],
+        "signature": " protected override void Created(Actor self)",
+        "responsibility": "Implement created; directly invokes Created, FirstOrDefault, RefreshSquadManager, ToArray, TraitOrDefault."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/SquadManagerBotModule.cs",
+          "member": "SquadManagerBotModule.EnsureStealthSquads",
+          "span": [
+            824,
+            840
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-AE3F7FCE1BC6",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          136,
+          136
+        ],
+        "signature": " public override object Create(ActorInitializer init)",
+        "responsibility": "Implement create; directly invokes new:StealthTankSquadBotModule."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs",
+          "member": "StealthAIStateBase.SafeRouteForStealth",
+          "span": [
+            676,
+            779
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-B2F00C5572CC",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          657,
+          662
+        ],
+        "signature": " public static List<CPos> ForwardExactGroundRoute(IEnumerable<CPos> reversedPathfinderRoute)",
+        "responsibility": "Implement forward exact ground route; directly invokes Reverse, ToList."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.ForwardExactGroundRoute",
+          "span": [
+            288,
+            293
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-B351F3E03F1C",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          109,
+          134
+        ],
+        "signature": " public override void RulesetLoaded(Ruleset rules, ActorInfo ai)",
+        "responsibility": "Implement ruleset loaded; directly invokes IsNullOrWhiteSpace, new:YamlException, RulesetLoaded, SquadCount."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/SquadManagerBotModule.cs",
+          "member": "SquadManagerBotModule.EnsureStealthSquads",
+          "span": [
+            824,
+            840
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-B70A464E87D3",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          3725,
+          3728
+        ],
+        "signature": " bool IsTransitThreatenedCell(CPos cell, Actor intendedTarget, List<Threat> threats, int ownRange)",
+        "responsibility": "Decide whether is transit threatened cell; directly invokes GetInfluenceMap, IsInfluencedCell."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs",
+          "member": "StealthAIStateBase.SafeRouteForStealth",
+          "span": [
+            676,
+            779
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-BCA5B6D1D908",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          1703,
+          1706
+        ],
+        "signature": " bool IsActiveSpecialist(Actor actor)",
+        "responsibility": "Decide whether is active specialist; directly invokes Contains, IsEligible."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/Squad.cs",
+          "member": "Squad.UpdateGroundReinforcements",
+          "span": [
+            434,
+            463
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-BDC91930911A",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          1759,
+          1776
+        ],
+        "signature": " StrategicView GetStrategicView(out bool cacheHit)",
+        "responsibility": "Resolve get strategic view; directly invokes GetTimestamp, OrderBy, Select, ShouldRefreshStrategicView, ToList."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs",
+          "member": "StealthAIStateBase.SafeRouteForStealth",
+          "span": [
+            676,
+            779
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-C1650AF19AE5",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          1081,
+          1086
+        ],
+        "signature": " public static int TransitThreatRange(int detectorRangeCells, int weaponRangeCells, bool weaponIsEngaged, bool canKiteTarget)",
+        "responsibility": "Implement transit threat range; directly invokes Max."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.TransitThreatRange",
+          "span": [
+            557,
+            562
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-C1DEDF484247",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          450,
+          454
+        ],
+        "signature": " public static bool ShouldRestoreReinforcementMember(bool eligible, bool reserved, bool selected)",
+        "responsibility": "Decide whether should restore reinforcement member."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.ShouldRestoreReinforcementMember",
+          "span": [
+            233,
+            237
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-C64AEFE1687B",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          3261,
+          3300
+        ],
+        "signature": " bool WaitNearHarvesterField(SpecialistGroup group, IEnumerable<Actor> enemies, List<Threat> threats, int ownRange, bool force)",
+        "responsibility": "Perform wait near harvester field; directly invokes CanEnterCell, Contains, FindTilesInAnnulus, FirstOrDefault, FromCell."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs",
+          "member": "StealthAIStateBase.SafeRouteForStealth",
+          "span": [
+            676,
+            779
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-C7D9CB4F388A",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          1075,
+          1079
+        ],
+        "signature": " public static bool ShouldRetainActiveEngagement(bool hasValidTarget, bool isEngaged, bool localThreatExposure, bool resourceHazard)",
+        "responsibility": "Decide whether should retain active engagement."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.ShouldRetainActiveEngagement",
+          "span": [
+            551,
+            555
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-CA7F7D08AE66",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          3730,
+          3739
+        ],
+        "signature": " bool IsInfluencedCell(SpecialistInfluenceMap map, CPos cell)",
+        "responsibility": "Decide whether is influenced cell; directly invokes Clamp, Contains, IsHardRouteDanger."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs",
+          "member": "StealthAIStateBase.SafeRouteForStealth",
+          "span": [
+            676,
+            779
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-CC1934993DB8",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          419,
+          424
+        ],
+        "signature": " void RefreshSquadManager()",
+        "responsibility": "Perform refresh squad manager; directly invokes FirstOrDefault, TraitsImplementing."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/SquadManagerBotModule.cs",
+          "member": "SquadManagerBotModule.EnsureStealthSquads",
+          "span": [
+            824,
+            840
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-D2672B2536B6",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          372,
+          417
+        ],
+        "signature": " void ReleaseSpecialists(string reason)",
+        "responsibility": "Perform release specialists; directly invokes Clear, ClearRetainedPlan, Join, OrderBy, RefreshSquadManager."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/SquadManagerBotModule.cs",
+          "member": "SquadManagerBotModule.EnsureStealthSquads",
+          "span": [
+            824,
+            840
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-D3003C07F306",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          440,
+          441
+        ],
+        "signature": " int StrategicCellSize",
+        "responsibility": "Compute the StrategicCellSize property behavior."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs",
+          "member": "StealthAIStateBase.SafeRouteForStealth",
+          "span": [
+            676,
+            779
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-DAA6127D3A32",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          700,
+          703
+        ],
+        "signature": " public static int OptimisticApproachDistance(int targetDistanceCells, int weaponRangeCells)",
+        "responsibility": "Implement optimistic approach distance; directly invokes Max."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.OptimisticApproachDistance",
+          "span": [
+            306,
+            309
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-DE95637FB877",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          761,
+          766
+        ],
+        "signature": " public static bool CanAttemptDefenderClear(int consecutiveNoSafeTargetScans, int requiredScans, int squadValue, int defendingValue, int requiredValueRatio)",
+        "responsibility": "Decide whether can attempt defender clear; directly invokes CanCarefullyClear, Max."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.CanAttemptDefenderClear",
+          "span": [
+            367,
+            372
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-DED9CDA2F63B",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          1018,
+          1026
+        ],
+        "signature": " public static T[] TargetChangedPlanMembers<T>(IEnumerable<T> activeMembers, Func<T, bool> isIdle, bool canSubmitThisTick)",
+        "responsibility": "Implement target changed plan members; directly invokes Empty, ToArray, Where."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.TargetChangedPlanMembers<T>",
+          "span": [
+            494,
+            502
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-E0358288BF0E",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          2286,
+          2383
+        ],
+        "signature": " void ApplyPendingReinforcementRestore()",
+        "responsibility": "Perform apply pending reinforcement restore; directly invokes Add, Contains, Count, Distinct, FirstOrDefault."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/Squad.cs",
+          "member": "Squad.UpdateGroundReinforcements",
+          "span": [
+            434,
+            463
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-E06508589937",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "RETREAT_FREE_EXTRACTION",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          404,
+          407
+        ],
+        "signature": " public static bool CanAdvanceReinforcement(bool active, bool retreatResponsibilityPending)",
+        "responsibility": "Decide whether can advance reinforcement."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.CanAdvanceReinforcement",
+          "span": [
+            187,
+            190
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-E866B456DF2D",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          3720,
+          3723
+        ],
+        "signature": " bool HasAnyResource(CPos cell)",
+        "responsibility": "Decide whether has any resource; directly invokes GetResource."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs",
+          "member": "StealthAIStateBase.SafeRouteForStealth",
+          "span": [
+            676,
+            779
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-ECFEEB8BBDD9",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          268,
+          275
+        ],
+        "signature": " public SpecialistInfluenceMap(int tick, int coarseSize, int width, int height)",
+        "responsibility": "Initialize SpecialistInfluenceMap state."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs",
+          "member": "StealthAIStateBase.SafeRouteForStealth",
+          "span": [
+            676,
+            779
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-EDBBEE6A60AF",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          421,
+          424
+        ],
+        "signature": " public static bool ShouldPreserveBusyReinforcement(bool retainedPlanMatches, bool isIdle)",
+        "responsibility": "Decide whether should preserve busy reinforcement."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.ShouldPreserveBusyReinforcement",
+          "span": [
+            204,
+            207
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-EEC02BC271EB",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          541,
+          544
+        ],
+        "signature": " public static bool ShouldRefreshInfluenceMap(int cachedTick, int currentTick, int interval)",
+        "responsibility": "Decide whether should refresh influence map; directly invokes Max."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.ShouldRefreshInfluenceMap",
+          "span": [
+            274,
+            277
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-F21490521A4B",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          833,
+          839
+        ],
+        "signature": " public static bool ShouldUseNearestSafeMobilityFallback(bool isIdle, bool hasAnchorDirectedRoute, bool hasNearestSafeRoute)",
+        "responsibility": "Decide whether should use nearest safe mobility fallback."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.ShouldUseNearestSafeMobilityFallback",
+          "span": [
+            425,
+            431
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-F298BD716C54",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          1012,
+          1016
+        ],
+        "signature": " public static T[] LostActivityPlanMembers<T>(IEnumerable<T> activeMembers, Func<T, bool> isIdle)",
+        "responsibility": "Implement lost activity plan members; directly invokes ToArray, Where."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.LostActivityPlanMembers<T>",
+          "span": [
+            488,
+            492
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-F440F05ED786",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          3442,
+          3464
+        ],
+        "signature": " int MobilityRouteContextHash(CPos origin, SpecialistInfluenceMap map)",
+        "responsibility": "Implement mobility route context hash; directly invokes Clamp, IsResourceHazard, Max, Min, new:CPos."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs",
+          "member": "StealthAIStateBase.SafeRouteForStealth",
+          "span": [
+            676,
+            779
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-F5560DA311E3",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          1798,
+          1802
+        ],
+        "signature": " bool IsEligible(Actor actor)",
+        "responsibility": "Decide whether is eligible; directly invokes Contains, IsTransportReserved."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/Squad.cs",
+          "member": "Squad.UpdateGroundReinforcements",
+          "span": [
+            434,
+            463
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-F8A2403C88EA",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          3705,
+          3718
+        ],
+        "signature": " bool IsResourceHazard(CPos cell)",
+        "responsibility": "Decide whether is resource hazard; directly invokes Add, Any, FindTilesInAnnulus, TryGetValue."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs",
+          "member": "StealthAIStateBase.SafeRouteForStealth",
+          "span": [
+            676,
+            779
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-F9F1EE8CB298",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          378,
+          383
+        ],
+        "signature": " public static bool IsSameOrAdjacentStrategicCell(CPos a, CPos b, int strategicCellSize)",
+        "responsibility": "Decide whether is same or adjacent strategic cell; directly invokes Abs, Max, StrategicCell."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.IsSameOrAdjacentStrategicCell",
+          "span": [
+            173,
+            178
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-FFD130CC4D88",
+      "matrix_verdict": "RESTORE_NECESSARY",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          755,
+          759
+        ],
+        "signature": " public static bool CanCarefullyClear(int squadValue, int defendingValue, int requiredValueRatio)",
+        "responsibility": "Decide whether can carefully clear."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.CanCarefullyClear",
+          "span": [
+            361,
+            365
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-452F3918CC13",
+      "matrix_verdict": "RESTORE_BETTER",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          438,
+          442
+        ],
+        "signature": " public static bool ShouldIssueSafeMobilityRoute(bool isIdle, bool exactSegmentsUsable, bool identicalFailedRoute)",
+        "responsibility": "Decide whether should issue safe mobility route."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.ShouldIssueSafeMobilityRoute",
+          "span": [
+            221,
+            225
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-A0D1B2722372",
+      "matrix_verdict": "RESTORE_BETTER",
+      "classification": "COMPOSED_INTO_AIR_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/StealthTankSquadBotModule.cs",
+        "span": [
+          3839,
+          3859
+        ],
+        "signature": " void MarkThreatRange(SpecialistInfluenceMap map, Threat threat, int range, float influence)",
+        "responsibility": "Perform mark threat range; directly invokes CenterOfCell, Clamp, Max, Min, new:CPos."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs",
+          "member": "StealthAIStateBase.SafeRouteForStealth",
+          "span": [
+            676,
+            779
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "responsibility is deliberately owned by the listed integrated Squad/State/Manager member; no legacy StealthTankSquadBotModule owner remains"
+    },
+    {
+      "id": "CNC96A-FN-ACFEEA330CB3",
+      "matrix_verdict": "RESTORE_BETTER",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          432,
+          436
+        ],
+        "signature": " public static bool ShouldRetryFailedMobilitySearch(bool sameOrigin, bool sameAnchor, bool sameRouteContext)",
+        "responsibility": "Decide whether should retry failed mobility search."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.ShouldRetryFailedMobilitySearch",
+          "span": [
+            215,
+            219
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-B80A72DB1FA9",
+      "matrix_verdict": "RESTORE_BETTER",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          170,
+          191
+        ],
+        "signature": " public static MiniYamlNode SaveReinforcementState(IEnumerable<StealthTankReinforcementSaveGroup> groups)",
+        "responsibility": "Implement save reinforcement state; directly invokes AddRange, FormatValue, new:List<MiniYamlNode>, new:MiniYamlNode, OrderBy."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.SaveReinforcementState",
+          "span": [
+            73,
+            94
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-C5A906E46C6D",
+      "matrix_verdict": "RESTORE_BETTER",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          426,
+          430
+        ],
+        "signature": " public static bool ShouldRetryFailedReinforcementSearch(bool sameTarget, bool sameOrigin, bool sameAnchor, bool sameRouteContext)",
+        "responsibility": "Decide whether should retry failed reinforcement search."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.ShouldRetryFailedReinforcementSearch",
+          "span": [
+            209,
+            213
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    },
+    {
+      "id": "CNC96A-FN-FA07A0BC30BF",
+      "matrix_verdict": "RESTORE_BETTER",
+      "classification": "EXACT_BODY",
+      "archived": {
+        "file": ".agents/inspiration/stealth-ai-pre-air-copy/OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthTankSquadPolicy.cs",
+        "span": [
+          193,
+          251
+        ],
+        "signature": " public static bool TryLoadReinforcementState(MiniYamlNode state, out StealthTankReinforcementSaveGroup[] groups)",
+        "responsibility": "Implement try load reinforcement state; directly invokes Any, Contains, Count, Distinct, Empty."
+      },
+      "live": [
+        {
+          "file": "OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthAISpecialistPolicy.cs",
+          "member": "StealthAISpecialistPolicy.TryLoadReinforcementState",
+          "span": [
+            96,
+            154
+          ]
+        }
+      ],
+      "reachable": true,
+      "evidence": "normalized archived body is present verbatim"
+    }
+  ],
+  "keep_air_validation": {
+    "ids": [
+      "CNC96A-FN-05A303AB9A60",
+      "CNC96A-FN-0768E72D45A9",
+      "CNC96A-FN-08DEFB74BA32",
+      "CNC96A-FN-10862FD4BB80",
+      "CNC96A-FN-1B453DEC45A2",
+      "CNC96A-FN-21C9A95B5D13",
+      "CNC96A-FN-262803A34A38",
+      "CNC96A-FN-275A6B9C5AAE",
+      "CNC96A-FN-2AC2ECF1433F",
+      "CNC96A-FN-3FA54BA95A9A",
+      "CNC96A-FN-40F9D3DB6F67",
+      "CNC96A-FN-420CCA8E009B",
+      "CNC96A-FN-433FDED9C78C",
+      "CNC96A-FN-49D73096388A",
+      "CNC96A-FN-4C202343D77A",
+      "CNC96A-FN-4C68E5818351",
+      "CNC96A-FN-4E99A6527BB3",
+      "CNC96A-FN-59DB2912BCE5",
+      "CNC96A-FN-600F4693E19D",
+      "CNC96A-FN-64F509910F66",
+      "CNC96A-FN-6603510ED64C",
+      "CNC96A-FN-7899189DBD3D",
+      "CNC96A-FN-7B1117151FA7",
+      "CNC96A-FN-80166B449CD5",
+      "CNC96A-FN-8167FCCCA106",
+      "CNC96A-FN-83C409535BEE",
+      "CNC96A-FN-844C01F7CA3F",
+      "CNC96A-FN-86DC10E1F57B",
+      "CNC96A-FN-96C7EC3F9186",
+      "CNC96A-FN-9BAA6E457A56",
+      "CNC96A-FN-9E84B45DB825",
+      "CNC96A-FN-A4C4B07E8256",
+      "CNC96A-FN-AB4A32EB4AA9",
+      "CNC96A-FN-ADD20465D7D7",
+      "CNC96A-FN-B036325AA7A8",
+      "CNC96A-FN-BD399E323A56",
+      "CNC96A-FN-C2E1EDB3B931",
+      "CNC96A-FN-CF92E57D7114",
+      "CNC96A-FN-D02DC77FBE68",
+      "CNC96A-FN-D030F65C4A79",
+      "CNC96A-FN-D34144A151D6",
+      "CNC96A-FN-D785F92F6BEE",
+      "CNC96A-FN-DD807FC00018",
+      "CNC96A-FN-E0E58762D260",
+      "CNC96A-FN-E2E7201136E1",
+      "CNC96A-FN-E3A118A3D1CE",
+      "CNC96A-FN-E756C21C06C4",
+      "CNC96A-FN-E7786086FF67",
+      "CNC96A-FN-ECB7E0F0C568",
+      "CNC96A-FN-FC863CCE421B",
+      "CNC96A-FN-FF68C9B44FAA"
+    ],
+    "result": "PASS",
+    "evidence": "live state-machine directly owns the copied Air bodies; legacy specialist owner types are absent"
+  },
+  "retreat_validation": {
+    "ids": [
+      "CNC96A-FN-00AE120A8253",
+      "CNC96A-FN-010528118B19",
+      "CNC96A-FN-044402DA7972",
+      "CNC96A-FN-0BD115A6AB20",
+      "CNC96A-FN-13BE4F1DD93E",
+      "CNC96A-FN-1D2737BDB051",
+      "CNC96A-FN-1FC15E173406",
+      "CNC96A-FN-2BD08A9C9CDC",
+      "CNC96A-FN-32CC02D5E637",
+      "CNC96A-FN-3924DA85CC50",
+      "CNC96A-FN-3F1B4A42109C",
+      "CNC96A-FN-530C8FAC9240",
+      "CNC96A-FN-5A882A56AE37",
+      "CNC96A-FN-605DE014E540",
+      "CNC96A-FN-70880D45F7CD",
+      "CNC96A-FN-74C20971730D",
+      "CNC96A-FN-77894A78AD0E",
+      "CNC96A-FN-8438307BB011",
+      "CNC96A-FN-86161F4A8F8C",
+      "CNC96A-FN-94FD4382367D",
+      "CNC96A-FN-9A9DFF3DF271",
+      "CNC96A-FN-9B7FEC1576AA",
+      "CNC96A-FN-9ECFE92700F5",
+      "CNC96A-FN-9F61A34BEC41",
+      "CNC96A-FN-AAE1F204C053",
+      "CNC96A-FN-AFBA467E47C0",
+      "CNC96A-FN-B023E2D1111D",
+      "CNC96A-FN-B0D9EE091849",
+      "CNC96A-FN-B5CF29341BD4",
+      "CNC96A-FN-C5DFD755A127",
+      "CNC96A-FN-CA67978FAA43",
+      "CNC96A-FN-CE2E6C4176F6",
+      "CNC96A-FN-CF517A6289A9",
+      "CNC96A-FN-E3744DF379F3",
+      "CNC96A-FN-FE50F0A3924E"
+    ],
+    "result": "PASS",
+    "evidence": "no StealthTankSquadBotModule/StealthAISquad/StealthAIModule live owner exists; excluded archived retreat bodies have no reachable legacy call path"
+  },
+  "duplicate_or_laundered_old_logic": [],
+  "unreachable_restored_bodies": [],
+  "correction_ids": []
+}

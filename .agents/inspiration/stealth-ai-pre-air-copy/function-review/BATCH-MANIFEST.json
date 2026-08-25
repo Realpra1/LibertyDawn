@@ -1,0 +1,590 @@
+{
+  "schema": 1,
+  "batch_count": 17,
+  "eligible_function_count": 149,
+  "retreat_functions_not_batched": 35,
+  "maximum_functions_per_batch": 10,
+  "standalone_body_threshold_lines": 200,
+  "batch_size_distribution": {
+    "1": 1,
+    "2": 1,
+    "6": 1,
+    "10": 14
+  },
+  "first_ready_batch_paths": [
+    ".build/cnc96a-air-copy-function-review/batches/CNC96A-BATCH-001.md",
+    ".build/cnc96a-air-copy-function-review/batches/CNC96A-BATCH-002.md",
+    ".build/cnc96a-air-copy-function-review/batches/CNC96A-BATCH-003.md"
+  ],
+  "batches": [
+    {
+      "id": "CNC96A-BATCH-001",
+      "topic": "source-adjacent-policy",
+      "function_ids": [
+        "CNC96A-FN-10862FD4BB80",
+        "CNC96A-FN-0768E72D45A9",
+        "CNC96A-FN-A4C4B07E8256",
+        "CNC96A-FN-9BAA6E457A56",
+        "CNC96A-FN-CF92E57D7114",
+        "CNC96A-FN-FF68C9B44FAA",
+        "CNC96A-FN-8167FCCCA106",
+        "CNC96A-FN-B80A72DB1FA9",
+        "CNC96A-FN-FA07A0BC30BF",
+        "CNC96A-FN-21C9A95B5D13"
+      ],
+      "function_count": 10,
+      "dependency_rank": 0,
+      "dependency_batch_ids": [],
+      "all_dependency_batch_ids": [],
+      "same_component_dependency_peer_ids": [],
+      "dependency_component": "CNC96A-COMPONENT-001",
+      "retreat_locked": false,
+      "path": ".build/cnc96a-air-copy-function-review/batches/CNC96A-BATCH-001.md",
+      "sha256": "9bf2feaa4f37a4de9725ba722663be9ae3d86e54f2f93f3d23b0c1bb9ac9f09a"
+    },
+    {
+      "id": "CNC96A-BATCH-002",
+      "topic": "source-adjacent-policy",
+      "function_ids": [
+        "CNC96A-FN-4C68E5818351",
+        "CNC96A-FN-929DFA9E156E",
+        "CNC96A-FN-F9F1EE8CB298",
+        "CNC96A-FN-64C6E112BC53",
+        "CNC96A-FN-D34144A151D6",
+        "CNC96A-FN-E06508589937",
+        "CNC96A-FN-8587B2653EE0",
+        "CNC96A-FN-EDBBEE6A60AF",
+        "CNC96A-FN-C5A906E46C6D",
+        "CNC96A-FN-ACFEEA330CB3"
+      ],
+      "function_count": 10,
+      "dependency_rank": 1,
+      "dependency_batch_ids": [],
+      "all_dependency_batch_ids": [],
+      "same_component_dependency_peer_ids": [],
+      "dependency_component": "CNC96A-COMPONENT-002",
+      "retreat_locked": false,
+      "path": ".build/cnc96a-air-copy-function-review/batches/CNC96A-BATCH-002.md",
+      "sha256": "31f03e320a675d24e2c8337ccaaec1fc2ab8e4b581e88c7422c6b134669a5a53"
+    },
+    {
+      "id": "CNC96A-BATCH-003",
+      "topic": "source-adjacent-policy",
+      "function_ids": [
+        "CNC96A-FN-452F3918CC13",
+        "CNC96A-FN-6231A086AAFB",
+        "CNC96A-FN-C1DEDF484247",
+        "CNC96A-FN-86DC10E1F57B",
+        "CNC96A-FN-8CF0395F4F4A",
+        "CNC96A-FN-735BB1952F56",
+        "CNC96A-FN-B036325AA7A8",
+        "CNC96A-FN-46B5C83A8729",
+        "CNC96A-FN-956A6252395D",
+        "CNC96A-FN-5020E8688F0A"
+      ],
+      "function_count": 10,
+      "dependency_rank": 0,
+      "dependency_batch_ids": [],
+      "all_dependency_batch_ids": [],
+      "same_component_dependency_peer_ids": [],
+      "dependency_component": "CNC96A-COMPONENT-003",
+      "retreat_locked": false,
+      "path": ".build/cnc96a-air-copy-function-review/batches/CNC96A-BATCH-003.md",
+      "sha256": "4b2aed9bbbb9b10e933cccff94d5cf20db5ece6e6d045fb4036ac222de388644"
+    },
+    {
+      "id": "CNC96A-BATCH-004",
+      "topic": "source-adjacent-policy",
+      "function_ids": [
+        "CNC96A-FN-EEC02BC271EB",
+        "CNC96A-FN-1B453DEC45A2",
+        "CNC96A-FN-3FA54BA95A9A",
+        "CNC96A-FN-433FDED9C78C",
+        "CNC96A-FN-600F4693E19D",
+        "CNC96A-FN-E2E7201136E1",
+        "CNC96A-FN-AB4A32EB4AA9",
+        "CNC96A-FN-D030F65C4A79",
+        "CNC96A-FN-D785F92F6BEE",
+        "CNC96A-FN-262803A34A38"
+      ],
+      "function_count": 10,
+      "dependency_rank": 3,
+      "dependency_batch_ids": [],
+      "all_dependency_batch_ids": [],
+      "same_component_dependency_peer_ids": [],
+      "dependency_component": "CNC96A-COMPONENT-004",
+      "retreat_locked": false,
+      "path": ".build/cnc96a-air-copy-function-review/batches/CNC96A-BATCH-004.md",
+      "sha256": "58abfe429ef7f080328a9209a53d603a233436db6cf74e8e8a2d03b8cabbd486"
+    },
+    {
+      "id": "CNC96A-BATCH-005",
+      "topic": "source-adjacent-policy",
+      "function_ids": [
+        "CNC96A-FN-B2F00C5572CC",
+        "CNC96A-FN-30CDF3188FC4",
+        "CNC96A-FN-DAA6127D3A32",
+        "CNC96A-FN-03BDDBEB2140",
+        "CNC96A-FN-4A18AAF662A5",
+        "CNC96A-FN-5B79C698C9E6",
+        "CNC96A-FN-693AE3CC121A",
+        "CNC96A-FN-FFD130CC4D88",
+        "CNC96A-FN-DE95637FB877",
+        "CNC96A-FN-0362E161B3C2"
+      ],
+      "function_count": 10,
+      "dependency_rank": 1,
+      "dependency_batch_ids": [],
+      "all_dependency_batch_ids": [],
+      "same_component_dependency_peer_ids": [],
+      "dependency_component": "CNC96A-COMPONENT-005",
+      "retreat_locked": false,
+      "path": ".build/cnc96a-air-copy-function-review/batches/CNC96A-BATCH-005.md",
+      "sha256": "d96df07ed3267405980da4a5224dfc555eabbd6906b2ca512d7c653c1772d10f"
+    },
+    {
+      "id": "CNC96A-BATCH-006",
+      "topic": "source-adjacent-policy",
+      "function_ids": [
+        "CNC96A-FN-80166B449CD5",
+        "CNC96A-FN-1E655A319999",
+        "CNC96A-FN-769F757A3C2C",
+        "CNC96A-FN-6EF96899F7C7",
+        "CNC96A-FN-F21490521A4B",
+        "CNC96A-FN-262BF2229BEC",
+        "CNC96A-FN-98208303E890",
+        "CNC96A-FN-3F3B0D7D81C8",
+        "CNC96A-FN-8FE742AE85D9",
+        "CNC96A-FN-587A04C0F70C"
+      ],
+      "function_count": 10,
+      "dependency_rank": 0,
+      "dependency_batch_ids": [],
+      "all_dependency_batch_ids": [],
+      "same_component_dependency_peer_ids": [],
+      "dependency_component": "CNC96A-COMPONENT-006",
+      "retreat_locked": false,
+      "path": ".build/cnc96a-air-copy-function-review/batches/CNC96A-BATCH-006.md",
+      "sha256": "f7f41b132645a1f52114a9b14b6a220e755f4500851cbef2f9dfdcd52b057537"
+    },
+    {
+      "id": "CNC96A-BATCH-007",
+      "topic": "source-adjacent-policy",
+      "function_ids": [
+        "CNC96A-FN-F298BD716C54",
+        "CNC96A-FN-DED9CDA2F63B",
+        "CNC96A-FN-11E6F17DBDE4",
+        "CNC96A-FN-926B1857FCAB",
+        "CNC96A-FN-6E2169D9F443",
+        "CNC96A-FN-21A541E3ACE9",
+        "CNC96A-FN-90E25B8D7663",
+        "CNC96A-FN-2B8A1C8B25A2",
+        "CNC96A-FN-C7D9CB4F388A",
+        "CNC96A-FN-C1650AF19AE5"
+      ],
+      "function_count": 10,
+      "dependency_rank": 0,
+      "dependency_batch_ids": [],
+      "all_dependency_batch_ids": [],
+      "same_component_dependency_peer_ids": [],
+      "dependency_component": "CNC96A-COMPONENT-007",
+      "retreat_locked": false,
+      "path": ".build/cnc96a-air-copy-function-review/batches/CNC96A-BATCH-007.md",
+      "sha256": "4b14b772cf4936eae8e4ced03b87f4f47d0c8517a2fcfa1d05667e9248b9547b"
+    },
+    {
+      "id": "CNC96A-BATCH-008",
+      "topic": "source-adjacent-module",
+      "function_ids": [
+        "CNC96A-FN-B351F3E03F1C",
+        "CNC96A-FN-AE3F7FCE1BC6",
+        "CNC96A-FN-9AAF88E48173",
+        "CNC96A-FN-ECFEEB8BBDD9",
+        "CNC96A-FN-E756C21C06C4",
+        "CNC96A-FN-A0B176AD444A",
+        "CNC96A-FN-4EE38893644D",
+        "CNC96A-FN-309094B02BB8",
+        "CNC96A-FN-D2672B2536B6",
+        "CNC96A-FN-CC1934993DB8"
+      ],
+      "function_count": 10,
+      "dependency_rank": 2,
+      "dependency_batch_ids": [
+        "CNC96A-BATCH-003"
+      ],
+      "all_dependency_batch_ids": [
+        "CNC96A-BATCH-003",
+        "CNC96A-BATCH-014"
+      ],
+      "same_component_dependency_peer_ids": [
+        "CNC96A-BATCH-014"
+      ],
+      "dependency_component": "CNC96A-COMPONENT-008",
+      "retreat_locked": false,
+      "path": ".build/cnc96a-air-copy-function-review/batches/CNC96A-BATCH-008.md",
+      "sha256": "0d0c9f7a5f091214196cc86cb979aadaa0cb6137e4da2b422317eac5119c39a4"
+    },
+    {
+      "id": "CNC96A-BATCH-009",
+      "topic": "source-adjacent-module",
+      "function_ids": [
+        "CNC96A-FN-844C01F7CA3F",
+        "CNC96A-FN-DD807FC00018",
+        "CNC96A-FN-FC863CCE421B",
+        "CNC96A-FN-6603510ED64C",
+        "CNC96A-FN-D3003C07F306",
+        "CNC96A-FN-2AC2ECF1433F",
+        "CNC96A-FN-C2E1EDB3B931",
+        "CNC96A-FN-7B1117151FA7",
+        "CNC96A-FN-E7786086FF67",
+        "CNC96A-FN-7899189DBD3D"
+      ],
+      "function_count": 10,
+      "dependency_rank": 9,
+      "dependency_batch_ids": [
+        "CNC96A-BATCH-003"
+      ],
+      "all_dependency_batch_ids": [
+        "CNC96A-BATCH-003",
+        "CNC96A-BATCH-008",
+        "CNC96A-BATCH-010",
+        "CNC96A-BATCH-011",
+        "CNC96A-BATCH-013"
+      ],
+      "same_component_dependency_peer_ids": [
+        "CNC96A-BATCH-008",
+        "CNC96A-BATCH-010",
+        "CNC96A-BATCH-011",
+        "CNC96A-BATCH-013"
+      ],
+      "dependency_component": "CNC96A-COMPONENT-008",
+      "retreat_locked": false,
+      "path": ".build/cnc96a-air-copy-function-review/batches/CNC96A-BATCH-009.md",
+      "sha256": "501632c804ebd7b68ab556e137dd32b4a730848649254486179857decad35ab4"
+    },
+    {
+      "id": "CNC96A-BATCH-010",
+      "topic": "source-adjacent-module",
+      "function_ids": [
+        "CNC96A-FN-D02DC77FBE68",
+        "CNC96A-FN-83C409535BEE",
+        "CNC96A-FN-49D73096388A",
+        "CNC96A-FN-40F9D3DB6F67",
+        "CNC96A-FN-275A6B9C5AAE",
+        "CNC96A-FN-ADD20465D7D7",
+        "CNC96A-FN-4C202343D77A",
+        "CNC96A-FN-96C7EC3F9186",
+        "CNC96A-FN-BCA5B6D1D908",
+        "CNC96A-FN-3D7D329646F9"
+      ],
+      "function_count": 10,
+      "dependency_rank": 8,
+      "dependency_batch_ids": [
+        "CNC96A-BATCH-003",
+        "CNC96A-BATCH-005",
+        "CNC96A-BATCH-006",
+        "CNC96A-BATCH-007"
+      ],
+      "all_dependency_batch_ids": [
+        "CNC96A-BATCH-003",
+        "CNC96A-BATCH-005",
+        "CNC96A-BATCH-006",
+        "CNC96A-BATCH-007",
+        "CNC96A-BATCH-008",
+        "CNC96A-BATCH-009",
+        "CNC96A-BATCH-011",
+        "CNC96A-BATCH-012",
+        "CNC96A-BATCH-013",
+        "CNC96A-BATCH-014",
+        "CNC96A-BATCH-015",
+        "CNC96A-BATCH-016"
+      ],
+      "same_component_dependency_peer_ids": [
+        "CNC96A-BATCH-008",
+        "CNC96A-BATCH-009",
+        "CNC96A-BATCH-011",
+        "CNC96A-BATCH-012",
+        "CNC96A-BATCH-013",
+        "CNC96A-BATCH-014",
+        "CNC96A-BATCH-015",
+        "CNC96A-BATCH-016"
+      ],
+      "dependency_component": "CNC96A-COMPONENT-008",
+      "retreat_locked": false,
+      "path": ".build/cnc96a-air-copy-function-review/batches/CNC96A-BATCH-010.md",
+      "sha256": "e0fcd86863779c94da3dc59f0c4262765bfc5cfead18113cdcd0d0d62566ca41"
+    },
+    {
+      "id": "CNC96A-BATCH-011",
+      "topic": "source-adjacent-module",
+      "function_ids": [
+        "CNC96A-FN-1675FD5BE194",
+        "CNC96A-FN-1603A9B999EF",
+        "CNC96A-FN-BDC91930911A",
+        "CNC96A-FN-E0E58762D260",
+        "CNC96A-FN-9E84B45DB825",
+        "CNC96A-FN-F5560DA311E3",
+        "CNC96A-FN-44B4F1A3CC3D",
+        "CNC96A-FN-4099692E50BB",
+        "CNC96A-FN-760611A2A6C7",
+        "CNC96A-FN-2DA8BDC4CE2A"
+      ],
+      "function_count": 10,
+      "dependency_rank": 6,
+      "dependency_batch_ids": [
+        "CNC96A-BATCH-002",
+        "CNC96A-BATCH-003",
+        "CNC96A-BATCH-004",
+        "CNC96A-BATCH-006",
+        "CNC96A-BATCH-007"
+      ],
+      "all_dependency_batch_ids": [
+        "CNC96A-BATCH-002",
+        "CNC96A-BATCH-003",
+        "CNC96A-BATCH-004",
+        "CNC96A-BATCH-006",
+        "CNC96A-BATCH-007",
+        "CNC96A-BATCH-009",
+        "CNC96A-BATCH-010",
+        "CNC96A-BATCH-012",
+        "CNC96A-BATCH-014",
+        "CNC96A-BATCH-015",
+        "CNC96A-BATCH-016"
+      ],
+      "same_component_dependency_peer_ids": [
+        "CNC96A-BATCH-009",
+        "CNC96A-BATCH-010",
+        "CNC96A-BATCH-012",
+        "CNC96A-BATCH-014",
+        "CNC96A-BATCH-015",
+        "CNC96A-BATCH-016"
+      ],
+      "dependency_component": "CNC96A-COMPONENT-008",
+      "retreat_locked": false,
+      "path": ".build/cnc96a-air-copy-function-review/batches/CNC96A-BATCH-011.md",
+      "sha256": "ce3b181216d146bd1e42c990f7a4a381e2ff017f4f09199727cba297fd1c4e39"
+    },
+    {
+      "id": "CNC96A-BATCH-012",
+      "topic": "source-adjacent-module",
+      "function_ids": [
+        "CNC96A-FN-5F94AED53553",
+        "CNC96A-FN-BD399E323A56",
+        "CNC96A-FN-E0358288BF0E",
+        "CNC96A-FN-08DEFB74BA32",
+        "CNC96A-FN-6F037D735ACA",
+        "CNC96A-FN-3DD07AA039AE"
+      ],
+      "function_count": 6,
+      "dependency_rank": 2,
+      "dependency_batch_ids": [
+        "CNC96A-BATCH-001",
+        "CNC96A-BATCH-003"
+      ],
+      "all_dependency_batch_ids": [
+        "CNC96A-BATCH-001",
+        "CNC96A-BATCH-003",
+        "CNC96A-BATCH-011"
+      ],
+      "same_component_dependency_peer_ids": [
+        "CNC96A-BATCH-011"
+      ],
+      "dependency_component": "CNC96A-COMPONENT-008",
+      "retreat_locked": false,
+      "path": ".build/cnc96a-air-copy-function-review/batches/CNC96A-BATCH-012.md",
+      "sha256": "3e9c884849d43dd875748866c9b0828d4ed763d41e899c6f05028f839f930bbc"
+    },
+    {
+      "id": "CNC96A-BATCH-013",
+      "topic": "source-adjacent-module",
+      "function_ids": [
+        "CNC96A-FN-039A14EF2BAE"
+      ],
+      "function_count": 1,
+      "dependency_rank": 7,
+      "dependency_batch_ids": [
+        "CNC96A-BATCH-002",
+        "CNC96A-BATCH-004",
+        "CNC96A-BATCH-005",
+        "CNC96A-BATCH-006",
+        "CNC96A-BATCH-007",
+        "CNC96A-BATCH-017"
+      ],
+      "all_dependency_batch_ids": [
+        "CNC96A-BATCH-002",
+        "CNC96A-BATCH-004",
+        "CNC96A-BATCH-005",
+        "CNC96A-BATCH-006",
+        "CNC96A-BATCH-007",
+        "CNC96A-BATCH-009",
+        "CNC96A-BATCH-010",
+        "CNC96A-BATCH-011",
+        "CNC96A-BATCH-012",
+        "CNC96A-BATCH-014",
+        "CNC96A-BATCH-015",
+        "CNC96A-BATCH-016",
+        "CNC96A-BATCH-017"
+      ],
+      "same_component_dependency_peer_ids": [
+        "CNC96A-BATCH-009",
+        "CNC96A-BATCH-010",
+        "CNC96A-BATCH-011",
+        "CNC96A-BATCH-012",
+        "CNC96A-BATCH-014",
+        "CNC96A-BATCH-015",
+        "CNC96A-BATCH-016"
+      ],
+      "dependency_component": "CNC96A-COMPONENT-008",
+      "retreat_locked": false,
+      "path": ".build/cnc96a-air-copy-function-review/batches/CNC96A-BATCH-013.md",
+      "sha256": "8c74f36e0c2cec5ac6e3266da44f1240e0316c545b1a28b43ddeb0942ba133d2"
+    },
+    {
+      "id": "CNC96A-BATCH-014",
+      "topic": "source-adjacent-module",
+      "function_ids": [
+        "CNC96A-FN-ECB7E0F0C568",
+        "CNC96A-FN-4E99A6527BB3",
+        "CNC96A-FN-7569FF5F3FB2",
+        "CNC96A-FN-63DC8C643A2D",
+        "CNC96A-FN-1C0B2713C45B",
+        "CNC96A-FN-9A8AA0DFB343",
+        "CNC96A-FN-4EC4985EF182",
+        "CNC96A-FN-C64AEFE1687B",
+        "CNC96A-FN-420CCA8E009B",
+        "CNC96A-FN-8AAF95C08BEC"
+      ],
+      "function_count": 10,
+      "dependency_rank": 6,
+      "dependency_batch_ids": [
+        "CNC96A-BATCH-002",
+        "CNC96A-BATCH-006"
+      ],
+      "all_dependency_batch_ids": [
+        "CNC96A-BATCH-002",
+        "CNC96A-BATCH-006",
+        "CNC96A-BATCH-009",
+        "CNC96A-BATCH-010",
+        "CNC96A-BATCH-011",
+        "CNC96A-BATCH-012",
+        "CNC96A-BATCH-015",
+        "CNC96A-BATCH-016"
+      ],
+      "same_component_dependency_peer_ids": [
+        "CNC96A-BATCH-009",
+        "CNC96A-BATCH-010",
+        "CNC96A-BATCH-011",
+        "CNC96A-BATCH-012",
+        "CNC96A-BATCH-015",
+        "CNC96A-BATCH-016"
+      ],
+      "dependency_component": "CNC96A-COMPONENT-008",
+      "retreat_locked": false,
+      "path": ".build/cnc96a-air-copy-function-review/batches/CNC96A-BATCH-014.md",
+      "sha256": "45c040e1adda70d719467e1cd2bde1d254216483e0aa5a37c7d433af7562ba46"
+    },
+    {
+      "id": "CNC96A-BATCH-015",
+      "topic": "source-adjacent-module",
+      "function_ids": [
+        "CNC96A-FN-163554C8C89D",
+        "CNC96A-FN-1F603BEE6EE0",
+        "CNC96A-FN-F440F05ED786",
+        "CNC96A-FN-64F509910F66",
+        "CNC96A-FN-05A303AB9A60",
+        "CNC96A-FN-370F3833E227",
+        "CNC96A-FN-3C2AE0D876CC",
+        "CNC96A-FN-3E1BF7F96158",
+        "CNC96A-FN-37C1BE7F8151",
+        "CNC96A-FN-F8A2403C88EA"
+      ],
+      "function_count": 10,
+      "dependency_rank": 5,
+      "dependency_batch_ids": [
+        "CNC96A-BATCH-002",
+        "CNC96A-BATCH-003",
+        "CNC96A-BATCH-004",
+        "CNC96A-BATCH-005",
+        "CNC96A-BATCH-006"
+      ],
+      "all_dependency_batch_ids": [
+        "CNC96A-BATCH-002",
+        "CNC96A-BATCH-003",
+        "CNC96A-BATCH-004",
+        "CNC96A-BATCH-005",
+        "CNC96A-BATCH-006",
+        "CNC96A-BATCH-009",
+        "CNC96A-BATCH-016"
+      ],
+      "same_component_dependency_peer_ids": [
+        "CNC96A-BATCH-009",
+        "CNC96A-BATCH-016"
+      ],
+      "dependency_component": "CNC96A-COMPONENT-008",
+      "retreat_locked": false,
+      "path": ".build/cnc96a-air-copy-function-review/batches/CNC96A-BATCH-015.md",
+      "sha256": "0a5f516151bc59d1bac9cae1e0371f9a7e4fb0e82698dc17e3f2c7e31ebbde80"
+    },
+    {
+      "id": "CNC96A-BATCH-016",
+      "topic": "source-adjacent-module",
+      "function_ids": [
+        "CNC96A-FN-E866B456DF2D",
+        "CNC96A-FN-B70A464E87D3",
+        "CNC96A-FN-CA7F7D08AE66",
+        "CNC96A-FN-72BD390EEAB1",
+        "CNC96A-FN-3F9F9A5DC8B3",
+        "CNC96A-FN-59DB2912BCE5",
+        "CNC96A-FN-0E77729B1DD4",
+        "CNC96A-FN-A0D1B2722372",
+        "CNC96A-FN-6EDD50846A63",
+        "CNC96A-FN-78896AE89AA2"
+      ],
+      "function_count": 10,
+      "dependency_rank": 3,
+      "dependency_batch_ids": [
+        "CNC96A-BATCH-003",
+        "CNC96A-BATCH-004",
+        "CNC96A-BATCH-005",
+        "CNC96A-BATCH-007"
+      ],
+      "all_dependency_batch_ids": [
+        "CNC96A-BATCH-003",
+        "CNC96A-BATCH-004",
+        "CNC96A-BATCH-005",
+        "CNC96A-BATCH-007",
+        "CNC96A-BATCH-008",
+        "CNC96A-BATCH-012"
+      ],
+      "same_component_dependency_peer_ids": [
+        "CNC96A-BATCH-008",
+        "CNC96A-BATCH-012"
+      ],
+      "dependency_component": "CNC96A-COMPONENT-008",
+      "retreat_locked": false,
+      "path": ".build/cnc96a-air-copy-function-review/batches/CNC96A-BATCH-016.md",
+      "sha256": "7545c9e5c79acc9e8b78869702ccdc4787f48b5a1422b57f9db3a21fed4fc637"
+    },
+    {
+      "id": "CNC96A-BATCH-017",
+      "topic": "source-adjacent-module",
+      "function_ids": [
+        "CNC96A-FN-76EEBE996564",
+        "CNC96A-FN-E3A118A3D1CE"
+      ],
+      "function_count": 2,
+      "dependency_rank": 1,
+      "dependency_batch_ids": [
+        "CNC96A-BATCH-007"
+      ],
+      "all_dependency_batch_ids": [
+        "CNC96A-BATCH-007"
+      ],
+      "same_component_dependency_peer_ids": [],
+      "dependency_component": "CNC96A-COMPONENT-009",
+      "retreat_locked": false,
+      "path": ".build/cnc96a-air-copy-function-review/batches/CNC96A-BATCH-017.md",
+      "sha256": "a728751c55908ba1dd8f777691bc164aa318a50daba6fd65e6d5d7e8eb90d168"
+    }
+  ]
+}

@@ -1,0 +1,93 @@
+# Exact inactive excerpt from mods/cnc/rules/ai.yaml at
+# 609ebf92eeac565af51b2b6acd53de37bb3b39d2.
+# Each of Cabal, Watson, HAL9001, Brutalis, VIKI, SkyNet, IronReaper,
+# WaveMaker, Easy, and Easiest originally carried this ownership declaration:
+		AdvancedSquadModules: SquadManagerBotModule, StealthTankSquadBotModule/stealth-tank, StealthTankSquadBotModule/chemical, EconomyFieldDefenseBotModule
+
+	StealthTankSquadBotModule:
+		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai || enable-Easiest-ai
+		UnitTypes: stnk
+		SquadLabel: stealth-tank
+		ClaimAllEligible: true
+		ScanInterval: 75
+		OrderInterval: 75
+		MaximumTargetCandidates: 48
+		ThreatRangeBufferCells: 2
+		DetectorRangeBufferCells: 2
+		RouteThreatPenalty: 4
+		MaximumRouteStretchPercent: 150
+		KiteRangeMarginCells: 1
+		CarefulClearValueRatio: 5
+		MinimumLateHarassmentGroupSize: 3
+		TargetSwitchImprovementPercent: 25
+		HarassmentDistancePenalty: 3
+		WallTargetPriority: 1
+		HarvesterTypes: harv, sharv
+		HarvesterWaitingAnchorTypes: proc, resonator
+		ResourceWaitingSearchRadius: 20
+		ResourceWaitingOrderInterval: 750
+		AvoidResourceTypes: BlueTiberium
+		PendingResourceExplosionAvoidanceRadius: 1
+		HazardRouteWaypointSpacing: 4
+		StrategicCellSize: 6
+		MissionRetryInterval: 300
+		NearbyTargetReactionRadiusCells: 12
+		RetreatAfterReveal: true
+		PostMissionRetreatDistanceCells: 6
+		PostMissionRetreatToleranceCells: 1
+		# Match AirSquad's three strategic scans of patience before a safe blocker clear.
+		DefenderClearFallbackScans: 3
+		DefenderClearValueRatio: 1
+		DefenderClearWeakestCandidates: 3
+		HarassmentTargetPriorities:
+			mcv: 5000
+			harv: 5000
+			sharv: 5000
+			fact: 2500
+			nuk2: 8500
+			proc: 6000
+			eye: 5500
+			tmpl: 5500
+			hq: 4500
+			nuke: 1800
+		AttackTargetPriorities:
+			htnk: 10000
+			mtnk: 8500
+			ctnk: 8000
+			ltnk: 7000
+			ftnk: 6500
+		DebugLogging: false
+	StealthTankSquadBotModule@chemical:
+		RequiresCondition: enable-cabal-ai || enable-watson-ai || enable-hal9001-ai || enable-brutalis-ai || enable-viki-ai || enable-skynet-ai || enable-ironreaper-ai || enable-wavemaker-ai || enable-Easy-ai || enable-Easiest-ai
+		UnitTypes: ctnk
+		SquadLabel: chemical
+		ScanInterval: 75
+		OrderInterval: 75
+		MaximumTargetCandidates: 48
+		MaximumHarassmentGroups: 1
+		IncludeAttackGroup: false
+		ReserveOpeningPair: false
+		ThreatRangeBufferCells: 2
+		DetectorRangeBufferCells: 2
+		KiteRangeMarginCells: 1
+		CarefulClearValueRatio: 5
+		MinimumLateHarassmentGroupSize: 3
+		TargetSwitchImprovementPercent: 25
+		ExcludedHarassmentTargetTypes: Tank
+		IgnoredHarassmentWeaponThreatTypes: Infantry, Creep
+		InfantryTargetPriority: 5000
+		StructureTargetPriority: 0
+		TankTargetPriority: 0
+		InfantryClusterRadiusCells: 3
+		InfantryClusterBonusPercentPerNearbyActor: 50
+		MaximumInfantryClusterMultiplierPercent: 300
+		CrushInfantryTargets: false
+		HarassmentTargetPriorities:
+			harv: 10000
+			sharv: 10000
+			vice: 10000
+			pvice: 10000
+		HarassmentArmorPriorities:
+			TiberiumWood: 6000
+			Tiberium: 6000
+		DebugLogging: false

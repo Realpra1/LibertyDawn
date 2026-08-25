@@ -1,55 +1,53 @@
-# CNC-110 worker assignment
+# CNC-96A PR132 finite-safety policy evidence follow-up
 
-- Task ID: CNC-110
-- Title: Prevent destroyed-actor crashes throughout HeavyDrop transport lifecycle.
-- Status: complete — fresh independent Terra final review ready with no required fix; balance and mission policy frozen
-- Common base: `4f806e742bd12145d2a601cc9ff71c3a0b141a13`
-- Task branch: `agent/round-20260815-cnc110-heavydrop-lifecycle-hotfix`
-- Worker worktree: `/root/github/LibertyDawn/COORDINATED-CNC-ROUNDS/20260815-bug-polish-06-resume/workers/worker-8-cnc110`
-- Scenario constraint: use deliberately constructed custom scenarios, never fixtures.
+- Status: telemetry-only implementation and exact-final evidence validation complete; coordinator policy routing pending
+- Base: `dc26620de92934d0ffee25bfb0510869746e93f5`
+- Product behavior: unchanged; candidate enumeration mirrors the existing danger-ascending/clearance-descending decision only when default-false `AirTargetDebugLogging` is enabled
+- Debug Game A: six evaluated safe neighboring 6x6 candidates; selected `27,39` is externally recomputed rank-zero/minimum under the unchanged risk ordering; one issue at tick 208, one arrival at tick 308, three preserved checks, no later/in-flight escape at tick-800 horizon
+- Release Game B: equivalent map/seed with logging field omitted; ordinary game reaches configured tick 800; external verifier observes zero safety-candidate, safety-state, or target-evidence markers
+- Artifacts: `.build/cnc96a-safety-policy2/results-exact-final/`; verifier: `.build/cnc96a-safety-policy2/verify_evidence.py`
+- Gates: `make check` PASS 0 warnings/errors; CNC YAML PASS; focused tests 7/7; `git diff --check` PASS
+- No push, publication, merge, task-sheet edit, or coordinator-state edit
 
-## Authoritative task text
+# CNC-96A PR132 policy evidence follow-up
 
-**Prevent destroyed-actor crashes throughout HeavyDrop transport lifecycle.** What happened: playtest `playtest-20260814-4` crashed during a long, well-separated Empire Earth4 game with two Brutalis AIs against one VIKI because `HeavyDropTransportManager` retained a destroyed, out-of-world transport pair and `IsLoaded` called `TraitOrDefault` on it. Primary bug fact and acceptance anchor: `System.InvalidOperationException: Attempted to get trait from destroyed object (tran 3340 (not in world))`; `at OpenRA.Mods.Common.Traits.HeavyDropTransportManager.IsLoaded(Pair pair) in .../HeavyDropTransportManager.cs:line 887`; `at ...HeavyDropTransportManager.<>c.<DiscardUnloadedPairs>b__26_0(Pair p) ...:line 316`; `at ...HeavyDropTransportManager.DiscardUnloadedPairs(IBot bot) ...:line 316`; `at ...HeavyDropTransportManager.AdvanceGathering(IBot bot) ...:line 262`; `at ...HeavyDropTransportManager.Tick(IBot bot) ...:line 140`. The diagnosed unsafe paths include `DiscardUnloadedPairs` using the original `wave.Pairs` after filtering `livePairs` (approximately lines 314–323), both `IsLoaded` selection/removal paths (approximately lines 885–887), and the phase guard near line 265. This is wrong because no HeavyDrop phase may dereference a destroyed or out-of-world transport/passenger or issue an order to a destroyed actor. Validate actor lifecycle before every phase use and order. Discard every invalid pair; release surviving unboarded cargo and its reservations to normal AI ownership. Existing HeavyDrop policy may continue the mission with fewer passengers or find a new transport, but mission policy and balance must otherwise remain unchanged. The predicted result is absolute absence of null/lifecycle crashes and destroyed-actor orders while valid surviving missions continue or release cleanly. This is needed because one stale pair currently terminates an otherwise valid long match. Add a focused lifecycle regression plus small full-engine custom scenarios only—no fixtures—covering carrier destruction during gathering with the remaining nine passengers loaded, timeout with eight loaded passengers, mirrored passenger invalidation, and a bounded longer two-Brutalis-versus-one-VIKI run.
+- Status: debug-gated evidence implementation and exact-final worker validation complete; coordinator policy routing pending
+- Base: `15d0bee25ddf5f008bbf01e515fe18de38b9e05a` (clean corrective-cycle commit)
+- Branch/worktree: unchanged `agent/20260825-cnc96a-air-cache-safety` in `repair4`
+- Product behavior: unchanged; release-default `AirTargetDebugLogging: false` incurs no evidence scan/list/counter work
+- Target evidence: at tick 119 equal-score/full-HP processors score 500000 and incumbent `proc#59` is retained over comparable `proc#50`; at tick 309 damaged `proc#61` (5000/100000 HP) scores 25714280 and replaces the incumbent
+- Safety evidence: tick 258 selects adjacent coarse delta `-1,1`, issues one order batch, preserves it across five 25-tick safety checks, and at tick 408 arrival transitions directly to Idle for immediate replan
+- Exact-final games: 2/2 PASS at tick 1600 under `.build/cnc96a-policy-followup/results-exact-final/`
+- Exact-final gates: `make check` PASS 0 warnings/errors; CNC YAML PASS; focused tests 7/7; `git diff --check` PASS
+- No push, publication, merge, task-sheet edit, or coordinator-state edit
 
-## Supplied exact playtest failure
+# CNC-96A PR132 corrective cycle: 6x6 cache and local safety
 
-`System.InvalidOperationException: Attempted to get trait from destroyed object (tran 3340 (not in world))`
+- Status: implementation and worker validation complete; fresh Luna narration/policy and Terra review pending coordinator routing
+- Base: `71fcbb102cf5ef09e548be50995bcf285a88c427` (published PR132 head)
+- Branch: `agent/20260825-cnc96a-air-cache-safety`
+- Worktree: `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260824-cnc96a-air-verbatim/repair4`
+- Correction: restored explicit and default 6x6 Stealth strategic cells; cached one manager/profile/locomotor influence map; Air-style bounded cell shortlist and incumbent retention; one A* per selected cell
+- Safety: independent 25-tick live bounded ground/detector scan; blue tiberium finite cost, red avoided; sparse non-detecting weapons finite; one neighboring 6x6-cell escape retained until arrival, then immediate replan; no completion retreat
+- Repair: ground/detector influence, terrain/resource grid, Mobile speed, and shared Air+Stealth facility claims
+- Validation: `make check` PASS 0 warnings/errors; CNC YAML PASS; focused tests 7/7; `git diff --check` PASS
+- Final games: 2/2 PASS at tick 3000 under `.build/cnc96a-air-cache-safety/results-final/`; summaries prove 6x6 influence, live safety escape, both profiles, and arriving reinforcement joins
+- Performance evidence: final benchmark reports cache hits exceeding rebuilds for STNK (812/268 and 857/261); separate Stealth strategy/local-safety/coarse-route samples emitted
+- No push, publication, merge, task-sheet edit, or coordinator-state edit
 
-Stack anchor: `HeavyDropTransportManager.IsLoaded` line 887 -> `DiscardUnloadedPairs` line 316 -> `AdvanceGathering` line 262 -> `Tick` line 140.
+# Prior CNC-96A Air-verbatim integration cycle 4
 
-Reproduction: playtest-20260814-4, Empire Earth4, long well-separated match, two Brutalis versus one VIKI.
-
-## User decisions
-
-Discard an invalid pair and release surviving unboarded cargo and reservations to normal AI. Cover every HeavyDrop lifecycle phase. Never dereference or issue an order to a destroyed/out-of-world transport or passenger. Existing HeavyDrop policy may load fewer units or find another transport. Freeze balance and mission policy.
-
-## Supplied read-only diagnosis
-
-`AdvanceGathering` filters a live-pair list but `DiscardUnloadedPairs` later enumerates the original pair list; two unguarded `IsLoaded` calls request Cargo from the disposed transport and Stop orders may also target disposed actors. No removal notification clears the stale pair. The smallest indicated correction guards loading/usability, classifies stale/unloaded pairs once, orders only individually usable actors, removes the cached invalid set, and safely releases survivors. Treat this as evidence, not permission to broaden the task.
-
-## Scope constraints
-
-- Do not read the full task sheet, coordinator state, another worker state, or task history.
-- Do not add architecture, behavior, policy, acceptance rules, or tests beyond the task and supplied facts.
-- Do not modify Red Alert, Dune 2000, or Tiberian Sun.
-- Keep raw game logs, replays, saves, build output, and local worktrees out of Git; preserve concise evidence and paths in the task report instead.
-
-## Completed cycle handoff
-
-- Implemented lifecycle pruning before every HeavyDrop phase, independently safe loading/boarding checks, and usable-actor order guards.
-- Invalid or unloaded pairs now release their individual mission ledger entries; surviving ground passengers are unreserved, stopped, and restored to ordinary squad ownership.
-- Added focused continuation/reservation regressions and a generator for ignored full-engine lifecycle scenarios.
-- Verification: solution build passed; all 715 `OpenRA.Test` tests passed.
-- Full-engine evidence: carrier invalidation passed to tick 2500 and continued with nine carriers; mirrored passenger invalidation passed to tick 1800 and continued with nine; eight-loaded timeout passed to tick 1800 after releasing two unassembled pairs; shipped Empire Earth4 two-Brutalis-versus-one-VIKI passed to tick 12000.
-- Evidence and exact paths are recorded in `REPORT.md`. No raw artifacts were added to Git.
-
-## Final-review evidence response
-
-- The prior final review found no product-code correctness, determinism, hot-path, balance, scope, diagnostic, build, test, or full-engine runtime defect. Its sole blocker was the absence of fresh independent Commenter narratives for four materially judged full-engine batches.
-- Four fresh native Terra Commenters independently read staged regular-file copies of the original run artifacts. Their durable narratives are recorded under `/root/github/LibertyDawn/analysis/20260815-bug-polish-06-resume/worker-8-cnc110/final-evidence/` and linked from `REPORT.md`.
-- Each narrative received a separate, serialized native Terra Policy Review. Balance, HeavyDrop thresholds, target selection, routing, timeouts, and mission policy remain unchanged.
-- Worker fact-check: the setup, bots, seeds, tick limits, clean exits, lifecycle-discard messages, nine-carrier continuation, two-pair timeout release, eight-carrier continuation, and long-run absence of the supplied failure pattern agree with the original artifacts. In the three focused scenarios, a passenger printed as `(not in world)` while inside its paired transport is normally loaded cargo, not evidence that it is destroyed or invalid. The valid-pair predicate expressly permits that transported state, while every phase prunes pairs whose carrier or passenger is actually unusable before trait access or orders.
-- Recommendation disposition: adopt/already satisfied the reviewers' highest-priority lifecycle rule—terminally remove each actually invalid pair, release its exact coordinator entries and surviving unboarded cargo/reservations, issue no order to an unusable actor, and let independently valid pairs continue. Reject treating every loaded `(not in world)` passenger or the unchanged exact-unload retry behavior as an invalid-pair loop; that conflates normal cargo state with the supplied destroyed-actor failure and would change frozen mission policy. Reject extra matched-control, natural-game-outcome, economy, performance, or phase-instrumentation work for this evidence-only response: the prior final review accepted the product diff and focused portfolio, the focused runs stop intentionally at bounded tick limits, and regression assertions already cover continuation plus reservation ownership.
-- The exact acceptance anchor remains: `System.InvalidOperationException: Attempted to get trait from destroyed object (tran 3340 (not in world))`, at `HeavyDropTransportManager.IsLoaded` -> `DiscardUnloadedPairs` -> `AdvanceGathering` -> `Tick`.
-- Fresh independent Terra final review of evidence head `c8e7bef20a`: `ready`; required fix: `none`. Receipt: `REVIEW.md`.
+- Status: complete; committed CI correction pending fresh Terra rereview
+- Base: `0f807a81cf8e9be1b8f6b4c3abd7ad4314223fea`
+- Branch: `agent/20260824-cnc96a-air-verbatim-cycle3`
+- Worktree: `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260824-cnc96a-air-verbatim/integration3`
+- Ownership: original `SquadManagerBotModule` is the sole `List<Squad>` owner; specialist groups are ordinary `SquadType.Stealth` squads
+- Profiles: `stealth-tank`/STNK and `chemical`/CTNK, shared implementation, aggregate maximum four squads
+- Matrix: 98/98 restored live mappings, 51 copied-Air authorities, 35 retreat exclusions, five retreat-free extractions
+- Cycle 4 correction: removed only the unnecessary `using System;` reported by Linux `make check`; no behavior, configuration, or refactor change
+- Product validation: exact Linux `make check` and solution build both 0 warnings/0 errors; CNC YAML pass; focused provenance tests 6/6; Air-copy checker pass; diff check pass
+- Final games: same two adversarial scenarios passed 2/2 at tick 3000 on final source under `/tmp/cnc96a-cycle4-games-final-rerun`
+- Final reviews: fresh separate Luna narratives and serialized fresh Luna policy reviews PASS for each game
+- Policy disposition: retain the existing HP/detector regression; record the no-valid-target/route suggestion as advisory and reject scenario expansion for this nonbehavioral CI-only correction
+- Raw logs, maps, benchmarks, and replays remain ignored/outside Git
+- Draft PR 132 already exists at the prior head; cycle 4 did not push or update it pending Terra READY
