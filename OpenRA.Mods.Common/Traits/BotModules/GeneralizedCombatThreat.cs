@@ -168,11 +168,14 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			public readonly string TargetClass;
 			public readonly double TimeToKillTicks;
+			public readonly int TargetHitPoints;
+			public double NormalizedKillTime => TimeToKillTicks / TargetHitPoints;
 
-			public ClassKillTimeProfile(string targetClass, double timeToKillTicks)
+			public ClassKillTimeProfile(string targetClass, double timeToKillTicks, int targetHitPoints)
 			{
 				TargetClass = targetClass;
 				TimeToKillTicks = timeToKillTicks;
+				TargetHitPoints = targetHitPoints;
 			}
 		}
 
@@ -323,8 +326,8 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		/// <summary>
-		/// Ranks an actor's target classes by raw kill time. Target cost is deliberately excluded;
-		/// economy weighting belongs to the individual crossover ranking instead.
+		/// Ranks an actor's target classes by kill time normalized to target hit points. Target
+		/// cost is deliberately excluded; economy weighting belongs to individual crossovers.
 		/// </summary>
 		public static IReadOnlyDictionary<string, KillTimeThird> RankClassKillTimeThirds(
 			IEnumerable<ClassKillTimeProfile> profiles)
@@ -338,27 +341,34 @@ namespace OpenRA.Mods.Common.Traits
 					throw new ArgumentException("Target classes must be non-empty.", nameof(profiles));
 				if (double.IsNaN(profile.TimeToKillTicks) || profile.TimeToKillTicks <= 0)
 					throw new ArgumentException("Kill times must be positive or infinite.", nameof(profiles));
+				if (profile.TargetHitPoints <= 0)
+					throw new ArgumentException("Target hit points must be positive.", nameof(profiles));
 
 				return profile;
 			})
-				.OrderBy(profile => profile.TimeToKillTicks)
+				.OrderBy(profile => profile.NormalizedKillTime)
 				.ThenBy(profile => profile.TargetClass, StringComparer.Ordinal)
 				.ToArray();
 			if (ordered.Select(profile => profile.TargetClass).Distinct(StringComparer.Ordinal).Count() != ordered.Length)
 				throw new ArgumentException("Target classes must be unique.", nameof(profiles));
 			if (ordered.Length == 0)
 				return new Dictionary<string, KillTimeThird>(StringComparer.Ordinal);
+			if (ordered.Length == 1)
+				return new Dictionary<string, KillTimeThird>(StringComparer.Ordinal)
+				{
+					{ ordered[0].TargetClass, KillTimeThird.Best }
+				};
 
 			var outerThirdCount = Math.Max(1, (ordered.Length + 1) / 3);
 			var bestEnd = Math.Min(outerThirdCount, ordered.Length);
 			var worstStart = Math.Max(0, ordered.Length - outerThirdCount);
-			var bestCutoff = ordered[bestEnd - 1].TimeToKillTicks;
-			var worstCutoff = ordered[worstStart].TimeToKillTicks;
+			var bestCutoff = ordered[bestEnd - 1].NormalizedKillTime;
+			var worstCutoff = ordered[worstStart].NormalizedKillTime;
 			var result = new Dictionary<string, KillTimeThird>(ordered.Length, StringComparer.Ordinal);
 			foreach (var profile in ordered)
 				result.Add(profile.TargetClass, bestCutoff >= worstCutoff ? KillTimeThird.Middle :
-					profile.TimeToKillTicks <= bestCutoff ? KillTimeThird.Best :
-					profile.TimeToKillTicks >= worstCutoff ? KillTimeThird.Worst : KillTimeThird.Middle);
+					profile.NormalizedKillTime <= bestCutoff ? KillTimeThird.Best :
+					profile.NormalizedKillTime >= worstCutoff ? KillTimeThird.Worst : KillTimeThird.Middle);
 
 			return result;
 		}
