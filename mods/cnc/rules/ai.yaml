@@ -1947,6 +1947,9 @@ Player:
 		OpeningSoldierCount: 0
 		OpeningHarvesterCount: 5
 		OpeningMcvCount: 1
+		OpeningTechnologyUnitType: stnk
+		OpeningTechnologyUnitPrerequisites: upgrade.covert3
+		OpeningTechnologyUnitCount: 1
 		OpeningRequestRetryDelay: 250
 		OpeningDebugLogging: false
 		FirstTowerTypes: gtwr, gun, atwr, obli
@@ -2673,6 +2676,9 @@ Player:
 		OpeningSoldierCount: 0
 		OpeningHarvesterCount: 5
 		OpeningMcvCount: 1
+		OpeningTechnologyUnitType: stnk
+		OpeningTechnologyUnitPrerequisites: upgrade.covert3
+		OpeningTechnologyUnitCount: 1
 		OpeningRequestRetryDelay: 250
 		OpeningDebugLogging: false
 		AirRepairBuildingTypes: hpad

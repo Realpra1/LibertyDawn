@@ -90,12 +90,20 @@ namespace OpenRA.Mods.Common.Traits
 		public readonly int OpeningHarvesterCount = 5;
 		public readonly int OpeningMcvCount = 1;
 
+		[Desc("Optional one-shot unit milestone activated after the configured technology prerequisites have been reached.",
+			"This is independent of opening completion, so unavailable late technology never keeps the opening policy active.")]
+		public readonly string OpeningTechnologyUnitType = "";
+		public readonly string[] OpeningTechnologyUnitPrerequisites = System.Array.Empty<string>();
+		public readonly int OpeningTechnologyUnitCount = 0;
+
 		[Desc("Ticks before retrying an opening structure request that never entered any production queue.")]
 		public readonly int OpeningRequestRetryDelay = 250;
 		public readonly int OpeningUnitRequestCooldown = 60;
 
 		[Desc("Ticks to remember an accepted opening MCV request after it leaves production, preventing a duplicate during actor creation. Retried after this timeout if no request, queued item, live MCV, or completed MCV remains.")]
 		public readonly int OpeningMcvRequestTimeout = 3000;
+		[Desc("Ticks to remember an accepted one-shot technology-unit request while it moves through production and actor creation.")]
+		public readonly int OpeningTechnologyUnitRequestTimeout = 3000;
 		public readonly int OpeningProgressLogInterval = 750;
 
 		[Desc("Write opening goal, request, completion, and stall diagnostics to debug.log.")]
@@ -662,12 +670,18 @@ namespace OpenRA.Mods.Common.Traits
 		bool openingInitialized;
 		int openingSoldierBuiltBaseline;
 		int openingMcvBuiltBaseline;
+		int openingTechnologyUnitBuiltBaseline;
 		int nextOpeningSoldierRequestTick;
 		int nextOpeningHarvesterRequestTick;
 		int nextOpeningDefenseUnlockRequestTick;
 		int nextOpeningMcvRequestTick;
 		bool openingMcvRequestOutstanding;
 		int openingMcvRequestExpiryTick;
+		bool openingTechnologyUnitUnlocked;
+		bool openingTechnologyUnitCompleted;
+		int nextOpeningTechnologyUnitRequestTick;
+		bool openingTechnologyUnitRequestOutstanding;
+		int openingTechnologyUnitRequestExpiryTick;
 		int nextOpeningProgressLogTick;
 		readonly Dictionary<uint, AirRepairBuildingReservation> airRepairBuildingReservations =
 			new Dictionary<uint, AirRepairBuildingReservation>();
@@ -1227,7 +1241,11 @@ namespace OpenRA.Mods.Common.Traits
 				openingSoldierBuiltBaseline = TotalBuilt(Info.OpeningSoldierTypes);
 				openingMcvBuiltBaseline = string.IsNullOrEmpty(Info.OpeningMcvType) ? 0 :
 					TotalBuilt(new[] { Info.OpeningMcvType });
+				openingTechnologyUnitBuiltBaseline = string.IsNullOrEmpty(Info.OpeningTechnologyUnitType) ? 0 :
+					TotalBuilt(new[] { Info.OpeningTechnologyUnitType });
 			}
+
+			UpdateOpeningTechnologyUnit(bot);
 
 			if (openingCompletionLogged)
 				return;
@@ -1288,6 +1306,77 @@ namespace OpenRA.Mods.Common.Traits
 				openingCompletionLogged = true;
 				LogOpening("{0} completed opening policy", player);
 			}
+		}
+
+		void UpdateOpeningTechnologyUnit(IBot bot)
+		{
+			if (openingTechnologyUnitCompleted || string.IsNullOrEmpty(Info.OpeningTechnologyUnitType) ||
+				Info.OpeningTechnologyUnitCount <= 0 || Info.OpeningTechnologyUnitPrerequisites.Length == 0)
+				return;
+
+			if (!openingTechnologyUnitUnlocked)
+			{
+				openingTechnologyUnitUnlocked = OpeningPolicyLogic.TechnologyUnitMilestoneUnlocked(
+					openingTechnologyUnitUnlocked, techTree.HasPrerequisites(Info.OpeningTechnologyUnitPrerequisites));
+				if (!openingTechnologyUnitUnlocked)
+					return;
+
+				// Iron Reaper can switch technology branches. Remember that the milestone
+				// was reached so a later downgrade cannot silently discard this obligation.
+				LogOpening("{0} unlocked one-shot technology unit milestone: {1}",
+					player, Info.OpeningTechnologyUnitType);
+			}
+
+			if (OpeningPolicyLogic.TechnologyUnitMilestoneCompleted(
+				OpeningTechnologyUnitsBuilt, Info.OpeningTechnologyUnitCount))
+			{
+				openingTechnologyUnitCompleted = true;
+				openingTechnologyUnitRequestOutstanding = false;
+				LogOpening("{0} completed one-shot technology unit milestone: {1}/{2} {3}", player,
+					OpeningTechnologyUnitsBuilt, Info.OpeningTechnologyUnitCount, Info.OpeningTechnologyUnitType);
+				return;
+			}
+
+			UpdateOpeningTechnologyUnitRequestState(bot);
+			var hasProductionCommitment = HasRequestedOrQueued(bot, Info.OpeningTechnologyUnitType) ||
+				CountQueuedOrPendingActors(new[] { Info.OpeningTechnologyUnitType }) > 0;
+			if (!OpeningPolicyLogic.ShouldRequestTechnologyUnit(openingTechnologyUnitUnlocked,
+				openingTechnologyUnitCompleted, openingTechnologyUnitRequestOutstanding,
+				hasProductionCommitment, IsCurrentlyBuildable(Info.OpeningTechnologyUnitType),
+				world.WorldTick, nextOpeningTechnologyUnitRequestTick))
+				return;
+
+			if (Request(bot, Info.OpeningTechnologyUnitType, "one-shot technology unit"))
+			{
+				openingTechnologyUnitRequestOutstanding = true;
+				openingTechnologyUnitRequestExpiryTick = world.WorldTick +
+					System.Math.Max(1, Info.OpeningTechnologyUnitRequestTimeout);
+				nextOpeningTechnologyUnitRequestTick = world.WorldTick +
+					System.Math.Max(1, Info.OpeningUnitRequestCooldown);
+			}
+		}
+
+		void UpdateOpeningTechnologyUnitRequestState(IBot bot)
+		{
+			if (!openingTechnologyUnitRequestOutstanding)
+				return;
+
+			if (OpeningPolicyLogic.TechnologyUnitMilestoneCompleted(
+				OpeningTechnologyUnitsBuilt, Info.OpeningTechnologyUnitCount))
+			{
+				openingTechnologyUnitRequestOutstanding = false;
+				return;
+			}
+
+			if (world.WorldTick < openingTechnologyUnitRequestExpiryTick ||
+				HasQueued(Info.OpeningTechnologyUnitType) ||
+				CountQueuedOrPendingActors(new[] { Info.OpeningTechnologyUnitType }) > 0)
+				return;
+
+			CancelRequests(bot, Info.OpeningTechnologyUnitType);
+			openingTechnologyUnitRequestOutstanding = false;
+			LogOpening("{0} one-shot technology unit request for {1} expired; allowing retry",
+				player, Info.OpeningTechnologyUnitType);
 		}
 
 		void UpdateOpeningMcvRequestState(IBot bot)
@@ -1367,6 +1456,9 @@ namespace OpenRA.Mods.Common.Traits
 
 		int OpeningMcvsBuilt => string.IsNullOrEmpty(Info.OpeningMcvType) ? 0 : System.Math.Max(0,
 			TotalBuilt(new[] { Info.OpeningMcvType }) - openingMcvBuiltBaseline);
+
+		int OpeningTechnologyUnitsBuilt => string.IsNullOrEmpty(Info.OpeningTechnologyUnitType) ? 0 : System.Math.Max(0,
+			TotalBuilt(new[] { Info.OpeningTechnologyUnitType }) - openingTechnologyUnitBuiltBaseline);
 
 		int TotalBuilt(IEnumerable<string> types)
 		{
@@ -1541,6 +1633,7 @@ namespace OpenRA.Mods.Common.Traits
 				new MiniYamlNode("OpeningInitialized", FieldSaver.FormatValue(openingInitialized)),
 				new MiniYamlNode("OpeningSoldierBuiltBaseline", FieldSaver.FormatValue(openingSoldierBuiltBaseline)),
 				new MiniYamlNode("OpeningMcvBuiltBaseline", FieldSaver.FormatValue(openingMcvBuiltBaseline)),
+				new MiniYamlNode("OpeningTechnologyUnitBuiltBaseline", FieldSaver.FormatValue(openingTechnologyUnitBuiltBaseline)),
 				new MiniYamlNode("CompletedOpeningGoals", FieldSaver.FormatValue(loggedCompletedOpeningGoals.ToArray())),
 				new MiniYamlNode("SkippedOpeningGoals", FieldSaver.FormatValue(skippedOpeningGoals.ToArray())),
 				new MiniYamlNode("OpeningCompletionLogged", FieldSaver.FormatValue(openingCompletionLogged)),
@@ -1564,6 +1657,11 @@ namespace OpenRA.Mods.Common.Traits
 				new MiniYamlNode("NextOpeningMcvRequestTick", FieldSaver.FormatValue(nextOpeningMcvRequestTick)),
 				new MiniYamlNode("OpeningMcvRequestOutstanding", FieldSaver.FormatValue(openingMcvRequestOutstanding)),
 				new MiniYamlNode("OpeningMcvRequestExpiryTick", FieldSaver.FormatValue(openingMcvRequestExpiryTick)),
+				new MiniYamlNode("OpeningTechnologyUnitUnlocked", FieldSaver.FormatValue(openingTechnologyUnitUnlocked)),
+				new MiniYamlNode("OpeningTechnologyUnitCompleted", FieldSaver.FormatValue(openingTechnologyUnitCompleted)),
+				new MiniYamlNode("NextOpeningTechnologyUnitRequestTick", FieldSaver.FormatValue(nextOpeningTechnologyUnitRequestTick)),
+				new MiniYamlNode("OpeningTechnologyUnitRequestOutstanding", FieldSaver.FormatValue(openingTechnologyUnitRequestOutstanding)),
+				new MiniYamlNode("OpeningTechnologyUnitRequestExpiryTick", FieldSaver.FormatValue(openingTechnologyUnitRequestExpiryTick)),
 				new MiniYamlNode("NextSmartEconomyScanTick", FieldSaver.FormatValue(smartEconomy?.NextScanTick ?? 0)),
 				new MiniYamlNode("NextSmartEconomyMcvRequestTick", FieldSaver.FormatValue(smartEconomy?.NextMcvRequestTick ?? 0)),
 				new MiniYamlNode("NextSmartEconomyProgressLogTick", FieldSaver.FormatValue(smartEconomy?.NextProgressLogTick ?? 0)),
@@ -1641,6 +1739,10 @@ namespace OpenRA.Mods.Common.Traits
 			var openingMcvBaselineNode = data.FirstOrDefault(n => n.Key == "OpeningMcvBuiltBaseline");
 			if (openingMcvBaselineNode != null)
 				openingMcvBuiltBaseline = FieldLoader.GetValue<int>("OpeningMcvBuiltBaseline", openingMcvBaselineNode.Value.Value);
+			var openingTechnologyUnitBaselineNode = data.FirstOrDefault(n => n.Key == "OpeningTechnologyUnitBuiltBaseline");
+			if (openingTechnologyUnitBaselineNode != null)
+				openingTechnologyUnitBuiltBaseline = FieldLoader.GetValue<int>(
+					"OpeningTechnologyUnitBuiltBaseline", openingTechnologyUnitBaselineNode.Value.Value);
 			var completedGoalsNode = data.FirstOrDefault(n => n.Key == "CompletedOpeningGoals");
 			if (completedGoalsNode != null)
 			{
@@ -1716,6 +1818,26 @@ namespace OpenRA.Mods.Common.Traits
 			var mcvExpiryNode = data.FirstOrDefault(n => n.Key == "OpeningMcvRequestExpiryTick");
 			if (mcvExpiryNode != null)
 				openingMcvRequestExpiryTick = FieldLoader.GetValue<int>("OpeningMcvRequestExpiryTick", mcvExpiryNode.Value.Value);
+			var technologyUnitUnlockedNode = data.FirstOrDefault(n => n.Key == "OpeningTechnologyUnitUnlocked");
+			if (technologyUnitUnlockedNode != null)
+				openingTechnologyUnitUnlocked = FieldLoader.GetValue<bool>(
+					"OpeningTechnologyUnitUnlocked", technologyUnitUnlockedNode.Value.Value);
+			var technologyUnitCompletedNode = data.FirstOrDefault(n => n.Key == "OpeningTechnologyUnitCompleted");
+			if (technologyUnitCompletedNode != null)
+				openingTechnologyUnitCompleted = FieldLoader.GetValue<bool>(
+					"OpeningTechnologyUnitCompleted", technologyUnitCompletedNode.Value.Value);
+			var technologyUnitRequestNode = data.FirstOrDefault(n => n.Key == "NextOpeningTechnologyUnitRequestTick");
+			if (technologyUnitRequestNode != null)
+				nextOpeningTechnologyUnitRequestTick = FieldLoader.GetValue<int>(
+					"NextOpeningTechnologyUnitRequestTick", technologyUnitRequestNode.Value.Value);
+			var technologyUnitOutstandingNode = data.FirstOrDefault(n => n.Key == "OpeningTechnologyUnitRequestOutstanding");
+			if (technologyUnitOutstandingNode != null)
+				openingTechnologyUnitRequestOutstanding = FieldLoader.GetValue<bool>(
+					"OpeningTechnologyUnitRequestOutstanding", technologyUnitOutstandingNode.Value.Value);
+			var technologyUnitExpiryNode = data.FirstOrDefault(n => n.Key == "OpeningTechnologyUnitRequestExpiryTick");
+			if (technologyUnitExpiryNode != null)
+				openingTechnologyUnitRequestExpiryTick = FieldLoader.GetValue<int>(
+					"OpeningTechnologyUnitRequestExpiryTick", technologyUnitExpiryNode.Value.Value);
 
 			var smartScanNode = data.FirstOrDefault(n => n.Key == "NextSmartEconomyScanTick");
 			var smartMcvRequestNode = data.FirstOrDefault(n => n.Key == "NextSmartEconomyMcvRequestTick");

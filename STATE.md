@@ -1,3 +1,29 @@
+# CNC-96A successor: mandatory Covert III STNK
+
+- Status: bounded successor implementation and exact-source validation complete;
+  coordinator review/publication pending
+- Base: `origin/bleed` / `4a1461f6c1497a70e48c8bf85078e0e7e0600deb`
+- Branch/worktree: `agent/20260825-cnc96a-mandatory-stank` /
+  `/root/github/LibertyDawn/.worktrees/coordinated-cnc/20260825-cnc96a-mandatory-stank`
+- Carry-forward: reviewed amendment `5a3e36886819d5a7148cec9c6dec0a6bc3592fa6`
+  cherry-picked clean as `e850013c62`; source trees are identical
+- Planner: separate optional one-shot late-technology milestone in the existing
+  `BaseBuilderBotModule`; excluded from `OpeningComplete`; configured only for
+  VIKI/Iron Reaper as one `stnk` after latched `upgrade.covert3`
+- Continuity: no request while unbuildable; requested/queued/pending dedupe;
+  timeout/retry; lifetime-built completion; persisted baseline, unlock,
+  completion, retry, outstanding request, and expiry
+- Existing behavior: five Harvesters, one MCV, structure goals, OpeningActive,
+  prerequisites, queue arbitration, weighted production, and fallback unchanged
+- Gates: `make check` PASS zero warnings/errors; focused opening/Stealth tests 22/22;
+  CNC YAML PASS; `git diff --check` PASS
+- Mandatory game: PASS tick 3200; tick301 pre-STNK=0, one mandatory STNK at
+  tick1481, completion 1/1, 14 later non-STNK productions
+- Obelisk game: PASS tick3500; 750-tick watchdog stalls=0,
+  Obelisk-attributed deaths=0, active firing observed
+- Artifacts: `.build/cnc96a-mandatory-stank/{results4,obelisk-results3}`
+- No push, publication, merge, task-sheet/coordinator-state edit, or bleed mutation
+
 # CNC-96A PR132 Obelisk/repair follow-up
 
 - Status: bounded implementation and exact-source validation complete; coordinator review/publication pending
