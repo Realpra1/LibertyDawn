@@ -49,8 +49,14 @@ needed to match one subject; `/N` means N subjects are needed to match one oppon
 `immune` means only the subject can engage; `cannot engage` means only the opponent
 can engage. These are strategic rules of thumb, not predictions of movement,
 terrain, focus fire, detection, or other live battle conditions.
-Only normally purchasable armed units and defense towers are ranked; unarmed,
-neutral, hidden, and support-power actors are omitted.
+Only normally purchasable combat-capable units and defense towers are ranked;
+neutral, hidden, and support-power actors are omitted. Two immobile actors are not
+matched against each other.
+
+The cache treats Commando demolition as a zero-range instant defeat. Engineer
+sabotage is a zero-range, consumed attack capped at half the target's maximum
+health, so two surviving Engineers are needed before return fire is considered.
+An immobile actor cannot engage an opponent whose valid weapon outranges it.
 
 ## Philosophy of Structures
 
@@ -151,10 +157,10 @@ light vehicles attacking without support. It detects stealth at very short range
 Mammoth Tanks can crush it, so an unsupported turret is not absolute. It cannot
 lose power.
 
-Cost-adjusted matchups — Best: Commando (immune), Mobile S.A.M. (immune), SAM Site
-(immune), Hum-Vee (x21), Nod Buggy (x24). Worst: Apache Longbow (cannot engage),
-Orca (cannot engage), Obelisk of Light (/4), Advanced Guard Tower (/2), Chemical
-Warrior (x5).
+Cost-adjusted matchups — Best: Mobile S.A.M. (immune), Hum-Vee (x21), Nod Buggy
+(x24), APC (x11), Recon Bike (x9). Worst: Apache Longbow (cannot engage), Artillery
+(cannot engage), Orca (cannot engage), Rocket Launcher (cannot engage), Stealth
+Tank (cannot engage).
 
 ### Guard Tower
 
@@ -162,10 +168,10 @@ The dedicated anti-infantry defense. It has good vision and short-range stealth
 detection but only a small ammunition reserve before reloading. It turns infantry
 to mist and damages light vehicles quickly. It cannot lose power.
 
-Cost-adjusted matchups — Best: Commando (immune), Mobile S.A.M. (immune), SAM Site
-(immune), Rocket Soldier (x26), Minigunner (x44). Worst: Apache Longbow (cannot
-engage), Orca (cannot engage), Mammoth Tank (/7), Obelisk of Light (/5), Turret
-(/2).
+Cost-adjusted matchups — Best: Mobile S.A.M. (immune), Rocket Soldier (x26),
+Minigunner (x44), Nod Buggy (x13), Hum-Vee (x11). Worst: Apache Longbow (cannot
+engage), Artillery (cannot engage), Orca (cannot engage), Rocket Launcher (cannot
+engage), Stealth Tank (cannot engage).
 
 ### Advanced Guard Tower
 
@@ -174,9 +180,9 @@ stealth over a useful distance, and provides vision for other weapons. It is
 strongest behind a frontline. Low power disables its weapon and detector. Large
 coverage areas make stealth assets difficult to slip through.
 
-Cost-adjusted matchups — Best: Commando (immune), Mobile S.A.M. (immune), SAM Site
-(immune), Apache Longbow (x8), Hum-Vee (x20). Worst: Mammoth Tank (/4), Obelisk of
-Light (/3), Guard Tower (x2), Turret (x2), Medium Tank (x2).
+Cost-adjusted matchups — Best: Mobile S.A.M. (immune), Apache Longbow (x8), Hum-Vee
+(x20), Nod Buggy (x23), Rocket Soldier (x27). Worst: Rocket Launcher (cannot
+engage), Commando (/3), Mammoth Tank (/4), Engineer (x2), Medium Tank (x2).
 
 ### SAM Site
 
@@ -185,9 +191,9 @@ it an early-warning position, but tanks can drive past unharmed. It becomes usel
 without power. Enough SAM Sites can make even the A-10 support power ineffective.
 
 Cost-adjusted matchups — Best: Apache Longbow (x12), Orca (x6). Worst: APC (cannot
-engage), Advanced Guard Tower (cannot engage), Artillery (cannot engage), Chemical
-Tank (cannot engage), Chemical Warrior (cannot engage). It has only two normal
-combat targets, so only two offensive matchups can be ranked.
+engage), Artillery (cannot engage), Chemical Tank (cannot engage), Chemical
+Warrior (cannot engage), Commando (cannot engage). It has only two normal combat
+targets, so only two offensive matchups can be ranked.
 
 ### Obelisk of Light
 
@@ -198,9 +204,10 @@ from several directions waste less value than feeding it one expensive unit at a
 time. Infantry can overwhelm it; artillery and Stealth Tanks outrange it. Several
 Obelisks together remain a formidable barrier.
 
-Cost-adjusted matchups — Best: Commando (immune), Mobile S.A.M. (immune), SAM Site
-(immune), APC (x20), Hum-Vee (x30). Worst: Apache Longbow (cannot engage), Orca
-(cannot engage), Grenadier (x9), Flamethrower (x12), Chemical Warrior (x14).
+Cost-adjusted matchups — Best: Mobile S.A.M. (immune), APC (x20), Hum-Vee (x30),
+Light Tank (x12), Nod Buggy (x30). Worst: Apache Longbow (cannot engage), Artillery
+(cannot engage), Orca (cannot engage), Rocket Launcher (cannot engage), Stealth
+Tank (cannot engage).
 
 ### Stealth Generator
 
@@ -270,8 +277,8 @@ Chemical Warriors, and Grenadiers, he carries no volatile ammunition. A few at a
 enemy barracks exit can suppress infantry production while Rocket Soldiers wreck
 the base. Even late, he protects tanks from anti-tank infantry.
 
-Cost-adjusted matchups — Best: Mobile S.A.M. (immune), Rocket Launcher (immune),
-SAM Site (immune), Rocket Soldier (x4), Commando (/4). Worst: Apache Longbow
+Cost-adjusted matchups — Best: Engineer (immune), Mobile S.A.M. (immune), Rocket
+Launcher (immune), SAM Site (immune), Rocket Soldier (x4). Worst: Apache Longbow
 (cannot engage), Orca (cannot engage), Guard Tower (/44), Mammoth Tank (/93),
 Advanced Guard Tower (/48).
 
@@ -282,8 +289,8 @@ Grenades pass over some obstructions and punish dense forces, but Grenadiers may
 explode when killed. Large formations may destroy themselves under area damage.
 Available at Covert I.
 
-Cost-adjusted matchups — Best: Mobile S.A.M. (immune), Rocket Launcher (immune),
-SAM Site (immune), Rocket Soldier (x6), Recon Bike (x2). Worst: Apache Longbow
+Cost-adjusted matchups — Best: Engineer (immune), Mobile S.A.M. (immune), Rocket
+Launcher (immune), SAM Site (immune), Rocket Soldier (x6). Worst: Apache Longbow
 (cannot engage), Orca (cannot engage), Guard Tower (/12), Nod Buggy (/5), Hum-Vee
 (/5).
 
@@ -293,8 +300,8 @@ The basic infantry answer to tanks. Slow, fragile, and poor against infantry and
 buildings, but inexpensive relative to the vehicles he can destroy. He carries
 anti-air rockets, though aircraft are not his preferred target.
 
-Cost-adjusted matchups — Best: Mobile S.A.M. (immune), SAM Site (immune), Light
-Tank (x2), Recon Bike (x2), Medium Tank (/2). Worst: Chemical Warrior (/6), Guard
+Cost-adjusted matchups — Best: Engineer (immune), Mobile S.A.M. (immune), SAM Site
+(immune), Light Tank (x2), Recon Bike (x2). Worst: Chemical Warrior (/6), Guard
 Tower (/26), Flamethrower (/5), Grenadier (/6), Minigunner (/4).
 
 ### Flamethrower
@@ -303,8 +310,8 @@ Recon I anti-infantry infantry. Cheap, fast enough to accompany assaults, and
 effective against infantry and buildings. His fuel tank may explode on death, so
 dense formations can chain-react.
 
-Cost-adjusted matchups — Best: Mobile S.A.M. (immune), Rocket Launcher (immune),
-SAM Site (immune), Rocket Soldier (x5), Recon Bike (x2). Worst: Apache Longbow
+Cost-adjusted matchups — Best: Engineer (immune), Mobile S.A.M. (immune), Rocket
+Launcher (immune), SAM Site (immune), Rocket Soldier (x5). Worst: Apache Longbow
 (cannot engage), Orca (cannot engage), Guard Tower (/13), Mammoth Tank (/31),
 Chemical Warrior (/2).
 
@@ -315,8 +322,8 @@ Tiberium terrain. Chemical spray is useful against infantry and Tiberium/economy
 structures. The unit retains infantry vulnerabilities and may explode on death.
 Tiberium fields can become its safest route to bases or harvesters.
 
-Cost-adjusted matchups — Best: Mobile S.A.M. (immune), Rocket Launcher (immune),
-SAM Site (immune), Rocket Soldier (x6), Recon Bike (x2). Worst: Apache Longbow
+Cost-adjusted matchups — Best: Engineer (immune), Mobile S.A.M. (immune), Rocket
+Launcher (immune), SAM Site (immune), Rocket Soldier (x6). Worst: Apache Longbow
 (cannot engage), Orca (cannot engage), Guard Tower (/15), Mammoth Tank (/38),
 Advanced Guard Tower (/15).
 
@@ -326,16 +333,21 @@ Unarmed but strategically devastating. Engineers capture or sabotage structures,
 repair bridges, and restore vehicle husks. Inside a transport, an Engineer is a
 threat far beyond his direct cost and may capture missing technology.
 
+Cost-adjusted matchups — Best: SAM Site (immune), Obelisk of Light (/2), Advanced
+Guard Tower (/2), Turret (/2), Guard Tower (/3). Worst: APC (cannot engage), Apache
+Longbow (cannot engage), Artillery (cannot engage), Chemical Tank (cannot engage),
+Chemical Warrior (cannot engage).
+
 ### Commando
 
 An expensive Recon III sniper with enormous vision. He kills infantry at range
 and demolishes buildings after planting explosives. Vehicles counter him only if
 they find and reach him. Transports, terrain, and distractions multiply his value.
 
-Cost-adjusted matchups — Best: Rocket Soldier (x10), Flamethrower (x4), Minigunner
-(x4), Grenadier (x3), Chemical Warrior (x3). Worst: APC (cannot engage), Advanced
-Guard Tower (cannot engage), Apache Longbow (cannot engage), Artillery (cannot
-engage), Chemical Tank (cannot engage).
+Cost-adjusted matchups — Best: Engineer (immune), SAM Site (immune), Turret (x9),
+Obelisk of Light (x3), Advanced Guard Tower (x3). Worst: APC (cannot engage), Apache
+Longbow (cannot engage), Artillery (cannot engage), Chemical Tank (cannot engage),
+Flame Tank (cannot engage).
 
 ### Sheep
 
@@ -368,8 +380,8 @@ A fast Recon I scout with a machine gun. Cheap and reasonably durable for its
 class, it chases infantry but loses to tanks. Its real value is revealing targets
 and killing infantry without wasting expensive tank shots.
 
-Cost-adjusted matchups — Best: Commando (immune), Mobile S.A.M. (immune), Rocket
-Launcher (immune), SAM Site (immune), Artillery (x3). Worst: Apache Longbow (cannot
+Cost-adjusted matchups — Best: Commando (immune), Engineer (immune), Mobile S.A.M.
+(immune), Rocket Launcher (immune), SAM Site (immune). Worst: Apache Longbow (cannot
 engage), Orca (cannot engage), Turret (/21), Advanced Guard Tower (/20), Obelisk of
 Light (/30).
 
@@ -379,8 +391,8 @@ The Covert I Hum-Vee counterpart. Cheaper and much faster but less durable. It
 raids Rocket Soldiers, Engineers, and exposed economy units if it avoids tanks and
 defensive fire.
 
-Cost-adjusted matchups — Best: Artillery (immune), Commando (immune), Mobile S.A.M.
-(immune), Rocket Launcher (immune), SAM Site (immune). Worst: Apache Longbow
+Cost-adjusted matchups — Best: Artillery (immune), Commando (immune), Engineer
+(immune), Mobile S.A.M. (immune), Rocket Launcher (immune). Worst: Apache Longbow
 (cannot engage), Orca (cannot engage), Turret (/24), Advanced Guard Tower (/23),
 Guard Tower (/13).
 
@@ -390,8 +402,8 @@ One of the fastest units. Rockets attack vehicles and, inaccurately, aircraft,
 making it a flexible raider and emergency anti-air unit. Its health is extremely
 low. Bikes win by choosing engagements, concentrating fire, and leaving quickly.
 
-Cost-adjusted matchups — Best: Artillery (immune), Commando (immune), Mobile S.A.M.
-(immune), Rocket Launcher (immune), SAM Site (immune). Worst: Chemical Warrior
+Cost-adjusted matchups — Best: Artillery (immune), Commando (immune), Engineer
+(immune), Mobile S.A.M. (immune), Rocket Launcher (immune). Worst: Chemical Warrior
 (/2), Flamethrower (/2), Turret (/9), Advanced Guard Tower (/9), Guard Tower (/5).
 
 ### APC
@@ -400,8 +412,8 @@ A Covert I armored transport carrying ten infantry with permanent stealth. It is
 fast and lightly armed, but its cargo is the threat. Engineers, Rocket Soldiers,
 Chemical Warriors, or a Commando can turn one opening into a destroyed base.
 
-Cost-adjusted matchups — Best: Commando (immune), Mobile S.A.M. (immune), Rocket
-Launcher (immune), SAM Site (immune), Artillery (x2). Worst: Apache Longbow (cannot
+Cost-adjusted matchups — Best: Commando (immune), Engineer (immune), Mobile S.A.M.
+(immune), Rocket Launcher (immune), SAM Site (immune). Worst: Apache Longbow (cannot
 engage), Orca (cannot engage), Turret (/11), Obelisk of Light (/20), Advanced Guard
 Tower (/10).
 
@@ -411,8 +423,8 @@ A fast Recon I tank with heavy armor and a respectable cannon. Weaker than a
 Medium Tank head-on, but much better at scouting, flanking, retreating, and hunting
 light vehicles. Trading stationary shots like a Mammoth wastes it.
 
-Cost-adjusted matchups — Best: Commando (immune), Mobile S.A.M. (immune), Rocket
-Launcher (immune), SAM Site (immune), Artillery (x7). Worst: Apache Longbow (cannot
+Cost-adjusted matchups — Best: Commando (immune), Engineer (immune), Mobile S.A.M.
+(immune), Rocket Launcher (immune), SAM Site (immune). Worst: Apache Longbow (cannot
 engage), Orca (cannot engage), Turret (/5), Obelisk of Light (/12), Rocket Soldier
 (/2).
 
@@ -422,8 +434,8 @@ Faster and cheaper than the Mammoth while retaining heavy armor and a serious
 cannon. It is the Economy I workhorse, excellent against light vehicles and able
 to chase raiders, dynamically protect fields, or attack weak points.
 
-Cost-adjusted matchups — Best: Commando (immune), Mobile S.A.M. (immune), Rocket
-Launcher (immune), SAM Site (immune), Artillery (x7). Worst: Apache Longbow (cannot
+Cost-adjusted matchups — Best: Commando (immune), Engineer (immune), Mobile S.A.M.
+(immune), Rocket Launcher (immune), SAM Site (immune). Worst: Apache Longbow (cannot
 engage), Orca (cannot engage), Obelisk of Light (/10), Turret (/3), Grenadier (x2).
 
 ### Mammoth Tank
@@ -434,8 +446,8 @@ weapons outside its vision can attack safely. It is a mobile fortification that
 needs scouts, detectors, and cheaper screens. Enough Mammoths can overwhelm Recon
 economically.
 
-Cost-adjusted matchups — Best: Commando (immune), Mobile S.A.M. (immune), SAM Site
-(immune), Apache Longbow (x12), Minigunner (x93). Worst: Obelisk of Light (/3),
+Cost-adjusted matchups — Best: Commando (immune), Engineer (immune), Mobile S.A.M.
+(immune), SAM Site (immune), Apache Longbow (x12). Worst: Obelisk of Light (/3),
 Turret (x2), Grenadier (x15), Stealth Tank (x3), Rocket Soldier (x11).
 
 ### Flame Tank
@@ -445,8 +457,8 @@ death explosion. It destroys infantry, buildings, and light vehicles but struggl
 against true tanks. Covert II disables its production, trading it for other tools.
 After aircraft clears an area, it removes buildings quickly.
 
-Cost-adjusted matchups — Best: Commando (immune), Mobile S.A.M. (immune), Rocket
-Launcher (immune), SAM Site (immune), Artillery (x5). Worst: Apache Longbow (cannot
+Cost-adjusted matchups — Best: Commando (immune), Engineer (immune), Mobile S.A.M.
+(immune), Rocket Launcher (immune), SAM Site (immune). Worst: Apache Longbow (cannot
 engage), Orca (cannot engage), Turret (/3), Mammoth Tank (/8), Obelisk of Light
 (/6).
 
@@ -457,8 +469,8 @@ infantry and Tiberium/nuclear targets. Its armor is light and it is poor against
 tanks and aircraft. Detection makes it expensive prey. It often turns enemy
 infantry into Visceroids.
 
-Cost-adjusted matchups — Best: Commando (immune), Mobile S.A.M. (immune), Rocket
-Launcher (immune), SAM Site (immune), Artillery (x4). Worst: Apache Longbow (cannot
+Cost-adjusted matchups — Best: Commando (immune), Engineer (immune), Mobile S.A.M.
+(immune), Rocket Launcher (immune), SAM Site (immune). Worst: Apache Longbow (cannot
 engage), Orca (cannot engage), Mammoth Tank (/13), Turret (/4), Medium Tank (/4).
 
 ### Artillery
@@ -468,8 +480,8 @@ and effective against infantry, vehicles, and buildings. It fires continuously
 and supports normal squads. It needs forward vision because it shoots farther
 than it sees.
 
-Cost-adjusted matchups — Best: Commando (immune), Mobile S.A.M. (immune), Rocket
-Launcher (immune), SAM Site (immune), Stealth Tank (x2). Worst: Apache Longbow
+Cost-adjusted matchups — Best: Commando (immune), Engineer (immune), Guard Tower
+(immune), Mobile S.A.M. (immune), Obelisk of Light (immune). Worst: Apache Longbow
 (cannot engage), Nod Buggy (cannot engage), Orca (cannot engage), Recon Bike
 (cannot engage), Light Tank (/7).
 
@@ -479,10 +491,10 @@ Economy II artillery with extreme range and devastating ground fire. It is slow,
 fragile, and has finite ammunition. Protected by tanks and scouts it dismantles a
 base outside defensive range; unsupported, it may die before turning.
 
-Cost-adjusted matchups — Best: Commando (immune), Mobile S.A.M. (immune), SAM Site
-(immune), Rocket Soldier (x5), Obelisk of Light (/3). Worst: APC (cannot engage),
-Apache Longbow (cannot engage), Artillery (cannot engage), Chemical Tank (cannot
-engage), Chemical Warrior (cannot engage).
+Cost-adjusted matchups — Best: Advanced Guard Tower (immune), Commando (immune),
+Engineer (immune), Guard Tower (immune), Mobile S.A.M. (immune). Worst: APC (cannot
+engage), Apache Longbow (cannot engage), Artillery (cannot engage), Chemical Tank
+(cannot engage), Chemical Warrior (cannot engage).
 
 ### Mobile SAM
 
@@ -502,9 +514,10 @@ harvesters, tanks, and buildings. Its armor is extremely weak. Recon detectors
 expose it, after which even riflemen kill it quickly. Its classic role is hit-and-
 run anti-armor raiding.
 
-Cost-adjusted matchups — Best: Commando (immune), Mobile S.A.M. (immune), Rocket
-Launcher (immune), SAM Site (immune), Artillery (x4). Worst: Turret (/4), Chemical
-Warrior (x2), Flamethrower (x2), Advanced Guard Tower (/4), Obelisk of Light (/6).
+Cost-adjusted matchups — Best: Commando (immune), Engineer (immune), Guard Tower
+(immune), Mobile S.A.M. (immune), Obelisk of Light (immune). Worst: Chemical
+Warrior (x2), Flamethrower (x2), Advanced Guard Tower (/4), Orca (/6), Chemical
+Tank (/2).
 
 ### Mobile HQ
 

@@ -173,6 +173,50 @@ namespace OpenRA.Test
 		}
 
 		[Test]
+		public void ImmobileAttackersCannotEngageLongerRangedTargets()
+		{
+			Assert.That(GeneralizedCombatThreatCalculator.EffectiveRangeCells(6, 0,
+				double.PositiveInfinity, 0, 0.5, true, false, 8, attackerIsImmobile: true), Is.Zero);
+			Assert.That(GeneralizedCombatThreatCalculator.EffectiveRangeCells(6, 0,
+				double.PositiveInfinity, 0, 0.5, true, false, 5, attackerIsImmobile: true), Is.EqualTo(6));
+		}
+
+		[Test]
+		public void ContactAttackUsesZeroWeaponRangeAndTargetRadiusForComparison()
+		{
+			Assert.That(GeneralizedCombatThreatCalculator.ComparableRange(false, 0, 0.5), Is.Zero);
+			Assert.That(GeneralizedCombatThreatCalculator.ComparableRange(true, 0, 0.5), Is.EqualTo(0.5));
+			Assert.That(GeneralizedCombatThreatCalculator.ComparableRange(true, 0, 0), Is.EqualTo(1d / 1024));
+		}
+
+		[Test]
+		public void ConsumedContactAttackersAllApplyTheirOpeningDamage()
+		{
+			Assert.That(GeneralizedCombatThreatCalculator.AttackerCountForDamage(2, singleUse: true), Is.EqualTo(2));
+			Assert.That(GeneralizedCombatThreatCalculator.AttackerCountForDamage(2, singleUse: false), Is.EqualTo(1.5));
+
+			var oneEngineer = new GeneralizedCombatThreatCalculator.AmmoDamageProfile(50, 1, 0);
+			var twoEngineers = new GeneralizedCombatThreatCalculator.AmmoDamageProfile(100, 1, 0);
+			Assert.That(GeneralizedCombatThreatCalculator.AmmoAdjustedTimeToKill(100, oneEngineer,
+				System.Array.Empty<GeneralizedCombatThreatCalculator.HealingProfile>()), Is.EqualTo(double.PositiveInfinity));
+			Assert.That(GeneralizedCombatThreatCalculator.AmmoAdjustedTimeToKill(100, twoEngineers,
+				System.Array.Empty<GeneralizedCombatThreatCalculator.HealingProfile>()), Is.EqualTo(1));
+		}
+
+		[Test]
+		public void CaptureRequiresOverlappingCaptureTypes()
+		{
+			var captures = new[] { new BitSet<CaptureType>("building", "husk") };
+			Assert.That(GeneralizedCombatThreatCalculator.CaptureTypesOverlap(captures,
+				new[] { new BitSet<CaptureType>("building") }), Is.True);
+			Assert.That(GeneralizedCombatThreatCalculator.CaptureTypesOverlap(captures,
+				new[] { new BitSet<CaptureType>("vehicle") }), Is.False);
+			Assert.That(GeneralizedCombatThreatCalculator.SabotageDamageFraction(25), Is.EqualTo(0.25));
+			Assert.That(GeneralizedCombatThreatCalculator.SabotageDamageFraction(50), Is.EqualTo(0.5));
+			Assert.That(GeneralizedCombatThreatCalculator.SabotageDamageFraction(90), Is.EqualTo(0.5));
+		}
+
+		[Test]
 		public void EachRangeFactorUsesEnemyEffectiveRangeOverOwnBaseRangeIndependently()
 		{
 			Assert.That(GeneralizedCombatThreatCalculator.EffectiveRangeFactor(3, 35),

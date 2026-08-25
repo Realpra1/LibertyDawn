@@ -29,9 +29,10 @@ namespace OpenRA.Mods.Common.UtilityCommands
 			Console.WriteLine("# INFANTRY_SPLASH_FACTOR adds a 50% expected same-cell target at actual subcell falloff and treats other affected cells as 1.5 targets");
 			Console.WriteLine("# SPLASH_AND_INACCURACY_MULTIPLIER = EXPECTED_HIT_CHANCE * SPLASH_FACTOR");
 			Console.WriteLine("# DAMAGE_CYCLE caps each shot's combined direct damage at defender HP before adding uncapped splash damage");
+			Console.WriteLine("# CONTACT_ATTACK models valid capture, sabotage, and demolition at zero weapon range; target radius supplies contact geometry");
 			Console.WriteLine("# FULL_AMMO_TICKS = first relevant pool capacity / max(0, full consumption rate - reload rate)");
 			Console.WriteLine("# RELOADING_DAMAGE_TICK = full damage rate scaled by sustained reload / consumption throughput");
-			Console.WriteLine("attacker\tdefender\tcan_target\thp\tarmor\teffective_range_cells\tnominal_range_cells\tminimum_range_cells\tprojectile_speed_cells_tick\ttarget_speed_cells_tick\thit_radius_cells\tinaccuracy_cells\texpected_hit_chance\tsplash_factor\tsplash_inaccuracy_multiplier\tdamage_cycle\tcycle_ticks\tdamage_tick\tfull_ammo_ticks\treloading_damage_tick\tdefender_healing_tick\ttime_to_kill_ticks\trange_multiplier\teffective_damage_tick\tkill_rate\tdefender_threat_attacker_equivalents\tsplash_zones");
+			Console.WriteLine("attacker\tdefender\tcan_target\tcontact_attack\tinstant_defeat\tsingle_use\thp\tarmor\teffective_range_cells\tnominal_range_cells\tminimum_range_cells\tprojectile_speed_cells_tick\ttarget_speed_cells_tick\thit_radius_cells\tinaccuracy_cells\texpected_hit_chance\tsplash_factor\tsplash_inaccuracy_multiplier\tdamage_cycle\tcycle_ticks\tdamage_tick\tfull_ammo_ticks\treloading_damage_tick\tdefender_healing_tick\ttime_to_kill_ticks\trange_multiplier\teffective_damage_tick\tkill_rate\tdefender_threat_attacker_equivalents\tsplash_zones");
 
 			var rows = calculator.OrderedPairs().Select(p => p.Forward)
 				.Where(d => attacker == null || d.Attacker == attacker)
@@ -43,7 +44,9 @@ namespace OpenRA.Mods.Common.UtilityCommands
 				calculator.TryGet(d.Attacker, d.Defender, out var pair);
 				var zones = string.Join(";", d.SplashZones.Select(z => F(z.InnerRadiusCells) + "-" + F(z.OuterRadiusCells) + "@" +
 					F(z.InnerDamageFraction) + "-" + F(z.OuterDamageFraction) + ":" + F(z.WeightedAffectedCells)));
-				Console.WriteLine(string.Join("\t", d.Attacker, d.Defender, d.CanTarget, d.DefenderHitPoints, d.DefenderArmor,
+				Console.WriteLine(string.Join("\t", d.Attacker, d.Defender, d.CanTarget, d.ContactAttack,
+					d.InstantDefeat, d.SingleUse,
+					d.DefenderHitPoints, d.DefenderArmor,
 					F(d.RangeCells), F(d.NominalRangeCells), F(d.MinimumRangeCells), F(d.ProjectileSpeedCellsPerTick),
 					F(d.TargetSpeedCellsPerTick), F(d.DefenderHitRadiusCells), F(d.InaccuracyCells), F(d.ExpectedHitChance), F(d.SplashFactor),
 					F(d.SplashAndInaccuracyMultiplier), F(d.DamagePerCycle), F(d.CycleTicks), F(d.DamagePerTick),
