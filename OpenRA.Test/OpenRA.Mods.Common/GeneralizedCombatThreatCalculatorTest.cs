@@ -141,6 +141,47 @@ namespace OpenRA.Test
 				Is.EqualTo(4 * 1.25 / 2.44).Within(0.000001));
 		}
 
+		[Test]
+		public void ClassKillTimeThirdsRankRawKillTimeAndSplitDeterministically()
+		{
+			var profiles = new[]
+			{
+				new GeneralizedCombatThreatCalculator.ClassKillTimeProfile("fastest", 1),
+				new GeneralizedCombatThreatCalculator.ClassKillTimeProfile("medium-fast", 2),
+				new GeneralizedCombatThreatCalculator.ClassKillTimeProfile("fast", 1.5),
+				new GeneralizedCombatThreatCalculator.ClassKillTimeProfile("slow", 4),
+				new GeneralizedCombatThreatCalculator.ClassKillTimeProfile("medium-slow", 3),
+				new GeneralizedCombatThreatCalculator.ClassKillTimeProfile("cannot-kill", double.PositiveInfinity)
+			};
+
+			var thirds = GeneralizedCombatThreatCalculator.RankClassKillTimeThirds(profiles);
+
+			Assert.That(thirds["fastest"], Is.EqualTo(GeneralizedCombatThreatCalculator.KillTimeThird.Best));
+			Assert.That(thirds["fast"], Is.EqualTo(GeneralizedCombatThreatCalculator.KillTimeThird.Best));
+			Assert.That(thirds["medium-fast"], Is.EqualTo(GeneralizedCombatThreatCalculator.KillTimeThird.Middle));
+			Assert.That(thirds["medium-slow"], Is.EqualTo(GeneralizedCombatThreatCalculator.KillTimeThird.Middle));
+			Assert.That(thirds["slow"], Is.EqualTo(GeneralizedCombatThreatCalculator.KillTimeThird.Worst));
+			Assert.That(thirds["cannot-kill"], Is.EqualTo(GeneralizedCombatThreatCalculator.KillTimeThird.Worst));
+
+			var fiveClasses = GeneralizedCombatThreatCalculator.RankClassKillTimeThirds(profiles.Take(5));
+			Assert.That(fiveClasses.Values.Count(t => t == GeneralizedCombatThreatCalculator.KillTimeThird.Best),
+				Is.EqualTo(2));
+			Assert.That(fiveClasses.Values.Count(t => t == GeneralizedCombatThreatCalculator.KillTimeThird.Middle),
+				Is.EqualTo(1));
+			Assert.That(fiveClasses.Values.Count(t => t == GeneralizedCombatThreatCalculator.KillTimeThird.Worst),
+				Is.EqualTo(2));
+
+			var tied = GeneralizedCombatThreatCalculator.RankClassKillTimeThirds(new[]
+			{
+				new GeneralizedCombatThreatCalculator.ClassKillTimeProfile("one", 10),
+				new GeneralizedCombatThreatCalculator.ClassKillTimeProfile("two", 10),
+				new GeneralizedCombatThreatCalculator.ClassKillTimeProfile("three", 10)
+			});
+			Assert.That(tied.Values, Is.All.EqualTo(GeneralizedCombatThreatCalculator.KillTimeThird.Middle));
+			Assert.That(GeneralizedCombatThreatCalculator.RankClassKillTimeThirds(
+				System.Array.Empty<GeneralizedCombatThreatCalculator.ClassKillTimeProfile>()), Is.Empty);
+		}
+
 		[TestCase(0, 0)]
 		[TestCase(1, 1)]
 		[TestCase(2, 3)]

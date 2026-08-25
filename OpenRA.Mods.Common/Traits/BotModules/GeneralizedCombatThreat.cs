@@ -157,6 +157,25 @@ namespace OpenRA.Mods.Common.Traits
 			}
 		}
 
+		public enum KillTimeThird
+		{
+			Best,
+			Middle,
+			Worst
+		}
+
+		public readonly struct ClassKillTimeProfile
+		{
+			public readonly string TargetClass;
+			public readonly double TimeToKillTicks;
+
+			public ClassKillTimeProfile(string targetClass, double timeToKillTicks)
+			{
+				TargetClass = targetClass;
+				TimeToKillTicks = timeToKillTicks;
+			}
+		}
+
 		public sealed class DirectionalThreat
 		{
 			public string Attacker { get; internal set; }
@@ -230,6 +249,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		readonly Dictionary<(string Attacker, string Defender), PairThreat> cache;
 		readonly WVec[] infantrySubCellOffsets;
+		readonly Ruleset rules;
 		public IReadOnlyDictionary<(string Attacker, string Defender), PairThreat> Cache => cache;
 		public static int CanonicalPairCount(int actorCount) => actorCount * (actorCount + 1) / 2;
 
@@ -242,6 +262,8 @@ namespace OpenRA.Mods.Common.Traits
 
 		public GeneralizedCombatThreatCalculator(Ruleset rules, IEnumerable<WVec> subCellOffsets = null)
 		{
+			this.rules = rules ?? throw new ArgumentNullException(nameof(rules));
+
 			// FullCell is index zero and is not an infantry occupancy position.
 			infantrySubCellOffsets = (subCellOffsets ?? Array.Empty<WVec>()).Skip(1).ToArray();
 			var combatActors = rules.Actors.Values
@@ -276,6 +298,69 @@ namespace OpenRA.Mods.Common.Traits
 
 			threat = Reverse(canonical);
 			return true;
+		}
+
+		/// <summary>
+		/// Calculates an immutable-rules matchup without requiring both actors to belong to the
+		/// combat cache. This supports analysis against unarmed but targetable baseline actors.
+		/// </summary>
+		public PairThreat CalculateBaseline(string attacker, string defender)
+		{
+			if (string.IsNullOrEmpty(attacker))
+				throw new ArgumentException("Actor types must be non-empty.", nameof(attacker));
+			if (string.IsNullOrEmpty(defender))
+				throw new ArgumentException("Actor types must be non-empty.", nameof(defender));
+
+			if (!rules.Actors.TryGetValue(attacker.ToLowerInvariant(), out var attackerInfo))
+				throw new KeyNotFoundException($"Unknown attacker actor type: {attacker}.");
+			if (!rules.Actors.TryGetValue(defender.ToLowerInvariant(), out var defenderInfo))
+				throw new KeyNotFoundException($"Unknown defender actor type: {defender}.");
+			if (!attackerInfo.HasTraitInfo<IHealthInfo>() || !attackerInfo.HasTraitInfo<ITargetableInfo>() ||
+				!defenderInfo.HasTraitInfo<IHealthInfo>() || !defenderInfo.HasTraitInfo<ITargetableInfo>())
+				throw new InvalidOperationException("Baseline combat analysis requires targetable actors with health.");
+
+			return CalculatePair(attackerInfo, defenderInfo);
+		}
+
+		/// <summary>
+		/// Ranks an actor's target classes by raw kill time. Target cost is deliberately excluded;
+		/// economy weighting belongs to the individual crossover ranking instead.
+		/// </summary>
+		public static IReadOnlyDictionary<string, KillTimeThird> RankClassKillTimeThirds(
+			IEnumerable<ClassKillTimeProfile> profiles)
+		{
+			if (profiles == null)
+				throw new ArgumentNullException(nameof(profiles));
+
+			var ordered = profiles.Select(profile =>
+			{
+				if (string.IsNullOrEmpty(profile.TargetClass))
+					throw new ArgumentException("Target classes must be non-empty.", nameof(profiles));
+				if (double.IsNaN(profile.TimeToKillTicks) || profile.TimeToKillTicks <= 0)
+					throw new ArgumentException("Kill times must be positive or infinite.", nameof(profiles));
+
+				return profile;
+			})
+				.OrderBy(profile => profile.TimeToKillTicks)
+				.ThenBy(profile => profile.TargetClass, StringComparer.Ordinal)
+				.ToArray();
+			if (ordered.Select(profile => profile.TargetClass).Distinct(StringComparer.Ordinal).Count() != ordered.Length)
+				throw new ArgumentException("Target classes must be unique.", nameof(profiles));
+			if (ordered.Length == 0)
+				return new Dictionary<string, KillTimeThird>(StringComparer.Ordinal);
+
+			var outerThirdCount = Math.Max(1, (ordered.Length + 1) / 3);
+			var bestEnd = Math.Min(outerThirdCount, ordered.Length);
+			var worstStart = Math.Max(0, ordered.Length - outerThirdCount);
+			var bestCutoff = ordered[bestEnd - 1].TimeToKillTicks;
+			var worstCutoff = ordered[worstStart].TimeToKillTicks;
+			var result = new Dictionary<string, KillTimeThird>(ordered.Length, StringComparer.Ordinal);
+			foreach (var profile in ordered)
+				result.Add(profile.TargetClass, bestCutoff >= worstCutoff ? KillTimeThird.Middle :
+					profile.TimeToKillTicks <= bestCutoff ? KillTimeThird.Best :
+					profile.TimeToKillTicks >= worstCutoff ? KillTimeThird.Worst : KillTimeThird.Middle);
+
+			return result;
 		}
 
 		/// <summary>
