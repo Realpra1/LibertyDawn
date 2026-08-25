@@ -19,13 +19,16 @@ namespace OpenRA.Mods.Common.UtilityCommands
 		void IUtilityCommand.Run(Utility utility, string[] args)
 		{
 			Game.ModData = utility.ModData;
-			var calculator = new GeneralizedCombatThreatCalculator(utility.ModData.DefaultRules);
+			var calculator = new GeneralizedCombatThreatCalculator(utility.ModData.DefaultRules,
+				utility.ModData.Manifest.Get<MapGrid>().SubCellOffsets);
 			var attacker = args.Length > 1 ? args[1].ToLowerInvariant() : null;
 			var defender = args.Length > 2 ? args[2].ToLowerInvariant() : null;
 
 			Console.WriteLine("# EXPECTED_HIT_CHANCE = min(1, max(defender-hit-radius, splash-radius) / inaccuracy)");
 			Console.WriteLine("# SPLASH_FACTOR = max(1, sum(area-weighted integral of linearly interpolated damage over each non-overlapping radius^2 annulus))");
+			Console.WriteLine("# INFANTRY_SPLASH_FACTOR adds a 50% expected same-cell target at actual subcell falloff and treats other affected cells as 1.5 targets");
 			Console.WriteLine("# SPLASH_AND_INACCURACY_MULTIPLIER = EXPECTED_HIT_CHANCE * SPLASH_FACTOR");
+			Console.WriteLine("# DAMAGE_CYCLE caps each shot's combined direct damage at defender HP before adding uncapped splash damage");
 			Console.WriteLine("# FULL_AMMO_TICKS = first relevant pool capacity / max(0, full consumption rate - reload rate)");
 			Console.WriteLine("# RELOADING_DAMAGE_TICK = full damage rate scaled by sustained reload / consumption throughput");
 			Console.WriteLine("attacker\tdefender\tcan_target\thp\tarmor\teffective_range_cells\tnominal_range_cells\tminimum_range_cells\tprojectile_speed_cells_tick\ttarget_speed_cells_tick\thit_radius_cells\tinaccuracy_cells\texpected_hit_chance\tsplash_factor\tsplash_inaccuracy_multiplier\tdamage_cycle\tcycle_ticks\tdamage_tick\tfull_ammo_ticks\treloading_damage_tick\tdefender_healing_tick\ttime_to_kill_ticks\trange_multiplier\teffective_damage_tick\tkill_rate\tdefender_threat_attacker_equivalents\tsplash_zones");

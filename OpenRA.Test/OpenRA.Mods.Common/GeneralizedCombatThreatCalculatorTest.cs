@@ -57,6 +57,49 @@ namespace OpenRA.Test
 		}
 
 		[Test]
+		public void InfantrySplashUsesSubCellFalloffForAnExpectedCellmate()
+		{
+			var zones = new[]
+			{
+				new GeneralizedCombatThreatCalculator.SplashZone(0, 0.5, 1, 0)
+			};
+			var offsets = new[] { new WVec(0, 0, 0), new WVec(512, 0, 0) };
+
+			// The second infantry is 0.5 cells away. Its 0.125-cell hit radius
+			// leaves 0.375 cells of falloff distance, giving 25% splash damage.
+			Assert.That(GeneralizedCombatThreatCalculator.InfantrySplashFactor(zones, 0.125, offsets),
+				Is.EqualTo(1.125).Within(0.000001));
+		}
+
+		[Test]
+		public void InfantrySplashUsesOneAndAHalfTargetsInOtherAffectedCells()
+		{
+			var zones = new[]
+			{
+				new GeneralizedCombatThreatCalculator.SplashZone(0, 2, 1, 1)
+			};
+
+			// Four affected cells contain the primary target plus three other cells.
+			Assert.That(GeneralizedCombatThreatCalculator.InfantrySplashFactor(
+				zones, 0.125, new[] { WVec.Zero }), Is.EqualTo(5.5));
+		}
+
+		[Test]
+		public void ExpectedShotDamageCapsThePrimaryUnitButPreservesSplash()
+		{
+			Assert.That(GeneralizedCombatThreatCalculator.ExpectedShotDamage(6000, new[]
+			{
+				new GeneralizedCombatThreatCalculator.ShotDamageProfile(45000, 1, 1)
+			}), Is.EqualTo(6000));
+
+			Assert.That(GeneralizedCombatThreatCalculator.ExpectedShotDamage(6000, new[]
+			{
+				new GeneralizedCombatThreatCalculator.ShotDamageProfile(4000, 1, 1),
+				new GeneralizedCombatThreatCalculator.ShotDamageProfile(4000, 1, 2)
+			}), Is.EqualTo(10000));
+		}
+
+		[Test]
 		public void ThreatEquivalentCapsDefenselessActorsAndHandlesMutuallyHarmlessActors()
 		{
 			Assert.That(GeneralizedCombatThreatCalculator.ThreatEquivalent(0, 0), Is.Zero);
@@ -313,7 +356,7 @@ namespace OpenRA.Test
 			Assert.That(result.Found, Is.True);
 			Assert.That(result.InitialEstimate, Is.EqualTo(10));
 			Assert.That(result.UnitCount, Is.EqualTo(38));
-			Assert.That(result.Evaluations, Is.EqualTo(15));
+			Assert.That(result.Evaluations, Is.EqualTo(16));
 		}
 
 		[Test]
@@ -341,7 +384,7 @@ namespace OpenRA.Test
 
 			Assert.That(result.Found, Is.False);
 			Assert.That(result.UnitCount, Is.EqualTo(100));
-			Assert.That(result.Evaluations, Is.EqualTo(32));
+			Assert.That(result.Evaluations, Is.EqualTo(34));
 		}
 
 		[Test]
@@ -370,8 +413,8 @@ namespace OpenRA.Test
 			Assert.That(result.Found, Is.True);
 			Assert.That(result.InitialEstimate, Is.EqualTo(100));
 			Assert.That(result.UnitCount, Is.EqualTo(38));
-			Assert.That(result.Evaluations, Is.EqualTo(6));
-			Assert.That(evaluated, Is.EqualTo(new[] { 100, 31, 34, 38, 36, 37 }));
+			Assert.That(result.Evaluations, Is.EqualTo(8));
+			Assert.That(evaluated, Is.EqualTo(new[] { 100, 26, 29, 32, 35, 38, 36, 37 }));
 		}
 
 		[Test]

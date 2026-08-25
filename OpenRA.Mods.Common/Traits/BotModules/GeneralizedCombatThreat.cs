@@ -28,9 +28,11 @@ namespace OpenRA.Mods.Common.Traits
 		public const int MixedGroupMaximumAttackerTypes = 3;
 
 		// Minimized evaluations in a sweep of all mutually targetable cached CNC matchups.
-		const double CrossoverEstimateBias = 0.99837;
-		const int CrossoverMaximumSearchStart = 31;
-		const double CrossoverSearchStep = 0.0935;
+		const double CrossoverEstimateBias = 0.99606;
+		const int CrossoverMaximumSearchStart = 26;
+		const double CrossoverSearchStep = 0.0844;
+		const double SameCellInfantryChance = 0.5;
+		const double OtherInfantryCellDensity = 1.5;
 
 		public readonly struct GroupTypeCount
 		{
@@ -83,6 +85,20 @@ namespace OpenRA.Mods.Common.Traits
 						InnerRadiusCells * area / 2;
 					return InnerDamageFraction * area + 2 * slope * radialMoment;
 				}
+			}
+		}
+
+		public readonly struct ShotDamageProfile
+		{
+			public readonly double Damage;
+			public readonly double HitChance;
+			public readonly double SplashFactor;
+
+			public ShotDamageProfile(double damage, double hitChance, double splashFactor)
+			{
+				Damage = damage;
+				HitChance = hitChance;
+				SplashFactor = splashFactor;
 			}
 		}
 
@@ -207,6 +223,7 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		readonly Dictionary<(string Attacker, string Defender), PairThreat> cache;
+		readonly WVec[] infantrySubCellOffsets;
 		public IReadOnlyDictionary<(string Attacker, string Defender), PairThreat> Cache => cache;
 		public static int CanonicalPairCount(int actorCount) => actorCount * (actorCount + 1) / 2;
 
@@ -217,8 +234,10 @@ namespace OpenRA.Mods.Common.Traits
 			return string.CompareOrdinal(first, second) <= 0 ? (first, second) : (second, first);
 		}
 
-		public GeneralizedCombatThreatCalculator(Ruleset rules)
+		public GeneralizedCombatThreatCalculator(Ruleset rules, IEnumerable<WVec> subCellOffsets = null)
 		{
+			// FullCell is index zero and is not an infantry occupancy position.
+			infantrySubCellOffsets = (subCellOffsets ?? Array.Empty<WVec>()).Skip(1).ToArray();
 			var combatActors = rules.Actors.Values
 				.Where(a => !a.Name.StartsWith(ActorInfo.AbstractActorPrefix, StringComparison.Ordinal)
 					&& a.HasTraitInfo<IHealthInfo>() && a.HasTraitInfo<ITargetableInfo>()
@@ -710,9 +729,10 @@ namespace OpenRA.Mods.Common.Traits
 			return matchups.Sum(m => m.DefenderThreatInAttackerEquivalents);
 		}
 
-		static DirectionalThreat CalculateDirection(ActorInfo attacker, ActorInfo defender)
+		DirectionalThreat CalculateDirection(ActorInfo attacker, ActorInfo defender)
 		{
 			var hp = defender.TraitInfo<IHealthInfo>().MaxHP;
+			var sharesCell = defender.TraitInfoOrDefault<MobileInfo>()?.LocomotorInfo.SharesCell == true;
 			var targetTypes = CachedTargetTypes(defender.HasTraitInfo<AircraftInfo>(),
 				defender.TraitInfos<ITargetableInfo>().Select(t => t.GetTargetTypes()));
 			var armor = defender.TraitInfos<ArmorInfo>().Select(a => a.Type).FirstOrDefault(a => a != null);
@@ -725,7 +745,7 @@ namespace OpenRA.Mods.Common.Traits
 
 			var applicable = attacker.TraitInfos<ArmamentInfo>()
 				.Where(a => a.WeaponInfo != null && a.WeaponInfo.IsValidTarget(targetTypes))
-				.Select(a => (Info: a, Threat: CalculateArmament(a, armor, hitRadius, a.ModifiedRange,
+				.Select(a => (Info: a, Threat: CalculateArmament(a, hp, armor, hitRadius, sharesCell, a.ModifiedRange,
 					Array.Empty<int>(), Array.Empty<int>(), Array.Empty<int>(), null, null,
 					targetSpeed, targetEngagementRange, targetTypes)))
 				.ToArray();
@@ -745,10 +765,11 @@ namespace OpenRA.Mods.Common.Traits
 				applicable.Select(a => a.Threat).ToArray(), healing, ammoProfile);
 		}
 
-		static DirectionalThreat CalculateLiveDirection(Actor attacker, Actor defender)
+		DirectionalThreat CalculateLiveDirection(Actor attacker, Actor defender)
 		{
 			var health = defender.TraitOrDefault<IHealth>();
 			var hp = health?.HP ?? 0;
+			var sharesCell = defender.Info.TraitInfoOrDefault<MobileInfo>()?.LocomotorInfo.SharesCell == true;
 			var targetTypes = defender.GetEnabledTargetTypes();
 			var armor = defender.TraitsImplementing<Armor>()
 				.Where(a => !a.IsTraitDisabled).Select(a => a.Info.Type).FirstOrDefault(a => a != null);
@@ -766,7 +787,7 @@ namespace OpenRA.Mods.Common.Traits
 				.Where(a => !a.IsTraitDisabled && !a.IsTraitPaused && a.Weapon.IsValidTarget(targetTypes))
 				.Where(a => ammoPools.Where(p => p.Info.Armaments.Contains(a.Info.Name))
 					.All(p => p.CurrentAmmoCount >= a.Info.AmmoUsage))
-				.Select(a => CalculateArmament(a.Info, armor, hitRadius, a.MaxRange(),
+				.Select(a => CalculateArmament(a.Info, hp, armor, hitRadius, sharesCell, a.MaxRange(),
 					firepowerModifiers, reloadModifiers, inaccuracyModifiers, attacker, defender,
 					targetSpeed, targetEngagementRange, targetTypes))
 				.ToArray();
@@ -951,7 +972,8 @@ namespace OpenRA.Mods.Common.Traits
 			return elapsed;
 		}
 
-		static DirectionalThreat CalculateArmament(ArmamentInfo armament, string armor, double hitRadius,
+		DirectionalThreat CalculateArmament(ArmamentInfo armament, int defenderHitPoints, string armor,
+			double hitRadius, bool defenderSharesCell,
 			WDist effectiveRange, int[] firepowerModifiers, int[] reloadModifiers, int[] inaccuracyModifiers,
 			Actor attacker, Actor defender, double targetSpeedCellsPerTick, double targetEngagementRangeCells,
 			BitSet<TargetableType> targetTypes)
@@ -973,11 +995,11 @@ namespace OpenRA.Mods.Common.Traits
 			var inaccuracy = weapon.TargetActorCenter && weapon.Projectile is InstantHitInfo ? 0 :
 				ProjectileInaccuracyCells(weapon.Projectile, effectiveRange, inaccuracyModifiers);
 			var raw = 0d;
-			var effective = 0d;
 			var weightedHitChance = 0d;
 			var weightedSplash = 0d;
 			var weightedMultiplier = 0d;
 			var allZones = new List<SplashZone>();
+			var damageProfiles = new List<ShotDamageProfile>();
 			foreach (var warhead in damagingWarheads)
 			{
 				var warheadDamage = Util.ApplyPercentageModifiers(warhead.Damage,
@@ -985,18 +1007,20 @@ namespace OpenRA.Mods.Common.Traits
 				if (defender != null)
 					warheadDamage = ApplyDamageModifiers(warheadDamage, warhead.DamageTypes, attacker, defender);
 				var zones = warhead is SpreadDamageWarhead spread ? SplashZones(spread) : Array.Empty<SplashZone>();
-				var splash = zones.Count == 0 ? 1 : SplashFactor(zones);
+				var splash = zones.Count == 0 ? 1 : defenderSharesCell ?
+					InfantrySplashFactor(zones, hitRadius, infantrySubCellOffsets) : SplashFactor(zones);
 				var warheadSplashRadius = zones.Select(z => z.OuterRadiusCells).DefaultIfEmpty(0).Max();
 				var hitChance = ExpectedHitChance(Math.Max(hitRadius, warheadSplashRadius), inaccuracy);
 				var multiplier = hitChance * splash;
 				raw += warheadDamage;
-				effective += warheadDamage * multiplier;
 				weightedHitChance += warheadDamage * hitChance;
 				weightedSplash += warheadDamage * splash;
 				weightedMultiplier += warheadDamage * multiplier;
+				damageProfiles.Add(new ShotDamageProfile(warheadDamage, hitChance, splash));
 				allZones.AddRange(zones);
 			}
 
+			var effective = ExpectedShotDamage(defenderHitPoints, damageProfiles);
 			var hitChanceAverage = raw > 0 ? weightedHitChance / raw : 0;
 			var splashAverage = raw > 0 ? weightedSplash / raw : 0;
 			var multiplierAverage = raw > 0 ? weightedMultiplier / raw : 0;
@@ -1148,6 +1172,61 @@ namespace OpenRA.Mods.Common.Traits
 			// One directly hit cell is the lower bound. Zone radii themselves are never
 			// clamped: an inner radius may legitimately be below or above one cell.
 			return Math.Max(1, zones.Sum(z => z.WeightedAffectedCells));
+		}
+
+		public static double InfantrySplashFactor(IEnumerable<SplashZone> zones, double hitRadiusCells,
+			IEnumerable<WVec> subCellOffsets)
+		{
+			var zoneArray = zones.ToArray();
+			var areaDamage = zoneArray.Sum(z => z.WeightedAffectedCells);
+			var otherCellDamage = Math.Max(0, areaDamage - 1) * OtherInfantryCellDensity;
+			var offsets = (subCellOffsets ?? Array.Empty<WVec>()).ToArray();
+			var sameCellDamage = 0d;
+			var pairCount = 0;
+			for (var targetIndex = 0; targetIndex < offsets.Length; targetIndex++)
+				for (var nearbyIndex = 0; nearbyIndex < offsets.Length; nearbyIndex++)
+				{
+					if (targetIndex == nearbyIndex)
+						continue;
+
+					var centerDistance = (offsets[targetIndex] - offsets[nearbyIndex]).HorizontalLength / 1024d;
+					var edgeDistance = Math.Max(0, centerDistance - hitRadiusCells);
+					sameCellDamage += DamageFractionAtDistance(zoneArray, edgeDistance);
+					pairCount++;
+				}
+
+			var averageSameCellDamage = pairCount > 0 ? sameCellDamage / pairCount : 0;
+			return 1 + SameCellInfantryChance * averageSameCellDamage + otherCellDamage;
+		}
+
+		static double DamageFractionAtDistance(IEnumerable<SplashZone> zones, double distanceCells)
+		{
+			foreach (var zone in zones)
+			{
+				if (distanceCells < zone.InnerRadiusCells || distanceCells >= zone.OuterRadiusCells)
+					continue;
+
+				var width = zone.OuterRadiusCells - zone.InnerRadiusCells;
+				if (width <= 0)
+					return 0;
+
+				var progress = (distanceCells - zone.InnerRadiusCells) / width;
+				return zone.InnerDamageFraction +
+					(zone.OuterDamageFraction - zone.InnerDamageFraction) * progress;
+			}
+
+			return 0;
+		}
+
+		public static double ExpectedShotDamage(double defenderHitPoints,
+			IEnumerable<ShotDamageProfile> damageProfiles)
+		{
+			var profiles = damageProfiles.ToArray();
+			var directDamage = profiles.Sum(p => Math.Max(0, p.Damage));
+			var directDamageScale = directDamage > 0 ?
+				(Math.Max(0, defenderHitPoints) / directDamage).Clamp(0, 1) : 0;
+			return profiles.Sum(p => Math.Max(0, p.Damage) * p.HitChance.Clamp(0, 1) *
+				(directDamageScale + Math.Max(0, p.SplashFactor - 1)));
 		}
 
 		public static IReadOnlyList<SplashZone> SplashZones(SpreadDamageWarhead warhead)
