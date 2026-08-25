@@ -547,14 +547,14 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		}
 
 		// BEGIN CNC96A GROUND EXTENSION
-		sealed class GroundThreat
+		protected sealed class GroundThreat
 		{
 			public Actor Actor;
 			public int WeaponRange;
 			public int DetectorRange;
 		}
 
-		sealed class StealthInfluenceCache
+		protected sealed class StealthInfluenceCache
 		{
 			public int Tick;
 			public int Width;
@@ -666,6 +666,47 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			return threats;
 		}
 
+		protected static bool IsLethalRevealedAttackPosition(Actor unit, Actor target, IEnumerable<GroundThreat> threats)
+		{
+			var health = unit.TraitOrDefault<IHealth>();
+			if (health == null || health.HP <= 0)
+				return false;
+
+			var armorType = unit.Info.TraitInfoOrDefault<ArmorInfo>()?.Type;
+			var targetTypes = unit.GetEnabledTargetTypes();
+			foreach (var threatFact in threats)
+			{
+				var threat = threatFact.Actor;
+				if (threat.IsDead)
+					continue;
+
+				var distance = (threat.CenterPosition - target.CenterPosition).Length;
+				foreach (var armament in threat.TraitsImplementing<Armament>())
+				{
+					if (armament.IsTraitDisabled || armament.IsTraitPaused ||
+						distance > armament.MaxRange().Length ||
+						!armament.Weapon.IsValidTarget(targetTypes))
+						continue;
+
+					var volleyDamage = 0L;
+					foreach (var warhead in armament.Weapon.Warheads)
+						if (warhead is DamageWarhead damage && damage.Damage > 0 &&
+							damage.ValidTargets.Overlaps(targetTypes) && !damage.InvalidTargets.Overlaps(targetTypes))
+						{
+							var versus = armorType != null && damage.Versus.TryGetValue(armorType, out var modifier) ?
+								modifier : 100;
+							volleyDamage += damage.Damage * (long)versus / 100;
+						}
+
+					volleyDamage *= Math.Max(1, armament.Weapon.Burst);
+					if (volleyDamage >= health.HP)
+						return true;
+				}
+			}
+
+			return false;
+		}
+
 		protected static int StealthCoarseSize(Squad owner)
 		{
 			return Math.Max(1, owner.StealthDefinition?.StrategicCellSize ??
@@ -700,7 +741,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				}
 		}
 
-		static StealthInfluenceCache StealthInfluence(Squad owner, Actor unit)
+		protected static StealthInfluenceCache StealthInfluence(Squad owner, Actor unit)
 		{
 			var definition = owner.StealthDefinition;
 			var mobile = unit.TraitOrDefault<Mobile>();
@@ -1011,6 +1052,33 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					Target.FromCell(owner.World, destination.Value), false));
 		}
 
+		protected static bool BeginStealthSafetyReposition(Squad owner)
+		{
+			var representative = AirDecisionUnits(owner).OrderBy(a => a.ActorID).FirstOrDefault();
+			var cache = representative == null ? null : StealthInfluence(owner, representative);
+			var destination = cache == null ? null : NearestSafeStealthNeighbor(owner, representative, cache);
+			if (destination == null)
+				return false;
+
+			owner.TargetActor = null;
+			owner.AirTargetStrategicCell = null;
+			owner.AirRoute.Clear();
+			owner.AirRouteQueued = false;
+			owner.AirEscapingLocalAa = true;
+			if (owner.SquadManager.Info.AirTargetDebugLogging)
+			{
+				owner.StealthEscapeIssuedTick = owner.World.WorldTick;
+				owner.StealthEscapeSafetyChecks = 0;
+				owner.StealthEscapeDestination = destination;
+			}
+
+			foreach (var unit in AirDecisionUnits(owner))
+				owner.Bot.QueueOrder(new Order("Move", unit,
+					Target.FromCell(owner.World, destination.Value), false));
+
+			return true;
+		}
+
 		static AirTargetPlan FindBestStealthTarget(Squad owner, Actor incumbent,
 			out AirTargetPlan incumbentPlan, CPos? requiredStrategicCell)
 		{
@@ -1026,10 +1094,12 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 			var coarseSize = StealthCoarseSize(owner);
 			var candidates = cache.Candidates.Where(c => !c.Actor.IsDead &&
-				owner.Units.Any(unit => CanAttackTarget(unit, c.Actor))).ToList();
+				owner.Units.Any(unit => CanAttackTarget(unit, c.Actor)) &&
+				!owner.Units.Any(unit => IsLethalRevealedAttackPosition(unit, c.Actor, cache.Threats))).ToList();
 			if (incumbent != null && !incumbent.IsDead && !candidates.Any(c => c.Actor == incumbent) &&
 				owner.SquadManager.IsPreferredEnemyUnit(incumbent) &&
-				owner.Units.Any(unit => CanAttackTarget(unit, incumbent)))
+				owner.Units.Any(unit => CanAttackTarget(unit, incumbent)) &&
+				!owner.Units.Any(unit => IsLethalRevealedAttackPosition(unit, incumbent, cache.Threats)))
 			{
 				var incumbentPriority = StealthPriority(owner, incumbent);
 				if (incumbentPriority > 0)
@@ -3259,7 +3329,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				// loitering next to an enemy base, so shuffle to a nearby point and try the scan again from
 				// there instead of hovering: this is the "if it cannot get there in a straight line, move
 				// around the base and try again" half of the loop, done the cheap way.
-				if (owner.SquadManager.Info.AirEvadeDistance > 0 && owner.AirThreatPositions.Count > 0)
+				if (owner.Type == SquadType.Stealth)
+					BeginStealthSafetyReposition(owner);
+				else if (owner.SquadManager.Info.AirEvadeDistance > 0 && owner.AirThreatPositions.Count > 0)
 					Evade(owner, "no eligible target near remembered AA");
 
 				return;
@@ -3462,10 +3534,13 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				if (nextTarget == null)
 				{
 					// BEGIN CNC96A GROUND EXTENSION
-					// Ground specialists never inherit Air's flee/retreat transition. They keep
-					// their current safe position until the next strategic rescan.
+					// Ground specialists never inherit Air's flee/retreat transition. When every
+					// firing position is unsafe, move one neighboring strategic cell and rescan.
 					if (owner.Type == SquadType.Stealth)
+					{
+						BeginStealthSafetyReposition(owner);
 						return;
+					}
 					// END CNC96A GROUND EXTENSION
 
 					if (info.AirTargetDebugLogging)
@@ -3477,6 +3552,15 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				}
 
 				ApplyAirTargetPlan(owner, nextTarget);
+			}
+
+			var liveStealthThreats = owner.Type == SquadType.Stealth && formationUnits.Count > 0 ?
+				StealthInfluence(owner, formationUnits[0])?.Threats : null;
+			if (owner.Type == SquadType.Stealth && owner.IsTargetValid && liveStealthThreats != null &&
+				formationUnits.Any(a => IsLethalRevealedAttackPosition(a, owner.TargetActor, liveStealthThreats)))
+			{
+				BeginStealthSafetyReposition(owner);
+				return;
 			}
 
 			if (owner.AirProfile == "Generic" && !NearToPosSafely(owner, owner.TargetActor.CenterPosition))

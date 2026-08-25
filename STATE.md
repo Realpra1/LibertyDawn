@@ -1,3 +1,14 @@
+# CNC-96A PR132 Obelisk/repair follow-up
+
+- Status: bounded implementation and exact-source validation complete; coordinator review/publication pending
+- Base: `fee78bab9311bf15f4e2dd59f839b9331891d9d9`
+- Repair: Air and Stealth now mutually participate in the same facility-claim and oldest-ready FIFO lookup; passive allied pad waiting remains intentional
+- Uncloaking: lethal one-volley firing positions are excluded without making non-detector transit hard; no-target Idle/Attack paths issue one latched neighboring 6x6 safety move, wait for arrival, then rescan; no completion retreat
+- Exact games: 2/2 reached tick 3500 under `.build/cnc96a-obelisk-followup/results-exact3/`; zero 750-tick stalls, zero attributed Obelisk kills, 62/86 intentional specialist firing events, 26/18 completed safety replans
+- Gates: `make check` PASS 0 warnings/errors; CNC YAML PASS; focused Stealth matrix 7/7; `git diff --check` PASS
+- Build order: no source/YAML change; existing VIKI/Iron STNK weights are probabilistic and no safe supported existing config/request surface guarantees one earliest-tech STNK for both, so the user-protected no-machinery-change scope leaves this blocked for coordinator disposition
+- No push, publication, merge, task-sheet edit, or coordinator-state edit
+
 # CNC-96A PR132 finite-safety policy evidence follow-up
 
 - Status: telemetry-only implementation and exact-final evidence validation complete; coordinator policy routing pending

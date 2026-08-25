@@ -1,3 +1,36 @@
+# CNC-96A PR132 Obelisk/repair follow-up
+
+Stealth already used Air's repair lifecycle, including passive allied repair
+auras and timestamped oldest-ready waiting. The parity defect was asymmetric
+ownership: Stealth considered both Air and Stealth claims, while Air considered
+only Air claims. Both sides now aggregate the same Air+Stealth repair squads,
+so a facility has one mutual claim/FIFO policy.
+
+The copied target planner treated ordinary ground weapons as finite transit
+cost, which is correct while cloaked, but did not distinguish the firing point
+where an attack reveals the unit. The focused correction reuses cached threat
+facts to exclude a target position when an enabled enemy weapon covering that
+position can destroy a squad member in one volley. Ordinary non-detector transit
+remains soft. If every firing position is unsafe, Idle or Attack invalidates the
+plan, issues one neighboring 6x6 safety move, preserves it until arrival, and
+immediately rescans. This is not completion retreat behavior.
+
+Two distinct ordinary VIKI-versus-Brutalis full-engine scenarios used single
+and corridor Obelisk/detector geometries. Their ignored Lua watchdog fails an
+owned STNK/CTNK after 750 stationary ticks unless that exact actor fired or
+repaired, and separately attributes Obelisk kills. On exact final source both
+games reached tick 3500 with zero stalls and zero attributed Obelisk kills.
+They retained combat activity with 62 and 86 specialist firing events and
+completed 26 and 18 latched safety replans. Artifacts are under
+`.build/cnc96a-obelisk-followup/results-exact3/`.
+
+`make check` passed with zero warnings/errors, CNC YAML validation passed, the
+focused Stealth matrix passed 7/7, and `git diff --check` passed. No build-order
+source or YAML was changed. Existing VIKI and Iron Reaper STNK entries are
+probabilistic; repository inspection found no supported existing config/request
+surface that guarantees one earliest-tech STNK for both profiles without
+changing or abusing production machinery, which the user explicitly prohibited.
+
 # CNC-96A PR132 finite-safety policy evidence follow-up
 
 This second follow-up changes no safety or routing decision. When the existing
