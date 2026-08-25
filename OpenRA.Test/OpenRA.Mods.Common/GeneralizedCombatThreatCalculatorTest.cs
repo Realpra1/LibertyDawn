@@ -57,6 +57,49 @@ namespace OpenRA.Test
 		}
 
 		[Test]
+		public void InfantrySplashUsesSubCellFalloffForAnExpectedCellmate()
+		{
+			var zones = new[]
+			{
+				new GeneralizedCombatThreatCalculator.SplashZone(0, 0.5, 1, 0)
+			};
+			var offsets = new[] { new WVec(0, 0, 0), new WVec(512, 0, 0) };
+
+			// The second infantry is 0.5 cells away. Its 0.125-cell hit radius
+			// leaves 0.375 cells of falloff distance, giving 25% splash damage.
+			Assert.That(GeneralizedCombatThreatCalculator.InfantrySplashFactor(zones, 0.125, offsets),
+				Is.EqualTo(1.125).Within(0.000001));
+		}
+
+		[Test]
+		public void InfantrySplashUsesOneAndAHalfTargetsInOtherAffectedCells()
+		{
+			var zones = new[]
+			{
+				new GeneralizedCombatThreatCalculator.SplashZone(0, 2, 1, 1)
+			};
+
+			// Four affected cells contain the primary target plus three other cells.
+			Assert.That(GeneralizedCombatThreatCalculator.InfantrySplashFactor(
+				zones, 0.125, new[] { WVec.Zero }), Is.EqualTo(5.5));
+		}
+
+		[Test]
+		public void ExpectedShotDamageCapsThePrimaryUnitButPreservesSplash()
+		{
+			Assert.That(GeneralizedCombatThreatCalculator.ExpectedShotDamage(6000, new[]
+			{
+				new GeneralizedCombatThreatCalculator.ShotDamageProfile(45000, 1, 1)
+			}), Is.EqualTo(6000));
+
+			Assert.That(GeneralizedCombatThreatCalculator.ExpectedShotDamage(6000, new[]
+			{
+				new GeneralizedCombatThreatCalculator.ShotDamageProfile(4000, 1, 1),
+				new GeneralizedCombatThreatCalculator.ShotDamageProfile(4000, 1, 2)
+			}), Is.EqualTo(10000));
+		}
+
+		[Test]
 		public void ThreatEquivalentCapsDefenselessActorsAndHandlesMutuallyHarmlessActors()
 		{
 			Assert.That(GeneralizedCombatThreatCalculator.ThreatEquivalent(0, 0), Is.Zero);
@@ -99,6 +142,63 @@ namespace OpenRA.Test
 		}
 
 		[Test]
+		public void ClassKillTimeThirdsNormalizeTargetHealthAndSplitDeterministically()
+		{
+			var profiles = new[]
+			{
+				new GeneralizedCombatThreatCalculator.ClassKillTimeProfile("fastest", 20, 200),
+				new GeneralizedCombatThreatCalculator.ClassKillTimeProfile("medium-fast", 20, 100),
+				new GeneralizedCombatThreatCalculator.ClassKillTimeProfile("fast", 15, 100),
+				new GeneralizedCombatThreatCalculator.ClassKillTimeProfile("slow", 40, 100),
+				new GeneralizedCombatThreatCalculator.ClassKillTimeProfile("medium-slow", 30, 100),
+				new GeneralizedCombatThreatCalculator.ClassKillTimeProfile("cannot-kill", double.PositiveInfinity, 100)
+			};
+
+			var thirds = GeneralizedCombatThreatCalculator.RankClassKillTimeThirds(profiles);
+
+			Assert.That(thirds["fastest"], Is.EqualTo(GeneralizedCombatThreatCalculator.KillTimeThird.Best));
+			Assert.That(thirds["fast"], Is.EqualTo(GeneralizedCombatThreatCalculator.KillTimeThird.Best));
+			Assert.That(thirds["medium-fast"], Is.EqualTo(GeneralizedCombatThreatCalculator.KillTimeThird.Middle));
+			Assert.That(thirds["medium-slow"], Is.EqualTo(GeneralizedCombatThreatCalculator.KillTimeThird.Middle));
+			Assert.That(thirds["slow"], Is.EqualTo(GeneralizedCombatThreatCalculator.KillTimeThird.Worst));
+			Assert.That(thirds["cannot-kill"], Is.EqualTo(GeneralizedCombatThreatCalculator.KillTimeThird.Worst));
+
+			var fiveClasses = GeneralizedCombatThreatCalculator.RankClassKillTimeThirds(profiles.Take(5));
+			Assert.That(fiveClasses.Values.Count(t => t == GeneralizedCombatThreatCalculator.KillTimeThird.Best),
+				Is.EqualTo(2));
+			Assert.That(fiveClasses.Values.Count(t => t == GeneralizedCombatThreatCalculator.KillTimeThird.Middle),
+				Is.EqualTo(1));
+			Assert.That(fiveClasses.Values.Count(t => t == GeneralizedCombatThreatCalculator.KillTimeThird.Worst),
+				Is.EqualTo(2));
+
+			var tied = GeneralizedCombatThreatCalculator.RankClassKillTimeThirds(new[]
+			{
+				new GeneralizedCombatThreatCalculator.ClassKillTimeProfile("one", 10, 100),
+				new GeneralizedCombatThreatCalculator.ClassKillTimeProfile("two", 20, 200),
+				new GeneralizedCombatThreatCalculator.ClassKillTimeProfile("three", 30, 300)
+			});
+			Assert.That(tied.Values, Is.All.EqualTo(GeneralizedCombatThreatCalculator.KillTimeThird.Middle));
+			var single = GeneralizedCombatThreatCalculator.RankClassKillTimeThirds(new[]
+			{
+				new GeneralizedCombatThreatCalculator.ClassKillTimeProfile("only", 10, 100)
+			});
+			Assert.That(single["only"], Is.EqualTo(GeneralizedCombatThreatCalculator.KillTimeThird.Best));
+			Assert.That(GeneralizedCombatThreatCalculator.RankClassKillTimeThirds(
+				System.Array.Empty<GeneralizedCombatThreatCalculator.ClassKillTimeProfile>()), Is.Empty);
+		}
+
+		[TestCase(0, 0)]
+		[TestCase(1, 1)]
+		[TestCase(2, 3)]
+		[TestCase(10, 55)]
+		public void DiscreteCombatPotentialSumsSurvivingActorCounts(double actorCount, double expected)
+		{
+			Assert.That(GeneralizedCombatThreatCalculator.DiscreteCombatPotential(actorCount), Is.EqualTo(expected));
+			Assert.That(GeneralizedCombatThreatCalculator.ActorCountForDiscreteCombatPotential(expected),
+				Is.EqualTo(actorCount).Within(0.000001));
+		}
+
+		[Test]
 		public void EffectiveRangeFindsProjectileFlightAndTargetDisplacementIntersection()
 		{
 			var range = GeneralizedCombatThreatCalculator.EffectiveRangeCells(11, 1,
@@ -116,6 +216,61 @@ namespace OpenRA.Test
 				50 / 1024d, 100 / 1024d, 0.5, false, true, 4), Is.EqualTo(4));
 			Assert.That(GeneralizedCombatThreatCalculator.EffectiveRangeCells(35, 4,
 				50 / 1024d, 100 / 1024d, 0.5, false, false, 3), Is.Zero);
+		}
+
+		[Test]
+		public void ImmobileAttackersRetainNormalRangeUnlessTargetOutrangesThem()
+		{
+			Assert.That(GeneralizedCombatThreatCalculator.EffectiveRangeCells(6, 0,
+				double.PositiveInfinity, 0, 0.5, true, false, 8, attackerIsImmobile: true), Is.Zero);
+			Assert.That(GeneralizedCombatThreatCalculator.EffectiveRangeCells(6, 0,
+				double.PositiveInfinity, 0, 0.5, true, false, 5, attackerIsImmobile: true), Is.EqualTo(6));
+		}
+
+		[Test]
+		public void ContactAttackUsesZeroWeaponRangeAndTargetRadiusForComparison()
+		{
+			Assert.That(GeneralizedCombatThreatCalculator.ComparableRange(false, 0, 0.5), Is.Zero);
+			Assert.That(GeneralizedCombatThreatCalculator.ComparableRange(true, 0, 0.5), Is.EqualTo(0.5));
+			Assert.That(GeneralizedCombatThreatCalculator.ComparableRange(true, 0, 0), Is.EqualTo(1d / 1024));
+		}
+
+		[Test]
+		public void ContactAttackApproachAccountsForDefenderRangeAndAttackerSpeed()
+		{
+			Assert.That(GeneralizedCombatThreatCalculator.ContactApproachTicks(11, 0.75, 0.05),
+				Is.EqualTo(205).Within(0.000001));
+			Assert.That(GeneralizedCombatThreatCalculator.ContactApproachTicks(0.5, 0.75, 0.05), Is.Zero);
+			Assert.That(GeneralizedCombatThreatCalculator.ContactApproachTicks(11, 0.75, 0),
+				Is.EqualTo(double.PositiveInfinity));
+			Assert.That(GeneralizedCombatThreatCalculator.EngagementAdjustedTimeToKill(1, 205), Is.EqualTo(206));
+		}
+
+		[Test]
+		public void ConsumedContactAttackersAllApplyTheirOpeningDamage()
+		{
+			Assert.That(GeneralizedCombatThreatCalculator.AttackerCountForDamage(2, singleUse: true), Is.EqualTo(2));
+			Assert.That(GeneralizedCombatThreatCalculator.AttackerCountForDamage(2, singleUse: false), Is.EqualTo(1.5));
+
+			var oneEngineer = new GeneralizedCombatThreatCalculator.AmmoDamageProfile(50, 1, 0);
+			var twoEngineers = new GeneralizedCombatThreatCalculator.AmmoDamageProfile(100, 1, 0);
+			Assert.That(GeneralizedCombatThreatCalculator.AmmoAdjustedTimeToKill(100, oneEngineer,
+				System.Array.Empty<GeneralizedCombatThreatCalculator.HealingProfile>()), Is.EqualTo(double.PositiveInfinity));
+			Assert.That(GeneralizedCombatThreatCalculator.AmmoAdjustedTimeToKill(100, twoEngineers,
+				System.Array.Empty<GeneralizedCombatThreatCalculator.HealingProfile>()), Is.EqualTo(1));
+		}
+
+		[Test]
+		public void CaptureRequiresOverlappingCaptureTypes()
+		{
+			var captures = new[] { new BitSet<CaptureType>("building", "husk") };
+			Assert.That(GeneralizedCombatThreatCalculator.CaptureTypesOverlap(captures,
+				new[] { new BitSet<CaptureType>("building") }), Is.True);
+			Assert.That(GeneralizedCombatThreatCalculator.CaptureTypesOverlap(captures,
+				new[] { new BitSet<CaptureType>("vehicle") }), Is.False);
+			Assert.That(GeneralizedCombatThreatCalculator.SabotageDamageFraction(25), Is.EqualTo(0.25));
+			Assert.That(GeneralizedCombatThreatCalculator.SabotageDamageFraction(50), Is.EqualTo(0.5));
+			Assert.That(GeneralizedCombatThreatCalculator.SabotageDamageFraction(90), Is.EqualTo(0.5));
 		}
 
 		[Test]
@@ -152,6 +307,89 @@ namespace OpenRA.Test
 		}
 
 		[Test]
+		public void CachedAmmoUsesFullMagazineThenReloadLimitedDamage()
+		{
+			var ammo = GeneralizedCombatThreatCalculator.CalculateAmmoDamageProfile(new[]
+			{
+				new GeneralizedCombatThreatCalculator.AmmoArmamentProfile(250, 0.1, "primary")
+			}, new[]
+			{
+				new GeneralizedCombatThreatCalculator.AmmoPoolProfile("primary", 20, 2d / 105)
+			});
+
+			Assert.That(ammo.FullDamagePerTick, Is.EqualTo(250));
+			Assert.That(ammo.FullAmmoTicks, Is.EqualTo(4200d / 17).Within(0.000001));
+			Assert.That(ammo.ReloadingDamagePerTick, Is.EqualTo(1000d / 21).Within(0.000001));
+			Assert.That(GeneralizedCombatThreatCalculator.AmmoAdjustedTimeToKill(4500, ammo,
+				System.Array.Empty<GeneralizedCombatThreatCalculator.HealingProfile>()), Is.EqualTo(18));
+			Assert.That(GeneralizedCombatThreatCalculator.AmmoAdjustedTimeToKill(100000, ammo,
+				System.Array.Empty<GeneralizedCombatThreatCalculator.HealingProfile>()), Is.EqualTo(1050).Within(0.000001));
+		}
+
+		[Test]
+		public void CachedAmmoWithoutReloadCannotDamagePastMagazineCapacity()
+		{
+			var ammo = GeneralizedCombatThreatCalculator.CalculateAmmoDamageProfile(new[]
+			{
+				new GeneralizedCombatThreatCalculator.AmmoArmamentProfile(10, 1, "primary")
+			}, new[]
+			{
+				new GeneralizedCombatThreatCalculator.AmmoPoolProfile("primary", 5, 0)
+			});
+
+			Assert.That(ammo.FullAmmoTicks, Is.EqualTo(5));
+			Assert.That(ammo.ReloadingDamagePerTick, Is.Zero);
+			Assert.That(GeneralizedCombatThreatCalculator.AmmoAdjustedTimeToKill(50, ammo,
+				System.Array.Empty<GeneralizedCombatThreatCalculator.HealingProfile>()), Is.EqualTo(5));
+			Assert.That(GeneralizedCombatThreatCalculator.AmmoAdjustedTimeToKill(51, ammo,
+				System.Array.Empty<GeneralizedCombatThreatCalculator.HealingProfile>()), Is.EqualTo(double.PositiveInfinity));
+		}
+
+		[Test]
+		public void CachedAmmoLeavesUnlimitedAndSelfSustainingArmamentsAtFullDamage()
+		{
+			var ammo = GeneralizedCombatThreatCalculator.CalculateAmmoDamageProfile(new[]
+			{
+				new GeneralizedCombatThreatCalculator.AmmoArmamentProfile(20, 0),
+				new GeneralizedCombatThreatCalculator.AmmoArmamentProfile(30, 0.5, "primary")
+			}, new[]
+			{
+				new GeneralizedCombatThreatCalculator.AmmoPoolProfile("primary", 4, 0.5)
+			});
+
+			Assert.That(ammo.FullDamagePerTick, Is.EqualTo(50));
+			Assert.That(ammo.FullAmmoTicks, Is.EqualTo(double.PositiveInfinity));
+			Assert.That(ammo.ReloadingDamagePerTick, Is.EqualTo(50));
+		}
+
+		[Test]
+		public void CachedAmmoAggregatesArmamentsSharingOnePool()
+		{
+			var ammo = GeneralizedCombatThreatCalculator.CalculateAmmoDamageProfile(new[]
+			{
+				new GeneralizedCombatThreatCalculator.AmmoArmamentProfile(40, 0.5, "primary"),
+				new GeneralizedCombatThreatCalculator.AmmoArmamentProfile(20, 0.25, "primary")
+			}, new[]
+			{
+				new GeneralizedCombatThreatCalculator.AmmoPoolProfile("primary", 15, 0.25)
+			});
+
+			Assert.That(ammo.FullDamagePerTick, Is.EqualTo(60));
+			Assert.That(ammo.FullAmmoTicks, Is.EqualTo(30));
+			Assert.That(ammo.ReloadingDamagePerTick, Is.EqualTo(20));
+		}
+
+		[Test]
+		public void CachedAmmoCarriesRemainingHealthAndHealingIntoReloadPhase()
+		{
+			var ammo = new GeneralizedCombatThreatCalculator.AmmoDamageProfile(10, 5, 6);
+			var healing = new[] { new GeneralizedCombatThreatCalculator.HealingProfile(2, 50) };
+
+			Assert.That(GeneralizedCombatThreatCalculator.AmmoAdjustedTimeToKill(100, ammo, healing),
+				Is.EqualTo(17.5));
+		}
+
+		[Test]
 		public void CachedAircraftUseAirborneTargetTypeInsteadOfConditionalGroundUnion()
 		{
 			var types = GeneralizedCombatThreatCalculator.CachedTargetTypes(true, new[]
@@ -164,17 +402,120 @@ namespace OpenRA.Test
 		}
 
 		[Test]
-		public void CrossoverEstimateFindsRifleGuardTowerBoundaryInConstantEvaluations()
+		public void CrossoverPercentageSearchFindsExactDiscreteEstimate()
 		{
 			const double rifleThreatToTower = 1d / 2100;
 			var result = GeneralizedCombatThreatCalculator.FindCrossover(rifleThreatToTower, count =>
-				new GeneralizedCombatThreatCalculator.GroupThreat(count,
-					2100d / (count * count), rifleThreatToTower * count * count));
+			{
+				var potential = GeneralizedCombatThreatCalculator.DiscreteCombatPotential(count);
+				return new GeneralizedCombatThreatCalculator.GroupThreat(count,
+					2100d / potential, rifleThreatToTower * potential);
+			});
 
 			Assert.That(result.Found, Is.True);
-			Assert.That(result.InitialEstimate, Is.EqualTo(46));
-			Assert.That(result.UnitCount, Is.EqualTo(46));
-			Assert.That(result.Evaluations, Is.EqualTo(2));
+			Assert.That(result.InitialEstimate, Is.EqualTo(65));
+			Assert.That(result.UnitCount, Is.EqualTo(65));
+			Assert.That(result.Evaluations, Is.EqualTo(5));
+		}
+
+		[Test]
+		public void CrossoverEstimateBiasCanCorrectAHighDiscreteEstimate()
+		{
+			const double unroundedEstimate = 100.1;
+			var baseThreat = 1 / GeneralizedCombatThreatCalculator.DiscreteCombatPotential(unroundedEstimate);
+			var result = GeneralizedCombatThreatCalculator.FindCrossover(baseThreat, count =>
+				new GeneralizedCombatThreatCalculator.GroupThreat(count,
+					count >= 100 ? 0.9 : 1.1, count >= 100 ? 1.1 : 0.9));
+
+			Assert.That(result.Found, Is.True);
+			Assert.That(result.InitialEstimate, Is.EqualTo(100));
+			Assert.That(result.UnitCount, Is.EqualTo(100));
+		}
+
+		[Test]
+		public void CrossoverPercentageSearchBracketsOverestimateBeforeBinarySearch()
+		{
+			const double baseThreat = 1d / 2100;
+			var result = GeneralizedCombatThreatCalculator.FindCrossover(baseThreat, count =>
+				new GeneralizedCombatThreatCalculator.GroupThreat(count,
+					count >= 38 ? 0.9 : 1.1, count >= 38 ? 1.1 : 0.9));
+
+			Assert.That(result.Found, Is.True);
+			Assert.That(result.InitialEstimate, Is.EqualTo(65));
+			Assert.That(result.UnitCount, Is.EqualTo(38));
+			Assert.That(result.Evaluations, Is.EqualTo(9));
+		}
+
+		[Test]
+		public void CrossoverPercentageSearchExpandsUnderestimateBeforeBinarySearch()
+		{
+			const double baseThreat = 1d / 55;
+			var result = GeneralizedCombatThreatCalculator.FindCrossover(baseThreat, count =>
+				new GeneralizedCombatThreatCalculator.GroupThreat(count,
+					count >= 38 ? 0.9 : 1.1, count >= 38 ? 1.1 : 0.9));
+
+			Assert.That(result.Found, Is.True);
+			Assert.That(result.InitialEstimate, Is.EqualTo(10));
+			Assert.That(result.UnitCount, Is.EqualTo(38));
+			Assert.That(result.Evaluations, Is.EqualTo(16));
+		}
+
+		[Test]
+		public void CrossoverPercentageSearchAdvancesByAtLeastOneFromOne()
+		{
+			var evaluated = new System.Collections.Generic.List<int>();
+			var result = GeneralizedCombatThreatCalculator.FindCrossover(1, count =>
+			{
+				evaluated.Add(count);
+				return new GeneralizedCombatThreatCalculator.GroupThreat(count,
+					count >= 3 ? 0.9 : 1.1, count >= 3 ? 1.1 : 0.9);
+			});
+
+			Assert.That(result.Found, Is.True);
+			Assert.That(result.InitialEstimate, Is.EqualTo(1));
+			Assert.That(result.UnitCount, Is.EqualTo(3));
+			Assert.That(evaluated, Is.EqualTo(new[] { 1, 2, 3 }));
+		}
+
+		[Test]
+		public void CrossoverPercentageSearchStopsAtMaximumWithoutCrossover()
+		{
+			var result = GeneralizedCombatThreatCalculator.FindCrossover(1, count =>
+				new GeneralizedCombatThreatCalculator.GroupThreat(count, 1.1, 0.9), 100);
+
+			Assert.That(result.Found, Is.False);
+			Assert.That(result.UnitCount, Is.EqualTo(100));
+			Assert.That(result.Evaluations, Is.EqualTo(34));
+		}
+
+		[Test]
+		public void CrossoverWithoutBaseThreatStartsAtMaximum()
+		{
+			var result = GeneralizedCombatThreatCalculator.FindCrossover(0, count =>
+				new GeneralizedCombatThreatCalculator.GroupThreat(count, 1.1, 0.9), 100);
+
+			Assert.That(result.Found, Is.False);
+			Assert.That(result.InitialEstimate, Is.EqualTo(100));
+			Assert.That(result.UnitCount, Is.EqualTo(100));
+			Assert.That(result.Evaluations, Is.EqualTo(1));
+		}
+
+		[Test]
+		public void CrossoverWithoutBaseThreatChecksMaximumThenRestartsFromTunedEstimate()
+		{
+			var evaluated = new System.Collections.Generic.List<int>();
+			var result = GeneralizedCombatThreatCalculator.FindCrossover(0, count =>
+			{
+				evaluated.Add(count);
+				return new GeneralizedCombatThreatCalculator.GroupThreat(count,
+					count >= 38 ? 0.9 : 1.1, count >= 38 ? 1.1 : 0.9);
+			}, 100);
+
+			Assert.That(result.Found, Is.True);
+			Assert.That(result.InitialEstimate, Is.EqualTo(100));
+			Assert.That(result.UnitCount, Is.EqualTo(38));
+			Assert.That(result.Evaluations, Is.EqualTo(8));
+			Assert.That(evaluated, Is.EqualTo(new[] { 100, 26, 29, 32, 35, 38, 36, 37 }));
 		}
 
 		[Test]
@@ -212,7 +553,10 @@ namespace OpenRA.Test
 				});
 
 			Assert.That(lookups, Is.EqualTo(9));
-			Assert.That(crossover, Is.EqualTo(System.Math.Sqrt(558d / 156)).Within(0.000001));
+			var threat = 558d / 156;
+			var requiredPotential = threat * GeneralizedCombatThreatCalculator.DiscreteCombatPotential(109);
+			var expected = GeneralizedCombatThreatCalculator.ActorCountForDiscreteCombatPotential(requiredPotential) / 109;
+			Assert.That(crossover, Is.EqualTo(expected).Within(0.000001));
 		}
 
 		[Test]
@@ -237,7 +581,10 @@ namespace OpenRA.Test
 				});
 
 			Assert.That(lookups, Is.EqualTo(2));
-			Assert.That(crossover, Is.EqualTo(System.Math.Sqrt(13d / 4)).Within(0.000001));
+			var threat = 13d / 4;
+			var requiredPotential = threat * GeneralizedCombatThreatCalculator.DiscreteCombatPotential(4);
+			var expected = GeneralizedCombatThreatCalculator.ActorCountForDiscreteCombatPotential(requiredPotential) / 4;
+			Assert.That(crossover, Is.EqualTo(expected).Within(0.000001));
 		}
 
 		[Test]
@@ -351,8 +698,8 @@ namespace OpenRA.Test
 				new[] { new GeneralizedCombatThreatCalculator.GroupTypeCount("e1", count, 120) }, theirs,
 				(ourType, theirType) => { lookups++; return ratings[theirType]; });
 
-			Assert.That(EngageWithRifles(130), Is.False);
-			Assert.That(EngageWithRifles(131), Is.True);
+			Assert.That(EngageWithRifles(133), Is.False);
+			Assert.That(EngageWithRifles(134), Is.True);
 			Assert.That(lookups, Is.EqualTo(8));
 		}
 	}

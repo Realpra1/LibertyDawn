@@ -10,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using OpenRA.GameRules;
+using OpenRA.Mods.Common.Activities;
 using OpenRA.Mods.Common.Projectiles;
 using OpenRA.Mods.Common.Warheads;
 using OpenRA.Primitives;
@@ -26,6 +27,13 @@ namespace OpenRA.Mods.Common.Traits
 		public const double MaximumThreatRating = 200;
 		public const int MixedGroupLookupBudget = 9;
 		public const int MixedGroupMaximumAttackerTypes = 3;
+
+		// Minimized evaluations in a sweep of all mutually targetable cached CNC matchups.
+		const double CrossoverEstimateBias = 0.99606;
+		const int CrossoverMaximumSearchStart = 26;
+		const double CrossoverSearchStep = 0.0844;
+		const double SameCellInfantryChance = 0.5;
+		const double OtherInfantryCellDensity = 1.5;
 
 		public readonly struct GroupTypeCount
 		{
@@ -81,6 +89,20 @@ namespace OpenRA.Mods.Common.Traits
 			}
 		}
 
+		public readonly struct ShotDamageProfile
+		{
+			public readonly double Damage;
+			public readonly double HitChance;
+			public readonly double SplashFactor;
+
+			public ShotDamageProfile(double damage, double hitChance, double splashFactor)
+			{
+				Damage = damage;
+				HitChance = hitChance;
+				SplashFactor = splashFactor;
+			}
+		}
+
 		public readonly struct HealingProfile
 		{
 			public readonly double HealingPerTick;
@@ -90,6 +112,70 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				HealingPerTick = healingPerTick;
 				StartsBelowHitPoints = startsBelowHitPoints;
+			}
+		}
+
+		public readonly struct AmmoPoolProfile
+		{
+			public readonly string Name;
+			public readonly double Capacity;
+			public readonly double ReloadPerTick;
+
+			public AmmoPoolProfile(string name, double capacity, double reloadPerTick)
+			{
+				Name = name;
+				Capacity = capacity;
+				ReloadPerTick = reloadPerTick;
+			}
+		}
+
+		public readonly struct AmmoArmamentProfile
+		{
+			public readonly double DamagePerTick;
+			public readonly double AmmoPerTick;
+			public readonly IReadOnlyList<string> AmmoPools;
+
+			public AmmoArmamentProfile(double damagePerTick, double ammoPerTick, params string[] ammoPools)
+			{
+				DamagePerTick = damagePerTick;
+				AmmoPerTick = ammoPerTick;
+				AmmoPools = ammoPools ?? Array.Empty<string>();
+			}
+		}
+
+		public readonly struct AmmoDamageProfile
+		{
+			public readonly double FullDamagePerTick;
+			public readonly double FullAmmoTicks;
+			public readonly double ReloadingDamagePerTick;
+
+			public AmmoDamageProfile(double fullDamagePerTick, double fullAmmoTicks, double reloadingDamagePerTick)
+			{
+				FullDamagePerTick = fullDamagePerTick;
+				FullAmmoTicks = fullAmmoTicks;
+				ReloadingDamagePerTick = reloadingDamagePerTick;
+			}
+		}
+
+		public enum KillTimeThird
+		{
+			Best,
+			Middle,
+			Worst
+		}
+
+		public readonly struct ClassKillTimeProfile
+		{
+			public readonly string TargetClass;
+			public readonly double TimeToKillTicks;
+			public readonly int TargetHitPoints;
+			public double NormalizedKillTime => TimeToKillTicks / TargetHitPoints;
+
+			public ClassKillTimeProfile(string targetClass, double timeToKillTicks, int targetHitPoints)
+			{
+				TargetClass = targetClass;
+				TimeToKillTicks = timeToKillTicks;
+				TargetHitPoints = targetHitPoints;
 			}
 		}
 
@@ -104,6 +190,7 @@ namespace OpenRA.Mods.Common.Traits
 			public double NominalRangeCells { get; internal set; }
 			public double MinimumRangeCells { get; internal set; }
 			public double ProjectileSpeedCellsPerTick { get; internal set; }
+			public double AttackerSpeedCellsPerTick { get; internal set; }
 			public double TargetSpeedCellsPerTick { get; internal set; }
 			public double DefenderHitRadiusCells { get; internal set; }
 			public double InaccuracyCells { get; internal set; }
@@ -113,8 +200,14 @@ namespace OpenRA.Mods.Common.Traits
 			public double DamagePerCycle { get; internal set; }
 			public double CycleTicks { get; internal set; }
 			public double DamagePerTick { get; internal set; }
+			public double FullAmmoTicks { get; internal set; } = double.PositiveInfinity;
+			public double ReloadingDamagePerTick { get; internal set; }
 			public double DefenderHealingPerTick { get; internal set; }
+			public double EngagementDelayTicks { get; internal set; }
 			public double TimeToKillTicks { get; internal set; }
+			public bool ContactAttack { get; internal set; }
+			public bool InstantDefeat { get; internal set; }
+			public bool SingleUse { get; internal set; }
 			public IReadOnlyList<HealingProfile> DefenderHealingProfiles { get; internal set; } = Array.Empty<HealingProfile>();
 			public double RangeMultiplier { get; internal set; } = 1;
 			public double EffectiveDamagePerTick => DamagePerTick * RangeMultiplier;
@@ -158,6 +251,8 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		readonly Dictionary<(string Attacker, string Defender), PairThreat> cache;
+		readonly WVec[] infantrySubCellOffsets;
+		readonly Ruleset rules;
 		public IReadOnlyDictionary<(string Attacker, string Defender), PairThreat> Cache => cache;
 		public static int CanonicalPairCount(int actorCount) => actorCount * (actorCount + 1) / 2;
 
@@ -168,12 +263,17 @@ namespace OpenRA.Mods.Common.Traits
 			return string.CompareOrdinal(first, second) <= 0 ? (first, second) : (second, first);
 		}
 
-		public GeneralizedCombatThreatCalculator(Ruleset rules)
+		public GeneralizedCombatThreatCalculator(Ruleset rules, IEnumerable<WVec> subCellOffsets = null)
 		{
+			this.rules = rules ?? throw new ArgumentNullException(nameof(rules));
+
+			// FullCell is index zero and is not an infantry occupancy position.
+			infantrySubCellOffsets = (subCellOffsets ?? Array.Empty<WVec>()).Skip(1).ToArray();
 			var combatActors = rules.Actors.Values
 				.Where(a => !a.Name.StartsWith(ActorInfo.AbstractActorPrefix, StringComparison.Ordinal)
 					&& a.HasTraitInfo<IHealthInfo>() && a.HasTraitInfo<ITargetableInfo>()
-					&& a.HasTraitInfo<ArmamentInfo>())
+					&& (a.HasTraitInfo<ArmamentInfo>() || a.HasTraitInfo<DemolitionInfo>() ||
+						a.HasTraitInfo<CapturesInfo>()))
 				.OrderBy(a => a.Name, StringComparer.Ordinal)
 				.ToArray();
 
@@ -204,9 +304,80 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		/// <summary>
+		/// Calculates an immutable-rules matchup without requiring both actors to belong to the
+		/// combat cache. This supports analysis against unarmed but targetable baseline actors.
+		/// </summary>
+		public PairThreat CalculateBaseline(string attacker, string defender)
+		{
+			if (string.IsNullOrEmpty(attacker))
+				throw new ArgumentException("Actor types must be non-empty.", nameof(attacker));
+			if (string.IsNullOrEmpty(defender))
+				throw new ArgumentException("Actor types must be non-empty.", nameof(defender));
+
+			if (!rules.Actors.TryGetValue(attacker.ToLowerInvariant(), out var attackerInfo))
+				throw new KeyNotFoundException($"Unknown attacker actor type: {attacker}.");
+			if (!rules.Actors.TryGetValue(defender.ToLowerInvariant(), out var defenderInfo))
+				throw new KeyNotFoundException($"Unknown defender actor type: {defender}.");
+			if (!attackerInfo.HasTraitInfo<IHealthInfo>() || !attackerInfo.HasTraitInfo<ITargetableInfo>() ||
+				!defenderInfo.HasTraitInfo<IHealthInfo>() || !defenderInfo.HasTraitInfo<ITargetableInfo>())
+				throw new InvalidOperationException("Baseline combat analysis requires targetable actors with health.");
+
+			return CalculatePair(attackerInfo, defenderInfo);
+		}
+
+		/// <summary>
+		/// Ranks an actor's target classes by kill time normalized to target hit points. Target
+		/// cost is deliberately excluded; economy weighting belongs to individual crossovers.
+		/// </summary>
+		public static IReadOnlyDictionary<string, KillTimeThird> RankClassKillTimeThirds(
+			IEnumerable<ClassKillTimeProfile> profiles)
+		{
+			if (profiles == null)
+				throw new ArgumentNullException(nameof(profiles));
+
+			var ordered = profiles.Select(profile =>
+			{
+				if (string.IsNullOrEmpty(profile.TargetClass))
+					throw new ArgumentException("Target classes must be non-empty.", nameof(profiles));
+				if (double.IsNaN(profile.TimeToKillTicks) || profile.TimeToKillTicks <= 0)
+					throw new ArgumentException("Kill times must be positive or infinite.", nameof(profiles));
+				if (profile.TargetHitPoints <= 0)
+					throw new ArgumentException("Target hit points must be positive.", nameof(profiles));
+
+				return profile;
+			})
+				.OrderBy(profile => profile.NormalizedKillTime)
+				.ThenBy(profile => profile.TargetClass, StringComparer.Ordinal)
+				.ToArray();
+			if (ordered.Select(profile => profile.TargetClass).Distinct(StringComparer.Ordinal).Count() != ordered.Length)
+				throw new ArgumentException("Target classes must be unique.", nameof(profiles));
+			if (ordered.Length == 0)
+				return new Dictionary<string, KillTimeThird>(StringComparer.Ordinal);
+			if (ordered.Length == 1)
+				return new Dictionary<string, KillTimeThird>(StringComparer.Ordinal)
+				{
+					{ ordered[0].TargetClass, KillTimeThird.Best }
+				};
+
+			var outerThirdCount = Math.Max(1, (ordered.Length + 1) / 3);
+			var bestEnd = Math.Min(outerThirdCount, ordered.Length);
+			var worstStart = Math.Max(0, ordered.Length - outerThirdCount);
+			var bestCutoff = ordered[bestEnd - 1].NormalizedKillTime;
+			var worstCutoff = ordered[worstStart].NormalizedKillTime;
+			var result = new Dictionary<string, KillTimeThird>(ordered.Length, StringComparer.Ordinal);
+			foreach (var profile in ordered)
+				result.Add(profile.TargetClass, bestCutoff >= worstCutoff ? KillTimeThird.Middle :
+					profile.NormalizedKillTime <= bestCutoff ? KillTimeThird.Best :
+					profile.NormalizedKillTime >= worstCutoff ? KillTimeThird.Worst : KillTimeThird.Middle);
+
+			return result;
+		}
+
+		/// <summary>
 		/// Estimates the multiplier needed for our mixed group to cross over against theirs.
 		/// The largest economic masses are selected under a fixed nine-lookup budget: up to
-		/// 1x9, 2x4, or 3x3 types. The result is policy-free: callers own any margin.
+		/// 1x9, 2x4, or 3x3 types. Discrete combat potential accounts for both groups losing
+		/// actors. The result is policy-free: callers own any margin.
 		/// </summary>
 		public double EstimateMixedGroupCrossover(IEnumerable<GroupTypeCount> ourGroup,
 			IEnumerable<GroupTypeCount> theirGroup)
@@ -299,6 +470,8 @@ namespace OpenRA.Mods.Common.Traits
 			if (normalizedTheirs.Length == 0)
 				return 0;
 
+			var theirCount = normalizedTheirs.Sum(t => (double)t.Count);
+
 			var ours = RepresentativeTypes(ourGroup, MixedGroupMaximumAttackerTypes);
 			if (ours.Length == 0)
 				return double.PositiveInfinity;
@@ -317,7 +490,8 @@ namespace OpenRA.Mods.Common.Traits
 				}
 
 			var theirGroupThreat = totalWeight > 0 ? weightedThreat / totalWeight : 0;
-			return Math.Sqrt(Math.Max(0, theirGroupThreat));
+			var requiredPotential = Math.Max(0, theirGroupThreat) * DiscreteCombatPotential(theirCount);
+			return ActorCountForDiscreteCombatPotential(requiredPotential) / theirCount;
 		}
 
 		static GroupTypeCount[] RepresentativeTypes(IEnumerable<GroupTypeCount> group, int maximumTypes)
@@ -395,6 +569,24 @@ namespace OpenRA.Mods.Common.Traits
 			return Math.Min(MaximumThreatRating, baseline * subjectFactor / opponentFactor);
 		}
 
+		public static double DiscreteCombatPotential(double actorCount)
+		{
+			if (!double.IsFinite(actorCount) || actorCount < 0)
+				throw new ArgumentOutOfRangeException(nameof(actorCount));
+
+			return actorCount * (actorCount + 1) / 2;
+		}
+
+		public static double ActorCountForDiscreteCombatPotential(double potential)
+		{
+			if (double.IsNaN(potential) || potential < 0)
+				throw new ArgumentOutOfRangeException(nameof(potential));
+			if (double.IsPositiveInfinity(potential))
+				return double.PositiveInfinity;
+
+			return (Math.Sqrt(1 + 8 * potential) - 1) / 2;
+		}
+
 		public static CrossoverResult FindCrossover(double baseGroupThreatRating,
 			Func<int, GroupThreat> evaluate, int maximumUnitCount = 10000)
 		{
@@ -404,9 +596,13 @@ namespace OpenRA.Mods.Common.Traits
 			if (maximumUnitCount < 1)
 				throw new ArgumentOutOfRangeException(nameof(maximumUnitCount));
 
-			var estimate = baseGroupThreatRating > 0 && !double.IsInfinity(baseGroupThreatRating) ?
-				(int)Math.Ceiling(Math.Sqrt(1 / baseGroupThreatRating)) : 1;
-			estimate = estimate.Clamp(1, maximumUnitCount);
+			var estimateValue = double.IsPositiveInfinity(baseGroupThreatRating) ? 1 :
+				baseGroupThreatRating > 0 && double.IsFinite(baseGroupThreatRating) ?
+				ActorCountForDiscreteCombatPotential(1 / baseGroupThreatRating) * CrossoverEstimateBias :
+				maximumUnitCount;
+			var initialEstimate = estimateValue >= maximumUnitCount ? maximumUnitCount :
+				(int)Math.Ceiling(estimateValue).Clamp(1, maximumUnitCount);
+			var estimate = initialEstimate;
 			var evaluations = 0;
 			GroupThreat Evaluate(int candidateCount)
 			{
@@ -414,52 +610,86 @@ namespace OpenRA.Mods.Common.Traits
 				return evaluate(candidateCount);
 			}
 
-			var count = estimate;
-			var threat = Evaluate(count);
-			if (threat.CrossesOver)
+			CrossoverResult Result(bool found, int unitCount, GroupThreat resultThreat)
 			{
-				while (count > 1)
-				{
-					var previous = Evaluate(count - 1);
-					if (!previous.CrossesOver)
-						break;
-
-					count--;
-					threat = previous;
-				}
-
 				return new CrossoverResult
 				{
-					Found = true,
-					UnitCount = count,
-					InitialEstimate = estimate,
+					Found = found,
+					UnitCount = unitCount,
+					InitialEstimate = initialEstimate,
 					Evaluations = evaluations,
-					Threat = threat
+					Threat = resultThreat
 				};
 			}
 
-			while (count < maximumUnitCount)
+			CrossoverResult BinarySearch(int lowerCount, int upperCount, GroupThreat upperThreat)
 			{
-				threat = Evaluate(++count);
-				if (threat.CrossesOver)
-					return new CrossoverResult
+				while (upperCount - lowerCount > 1)
+				{
+					var middleCount = lowerCount + (upperCount - lowerCount) / 2;
+					var middleThreat = Evaluate(middleCount);
+					if (middleThreat.CrossesOver)
 					{
-						Found = true,
-						UnitCount = count,
-						InitialEstimate = estimate,
-						Evaluations = evaluations,
-						Threat = threat
-					};
+						upperCount = middleCount;
+						upperThreat = middleThreat;
+					}
+					else
+						lowerCount = middleCount;
+				}
+
+				return Result(true, upperCount, upperThreat);
 			}
 
-			return new CrossoverResult
+			GroupThreat knownMaximumThreat = null;
+			GroupThreat threat;
+			if (estimate == maximumUnitCount)
 			{
-				Found = false,
-				UnitCount = maximumUnitCount,
-				InitialEstimate = estimate,
-				Evaluations = evaluations,
-				Threat = threat
-			};
+				knownMaximumThreat = Evaluate(maximumUnitCount);
+				if (!knownMaximumThreat.CrossesOver)
+					return Result(false, maximumUnitCount, knownMaximumThreat);
+
+				estimate = Math.Min(CrossoverMaximumSearchStart, maximumUnitCount);
+				threat = estimate == maximumUnitCount ? knownMaximumThreat : Evaluate(estimate);
+			}
+			else
+				threat = Evaluate(estimate);
+
+			if (threat.CrossesOver)
+			{
+				var passedCount = estimate;
+				while (passedCount > 1)
+				{
+					var failedCandidate = Math.Max(1,
+						(int)Math.Floor(passedCount * (1 - CrossoverSearchStep)));
+					if (failedCandidate >= passedCount)
+						failedCandidate = passedCount - 1;
+
+					var candidateThreat = Evaluate(failedCandidate);
+					if (!candidateThreat.CrossesOver)
+						return BinarySearch(failedCandidate, passedCount, threat);
+
+					passedCount = failedCandidate;
+					threat = candidateThreat;
+				}
+
+				return Result(true, 1, threat);
+			}
+
+			var failedCount = estimate;
+			while (failedCount < maximumUnitCount)
+			{
+				var candidateValue = Math.Ceiling(failedCount * (1 + CrossoverSearchStep));
+				var passedCandidate = candidateValue >= maximumUnitCount ? maximumUnitCount :
+					Math.Max(failedCount + 1, (int)candidateValue);
+				threat = passedCandidate == maximumUnitCount && knownMaximumThreat != null ?
+					knownMaximumThreat : Evaluate(passedCandidate);
+				if (threat.CrossesOver)
+					return BinarySearch(failedCount, passedCandidate, threat);
+
+				failedCount = passedCandidate;
+			}
+
+			return Result(false, maximumUnitCount, threat);
 		}
 
 		public CrossoverResult CalculateCrossover(PairThreat pair, int maximumUnitCount = 10000)
@@ -481,22 +711,40 @@ namespace OpenRA.Mods.Common.Traits
 
 			var forward = pair.Forward;
 			var reverse = pair.Reverse;
-			var defenderTimeToKill = HealingAdjustedTimeToKill(forward.DefenderHitPoints,
-				forward.DamagePerTick * unitCount, forward.DefenderHealingProfiles);
+
+			// Each destroyed sustained-fire actor removes one weapon. Consumed contact attackers
+			// instead apply their single opening action before the discrete attrition phase.
+			var attackerCountForDamage = AttackerCountForDamage(unitCount, forward.SingleUse);
+			var defenderTimeToKill = EngagementAdjustedTimeToKill(AmmoAdjustedTimeToKill(forward.DefenderHitPoints,
+				new AmmoDamageProfile(forward.DamagePerTick * attackerCountForDamage, forward.FullAmmoTicks,
+					forward.ReloadingDamagePerTick * attackerCountForDamage), forward.DefenderHealingProfiles),
+				forward.EngagementDelayTicks);
 			var groupHealing = reverse.DefenderHealingProfiles.Select(h => new HealingProfile(
 				h.HealingPerTick * unitCount, h.StartsBelowHitPoints * unitCount));
-			var groupTimeToKill = HealingAdjustedTimeToKill(reverse.DefenderHitPoints * (double)unitCount,
-				reverse.DamagePerTick, groupHealing);
+			var groupTimeToKill = AmmoAdjustedTimeToKill(reverse.DefenderHitPoints * (double)unitCount,
+				new AmmoDamageProfile(reverse.DamagePerTick, reverse.FullAmmoTicks,
+					reverse.ReloadingDamagePerTick), groupHealing);
 			var groupKillRate = KillRate(defenderTimeToKill);
 			var defenderKillRate = KillRate(groupTimeToKill);
-			var defenderThreat = RangeAdjustedThreatEquivalent(defenderKillRate, groupKillRate,
-				reverse.RangeCells, forward.NominalRangeCells);
-			var groupThreat = RangeAdjustedThreatEquivalent(groupKillRate, defenderKillRate,
-				forward.RangeCells, reverse.NominalRangeCells);
+			var contactExchange = forward.ContactAttack || reverse.ContactAttack;
+			var defenderThreat = contactExchange ? ThreatEquivalent(defenderKillRate, groupKillRate) :
+				RangeAdjustedThreatEquivalent(defenderKillRate, groupKillRate,
+					ComparableRange(reverse, reverse.RangeCells), ComparableRange(forward, forward.NominalRangeCells));
+			var groupThreat = contactExchange ? ThreatEquivalent(groupKillRate, defenderKillRate) :
+				RangeAdjustedThreatEquivalent(groupKillRate, defenderKillRate,
+					ComparableRange(forward, forward.RangeCells), ComparableRange(reverse, reverse.NominalRangeCells));
 
 			return new GroupThreat(unitCount,
 				ScaleCachedExchange(defenderThreat, pair.DefenderVeterancyFactor, pair.AttackerVeterancyFactor),
 				ScaleCachedExchange(groupThreat, pair.AttackerVeterancyFactor, pair.DefenderVeterancyFactor));
+		}
+
+		public static double AttackerCountForDamage(int unitCount, bool singleUse)
+		{
+			if (unitCount < 1)
+				throw new ArgumentOutOfRangeException(nameof(unitCount));
+
+			return singleUse ? unitCount : DiscreteCombatPotential(unitCount) / unitCount;
 		}
 
 		static double KillRate(double timeToKill)
@@ -548,18 +796,66 @@ namespace OpenRA.Mods.Common.Traits
 
 		static PairThreat CreatePair(DirectionalThreat forward, DirectionalThreat reverse)
 		{
-			forward.RangeMultiplier = EffectiveRangeFactor(forward.RangeCells, reverse.NominalRangeCells);
-			reverse.RangeMultiplier = EffectiveRangeFactor(reverse.RangeCells, forward.NominalRangeCells);
+			ApplyContactApproach(forward, reverse);
+			ApplyContactApproach(reverse, forward);
+			var contactExchange = forward.ContactAttack || reverse.ContactAttack;
+			forward.RangeMultiplier = contactExchange ? 1 : EffectiveRangeFactor(ComparableRange(forward, forward.RangeCells),
+				ComparableRange(reverse, reverse.NominalRangeCells));
+			reverse.RangeMultiplier = contactExchange ? 1 : EffectiveRangeFactor(ComparableRange(reverse, reverse.RangeCells),
+				ComparableRange(forward, forward.NominalRangeCells));
 
 			return new PairThreat
 			{
 				Forward = forward,
 				Reverse = reverse,
-				DefenderThreatInAttackerEquivalents = RangeAdjustedThreatEquivalent(
-					reverse.RawKillRate, forward.RawKillRate, reverse.RangeCells, forward.NominalRangeCells),
-				AttackerThreatInDefenderEquivalents = RangeAdjustedThreatEquivalent(
-					forward.RawKillRate, reverse.RawKillRate, forward.RangeCells, reverse.NominalRangeCells)
+				DefenderThreatInAttackerEquivalents = contactExchange ?
+					ThreatEquivalent(reverse.RawKillRate, forward.RawKillRate) :
+					RangeAdjustedThreatEquivalent(reverse.RawKillRate, forward.RawKillRate,
+						ComparableRange(reverse, reverse.RangeCells), ComparableRange(forward, forward.NominalRangeCells)),
+				AttackerThreatInDefenderEquivalents = contactExchange ?
+					ThreatEquivalent(forward.RawKillRate, reverse.RawKillRate) :
+					RangeAdjustedThreatEquivalent(forward.RawKillRate, reverse.RawKillRate,
+						ComparableRange(forward, forward.RangeCells), ComparableRange(reverse, reverse.NominalRangeCells))
 			};
+		}
+
+		static void ApplyContactApproach(DirectionalThreat contact, DirectionalThreat defender)
+		{
+			if (!contact.ContactAttack)
+				return;
+
+			contact.EngagementDelayTicks = ContactApproachTicks(defender.RangeCells,
+				contact.DefenderHitRadiusCells, contact.AttackerSpeedCellsPerTick);
+			contact.TimeToKillTicks = EngagementAdjustedTimeToKill(
+				contact.TimeToKillTicks, contact.EngagementDelayTicks);
+			contact.RawKillRate = KillRate(contact.TimeToKillTicks);
+		}
+
+		public static double ComparableRange(bool contactAttack, double rangeCells, double defenderHitRadiusCells)
+		{
+			return contactAttack ? Math.Max(defenderHitRadiusCells, 1d / 1024) : rangeCells;
+		}
+
+		public static double ContactApproachTicks(double defenderEngagementRangeCells,
+			double defenderHitRadiusCells, double attackerSpeedCellsPerTick)
+		{
+			var approachDistance = defenderEngagementRangeCells -
+				ComparableRange(true, 0, defenderHitRadiusCells);
+			if (approachDistance <= 0)
+				return 0;
+
+			return attackerSpeedCellsPerTick > 0 ? approachDistance / attackerSpeedCellsPerTick :
+				double.PositiveInfinity;
+		}
+
+		public static double EngagementAdjustedTimeToKill(double timeToKillTicks, double engagementDelayTicks)
+		{
+			return timeToKillTicks + Math.Max(0, engagementDelayTicks);
+		}
+
+		static double ComparableRange(DirectionalThreat threat, double rangeCells)
+		{
+			return ComparableRange(threat.ContactAttack, rangeCells, threat.DefenderHitRadiusCells);
 		}
 
 		public static double ThreatEquivalent(double incomingKillRate, double outgoingKillRate)
@@ -595,42 +891,73 @@ namespace OpenRA.Mods.Common.Traits
 			return matchups.Sum(m => m.DefenderThreatInAttackerEquivalents);
 		}
 
-		static DirectionalThreat CalculateDirection(ActorInfo attacker, ActorInfo defender)
+		DirectionalThreat CalculateDirection(ActorInfo attacker, ActorInfo defender)
 		{
 			var hp = defender.TraitInfo<IHealthInfo>().MaxHP;
+			var sharesCell = defender.TraitInfoOrDefault<MobileInfo>()?.LocomotorInfo.SharesCell == true;
+			var attackerTargetTypes = CachedTargetTypes(attacker.HasTraitInfo<AircraftInfo>(),
+				attacker.TraitInfos<ITargetableInfo>().Select(t => t.GetTargetTypes()));
 			var targetTypes = CachedTargetTypes(defender.HasTraitInfo<AircraftInfo>(),
 				defender.TraitInfos<ITargetableInfo>().Select(t => t.GetTargetTypes()));
 			var armor = defender.TraitInfos<ArmorInfo>().Select(a => a.Type).FirstOrDefault(a => a != null);
 			var hitRadius = defender.TraitInfos<HitShapeInfo>()
 				.Select(h => Cells(h.Type.OuterRadius)).DefaultIfEmpty(0.5).Max();
+			var attackerSpeed = MovementSpeedCellsPerTick(attacker);
 			var targetSpeed = MovementSpeedCellsPerTick(defender);
 			var targetEngagementRange = defender.TraitInfos<ArmamentInfo>()
-				.Where(a => a.WeaponInfo != null).Select(a => Cells(a.ModifiedRange)).DefaultIfEmpty(0).Max();
+				.Where(a => a.WeaponInfo != null && a.WeaponInfo.IsValidTarget(attackerTargetTypes))
+				.Select(a => Cells(a.ModifiedRange)).DefaultIfEmpty(0).Max();
 			var healing = HealingProfiles(defender, hp);
+			if (TryGetCachedContactAttack(attacker, defender,
+				out var damageFraction, out var instantDefeat, out var consumed))
+				return CreateContactAttackDirection(attacker.Name, defender.Name, hp, armor, hitRadius, targetSpeed,
+					hp * damageFraction, instantDefeat, consumed, attackerSpeed);
 
 			var applicable = attacker.TraitInfos<ArmamentInfo>()
 				.Where(a => a.WeaponInfo != null && a.WeaponInfo.IsValidTarget(targetTypes))
-				.Select(a => CalculateArmament(a, armor, hitRadius, a.ModifiedRange,
+				.Select(a => (Info: a, Threat: CalculateArmament(a, hp, armor, hitRadius, sharesCell,
+					attackerSpeed <= 0, a.ModifiedRange,
 					Array.Empty<int>(), Array.Empty<int>(), Array.Empty<int>(), null, null,
-					targetSpeed, targetEngagementRange, targetTypes))
+					targetSpeed, targetEngagementRange, targetTypes)))
 				.ToArray();
+			var ammoPools = attacker.TraitInfos<AmmoPoolInfo>().ToArray();
+			var reloadRates = attacker.TraitInfos<ReloadAmmoPoolInfo>()
+				.Where(r => r.EnabledByDefault && !r.PausedByDefault && r.Delay > 0 && r.Count > 0)
+				.GroupBy(r => r.AmmoPool)
+				.ToDictionary(g => g.Key, g => g.Sum(r => r.Count / (double)r.Delay));
+			var ammoProfile = CalculateAmmoDamageProfile(applicable.Select(a => new AmmoArmamentProfile(
+				a.Threat.DamagePerTick,
+				a.Info.AmmoUsage * Math.Max(1, a.Info.WeaponInfo.Burst) / a.Threat.CycleTicks,
+				ammoPools.Where(p => p.Armaments.Contains(a.Info.Name)).Select(p => p.Name).ToArray())),
+				ammoPools.Select(p => new AmmoPoolProfile(p.Name, Math.Max(0, p.Ammo),
+					reloadRates.TryGetValue(p.Name, out var rate) ? rate : 0)));
 
-			return CombineDirections(attacker.Name, defender.Name, hp, armor, hitRadius, applicable, healing);
+			return CombineDirections(attacker.Name, defender.Name, hp, armor, hitRadius,
+				applicable.Select(a => a.Threat).ToArray(), healing, ammoProfile);
 		}
 
-		static DirectionalThreat CalculateLiveDirection(Actor attacker, Actor defender)
+		DirectionalThreat CalculateLiveDirection(Actor attacker, Actor defender)
 		{
 			var health = defender.TraitOrDefault<IHealth>();
 			var hp = health?.HP ?? 0;
+			var sharesCell = defender.Info.TraitInfoOrDefault<MobileInfo>()?.LocomotorInfo.SharesCell == true;
+			var attackerTargetTypes = attacker.GetEnabledTargetTypes();
 			var targetTypes = defender.GetEnabledTargetTypes();
 			var armor = defender.TraitsImplementing<Armor>()
 				.Where(a => !a.IsTraitDisabled).Select(a => a.Info.Type).FirstOrDefault(a => a != null);
 			var hitRadius = defender.TraitsImplementing<HitShape>()
 				.Where(h => !h.IsTraitDisabled).Select(h => Cells(h.Info.Type.OuterRadius)).DefaultIfEmpty(0.5).Max();
+			var attackerSpeed = MovementSpeedCellsPerTick(attacker);
 			var targetSpeed = MovementSpeedCellsPerTick(defender);
 			var targetEngagementRange = defender.TraitsImplementing<Armament>()
-				.Where(a => !a.IsTraitDisabled && !a.IsTraitPaused).Select(a => Cells(a.MaxRange())).DefaultIfEmpty(0).Max();
+				.Where(a => !a.IsTraitDisabled && !a.IsTraitPaused && a.Weapon.IsValidTarget(attackerTargetTypes))
+				.Select(a => Cells(a.MaxRange())).DefaultIfEmpty(0).Max();
 			var healing = HealingProfiles(defender);
+			if (TryGetLiveContactAttack(attacker, defender,
+				out var damageFraction, out var instantDefeat, out var consumed))
+				return CreateContactAttackDirection(attacker.Info.Name, defender.Info.Name, hp, armor, hitRadius, targetSpeed,
+					instantDefeat ? hp : Math.Min(hp, (health?.MaxHP ?? hp) * damageFraction), instantDefeat, consumed, attackerSpeed);
+
 			var firepowerModifiers = attacker.TraitsImplementing<IFirepowerModifier>().Select(m => m.GetFirepowerModifier()).ToArray();
 			var reloadModifiers = attacker.TraitsImplementing<IReloadModifier>().Select(m => m.GetReloadModifier()).ToArray();
 			var inaccuracyModifiers = attacker.TraitsImplementing<IInaccuracyModifier>().Select(m => m.GetInaccuracyModifier()).ToArray();
@@ -639,7 +966,8 @@ namespace OpenRA.Mods.Common.Traits
 				.Where(a => !a.IsTraitDisabled && !a.IsTraitPaused && a.Weapon.IsValidTarget(targetTypes))
 				.Where(a => ammoPools.Where(p => p.Info.Armaments.Contains(a.Info.Name))
 					.All(p => p.CurrentAmmoCount >= a.Info.AmmoUsage))
-				.Select(a => CalculateArmament(a.Info, armor, hitRadius, a.MaxRange(),
+				.Select(a => CalculateArmament(a.Info, hp, armor, hitRadius, sharesCell,
+					attackerSpeed <= 0, a.MaxRange(),
 					firepowerModifiers, reloadModifiers, inaccuracyModifiers, attacker, defender,
 					targetSpeed, targetEngagementRange, targetTypes))
 				.ToArray();
@@ -647,12 +975,142 @@ namespace OpenRA.Mods.Common.Traits
 			return CombineDirections(attacker.Info.Name, defender.Info.Name, hp, armor, hitRadius, applicable, healing);
 		}
 
+		static bool TryGetCachedContactAttack(ActorInfo attacker, ActorInfo defender,
+			out double damageFraction, out bool instantDefeat, out bool consumed)
+		{
+			var demolitions = attacker.TraitInfos<DemolitionInfo>().ToArray();
+			if (demolitions.Length > 0 && defender.TraitInfos<IDemolishableInfo>()
+				.Any(d => (!(d is ConditionalTraitInfo conditional) || conditional.EnabledByDefault) &&
+					d.IsValidTarget(defender, null)))
+			{
+				damageFraction = 1;
+				instantDefeat = true;
+				consumed = demolitions.All(d => d.EnterBehaviour != EnterBehaviour.Exit);
+				return true;
+			}
+
+			var capturableTypes = defender.TraitInfos<CapturableInfo>()
+				.Where(c => c.EnabledByDefault && c.ValidRelationships.HasRelationship(PlayerRelationship.Enemy))
+				.Select(c => c.Types).ToArray();
+			var captures = attacker.TraitInfos<CapturesInfo>().Where(c => c.EnabledByDefault).ToArray();
+			if (!CaptureTypesOverlap(captures.Select(c => c.CaptureTypes), capturableTypes))
+			{
+				damageFraction = 0;
+				instantDefeat = false;
+				consumed = false;
+				return false;
+			}
+
+			var capture = captures.Where(c => capturableTypes.Any(c.CaptureTypes.Overlaps))
+				.OrderBy(c => c.SabotageThreshold).FirstOrDefault();
+			if (capture == null)
+			{
+				damageFraction = 0;
+				instantDefeat = false;
+				consumed = false;
+				return false;
+			}
+
+			instantDefeat = capture.SabotageThreshold <= 0;
+			damageFraction = instantDefeat ? 1 : SabotageDamageFraction(capture.SabotageHPRemoval);
+			consumed = capture.ConsumedByCapture;
+			return true;
+		}
+
+		static bool TryGetLiveContactAttack(Actor attacker, Actor defender,
+			out double damageFraction, out bool instantDefeat, out bool consumed)
+		{
+			var demolitions = attacker.TraitsImplementing<Demolition>().ToArray();
+			if (demolitions.Length > 0 && defender.TraitsImplementing<IDemolishable>()
+				.Any(d => d.IsValidTarget(defender, attacker)))
+			{
+				damageFraction = 1;
+				instantDefeat = true;
+				consumed = attacker.Info.TraitInfos<DemolitionInfo>()
+					.All(d => d.EnterBehaviour != EnterBehaviour.Exit);
+				return true;
+			}
+
+			var captureManager = defender.TraitOrDefault<CaptureManager>();
+			var capture = captureManager == null ? null : attacker.TraitsImplementing<Captures>()
+				.Where(c => !c.IsTraitDisabled)
+				.Where(c => captureManager.CanBeTargetedBy(defender, attacker, c))
+				.OrderBy(c => c.Info.SabotageThreshold).FirstOrDefault();
+			if (capture == null)
+			{
+				damageFraction = 0;
+				instantDefeat = false;
+				consumed = false;
+				return false;
+			}
+
+			var health = defender.Trait<IHealth>();
+			var sabotages = capture.Info.SabotageThreshold > 0 && !defender.Owner.NonCombatant &&
+				100L * health.HP > capture.Info.SabotageThreshold * (long)health.MaxHP;
+			instantDefeat = !sabotages;
+			damageFraction = instantDefeat ? 1 : SabotageDamageFraction(capture.Info.SabotageHPRemoval);
+			consumed = capture.Info.ConsumedByCapture;
+			return true;
+		}
+
+		public static bool CaptureTypesOverlap(IEnumerable<BitSet<CaptureType>> captureTypes,
+			IEnumerable<BitSet<CaptureType>> capturableTypes)
+		{
+			var targets = capturableTypes.ToArray();
+			return captureTypes.Any(capture => targets.Any(capture.Overlaps));
+		}
+
+		public static double SabotageDamageFraction(int percentage)
+		{
+			return Math.Min(0.5, Math.Max(0, percentage / 100d));
+		}
+
+		static DirectionalThreat CreateContactAttackDirection(string attacker, string defender,
+			int hp, string armor, double hitRadius, double targetSpeed, double damage,
+			bool instantDefeat, bool consumed, double attackerSpeed)
+		{
+			var ammo = new AmmoDamageProfile(damage, consumed ? 1 : double.PositiveInfinity,
+				consumed ? 0 : damage);
+			var timeToKill = AmmoAdjustedTimeToKill(hp, ammo, Array.Empty<HealingProfile>());
+			return new DirectionalThreat
+			{
+				Attacker = attacker,
+				Defender = defender,
+				CanTarget = true,
+				DefenderHitPoints = hp,
+				DefenderArmor = armor ?? "none",
+				RangeCells = 0,
+				NominalRangeCells = 0,
+				MinimumRangeCells = 0,
+				ProjectileSpeedCellsPerTick = double.PositiveInfinity,
+				AttackerSpeedCellsPerTick = attackerSpeed,
+				TargetSpeedCellsPerTick = targetSpeed,
+				DefenderHitRadiusCells = hitRadius,
+				ExpectedHitChance = 1,
+				SplashFactor = 1,
+				SplashAndInaccuracyMultiplier = 1,
+				DamagePerCycle = damage,
+				CycleTicks = 1,
+				DamagePerTick = damage,
+				FullAmmoTicks = ammo.FullAmmoTicks,
+				ReloadingDamagePerTick = ammo.ReloadingDamagePerTick,
+				TimeToKillTicks = timeToKill,
+				ContactAttack = true,
+				InstantDefeat = instantDefeat,
+				SingleUse = consumed,
+				RawKillRate = KillRate(timeToKill)
+			};
+		}
+
 		static DirectionalThreat CombineDirections(string attacker, string defender, int hp, string armor,
-			double hitRadius, DirectionalThreat[] applicable, HealingProfile[] healing)
+			double hitRadius, DirectionalThreat[] applicable, HealingProfile[] healing,
+			AmmoDamageProfile? cachedAmmoProfile = null)
 		{
 			var totalDpt = applicable.Sum(a => a.DamagePerTick);
+			var ammoProfile = cachedAmmoProfile ??
+				new AmmoDamageProfile(totalDpt, double.PositiveInfinity, totalDpt);
 			var weight = applicable.Sum(a => a.DamagePerCycle);
-			var timeToKill = HealingAdjustedTimeToKill(hp, totalDpt, healing);
+			var timeToKill = AmmoAdjustedTimeToKill(hp, ammoProfile, healing);
 			return new DirectionalThreat
 			{
 				Attacker = attacker,
@@ -673,6 +1131,8 @@ namespace OpenRA.Mods.Common.Traits
 				DamagePerCycle = applicable.Sum(a => a.DamagePerCycle),
 				CycleTicks = Weighted(applicable, a => a.CycleTicks, weight),
 				DamagePerTick = totalDpt,
+				FullAmmoTicks = ammoProfile.FullAmmoTicks,
+				ReloadingDamagePerTick = ammoProfile.ReloadingDamagePerTick,
 				DefenderHealingPerTick = healing.Sum(h => h.HealingPerTick),
 				TimeToKillTicks = timeToKill,
 				DefenderHealingProfiles = healing,
@@ -701,6 +1161,93 @@ namespace OpenRA.Mods.Common.Traits
 			var healingPerStep = info.Step + info.PercentageStep * (long)maximumHitPoints / 100d;
 			return new HealingProfile(Math.Max(0, healingPerStep / info.Delay),
 				maximumHitPoints * info.StartIfBelow.Clamp(0, 100) / 100d);
+		}
+
+		public static AmmoDamageProfile CalculateAmmoDamageProfile(
+			IEnumerable<AmmoArmamentProfile> armaments, IEnumerable<AmmoPoolProfile> pools)
+		{
+			var armamentProfiles = armaments.ToArray();
+			var poolProfiles = pools.GroupBy(p => p.Name).ToDictionary(g => g.Key,
+				g => new AmmoPoolProfile(g.Key, g.Max(p => Math.Max(0, p.Capacity)),
+					g.Sum(p => Math.Max(0, p.ReloadPerTick))));
+			var fullDamagePerTick = armamentProfiles.Sum(a => Math.Max(0, a.DamagePerTick));
+
+			// Treat discrete fire and reload events as continuous rates. This keeps the cached
+			// model bounded while preserving both the opening magazine and sustained throughput.
+			var poolScales = new Dictionary<string, double>();
+			var fullAmmoTicks = double.PositiveInfinity;
+			foreach (var pool in poolProfiles.Values)
+			{
+				var consumption = armamentProfiles.Where(a =>
+					(a.AmmoPools ?? Array.Empty<string>()).Contains(pool.Name))
+					.Sum(a => Math.Max(0, a.AmmoPerTick));
+				if (consumption <= 0)
+				{
+					poolScales.Add(pool.Name, 1);
+					continue;
+				}
+
+				var reload = Math.Max(0, pool.ReloadPerTick);
+				poolScales.Add(pool.Name, (reload / consumption).Clamp(0, 1));
+				if (consumption > reload)
+					fullAmmoTicks = Math.Min(fullAmmoTicks, pool.Capacity / (consumption - reload));
+			}
+
+			var reloadingDamagePerTick = armamentProfiles.Sum(a =>
+			{
+				var ammoPools = a.AmmoPools ?? Array.Empty<string>();
+				var scales = ammoPools.Where(poolScales.ContainsKey).Select(p => poolScales[p]).ToArray();
+				var scale = scales.Length > 0 ? scales.Min() : 1;
+				return Math.Max(0, a.DamagePerTick) * scale;
+			});
+
+			return new AmmoDamageProfile(fullDamagePerTick, fullAmmoTicks, reloadingDamagePerTick);
+		}
+
+		public static double AmmoAdjustedTimeToKill(double currentHitPoints, AmmoDamageProfile ammo,
+			IEnumerable<HealingProfile> healingProfiles)
+		{
+			var fullAmmoTimeToKill = HealingAdjustedTimeToKill(
+				currentHitPoints, ammo.FullDamagePerTick, healingProfiles);
+			if (double.IsPositiveInfinity(ammo.FullAmmoTicks) || fullAmmoTimeToKill <= ammo.FullAmmoTicks)
+				return fullAmmoTimeToKill;
+
+			var remainingHitPoints = HitPointsAfterTicks(
+				currentHitPoints, ammo.FullDamagePerTick, ammo.FullAmmoTicks, healingProfiles);
+			var reloadingTimeToKill = HealingAdjustedTimeToKill(
+				remainingHitPoints, ammo.ReloadingDamagePerTick, healingProfiles);
+			return double.IsPositiveInfinity(reloadingTimeToKill) ?
+				double.PositiveInfinity : ammo.FullAmmoTicks + reloadingTimeToKill;
+		}
+
+		static double HitPointsAfterTicks(double currentHitPoints, double damagePerTick, double ticks,
+			IEnumerable<HealingProfile> healingProfiles)
+		{
+			if (currentHitPoints <= 0 || damagePerTick <= 0 || ticks <= 0)
+				return Math.Max(0, currentHitPoints);
+
+			var profiles = healingProfiles.Where(h => h.HealingPerTick > 0).ToArray();
+			var boundaries = profiles.Select(h => h.StartsBelowHitPoints.Clamp(0, currentHitPoints))
+				.Append(currentHitPoints).Append(0).Distinct().OrderByDescending(h => h).ToArray();
+			var remainingTicks = ticks;
+			for (var i = 0; i < boundaries.Length - 1; i++)
+			{
+				var upper = boundaries[i];
+				var lower = boundaries[i + 1];
+				var midpoint = (upper + lower) / 2;
+				var healingPerTick = profiles.Where(h => midpoint < h.StartsBelowHitPoints).Sum(h => h.HealingPerTick);
+				var netDamagePerTick = damagePerTick - healingPerTick;
+				if (netDamagePerTick <= 0)
+					return upper;
+
+				var ticksToBoundary = (upper - lower) / netDamagePerTick;
+				if (remainingTicks < ticksToBoundary)
+					return upper - remainingTicks * netDamagePerTick;
+
+				remainingTicks -= ticksToBoundary;
+			}
+
+			return 0;
 		}
 
 		public static double HealingAdjustedTimeToKill(double currentHitPoints, double damagePerTick,
@@ -732,7 +1279,8 @@ namespace OpenRA.Mods.Common.Traits
 			return elapsed;
 		}
 
-		static DirectionalThreat CalculateArmament(ArmamentInfo armament, string armor, double hitRadius,
+		DirectionalThreat CalculateArmament(ArmamentInfo armament, int defenderHitPoints, string armor,
+			double hitRadius, bool defenderSharesCell, bool attackerIsImmobile,
 			WDist effectiveRange, int[] firepowerModifiers, int[] reloadModifiers, int[] inaccuracyModifiers,
 			Actor attacker, Actor defender, double targetSpeedCellsPerTick, double targetEngagementRangeCells,
 			BitSet<TargetableType> targetTypes)
@@ -749,16 +1297,16 @@ namespace OpenRA.Mods.Common.Traits
 			var minimumRangeCells = Cells(weapon.MinRange);
 			var movementLimitedRangeCells = EffectiveRangeCells(nominalRangeCells, minimumRangeCells,
 				projectile.SpeedCellsPerTick, targetSpeedCellsPerTick, effectiveHitRadius,
-				projectile.IsInstant, projectile.IsHoming, targetEngagementRangeCells);
+				projectile.IsInstant, projectile.IsHoming, targetEngagementRangeCells, attackerIsImmobile);
 			effectiveRange = new WDist((int)(movementLimitedRangeCells * 1024));
 			var inaccuracy = weapon.TargetActorCenter && weapon.Projectile is InstantHitInfo ? 0 :
 				ProjectileInaccuracyCells(weapon.Projectile, effectiveRange, inaccuracyModifiers);
 			var raw = 0d;
-			var effective = 0d;
 			var weightedHitChance = 0d;
 			var weightedSplash = 0d;
 			var weightedMultiplier = 0d;
 			var allZones = new List<SplashZone>();
+			var damageProfiles = new List<ShotDamageProfile>();
 			foreach (var warhead in damagingWarheads)
 			{
 				var warheadDamage = Util.ApplyPercentageModifiers(warhead.Damage,
@@ -766,18 +1314,20 @@ namespace OpenRA.Mods.Common.Traits
 				if (defender != null)
 					warheadDamage = ApplyDamageModifiers(warheadDamage, warhead.DamageTypes, attacker, defender);
 				var zones = warhead is SpreadDamageWarhead spread ? SplashZones(spread) : Array.Empty<SplashZone>();
-				var splash = zones.Count == 0 ? 1 : SplashFactor(zones);
+				var splash = zones.Count == 0 ? 1 : defenderSharesCell ?
+					InfantrySplashFactor(zones, hitRadius, infantrySubCellOffsets) : SplashFactor(zones);
 				var warheadSplashRadius = zones.Select(z => z.OuterRadiusCells).DefaultIfEmpty(0).Max();
 				var hitChance = ExpectedHitChance(Math.Max(hitRadius, warheadSplashRadius), inaccuracy);
 				var multiplier = hitChance * splash;
 				raw += warheadDamage;
-				effective += warheadDamage * multiplier;
 				weightedHitChance += warheadDamage * hitChance;
 				weightedSplash += warheadDamage * splash;
 				weightedMultiplier += warheadDamage * multiplier;
+				damageProfiles.Add(new ShotDamageProfile(warheadDamage, hitChance, splash));
 				allZones.AddRange(zones);
 			}
 
+			var effective = ExpectedShotDamage(defenderHitPoints, damageProfiles);
 			var hitChanceAverage = raw > 0 ? weightedHitChance / raw : 0;
 			var splashAverage = raw > 0 ? weightedSplash / raw : 0;
 			var multiplierAverage = raw > 0 ? weightedMultiplier / raw : 0;
@@ -861,9 +1411,11 @@ namespace OpenRA.Mods.Common.Traits
 
 		public static double EffectiveRangeCells(double maximumRangeCells, double minimumRangeCells,
 			double projectileSpeedCellsPerTick, double targetSpeedCellsPerTick, double effectiveHitRadiusCells,
-			bool isInstant, bool isHoming, double targetEngagementRangeCells)
+			bool isInstant, bool isHoming, double targetEngagementRangeCells, bool attackerIsImmobile = false)
 		{
 			if (maximumRangeCells <= minimumRangeCells)
+				return 0;
+			if (attackerIsImmobile && targetEngagementRangeCells > maximumRangeCells)
 				return 0;
 
 			if (isInstant || targetSpeedCellsPerTick <= 0)
@@ -929,6 +1481,61 @@ namespace OpenRA.Mods.Common.Traits
 			// One directly hit cell is the lower bound. Zone radii themselves are never
 			// clamped: an inner radius may legitimately be below or above one cell.
 			return Math.Max(1, zones.Sum(z => z.WeightedAffectedCells));
+		}
+
+		public static double InfantrySplashFactor(IEnumerable<SplashZone> zones, double hitRadiusCells,
+			IEnumerable<WVec> subCellOffsets)
+		{
+			var zoneArray = zones.ToArray();
+			var areaDamage = zoneArray.Sum(z => z.WeightedAffectedCells);
+			var otherCellDamage = Math.Max(0, areaDamage - 1) * OtherInfantryCellDensity;
+			var offsets = (subCellOffsets ?? Array.Empty<WVec>()).ToArray();
+			var sameCellDamage = 0d;
+			var pairCount = 0;
+			for (var targetIndex = 0; targetIndex < offsets.Length; targetIndex++)
+				for (var nearbyIndex = 0; nearbyIndex < offsets.Length; nearbyIndex++)
+				{
+					if (targetIndex == nearbyIndex)
+						continue;
+
+					var centerDistance = (offsets[targetIndex] - offsets[nearbyIndex]).HorizontalLength / 1024d;
+					var edgeDistance = Math.Max(0, centerDistance - hitRadiusCells);
+					sameCellDamage += DamageFractionAtDistance(zoneArray, edgeDistance);
+					pairCount++;
+				}
+
+			var averageSameCellDamage = pairCount > 0 ? sameCellDamage / pairCount : 0;
+			return 1 + SameCellInfantryChance * averageSameCellDamage + otherCellDamage;
+		}
+
+		static double DamageFractionAtDistance(IEnumerable<SplashZone> zones, double distanceCells)
+		{
+			foreach (var zone in zones)
+			{
+				if (distanceCells < zone.InnerRadiusCells || distanceCells >= zone.OuterRadiusCells)
+					continue;
+
+				var width = zone.OuterRadiusCells - zone.InnerRadiusCells;
+				if (width <= 0)
+					return 0;
+
+				var progress = (distanceCells - zone.InnerRadiusCells) / width;
+				return zone.InnerDamageFraction +
+					(zone.OuterDamageFraction - zone.InnerDamageFraction) * progress;
+			}
+
+			return 0;
+		}
+
+		public static double ExpectedShotDamage(double defenderHitPoints,
+			IEnumerable<ShotDamageProfile> damageProfiles)
+		{
+			var profiles = damageProfiles.ToArray();
+			var directDamage = profiles.Sum(p => Math.Max(0, p.Damage));
+			var directDamageScale = directDamage > 0 ?
+				(Math.Max(0, defenderHitPoints) / directDamage).Clamp(0, 1) : 0;
+			return profiles.Sum(p => Math.Max(0, p.Damage) * p.HitChance.Clamp(0, 1) *
+				(directDamageScale + Math.Max(0, p.SplashFactor - 1)));
 		}
 
 		public static IReadOnlyList<SplashZone> SplashZones(SpreadDamageWarhead warhead)

@@ -93,7 +93,7 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			world = self.World;
 			player = self.Owner;
-			threatCalculator = new GeneralizedCombatThreatCalculator(world.Map.Rules);
+			threatCalculator = new GeneralizedCombatThreatCalculator(world.Map.Rules, world.Map.Grid.SubCellOffsets);
 		}
 
 		protected override void Created(Actor self)

@@ -42,6 +42,51 @@ army at a time and set a few attack orders, while an AI can command five to ten
 armies and scale an economy simultaneously. Rules of thumb are allowed; excessive
 blunders by micro-managed armies and economy are not.
 
+Cost-adjusted matchup notes use the cached combat crossover estimate for current
+rules, baseline veterancy, and isolated actors. Ordinary matchups are ordered by
+the cost of the crossover force divided by the subject actor's cost. `xN` means N
+opponents are needed to match one subject; `/N` means N subjects are needed to
+match one opponent. One-sided categorical and range matchups are retained for
+mobile and immobile subjects. `immune` means only the subject can target the
+opponent, `cannot engage` means only the opponent can target the subject, and
+`outrange` means both can target each other but only one has effective engagement
+range. One-sided entries are ordered by kill time because no crossover exists.
+Each note states whether the subject can target ground, air, or both.
+
+General class strengths and weaknesses use the median baseline kill time
+normalized by target maximum health across all normally purchasable, targetable
+actors in each available armor class, including unarmed buildings and
+harvesters. This measures the time needed to remove a standard amount of health,
+so fragile targets do not make a weapon appear strong against their entire
+class. Offensive class scores are divided into best, middle, and worst thirds;
+only the best and worst thirds are listed. A class that the subject cannot attack
+but whose members can attack the subject participates as an infinite weakness.
+Target cost does not affect class labels. Player-facing classes map to rules armor
+as follows: Infantry = `None`, Buildings = `Wood`, Economy = `Tiberium` or
+`TiberiumWood`, Light Armor = `Light`, and Heavy Armor = `Heavy`. Capture-only
+specialists summarize their strength as Structures and their weakness as All
+units. Dedicated anti-air actors that cannot attack ground summarize their
+weakness as All ground units; immobile ground-only defenses similarly use All air
+units. A valid but unreachable target has infinite normalized kill time. These
+are strategic rules of thumb, not predictions of movement, terrain, focus fire,
+detection, or other live battle conditions. Only normally purchasable
+combat-capable units and defense towers receive matchup annotations; neutral,
+hidden, and support-power actors are omitted. Two immobile actors are not included
+in the individual matchup lists. An opponent's inability to retaliate is not
+treated as a best matchup; these categorical immunity cases are retained only
+when the subject itself cannot engage the opponent and therefore has a meaningful
+worst matchup. Range-based one-sided matchups remain listed as outranging. Run
+`./utility.sh cnc --combat-threat-annotations [ACTOR]` to regenerate the Markdown
+annotations from current rules; the command prints output and does not edit this
+document.
+
+The cache treats Commando demolition as a zero-range instant defeat. Engineer
+sabotage is a zero-range, consumed attack capped at half the target's maximum
+health, so two Engineers must survive to reach the target. Contact specialists'
+approach time accounts for exposure inside an armed defender's valid range. An
+immobile actor cannot engage an opponent only when that opponent's valid weapon
+outranges it; otherwise its normal range calculation is retained.
+
 ## Philosophy of Structures
 
 ### Construction Yard
@@ -141,11 +186,23 @@ light vehicles attacking without support. It detects stealth at very short range
 Mammoth Tanks can crush it, so an unsupported turret is not absolute. It cannot
 lose power.
 
+Cost-adjusted matchups — Cannot target: Air. Best against: Light Armor, Heavy
+Armor. Worst against: All air units. Best: Hum-Vee (x21), Nod Buggy (x24), APC
+(x11), Recon Bike (x9), Light Tank (x5). Worst: Stealth Tank
+(outrange), Artillery (outrange), Rocket Launcher (outrange), Orca (cannot
+engage), Apache Longbow (cannot engage).
+
 ### Guard Tower
 
 The dedicated anti-infantry defense. It has good vision and short-range stealth
 detection but only a small ammunition reserve before reloading. It turns infantry
 to mist and damages light vehicles quickly. It cannot lose power.
+
+Cost-adjusted matchups — Cannot target: Air. Best against: Infantry, Light
+Armor. Worst against: All air units. Best: Rocket Soldier (x26), Minigunner
+(x44), Engineer (x21), Commando (x5), Nod Buggy (x13). Worst: Stealth
+Tank (outrange), Artillery (outrange), Rocket Launcher (outrange), Orca (cannot
+engage), Apache Longbow (cannot engage).
 
 ### Advanced Guard Tower
 
@@ -154,11 +211,22 @@ stealth over a useful distance, and provides vision for other weapons. It is
 strongest behind a frontline. Low power disables its weapon and detector. Large
 coverage areas make stealth assets difficult to slip through.
 
+Cost-adjusted matchups — Can target: Ground and Air. Best against: Infantry,
+Light Armor. Worst against: Buildings, Economy, Heavy Armor. Best: Apache
+Longbow (x8), Hum-Vee (x20), Nod Buggy (x23), Rocket Soldier (x27), APC (x10).
+Worst: Rocket Launcher (outrange), Mammoth Tank (/4), Medium Tank (x2),
+Flamethrower (x14), Chemical Warrior (x15).
+
 ### SAM Site
 
 A specialized anti-air defense unable to attack ground targets. Long vision makes
 it an early-warning position, but tanks can drive past unharmed. It becomes useless
 without power. Enough SAM Sites can make even the A-10 support power ineffective.
+
+Cost-adjusted matchups — Cannot target: Ground. Best against: Light Armor. Worst
+against: All ground units. Best: Apache Longbow (x12), Orca (x6). Worst:
+Commando (cannot engage), Flame Tank (cannot engage), Chemical Tank (cannot
+engage), Mammoth Tank (cannot engage), Stealth Tank (cannot engage).
 
 ### Obelisk of Light
 
@@ -168,6 +236,12 @@ substantial power. It must charge before firing, so many cheap targets or attack
 from several directions waste less value than feeding it one expensive unit at a
 time. Infantry can overwhelm it; artillery and Stealth Tanks outrange it. Several
 Obelisks together remain a formidable barrier.
+
+Cost-adjusted matchups — Cannot target: Air. Best against: Buildings, Heavy
+Armor. Worst against: All air units. Best: APC (x20), Hum-Vee (x30), Light Tank
+(x12), Nod Buggy (x30), Medium Tank (x10). Worst: Stealth Tank
+(outrange), Artillery (outrange), Rocket Launcher (outrange), Orca (cannot
+engage), Apache Longbow (cannot engage).
 
 ### Stealth Generator
 
@@ -237,6 +311,12 @@ Chemical Warriors, and Grenadiers, he carries no volatile ammunition. A few at a
 enemy barracks exit can suppress infantry production while Rocket Soldiers wreck
 the base. Even late, he protects tanks from anti-tank infantry.
 
+Cost-adjusted matchups — Cannot target: Air. Best against: Infantry, Light
+Armor. Worst against: Buildings, Economy, Heavy Armor. Best: Rocket Launcher
+(outrange), Rocket Soldier (x4), Commando (/4), Stealth Tank (/5), Recon Bike
+(/3). Worst: Apache Longbow (cannot engage), Orca (cannot engage), Guard
+Tower (/44), Mammoth Tank (/93), Advanced Guard Tower (/48).
+
 ### Grenadier
 
 Fast infantry with a powerful arcing attack against buildings and slow targets.
@@ -244,17 +324,35 @@ Grenades pass over some obstructions and punish dense forces, but Grenadiers may
 explode when killed. Large formations may destroy themselves under area damage.
 Available at Covert I.
 
+Cost-adjusted matchups — Cannot target: Air. Best against: Infantry, Buildings,
+Economy. Worst against: Light Armor, Heavy Armor. Best: Rocket Launcher
+(outrange), Rocket Soldier (x6), Recon Bike (x2), Medium Tank (/2), Light Tank
+(/2). Worst: Apache Longbow (cannot engage), Orca (cannot engage), Guard
+Tower (/12), Nod Buggy (/5), Hum-Vee (/5).
+
 ### Rocket Soldier
 
 The basic infantry answer to tanks. Slow, fragile, and poor against infantry and
 buildings, but inexpensive relative to the vehicles he can destroy. He carries
 anti-air rockets, though aircraft are not his preferred target.
 
+Cost-adjusted matchups — Can target: Ground and Air. Best against: Light Armor,
+Heavy Armor. Worst against: Infantry, Buildings, Economy. Best: Light Tank (x2),
+Recon Bike (x2), Medium Tank (/2), APC (/2), Orca (/5). Worst: Chemical Warrior
+(/6), Guard Tower (/26), Flamethrower (/5),
+Grenadier (/6), Minigunner (/4).
+
 ### Flamethrower
 
 Recon I anti-infantry infantry. Cheap, fast enough to accompany assaults, and
 effective against infantry and buildings. His fuel tank may explode on death, so
 dense formations can chain-react.
+
+Cost-adjusted matchups — Cannot target: Air. Best against: Infantry, Buildings,
+Economy. Worst against: Light Armor, Heavy Armor. Best: Rocket Launcher
+(outrange), Rocket Soldier (x5), Recon Bike (x2), Stealth Tank (/2), APC (/2).
+Worst: Apache Longbow (cannot engage), Orca (cannot engage), Guard
+Tower (/13), Mammoth Tank (/31), Chemical Warrior (/2).
 
 ### Chemical Warrior
 
@@ -263,17 +361,35 @@ Tiberium terrain. Chemical spray is useful against infantry and Tiberium/economy
 structures. The unit retains infantry vulnerabilities and may explode on death.
 Tiberium fields can become its safest route to bases or harvesters.
 
+Cost-adjusted matchups — Cannot target: Air. Best against: Infantry, Economy.
+Worst against: Light Armor, Heavy Armor. Best: Rocket Launcher (outrange),
+Rocket Soldier (x6), Recon Bike (x2), Stealth Tank (/2), APC (/2). Worst: Apache
+Longbow (cannot engage), Orca (cannot engage), Guard Tower
+(/15), Mammoth Tank (/38), Advanced Guard Tower (/15).
+
 ### Engineer
 
 Unarmed but strategically devastating. Engineers capture or sabotage structures,
 repair bridges, and restore vehicle husks. Inside a transport, an Engineer is a
 threat far beyond his direct cost and may capture missing technology.
 
+Cost-adjusted matchups — Cannot target: Air. Best against: Structures. Worst
+against: All units. Best: Obelisk of Light (/4), Turret (/3), Advanced Guard
+Tower (/16), Guard Tower (/21). Worst: Chemical Tank (cannot
+engage), Apache Longbow (cannot engage), Hum-Vee (cannot engage), Nod Buggy
+(cannot engage), Flame Tank (cannot engage).
+
 ### Commando
 
 An expensive Recon III sniper with enormous vision. He kills infantry at range
 and demolishes buildings after planting explosives. Vehicles counter him only if
 they find and reach him. Transports, terrain, and distractions multiply his value.
+
+Cost-adjusted matchups — Cannot target: Air. Best against: Buildings. Worst
+against: Light Armor, Heavy Armor. Best: Turret (x23), Obelisk of Light (x8),
+Advanced Guard Tower (x11), Guard Tower (x5), Rocket Soldier (x10). Worst: Chemical
+Tank (cannot engage), Flame Tank (cannot engage), Mammoth Tank (cannot engage),
+Apache Longbow (cannot engage), Hum-Vee (cannot engage).
 
 ### Sheep
 
@@ -306,11 +422,23 @@ A fast Recon I scout with a machine gun. Cheap and reasonably durable for its
 class, it chases infantry but loses to tanks. Its real value is revealing targets
 and killing infantry without wasting expensive tank shots.
 
+Cost-adjusted matchups — Cannot target: Air. Best against: Infantry, Light
+Armor. Worst against: Buildings, Economy, Heavy Armor. Best: Rocket Launcher
+(outrange), Artillery (x3), APC (x2), Recon Bike (x2), Rocket Soldier (x4).
+Worst: Orca (cannot engage), Apache Longbow (cannot engage), Turret (/21),
+Advanced Guard Tower (/20), Obelisk of Light (/30).
+
 ### Nod Buggy
 
 The Covert I Hum-Vee counterpart. Cheaper and much faster but less durable. It
 raids Rocket Soldiers, Engineers, and exposed economy units if it avoids tanks and
 defensive fire.
+
+Cost-adjusted matchups — Cannot target: Air. Best against: Infantry, Light
+Armor. Worst against: Buildings, Economy, Heavy Armor. Best: Rocket Launcher
+(outrange), Artillery (outrange), APC (x2), Rocket Soldier (x4), Minigunner
+(x7). Worst: Orca (cannot engage), Apache Longbow (cannot engage), Turret (/24),
+Advanced Guard Tower (/23), Guard Tower (/13).
 
 ### Recon Bike
 
@@ -318,11 +446,23 @@ One of the fastest units. Rockets attack vehicles and, inaccurately, aircraft,
 making it a flexible raider and emergency anti-air unit. Its health is extremely
 low. Bikes win by choosing engagements, concentrating fire, and leaving quickly.
 
+Cost-adjusted matchups — Can target: Ground and Air. Best against: Light Armor,
+Heavy Armor. Worst against: Infantry, Buildings, Economy. Best: Rocket Launcher
+(outrange), Artillery (outrange), APC (x2), Nod Buggy (x2), Stealth Tank (/2).
+Worst: Chemical Warrior (/2), Flamethrower (/2), Turret (/9), Advanced Guard
+Tower (/9), Guard Tower (/5).
+
 ### APC
 
 A Covert I armored transport carrying ten infantry with permanent stealth. It is
 fast and lightly armed, but its cargo is the threat. Engineers, Rocket Soldiers,
 Chemical Warriors, or a Commando can turn one opening into a destroyed base.
+
+Cost-adjusted matchups — Cannot target: Air. Best against: Infantry, Light
+Armor. Worst against: Buildings, Economy, Heavy Armor. Best: Rocket Launcher
+(outrange), Artillery (x2), Recon Bike (x2), Minigunner (x5), Nod Buggy (x2).
+Worst: Orca (cannot engage), Apache Longbow (cannot engage), Turret (/11),
+Obelisk of Light (/20), Advanced Guard Tower (/10).
 
 ### Light Tank
 
@@ -330,11 +470,23 @@ A fast Recon I tank with heavy armor and a respectable cannon. Weaker than a
 Medium Tank head-on, but much better at scouting, flanking, retreating, and hunting
 light vehicles. Trading stationary shots like a Mammoth wastes it.
 
+Cost-adjusted matchups — Cannot target: Air. Best against: Buildings, Economy,
+Light Armor. Worst against: Infantry, Heavy Armor. Best: Rocket Launcher
+(outrange), Artillery (x7), Hum-Vee (x7), APC (x4), Nod Buggy (x8). Worst: Orca
+(cannot engage), Apache Longbow (cannot engage), Turret (/5), Obelisk of Light
+(/12), Rocket Soldier (/2).
+
 ### Medium Tank
 
 Faster and cheaper than the Mammoth while retaining heavy armor and a serious
 cannon. It is the Economy I workhorse, excellent against light vehicles and able
 to chase raiders, dynamically protect fields, or attack weak points.
+
+Cost-adjusted matchups — Cannot target: Air. Best against: Buildings, Economy,
+Light Armor. Worst against: Infantry, Heavy Armor. Best: Rocket Launcher
+(outrange), Artillery (x7), Hum-Vee (x9), APC (x5), Nod Buggy (x10). Worst: Orca
+(cannot engage), Apache Longbow (cannot engage), Obelisk of Light (/10), Turret
+(/3), Grenadier (x2).
 
 ### Mammoth Tank
 
@@ -344,12 +496,24 @@ weapons outside its vision can attack safely. It is a mobile fortification that
 needs scouts, detectors, and cheaper screens. Enough Mammoths can overwhelm Recon
 economically.
 
+Cost-adjusted matchups — Can target: Ground and Air. Best against: Buildings,
+Economy, Light Armor. Worst against: Infantry, Heavy Armor. Best: Apache Longbow
+(x12), Minigunner (x93), Hum-Vee (x28), Nod Buggy (x31), Artillery (x15). Worst:
+Obelisk of Light (/3), Turret (x2), Grenadier (x15), Stealth Tank (x3), Rocket
+Soldier (x11).
+
 ### Flame Tank
 
 A fast Recon II assault vehicle with good health, twin flamethrowers, and a violent
 death explosion. It destroys infantry, buildings, and light vehicles but struggles
 against true tanks. Covert II disables its production, trading it for other tools.
 After aircraft clears an area, it removes buildings quickly.
+
+Cost-adjusted matchups — Cannot target: Air. Best against: Buildings, Economy.
+Worst against: Light Armor, Heavy Armor. Best: Rocket Launcher (outrange),
+Artillery (x5), APC (x4), Stealth Tank (x2), Minigunner (x13). Worst: Orca
+(cannot engage), Apache Longbow (cannot engage), Turret (/3), Mammoth Tank (/8),
+Obelisk of Light (/6).
 
 ### Chemical Tank
 
@@ -358,6 +522,12 @@ infantry and Tiberium/nuclear targets. Its armor is light and it is poor against
 tanks and aircraft. Detection makes it expensive prey. It often turns enemy
 infantry into Visceroids.
 
+Cost-adjusted matchups — Cannot target: Air. Best against: Infantry, Economy.
+Worst against: Light Armor, Heavy Armor. Best: Rocket Launcher (outrange),
+Artillery (x4), APC (x3), Stealth Tank (x2), Recon Bike (x3). Worst: Orca
+(cannot engage), Apache Longbow (cannot engage), Mammoth Tank (/13), Turret
+(/4), Medium Tank (/4).
+
 ### Artillery
 
 A Covert II mid-range weapon with little health. Faster than the Rocket Launcher
@@ -365,11 +535,23 @@ and effective against infantry, vehicles, and buildings. It fires continuously
 and supports normal squads. It needs forward vision because it shoots farther
 than it sees.
 
+Cost-adjusted matchups — Cannot target: Air. Best against: Buildings, Economy.
+Worst against: Infantry, Heavy Armor. Best: Rocket Launcher (outrange), Guard
+Tower (outrange), Turret (outrange), Obelisk of Light (outrange), Stealth Tank
+(x2). Worst: Orca (cannot engage), Apache Longbow (cannot engage), Nod Buggy
+(outrange), Recon Bike (outrange), Light Tank (/7).
+
 ### Rocket Launcher
 
 Economy II artillery with extreme range and devastating ground fire. It is slow,
 fragile, and has finite ammunition. Protected by tanks and scouts it dismantles a
 base outside defensive range; unsupported, it may die before turning.
+
+Cost-adjusted matchups — Cannot target: Air. Best against: Buildings, Economy,
+Heavy Armor. Worst against: Infantry, Light Armor. Best: Guard Tower (outrange),
+Turret (outrange), Advanced Guard Tower (outrange), Obelisk of Light (outrange),
+Rocket Soldier (x5). Worst: Orca (cannot engage), Chemical Tank (outrange),
+Flame Tank (outrange), Apache Longbow (cannot engage), Light Tank (outrange).
 
 ### Mobile SAM
 
@@ -377,12 +559,23 @@ Economy II anti-air vehicle with good speed and vision but only two missiles bef
 reloading and no ground attack. It belongs behind the army. Even a Minigunner can
 destroy an unsupported Mobile SAM. It is essential against air harassment.
 
+Cost-adjusted matchups — Cannot target: Ground. Best against: Light Armor. Worst
+against: All ground units. Best: Apache Longbow (x4), Orca (x2). Worst: Obelisk
+of Light (cannot engage), Mammoth Tank (cannot engage), Turret (cannot engage),
+Flame Tank (cannot engage), Chemical Tank (cannot engage).
+
 ### Stealth Tank
 
 The peak Covert combat vehicle: fast, long-ranged, cloaked, and effective against
 harvesters, tanks, and buildings. Its armor is extremely weak. Recon detectors
 expose it, after which even riflemen kill it quickly. Its classic role is hit-and-
 run anti-armor raiding.
+
+Cost-adjusted matchups — Can target: Ground and Air. Best against: Buildings,
+Economy, Heavy Armor. Worst against: Infantry, Light Armor. Best: Rocket
+Launcher (outrange), Guard Tower (outrange), Turret (outrange), Obelisk of Light
+(outrange), Artillery (x4). Worst: Chemical Warrior (x2), Flamethrower (x2),
+Advanced Guard Tower (/4), Orca (/6), Chemical Tank (/2).
 
 ### Mobile HQ
 
@@ -407,6 +600,12 @@ A Recon II gunship with substantial health and ammunition. Its guns excel agains
 infantry, light vehicles, and aircraft but are weak against tanks. It clears light
 units and harvesters but wastes ammunition on buildings.
 
+Cost-adjusted matchups — Can target: Ground and Air. Best against: Infantry,
+Light Armor. Worst against: Buildings, Heavy Armor. Best: Rocket Soldier (x14),
+Stealth Tank (x3), Recon Bike (x4), Orca (/2), Mobile S.A.M. (/4). Worst: SAM
+Site (/12), Advanced Guard Tower (/8), Mammoth Tank (/12), Mobile S.A.M. (/4),
+Orca (/2).
+
 ### Orca
 
 A Recon III missile gunship and the fastest normal combat unit. It attacks ground
@@ -414,6 +613,12 @@ and air, especially tanks and buildings, but has little health and only eight
 missiles. Orcas concentrate damage and leave before anti-air responds. They can
 dodge missiles but remain vulnerable to splash; hovering empty over a base is
 fatal.
+
+Cost-adjusted matchups — Can target: Ground and Air. Best against: Light Armor,
+Heavy Armor. Worst against: Infantry, Buildings. Best: Stealth Tank (x6), Recon
+Bike (x8), Apache Longbow (x2), Rocket Soldier (x5), Mammoth Tank (/2). Worst:
+SAM Site (/6), Mobile S.A.M. (/2), Advanced Guard Tower (/3), Mammoth Tank
+(/2), Rocket Soldier (x5).
 
 ### A-10 Bomber
 

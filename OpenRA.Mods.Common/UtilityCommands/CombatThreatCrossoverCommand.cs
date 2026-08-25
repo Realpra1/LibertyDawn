@@ -18,7 +18,8 @@ namespace OpenRA.Mods.Common.UtilityCommands
 		void IUtilityCommand.Run(Utility utility, string[] args)
 		{
 			Game.ModData = utility.ModData;
-			var calculator = new GeneralizedCombatThreatCalculator(utility.ModData.DefaultRules);
+			var calculator = new GeneralizedCombatThreatCalculator(utility.ModData.DefaultRules,
+				utility.ModData.Manifest.Get<MapGrid>().SubCellOffsets);
 			var attacker = args[1].ToLowerInvariant();
 			var defender = args[2].ToLowerInvariant();
 			var maximum = args.Length == 4 ? int.Parse(args[3], CultureInfo.InvariantCulture) : 10000;
