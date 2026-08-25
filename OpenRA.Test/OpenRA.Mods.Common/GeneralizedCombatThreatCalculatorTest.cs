@@ -317,6 +317,23 @@ namespace OpenRA.Test
 		}
 
 		[Test]
+		public void CrossoverPercentageSearchAdvancesByAtLeastOneFromOne()
+		{
+			var evaluated = new System.Collections.Generic.List<int>();
+			var result = GeneralizedCombatThreatCalculator.FindCrossover(1, count =>
+			{
+				evaluated.Add(count);
+				return new GeneralizedCombatThreatCalculator.GroupThreat(count,
+					count >= 3 ? 0.9 : 1.1, count >= 3 ? 1.1 : 0.9);
+			});
+
+			Assert.That(result.Found, Is.True);
+			Assert.That(result.InitialEstimate, Is.EqualTo(1));
+			Assert.That(result.UnitCount, Is.EqualTo(3));
+			Assert.That(evaluated, Is.EqualTo(new[] { 1, 2, 3 }));
+		}
+
+		[Test]
 		public void CrossoverPercentageSearchStopsAtMaximumWithoutCrossover()
 		{
 			var result = GeneralizedCombatThreatCalculator.FindCrossover(1, count =>
