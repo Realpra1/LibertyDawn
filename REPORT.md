@@ -1,3 +1,32 @@
+# CNC-96A release-default pending-Blue latch correction
+
+The pending-explosion escape latch is now assigned unconditionally with the
+semantic escape state. Only debug counters, remembered debug destination, and log
+formatting remain behind `AirTargetDebugLogging`. Release-default execution can
+therefore preserve an in-flight pending-Blue escape instead of clearing and
+reissuing it on the next five-tick safety check.
+
+The discriminating test map omits `AirTargetDebugLogging`. A test-only driver
+selects a real non-lead member, puts one Blue resource at an unoccupied exact cell
+in its current 6x6 cell, explicitly rebuilds the influence cache before creating
+the pending explosion, and then invokes the ordinary release safety check. A
+separate test-only observer measures the bot queue delta and every registered
+member's cell exit; none of these traits exist in normal CNC rules.
+
+Under `.build/cnc96a-kiting/results31/blue-exit`, cache priming occurred at tick
+101 and pending appeared at tick 103. The release-default safety call queued
+exactly two orders for the two-member squad and immediately reported both
+`escaping=True` and `latch=True`. Members exited at ticks 144 and 185, the latch
+remained preserved with no failure, and ordinary arrival completed at tick 267.
+The tick-701 watchdog recorded zero stalls and deaths. The run contained no
+product `Stealth safety [` debug telemetry, proving logging was not enabling the
+behavior.
+
+Exact-source `make check` and the full solution build pass with zero
+warnings/errors, CNC YAML validation passes, the focused Stealth matrix passes
+9/9, and `git diff --check` passes. The standalone test project reports only four
+unrelated pre-existing analyzer warnings.
+
 # CNC-96A pending-Blue stale-cache correction
 
 The five-tick Stealth safety path no longer uses the strategic influence cache to

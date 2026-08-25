@@ -1,3 +1,18 @@
+# CNC-96A release-default pending-Blue latch correction
+
+- Status: bounded implementation, release-default engine discriminator, and
+  exact-source validation complete; coordinator integration pending
+- Base: `dd00a80eef5bc19e1ab46aae5ae9b2557c50c1d1`
+- Product: semantic pending-explosion latch assignment moved outside debug guard;
+  counters/destination/logging remain default-false gated
+- Release engine: `results31/blue-exit` PASS with `AirTargetDebugLogging` omitted;
+  cache prime tick101, pending tick103, exact queue delta 2 for squad size 2,
+  escaping/latch true, both members exit, preserved failure false, arrival tick267
+- Watchdog: tick701 stalls=0 deaths=0; product Stealth safety debug lines=0
+- Gates: `make check` PASS 0 warnings/errors; solution build PASS 0 warnings/errors;
+  CNC YAML PASS; focused matrix PASS 9/9; `git diff --check` PASS
+- No push, publication, merge, task-sheet/coordinator-state edit, or bleed mutation
+
 # CNC-96A pending-Blue stale-cache correction
 
 - Status: bounded implementation, discriminating engine evidence, and exact-source

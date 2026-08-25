@@ -164,7 +164,13 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(states, Does.Contain("resourceLayer.GetResource(cell).Type == \"BlueTiberium\" &&"));
 			Assert.That(states, Does.Contain("resourceLayer.IsExplosionPending(cell)"));
 			Assert.That(states, Does.Not.Contain("memberCoarseCells.Any(cache.PendingExplosionCells.Contains)"));
+			var pendingLatch = states.IndexOf("owner.StealthEscapePendingExplosion = pendingBlueExplosion;",
+				StringComparison.Ordinal);
+			Assert.That(pendingLatch, Is.GreaterThanOrEqualTo(0));
+			Assert.That(pendingLatch, Is.LessThan(states.IndexOf(
+				"if (owner.SquadManager.Info.AirTargetDebugLogging)", pendingLatch, StringComparison.Ordinal)));
 			Assert.That(yaml, Does.Not.Contain("StealthResourceExplosionTestDriver"));
+			Assert.That(yaml, Does.Not.Contain("StealthPendingBlueOrderObserver"));
 			Assert.That(yaml, Does.Not.Contain("StealthCrushTestTelemetry"));
 			Assert.That(StealthAISpecialistPolicy.IsEngagementThreat(true, true, false), Is.True);
 			Assert.That(StealthAISpecialistPolicy.IsEngagementThreat(false, true, false), Is.False);

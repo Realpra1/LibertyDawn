@@ -580,6 +580,16 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		static readonly Dictionary<SquadManagerBotModule, Dictionary<string, StealthInfluenceCache>>
 			StealthInfluenceCaches =
 				new Dictionary<SquadManagerBotModule, Dictionary<string, StealthInfluenceCache>>();
+
+		internal static void PrimeStealthInfluenceForTest(Squad owner)
+		{
+			if (StealthInfluenceCaches.TryGetValue(owner.SquadManager, out var profiles))
+				profiles.Remove(owner.StealthProfile);
+			var representative = owner.AirFormationUnits(bootstrapIfEmpty: true)
+				.OrderBy(a => a.ActorID).FirstOrDefault();
+			if (representative != null)
+				StealthInfluence(owner, representative);
+		}
 		// END CNC96A GROUND EXTENSION
 
 		sealed class DefendedCellPlan
@@ -1290,12 +1300,12 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			owner.AirRoute.Clear();
 			owner.AirRouteQueued = false;
 			owner.AirEscapingLocalAa = true;
+			owner.StealthEscapePendingExplosion = pendingBlueExplosion;
 			if (owner.SquadManager.Info.AirTargetDebugLogging)
 			{
 				owner.StealthEscapeIssuedTick = owner.World.WorldTick;
 				owner.StealthEscapeSafetyChecks = 0;
 				owner.StealthEscapeDestination = destination;
-				owner.StealthEscapePendingExplosion = pendingBlueExplosion;
 				var from = new CPos(representative.Location.X / StealthCoarseSize(owner),
 					representative.Location.Y / StealthCoarseSize(owner));
 				var to = new CPos(destination.Value.X / StealthCoarseSize(owner),
