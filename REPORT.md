@@ -1,3 +1,84 @@
+# CNC-96A successor: mandatory first Covert III STNK
+
+Current `origin/bleed` at `4a1461f6c1497a70e48c8bf85078e0e7e0600deb`
+already contains PR132. The reviewed repair/Obelisk amendment was carried
+forward unchanged from `5a3e36886819d5a7148cec9c6dec0a6bc3592fa6` as
+`e850013c62` before this production amendment.
+
+The existing `BaseBuilderBotModule` opening planner now owns an optional,
+separate one-shot technology-unit milestone. It is deliberately not part of
+`OpeningComplete`, so late technology cannot retain `OpeningActive` or disturb
+the existing structure, five-Harvester, and one-MCV sequence. VIKI and Iron
+Reaper alone configure one `stnk` after `upgrade.covert3` has been observed.
+The observation is latched because Iron Reaper may later change branches.
+
+The milestone waits without issuing a request until STNK is actually buildable
+and a compatible queue is idle. Existing requested, queued, or pending STNKs
+deduplicate it. One accepted request uses the existing external-unit lifecycle,
+timeout, and retry behavior; lifetime production satisfies the milestone, so a
+later loss cannot request a replacement. Baseline, unlock, completion, retry,
+outstanding-request, and expiry state are game-save persisted. Normal weighted
+STNK production remains enabled after the mandatory obligation completes.
+
+Exact-source validation:
+
+- `make check`: PASS, zero warnings/errors.
+- Focused opening-policy and Stealth matrix tests: PASS, 22/22 (the test project emits four unrelated
+  pre-existing analyzer warnings).
+- CNC YAML validation: PASS.
+- `git diff --check`: PASS.
+- Mandatory production full-engine game: PASS at tick 3200 under
+  `.build/cnc96a-mandatory-stank/results4/`. At tick 301 VIKI had zero STNKs;
+  after Covert III the planner logged exactly one request and produced exactly
+  one STNK at tick 1481. The milestone completed 1/1 and ordinary production
+  subsequently produced 14 non-STNK units by tick 3001.
+- Prior-amendment single-Obelisk full-engine game: PASS at tick 3500 under
+  `.build/cnc96a-mandatory-stank/obelisk-results3/`. The unchanged 750-tick
+  watchdog tracked firing STNKs and reported zero stalls and zero
+  Obelisk-attributed deaths at tick 3001.
+
+Early harness runs reached their tick bounds but were rejected because the
+default generated settings omitted `Debug.LuaDebug`, suppressing Lua evidence.
+Accepted reruns use the prior known-good settings template. The old manifest's
+tick-3000 expression was corrected harness-only to accept the engine's actual
+`Trigger.AfterDelay` marker at tick 3001. No product behavior was changed for
+either correction. Raw maps, logs, replays, and build output remain ignored.
+No push, publication, merge, task-sheet edit, coordinator-state edit, or
+`bleed` mutation was performed.
+
+# CNC-96A PR132 Obelisk/repair follow-up
+
+Stealth already used Air's repair lifecycle, including passive allied repair
+auras and timestamped oldest-ready waiting. The parity defect was asymmetric
+ownership: Stealth considered both Air and Stealth claims, while Air considered
+only Air claims. Both sides now aggregate the same Air+Stealth repair squads,
+so a facility has one mutual claim/FIFO policy.
+
+The copied target planner treated ordinary ground weapons as finite transit
+cost, which is correct while cloaked, but did not distinguish the firing point
+where an attack reveals the unit. The focused correction reuses cached threat
+facts to exclude a target position when an enabled enemy weapon covering that
+position can destroy a squad member in one volley. Ordinary non-detector transit
+remains soft. If every firing position is unsafe, Idle or Attack invalidates the
+plan, issues one neighboring 6x6 safety move, preserves it until arrival, and
+immediately rescans. This is not completion retreat behavior.
+
+Two distinct ordinary VIKI-versus-Brutalis full-engine scenarios used single
+and corridor Obelisk/detector geometries. Their ignored Lua watchdog fails an
+owned STNK/CTNK after 750 stationary ticks unless that exact actor fired or
+repaired, and separately attributes Obelisk kills. On exact final source both
+games reached tick 3500 with zero stalls and zero attributed Obelisk kills.
+They retained combat activity with 62 and 86 specialist firing events and
+completed 26 and 18 latched safety replans. Artifacts are under
+`.build/cnc96a-obelisk-followup/results-exact3/`.
+
+`make check` passed with zero warnings/errors, CNC YAML validation passed, the
+focused Stealth matrix passed 7/7, and `git diff --check` passed. No build-order
+source or YAML was changed. Existing VIKI and Iron Reaper STNK entries are
+probabilistic; repository inspection found no supported existing config/request
+surface that guarantees one earliest-tech STNK for both profiles without
+changing or abusing production machinery, which the user explicitly prohibited.
+
 # CNC-96A PR132 finite-safety policy evidence follow-up
 
 This second follow-up changes no safety or routing decision. When the existing

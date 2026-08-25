@@ -146,6 +146,37 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
+		public void TechnologyUnitMilestoneLatchesAndRequestsExactlyOneObligation()
+		{
+			Assert.That(OpeningPolicyLogic.TechnologyUnitMilestoneUnlocked(false, false), Is.False,
+				"The mandatory unit must not be requested before its technology is reached.");
+			Assert.That(OpeningPolicyLogic.TechnologyUnitMilestoneUnlocked(false, true), Is.True);
+			Assert.That(OpeningPolicyLogic.TechnologyUnitMilestoneUnlocked(true, false), Is.True,
+				"A later branch downgrade must not discard the reached milestone.");
+
+			Assert.That(OpeningPolicyLogic.TechnologyUnitMilestoneCompleted(0, 1), Is.False);
+			Assert.That(OpeningPolicyLogic.TechnologyUnitMilestoneCompleted(1, 1), Is.True,
+				"Lifetime production satisfies the milestone even if the unit is later destroyed.");
+
+			Assert.That(OpeningPolicyLogic.ShouldRequestTechnologyUnit(
+				false, false, false, false, true, 100, 0), Is.False);
+			Assert.That(OpeningPolicyLogic.ShouldRequestTechnologyUnit(
+				true, false, false, false, false, 100, 0), Is.False,
+				"Temporary prerequisite or queue loss must not create a blocking request.");
+			Assert.That(OpeningPolicyLogic.ShouldRequestTechnologyUnit(
+				true, false, false, false, true, 100, 0), Is.True);
+			Assert.That(OpeningPolicyLogic.ShouldRequestTechnologyUnit(
+				true, false, true, false, true, 100, 0), Is.False,
+				"An outstanding request must not be duplicated.");
+			Assert.That(OpeningPolicyLogic.ShouldRequestTechnologyUnit(
+				true, false, false, true, true, 100, 0), Is.False,
+				"An existing queued or pending unit already owns the obligation.");
+			Assert.That(OpeningPolicyLogic.ShouldRequestTechnologyUnit(
+				true, true, false, false, true, 100, 0), Is.False,
+				"Normal production must resume after the one-shot milestone completes.");
+		}
+
+		[Test]
 		public void PicksPreferredAlternativeFromFirstBuildableGoal()
 		{
 			var goal = OpeningPolicyLogic.FirstBuildableGoal(

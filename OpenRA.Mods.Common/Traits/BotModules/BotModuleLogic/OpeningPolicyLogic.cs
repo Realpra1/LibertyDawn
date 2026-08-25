@@ -96,6 +96,24 @@ namespace OpenRA.Mods.Common.Traits
 			return Enumerable.Range(0, prefixGoalCount).All(completedGoals.Contains);
 		}
 
+		public static bool TechnologyUnitMilestoneUnlocked(bool previouslyUnlocked, bool prerequisitesAvailable)
+		{
+			return previouslyUnlocked || prerequisitesAvailable;
+		}
+
+		public static bool TechnologyUnitMilestoneCompleted(int lifetimeBuilt, int requiredCount)
+		{
+			return requiredCount > 0 && lifetimeBuilt >= requiredCount;
+		}
+
+		public static bool ShouldRequestTechnologyUnit(bool unlocked, bool completed,
+			bool requestOutstanding, bool hasProductionCommitment, bool buildable,
+			int currentTick, int nextRequestTick)
+		{
+			return unlocked && !completed && !requestOutstanding && !hasProductionCommitment &&
+				buildable && currentTick >= nextRequestTick;
+		}
+
 		public static int FirstBuildableGoal(
 			IReadOnlyList<string[]> orderedGoals,
 			IReadOnlyCollection<int> completedGoals,

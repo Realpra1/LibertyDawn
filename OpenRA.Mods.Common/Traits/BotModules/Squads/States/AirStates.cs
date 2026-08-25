@@ -2313,7 +2313,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 				if (owned && requireAvailable)
 				{
-					var airSquads = owner.SquadManager.Squads.Where(s => s.Type == SquadType.Air).ToList();
+					var airSquads = owner.SquadManager.Squads.Where(s =>
+						s.Type == SquadType.Air || s.Type == SquadType.Stealth).ToList();
 					var assignments = airSquads.SelectMany(s => s.AirRepairTargets)
 						.ToDictionary(a => a.Key, a => a.Value);
 					var repairing = new HashSet<uint>(airSquads.SelectMany(s => s.AirUnitsRepairing));
@@ -2392,7 +2393,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 		static bool IsOldestReadyRepairWaiter(Squad owner, Actor aircraft, Actor facility)
 		{
-			var airSquads = owner.SquadManager.Squads.Where(s => s.Type == SquadType.Air).ToList();
+			var airSquads = owner.SquadManager.Squads.Where(s =>
+				s.Type == SquadType.Air || s.Type == SquadType.Stealth).ToList();
 			var waitingSince = airSquads.SelectMany(s => s.AirRepairWaitingSince)
 				.ToDictionary(a => a.Key, a => a.Value);
 			var ready = airSquads.SelectMany(s => s.Units)
