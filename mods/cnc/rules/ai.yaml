@@ -701,12 +701,7 @@ Player:
 				HarassmentTargetPriorities:
 					harv: 5000
 					sharv: 5000
-					proc: 6000
-				AttackTargetPriorities:
-					htnk: 10000
-					mtnk: 8500
-					ctnk: 8000
-					ltnk: 7000
+					proc: 2500
 			chemical:
 				UnitTypes: ctnk
 				StrategicCellSize: 6
@@ -719,14 +714,15 @@ Player:
 				StructureTargetPriority: 0
 				TankTargetPriority: 0
 				CrushInfantryTargets: false
+				EnableKiting: false
 				HarassmentTargetPriorities:
-					harv: 10000
-					sharv: 10000
-					vice: 10000
-					pvice: 10000
+					harv: 5000
+					sharv: 5000
+					vice: 1
+					pvice: 1
 				HarassmentArmorPriorities:
-					TiberiumWood: 6000
-					Tiberium: 6000
+					TiberiumWood: 600
+					Tiberium: 600
 		AirTargetHarvesterValue: 1000
 		AirTargetUnitValue: 450
 		AirTargetProductionValue: 300
@@ -949,12 +945,7 @@ Player:
 				HarassmentTargetPriorities:
 					harv: 5000
 					sharv: 5000
-					proc: 6000
-				AttackTargetPriorities:
-					htnk: 10000
-					mtnk: 8500
-					ctnk: 8000
-					ltnk: 7000
+					proc: 2500
 			chemical:
 				UnitTypes: ctnk
 				StrategicCellSize: 6
@@ -967,14 +958,15 @@ Player:
 				StructureTargetPriority: 0
 				TankTargetPriority: 0
 				CrushInfantryTargets: false
+				EnableKiting: false
 				HarassmentTargetPriorities:
-					harv: 10000
-					sharv: 10000
-					vice: 10000
-					pvice: 10000
+					harv: 5000
+					sharv: 5000
+					vice: 1
+					pvice: 1
 				HarassmentArmorPriorities:
-					TiberiumWood: 6000
-					Tiberium: 6000
+					TiberiumWood: 600
+					Tiberium: 600
 		AirTargetHarvesterValue: 1000
 		AirTargetUnitValue: 450
 		AirTargetProductionValue: 300
@@ -1197,12 +1189,7 @@ Player:
 				HarassmentTargetPriorities:
 					harv: 5000
 					sharv: 5000
-					proc: 6000
-				AttackTargetPriorities:
-					htnk: 10000
-					mtnk: 8500
-					ctnk: 8000
-					ltnk: 7000
+					proc: 2500
 			chemical:
 				UnitTypes: ctnk
 				StrategicCellSize: 6
@@ -1215,14 +1202,15 @@ Player:
 				StructureTargetPriority: 0
 				TankTargetPriority: 0
 				CrushInfantryTargets: false
+				EnableKiting: false
 				HarassmentTargetPriorities:
-					harv: 10000
-					sharv: 10000
-					vice: 10000
-					pvice: 10000
+					harv: 5000
+					sharv: 5000
+					vice: 1
+					pvice: 1
 				HarassmentArmorPriorities:
-					TiberiumWood: 6000
-					Tiberium: 6000
+					TiberiumWood: 600
+					Tiberium: 600
 		AirTargetHarvesterValue: 1000
 		AirTargetUnitValue: 450
 		AirTargetProductionValue: 300
@@ -1527,12 +1515,7 @@ Player:
 				HarassmentTargetPriorities:
 					harv: 5000
 					sharv: 5000
-					proc: 6000
-				AttackTargetPriorities:
-					htnk: 10000
-					mtnk: 8500
-					ctnk: 8000
-					ltnk: 7000
+					proc: 2500
 			chemical:
 				UnitTypes: ctnk
 				StrategicCellSize: 6
@@ -1545,14 +1528,15 @@ Player:
 				StructureTargetPriority: 0
 				TankTargetPriority: 0
 				CrushInfantryTargets: false
+				EnableKiting: false
 				HarassmentTargetPriorities:
-					harv: 10000
-					sharv: 10000
-					vice: 10000
-					pvice: 10000
+					harv: 5000
+					sharv: 5000
+					vice: 1
+					pvice: 1
 				HarassmentArmorPriorities:
-					TiberiumWood: 6000
-					Tiberium: 6000
+					TiberiumWood: 600
+					Tiberium: 600
 		AirTargetHarvesterValue: 1000
 		AirTargetUnitValue: 450
 		AirTargetProductionValue: 300
@@ -1687,12 +1671,7 @@ Player:
 				HarassmentTargetPriorities:
 					harv: 5000
 					sharv: 5000
-					proc: 6000
-				AttackTargetPriorities:
-					htnk: 10000
-					mtnk: 8500
-					ctnk: 8000
-					ltnk: 7000
+					proc: 2500
 			chemical:
 				UnitTypes: ctnk
 				StrategicCellSize: 6
@@ -1705,14 +1684,15 @@ Player:
 				StructureTargetPriority: 0
 				TankTargetPriority: 0
 				CrushInfantryTargets: false
+				EnableKiting: false
 				HarassmentTargetPriorities:
-					harv: 10000
-					sharv: 10000
-					vice: 10000
-					pvice: 10000
+					harv: 5000
+					sharv: 5000
+					vice: 1
+					pvice: 1
 				HarassmentArmorPriorities:
-					TiberiumWood: 6000
-					Tiberium: 6000
+					TiberiumWood: 600
+					Tiberium: 600
 		AirTargetHarvesterValue: 1000
 		AirTargetUnitValue: 450
 		AirTargetProductionValue: 300
@@ -2035,12 +2015,7 @@ Player:
 				HarassmentTargetPriorities:
 					harv: 5000
 					sharv: 5000
-					proc: 6000
-				AttackTargetPriorities:
-					htnk: 10000
-					mtnk: 8500
-					ctnk: 8000
-					ltnk: 7000
+					proc: 2500
 			chemical:
 				UnitTypes: ctnk
 				StrategicCellSize: 6
@@ -2053,14 +2028,15 @@ Player:
 				StructureTargetPriority: 0
 				TankTargetPriority: 0
 				CrushInfantryTargets: false
+				EnableKiting: false
 				HarassmentTargetPriorities:
-					harv: 10000
-					sharv: 10000
-					vice: 10000
-					pvice: 10000
+					harv: 5000
+					sharv: 5000
+					vice: 1
+					pvice: 1
 				HarassmentArmorPriorities:
-					TiberiumWood: 6000
-					Tiberium: 6000
+					TiberiumWood: 600
+					Tiberium: 600
 		AirTargetHarvesterValue: 1000
 		AirTargetUnitValue: 450
 		AirTargetProductionValue: 300
@@ -2395,12 +2371,7 @@ Player:
 				HarassmentTargetPriorities:
 					harv: 5000
 					sharv: 5000
-					proc: 6000
-				AttackTargetPriorities:
-					htnk: 10000
-					mtnk: 8500
-					ctnk: 8000
-					ltnk: 7000
+					proc: 2500
 			chemical:
 				UnitTypes: ctnk
 				StrategicCellSize: 6
@@ -2413,14 +2384,15 @@ Player:
 				StructureTargetPriority: 0
 				TankTargetPriority: 0
 				CrushInfantryTargets: false
+				EnableKiting: false
 				HarassmentTargetPriorities:
-					harv: 10000
-					sharv: 10000
-					vice: 10000
-					pvice: 10000
+					harv: 5000
+					sharv: 5000
+					vice: 1
+					pvice: 1
 				HarassmentArmorPriorities:
-					TiberiumWood: 6000
-					Tiberium: 6000
+					TiberiumWood: 600
+					Tiberium: 600
 		RequiresCondition: enable-skynet-ai
 		SquadSize: 10
 		AttackForceInterval: 50
@@ -2801,12 +2773,7 @@ Player:
 				HarassmentTargetPriorities:
 					harv: 5000
 					sharv: 5000
-					proc: 6000
-				AttackTargetPriorities:
-					htnk: 10000
-					mtnk: 8500
-					ctnk: 8000
-					ltnk: 7000
+					proc: 2500
 			chemical:
 				UnitTypes: ctnk
 				StrategicCellSize: 6
@@ -2819,14 +2786,15 @@ Player:
 				StructureTargetPriority: 0
 				TankTargetPriority: 0
 				CrushInfantryTargets: false
+				EnableKiting: false
 				HarassmentTargetPriorities:
-					harv: 10000
-					sharv: 10000
-					vice: 10000
-					pvice: 10000
+					harv: 5000
+					sharv: 5000
+					vice: 1
+					pvice: 1
 				HarassmentArmorPriorities:
-					TiberiumWood: 6000
-					Tiberium: 6000
+					TiberiumWood: 600
+					Tiberium: 600
 		AirTargetHarvesterValue: 1000
 		AirTargetUnitValue: 450
 		AirTargetProductionValue: 300
@@ -3133,12 +3101,7 @@ Player:
 				HarassmentTargetPriorities:
 					harv: 5000
 					sharv: 5000
-					proc: 6000
-				AttackTargetPriorities:
-					htnk: 10000
-					mtnk: 8500
-					ctnk: 8000
-					ltnk: 7000
+					proc: 2500
 			chemical:
 				UnitTypes: ctnk
 				StrategicCellSize: 6
@@ -3151,14 +3114,15 @@ Player:
 				StructureTargetPriority: 0
 				TankTargetPriority: 0
 				CrushInfantryTargets: false
+				EnableKiting: false
 				HarassmentTargetPriorities:
-					harv: 10000
-					sharv: 10000
-					vice: 10000
-					pvice: 10000
+					harv: 5000
+					sharv: 5000
+					vice: 1
+					pvice: 1
 				HarassmentArmorPriorities:
-					TiberiumWood: 6000
-					Tiberium: 6000
+					TiberiumWood: 600
+					Tiberium: 600
 		AirTargetHarvesterValue: 1000
 		AirTargetUnitValue: 450
 		AirTargetProductionValue: 300
@@ -3431,12 +3395,7 @@ Player:
 				HarassmentTargetPriorities:
 					harv: 5000
 					sharv: 5000
-					proc: 6000
-				AttackTargetPriorities:
-					htnk: 10000
-					mtnk: 8500
-					ctnk: 8000
-					ltnk: 7000
+					proc: 2500
 			chemical:
 				UnitTypes: ctnk
 				StrategicCellSize: 6
@@ -3449,14 +3408,15 @@ Player:
 				StructureTargetPriority: 0
 				TankTargetPriority: 0
 				CrushInfantryTargets: false
+				EnableKiting: false
 				HarassmentTargetPriorities:
-					harv: 10000
-					sharv: 10000
-					vice: 10000
-					pvice: 10000
+					harv: 5000
+					sharv: 5000
+					vice: 1
+					pvice: 1
 				HarassmentArmorPriorities:
-					TiberiumWood: 6000
-					Tiberium: 6000
+					TiberiumWood: 600
+					Tiberium: 600
 		AirTargetHarvesterValue: 1000
 		AirTargetUnitValue: 450
 		AirTargetProductionValue: 300

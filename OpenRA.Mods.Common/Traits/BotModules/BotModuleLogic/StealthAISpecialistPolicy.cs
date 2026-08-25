@@ -532,6 +532,29 @@ namespace OpenRA.Mods.Common.Traits
 			return rangeCells > 0 ? rangeCells + Math.Max(0, bufferCells) : 0;
 		}
 
+		public static bool IsWithinUndefendedTravelPreference(long travelMilliseconds, int maximumSeconds)
+		{
+			return travelMilliseconds >= 0 && maximumSeconds > 0 &&
+				travelMilliseconds <= maximumSeconds * 1000L;
+		}
+
+		public static bool CanKite(int ownSpeed, int enemySpeed, int ownRangeCells,
+			int enemyRangeCells, int marginCells, int minimumSpeedPercent)
+		{
+			return ownSpeed > 0 && enemySpeed >= 0 && ownRangeCells > enemyRangeCells + marginCells &&
+				ownSpeed * 100L >= enemySpeed * (long)minimumSpeedPercent;
+		}
+
+		public static bool ShouldEnterMassClear(double overmatch, int entryPercent)
+		{
+			return double.IsFinite(overmatch) && overmatch * 100 > entryPercent;
+		}
+
+		public static bool ShouldAbortMassClear(double overmatch, int abortPercent)
+		{
+			return !double.IsFinite(overmatch) || overmatch * 100 <= abortPercent;
+		}
+
 		public static bool CanOutrangeTargetDetector(bool threatIsTarget, int weaponRangeCells,
 			int detectorRangeCells, int ownRangeCells)
 		{

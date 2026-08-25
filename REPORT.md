@@ -1,3 +1,148 @@
+# CNC-96A release-default pending-Blue latch correction
+
+The pending-explosion escape latch is now assigned unconditionally with the
+semantic escape state. Only debug counters, remembered debug destination, and log
+formatting remain behind `AirTargetDebugLogging`. Release-default execution can
+therefore preserve an in-flight pending-Blue escape instead of clearing and
+reissuing it on the next five-tick safety check.
+
+The discriminating test map omits `AirTargetDebugLogging`. A test-only driver
+selects a real non-lead member, puts one Blue resource at an unoccupied exact cell
+in its current 6x6 cell, explicitly rebuilds the influence cache before creating
+the pending explosion, and then invokes the ordinary release safety check. A
+separate test-only observer measures the bot queue delta and every registered
+member's cell exit; none of these traits exist in normal CNC rules.
+
+Under `.build/cnc96a-kiting/results31/blue-exit`, cache priming occurred at tick
+101 and pending appeared at tick 103. The release-default safety call queued
+exactly two orders for the two-member squad and immediately reported both
+`escaping=True` and `latch=True`. Members exited at ticks 144 and 185, the latch
+remained preserved with no failure, and ordinary arrival completed at tick 267.
+The tick-701 watchdog recorded zero stalls and deaths. The run contained no
+product `Stealth safety [` debug telemetry, proving logging was not enabling the
+behavior.
+
+Exact-source `make check` and the full solution build pass with zero
+warnings/errors, CNC YAML validation passes, the focused Stealth matrix passes
+9/9, and `git diff --check` passes. The standalone test project reports only four
+unrelated pre-existing analyzer warnings.
+
+# CNC-96A pending-Blue stale-cache correction
+
+The five-tick Stealth safety path no longer uses the strategic influence cache to
+decide whether a squad is currently standing in a pending Blue explosion. It now
+deduplicates the current 6x6 cells of all live, in-world, non-repairing squad
+members and directly checks each in-map exact cell for both Blue Tiberium and
+`IResourceLayer.IsExplosionPending`. This is bounded to 36 resource reads per
+distinct occupied strategic cell and adds no actor or world threat scan. The
+cached pending grid remains available only to strategic route planning and
+destination validation.
+
+The test-only resource driver now supports a stale-cache phase: it fills the real
+non-lead member's strategic cell, waits 30 ticks (longer than the fixture's
+25-tick influence interval), then damages a currently unoccupied exact cell in
+that same 6x6. On exact corrected source under
+`.build/cnc96a-kiting/results20/blue-exit`, Blue was filled at tick 100, pending
+appeared at tick 133 in `stnk#151`'s cell at unoccupied exact cell `83,48`, and
+the safety path detected it at tick 136, within three ticks. It issued one
+pending-explosion whole-squad move to destination `77,54`, explicitly logged
+`Blue=false`, `Red=false`, and `pending=false`, arrived/replanned at tick 201,
+and reported zero stalls and deaths. A serialized repeat under `results21`
+detected the equivalent unoccupied-cell hazard within one tick and likewise
+completed one clean exit with zero stalls/deaths.
+
+Exact-source `make check` and the full solution build pass with zero warnings/errors,
+CNC YAML validation passes, the focused matrix passes 9/9, and `git diff --check`
+passes. The test project retains four unrelated pre-existing analyzer warnings.
+The earlier accepted tactical scenarios remain unchanged by
+this resource-read correction. Exact-source reruns retained the natural watchdog,
+mass-package wipe, and crossover-abort behaviors, but their intentionally natural
+combat attribution/mode markers vary between identical seeded launches; the
+impacted stale-cache scenario is the discriminating release gate for this bounded
+correction.
+
+# CNC-96A cached kiting and clearing successor
+
+This cycle replaces broad live ground-threat scans with an Air-derived bounded
+planning flow. Stealth targets are grouped into cached 6x6 strategic cells and
+shortlisted using the existing Air candidate selector. Scores use the requested
+actor priorities, a capped one-to-two-times price bonus, and inverse remaining
+health. A configurable 30-second ETA uses the selected ground route and current
+squad movement speed as a preference: the planner first chooses nearby safe
+economic targets, then a viable clearing opportunity, then a reachable safe
+economic target beyond the preference window so distance cannot leave squads idle.
+
+Each defended target's package is exactly the enemy actors in its target-centered
+3x3 cache neighborhood. Kiting is selected before mass clearing when every squad
+member is at least 20 percent faster than the live target and has a legal firing
+band beyond that target's current range. The whole squad focus-fires, excludes
+positions covered by any other cached local weapon threat, and moves outward when
+too close. After armed vehicles are gone and the squad is cloaked, configured STNK
+squads may crush non-detecting infantry. CTNK profiles explicitly disable both
+kiting and crushing.
+
+When neither kiting nor crushing is available, the manager-owned shared
+`GeneralizedCombatThreatCalculator` evaluates only current squad members against
+the cached 3x3 defender package. Mass mode enters strictly above a 2.0 overmatch,
+latches the package, and attacks the calculator's highest-threat victim first.
+It recalculates only on squad/package membership changes or victim loss, continues
+above 1.0, and aborts/flees at or below 1.0. Once Kite, Crush, or Mass starts, the
+cached package is authoritative until it is cleared or explicitly aborted, so a
+moving Harvester cannot preempt the defense-clear mission. The focused policy tests
+exercise all four strict boundaries. Engine fixtures prove strict entry, ordered
+highest-threat focus, complete package removal, and a single below-one abort after
+a fresh overwhelming package changes membership.
+
+Pending Blue explosions are checked over each member's current strategic cell,
+bounded to at most 36 exact cells per squad tick. One latched whole-squad move exits
+to a neighboring strategic cell containing no Blue, Red, or pending explosion,
+then immediately replans on arrival. Normal Blue Tiberium remains a finite route
+cost, Green is legal, and Red/pending cells are forbidden. The old broad pending
+annulus and local actor-circle scans are not used. All diagnostic logging remains
+behind the existing default-false target-debug flag. The two evidence traits are
+absent from normal CNC rules and exist only for generated test maps.
+
+Exact-source validation:
+
+- `make check`: PASS, zero warnings/errors.
+- `dotnet build OpenRA.sln --no-restore`: PASS, zero warnings/errors.
+- Focused `StealthAIFunctionMatrixTest`: PASS, 9/9 (four unrelated pre-existing
+  test-project analyzer warnings).
+- `./utility.sh cnc --check-yaml`: PASS when run alone. An earlier concurrent run
+  ended in a native bus error during map validation and was discarded.
+- `git diff --check`: PASS.
+- Four ordinary-AI engine scenarios: PASS 4/4 under
+  `.build/cnc96a-kiting/results15`.
+
+The MTNK/kiting fixture reached tick 3200 with six tracked STNKs, 64 specialist
+damage events, three Harvester kills, one infantry kill, zero 750-tick stalls, and
+zero STNK deaths. It exercised `Kite` and `Crush`; exact `INotifyCrushed` telemetry
+records `stnk#146` crushing `e1#138` at tick 656. At tick 3001 the fixture MTNK
+remained at 43,680/45,000 HP and the MSAM at 15,305/18,000 HP while nearer safe
+economic targets remained available. This is accepted as advisory evidence under
+the required precedence (short safe target before Kite), not misreported as a
+natural defense-package wipe; the isolated fixtures below prove clearing behavior.
+
+The isolated mass fixture disabled kiting/crushing only in its generated map and
+entered `Mass` at tick 11 with crossover 10.296. Its first ordered victim was the
+highest-threat MTNK. The exact cached Harvester, Rifle, MTNK, and MSAM package was
+fully removed by tick 1579, with zero stalls or STNK deaths. A separate abort
+fixture first removed the same original package, then introduced twelve HTNKs into
+the same cached 3x3 neighborhood. Package membership changed, crossover recalculated
+to 0.407, and the squad issued exactly one flee at tick 381, arrived at tick 556,
+and did not reissue, stall, or lose a unit. The release profile retains the normal
+kiting-first pipeline.
+
+The Blue fixture selected an actual non-lead squad member, filled that member's
+exact 6x6 cell, and called the real `IResourceLayer.DamageResource`. Pending state
+appeared at tick 101. The whole squad issued one latched exit from coarse `15,10`
+to neighboring `15,11`; telemetry explicitly recorded destination `Blue=false`,
+`Red=false`, and `pending=false`. It arrived at tick 204 and replanned, with zero
+reissues, stalls, or deaths through the tick-900 horizon.
+
+Raw maps, logs, and build artifacts remain ignored under `.build`. This worker did
+not push, publish, merge, edit the task sheet/coordinator state, or mutate `bleed`.
+
 # CNC-96A successor: mandatory first Covert III STNK
 
 Current `origin/bleed` at `4a1461f6c1497a70e48c8bf85078e0e7e0600deb`

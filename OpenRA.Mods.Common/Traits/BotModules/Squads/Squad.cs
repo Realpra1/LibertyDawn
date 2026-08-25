@@ -78,6 +78,11 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		internal int StealthEscapeIssuedTick = -1;
 		internal int StealthEscapeSafetyChecks;
 		internal CPos? StealthEscapeDestination;
+		internal bool StealthEscapePendingExplosion;
+		internal StealthClearMode StealthClearMode;
+		internal readonly HashSet<uint> StealthClearPackage = new HashSet<uint>();
+		internal int StealthClearMembershipSignature;
+		internal CPos? StealthClearCenterCell;
 
 		// General-attack reinforcements remain squad-owned while traveling, but do not pull the
 		// established formation center home or inflate its strategic strength before they arrive.
