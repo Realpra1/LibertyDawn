@@ -74,7 +74,9 @@ weaknesses against an immobile subject are ordered by incoming kill time because
 no crossover exists. Only normally purchasable combat-capable units and defense
 towers receive matchup annotations; neutral, hidden, and support-power actors
 are omitted. Two immobile actors are not included in the individual matchup
-lists.
+lists. Run `./utility.sh cnc --combat-threat-annotations [ACTOR]` to regenerate
+the Markdown annotations from current rules; the command prints output and does
+not edit this document.
 
 The cache treats Commando demolition as a zero-range instant defeat. Engineer
 sabotage is a zero-range, consumed attack capped at half the target's maximum
