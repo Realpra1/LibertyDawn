@@ -34,7 +34,7 @@ namespace OpenRA.Mods.Common.Traits
 		public readonly int TargetSwitchImprovementPercent = 25;
 		public readonly int HarassmentDistancePenalty = 1;
 		[Desc("Preferred maximum driving time in seconds for an undefended target. Farther safe targets remain a fallback.")]
-		public readonly int MaximumUndefendedTargetTravelSeconds = 30;
+		public readonly int MaximumUndefendedTargetTravelSeconds = 60;
 		public readonly bool EnableKiting = true;
 		public readonly int MinimumKiteSpeedPercent = 120;
 		public readonly int MassClearEntryCrossoverPercent = 200;

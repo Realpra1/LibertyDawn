@@ -95,6 +95,8 @@ namespace OpenRA.Mods.Common.Traits
 		public readonly string OpeningTechnologyUnitType = "";
 		public readonly string[] OpeningTechnologyUnitPrerequisites = System.Array.Empty<string>();
 		public readonly int OpeningTechnologyUnitCount = 0;
+		[Desc("Ordered technology actors requested as soon as each becomes buildable. This sequence is independent of ordinary unit-production pauses and completes before the one-shot technology unit milestone.")]
+		public readonly string[] OpeningTechnologyResearchSequence = System.Array.Empty<string>();
 
 		[Desc("Ticks before retrying an opening structure request that never entered any production queue.")]
 		public readonly int OpeningRequestRetryDelay = 250;
@@ -512,6 +514,14 @@ namespace OpenRA.Mods.Common.Traits
 		public override void RulesetLoaded(Ruleset rules, ActorInfo ai)
 		{
 			base.RulesetLoaded(rules, ai);
+			if (OpeningTechnologyResearchSequence.Distinct(System.StringComparer.Ordinal).Count() !=
+				OpeningTechnologyResearchSequence.Length)
+				throw new YamlException("Opening technology research actors must be unique and ordered.");
+
+			foreach (var actorType in OpeningTechnologyResearchSequence)
+				if (!rules.Actors.TryGetValue(actorType, out var actor) || actor.TraitInfoOrDefault<BuildableInfo>() == null)
+					throw new YamlException($"Opening technology research actor '{actorType}' must exist and be buildable.");
+
 			if (RadarRecoveryTypes.Length > 0)
 			{
 				if (RadarRecoveryReservationTimeout <= 0 || RadarRecoveryScanInterval <= 0 ||
@@ -682,6 +692,10 @@ namespace OpenRA.Mods.Common.Traits
 		int nextOpeningTechnologyUnitRequestTick;
 		bool openingTechnologyUnitRequestOutstanding;
 		int openingTechnologyUnitRequestExpiryTick;
+		int nextOpeningTechnologyResearchRequestTick;
+		bool openingTechnologyResearchRequestOutstanding;
+		int openingTechnologyResearchRequestExpiryTick;
+		string openingTechnologyResearchRequestType;
 		int nextOpeningProgressLogTick;
 		readonly Dictionary<uint, AirRepairBuildingReservation> airRepairBuildingReservations =
 			new Dictionary<uint, AirRepairBuildingReservation>();
@@ -1245,6 +1259,7 @@ namespace OpenRA.Mods.Common.Traits
 					TotalBuilt(new[] { Info.OpeningTechnologyUnitType });
 			}
 
+			UpdateOpeningTechnologyResearch(bot);
 			UpdateOpeningTechnologyUnit(bot);
 
 			if (openingCompletionLogged)
@@ -1377,6 +1392,74 @@ namespace OpenRA.Mods.Common.Traits
 			openingTechnologyUnitRequestOutstanding = false;
 			LogOpening("{0} one-shot technology unit request for {1} expired; allowing retry",
 				player, Info.OpeningTechnologyUnitType);
+		}
+
+		void UpdateOpeningTechnologyResearch(IBot bot)
+		{
+			if (Info.OpeningTechnologyResearchSequence.Length == 0)
+				return;
+
+			var next = Info.OpeningTechnologyResearchSequence.FirstOrDefault(type =>
+				!techTree.HasPrerequisites(new[] { type }));
+			if (string.IsNullOrEmpty(next))
+			{
+				openingTechnologyResearchRequestOutstanding = false;
+				openingTechnologyResearchRequestType = null;
+				return;
+			}
+
+			if (openingTechnologyResearchRequestOutstanding &&
+				!string.Equals(openingTechnologyResearchRequestType, next, System.StringComparison.Ordinal))
+			{
+				if (!string.IsNullOrEmpty(openingTechnologyResearchRequestType))
+					CancelRequests(bot, openingTechnologyResearchRequestType);
+				openingTechnologyResearchRequestOutstanding = false;
+				openingTechnologyResearchRequestType = null;
+			}
+
+			if (HasQueued(next))
+			{
+				if (!openingTechnologyResearchRequestOutstanding)
+				{
+					openingTechnologyResearchRequestOutstanding = true;
+					openingTechnologyResearchRequestType = next;
+				}
+
+				return;
+			}
+
+			if (HasRequestedOrQueued(bot, next) && !openingTechnologyResearchRequestOutstanding)
+			{
+				openingTechnologyResearchRequestOutstanding = true;
+				openingTechnologyResearchRequestType = next;
+				openingTechnologyResearchRequestExpiryTick = world.WorldTick +
+					System.Math.Max(1, Info.OpeningTechnologyUnitRequestTimeout);
+				return;
+			}
+
+			if (openingTechnologyResearchRequestOutstanding)
+			{
+				if (world.WorldTick < openingTechnologyResearchRequestExpiryTick)
+					return;
+
+				CancelRequests(bot, next);
+				openingTechnologyResearchRequestOutstanding = false;
+				openingTechnologyResearchRequestType = null;
+				LogOpening("{0} opening technology request for {1} expired; allowing retry", player, next);
+			}
+
+			if (world.WorldTick < nextOpeningTechnologyResearchRequestTick || !IsCurrentlyBuildable(next))
+				return;
+
+			if (Request(bot, next, "ordered opening technology"))
+			{
+				openingTechnologyResearchRequestOutstanding = true;
+				openingTechnologyResearchRequestType = next;
+				openingTechnologyResearchRequestExpiryTick = world.WorldTick +
+					System.Math.Max(1, Info.OpeningTechnologyUnitRequestTimeout);
+				nextOpeningTechnologyResearchRequestTick = world.WorldTick +
+					System.Math.Max(1, Info.OpeningUnitRequestCooldown);
+			}
 		}
 
 		void UpdateOpeningMcvRequestState(IBot bot)
@@ -1662,6 +1745,10 @@ namespace OpenRA.Mods.Common.Traits
 				new MiniYamlNode("NextOpeningTechnologyUnitRequestTick", FieldSaver.FormatValue(nextOpeningTechnologyUnitRequestTick)),
 				new MiniYamlNode("OpeningTechnologyUnitRequestOutstanding", FieldSaver.FormatValue(openingTechnologyUnitRequestOutstanding)),
 				new MiniYamlNode("OpeningTechnologyUnitRequestExpiryTick", FieldSaver.FormatValue(openingTechnologyUnitRequestExpiryTick)),
+				new MiniYamlNode("NextOpeningTechnologyResearchRequestTick", FieldSaver.FormatValue(nextOpeningTechnologyResearchRequestTick)),
+				new MiniYamlNode("OpeningTechnologyResearchRequestOutstanding", FieldSaver.FormatValue(openingTechnologyResearchRequestOutstanding)),
+				new MiniYamlNode("OpeningTechnologyResearchRequestExpiryTick", FieldSaver.FormatValue(openingTechnologyResearchRequestExpiryTick)),
+				new MiniYamlNode("OpeningTechnologyResearchRequestType", FieldSaver.FormatValue(openingTechnologyResearchRequestType ?? "")),
 				new MiniYamlNode("NextSmartEconomyScanTick", FieldSaver.FormatValue(smartEconomy?.NextScanTick ?? 0)),
 				new MiniYamlNode("NextSmartEconomyMcvRequestTick", FieldSaver.FormatValue(smartEconomy?.NextMcvRequestTick ?? 0)),
 				new MiniYamlNode("NextSmartEconomyProgressLogTick", FieldSaver.FormatValue(smartEconomy?.NextProgressLogTick ?? 0)),
@@ -1838,6 +1925,26 @@ namespace OpenRA.Mods.Common.Traits
 			if (technologyUnitExpiryNode != null)
 				openingTechnologyUnitRequestExpiryTick = FieldLoader.GetValue<int>(
 					"OpeningTechnologyUnitRequestExpiryTick", technologyUnitExpiryNode.Value.Value);
+			var technologyResearchRequestNode = data.FirstOrDefault(n => n.Key == "NextOpeningTechnologyResearchRequestTick");
+			if (technologyResearchRequestNode != null)
+				nextOpeningTechnologyResearchRequestTick = FieldLoader.GetValue<int>(
+					"NextOpeningTechnologyResearchRequestTick", technologyResearchRequestNode.Value.Value);
+			var technologyResearchOutstandingNode = data.FirstOrDefault(n => n.Key == "OpeningTechnologyResearchRequestOutstanding");
+			if (technologyResearchOutstandingNode != null)
+				openingTechnologyResearchRequestOutstanding = FieldLoader.GetValue<bool>(
+					"OpeningTechnologyResearchRequestOutstanding", technologyResearchOutstandingNode.Value.Value);
+			var technologyResearchExpiryNode = data.FirstOrDefault(n => n.Key == "OpeningTechnologyResearchRequestExpiryTick");
+			if (technologyResearchExpiryNode != null)
+				openingTechnologyResearchRequestExpiryTick = FieldLoader.GetValue<int>(
+					"OpeningTechnologyResearchRequestExpiryTick", technologyResearchExpiryNode.Value.Value);
+			var technologyResearchTypeNode = data.FirstOrDefault(n => n.Key == "OpeningTechnologyResearchRequestType");
+			if (technologyResearchTypeNode != null)
+			{
+				openingTechnologyResearchRequestType = FieldLoader.GetValue<string>(
+					"OpeningTechnologyResearchRequestType", technologyResearchTypeNode.Value.Value);
+				if (string.IsNullOrEmpty(openingTechnologyResearchRequestType))
+					openingTechnologyResearchRequestType = null;
+			}
 
 			var smartScanNode = data.FirstOrDefault(n => n.Key == "NextSmartEconomyScanTick");
 			var smartMcvRequestNode = data.FirstOrDefault(n => n.Key == "NextSmartEconomyMcvRequestTick");

@@ -60,6 +60,20 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		internal readonly HashSet<uint> AirRepairUnavailable = new HashSet<uint>();
 		internal readonly HashSet<uint> AirReinforcements = new HashSet<uint>();
 		internal readonly Dictionary<uint, uint> AirReinforcementTargets = new Dictionary<uint, uint>();
+		internal readonly Dictionary<uint, CPos> AirReinforcementJoinCells = new Dictionary<uint, CPos>();
+		internal readonly Dictionary<uint, CPos> AirReinforcementFallbackCells = new Dictionary<uint, CPos>();
+		internal readonly Dictionary<uint, int> AirReinforcementFallbackTicks = new Dictionary<uint, int>();
+		internal int StealthReinforcementRouteIssues;
+		internal int StealthReinforcementRoutePreserves;
+		internal int StealthCoreRouteIssues;
+		internal int StealthCoreRoutePreserves;
+		internal CPos? StealthRouteLastCenterCell;
+		internal int StealthRouteLastCenterProgressTick;
+
+		// Lazily allocated only for BotDebug acceptance runs. Release games with target debugging
+		// disabled perform no per-member motion tracking and allocate no watchdog state.
+		internal Dictionary<uint, (Actor Actor, CPos Location, int LastMoveTick, bool Triggered)>
+			StealthDebugMotion;
 		WPos airLastFormationCenter;
 		bool hasAirFormationCenter;
 		internal CPos? AirTargetStrategicCell;
@@ -78,7 +92,13 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		internal int StealthEscapeIssuedTick = -1;
 		internal int StealthEscapeSafetyChecks;
 		internal CPos? StealthEscapeDestination;
+		internal CPos? StealthEscapeStartCell;
+		internal CPos? StealthEscapeDestinationCell;
 		internal bool StealthEscapePendingExplosion;
+		internal int StealthEscapeLastProgressTick = -1;
+		internal int StealthEscapeLastDistanceCells = int.MaxValue;
+		internal CPos? StealthKiteTargetCell;
+		internal readonly Dictionary<uint, int> StealthKiteParticipantHealth = new Dictionary<uint, int>();
 		internal StealthClearMode StealthClearMode;
 		internal readonly HashSet<uint> StealthClearPackage = new HashSet<uint>();
 		internal int StealthClearMembershipSignature;
@@ -166,6 +186,17 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				else
 					AirStateBase.TickAirSafety(this);
 			}
+		}
+
+		public void TickStealthBlueSafety()
+		{
+			if (!IsValid || Type != SquadType.Stealth)
+				return;
+
+			if (Game.IsBenchmarking)
+				BenchmarkAirWork("blue-safety", () => StealthAIStateBase.TickStealthSafety(this, true));
+			else
+				StealthAIStateBase.TickStealthSafety(this, true);
 		}
 
 		void BenchmarkAirWork(string phase, Action work)
@@ -288,6 +319,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		{
 			AirReinforcements.Add(actor.ActorID);
 			AirReinforcementTargets.Remove(actor.ActorID);
+			AirReinforcementJoinCells.Remove(actor.ActorID);
+			AirReinforcementFallbackCells.Remove(actor.ActorID);
+			AirReinforcementFallbackTicks.Remove(actor.ActorID);
 		}
 
 		internal void MarkAirRepairing(Actor actor, Actor destination = null)
@@ -323,6 +357,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		{
 			AirReinforcements.Remove(actor.ActorID);
 			AirReinforcementTargets.Remove(actor.ActorID);
+			AirReinforcementJoinCells.Remove(actor.ActorID);
+			AirReinforcementFallbackCells.Remove(actor.ActorID);
+			AirReinforcementFallbackTicks.Remove(actor.ActorID);
 			airLastFormationCenter = actor.CenterPosition;
 			hasAirFormationCenter = true;
 		}
@@ -341,6 +378,12 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			AirReinforcements.RemoveWhere(id => !live.Contains(id));
 			foreach (var id in AirReinforcementTargets.Keys.Where(id => !live.Contains(id)).ToList())
 				AirReinforcementTargets.Remove(id);
+			foreach (var id in AirReinforcementJoinCells.Keys.Where(id => !live.Contains(id)).ToList())
+				AirReinforcementJoinCells.Remove(id);
+			foreach (var id in AirReinforcementFallbackCells.Keys.Where(id => !live.Contains(id)).ToList())
+				AirReinforcementFallbackCells.Remove(id);
+			foreach (var id in AirReinforcementFallbackTicks.Keys.Where(id => !live.Contains(id)).ToList())
+				AirReinforcementFallbackTicks.Remove(id);
 
 			var formation = AirFormationUnits();
 			if (formation.Count == 0)
