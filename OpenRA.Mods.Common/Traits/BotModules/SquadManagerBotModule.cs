@@ -285,6 +285,8 @@ namespace OpenRA.Mods.Common.Traits
 		public readonly int AirSafetyCheckInterval = 0;
 		[Desc("Ticks between lightweight local safety checks for ground stealth squads.")]
 		public readonly int StealthSafetyCheckInterval = 25;
+		[Desc("Ticks between bounded live checks of an owned stealth Crush or Kite target.")]
+		public readonly int StealthLiveTargetCheckInterval = 12;
 		[Desc("Ticks between live pending-Blue-explosion checks for ground stealth squads.")]
 		public readonly int StealthBlueSafetyCheckInterval = 5;
 
@@ -480,7 +482,8 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (AirSafetyCheckInterval > 0 && AirThreatScanRadius <= 0)
 				throw new YamlException("AirThreatScanRadius must be greater than zero when AirSafetyCheckInterval is set.");
-			if (StealthSafetyCheckInterval < 0 || StealthBlueSafetyCheckInterval < 0)
+			if (StealthSafetyCheckInterval < 0 || StealthLiveTargetCheckInterval < 0 ||
+				StealthBlueSafetyCheckInterval < 0)
 				throw new YamlException("Stealth safety intervals must not be negative.");
 
 			if (AirThreatFleeMultiplier <= 0)
@@ -586,6 +589,10 @@ namespace OpenRA.Mods.Common.Traits
 		static readonly Dictionary<Ruleset, GeneralizedCombatThreatCalculator> CombatThreatCalculators =
 			new Dictionary<Ruleset, GeneralizedCombatThreatCalculator>();
 		readonly Dictionary<uint, int> airMarkedGroundTargets = new Dictionary<uint, int>();
+		readonly Dictionary<uint, (string Definition, int Index)> stealthSquadAssignments =
+			new Dictionary<uint, (string Definition, int Index)>();
+		readonly HashSet<(string Definition, int Index)> expiredStealthSquadSlots =
+			new HashSet<(string Definition, int Index)>();
 
 		// Units that the bot already knows about. Any unit not on this list needs to be given a role.
 		readonly List<Actor> activeUnits = new List<Actor>();
@@ -608,6 +615,7 @@ namespace OpenRA.Mods.Common.Traits
 		int minAttackForceDelayTicks;
 		int airSafetyTicks;
 		int stealthSafetyTicks;
+		int stealthLiveTargetTicks;
 		int stealthBlueSafetyTicks;
 		int adaptiveAirRiskTicks;
 		int stealthRecruitTicks;
@@ -727,6 +735,8 @@ namespace OpenRA.Mods.Common.Traits
 				airSafetyTicks = World.LocalRandom.Next(0, Info.AirSafetyCheckInterval);
 			if (Info.StealthSafetyCheckInterval > 0)
 				stealthSafetyTicks = World.LocalRandom.Next(0, Info.StealthSafetyCheckInterval);
+			if (Info.StealthLiveTargetCheckInterval > 0)
+				stealthLiveTargetTicks = World.LocalRandom.Next(0, Info.StealthLiveTargetCheckInterval);
 			if (Info.StealthBlueSafetyCheckInterval > 0)
 				stealthBlueSafetyTicks = World.LocalRandom.Next(0, Info.StealthBlueSafetyCheckInterval);
 
@@ -850,8 +860,12 @@ namespace OpenRA.Mods.Common.Traits
 					(configured.Value.IncludeAttackGroup ? 1 : 0);
 				var configuredSquads = Squads.Where(s => s.Type == SquadType.Stealth &&
 					s.StealthSquadDefinition == configured.Key).OrderBy(s => s.StealthSquadIndex).ToList();
-				for (var i = configuredSquads.Count; i < count; i++)
+				for (var i = 0; i < count; i++)
 				{
+					if (configuredSquads.Any(existing => existing.StealthSquadIndex == i) ||
+						expiredStealthSquadSlots.Contains((configured.Key, i)))
+						continue;
+
 					var squad = RegisterNewSquad(enabledBot, SquadType.Stealth);
 					squad.StealthSquadDefinition = configured.Key;
 					squad.StealthSquadIndex = i;
@@ -862,15 +876,45 @@ namespace OpenRA.Mods.Common.Traits
 
 		void RebalanceStealthSquads()
 		{
+			// activeUnits is the manager-owned actor cache, while the registry admits newly produced
+			// or released combat units before they are claimed. Keep the frequent specialist lifecycle
+			// owner-bounded instead of materializing every actor in the world.
+			var recruitmentActors = activeUnits
+				.Concat(unassignedCombatUnits?.UnassignedActors ?? Array.Empty<Actor>())
+				.Where(actor => actor != null)
+				.Distinct()
+				.OrderBy(actor => actor.ActorID)
+				.ToList();
+			foreach (var actorId in stealthSquadAssignments.Keys
+				.Where(id => World.GetActorById(id) == null).ToList())
+				stealthSquadAssignments.Remove(actorId);
+
 			foreach (var configured in Info.StealthSquadDefinitions.OrderBy(entry => entry.Key))
 			{
 				var specialistSquads = Squads.Where(s => s.Type == SquadType.Stealth &&
-					s.StealthSquadDefinition == configured.Key).OrderBy(s => s.StealthSquadIndex).ToArray();
+					s.StealthSquadDefinition == configured.Key).OrderBy(s => s.StealthSquadIndex).ToList();
 				var previousMembership = specialistSquads.SelectMany(s => s.Units.Select(a =>
 					new { Actor = a, Squad = s })).ToDictionary(entry => entry.Actor.ActorID);
-				var eligible = World.Actors.Where(a => !unitCannotBeOrdered(a) &&
+				var eligible = recruitmentActors.Where(a => !unitCannotBeOrdered(a) &&
 					configured.Value.UnitTypes.Contains(a.Info.Name) && !IsReservedForTransport(a) &&
 					!IsUnitTemporarilyControlled(a)).OrderBy(a => a.ActorID).ToList();
+				var unassigned = eligible.Count(actor => !stealthSquadAssignments.TryGetValue(
+					actor.ActorID, out var assignment) || assignment.Definition != configured.Key);
+				foreach (var slot in expiredStealthSquadSlots.Where(slot => slot.Definition == configured.Key)
+					.OrderBy(slot => slot.Index).Take(unassigned).ToArray())
+				{
+					var remade = RegisterNewSquad(bot, SquadType.Stealth);
+					remade.StealthSquadDefinition = slot.Definition;
+					remade.StealthSquadIndex = slot.Index;
+					specialistSquads.Add(remade);
+					expiredStealthSquadSlots.Remove(slot);
+					if (Info.AirTargetDebugLogging)
+						Log.Write("debug", "Stealth squad lifecycle [{0}] remade: tick={1} squad={2}#{3} " +
+							"available-new-members={4} cadence-window=fresh.", configured.Key,
+							World.WorldTick, slot.Definition, slot.Index, unassigned);
+				}
+
+				specialistSquads = specialistSquads.OrderBy(squad => squad.StealthSquadIndex).ToList();
 				foreach (var squad in specialistSquads)
 					squad.Units.Clear();
 
@@ -878,14 +922,18 @@ namespace OpenRA.Mods.Common.Traits
 				{
 					var actor = eligible[i];
 					var groupIndex = previousMembership.TryGetValue(actor.ActorID, out var membership) ?
-						membership.Squad.StealthSquadIndex : specialistSquads
+						membership.Squad.StealthSquadIndex :
+						stealthSquadAssignments.TryGetValue(actor.ActorID, out var assignment) &&
+						assignment.Definition == configured.Key ? assignment.Index : specialistSquads
 							.OrderBy(candidateSquad => candidateSquad.Units.Count)
 							.ThenBy(candidateSquad => candidateSquad.StealthSquadIndex)
 							.First().StealthSquadIndex;
-					if (groupIndex < 0 || groupIndex >= specialistSquads.Length)
+					var assignedSquad = specialistSquads.FirstOrDefault(squad =>
+						squad.StealthSquadIndex == groupIndex);
+					if (assignedSquad == null)
 						continue;
 
-					var assignedSquad = specialistSquads[groupIndex];
+					stealthSquadAssignments[actor.ActorID] = (configured.Key, groupIndex);
 					assignedSquad.Units.Add(actor);
 					if (!previousMembership.ContainsKey(actor.ActorID) && assignedSquad.Units.Count > 1)
 						assignedSquad.MarkAirReinforcement(actor);
@@ -895,6 +943,37 @@ namespace OpenRA.Mods.Common.Traits
 					if (!activeUnits.Contains(actor))
 						activeUnits.Add(actor);
 					unassignedCombatUnits?.ClaimActors(new[] { actor });
+				}
+
+				foreach (var squad in specialistSquads)
+				{
+					if (squad.IsValid || recruitmentActors.Any(actor => !unitCannotBeOrdered(actor) &&
+						stealthSquadAssignments.TryGetValue(actor.ActorID, out var assignment) &&
+						assignment.Definition == configured.Key && assignment.Index == squad.StealthSquadIndex))
+					{
+						squad.StealthEmptySinceTick = -1;
+						continue;
+					}
+
+					if (squad.StealthEmptySinceTick < 0)
+					{
+						squad.StealthEmptySinceTick = World.WorldTick;
+						continue;
+					}
+
+					if (World.WorldTick - squad.StealthEmptySinceTick < configured.Value.ScanInterval)
+						continue;
+
+					Squads.Remove(squad);
+					expiredStealthSquadSlots.Add((configured.Key, squad.StealthSquadIndex));
+					if (Info.AirTargetDebugLogging)
+						Log.Write("debug", "Stealth squad lifecycle [{0}] empty timeout: tick={1} " +
+							"removed-squad={2}#{3} empty-age={4} transient-affinity=False " +
+							"status=timed-out cadence-age={5}/{6} squad-kills={7} cadence-failed={8}.", configured.Key,
+							World.WorldTick, squad.StealthSquadDefinition, squad.StealthSquadIndex,
+							World.WorldTick - squad.StealthEmptySinceTick, squad.StealthKillCadenceAge,
+							Math.Max(1, 45000 / Math.Max(1, World.Timestep)),
+							squad.StealthDebugKillCadenceKills, squad.StealthDebugKillCadenceFailed);
 				}
 			}
 		}
@@ -1136,6 +1215,13 @@ namespace OpenRA.Mods.Common.Traits
 				stealthSafetyTicks = Info.StealthSafetyCheckInterval;
 				foreach (var s in Squads.Where(s => s.Type == SquadType.Stealth))
 					s.TickAirSafety();
+			}
+
+			if (Info.StealthLiveTargetCheckInterval > 0 && --stealthLiveTargetTicks <= 0)
+			{
+				stealthLiveTargetTicks = Info.StealthLiveTargetCheckInterval;
+				foreach (var s in Squads.Where(s => s.Type == SquadType.Stealth))
+					s.TickStealthLiveTarget();
 			}
 
 			if (Info.StealthBlueSafetyCheckInterval > 0 && --stealthBlueSafetyTicks <= 0)
@@ -1647,6 +1733,25 @@ namespace OpenRA.Mods.Common.Traits
 			if (IsTraitDisabled || e.DamageState != DamageState.Dead || e.PreviousDamageState == DamageState.Dead ||
 				e.Attacker == null || e.Attacker.Owner != Player || Player.RelationshipWith(damaged.Owner) != PlayerRelationship.Enemy)
 				return;
+
+			if (e.Attacker.Info.Name == "stnk")
+			{
+				var stealthSquad = Squads.FirstOrDefault(s => s.Type == SquadType.Stealth &&
+					s.StealthProfile == "stealth-tank" && s.Units.Contains(e.Attacker));
+				if (stealthSquad != null)
+				{
+					stealthSquad.StealthKillCadenceAge = 0;
+					stealthSquad.StealthKillCadenceLastTick = World.WorldTick;
+					stealthSquad.StealthDebugKillCadenceKills++;
+					stealthSquad.StealthDebugKillCadenceFailed = false;
+					if (Info.AirTargetDebugLogging)
+						Log.Write("debug", "Stealth kill watchdog [stealth-tank] STNK-attributed kill: " +
+							"tick={0} squad={1}#{2} attacker=stnk#{3} victim={4}#{5} squad-kills={6} cadence-age=0.",
+							World.WorldTick, stealthSquad.StealthSquadDefinition,
+							stealthSquad.StealthSquadIndex, e.Attacker.ActorID, damaged.Info.Name,
+							damaged.ActorID, stealthSquad.StealthDebugKillCadenceKills);
+				}
+			}
 
 			if (Info.GroundTargetDebugLogging)
 			{

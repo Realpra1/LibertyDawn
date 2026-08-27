@@ -27,6 +27,20 @@ namespace OpenRA.Mods.Common.Traits
 	/// </summary>
 	public static class StealthAIThreatGeometry
 	{
+		public sealed class ReachableTargetCell
+		{
+			public int TargetIndex { get; set; }
+			public float RouteCost { get; set; }
+			public List<CPos> Route { get; set; }
+			public bool IsRequired { get; set; }
+		}
+
+		public sealed class ReachableTargetCells
+		{
+			public List<ReachableTargetCell> Targets { get; set; }
+			public int ExpandedCells { get; set; }
+		}
+
 		/// <summary>
 		/// True when another damaged aircraft has already selected a facility, including assignments made
 		/// earlier in the current bot tick before the engine has processed its reservation order.
@@ -80,6 +94,118 @@ namespace OpenRA.Mods.Common.Traits
 				result.Add(requiredIndex);
 
 			return result;
+		}
+
+		/// <summary>
+		/// Expands one deterministic lowest-cost frontier from the active coarse cell and returns the
+		/// first bounded target-bearing cells that are reachable without crossing hard danger. A valid
+		/// required target is retained in addition to the normal result limit. The returned routes all
+		/// share the same cost/previous search state, so callers do not need a route search per target.
+		/// </summary>
+		public static ReachableTargetCells SelectReachableTargetCells(
+			float[] danger, int width, int height, int startX, int startY,
+			IReadOnlyList<CPos> targetCells, float dangerCost, int maximumResults,
+			int requiredIndex = -1)
+		{
+			if (danger == null || width <= 0 || height <= 0 || danger.Length != width * height ||
+				startX < 0 || startY < 0 || startX >= width || startY >= height ||
+				targetCells == null || maximumResults <= 0)
+				return null;
+
+			var targetsByCell = new Dictionary<int, List<int>>();
+			for (var i = 0; i < targetCells.Count; i++)
+			{
+				var cell = targetCells[i];
+				if (cell.X < 0 || cell.Y < 0 || cell.X >= width || cell.Y >= height)
+					continue;
+
+				var cellIndex = cell.Y * width + cell.X;
+				if (!targetsByCell.TryGetValue(cellIndex, out var targetIndices))
+					targetsByCell.Add(cellIndex, targetIndices = new List<int>());
+				targetIndices.Add(i);
+			}
+
+			var cost = Enumerable.Repeat(float.MaxValue, danger.Length).ToArray();
+			var previous = Enumerable.Repeat(-1, danger.Length).ToArray();
+			var open = new List<int>();
+			var start = startY * width + startX;
+			cost[start] = 0;
+			open.Add(start);
+			var selected = new List<ReachableTargetCell>();
+			var selectedIndices = new HashSet<int>();
+			var regularResults = 0;
+			var requiredFound = requiredIndex < 0 || requiredIndex >= targetCells.Count;
+			var expanded = 0;
+
+			List<CPos> RouteTo(int goal)
+			{
+				var route = new List<CPos>();
+				for (var at = goal; at != start && at >= 0; at = previous[at])
+					route.Add(new CPos(at % width, at / width));
+
+				route.Reverse();
+				return route;
+			}
+
+			while (open.Count > 0 && (regularResults < maximumResults || !requiredFound))
+			{
+				var bestOpen = 0;
+				for (var i = 1; i < open.Count; i++)
+					if (cost[open[i]] < cost[open[bestOpen]] ||
+						(cost[open[i]] == cost[open[bestOpen]] && open[i] < open[bestOpen]))
+						bestOpen = i;
+
+				var current = open[bestOpen];
+				open.RemoveAt(bestOpen);
+				expanded++;
+				if (targetsByCell.TryGetValue(current, out var targetIndices))
+					foreach (var targetIndex in targetIndices.OrderBy(i => i))
+					{
+						var required = targetIndex == requiredIndex;
+						if (!required && regularResults >= maximumResults)
+							continue;
+
+						if (!selectedIndices.Add(targetIndex))
+							continue;
+
+						selected.Add(new ReachableTargetCell
+						{
+							TargetIndex = targetIndex,
+							RouteCost = cost[current],
+							Route = RouteTo(current),
+							IsRequired = required,
+						});
+						if (required)
+							requiredFound = true;
+						else
+							regularResults++;
+					}
+
+				var cx = current % width;
+				var cy = current / width;
+				for (var direction = 0; direction < 4; direction++)
+				{
+					var nx = cx + (direction == 0 ? -1 : direction == 1 ? 1 : 0);
+					var ny = cy + (direction == 2 ? -1 : direction == 3 ? 1 : 0);
+					if (nx < 0 || ny < 0 || nx >= width || ny >= height)
+						continue;
+
+					var next = ny * width + nx;
+					if (StealthAISpecialistPolicy.IsHardRouteDanger(danger[next]))
+						continue;
+
+					var nextCost = cost[current] + 1 + Math.Max(0, danger[next]) * Math.Max(0, dangerCost);
+					if (nextCost >= cost[next])
+						continue;
+
+					cost[next] = nextCost;
+					previous[next] = current;
+					if (!open.Contains(next))
+						open.Add(next);
+				}
+			}
+
+			return new ReachableTargetCells { Targets = selected, ExpandedCells = expanded };
 		}
 
 		/// <summary>

@@ -919,6 +919,7 @@ STNK:
 		Voice: Attack
 	AttackMove:
 		Voice: Attack
+	EconomyMammothCrushMove:
 	AutoTarget:
 		InitialStance: HoldFire
 		InitialStanceAI: ReturnFire
