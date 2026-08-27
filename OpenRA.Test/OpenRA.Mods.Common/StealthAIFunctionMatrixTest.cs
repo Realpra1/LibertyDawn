@@ -322,8 +322,17 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(manager, Does.Contain("stealthSquadAssignments"));
 			Assert.That(manager, Does.Contain("assignment.Definition == configured.Key ? assignment.Index"),
 				"Temporary control or reservation must not move a returning STNK to another persistent squad.");
-			Assert.That(manager, Does.Contain("!worldActorIds.Contains(id)"),
-				"Persistent squad affinity should be pruned only after the actor leaves the world.");
+			var rebalance = manager.Substring(manager.IndexOf("void RebalanceStealthSquads()",
+				StringComparison.Ordinal));
+			rebalance = rebalance.Substring(0, rebalance.IndexOf("bool IsManagerOwnedSpecialist",
+				StringComparison.Ordinal));
+			Assert.That(rebalance, Does.Not.Contain("World.Actors"),
+				"The frequent specialist lifecycle must never enumerate or materialize the whole world.");
+			Assert.That(rebalance, Does.Contain("activeUnits"));
+			Assert.That(rebalance, Does.Contain("unassignedCombatUnits?.UnassignedActors"),
+				"Newly admitted combat units must join the existing manager-owned cache without a world scan.");
+			Assert.That(rebalance, Does.Contain("World.GetActorById(id) == null"),
+				"Persistent squad affinity should be pruned by bounded assignment lookup only after the actor leaves the world.");
 			Assert.That(states, Does.Contain("squad acceptance: tick={0}"));
 			Assert.That(states, Does.Contain("members=[{9}]"),
 				"Acceptance telemetry must identify bounded current membership for churn audits.");

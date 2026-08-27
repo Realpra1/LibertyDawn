@@ -876,9 +876,17 @@ namespace OpenRA.Mods.Common.Traits
 
 		void RebalanceStealthSquads()
 		{
-			var worldActors = World.Actors.ToList();
-			var worldActorIds = worldActors.Select(actor => actor.ActorID).ToHashSet();
-			foreach (var actorId in stealthSquadAssignments.Keys.Where(id => !worldActorIds.Contains(id)).ToList())
+			// activeUnits is the manager-owned actor cache, while the registry admits newly produced
+			// or released combat units before they are claimed. Keep the frequent specialist lifecycle
+			// owner-bounded instead of materializing every actor in the world.
+			var recruitmentActors = activeUnits
+				.Concat(unassignedCombatUnits?.UnassignedActors ?? Array.Empty<Actor>())
+				.Where(actor => actor != null)
+				.Distinct()
+				.OrderBy(actor => actor.ActorID)
+				.ToList();
+			foreach (var actorId in stealthSquadAssignments.Keys
+				.Where(id => World.GetActorById(id) == null).ToList())
 				stealthSquadAssignments.Remove(actorId);
 
 			foreach (var configured in Info.StealthSquadDefinitions.OrderBy(entry => entry.Key))
@@ -887,7 +895,7 @@ namespace OpenRA.Mods.Common.Traits
 					s.StealthSquadDefinition == configured.Key).OrderBy(s => s.StealthSquadIndex).ToList();
 				var previousMembership = specialistSquads.SelectMany(s => s.Units.Select(a =>
 					new { Actor = a, Squad = s })).ToDictionary(entry => entry.Actor.ActorID);
-				var eligible = worldActors.Where(a => !unitCannotBeOrdered(a) &&
+				var eligible = recruitmentActors.Where(a => !unitCannotBeOrdered(a) &&
 					configured.Value.UnitTypes.Contains(a.Info.Name) && !IsReservedForTransport(a) &&
 					!IsUnitTemporarilyControlled(a)).OrderBy(a => a.ActorID).ToList();
 				var unassigned = eligible.Count(actor => !stealthSquadAssignments.TryGetValue(
@@ -939,7 +947,7 @@ namespace OpenRA.Mods.Common.Traits
 
 				foreach (var squad in specialistSquads)
 				{
-					if (squad.IsValid || worldActors.Any(actor => !unitCannotBeOrdered(actor) &&
+					if (squad.IsValid || recruitmentActors.Any(actor => !unitCannotBeOrdered(actor) &&
 						stealthSquadAssignments.TryGetValue(actor.ActorID, out var assignment) &&
 						assignment.Definition == configured.Key && assignment.Index == squad.StealthSquadIndex))
 					{
