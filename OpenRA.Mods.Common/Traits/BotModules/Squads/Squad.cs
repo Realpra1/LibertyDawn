@@ -20,6 +20,53 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 {
 	public enum SquadType { Assault, Air, Rush, Protection, Naval, GeneralAttack, Stealth }
 
+	public struct StealthDebugLifecycleSnapshot
+	{
+		public int Tick;
+		public int CadenceAge;
+		public int Reason;
+		public uint ActorId;
+		public string Role;
+		public StealthClearMode Mode;
+		public string TargetName;
+		public uint TargetId;
+		public bool HasTarget;
+		public CPos TargetCell;
+		public bool CanAttack;
+		public CPos ActorCell;
+		public int Distance;
+		public bool RouteQueued;
+		public int RouteBuffer;
+		public string RoutePhase;
+		public int ProgressAge;
+		public bool Safety;
+		public CPos EscapeDestination;
+		public bool HasEscapeDestination;
+		public bool Firing;
+		public int MaximumFireDelay;
+		public int HP;
+		public int MaxHP;
+		public bool Repair;
+		public uint RepairTargetId;
+		public bool HasRepairTarget;
+		public bool Idle;
+		public string CurrentActivity;
+		public int CurrentActivityState;
+		public bool CurrentActivityCanceling;
+		public string NextActivity;
+		public int NextActivityState;
+		public bool NextActivityCanceling;
+		public string FinalActivity;
+		public int FinalActivityState;
+		public bool FinalActivityCanceling;
+		public int ActivityDepth;
+		public TargetType OrderTargetType;
+		public string OrderTargetName;
+		public uint OrderTargetId;
+		public CPos OrderTargetCell;
+		public int Signature;
+	}
+
 	public class Squad
 	{
 		public List<Actor> Units = new List<Actor>();
@@ -74,6 +121,15 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		// disabled perform no per-member motion tracking and allocate no watchdog state.
 		internal Dictionary<uint, (Actor Actor, CPos Location, int LastMoveTick, bool Triggered)>
 			StealthDebugMotion;
+		internal Dictionary<uint, Queue<StealthDebugLifecycleSnapshot>> StealthDebugLifecycle;
+		internal Dictionary<uint, (int Signature, int LastReportTick)> StealthDebugLifecycleState;
+		internal int StealthDebugLifecycleLastCadenceAge = -1;
+		internal int StealthKillCadenceAge;
+		internal int StealthKillCadenceLastTick = -1;
+		internal int StealthDebugKillCadenceNextReportTick = -1;
+		internal int StealthDebugKillCadenceKills;
+		internal bool StealthDebugKillCadenceFailed;
+		internal int StealthEmptySinceTick = -1;
 		WPos airLastFormationCenter;
 		bool hasAirFormationCenter;
 		internal CPos? AirTargetStrategicCell;
@@ -98,8 +154,12 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		internal int StealthEscapeLastProgressTick = -1;
 		internal int StealthEscapeLastDistanceCells = int.MaxValue;
 		internal CPos? StealthKiteTargetCell;
+		internal uint StealthKiteSupersessionActorId;
+		internal int StealthKiteSupersessionConfirmations;
 		internal readonly Dictionary<uint, int> StealthKiteParticipantHealth = new Dictionary<uint, int>();
+		internal uint StealthCrushLeaderActorId;
 		internal StealthClearMode StealthClearMode;
+		internal bool StealthAggressiveMass;
 		internal readonly HashSet<uint> StealthClearPackage = new HashSet<uint>();
 		internal int StealthClearMembershipSignature;
 		internal CPos? StealthClearCenterCell;
@@ -197,6 +257,12 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				BenchmarkAirWork("blue-safety", () => StealthAIStateBase.TickStealthSafety(this, true));
 			else
 				StealthAIStateBase.TickStealthSafety(this, true);
+		}
+
+		public void TickStealthLiveTarget()
+		{
+			if (IsValid && Type == SquadType.Stealth)
+				StealthAIStateBase.TickStealthLiveTarget(this);
 		}
 
 		void BenchmarkAirWork(string phase, Action work)

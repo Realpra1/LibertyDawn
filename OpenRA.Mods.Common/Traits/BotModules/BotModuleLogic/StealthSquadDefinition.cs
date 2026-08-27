@@ -33,8 +33,10 @@ namespace OpenRA.Mods.Common.Traits
 		public readonly int MinimumLateHarassmentGroupSize = 3;
 		public readonly int TargetSwitchImprovementPercent = 25;
 		public readonly int HarassmentDistancePenalty = 1;
+		[Desc("Number of reachable target-bearing strategic cells collected by the STNK outward frontier.")]
+		public readonly int OutwardTargetCellLimit = 8;
 		[Desc("Preferred maximum driving time in seconds for an undefended target. Farther safe targets remain a fallback.")]
-		public readonly int MaximumUndefendedTargetTravelSeconds = 60;
+		public readonly int MaximumUndefendedTargetTravelSeconds = 20;
 		public readonly bool EnableKiting = true;
 		public readonly int MinimumKiteSpeedPercent = 120;
 		public readonly int MassClearEntryCrossoverPercent = 200;
@@ -73,6 +75,7 @@ namespace OpenRA.Mods.Common.Traits
 				DetectorRangeBufferCells < 0 || RouteThreatPenalty < 0 || MaximumRouteStretchPercent < 100 ||
 				KiteRangeMarginCells < 0 || CarefulClearValueRatio <= 0 || MinimumLateHarassmentGroupSize <= 0 ||
 				TargetSwitchImprovementPercent < 0 || HarassmentDistancePenalty <= 0 ||
+				OutwardTargetCellLimit < 5 || OutwardTargetCellLimit > 10 ||
 				MaximumUndefendedTargetTravelSeconds <= 0 || MinimumKiteSpeedPercent < 100 ||
 				MassClearEntryCrossoverPercent <= MassClearAbortCrossoverPercent ||
 				MassClearAbortCrossoverPercent < 0 ||

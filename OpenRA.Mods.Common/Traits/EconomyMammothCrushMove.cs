@@ -31,6 +31,12 @@ namespace OpenRA.Mods.Common.Traits
 			return EconomyTroopPolicy.ShouldIssueCrushOrder(target.ActorID, activeTargetIds);
 		}
 
+		internal bool IsCurrentOrder(Actor self, Actor target)
+		{
+			return self.CurrentActivity is MoveToCrushTarget current &&
+				!current.IsCanceling && current.TargetId == target.ActorID;
+		}
+
 		void IResolveOrder.ResolveOrder(Actor self, Order order)
 		{
 			if (order.OrderString != OrderId)

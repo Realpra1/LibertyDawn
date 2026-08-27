@@ -9,6 +9,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using OpenRA.Mods.Common.Traits.BotModules.Squads;
 
 #pragma warning disable SA1507
 
@@ -43,6 +44,12 @@ namespace OpenRA.Mods.Common.Traits
 		Repairing
 	}
 
+	public enum StealthCadenceQuickClearMode
+	{
+		UndefendedValue,
+		Kite
+	}
+
 	public sealed class StealthTankReinforcementSaveGroup
 	{
 		public int GroupIndex;
@@ -61,6 +68,7 @@ namespace OpenRA.Mods.Common.Traits
 		public const float OrdinaryWeaponRouteInfluence = 0.2f;
 		public const float HardDetectorRouteInfluence = 1f;
 		public const int ReinforcementSaveVersion = 2;
+		public const int AggressiveMassEntryCrossoverPercent = 500;
 
 
 
@@ -555,6 +563,12 @@ namespace OpenRA.Mods.Common.Traits
 			return !double.IsFinite(overmatch) || overmatch * 100 <= abortPercent;
 		}
 
+		public static bool ShouldEnterAggressiveMass(double overmatch)
+		{
+			return double.IsFinite(overmatch) &&
+				overmatch * 100 > AggressiveMassEntryCrossoverPercent;
+		}
+
 		public static bool CanOutrangeTargetDetector(bool threatIsTarget, int weaponRangeCells,
 			int detectorRangeCells, int ownRangeCells)
 		{
@@ -575,6 +589,144 @@ namespace OpenRA.Mods.Common.Traits
 			bool localThreatExposure, bool resourceHazard)
 		{
 			return hasValidTarget && isEngaged && !localThreatExposure && !resourceHazard;
+		}
+
+		public static int NextKillCadenceAge(int currentAge, int elapsedTicks,
+			bool stnkKill, bool exempt)
+		{
+			if (currentAge < 0)
+				throw new ArgumentOutOfRangeException(nameof(currentAge));
+			if (elapsedTicks < 0)
+				throw new ArgumentOutOfRangeException(nameof(elapsedTicks));
+
+			if (stnkKill)
+				return 0;
+
+			return exempt ? currentAge : currentAge + elapsedTicks;
+		}
+
+		public static bool KillCadenceFailed(int ageTicks, int maximumTicks)
+		{
+			return maximumTicks > 0 && ageTicks >= maximumTicks;
+		}
+
+		public static bool ShouldDispatchOwnedMissionImmediately(bool isStealthTank,
+			bool targetValid, int routeWaypoints, bool routeQueued)
+		{
+			return isStealthTank && targetValid && routeWaypoints > 0 && !routeQueued;
+		}
+
+		public static bool ShouldPreserveOwnedMissionRoute(bool isStealthTank,
+			bool sameActor, bool routeQueued, bool activeUnit,
+			StealthClearMode currentMode, StealthClearMode plannedMode)
+		{
+			return isStealthTank && sameActor && routeQueued && activeUnit &&
+				currentMode == plannedMode;
+		}
+
+		public static bool ShouldUseBoundedCrush(long serviceMilliseconds, int maximumSeconds)
+		{
+			return IsWithinUndefendedTravelPreference(serviceMilliseconds, maximumSeconds);
+		}
+
+		public static bool ShouldRefreshQueuedCrushRoute(bool ordinaryCrush, bool routeQueued,
+			bool trackedOrderIsCurrent, bool targetChangedStrategicCell)
+		{
+			return ordinaryCrush && routeQueued && !trackedOrderIsCurrent && targetChangedStrategicCell;
+		}
+
+		public static int KillCadenceFinishMarginTicks(int reviewTicks, int stallTicks)
+		{
+			return Math.Max(1, reviewTicks) + Math.Max(1, stallTicks);
+		}
+
+		public static bool CanFinishWithinKillCadence(long serviceMilliseconds, int timestep,
+			int ageTicks, int maximumTicks, int finishMarginTicks)
+		{
+			if (serviceMilliseconds < 0 || serviceMilliseconds == long.MaxValue || timestep <= 0 ||
+				maximumTicks <= 0)
+				return false;
+
+			var remainingTicks = Math.Max(0, maximumTicks - Math.Max(0, ageTicks) -
+				Math.Max(0, finishMarginTicks));
+			return serviceMilliseconds <= remainingTicks * (long)timestep;
+		}
+
+		public static long CachedMobileServiceMilliseconds(long serviceMilliseconds, int timestep,
+			int finishMarginTicks, bool mobile)
+		{
+			if (serviceMilliseconds < 0 || serviceMilliseconds == long.MaxValue || timestep <= 0)
+				return long.MaxValue;
+
+			if (!mobile)
+				return serviceMilliseconds;
+
+			var reserveMilliseconds = Math.Max(0, finishMarginTicks) * (long)timestep;
+			return serviceMilliseconds > long.MaxValue - reserveMilliseconds ? long.MaxValue :
+				serviceMilliseconds + reserveMilliseconds;
+		}
+
+		public static bool IsKillCadenceUrgent(int ageTicks, int maximumTicks, int finishMarginTicks)
+		{
+			return maximumTicks > 0 && Math.Max(0, ageTicks) + Math.Max(0, finishMarginTicks) >=
+				(maximumTicks + 2) / 3;
+		}
+
+		public static int CadenceUrgentLocalQuickClearRank(bool isStealthTank, bool cadenceUrgent,
+			bool cachedLocal, bool ownedOrDeconflicted, bool safe, bool hasRoute, bool finishable,
+			bool withinLocalServiceWindow, StealthCadenceQuickClearMode mode,
+			bool eligibleUndefendedValue, bool eligibleKite)
+		{
+			if (!isStealthTank || !cadenceUrgent || !cachedLocal || !ownedOrDeconflicted ||
+				!safe || !hasRoute || !finishable || !withinLocalServiceWindow)
+				return int.MaxValue;
+
+			if (mode == StealthCadenceQuickClearMode.UndefendedValue && eligibleUndefendedValue)
+				return 0;
+
+			return mode == StealthCadenceQuickClearMode.Kite && eligibleKite ?
+				1 : int.MaxValue;
+		}
+
+		public static (long DistanceSquared, long ThreatTieBreak, int ValueTieBreak, uint ActorId)
+			CachedLocalKiteOrderKey(long distanceSquared, long cachedThreat, int cachedValue, uint actorId)
+		{
+			return (Math.Max(0, distanceSquared), -Math.Max(0, cachedThreat),
+				-Math.Max(0, cachedValue), actorId);
+		}
+
+		public static bool ShouldReplaceNonFinishableMission(long incumbentServiceMilliseconds,
+			long challengerServiceMilliseconds, int timestep, int ageTicks, int maximumTicks,
+			int finishMarginTicks, bool incumbentMobile = true, bool challengerMobile = true)
+		{
+			if (challengerServiceMilliseconds < 0 || challengerServiceMilliseconds == long.MaxValue)
+				return false;
+
+			var incumbentFits = CanFinishWithinKillCadence(incumbentServiceMilliseconds, timestep,
+				ageTicks, maximumTicks, finishMarginTicks);
+			var challengerFits = CanFinishWithinKillCadence(challengerServiceMilliseconds, timestep,
+				ageTicks, maximumTicks, finishMarginTicks);
+			var minimumImprovementMilliseconds = Math.Max(0, finishMarginTicks) *
+				(long)Math.Max(1, timestep);
+			var materiallyShorter = challengerServiceMilliseconds < incumbentServiceMilliseconds &&
+				incumbentServiceMilliseconds - challengerServiceMilliseconds >= minimumImprovementMilliseconds;
+			var preservesStationaryFinish = !incumbentMobile && challengerMobile;
+			var replacementShorter = challengerServiceMilliseconds < incumbentServiceMilliseconds &&
+				(!preservesStationaryFinish || materiallyShorter);
+			return (!incumbentFits && (challengerFits || replacementShorter)) ||
+				(IsKillCadenceUrgent(ageTicks, maximumTicks, finishMarginTicks) &&
+				replacementShorter);
+		}
+
+		public static bool ShouldReplaceLowValueWallWithConfirmedMovingMtnkKite(
+			bool isStealthTank, bool incumbentIsWall, bool challengerIsMovingMtnk,
+			StealthClearMode challengerMode, int consecutiveConfirmations,
+			long challengerServiceMilliseconds, int maximumLocalTravelSeconds)
+		{
+			return isStealthTank && incumbentIsWall && challengerIsMovingMtnk &&
+				challengerMode == StealthClearMode.Kite && consecutiveConfirmations >= 2 &&
+				IsWithinUndefendedTravelPreference(
+					challengerServiceMilliseconds, maximumLocalTravelSeconds);
 		}
 
 		public static int TransitThreatRange(int detectorRangeCells, int weaponRangeCells,
