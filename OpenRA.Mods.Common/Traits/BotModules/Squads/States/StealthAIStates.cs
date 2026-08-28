@@ -822,8 +822,14 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				StealthAISpecialistPolicy.CanOutrangeUndetectingTarget(
 					targetThreat.WeaponRange, targetThreat.DetectorRange, range);
 			var minimumRange = outrangesTarget ? targetThreat.WeaponRange + 1 : 1;
+			var coarseSize = StealthCoarseSize(owner);
 			return owner.World.Map.FindTilesInAnnulus(target.Location, minimumRange, range)
 				.Where(c => mobile.CanEnterCell(c, null, BlockedByActor.Immovable))
+				.Where(c => target.Info.Name != "obli" || targetThreat == null ||
+					StealthAIThreatGeometry.IsOutsideWeaponRange(owner.World.Map.Clamp(new CPos(
+						c.X / coarseSize * coarseSize + coarseSize / 2,
+						c.Y / coarseSize * coarseSize + coarseSize / 2)),
+						target.Location, targetThreat.WeaponRange))
 				.Where(c => !localThreats.Any(t => CachedThreatCoversReveal(
 					owner, t, owner.World.Map.CenterOfCell(c), outrangesTarget ? target : null)))
 				.OrderBy(c => (c - representative.Location).LengthSquared)
@@ -1237,6 +1243,27 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 						StealthAISpecialistPolicy.HardRouteDangerThreshold);
 			}
 
+			var directObeliskThreat = directObeliskTarget != null &&
+				directObeliskTarget.Info.Name == "obli" &&
+				cache.ThreatByActor.TryGetValue(directObeliskTarget, out var directThreat) &&
+				directThreat.WeaponRange > 0 ? directThreat : null;
+			if (directObeliskThreat != null)
+			{
+				danger = (float[])danger.Clone();
+				var directCoarseSize = StealthCoarseSize(owner);
+				for (var y = 0; y < cache.Height; y++)
+					for (var x = 0; x < cache.Width; x++)
+					{
+						var waypoint = owner.World.Map.Clamp(new CPos(
+							x * directCoarseSize + directCoarseSize / 2,
+							y * directCoarseSize + directCoarseSize / 2));
+						if (!StealthAIThreatGeometry.IsOutsideWeaponRange(waypoint,
+							directObeliskTarget.Location, directObeliskThreat.WeaponRange))
+							danger[y * cache.Width + x] = Math.Max(danger[y * cache.Width + x],
+								StealthAISpecialistPolicy.HardRouteDangerThreshold);
+					}
+			}
+
 			var coarseSize = StealthCoarseSize(owner);
 			var startX = Math.Clamp(unit.Location.X / coarseSize, 0, cache.Width - 1);
 			var startY = Math.Clamp(unit.Location.Y / coarseSize, 0, cache.Height - 1);
@@ -1252,6 +1279,23 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				startX, startY, route).Select(cell => owner.World.Map.Clamp(new CPos(
 					cell.X * coarseSize + coarseSize / 2,
 					cell.Y * coarseSize + coarseSize / 2))).ToList();
+		}
+
+		static List<CPos> AppendValidatedFiringCell(StealthInfluenceCache cache, Actor target,
+			CPos firingCell, IReadOnlyList<CPos> coarseRoute)
+		{
+			if (target.Info.Name == "obli" && cache.ThreatByActor.TryGetValue(target, out var threat) &&
+				threat.WeaponRange > 0)
+				return StealthAIThreatGeometry.AppendDirectSafeFiringCell(coarseRoute,
+					firingCell, target.Location, threat.WeaponRange);
+
+			if (coarseRoute == null)
+				return null;
+
+			var route = new List<CPos>(coarseRoute);
+			if (route.Count == 0 || route[route.Count - 1] != firingCell)
+				route.Add(firingCell);
+			return route;
 		}
 
 		static List<CPos> MassClearRoute(Squad owner, Actor unit, StealthInfluenceCache cache, Actor target)
@@ -2409,13 +2453,13 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				{
 					var stalledTarget = owner.TargetActor;
 					var firingCell = SafeOrdinaryFiringCell(owner, formation[0], cache, stalledTarget);
-					var route = firingCell == null ? null :
+					var coarseRoute = firingCell == null ? null :
 						StealthRouteToCell(owner, formation[0], cache,
 							CoarseCell(owner, firingCell.Value), stalledTarget);
+					var route = firingCell == null ? null : AppendValidatedFiringCell(
+						cache, stalledTarget, firingCell.Value, coarseRoute);
 					if (route != null)
 					{
-						if (route.Count == 0 || route[route.Count - 1] != firingCell.Value)
-							route.Add(firingCell.Value);
 						LogObeliskSafeRouteEvidence(owner, cache, stalledTarget,
 							firingCell.Value, route, "stalled-fallback");
 						if (owner.SquadManager.Info.AirTargetDebugLogging)
@@ -2882,12 +2926,12 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 					if (firingCell != null)
 					{
-						var firingRoute = StealthRouteToCell(owner, representative, cache,
+						var coarseFiringRoute = StealthRouteToCell(owner, representative, cache,
 							CoarseCell(owner, firingCell.Value), actor);
+						var firingRoute = AppendValidatedFiringCell(
+							cache, actor, firingCell.Value, coarseFiringRoute);
 						if (firingRoute == null)
 							continue;
-						if (firingRoute.Count == 0 || firingRoute[firingRoute.Count - 1] != firingCell.Value)
-							firingRoute.Add(firingCell.Value);
 						LogObeliskSafeRouteEvidence(owner, cache, actor,
 							firingCell.Value, firingRoute, "ordinary-plan");
 						var plan = new AirTargetPlan(actor, score, true, firingRoute);

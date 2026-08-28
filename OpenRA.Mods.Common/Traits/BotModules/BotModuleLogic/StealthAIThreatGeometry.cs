@@ -27,6 +27,25 @@ namespace OpenRA.Mods.Common.Traits
 	/// </summary>
 	public static class StealthAIThreatGeometry
 	{
+		public static bool IsOutsideWeaponRange(CPos waypoint, CPos target, int weaponRange)
+		{
+			return weaponRange <= 0 || (waypoint - target).LengthSquared > weaponRange * weaponRange;
+		}
+
+		public static List<CPos> AppendDirectSafeFiringCell(IReadOnlyList<CPos> coarseWaypoints,
+			CPos firingCell, CPos target, int weaponRange)
+		{
+			if (coarseWaypoints == null || !IsOutsideWeaponRange(firingCell, target, weaponRange) ||
+				coarseWaypoints.Any(cell => !IsOutsideWeaponRange(cell, target, weaponRange)))
+				return null;
+
+			var route = new List<CPos>(coarseWaypoints);
+			if (route.Count == 0 || route[route.Count - 1] != firingCell)
+				route.Add(firingCell);
+
+			return route;
+		}
+
 		public sealed class ReachableTargetCell
 		{
 			public int TargetIndex { get; set; }

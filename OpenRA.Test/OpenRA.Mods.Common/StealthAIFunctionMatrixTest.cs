@@ -684,20 +684,11 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
-		public void OrdinaryAndStalledFireRoutesEndAtTheObeliskSafeCell()
+		public void OrdinaryAndStalledFireRoutesShareValidatedFinalizer()
 		{
 			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
-			var directSafeCellRoute =
-				"StealthRouteToCell(owner, formation[0], cache,\n" +
-				"\t\t\t\t\t\t\tCoarseCell(owner, firingCell.Value), stalledTarget)";
-			var directOrdinaryRoute =
-				"StealthRouteToCell(owner, representative, cache,\n" +
-				"\t\t\t\t\t\t\tCoarseCell(owner, firingCell.Value), actor)";
-
-			Assert.That(states, Does.Contain(directSafeCellRoute),
-				"A stalled STNK target must route to the selected safe firing cell, not the Obelisk cell.");
-			Assert.That(states, Does.Contain(directOrdinaryRoute),
-				"An ordinary STNK plan must discard the target-cell frontier endpoint before submission.");
+			Assert.That(states.Split("AppendValidatedFiringCell(").Length - 1, Is.EqualTo(3),
+				"The shared invariant must be defined once and used by both ordinary and stalled routes.");
 
 			var stalledFallback = states.Substring(states.IndexOf(
 				"var stalledTarget = owner.TargetActor;", StringComparison.Ordinal));
@@ -722,17 +713,48 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(watchdog, Does.Contain("AI stationary watchdog cloak-transition"));
 			Assert.That(watchdog, Does.Contain("AI stationary watchdog damage"));
 			Assert.That(watchdog, Does.Contain("AI stationary watchdog death"));
+		}
 
-			var obelisk = new CPos(30, 30);
-			var safeFiringCell = new CPos(38, 30);
-			var coarseSize = StealthAISpecialistPolicy.RequiredStrategicCellSize;
-			var safeCoarseCenter = new CPos(
-				safeFiringCell.X / coarseSize * coarseSize + coarseSize / 2,
-				safeFiringCell.Y / coarseSize * coarseSize + coarseSize / 2);
-			var submittedWaypoints = new[] { safeCoarseCenter, safeFiringCell };
-			Assert.That(submittedWaypoints.All(cell =>
-				(cell - obelisk).LengthSquared > 7 * 7), Is.True,
-				"Every submitted coarse/exact endpoint must remain outside Obelisk weapon range.");
+		[TestCase(29, 30, 37, 30)]
+		[TestCase(30, 31, 38, 31)]
+		[TestCase(31, 32, 39, 32)]
+		public void OrdinaryObeliskRouteFinalizerAppendsOnlyOutsideOffsetRange(
+			int targetX, int targetY, int firingX, int firingY)
+		{
+			var target = new CPos(targetX, targetY);
+			var firingCell = new CPos(firingX, firingY);
+			var coarseWaypoints = new[]
+			{
+				new CPos(21, 21), new CPos(27, 21), new CPos(33, 21),
+				new CPos(39, 21), new CPos(39, 27), new CPos(39, 33)
+			};
+
+			var route = StealthAIThreatGeometry.AppendDirectSafeFiringCell(
+				coarseWaypoints, firingCell, target, 7);
+			Assert.That(route, Is.Not.Null);
+			Assert.That(route.Last(), Is.EqualTo(firingCell),
+				"The ordinary production finalizer must append the exact safe firing cell.");
+			Assert.That(route.All(cell => StealthAIThreatGeometry.IsOutsideWeaponRange(
+				cell, target, 7)), Is.True,
+				"Every submitted ordinary coarse waypoint and exact endpoint must be outside range.");
+		}
+
+		[TestCase(28, 33, 21, 33, 39, 33)]
+		[TestCase(33, 28, 33, 21, 33, 39)]
+		[TestCase(32, 32, 33, 33, 40, 32)]
+		public void StalledObeliskRouteFinalizerRejectsOffsetBoundaryIngress(
+			int targetX, int targetY, int unsafeX, int unsafeY, int firingX, int firingY)
+		{
+			var target = new CPos(targetX, targetY);
+			var unsafeCoarseWaypoint = new CPos(unsafeX, unsafeY);
+			var firingCell = new CPos(firingX, firingY);
+			Assert.That(StealthAIThreatGeometry.IsOutsideWeaponRange(
+				unsafeCoarseWaypoint, target, 7), Is.False);
+
+			var route = StealthAIThreatGeometry.AppendDirectSafeFiringCell(
+				new[] { new CPos(21, 21), unsafeCoarseWaypoint }, firingCell, target, 7);
+			Assert.That(route, Is.Null,
+				"The stalled production finalizer must reject inside and exact-boundary coarse centers.");
 		}
 
 		[Test]
