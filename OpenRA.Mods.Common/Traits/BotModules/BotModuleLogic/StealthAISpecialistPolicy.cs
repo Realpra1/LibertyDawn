@@ -317,6 +317,11 @@ namespace OpenRA.Mods.Common.Traits
 			return actorTicks + Math.Max(0, liveActors);
 		}
 
+		public static bool ShouldOwnStealthEfficiencyTerminal(bool botEnabled, bool traitEnabled)
+		{
+			return botEnabled && traitEnabled;
+		}
+
 		public static StealthEfficiencySummary StealthEfficiency(long rawKilledValue,
 			long actorTicks, long totalDamage, int uniqueStnks)
 		{

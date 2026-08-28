@@ -730,13 +730,9 @@ namespace OpenRA.Mods.Common.Traits
 
 		protected override void TraitEnabled(Actor self)
 		{
-			if (!stealthEfficiencyTerminalSubscribed)
-			{
-				stealthEfficiencyWindowStartTick = World.WorldTick;
-				stealthEfficiencyTerminalReported = false;
-				stealthEfficiencyTerminalSubscribed = true;
-				World.GameOver += EmitTerminalStealthEfficiencySummary;
-			}
+			stealthEfficiencyWindowStartTick = World.WorldTick;
+			stealthEfficiencyTerminalReported = false;
+			UpdateStealthEfficiencyTerminalSubscription();
 
 			// Avoid all AIs trying to rush in the same tick, randomize their initial rush a little.
 			var smallFractionOfRushInterval = Info.RushInterval / 20;
@@ -763,18 +759,29 @@ namespace OpenRA.Mods.Common.Traits
 
 		protected override void TraitDisabled(Actor self)
 		{
-			if (!stealthEfficiencyTerminalSubscribed)
-				return;
-
-			World.GameOver -= EmitTerminalStealthEfficiencySummary;
-			stealthEfficiencyTerminalSubscribed = false;
+			UpdateStealthEfficiencyTerminalSubscription();
 		}
 
 		void IBotEnabled.BotEnabled(IBot bot)
 		{
 			this.bot = bot;
+			UpdateStealthEfficiencyTerminalSubscription();
 			EnsureStealthSquads(bot);
 			stealthRecruitTicks = 1;
+		}
+
+		void UpdateStealthEfficiencyTerminalSubscription()
+		{
+			var shouldSubscribe = StealthAISpecialistPolicy.ShouldOwnStealthEfficiencyTerminal(
+				bot != null, !IsTraitDisabled);
+			if (shouldSubscribe == stealthEfficiencyTerminalSubscribed)
+				return;
+
+			if (shouldSubscribe)
+				World.GameOver += EmitTerminalStealthEfficiencySummary;
+			else
+				World.GameOver -= EmitTerminalStealthEfficiencySummary;
+			stealthEfficiencyTerminalSubscribed = shouldSubscribe;
 		}
 
 		void IBotTick.BotTick(IBot bot)
@@ -814,7 +821,8 @@ namespace OpenRA.Mods.Common.Traits
 
 		void EmitTerminalStealthEfficiencySummary()
 		{
-			if (stealthEfficiencyTerminalReported)
+			if (stealthEfficiencyTerminalReported ||
+				!StealthAISpecialistPolicy.ShouldOwnStealthEfficiencyTerminal(bot != null, !IsTraitDisabled))
 				return;
 
 			stealthEfficiencyTerminalReported = true;

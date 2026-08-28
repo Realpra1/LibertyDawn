@@ -966,6 +966,13 @@ namespace OpenRA.Test.Mods.Common
 		[Test]
 		public void StealthEfficiencyWatchdogOwnsOneBotScopeWindowAndSurvivesSaveLoad()
 		{
+			Assert.That(StealthAISpecialistPolicy.ShouldOwnStealthEfficiencyTerminal(true, true), Is.True);
+			Assert.That(StealthAISpecialistPolicy.ShouldOwnStealthEfficiencyTerminal(false, true), Is.False,
+				"A trait whose bot was never enabled must never subscribe or emit.");
+			Assert.That(StealthAISpecialistPolicy.ShouldOwnStealthEfficiencyTerminal(true, false), Is.False,
+				"A disabled bot-specific module must never subscribe or emit.");
+			Assert.That(StealthAISpecialistPolicy.ShouldOwnStealthEfficiencyTerminal(false, false), Is.False);
+
 			var beforeSave = StealthAISpecialistPolicy.StealthEfficiency(1234, 5678, 90, 4);
 			var afterLoad = StealthAISpecialistPolicy.StealthEfficiency(
 				beforeSave.RawKilledValue, beforeSave.ActorTicks, beforeSave.TotalDamage, beforeSave.UniqueStnks);
@@ -983,6 +990,17 @@ namespace OpenRA.Test.Mods.Common
 				Is.EqualTo(1));
 			Assert.That(manager, Does.Contain("World.GameOver -= EmitTerminalStealthEfficiencySummary"),
 				"Only the enabled bot-specific module may own the terminal summary subscription.");
+			var traitEnabled = manager.Substring(manager.IndexOf(
+				"protected override void TraitEnabled", StringComparison.Ordinal));
+			traitEnabled = traitEnabled.Substring(0, traitEnabled.IndexOf(
+				"protected override void TraitDisabled", StringComparison.Ordinal));
+			Assert.That(traitEnabled, Does.Not.Contain("World.GameOver +="),
+				"Trait enablement alone must never subscribe the terminal handler.");
+			var subscription = manager.Substring(manager.IndexOf(
+				"void UpdateStealthEfficiencyTerminalSubscription", StringComparison.Ordinal));
+			subscription = subscription.Substring(0, subscription.IndexOf(
+				"void IBotTick.BotTick", StringComparison.Ordinal));
+			Assert.That(subscription, Does.Contain("bot != null, !IsTraitDisabled"));
 			Assert.That(manager, Does.Not.Contain("World.Timestep,\n\t\t\t\tstealthEfficiencyDamageTaken"),
 				"Whole-game time or wall-clock timestep must not replace accumulated STNK actor ticks.");
 
