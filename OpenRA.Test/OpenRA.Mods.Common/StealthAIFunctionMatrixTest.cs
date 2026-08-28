@@ -687,7 +687,7 @@ namespace OpenRA.Test.Mods.Common
 		public void OrdinaryAndStalledFireRoutesShareValidatedFinalizer()
 		{
 			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
-			Assert.That(states.Split("AppendValidatedFiringCell(").Length - 1, Is.EqualTo(3),
+			Assert.That(states.Split("BuildValidatedFiringRoute(").Length - 1, Is.EqualTo(3),
 				"The shared invariant must be defined once and used by both ordinary and stalled routes.");
 
 			var stalledFallback = states.Substring(states.IndexOf(
@@ -718,7 +718,7 @@ namespace OpenRA.Test.Mods.Common
 		[TestCase(29, 30, 37, 30)]
 		[TestCase(30, 31, 38, 31)]
 		[TestCase(31, 32, 39, 32)]
-		public void OrdinaryObeliskRouteFinalizerAppendsOnlyOutsideOffsetRange(
+		public void OrdinaryObeliskProductionRouteAppendsOnlyOutsideOffsetRange(
 			int targetX, int targetY, int firingX, int firingY)
 		{
 			var target = new CPos(targetX, targetY);
@@ -729,8 +729,14 @@ namespace OpenRA.Test.Mods.Common
 				new CPos(39, 21), new CPos(39, 27), new CPos(39, 33)
 			};
 
-			var route = StealthAIThreatGeometry.AppendDirectSafeFiringCell(
-				coarseWaypoints, firingCell, target, 7);
+			var constructionCalls = 0;
+			var route = StealthAIThreatGeometry.BuildDirectSafeFiringRoute(() =>
+			{
+				constructionCalls++;
+				return coarseWaypoints;
+			}, firingCell, target, 7);
+			Assert.That(constructionCalls, Is.EqualTo(1),
+				"The ordinary regression must drive the shared production route construction.");
 			Assert.That(route, Is.Not.Null);
 			Assert.That(route.Last(), Is.EqualTo(firingCell),
 				"The ordinary production finalizer must append the exact safe firing cell.");
@@ -742,7 +748,7 @@ namespace OpenRA.Test.Mods.Common
 		[TestCase(28, 33, 21, 33, 39, 33)]
 		[TestCase(33, 28, 33, 21, 33, 39)]
 		[TestCase(32, 32, 33, 33, 40, 32)]
-		public void StalledObeliskRouteFinalizerRejectsOffsetBoundaryIngress(
+		public void StalledObeliskProductionRouteRejectsOffsetBoundaryIngress(
 			int targetX, int targetY, int unsafeX, int unsafeY, int firingX, int firingY)
 		{
 			var target = new CPos(targetX, targetY);
@@ -751,9 +757,28 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(StealthAIThreatGeometry.IsOutsideWeaponRange(
 				unsafeCoarseWaypoint, target, 7), Is.False);
 
-			var route = StealthAIThreatGeometry.AppendDirectSafeFiringCell(
-				new[] { new CPos(21, 21), unsafeCoarseWaypoint }, firingCell, target, 7);
-			Assert.That(route, Is.Null,
+			var constructionCalls = 0;
+			var route = StealthAIThreatGeometry.BuildDirectSafeFiringRoute(() =>
+			{
+				constructionCalls++;
+				return new[] { new CPos(21, 21) };
+			}, firingCell, target, 7);
+			Assert.That(constructionCalls, Is.EqualTo(1),
+				"The stalled regression must drive the shared production route construction.");
+			Assert.That(route, Is.Not.Null);
+			Assert.That(route.Last(), Is.EqualTo(firingCell),
+				"The stalled production builder must append the exact safe firing cell.");
+			Assert.That(route.All(cell => StealthAIThreatGeometry.IsOutsideWeaponRange(
+				cell, target, 7)), Is.True,
+				"Every submitted stalled coarse waypoint and exact endpoint must be outside range.");
+
+			var rejectedRoute = StealthAIThreatGeometry.BuildDirectSafeFiringRoute(() =>
+			{
+				constructionCalls++;
+				return new[] { new CPos(21, 21), unsafeCoarseWaypoint };
+			}, firingCell, target, 7);
+			Assert.That(constructionCalls, Is.EqualTo(2));
+			Assert.That(rejectedRoute, Is.Null,
 				"The stalled production finalizer must reject inside and exact-boundary coarse centers.");
 		}
 

@@ -32,9 +32,10 @@ namespace OpenRA.Mods.Common.Traits
 			return weaponRange <= 0 || (waypoint - target).LengthSquared > weaponRange * weaponRange;
 		}
 
-		public static List<CPos> AppendDirectSafeFiringCell(IReadOnlyList<CPos> coarseWaypoints,
+		public static List<CPos> BuildDirectSafeFiringRoute(Func<IReadOnlyList<CPos>> coarseRouteBuilder,
 			CPos firingCell, CPos target, int weaponRange)
 		{
+			var coarseWaypoints = coarseRouteBuilder?.Invoke();
 			if (coarseWaypoints == null || !IsOutsideWeaponRange(firingCell, target, weaponRange) ||
 				coarseWaypoints.Any(cell => !IsOutsideWeaponRange(cell, target, weaponRange)))
 				return null;

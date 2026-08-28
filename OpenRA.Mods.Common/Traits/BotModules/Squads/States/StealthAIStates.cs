@@ -1281,14 +1281,15 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					cell.Y * coarseSize + coarseSize / 2))).ToList();
 		}
 
-		static List<CPos> AppendValidatedFiringCell(StealthInfluenceCache cache, Actor target,
-			CPos firingCell, IReadOnlyList<CPos> coarseRoute)
+		static List<CPos> BuildValidatedFiringRoute(StealthInfluenceCache cache, Actor target,
+			CPos firingCell, Func<IReadOnlyList<CPos>> coarseRouteBuilder)
 		{
 			if (target.Info.Name == "obli" && cache.ThreatByActor.TryGetValue(target, out var threat) &&
 				threat.WeaponRange > 0)
-				return StealthAIThreatGeometry.AppendDirectSafeFiringCell(coarseRoute,
+				return StealthAIThreatGeometry.BuildDirectSafeFiringRoute(coarseRouteBuilder,
 					firingCell, target.Location, threat.WeaponRange);
 
+			var coarseRoute = coarseRouteBuilder?.Invoke();
 			if (coarseRoute == null)
 				return null;
 
@@ -2453,11 +2454,10 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				{
 					var stalledTarget = owner.TargetActor;
 					var firingCell = SafeOrdinaryFiringCell(owner, formation[0], cache, stalledTarget);
-					var coarseRoute = firingCell == null ? null :
-						StealthRouteToCell(owner, formation[0], cache,
-							CoarseCell(owner, firingCell.Value), stalledTarget);
-					var route = firingCell == null ? null : AppendValidatedFiringCell(
-						cache, stalledTarget, firingCell.Value, coarseRoute);
+					var route = firingCell == null ? null : BuildValidatedFiringRoute(
+						cache, stalledTarget, firingCell.Value, () =>
+							StealthRouteToCell(owner, formation[0], cache,
+								CoarseCell(owner, firingCell.Value), stalledTarget));
 					if (route != null)
 					{
 						LogObeliskSafeRouteEvidence(owner, cache, stalledTarget,
@@ -2926,10 +2926,10 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 					if (firingCell != null)
 					{
-						var coarseFiringRoute = StealthRouteToCell(owner, representative, cache,
-							CoarseCell(owner, firingCell.Value), actor);
-						var firingRoute = AppendValidatedFiringCell(
-							cache, actor, firingCell.Value, coarseFiringRoute);
+						var firingRoute = BuildValidatedFiringRoute(
+							cache, actor, firingCell.Value, () =>
+								StealthRouteToCell(owner, representative, cache,
+									CoarseCell(owner, firingCell.Value), actor));
 						if (firingRoute == null)
 							continue;
 						LogObeliskSafeRouteEvidence(owner, cache, actor,
