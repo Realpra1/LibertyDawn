@@ -151,6 +151,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		internal int StealthEscapeLastDistanceCells = int.MaxValue;
 		internal CPos? StealthKiteTargetCell;
 		internal CPos? StealthCrushTargetCell;
+		internal CPos? StealthPostAttackCell;
 		internal uint StealthKiteSupersessionActorId;
 		internal int StealthKiteSupersessionConfirmations;
 		internal readonly Dictionary<uint, int> StealthKiteParticipantHealth = new Dictionary<uint, int>();

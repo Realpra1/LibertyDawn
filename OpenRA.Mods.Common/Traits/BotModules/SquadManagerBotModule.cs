@@ -626,6 +626,11 @@ namespace OpenRA.Mods.Common.Traits
 		readonly Dictionary<uint, CPos> fallbackOrderTargets = new Dictionary<uint, CPos>();
 		readonly BotModules.AdvancedBotFallbackOwnership releasedFallbackOwnership =
 			new BotModules.AdvancedBotFallbackOwnership();
+		long stealthEfficiencyKillValue;
+		long stealthEfficiencyActorTicks;
+		long stealthEfficiencyDamageTaken;
+		readonly HashSet<uint> stealthEfficiencyActors = new HashSet<uint>();
+		int stealthEfficiencyNextReportTick;
 
 		public SquadManagerBotModule(Actor self, SquadManagerBotModuleInfo info)
 			: base(info)
@@ -753,6 +758,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		void IBotTick.BotTick(IBot bot)
 		{
+			UpdateStealthEfficiencyTelemetry();
 			EnsureStealthSquads(bot);
 			if (advancedBehaviorEnabled && --stealthRecruitTicks <= 0)
 			{
@@ -769,6 +775,31 @@ namespace OpenRA.Mods.Common.Traits
 			}
 			else
 				AssignRolesToIdleUnitsDegraded(bot);
+		}
+
+		void UpdateStealthEfficiencyTelemetry()
+		{
+			var live = World.Actors.Where(actor => actor.Owner == Player && actor.IsInWorld &&
+				!actor.IsDead && actor.Info.Name == "stnk").OrderBy(actor => actor.ActorID).ToArray();
+			stealthEfficiencyActorTicks = StealthAISpecialistPolicy.AccumulateActorTicks(
+				stealthEfficiencyActorTicks, live.Length);
+			stealthEfficiencyActors.UnionWith(live.Select(actor => actor.ActorID));
+			if (World.WorldTick < stealthEfficiencyNextReportTick)
+				return;
+
+			stealthEfficiencyNextReportTick = World.WorldTick + Math.Max(1, 60000 / World.Timestep);
+			var metric = StealthAISpecialistPolicy.StealthEfficiency(
+				stealthEfficiencyKillValue, stealthEfficiencyActorTicks, World.Timestep,
+				stealthEfficiencyDamageTaken, stealthEfficiencyActors.Count);
+			Log.Write("debug", "Stealth efficiency telemetry [stealth-tank]: tick={0} " +
+				"attributed-kill-value={1} actor-ticks={2} timestep-ms={3} unique-stnks={4} " +
+				"damage-taken={5} kill-value-per-actor-minute={6:0.###} " +
+				"damage-per-stnk={7:0.###} rating={8} zero-damage-perfect={9} diagnostic-only=True.",
+				World.WorldTick, stealthEfficiencyKillValue, stealthEfficiencyActorTicks,
+				World.Timestep, stealthEfficiencyActors.Count, stealthEfficiencyDamageTaken,
+				metric.KillValuePerActorMinute, metric.DamagePerDeployedActor,
+				metric.PerfectZeroDamage ? "infinite" : metric.Rating.ToString("0.###"),
+				metric.PerfectZeroDamage);
 		}
 
 		void RunFailsafeTestPressure()
@@ -1740,6 +1771,8 @@ namespace OpenRA.Mods.Common.Traits
 					s.StealthProfile == "stealth-tank" && s.Units.Contains(e.Attacker));
 				if (stealthSquad != null)
 				{
+					stealthEfficiencyKillValue += Math.Max(0,
+						damaged.Info.TraitInfoOrDefault<ValuedInfo>()?.Cost ?? 0);
 					stealthSquad.StealthKillCadenceAge = 0;
 					stealthSquad.StealthKillCadenceLastTick = World.WorldTick;
 					stealthSquad.StealthDebugKillCadenceKills++;
@@ -1815,6 +1848,12 @@ namespace OpenRA.Mods.Common.Traits
 
 		void IBotRespondToAttack.RespondToAttack(IBot bot, Actor self, AttackInfo e)
 		{
+			if (self.Owner == Player && self.Info.Name == "stnk")
+			{
+				stealthEfficiencyActors.Add(self.ActorID);
+				stealthEfficiencyDamageTaken += Math.Max(0, e.Damage.Value);
+			}
+
 			if (!IsPreferredEnemyUnit(e.Attacker))
 				return;
 
@@ -1851,6 +1890,11 @@ namespace OpenRA.Mods.Common.Traits
 				new MiniYamlNode("MinAttackForceDelayTicks", FieldSaver.FormatValue(minAttackForceDelayTicks)),
 				new MiniYamlNode("AdaptiveAirRiskTicks", FieldSaver.FormatValue(adaptiveAirRiskTicks)),
 				new MiniYamlNode("AdvancedBehaviorEnabled", FieldSaver.FormatValue(advancedBehaviorEnabled)),
+				new MiniYamlNode("StealthEfficiencyKillValue", FieldSaver.FormatValue(stealthEfficiencyKillValue)),
+				new MiniYamlNode("StealthEfficiencyActorTicks", FieldSaver.FormatValue(stealthEfficiencyActorTicks)),
+				new MiniYamlNode("StealthEfficiencyDamageTaken", FieldSaver.FormatValue(stealthEfficiencyDamageTaken)),
+				new MiniYamlNode("StealthEfficiencyActors", FieldSaver.FormatValue(stealthEfficiencyActors.ToArray())),
+				new MiniYamlNode("StealthEfficiencyNextReportTick", FieldSaver.FormatValue(stealthEfficiencyNextReportTick)),
 				new MiniYamlNode("FallbackReconsiderTicks", FieldSaver.FormatValue(fallbackReconsiderTicks)),
 				new MiniYamlNode("FallbackTarget", FieldSaver.FormatValue(fallbackTarget?.ActorID ?? 0)),
 				new MiniYamlNode("FallbackOrderedActors", FieldSaver.FormatValue(fallbackOrderedActors.ToArray())),
@@ -1920,6 +1964,30 @@ namespace OpenRA.Mods.Common.Traits
 			var advancedBehaviorNode = data.FirstOrDefault(n => n.Key == "AdvancedBehaviorEnabled");
 			if (advancedBehaviorNode != null)
 				advancedBehaviorEnabled = FieldLoader.GetValue<bool>("AdvancedBehaviorEnabled", advancedBehaviorNode.Value.Value);
+			var efficiencyKillNode = data.FirstOrDefault(n => n.Key == "StealthEfficiencyKillValue");
+			if (efficiencyKillNode != null)
+				stealthEfficiencyKillValue = FieldLoader.GetValue<long>(
+					"StealthEfficiencyKillValue", efficiencyKillNode.Value.Value);
+			var efficiencyTicksNode = data.FirstOrDefault(n => n.Key == "StealthEfficiencyActorTicks");
+			if (efficiencyTicksNode != null)
+				stealthEfficiencyActorTicks = FieldLoader.GetValue<long>(
+					"StealthEfficiencyActorTicks", efficiencyTicksNode.Value.Value);
+			var efficiencyDamageNode = data.FirstOrDefault(n => n.Key == "StealthEfficiencyDamageTaken");
+			if (efficiencyDamageNode != null)
+				stealthEfficiencyDamageTaken = FieldLoader.GetValue<long>(
+					"StealthEfficiencyDamageTaken", efficiencyDamageNode.Value.Value);
+			var efficiencyActorsNode = data.FirstOrDefault(n => n.Key == "StealthEfficiencyActors");
+			if (efficiencyActorsNode != null)
+			{
+				stealthEfficiencyActors.Clear();
+				stealthEfficiencyActors.UnionWith(FieldLoader.GetValue<uint[]>(
+					"StealthEfficiencyActors", efficiencyActorsNode.Value.Value));
+			}
+
+			var efficiencyReportNode = data.FirstOrDefault(n => n.Key == "StealthEfficiencyNextReportTick");
+			if (efficiencyReportNode != null)
+				stealthEfficiencyNextReportTick = FieldLoader.GetValue<int>(
+					"StealthEfficiencyNextReportTick", efficiencyReportNode.Value.Value);
 			var fallbackTicksNode = data.FirstOrDefault(n => n.Key == "FallbackReconsiderTicks");
 			if (fallbackTicksNode != null)
 				fallbackReconsiderTicks = FieldLoader.GetValue<int>("FallbackReconsiderTicks", fallbackTicksNode.Value.Value);

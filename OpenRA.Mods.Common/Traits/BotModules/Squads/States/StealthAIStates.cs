@@ -535,13 +535,14 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			public readonly IReadOnlyCollection<uint> StealthPackage;
 			public readonly CPos? StealthClearCenterCell;
 			public readonly bool StealthAggressiveMass;
+			public readonly CPos? StealthPostAttackCell;
 			public long ServiceMilliseconds = long.MaxValue;
 
 			public AirTargetPlan(Actor actor, int score, bool isUndefended, List<CPos> route,
 				bool clearsAa = false, List<Squad> supportSquads = null, CPos? aaProtectedCell = null,
 				IReadOnlyCollection<uint> aaThreatIds = null, StealthClearMode stealthMode = StealthClearMode.None,
 				IReadOnlyCollection<uint> stealthPackage = null, CPos? stealthClearCenterCell = null,
-				bool stealthAggressiveMass = false)
+				bool stealthAggressiveMass = false, CPos? stealthPostAttackCell = null)
 			{
 				Actor = actor;
 				Score = score;
@@ -555,6 +556,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				StealthPackage = stealthPackage;
 				StealthClearCenterCell = stealthClearCenterCell;
 				StealthAggressiveMass = stealthAggressiveMass;
+				StealthPostAttackCell = stealthPostAttackCell;
 			}
 		}
 
@@ -573,6 +575,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			public int Width;
 			public int Height;
 			public float[] Danger;
+			public float[] CloakedDanger;
 			public float[] MobilityDanger;
 			public List<(Actor Actor, int Priority)> Candidates;
 			public List<GroundThreat> Threats;
@@ -785,8 +788,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				return false;
 
 			var definition = owner.StealthDefinition;
-			return ThreatCoversPosition(threat, position, true, definition.ThreatRangeBufferCells) ||
-				ThreatCoversPosition(threat, position, false, definition.DetectorRangeBufferCells);
+			return ThreatCoversPosition(threat, position, true, definition.ThreatRangeBufferCells);
 		}
 
 		static string CachedRevealThreatSummary(IEnumerable<GroundThreat> threats, Actor ignoredThreat = null)
@@ -825,7 +827,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var coarseSize = StealthCoarseSize(owner);
 			return owner.World.Map.FindTilesInAnnulus(target.Location, minimumRange, range)
 				.Where(c => mobile.CanEnterCell(c, null, BlockedByActor.Immovable))
-				.Where(c => target.Info.Name != "obli" || targetThreat == null ||
+				.Where(c => !outrangesTarget || targetThreat == null ||
 					StealthAIThreatGeometry.IsOutsideWeaponRange(owner.World.Map.Clamp(new CPos(
 						c.X / coarseSize * coarseSize + coarseSize / 2,
 						c.Y / coarseSize * coarseSize + coarseSize / 2)),
@@ -836,11 +838,69 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				.ThenBy(c => c.Y).ThenBy(c => c.X).Cast<CPos?>().FirstOrDefault();
 		}
 
-		static void LogObeliskSafeRouteEvidence(Squad owner, StealthInfluenceCache cache,
+		static bool CoveringWeaponAt(Squad owner, StealthInfluenceCache cache, WPos position,
+			Actor ignoredThreat = null)
+		{
+			return cache.Threats.Any(threat => CachedThreatCoversReveal(
+				owner, threat, position, ignoredThreat));
+		}
+
+		static CPos? SafePostAttackStrategicCell(Squad owner, Actor representative,
+			StealthInfluenceCache cache, CPos firingCell)
+		{
+			var mobile = representative.TraitOrDefault<Mobile>();
+			if (mobile == null)
+				return null;
+
+			var size = StealthCoarseSize(owner);
+			var origin = CoarseCell(owner, firingCell);
+			return Enumerable.Range(-1, 3).SelectMany(dy => Enumerable.Range(-1, 3)
+				.Select(dx => new CPos(origin.X + dx, origin.Y + dy)))
+				.Where(coarse => coarse != origin && coarse.X >= 0 && coarse.Y >= 0 &&
+					coarse.X < cache.Width && coarse.Y < cache.Height)
+				.Select(coarse => owner.World.Map.Clamp(new CPos(
+					coarse.X * size + size / 2, coarse.Y * size + size / 2)))
+				.Where(cell => mobile.CanEnterCell(cell, null, BlockedByActor.Immovable) &&
+					!CoarseCellHasForbiddenResource(owner, CoarseCell(owner, cell), true) &&
+					!CoveringWeaponAt(owner, cache, owner.World.Map.CenterOfCell(cell)))
+				.OrderBy(cell => (cell - firingCell).LengthSquared)
+				.ThenBy(cell => cell.Y).ThenBy(cell => cell.X).Cast<CPos?>().FirstOrDefault();
+		}
+
+		static bool OrdinaryCrushExposureIsSafe(Squad owner, StealthInfluenceCache cache,
+			Actor target, CPos? nextStrategicCell)
+		{
+			if (nextStrategicCell == null)
+				return false;
+
+			var size = StealthCoarseSize(owner);
+			var next = owner.World.Map.Clamp(new CPos(
+				nextStrategicCell.Value.X * size + size / 2,
+				nextStrategicCell.Value.Y * size + size / 2));
+			return StealthAISpecialistPolicy.PlannedExposureIsSafe(
+				CoveringWeaponAt(owner, cache, target.CenterPosition),
+				!CoveringWeaponAt(owner, cache, owner.World.Map.CenterOfCell(next)), false);
+		}
+
+		protected static bool OrdinaryAttackExposureIsSafe(Squad owner, StealthInfluenceCache cache,
+			Actor unit, Actor target, CPos? nextCell)
+		{
+			if (cache == null || nextCell == null)
+				return false;
+
+			var targetThreat = cache.ThreatByActor.TryGetValue(target, out var threat) &&
+				StealthAISpecialistPolicy.CanOutrangeUndetectingTarget(
+					threat.WeaponRange, threat.DetectorRange, GroundWeaponRange(unit, target)) ? target : null;
+			return StealthAISpecialistPolicy.PlannedExposureIsSafe(
+				CoveringWeaponAt(owner, cache, unit.CenterPosition, targetThreat),
+				!CoveringWeaponAt(owner, cache, owner.World.Map.CenterOfCell(nextCell.Value)), false);
+		}
+
+		static void LogDirectSafeRouteEvidence(Squad owner, StealthInfluenceCache cache,
 			Actor target, CPos firingCell, IReadOnlyList<CPos> route, string phase)
 		{
 			if (!owner.SquadManager.Info.AirTargetDebugLogging ||
-				owner.StealthProfile != "stealth-tank" || target.Info.Name != "obli")
+				owner.StealthProfile != "stealth-tank")
 				return;
 
 			var targetThreat = cache.ThreatByActor.TryGetValue(target, out var threat) ? threat : null;
@@ -857,11 +917,11 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var minimumDistanceSquared = route.Select(cell =>
 				(cell - target.Location).LengthSquared).DefaultIfEmpty(int.MaxValue).Min();
 
-			Log.Write("debug", "Stealth Obelisk safe route [{0}] tick={1}: phase={2} target=obli#{3} " +
-				"target-cell={4} target-coarse={5} firing-cell={6} direct-coarse={7} " +
-				"weapon-range={8} weapon-range-squared={9} route-waypoints={10} " +
-				"minimum-distance-squared={11} all-outside={12} members={13} waypoint-facts=[{14}].",
-				owner.StealthProfile, owner.World.WorldTick, phase, target.ActorID, target.Location,
+			Log.Write("debug", "Stealth direct safe route [{0}] tick={1}: phase={2} target={3}#{4} " +
+				"target-cell={5} target-coarse={6} firing-cell={7} direct-coarse={8} " +
+				"weapon-range={9} weapon-range-squared={10} route-waypoints={11} " +
+				"minimum-distance-squared={12} all-outside={13} members={14} waypoint-facts=[{15}].",
+				owner.StealthProfile, owner.World.WorldTick, phase, target.Info.Name, target.ActorID, target.Location,
 				CoarseCell(owner, target.Location), firingCell, CoarseCell(owner, firingCell),
 				weaponRange, weaponRangeSquared, route.Count, minimumDistanceSquared, allOutside,
 				string.Join(",", owner.AirFormationUnits().OrderBy(unit => unit.ActorID).Select(unit =>
@@ -1092,7 +1152,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			}
 
 			var started = Stopwatch.GetTimestamp();
-			var danger = new float[width * height];
+			var weaponDanger = new float[width * height];
+			var detectorCoverage = new float[width * height];
 			var mobilityDanger = new float[width * height];
 			var candidates = new List<(Actor Actor, int Priority)>();
 			var threatFacts = StealthThreats(owner);
@@ -1101,11 +1162,11 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			{
 				var ignoreWeapon = threat.Actor.GetEnabledTargetTypes()
 					.Overlaps(definition.IgnoredHarassmentWeaponThreatTypes);
-				MarkStealthRange(owner, danger, width, height, coarseSize, threat,
+				MarkStealthRange(owner, detectorCoverage, width, height, coarseSize, threat,
 					StealthAISpecialistPolicy.BufferedRange(threat.DetectorRange,
 						definition.DetectorRangeBufferCells),
 					StealthAISpecialistPolicy.HardDetectorRouteInfluence, threatCoverage);
-				MarkStealthRange(owner, danger, width, height, coarseSize, threat,
+				MarkStealthRange(owner, weaponDanger, width, height, coarseSize, threat,
 					StealthAISpecialistPolicy.BufferedRange(ignoreWeapon ? 0 : threat.WeaponRange,
 						definition.ThreatRangeBufferCells),
 					StealthAISpecialistPolicy.OrdinaryWeaponRouteInfluence, threatCoverage);
@@ -1136,7 +1197,6 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 						var index = y * width + x;
 						if (!mobile.CanExistInCell(cell))
 						{
-							danger[index] += StealthAISpecialistPolicy.HardRouteDangerThreshold;
 							mobilityDanger[index] += StealthAISpecialistPolicy.HardRouteDangerThreshold;
 						}
 						if (resourceLayer == null)
@@ -1159,24 +1219,33 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 						if (hasRed || hasPending)
 						{
-							danger[index] += StealthAISpecialistPolicy.HardRouteDangerThreshold;
 							mobilityDanger[index] += StealthAISpecialistPolicy.HardRouteDangerThreshold;
 						}
 						else if (hasBlue)
 						{
-							danger[index] += StealthAISpecialistPolicy.SoftResourceRouteCost;
 							mobilityDanger[index] += StealthAISpecialistPolicy.SoftResourceRouteCost;
 						}
 						if (hasPending)
 							pendingExplosionCells.Add(new CPos(x, y));
 					}
 
+			var exposedDanger = new float[mobilityDanger.Length];
+			var cloakedDanger = new float[mobilityDanger.Length];
+			for (var i = 0; i < mobilityDanger.Length; i++)
+			{
+				exposedDanger[i] = StealthAISpecialistPolicy.CloakAwareRouteDanger(
+					mobilityDanger[i], weaponDanger[i], detectorCoverage[i] > 0, false);
+				cloakedDanger[i] = StealthAISpecialistPolicy.CloakAwareRouteDanger(
+					mobilityDanger[i], weaponDanger[i], detectorCoverage[i] > 0, true);
+			}
+
 			cached = new StealthInfluenceCache
 			{
 				Tick = owner.World.WorldTick,
 				Width = width,
 				Height = height,
-				Danger = danger,
+				Danger = exposedDanger,
+				CloakedDanger = cloakedDanger,
 				MobilityDanger = mobilityDanger,
 				Candidates = candidates,
 				Threats = threatFacts,
@@ -1213,41 +1282,27 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		}
 
 		static List<CPos> StealthRouteToCell(Squad owner, Actor unit,
-			StealthInfluenceCache cache, CPos goalCell, Actor directObeliskTarget = null)
+			StealthInfluenceCache cache, CPos goalCell, Actor directTarget = null)
 		{
-			return StealthRouteToCell(owner, unit, cache, goalCell, cache?.Danger,
-				false, directObeliskTarget);
+			var cloaked = unit.TraitsImplementing<Cloak>().Any(cloak => cloak.Cloaked);
+			var danger = cloaked ? cache?.CloakedDanger : cache?.Danger;
+			return StealthRouteToCell(owner, unit, cache, goalCell, danger, false, directTarget);
 		}
 
 		static List<CPos> StealthRouteToCell(Squad owner, Actor unit,
 			StealthInfluenceCache cache, CPos goalCell, float[] danger, bool allowDangerousStart = false,
-			Actor directObeliskTarget = null)
+			Actor directTarget = null)
 		{
 			var definition = owner.StealthDefinition;
 			if (definition == null || cache == null || danger == null)
 				return null;
 
-			// Ordinary missions must treat every cached live Obelisk coverage cell as
-			// impassable. A mission targeting that Obelisk is the sole exception: its
-			// separately selected outrange firing cell remains the route destination.
-			var obeliskCoverage = cache.ThreatCoverageByCell.Where(coverage =>
-				coverage.Value.Any(threat => threat.Actor != directObeliskTarget &&
-					!threat.Actor.IsDead && threat.Actor.Info.Name == "obli" && threat.WeaponRange > 0))
-				.Select(coverage => coverage.Key).ToArray();
-			if (obeliskCoverage.Length > 0)
-			{
-				danger = (float[])danger.Clone();
-				foreach (var cell in obeliskCoverage)
-					danger[cell.Y * cache.Width + cell.X] = Math.Max(
-						danger[cell.Y * cache.Width + cell.X],
-						StealthAISpecialistPolicy.HardRouteDangerThreshold);
-			}
-
-			var directObeliskThreat = directObeliskTarget != null &&
-				directObeliskTarget.Info.Name == "obli" &&
-				cache.ThreatByActor.TryGetValue(directObeliskTarget, out var directThreat) &&
-				directThreat.WeaponRange > 0 ? directThreat : null;
-			if (directObeliskThreat != null)
+			var directThreat = directTarget != null &&
+				cache.ThreatByActor.TryGetValue(directTarget, out var foundDirectThreat) &&
+				StealthAISpecialistPolicy.CanOutrangeUndetectingTarget(
+					foundDirectThreat.WeaponRange, foundDirectThreat.DetectorRange,
+					GroundWeaponRange(unit, directTarget)) ? foundDirectThreat : null;
+			if (directThreat != null)
 			{
 				danger = (float[])danger.Clone();
 				var directCoarseSize = StealthCoarseSize(owner);
@@ -1258,7 +1313,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 							x * directCoarseSize + directCoarseSize / 2,
 							y * directCoarseSize + directCoarseSize / 2));
 						if (!StealthAIThreatGeometry.IsOutsideWeaponRange(waypoint,
-							directObeliskTarget.Location, directObeliskThreat.WeaponRange))
+							directTarget.Location, directThreat.WeaponRange))
 							danger[y * cache.Width + x] = Math.Max(danger[y * cache.Width + x],
 								StealthAISpecialistPolicy.HardRouteDangerThreshold);
 					}
@@ -1284,8 +1339,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		static List<CPos> BuildValidatedFiringRoute(StealthInfluenceCache cache, Actor target,
 			CPos firingCell, Func<IReadOnlyList<CPos>> coarseRouteBuilder)
 		{
-			if (target.Info.Name == "obli" && cache.ThreatByActor.TryGetValue(target, out var threat) &&
-				threat.WeaponRange > 0)
+			if (cache.ThreatByActor.TryGetValue(target, out var threat) &&
+				StealthAISpecialistPolicy.CanOutrangeUndetectingTarget(
+					threat.WeaponRange, threat.DetectorRange, int.MaxValue))
 				return StealthAIThreatGeometry.BuildDirectSafeFiringRoute(coarseRouteBuilder,
 					firingCell, target.Location, threat.WeaponRange);
 
@@ -1351,7 +1407,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 						.OrderBy(c => (representative.Location - c).LengthSquared).FirstOrDefault() :
 						map.Clamp(new CPos(coarse.X * coarseSize + coarseSize / 2,
 							coarse.Y * coarseSize + coarseSize / 2));
-					if (destination == default(CPos) || !map.Contains(destination))
+					if (destination == default(CPos) || !map.Contains(destination) ||
+						!StealthAISpecialistPolicy.DestinationBelongsToStrategicCell(
+							destination.X, destination.Y, coarseSize, coarse.X, coarse.Y))
 						continue;
 					if (!mobile.CanEnterCell(destination, null, BlockedByActor.Immovable))
 						continue;
@@ -1560,6 +1618,22 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				Math.Abs(destinationCell.Y - start.Y) > 1)
 				return false;
 
+			var occupied = members.Select(member => member.Location).ToHashSet();
+			var exactCandidates = Enumerable.Range(-2, 5).SelectMany(dy => Enumerable.Range(-2, 5)
+				.Select(dx => owner.World.Map.Clamp(new CPos(destination.X + dx, destination.Y + dy))))
+				.Where(cell => CoarseCell(owner, cell) == destinationCell).Distinct()
+				.OrderBy(cell => (cell - destination).LengthSquared)
+				.ThenBy(cell => cell.Y).ThenBy(cell => cell.X).ToList();
+			var exactIndex = StealthAISpecialistPolicy.FirstUnoccupiedEnterableDestination(
+				exactCandidates.Select(occupied.Contains).ToList(),
+				exactCandidates.Select(cell => members.All(member =>
+					member.TraitOrDefault<Mobile>()?.CanEnterCell(
+						cell, null, BlockedByActor.Immovable) == true)).ToList());
+			if (exactIndex < 0)
+				return false;
+
+			var exactDestination = exactCandidates[exactIndex];
+
 			owner.TargetActor = null;
 			owner.AirTargetStrategicCell = null;
 			owner.AirRoute.Clear();
@@ -1568,19 +1642,19 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			owner.StealthEscapePendingExplosion = pendingBlueExplosion;
 			owner.StealthEscapeIssuedTick = owner.World.WorldTick;
 			owner.StealthEscapeLastProgressTick = owner.World.WorldTick;
-			owner.StealthEscapeDestination = destination;
+			owner.StealthEscapeDestination = exactDestination;
 			owner.StealthEscapeStartCell = start;
 			owner.StealthEscapeDestinationCell = destinationCell;
 			owner.StealthEscapeLastDistanceCells = 0;
 			owner.StealthEscapeSafetyChecks = 0;
 
 			owner.Bot.QueueOrder(new Order("Move", null,
-				Target.FromCell(owner.World, destination), false, groupedActors: members));
+				Target.FromCell(owner.World, exactDestination), false, groupedActors: members));
 			if (owner.SquadManager.Info.AirTargetDebugLogging)
 				Log.Write("debug", "Stealth safety [{0}] issued one grouped adjacent-cell Move: " +
 					"tick={1} members={2} start={3} destination={4} exact={5} extra-a-star=0.",
 					owner.StealthProfile, owner.World.WorldTick, members.Length,
-					start, destinationCell, destination);
+					start, destinationCell, exactDestination);
 
 			return true;
 		}
@@ -2139,7 +2213,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 							unit.TraitsImplementing<Cloak>().Any(cloak => cloak.Cloaked));
 						var crushRoute = crushBlocker == null || !bridgeFormationCloaked ? null :
 							SafeRouteForStealth(owner, representative, crushBlocker);
-						if (crushRoute != null)
+						if (crushRoute != null && OrdinaryCrushExposureIsSafe(
+							owner, cache, crushBlocker, retreatCell))
 						{
 							if (owner.SquadManager.Info.AirTargetDebugLogging)
 								Log.Write("debug", "Stealth crush bridge [{0}] selected cached blocker: tick={1} " +
@@ -2213,7 +2288,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				if (crush != null)
 				{
 					var route = SafeRouteForStealth(owner, representative, crush);
-					if (route != null)
+					if (route != null && OrdinaryCrushExposureIsSafe(
+						owner, cache, crush, retreatCell))
 					{
 						var crushPlan = new AirTargetPlan(crush, score, false, route,
 							stealthMode: StealthClearMode.Crush,
@@ -2460,7 +2536,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 								CoarseCell(owner, firingCell.Value), stalledTarget));
 					if (route != null)
 					{
-						LogObeliskSafeRouteEvidence(owner, cache, stalledTarget,
+						LogDirectSafeRouteEvidence(owner, cache, stalledTarget,
 							firingCell.Value, route, "stalled-fallback");
 						if (owner.SquadManager.Info.AirTargetDebugLogging)
 							Log.Write("debug", "Stealth clear [{0}] bounded Crush fallback: tick={1} " +
@@ -2645,10 +2721,13 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				var targetChangedCell = owner.StealthCrushTargetCell == null ||
 					owner.StealthCrushTargetCell.Value != targetCell;
 				var crushCache = leader == null ? null : CachedStealthInfluence(owner, leader);
+				var crushExposureSafe = leader != null && crushCache != null &&
+					OrdinaryCrushExposureIsSafe(owner, crushCache, owner.TargetActor,
+						SafeRetreatCellNearTarget(owner, crushCache, owner.TargetActor));
 				var cachedLocalTarget = crushCache != null && crushCache.Candidates.Any(candidate =>
 					candidate.Actor == owner.TargetActor);
 				var crushRouteChanged = false;
-				if (leader != null && StealthAISpecialistPolicy.ShouldRefreshQueuedCrushRoute(
+				if (crushExposureSafe && StealthAISpecialistPolicy.ShouldRefreshQueuedCrushRoute(
 					owner.StealthClearMode == StealthClearMode.Crush, owner.AirRouteQueued,
 					trackedOrderIsCurrent, cachedLocalTarget, targetChangedCell))
 				{
@@ -2694,7 +2773,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 							owner.TargetActor.Location, route?.Count ?? 0, crushRouteChanged);
 				}
 
-				var orderChanged = !crushRouteChanged && crushMove != null && !owner.AirRouteQueued &&
+				var orderChanged = crushExposureSafe && !crushRouteChanged && crushMove != null && !owner.AirRouteQueued &&
 					crushMove.ShouldIssueOrder(leader, owner.TargetActor);
 				if (orderChanged)
 					owner.Bot.QueueOrder(new Order(EconomyMammothCrushMove.OrderId, leader,
@@ -2810,12 +2889,18 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				requiredStrategicCell = new CPos(
 					incumbent.Location.X / coarseSize, incumbent.Location.Y / coarseSize);
 
-			var cells = candidates.GroupBy(c => new CPos(
-				c.Actor.Location.X / coarseSize, c.Actor.Location.Y / coarseSize))
+			var groupedCells = candidates.GroupBy(c => new CPos(
+				c.Actor.Location.X / coarseSize, c.Actor.Location.Y / coarseSize)).ToList();
+			long CellValue(IGrouping<CPos, (Actor Actor, int Priority)> group) => group.Sum(candidate =>
+				StealthAISpecialistPolicy.StrategicTargetValue(candidate.Priority,
+					candidate.Actor.Info.TraitInfoOrDefault<ValuedInfo>()?.Cost ?? 0));
+			var highTierExists = owner.StealthProfile == "stealth-tank" &&
+				groupedCells.Any(group => StealthAISpecialistPolicy.MeetsMinimumStrategicCellValue(
+					CellValue(group)));
+			var cells = groupedCells
 				.Where(group => owner.StealthProfile != "stealth-tank" ||
-					StealthAISpecialistPolicy.MeetsMinimumStrategicCellValue(group.Sum(candidate =>
-						StealthAISpecialistPolicy.StrategicTargetValue(candidate.Priority,
-							candidate.Actor.Info.TraitInfoOrDefault<ValuedInfo>()?.Cost ?? 0))))
+					StealthAISpecialistPolicy.TargetCellIsInActiveTier(
+						CellValue(group), highTierExists))
 				.OrderBy(g => g.Key.Y).ThenBy(g => g.Key.X).ToList();
 			var requiredIndex = requiredStrategicCell == null ? -1 :
 				cells.FindIndex(g => g.Key == requiredStrategicCell.Value);
@@ -2878,6 +2963,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			foreach (var selectedIndex in selectedIndices)
 			{
 				var cell = cells[selectedIndex];
+				var cellSafePlans = new List<(AirTargetPlan Plan, long TravelMs, long ServiceMs, int Priority)>();
+				var cellClearPlans = new List<(AirTargetPlan Plan, int Priority)>();
 				var safeRoute = cachedFrontierRoutes.TryGetValue(selectedIndex, out var cachedRoute) ?
 					cachedRoute : owner.StealthProfile == "stealth-tank" ? null :
 					StealthRouteToCell(owner, representative, cache, cell.Key);
@@ -2917,24 +3004,35 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					{
 						dynamicClear.ServiceMilliseconds = StealthMissionServiceMilliseconds(
 							owner, representative, formation, dynamicClear);
-						clearPlans.Add(dynamicClear);
+						cellClearPlans.Add((dynamicClear, candidate.Priority));
 						debugPlans?.Add(dynamicClear);
-						if (dynamicClear.Actor == incumbent)
-							incumbentPlan = dynamicClear;
 						continue;
 					}
 
 					if (firingCell != null)
 					{
+						var ignoredActionThreat = cache.ThreatByActor.TryGetValue(actor, out var actionThreat) &&
+							StealthAISpecialistPolicy.CanOutrangeUndetectingTarget(
+								actionThreat.WeaponRange, actionThreat.DetectorRange,
+								GroundWeaponRange(representative, actor)) ? actor : null;
+						var postAttackCell = SafePostAttackStrategicCell(
+							owner, representative, cache, firingCell.Value);
+						var firingCovered = CoveringWeaponAt(owner, cache,
+							owner.World.Map.CenterOfCell(firingCell.Value), ignoredActionThreat);
+						if (!StealthAISpecialistPolicy.PlannedExposureIsSafe(
+							firingCovered, postAttackCell != null, false))
+							continue;
+
 						var firingRoute = BuildValidatedFiringRoute(
 							cache, actor, firingCell.Value, () =>
 								StealthRouteToCell(owner, representative, cache,
 									CoarseCell(owner, firingCell.Value), actor));
 						if (firingRoute == null)
 							continue;
-						LogObeliskSafeRouteEvidence(owner, cache, actor,
+						LogDirectSafeRouteEvidence(owner, cache, actor,
 							firingCell.Value, firingRoute, "ordinary-plan");
-						var plan = new AirTargetPlan(actor, score, true, firingRoute);
+						var plan = new AirTargetPlan(actor, score, true, firingRoute,
+							stealthPostAttackCell: postAttackCell);
 						var travel = RouteTravelMilliseconds(owner, representative, firingRoute, actor);
 						var killTicks = EstimatedKillTicks(formation, new[] { actor });
 						var rawService = killTicks == long.MaxValue || travel == long.MaxValue ? long.MaxValue :
@@ -2945,10 +3043,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 								owner.SquadManager.Info.AirTargetStallTicks),
 							actor.Info.HasTraitInfo<MobileInfo>());
 						plan.ServiceMilliseconds = service;
-						safePlans.Add((plan, travel, service));
+						cellSafePlans.Add((plan, travel, service, candidate.Priority));
 						debugPlans?.Add(plan);
-						if (actor == incumbent)
-							incumbentPlan = plan;
 						continue;
 					}
 
@@ -2966,11 +3062,27 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 						continue;
 					clear.ServiceMilliseconds = StealthMissionServiceMilliseconds(
 						owner, representative, formation, clear);
-					clearPlans.Add(clear);
+					cellClearPlans.Add((clear, candidate.Priority));
 					debugPlans?.Add(clear);
-					if (clear.Actor == incumbent)
-						incumbentPlan = clear;
 				}
+
+				// Strategic-cell selection chooses where to engage; actor engagement within that
+				// cell must still obey the configured target priorities. Filter only after all
+				// safety/attackability checks above, so an invalid or unsafe preferred actor
+				// naturally leaves the next configured tier as the eligible fallback.
+				var preferred = StealthAISpecialistPolicy.HighestPriorityEligibleEngagements(
+					cellSafePlans.Select(entry => (entry.Plan, entry.Priority))
+						.Concat(cellClearPlans.Select(entry => (entry.Plan, entry.Priority))))
+					.Select(plan => plan.Actor.ActorID).ToHashSet();
+				safePlans.AddRange(cellSafePlans.Where(entry => preferred.Contains(entry.Plan.Actor.ActorID))
+					.Select(entry => (entry.Plan, entry.TravelMs, entry.ServiceMs)));
+				clearPlans.AddRange(cellClearPlans.Where(entry => preferred.Contains(entry.Plan.Actor.ActorID))
+					.Select(entry => entry.Plan));
+				if (incumbent != null)
+					incumbentPlan = cellSafePlans.Select(entry => entry.Plan)
+						.Concat(cellClearPlans.Select(entry => entry.Plan))
+						.FirstOrDefault(plan => preferred.Contains(plan.Actor.ActorID) && plan.Actor == incumbent)
+						?? incumbentPlan;
 			}
 
 			var bestSafe = safePlans.OrderByDescending(p => p.Plan.Score).ThenBy(p => p.TravelMs)
@@ -3877,6 +3989,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			owner.AirAaClearEngaged = false;
 			if (owner.Type == SquadType.Stealth)
 			{
+				owner.StealthPostAttackCell = plan.StealthPostAttackCell;
 				owner.StealthClearMode = plan.StealthMode;
 				owner.StealthAggressiveMass = plan.StealthMode == StealthClearMode.Mass &&
 					plan.StealthAggressiveMass;
@@ -5910,6 +6023,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					else if (!aggressiveMass && CanAttackTarget(a, owner.TargetActor))
 					{
 						owner.Bot.QueueOrder(new Order("Attack", a, Target.FromActor(owner.TargetActor), true));
+						if (owner.StealthPostAttackCell != null)
+							owner.Bot.QueueOrder(new Order("Move", a,
+								Target.FromCell(owner.World, owner.StealthPostAttackCell.Value), true));
 						attackOrders++;
 					}
 
@@ -6037,7 +6153,10 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 								owner.TargetActor.Location);
 					}
 				}
-				else if (CanAttackTarget(a, owner.TargetActor))
+				else if (CanAttackTarget(a, owner.TargetActor) &&
+					(owner.Type != SquadType.Stealth || owner.StealthClearMode == StealthClearMode.Kite ||
+					owner.StealthClearMode == StealthClearMode.Mass || OrdinaryAttackExposureIsSafe(
+						owner, stealthCache, a, owner.TargetActor, owner.StealthPostAttackCell)))
 				{
 					owner.Bot.QueueOrder(new Order("Attack", a, Target.FromActor(owner.TargetActor), false));
 					if (owner.SquadManager.Info.AirTargetDebugLogging)

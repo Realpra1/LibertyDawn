@@ -60,6 +60,23 @@ namespace OpenRA.Mods.Common.Traits
 
 	public static class StealthAISpecialistPolicy
 	{
+		public readonly struct EfficiencyRating
+		{
+			public readonly double KillValuePerActorMinute;
+			public readonly double DamagePerDeployedActor;
+			public readonly double Rating;
+			public readonly bool PerfectZeroDamage;
+
+			public EfficiencyRating(double killValuePerActorMinute,
+				double damagePerDeployedActor, double rating, bool perfectZeroDamage)
+			{
+				KillValuePerActorMinute = killValuePerActorMinute;
+				DamagePerDeployedActor = damagePerDeployedActor;
+				Rating = rating;
+				PerfectZeroDamage = perfectZeroDamage;
+			}
+		}
+
 		public const int MaximumSquadCount = 4;
 		public const int RequiredStrategicCellSize = 6;
 		public const int NearbyReactionMaximumLatencyTicks = 25;
@@ -130,6 +147,91 @@ namespace OpenRA.Mods.Common.Traits
 		public static bool MeetsMinimumStrategicCellValue(long value)
 		{
 			return value >= MinimumStrategicCellValue;
+		}
+
+		public static bool TargetCellIsInActiveTier(long value, bool highTierExists)
+		{
+			var high = MeetsMinimumStrategicCellValue(value);
+			return highTierExists ? high : !high;
+		}
+
+		public static IReadOnlyList<T> HighestPriorityEligibleEngagements<T>(
+			IEnumerable<(T Item, int Priority)> eligible)
+		{
+			if (eligible == null)
+				throw new ArgumentNullException(nameof(eligible));
+
+			var candidates = eligible.ToList();
+			if (candidates.Count == 0)
+				return Array.Empty<T>();
+
+			var highestPriority = candidates.Max(candidate => candidate.Priority);
+			return candidates.Where(candidate => candidate.Priority == highestPriority)
+				.Select(candidate => candidate.Item).ToList();
+		}
+
+		public static int FirstUnoccupiedEnterableDestination(
+			IReadOnlyList<bool> occupied, IReadOnlyList<bool> enterable)
+		{
+			if (occupied == null)
+				throw new ArgumentNullException(nameof(occupied));
+			if (enterable == null)
+				throw new ArgumentNullException(nameof(enterable));
+			if (occupied.Count != enterable.Count)
+				throw new ArgumentException("Destination state lengths must match.");
+
+			for (var i = 0; i < occupied.Count; i++)
+				if (!occupied[i] && enterable[i])
+					return i;
+
+			return -1;
+		}
+
+		public static bool DestinationBelongsToStrategicCell(
+			int destinationX, int destinationY, int strategicCellSize,
+			int expectedStrategicX, int expectedStrategicY)
+		{
+			return strategicCellSize > 0 &&
+				destinationX / strategicCellSize == expectedStrategicX &&
+				destinationY / strategicCellSize == expectedStrategicY;
+		}
+
+		public static float CloakAwareRouteDanger(float mobilityDanger, float weaponDanger,
+			bool detectorCoverage, bool currentlyCloaked)
+		{
+			if (!currentlyCloaked)
+				return mobilityDanger + weaponDanger;
+
+			// Detection is harmless by itself, but lets every covering weapon engage the
+			// cloaked unit. Make that guarded overlap hard danger without pricing weapons
+			// that cannot currently acquire the unit.
+			return mobilityDanger + (detectorCoverage && weaponDanger > 0 ?
+				HardDetectorRouteInfluence : 0);
+		}
+
+		public static bool PlannedExposureIsSafe(bool coveringWeapon, bool nextCellSafe,
+			bool existingExposureException)
+		{
+			return existingExposureException || (!coveringWeapon && nextCellSafe);
+		}
+
+		public static long AccumulateActorTicks(long actorTicks, int liveActors)
+		{
+			return actorTicks + Math.Max(0, liveActors);
+		}
+
+		public static EfficiencyRating StealthEfficiency(long attributedKillValue,
+			long actorTicks, int timestepMilliseconds, long damageTaken, int uniqueActorsDeployed)
+		{
+			var actorMinutes = actorTicks > 0 && timestepMilliseconds > 0 ?
+				actorTicks * (double)timestepMilliseconds / 60000 : 0;
+			var killRate = actorMinutes > 0 ? Math.Max(0, attributedKillValue) / actorMinutes : 0;
+			var damagePerActor = uniqueActorsDeployed > 0 ?
+				Math.Max(0, damageTaken) / (double)uniqueActorsDeployed : 0;
+			var perfect = damagePerActor == 0 && killRate > 0;
+			var rating = perfect ? double.PositiveInfinity :
+				damagePerActor > 0 ? killRate / damagePerActor : 0;
+			return new EfficiencyRating(killRate, damagePerActor, rating, perfect);
 		}
 
 		public static int WeightedRouteDistanceCells(float routeCost, int strategicCellSize)
