@@ -8,6 +8,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -887,7 +888,7 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
-		public void StealthEfficiencyTelemetryUsesActorTimeAndExactZeroDamageSemantics()
+		public void StealthEfficiencyWatchdogUsesExactRawTickFormulasAndUndefinedSemantics()
 		{
 			long actorTicks = 0;
 			foreach (var liveActors in new[] { 1, 2, 1, 0 })
@@ -895,22 +896,102 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(actorTicks, Is.EqualTo(4),
 				"Actor joins and deaths contribute only their live actor-ticks.");
 
-			var rated = StealthAISpecialistPolicy.StealthEfficiency(3000, 3000, 20, 600, 2);
-			Assert.That(rated.KillValuePerActorMinute, Is.EqualTo(3000));
-			Assert.That(rated.DamagePerDeployedActor, Is.EqualTo(300));
-			Assert.That(rated.Rating, Is.EqualTo(10));
-			Assert.That(rated.PerfectZeroDamage, Is.False);
+			var rated = StealthAISpecialistPolicy.StealthEfficiency(3000, 3000, 600, 2);
+			Assert.That(rated.RawKilledValue, Is.EqualTo(3000));
+			Assert.That(rated.ActorTicks, Is.EqualTo(3000));
+			Assert.That(rated.ActorMinutes, Is.EqualTo(1));
+			Assert.That(rated.UniqueStnks, Is.EqualTo(2));
+			Assert.That(rated.TotalDamage, Is.EqualTo(600));
+			Assert.That(rated.AverageDamage, Is.EqualTo(300));
+			Assert.That(rated.Primary, Is.EqualTo(3000));
+			Assert.That(rated.DamageAdjusted, Is.EqualTo(10));
+			Assert.That(rated.InfiniteDamageAdjusted, Is.False);
 
-			var noKills = StealthAISpecialistPolicy.StealthEfficiency(0, 3000, 20, 600, 2);
-			Assert.That(noKills.Rating, Is.Zero);
-			Assert.That(double.IsNaN(noKills.Rating), Is.False);
-			var noDamage = StealthAISpecialistPolicy.StealthEfficiency(3000, 3000, 20, 0, 2);
-			Assert.That(noDamage.PerfectZeroDamage, Is.True);
-			Assert.That(double.IsPositiveInfinity(noDamage.Rating), Is.True,
-				"Perfect zero damage is infinite, never an epsilon-adjusted finite rating.");
-			var empty = StealthAISpecialistPolicy.StealthEfficiency(0, 0, 20, 0, 0);
-			Assert.That(empty.Rating, Is.Zero);
-			Assert.That(double.IsNaN(empty.Rating), Is.False);
+			var zeroActorTime = StealthAISpecialistPolicy.StealthEfficiency(3000, 0, 600, 2);
+			Assert.That(zeroActorTime.ActorMinutes, Is.Zero);
+			Assert.That(zeroActorTime.Primary, Is.Null);
+			Assert.That(zeroActorTime.DamageAdjusted, Is.Null);
+			var zeroActors = StealthAISpecialistPolicy.StealthEfficiency(3000, 3000, 0, 0);
+			Assert.That(zeroActors.AverageDamage, Is.Null);
+			Assert.That(zeroActors.DamageAdjusted, Is.Null);
+			Assert.That(zeroActors.InfiniteDamageAdjusted, Is.False);
+			var noDamage = StealthAISpecialistPolicy.StealthEfficiency(3000, 3000, 0, 2);
+			Assert.That(noDamage.AverageDamage, Is.Zero);
+			Assert.That(noDamage.DamageAdjusted, Is.Null);
+			Assert.That(noDamage.InfiniteDamageAdjusted, Is.True,
+				"Positive primary divided by exact zero average damage is explicitly infinite.");
+			var zeroOverZero = StealthAISpecialistPolicy.StealthEfficiency(0, 3000, 0, 2);
+			Assert.That(zeroOverZero.DamageAdjusted, Is.Null);
+			Assert.That(zeroOverZero.InfiniteDamageAdjusted, Is.False);
+		}
+
+		[Test]
+		public void StealthEfficiencyWatchdogOutputIsStableInvariantAndPeriodicTerminalEquivalent()
+		{
+			var metric = StealthAISpecialistPolicy.StealthEfficiency(1000, 1000, 3, 2);
+			var expectedPeriodic = "stealth_efficiency_watchdog|summary=periodic|bot_id=7|scope=stnk|" +
+				"window_start_tick=11|window_end_tick=99|raw_killed_value=1000|actor_ticks=1000|" +
+				"actor_minutes=0.3333333333333333|unique_stnks=2|total_damage=3|average_damage=1.5|" +
+				"primary=3000|damage_adjusted=2000|diagnostic_only=true";
+			var expectedTerminal = expectedPeriodic.Replace("summary=periodic", "summary=terminal");
+
+			var previousCulture = CultureInfo.CurrentCulture;
+			var previousUiCulture = CultureInfo.CurrentUICulture;
+			try
+			{
+				CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("de-DE");
+				CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("de-DE");
+				Assert.That(StealthAISpecialistPolicy.FormatStealthEfficiencySummary(
+					"periodic", 7, 11, 99, metric), Is.EqualTo(expectedPeriodic));
+				Assert.That(StealthAISpecialistPolicy.FormatStealthEfficiencySummary(
+					"terminal", 7, 11, 99, metric), Is.EqualTo(expectedTerminal));
+			}
+			finally
+			{
+				CultureInfo.CurrentCulture = previousCulture;
+				CultureInfo.CurrentUICulture = previousUiCulture;
+			}
+
+			var zeroTime = StealthAISpecialistPolicy.StealthEfficiency(1000, 0, 3, 2);
+			Assert.That(StealthAISpecialistPolicy.FormatStealthEfficiencySummary(
+				"terminal", 7, 11, 99, zeroTime), Does.Contain(
+				"|actor_ticks=0|actor_minutes=0|unique_stnks=2|total_damage=3|average_damage=1.5|" +
+				"primary=unavailable|damage_adjusted=unavailable|"));
+			var infinite = StealthAISpecialistPolicy.StealthEfficiency(1000, 3000, 0, 1);
+			Assert.That(StealthAISpecialistPolicy.FormatStealthEfficiencySummary(
+				"periodic", 7, 11, 99, infinite), Does.Contain(
+				"|unique_stnks=1|total_damage=0|average_damage=0|primary=1000|damage_adjusted=infinite|"));
+		}
+
+		[Test]
+		public void StealthEfficiencyWatchdogOwnsOneBotScopeWindowAndSurvivesSaveLoad()
+		{
+			var beforeSave = StealthAISpecialistPolicy.StealthEfficiency(1234, 5678, 90, 4);
+			var afterLoad = StealthAISpecialistPolicy.StealthEfficiency(
+				beforeSave.RawKilledValue, beforeSave.ActorTicks, beforeSave.TotalDamage, beforeSave.UniqueStnks);
+			Assert.That(StealthAISpecialistPolicy.FormatStealthEfficiencySummary(
+				"periodic", 42, 17, 6000, afterLoad), Is.EqualTo(
+				StealthAISpecialistPolicy.FormatStealthEfficiencySummary(
+					"periodic", 42, 17, 6000, beforeSave)));
+
+			var manager = Source("OpenRA.Mods.Common/Traits/BotModules/SquadManagerBotModule.cs");
+			Assert.That(manager, Does.Contain("actor.Owner == Player"));
+			Assert.That(manager, Does.Contain("e.Attacker.Owner != Player"));
+			Assert.That(manager, Does.Contain("self.Owner == Player && self.Info.Name == \"stnk\""));
+			Assert.That(manager, Does.Contain("StealthEfficiencyWindowStartTick"));
+			Assert.That(manager.Split("World.GameOver += EmitTerminalStealthEfficiencySummary").Length - 1,
+				Is.EqualTo(1));
+			Assert.That(manager, Does.Contain("World.GameOver -= EmitTerminalStealthEfficiencySummary"),
+				"Only the enabled bot-specific module may own the terminal summary subscription.");
+			Assert.That(manager, Does.Not.Contain("World.Timestep,\n\t\t\t\tstealthEfficiencyDamageTaken"),
+				"Whole-game time or wall-clock timestep must not replace accumulated STNK actor ticks.");
+
+			var output = manager.Substring(manager.IndexOf(
+				"void EmitStealthEfficiencySummary", StringComparison.Ordinal));
+			output = output.Substring(0, output.IndexOf("void RunFailsafeTestPressure", StringComparison.Ordinal));
+			Assert.That(output, Does.Not.Contain("Target"));
+			Assert.That(output, Does.Not.Contain("Route"));
+			Assert.That(output, Does.Not.Contain("Priority"));
 		}
 
 		[Test]

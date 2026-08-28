@@ -632,6 +632,9 @@ namespace OpenRA.Mods.Common.Traits
 		long stealthEfficiencyDamageTaken;
 		readonly HashSet<uint> stealthEfficiencyActors = new HashSet<uint>();
 		int stealthEfficiencyNextReportTick;
+		int stealthEfficiencyWindowStartTick;
+		bool stealthEfficiencyTerminalReported;
+		bool stealthEfficiencyTerminalSubscribed;
 
 		public SquadManagerBotModule(Actor self, SquadManagerBotModuleInfo info)
 			: base(info)
@@ -727,6 +730,14 @@ namespace OpenRA.Mods.Common.Traits
 
 		protected override void TraitEnabled(Actor self)
 		{
+			if (!stealthEfficiencyTerminalSubscribed)
+			{
+				stealthEfficiencyWindowStartTick = World.WorldTick;
+				stealthEfficiencyTerminalReported = false;
+				stealthEfficiencyTerminalSubscribed = true;
+				World.GameOver += EmitTerminalStealthEfficiencySummary;
+			}
+
 			// Avoid all AIs trying to rush in the same tick, randomize their initial rush a little.
 			var smallFractionOfRushInterval = Info.RushInterval / 20;
 			rushTicks = World.LocalRandom.Next(Info.RushInterval - smallFractionOfRushInterval, Info.RushInterval + smallFractionOfRushInterval);
@@ -748,6 +759,15 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (Info.AirAdaptiveRiskInterval > 0)
 				adaptiveAirRiskTicks = Info.AirAdaptiveRiskInterval;
+		}
+
+		protected override void TraitDisabled(Actor self)
+		{
+			if (!stealthEfficiencyTerminalSubscribed)
+				return;
+
+			World.GameOver -= EmitTerminalStealthEfficiencySummary;
+			stealthEfficiencyTerminalSubscribed = false;
 		}
 
 		void IBotEnabled.BotEnabled(IBot bot)
@@ -789,18 +809,26 @@ namespace OpenRA.Mods.Common.Traits
 				return;
 
 			stealthEfficiencyNextReportTick = World.WorldTick + Math.Max(1, 60000 / World.Timestep);
+			EmitStealthEfficiencySummary("periodic");
+		}
+
+		void EmitTerminalStealthEfficiencySummary()
+		{
+			if (stealthEfficiencyTerminalReported)
+				return;
+
+			stealthEfficiencyTerminalReported = true;
+			EmitStealthEfficiencySummary("terminal");
+		}
+
+		void EmitStealthEfficiencySummary(string summary)
+		{
 			var metric = StealthAISpecialistPolicy.StealthEfficiency(
-				stealthEfficiencyKillValue, stealthEfficiencyActorTicks, World.Timestep,
+				stealthEfficiencyKillValue, stealthEfficiencyActorTicks,
 				stealthEfficiencyDamageTaken, stealthEfficiencyActors.Count);
-			Log.Write("debug", "Stealth efficiency telemetry [stealth-tank]: tick={0} " +
-				"attributed-kill-value={1} actor-ticks={2} timestep-ms={3} unique-stnks={4} " +
-				"damage-taken={5} kill-value-per-actor-minute={6:0.###} " +
-				"damage-per-stnk={7:0.###} rating={8} zero-damage-perfect={9} diagnostic-only=True.",
-				World.WorldTick, stealthEfficiencyKillValue, stealthEfficiencyActorTicks,
-				World.Timestep, stealthEfficiencyActors.Count, stealthEfficiencyDamageTaken,
-				metric.KillValuePerActorMinute, metric.DamagePerDeployedActor,
-				metric.PerfectZeroDamage ? "infinite" : metric.Rating.ToString("0.###"),
-				metric.PerfectZeroDamage);
+			Log.Write("debug", StealthAISpecialistPolicy.FormatStealthEfficiencySummary(
+				summary, Player.PlayerActor.ActorID, stealthEfficiencyWindowStartTick,
+				World.WorldTick, metric));
 		}
 
 		void RunFailsafeTestPressure()
@@ -1931,6 +1959,7 @@ namespace OpenRA.Mods.Common.Traits
 				new MiniYamlNode("StealthEfficiencyDamageTaken", FieldSaver.FormatValue(stealthEfficiencyDamageTaken)),
 				new MiniYamlNode("StealthEfficiencyActors", FieldSaver.FormatValue(stealthEfficiencyActors.ToArray())),
 				new MiniYamlNode("StealthEfficiencyNextReportTick", FieldSaver.FormatValue(stealthEfficiencyNextReportTick)),
+				new MiniYamlNode("StealthEfficiencyWindowStartTick", FieldSaver.FormatValue(stealthEfficiencyWindowStartTick)),
 				new MiniYamlNode("FallbackReconsiderTicks", FieldSaver.FormatValue(fallbackReconsiderTicks)),
 				new MiniYamlNode("FallbackTarget", FieldSaver.FormatValue(fallbackTarget?.ActorID ?? 0)),
 				new MiniYamlNode("FallbackOrderedActors", FieldSaver.FormatValue(fallbackOrderedActors.ToArray())),
@@ -2029,6 +2058,10 @@ namespace OpenRA.Mods.Common.Traits
 			if (efficiencyReportNode != null)
 				stealthEfficiencyNextReportTick = FieldLoader.GetValue<int>(
 					"StealthEfficiencyNextReportTick", efficiencyReportNode.Value.Value);
+			var efficiencyWindowNode = data.FirstOrDefault(n => n.Key == "StealthEfficiencyWindowStartTick");
+			if (efficiencyWindowNode != null)
+				stealthEfficiencyWindowStartTick = FieldLoader.GetValue<int>(
+					"StealthEfficiencyWindowStartTick", efficiencyWindowNode.Value.Value);
 			var fallbackTicksNode = data.FirstOrDefault(n => n.Key == "FallbackReconsiderTicks");
 			if (fallbackTicksNode != null)
 				fallbackReconsiderTicks = FieldLoader.GetValue<int>("FallbackReconsiderTicks", fallbackTicksNode.Value.Value);

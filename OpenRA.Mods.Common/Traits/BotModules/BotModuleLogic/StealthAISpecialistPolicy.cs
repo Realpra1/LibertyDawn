@@ -8,6 +8,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using OpenRA.Mods.Common.Traits.BotModules.Squads;
 
@@ -145,20 +146,31 @@ namespace OpenRA.Mods.Common.Traits
 
 	public static class StealthAISpecialistPolicy
 	{
-		public readonly struct EfficiencyRating
+		public readonly struct StealthEfficiencySummary
 		{
-			public readonly double KillValuePerActorMinute;
-			public readonly double DamagePerDeployedActor;
-			public readonly double Rating;
-			public readonly bool PerfectZeroDamage;
+			public readonly long RawKilledValue;
+			public readonly long ActorTicks;
+			public readonly double ActorMinutes;
+			public readonly int UniqueStnks;
+			public readonly long TotalDamage;
+			public readonly double? AverageDamage;
+			public readonly double? Primary;
+			public readonly double? DamageAdjusted;
+			public readonly bool InfiniteDamageAdjusted;
 
-			public EfficiencyRating(double killValuePerActorMinute,
-				double damagePerDeployedActor, double rating, bool perfectZeroDamage)
+			public StealthEfficiencySummary(long rawKilledValue, long actorTicks,
+				double actorMinutes, int uniqueStnks, long totalDamage, double? averageDamage,
+				double? primary, double? damageAdjusted, bool infiniteDamageAdjusted)
 			{
-				KillValuePerActorMinute = killValuePerActorMinute;
-				DamagePerDeployedActor = damagePerDeployedActor;
-				Rating = rating;
-				PerfectZeroDamage = perfectZeroDamage;
+				RawKilledValue = rawKilledValue;
+				ActorTicks = actorTicks;
+				ActorMinutes = actorMinutes;
+				UniqueStnks = uniqueStnks;
+				TotalDamage = totalDamage;
+				AverageDamage = averageDamage;
+				Primary = primary;
+				DamageAdjusted = damageAdjusted;
+				InfiniteDamageAdjusted = infiniteDamageAdjusted;
 			}
 		}
 
@@ -305,18 +317,51 @@ namespace OpenRA.Mods.Common.Traits
 			return actorTicks + Math.Max(0, liveActors);
 		}
 
-		public static EfficiencyRating StealthEfficiency(long attributedKillValue,
-			long actorTicks, int timestepMilliseconds, long damageTaken, int uniqueActorsDeployed)
+		public static StealthEfficiencySummary StealthEfficiency(long rawKilledValue,
+			long actorTicks, long totalDamage, int uniqueStnks)
 		{
-			var actorMinutes = actorTicks > 0 && timestepMilliseconds > 0 ?
-				actorTicks * (double)timestepMilliseconds / 60000 : 0;
-			var killRate = actorMinutes > 0 ? Math.Max(0, attributedKillValue) / actorMinutes : 0;
-			var damagePerActor = uniqueActorsDeployed > 0 ?
-				Math.Max(0, damageTaken) / (double)uniqueActorsDeployed : 0;
-			var perfect = damagePerActor == 0 && killRate > 0;
-			var rating = perfect ? double.PositiveInfinity :
-				damagePerActor > 0 ? killRate / damagePerActor : 0;
-			return new EfficiencyRating(killRate, damagePerActor, rating, perfect);
+			var actorMinutes = actorTicks / 3000d;
+			double? primary = actorMinutes == 0 ? (double?)null : rawKilledValue / actorMinutes;
+			double? averageDamage = uniqueStnks == 0 ? (double?)null : totalDamage / (double)uniqueStnks;
+			var infinite = primary > 0 && averageDamage == 0;
+			double? damageAdjusted = primary == null || averageDamage == null || averageDamage == 0 ?
+				null : primary / averageDamage;
+
+			return new StealthEfficiencySummary(rawKilledValue, actorTicks, actorMinutes,
+				uniqueStnks, totalDamage, averageDamage, primary, damageAdjusted, infinite);
+		}
+
+		static string EfficiencyValue(double? value, bool infinite = false)
+		{
+			if (infinite)
+				return "infinite";
+			if (value == null)
+				return "unavailable";
+
+			return value.Value.ToString("R", CultureInfo.InvariantCulture);
+		}
+
+		public static string FormatStealthEfficiencySummary(string summary, uint botId,
+			int windowStartTick, int windowEndTick, StealthEfficiencySummary metric)
+		{
+			return string.Join("|", new[]
+			{
+				"stealth_efficiency_watchdog",
+				"summary=" + summary,
+				"bot_id=" + botId.ToString(CultureInfo.InvariantCulture),
+				"scope=stnk",
+				"window_start_tick=" + windowStartTick.ToString(CultureInfo.InvariantCulture),
+				"window_end_tick=" + windowEndTick.ToString(CultureInfo.InvariantCulture),
+				"raw_killed_value=" + metric.RawKilledValue.ToString(CultureInfo.InvariantCulture),
+				"actor_ticks=" + metric.ActorTicks.ToString(CultureInfo.InvariantCulture),
+				"actor_minutes=" + EfficiencyValue(metric.ActorMinutes),
+				"unique_stnks=" + metric.UniqueStnks.ToString(CultureInfo.InvariantCulture),
+				"total_damage=" + metric.TotalDamage.ToString(CultureInfo.InvariantCulture),
+				"average_damage=" + EfficiencyValue(metric.AverageDamage),
+				"primary=" + EfficiencyValue(metric.Primary),
+				"damage_adjusted=" + EfficiencyValue(metric.DamageAdjusted, metric.InfiniteDamageAdjusted),
+				"diagnostic_only=true"
+			});
 		}
 
 		public static int WeightedRouteDistanceCells(float routeCost, int strategicCellSize)
