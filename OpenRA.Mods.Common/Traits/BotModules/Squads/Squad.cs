@@ -117,10 +117,6 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		internal CPos? StealthRouteLastCenterCell;
 		internal int StealthRouteLastCenterProgressTick;
 
-		// Lazily allocated only for BotDebug acceptance runs. Release games with target debugging
-		// disabled perform no per-member motion tracking and allocate no watchdog state.
-		internal Dictionary<uint, (Actor Actor, CPos Location, int LastMoveTick, bool Triggered)>
-			StealthDebugMotion;
 		internal Dictionary<uint, Queue<StealthDebugLifecycleSnapshot>> StealthDebugLifecycle;
 		internal Dictionary<uint, (int Signature, int LastReportTick)> StealthDebugLifecycleState;
 		internal int StealthDebugLifecycleLastCadenceAge = -1;
@@ -154,6 +150,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		internal int StealthEscapeLastProgressTick = -1;
 		internal int StealthEscapeLastDistanceCells = int.MaxValue;
 		internal CPos? StealthKiteTargetCell;
+		internal CPos? StealthCrushTargetCell;
 		internal uint StealthKiteSupersessionActorId;
 		internal int StealthKiteSupersessionConfirmations;
 		internal readonly Dictionary<uint, int> StealthKiteParticipantHealth = new Dictionary<uint, int>();

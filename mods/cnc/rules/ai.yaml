@@ -702,6 +702,11 @@ Player:
 					harv: 5000
 					sharv: 5000
 					proc: 2500
+					vice: -1
+					pvice: -1
+				AttackTargetPriorities:
+					vice: -1
+					pvice: -1
 			chemical:
 				UnitTypes: ctnk
 				StrategicCellSize: 6
@@ -946,6 +951,11 @@ Player:
 					harv: 5000
 					sharv: 5000
 					proc: 2500
+					vice: -1
+					pvice: -1
+				AttackTargetPriorities:
+					vice: -1
+					pvice: -1
 			chemical:
 				UnitTypes: ctnk
 				StrategicCellSize: 6
@@ -1190,6 +1200,11 @@ Player:
 					harv: 5000
 					sharv: 5000
 					proc: 2500
+					vice: -1
+					pvice: -1
+				AttackTargetPriorities:
+					vice: -1
+					pvice: -1
 			chemical:
 				UnitTypes: ctnk
 				StrategicCellSize: 6
@@ -1516,6 +1531,11 @@ Player:
 					harv: 5000
 					sharv: 5000
 					proc: 2500
+					vice: -1
+					pvice: -1
+				AttackTargetPriorities:
+					vice: -1
+					pvice: -1
 			chemical:
 				UnitTypes: ctnk
 				StrategicCellSize: 6
@@ -1672,6 +1692,11 @@ Player:
 					harv: 5000
 					sharv: 5000
 					proc: 2500
+					vice: -1
+					pvice: -1
+				AttackTargetPriorities:
+					vice: -1
+					pvice: -1
 			chemical:
 				UnitTypes: ctnk
 				StrategicCellSize: 6
@@ -2017,6 +2042,11 @@ Player:
 					harv: 5000
 					sharv: 5000
 					proc: 2500
+					vice: -1
+					pvice: -1
+				AttackTargetPriorities:
+					vice: -1
+					pvice: -1
 			chemical:
 				UnitTypes: ctnk
 				StrategicCellSize: 6
@@ -2373,6 +2403,11 @@ Player:
 					harv: 5000
 					sharv: 5000
 					proc: 2500
+					vice: -1
+					pvice: -1
+				AttackTargetPriorities:
+					vice: -1
+					pvice: -1
 			chemical:
 				UnitTypes: ctnk
 				StrategicCellSize: 6
@@ -2776,6 +2811,11 @@ Player:
 					harv: 5000
 					sharv: 5000
 					proc: 2500
+					vice: -1
+					pvice: -1
+				AttackTargetPriorities:
+					vice: -1
+					pvice: -1
 			chemical:
 				UnitTypes: ctnk
 				StrategicCellSize: 6
@@ -3104,6 +3144,11 @@ Player:
 					harv: 5000
 					sharv: 5000
 					proc: 2500
+					vice: -1
+					pvice: -1
+				AttackTargetPriorities:
+					vice: -1
+					pvice: -1
 			chemical:
 				UnitTypes: ctnk
 				StrategicCellSize: 6
@@ -3398,6 +3443,11 @@ Player:
 					harv: 5000
 					sharv: 5000
 					proc: 2500
+					vice: -1
+					pvice: -1
+				AttackTargetPriorities:
+					vice: -1
+					pvice: -1
 			chemical:
 				UnitTypes: ctnk
 				StrategicCellSize: 6

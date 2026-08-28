@@ -69,6 +69,77 @@ namespace OpenRA.Mods.Common.Traits
 		public const float HardDetectorRouteInfluence = 1f;
 		public const int ReinforcementSaveVersion = 2;
 		public const int AggressiveMassEntryCrossoverPercent = 500;
+		public const long MinimumStrategicCellValue = 5000L * 1100L;
+
+		public static BotStationaryWatchdogExemption StationaryWatchdogExemption(
+			bool sustainedFiring, bool observedHealing)
+		{
+			if (observedHealing)
+				return BotStationaryWatchdogExemption.Repairing;
+
+			return sustainedFiring ? BotStationaryWatchdogExemption.Firing :
+				BotStationaryWatchdogExemption.None;
+		}
+
+		public static int ObservedRepairAmount(int previousHealth, int currentHealth)
+		{
+			return Math.Max(0, currentHealth - previousHealth);
+		}
+
+		public static int FiringEpisodeCadenceTicks(int reloadDelay,
+			IEnumerable<int> burstDelays, int toleranceTicks)
+		{
+			if (reloadDelay < 0)
+				throw new ArgumentOutOfRangeException(nameof(reloadDelay));
+			if (toleranceTicks < 0)
+				throw new ArgumentOutOfRangeException(nameof(toleranceTicks));
+
+			return Math.Max(1, reloadDelay + (burstDelays?.Sum() ?? 0) + toleranceTicks);
+		}
+
+		public static bool IsSustainedFiringEpisode(int lastDischargeTick, int currentTick,
+			int cadenceTicks, bool sameTarget, bool sameAttackActivity, bool targetValid)
+		{
+			return lastDischargeTick != int.MinValue && cadenceTicks > 0 &&
+				currentTick >= lastDischargeTick && currentTick - lastDischargeTick <= cadenceTicks &&
+				sameTarget && sameAttackActivity && targetValid;
+		}
+
+		public static int NextStationaryWatchdogAge(int currentAge, bool moved,
+			BotStationaryWatchdogExemption exemption)
+		{
+			if (currentAge < 0)
+				throw new ArgumentOutOfRangeException(nameof(currentAge));
+
+			if (moved)
+				return 0;
+
+			return exemption == BotStationaryWatchdogExemption.None ? currentAge + 1 : currentAge;
+		}
+
+		public static bool StationaryWatchdogFailed(int stationaryAge, int maximumStationaryTicks)
+		{
+			return maximumStationaryTicks > 0 && stationaryAge >= maximumStationaryTicks;
+		}
+
+		public static long StrategicTargetValue(int priority, int actorValue)
+		{
+			return priority > 0 && actorValue > 0 ? priority * (long)actorValue : 0;
+		}
+
+		public static bool MeetsMinimumStrategicCellValue(long value)
+		{
+			return value >= MinimumStrategicCellValue;
+		}
+
+		public static int WeightedRouteDistanceCells(float routeCost, int strategicCellSize)
+		{
+			if (!float.IsFinite(routeCost) || routeCost < 0)
+				return int.MaxValue;
+
+			return (int)Math.Min(int.MaxValue,
+				Math.Ceiling(routeCost * Math.Max(1, strategicCellSize)));
+		}
 
 
 
@@ -576,6 +647,13 @@ namespace OpenRA.Mods.Common.Traits
 				ownRangeCells > detectorRangeCells;
 		}
 
+		public static bool CanOutrangeUndetectingTarget(int weaponRangeCells,
+			int detectorRangeCells, int ownRangeCells)
+		{
+			return weaponRangeCells > 0 && detectorRangeCells <= 0 &&
+				ownRangeCells > weaponRangeCells;
+		}
+
 		public static bool IsEngagementThreat(bool detectorExposure, bool armedCoverage,
 			bool engagedWeaponExposure)
 		{
@@ -610,6 +688,12 @@ namespace OpenRA.Mods.Common.Traits
 			return maximumTicks > 0 && ageTicks >= maximumTicks;
 		}
 
+		public static bool IsObeliskAttributedStealthTankDeath(string victimType, string attackerType)
+		{
+			return string.Equals(victimType, "stnk", StringComparison.OrdinalIgnoreCase) &&
+				string.Equals(attackerType, "obli", StringComparison.OrdinalIgnoreCase);
+		}
+
 		public static bool ShouldDispatchOwnedMissionImmediately(bool isStealthTank,
 			bool targetValid, int routeWaypoints, bool routeQueued)
 		{
@@ -630,9 +714,10 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		public static bool ShouldRefreshQueuedCrushRoute(bool ordinaryCrush, bool routeQueued,
-			bool trackedOrderIsCurrent, bool targetChangedStrategicCell)
+			bool trackedOrderIsCurrent, bool cachedLocalTarget, bool targetChangedCell)
 		{
-			return ordinaryCrush && routeQueued && !trackedOrderIsCurrent && targetChangedStrategicCell;
+			return ordinaryCrush && routeQueued && !trackedOrderIsCurrent &&
+				cachedLocalTarget && targetChangedCell;
 		}
 
 		public static int KillCadenceFinishMarginTicks(int reviewTicks, int stallTicks)

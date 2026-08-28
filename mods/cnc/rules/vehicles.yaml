@@ -920,6 +920,8 @@ STNK:
 	AttackMove:
 		Voice: Attack
 	EconomyMammothCrushMove:
+	BotOwnedStationaryWatchdog:
+		MaximumStationaryMilliseconds: 30000
 	AutoTarget:
 		InitialStance: HoldFire
 		InitialStanceAI: ReturnFire

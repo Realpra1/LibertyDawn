@@ -262,13 +262,13 @@ namespace OpenRA.Test.Mods.Common
 				"A valid static STNK mission must reach service instead of restarting for every economic challenger.");
 			Assert.That(states, Does.Contain("if (cache == null || !cache.Threats.Any(t => t.Actor == target)"),
 				"An owned Kite must reject a transiently unavailable influence cache and use the existing safe replan path.");
-			var watchdogGuard = states.IndexOf(
-				"if (!owner.SquadManager.Info.AirTargetDebugLogging || owner.StealthProfile != \"stealth-tank\")",
-				StringComparison.Ordinal);
+			var watchdog = Source("OpenRA.Mods.Common/Traits/BotOwnedStationaryWatchdog.cs");
+			var watchdogGuard = watchdog.IndexOf(
+				"if (!Game.Settings.Debug.BotDebug || !self.Owner.IsBot)", StringComparison.Ordinal);
 			Assert.That(watchdogGuard, Is.GreaterThanOrEqualTo(0));
-			Assert.That(watchdogGuard, Is.LessThan(states.IndexOf(
-				"if (owner.StealthDebugMotion == null)", watchdogGuard, StringComparison.Ordinal)),
-				"Debug-disabled games must return before allocating or enumerating per-member watchdog state.");
+			Assert.That(watchdogGuard, Is.LessThan(watchdog.IndexOf(
+				"var currentHealth", watchdogGuard, StringComparison.Ordinal)),
+				"Debug-disabled games must return before firing, healing, or movement diagnostics.");
 			Assert.That(states, Does.Contain("StealthKiteParticipantHealth[participant.ActorID]"));
 			Assert.That(states, Does.Contain("completed owned MTNK lifecycle"),
 				"BotDebug evidence must distinguish an owned Kite completion from mode-unaware observer range inference.");
@@ -621,22 +621,89 @@ namespace OpenRA.Test.Mods.Common
 		public void QueuedCrushRefreshesOnlyForMaterialMovementBeforeTrackingOwnsMotion()
 		{
 			Assert.That(StealthAISpecialistPolicy.ShouldRefreshQueuedCrushRoute(
-				true, true, false, true), Is.True,
+				true, true, false, true, true), Is.True,
 				"A moved owned target invalidates the static route while tracked Crush is only queued.");
 			Assert.That(StealthAISpecialistPolicy.ShouldRefreshQueuedCrushRoute(
-				true, true, false, false), Is.False,
+				true, true, false, true, false), Is.False,
 				"An unchanged target cell must preserve the useful queued route without churn.");
 			Assert.That(StealthAISpecialistPolicy.ShouldRefreshQueuedCrushRoute(
-				true, true, true, true), Is.False,
+				true, true, true, true, true), Is.False,
 				"Once actor tracking controls current motion the engine follows the target without reissue.");
 			Assert.That(StealthAISpecialistPolicy.ShouldRefreshQueuedCrushRoute(
-				false, true, false, true), Is.False,
+				false, true, false, true, true), Is.False,
 				"CrushBridge and other modes preserve their existing routing semantics.");
 
 			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
-			Assert.That(states, Does.Contain("var crushCache = CachedStealthInfluence(owner, leader);"),
+			Assert.That(states, Does.Contain(
+				"var crushCache = leader == null ? null : CachedStealthInfluence(owner, leader);"),
 				"Live interception must reuse the bounded cache instead of scanning the world.");
 			Assert.That(states, Does.Contain("tracking-current={12}"));
+		}
+
+		[Test]
+		public void PostPr137StealthAcceptanceGatesAreLiteralAndProtected()
+		{
+			var yaml = Source("mods/cnc/rules/ai.yaml");
+			Assert.That(yaml.Split("stealth-tank:").Length - 1, Is.EqualTo(10));
+			Assert.That(yaml.Split('\n').Count(line => line.Trim() == "vice: -1"), Is.EqualTo(20),
+				"Every harassment and attack STNK profile must reject both Visceroid actor types.");
+			Assert.That(yaml.Split('\n').Count(line => line.Trim() == "pvice: -1"), Is.EqualTo(20));
+
+			Assert.That(StealthAISpecialistPolicy.MinimumStrategicCellValue,
+				Is.EqualTo(5000L * 1100L));
+			Assert.That(StealthAISpecialistPolicy.StrategicTargetValue(5000, 1100),
+				Is.EqualTo(StealthAISpecialistPolicy.MinimumStrategicCellValue));
+			Assert.That(StealthAISpecialistPolicy.MeetsMinimumStrategicCellValue(
+				5000L * 1100L - 1), Is.False);
+			Assert.That(StealthAISpecialistPolicy.MeetsMinimumStrategicCellValue(
+				5000L * 1100L), Is.True);
+
+			Assert.That(StealthAISpecialistPolicy.WeightedRouteDistanceCells(4.5f, 6), Is.EqualTo(27));
+			Assert.That(StealthAISpecialistPolicy.CanOutrangeUndetectingTarget(7, 0, 8), Is.True,
+				"An STNK must use its exact one-cell Obelisk range advantage.");
+			Assert.That(StealthAISpecialistPolicy.CanOutrangeUndetectingTarget(7, 1, 8), Is.False);
+			Assert.That(StealthAISpecialistPolicy.IsObeliskAttributedStealthTankDeath("stnk", "obli"),
+				Is.True);
+
+			Assert.That(StealthAISpecialistPolicy.NextKillCadenceAge(2249, 1, false, false),
+				Is.EqualTo(2250));
+			Assert.That(StealthAISpecialistPolicy.KillCadenceFailed(2250, 2250), Is.True);
+			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
+			Assert.That(states, Does.Contain("var exempt = noStnk;"),
+				"Firing, repair, planning, and target absence cannot pause an active squad kill clock.");
+			Assert.That(states, Does.Contain("Game.Settings.Debug.BotDebug"));
+			Assert.That(states, Does.Contain("cachedFrontierRouteCosts[target.TargetIndex] = target.RouteCost"));
+			Assert.That(states, Does.Contain("owner.StealthCrushTargetCell.Value != targetCell"));
+			Assert.That(states, Does.Contain("route.Add(targetCell)"));
+
+			var vehicles = Source("mods/cnc/rules/vehicles.yaml");
+			Assert.That(vehicles, Does.Contain("BotOwnedStationaryWatchdog:"));
+			Assert.That(vehicles, Does.Contain("MaximumStationaryMilliseconds: 30000"));
+			var manager = Source("OpenRA.Mods.Common/Traits/BotModules/SquadManagerBotModule.cs");
+			Assert.That(manager, Does.Contain("Stealth Obelisk death watchdog failure"));
+		}
+
+		[Test]
+		public void StationaryWatchdogExemptsOnlyObservedHealingAndShotConfirmedCadence()
+		{
+			var none = StealthAISpecialistPolicy.StationaryWatchdogExemption(false, false);
+			Assert.That(StealthAISpecialistPolicy.NextStationaryWatchdogAge(1499, false, none),
+				Is.EqualTo(1500), "Attack, approach, staging, and repair travel remain non-exempt.");
+			Assert.That(StealthAISpecialistPolicy.ObservedRepairAmount(400, 400), Is.Zero);
+			Assert.That(StealthAISpecialistPolicy.ObservedRepairAmount(400, 405), Is.EqualTo(5));
+			Assert.That(StealthAISpecialistPolicy.StationaryWatchdogExemption(false, true),
+				Is.EqualTo(BotStationaryWatchdogExemption.Repairing));
+
+			var cadence = StealthAISpecialistPolicy.FiringEpisodeCadenceTicks(70, new[] { 10 }, 2);
+			Assert.That(cadence, Is.EqualTo(82));
+			Assert.That(StealthAISpecialistPolicy.IsSustainedFiringEpisode(
+				100, 182, cadence, true, true, true), Is.True);
+			Assert.That(StealthAISpecialistPolicy.IsSustainedFiringEpisode(
+				100, 183, cadence, true, true, true), Is.False);
+			Assert.That(StealthAISpecialistPolicy.IsSustainedFiringEpisode(
+				100, 101, cadence, false, true, true), Is.False);
+			Assert.That(StealthAISpecialistPolicy.StationaryWatchdogFailed(1499, 1500), Is.False);
+			Assert.That(StealthAISpecialistPolicy.StationaryWatchdogFailed(1500, 1500), Is.True);
 		}
 
 		[Test]

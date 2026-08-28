@@ -1791,6 +1791,17 @@ namespace OpenRA.Mods.Common.Traits
 				Player.RelationshipWith(e.Attacker.Owner) != PlayerRelationship.Enemy)
 				return;
 
+			if (Game.Settings.Debug.BotDebug &&
+				StealthAISpecialistPolicy.IsObeliskAttributedStealthTankDeath(
+					self.Info.Name, e.Attacker.Info.Name))
+			{
+				var message = $"Stealth Obelisk death watchdog failure owner={self.Owner.PlayerName} " +
+					$"victim=stnk#{self.ActorID} attacker=obli#{e.Attacker.ActorID} " +
+					$"tick={World.WorldTick}.";
+				Log.Write("debug", message);
+				throw new InvalidOperationException(message);
+			}
+
 			var profile = AirProfileFor(self);
 			if (profile == null || !adaptiveAirRisk.TryGetValue(profile, out var controller))
 				return;
