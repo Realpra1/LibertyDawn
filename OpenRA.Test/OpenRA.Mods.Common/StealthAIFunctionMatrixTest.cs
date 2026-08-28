@@ -304,14 +304,14 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(manager, Does.Contain("StealthLiveTargetCheckInterval = 12"));
 			Assert.That(manager, Does.Contain("s.TickStealthLiveTarget()"),
 				"Owned Crush/Kite live checks must run independently of the 75-tick strategy interval.");
-			Assert.That(manager, Does.Contain("status=timed-out cadence-age={5}/{6}"),
+			Assert.That(manager, Does.Contain("status=timed-out cadence-age={6}/{7}"),
 				"Debug acceptance runs must account for an expired STNK squad without changing cadence state.");
 			Assert.That(manager, Does.Contain("e.Attacker.Info.Name == \"stnk\""));
-			Assert.That(manager, Does.Contain("stealthSquad.StealthKillCadenceAge = 0"),
+			Assert.That(manager, Does.Contain("StealthKillCadenceGeneration.AttributeKill(World.WorldTick)"),
 				"Only an attributed STNK kill may reset its current squad's running cadence window.");
 			Assert.That(manager, Does.Not.Contain("internal int StealthKillCadenceAge"),
 				"Cadence state must not be owner-wide.");
-			Assert.That(squad, Does.Contain("internal int StealthKillCadenceAge"),
+			Assert.That(squad, Does.Contain("internal StealthKillCadenceGeneration StealthKillCadenceGeneration"),
 				"Every persistent configured STNK squad must own an independent cadence clock.");
 			var cadenceObserver = states.IndexOf("static void TickStealthDebugKillCadenceWatchdog",
 				StringComparison.Ordinal);
@@ -334,7 +334,7 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(rebalance, Does.Contain("World.GetActorById(id) == null"),
 				"Persistent squad affinity should be pruned by bounded assignment lookup only after the actor leaves the world.");
 			Assert.That(states, Does.Contain("squad acceptance: tick={0}"));
-			Assert.That(states, Does.Contain("members=[{9}]"),
+			Assert.That(states, Does.Contain("members=[{12}]"),
 				"Acceptance telemetry must identify bounded current membership for churn audits.");
 			var lifecycleObserver = states.IndexOf("static void RecordStealthDebugLifecycle",
 				StringComparison.Ordinal);
@@ -354,7 +354,7 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(states, Does.Contain("new Queue<StealthDebugLifecycleSnapshot>(256)"));
 			Assert.That(states, Does.Contain("if (history.Count == 256)"));
 			Assert.That(states, Does.Contain("buffered-member: tick={0}"));
-			Assert.That(states, Does.Contain("activity-current={27}:{28}:cancel={29}"),
+			Assert.That(states, Does.Contain("activity-current={28}:{29}:cancel={30}"),
 				"Failure flush must retain exact activity and cancellation state.");
 			Assert.That(states, Does.Contain("tick - previous.LastReportTick >= 75"));
 			Assert.That(states, Does.Contain("maximumTicks - 600"));
@@ -363,7 +363,7 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(states, Does.Contain("FlushStealthDebugLifecycle(owner, stnks);"));
 			Assert.That(manager, Does.Contain("Stealth squad lifecycle [{0}] empty timeout:"),
 				"A genuinely empty squad must expire instead of living indefinitely under a no-actor exemption.");
-			Assert.That(manager, Does.Contain("Stealth squad lifecycle [{0}] remade:"),
+			Assert.That(manager, Does.Contain("lifecycle={6}"),
 				"Newly available members must remake an expired configured squad with a fresh lifecycle.");
 			Assert.That(manager, Does.Contain("transient-affinity=False"),
 				"Temporary control or reservation must retain affinity and not trigger an empty lifecycle reset.");
@@ -378,6 +378,96 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(states, Does.Not.Contain(
 				"unit.Info.Name == \"stnk\" && !squad.AirReinforcements.Contains"),
 				"Reinforcement accounting must not remove live squad members from cadence observation.");
+		}
+
+		[Test]
+		public void RealSquadCadenceGenerationsRemainIndependentAcrossSlotReuse()
+		{
+			var first = new StealthKillCadenceGeneration(41, 1000);
+			first.Observe(1200, true);
+			Assert.That(first.AttributeKill(1300), Is.True);
+			first.Observe(1400, true);
+
+			var remake = new StealthKillCadenceGeneration(42, 1400);
+			remake.Observe(1500, true);
+
+			Assert.Multiple(() =>
+			{
+				Assert.That(first.GenerationId, Is.EqualTo(41));
+				Assert.That(first.AttributedKills, Is.EqualTo(1));
+				Assert.That(first.CadenceAge, Is.EqualTo(100));
+				Assert.That(remake.GenerationId, Is.EqualTo(42));
+				Assert.That(remake.AttributedKills, Is.Zero);
+				Assert.That(remake.CadenceAge, Is.EqualTo(100));
+				Assert.That(remake.WindowStartTick, Is.EqualTo(1400));
+			});
+		}
+
+		[Test]
+		public void CadenceAgeUsesActiveGenerationTicksAndMismatchFailureIsPermanent()
+		{
+			var generation = new StealthKillCadenceGeneration(7, 500);
+			generation.Observe(600, false);
+			generation.Observe(700, true);
+			Assert.That(generation.CadenceAge, Is.EqualTo(100),
+				"An empty interval must not be charged retroactively when membership becomes active.");
+			Assert.That(generation.GenerationStartTick, Is.EqualTo(500));
+
+			var corrupt = StealthKillCadenceGeneration.Restore(8, 1000, 1000, 1100,
+				101, 0, false, false);
+			Assert.That(corrupt.MismatchFailed, Is.True);
+			Assert.That(corrupt.AttributeKill(1101), Is.False,
+				"A later kill cannot erase or retroactively repair a generation-age mismatch.");
+			Assert.That(corrupt.MismatchFailed, Is.True);
+			Assert.That(corrupt.AttributedKills, Is.Zero);
+		}
+
+		[Test]
+		public void KillTimeMembershipSelectsOnlyTheCurrentGeneration()
+		{
+			var beforeTransfer = new[]
+			{
+				new KeyValuePair<uint, int>(100, 1),
+				new KeyValuePair<uint, int>(200, 2)
+			};
+			var afterTransfer = new[]
+			{
+				new KeyValuePair<uint, int>(100, 2),
+				new KeyValuePair<uint, int>(200, 2)
+			};
+
+			Assert.That(StealthAISpecialistPolicy.KillTimeOwnerGeneration(100, beforeTransfer), Is.EqualTo(1));
+			Assert.That(StealthAISpecialistPolicy.KillTimeOwnerGeneration(100, afterTransfer), Is.EqualTo(2));
+			Assert.That(StealthAISpecialistPolicy.KillTimeOwnerGeneration(300, afterTransfer), Is.Zero);
+		}
+
+		[Test]
+		public void CadenceGenerationStateRoundTripsWithoutAWindowReset()
+		{
+			var original = new StealthKillCadenceGeneration(19, 2000);
+			original.Observe(2100, true);
+			original.AttributeKill(2125);
+			original.Observe(2200, true);
+			var restored = StealthKillCadenceGeneration.Restore(original.GenerationId,
+				original.GenerationStartTick, original.WindowStartTick, original.LastObservedTick,
+				original.CadenceAge, original.AttributedKills, original.CadenceFailed,
+				original.MismatchFailed);
+
+			Assert.Multiple(() =>
+			{
+				Assert.That(restored.GenerationId, Is.EqualTo(19));
+				Assert.That(restored.GenerationStartTick, Is.EqualTo(2000));
+				Assert.That(restored.WindowStartTick, Is.EqualTo(2125));
+				Assert.That(restored.LastObservedTick, Is.EqualTo(2200));
+				Assert.That(restored.CadenceAge, Is.EqualTo(75));
+				Assert.That(restored.AttributedKills, Is.EqualTo(1));
+			});
+
+			var squad = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/Squad.cs");
+			var manager = Source("OpenRA.Mods.Common/Traits/BotModules/SquadManagerBotModule.cs");
+			Assert.That(squad, Does.Contain("StealthCadenceGenerationStartTick"));
+			Assert.That(squad, Does.Contain("StealthCadenceMismatchFailed"));
+			Assert.That(manager, Does.Contain("NextStealthSquadGenerationId"));
 		}
 
 		[Test]

@@ -1855,19 +1855,21 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				return;
 
 			Log.Write("debug", "Stealth cadence lifecycle [stealth-tank] failure-window: tick={0} " +
-				"squad={1}#{2} representative=stnk#{3} snapshots={4} ring-capacity=256 " +
+				"generation={1} squad={2}#{3} representative=stnk#{4} snapshots={5} ring-capacity=256 " +
 				"flush=watchdog-failure one-unit-only=True.", owner.World.WorldTick,
-				owner.StealthSquadDefinition, owner.StealthSquadIndex, representative.ActorID, history.Count);
+				owner.StealthKillCadenceGeneration.GenerationId, owner.StealthSquadDefinition,
+				owner.StealthSquadIndex, representative.ActorID, history.Count);
 			foreach (var snapshot in history)
 				Log.Write("debug", "Stealth cadence lifecycle [stealth-tank] buffered-member: tick={0} " +
-					"squad={1}#{2} actor=stnk#{3} reason={4} cadence-age={5}/{6} role={7} mode={8} " +
-					"target={9} target-cell={10} can-attack={11} actor-cell={12} distance={13} " +
-					"route-queued={14} route-buffer={15} route-phase={16} progress-age={17} " +
-					"safety={18} escape={19} firing={20} max-fire-delay={21} hp={22}/{23} " +
-					"repair={24} repair-target={25} idle={26} activity-current={27}:{28}:cancel={29} " +
-					"activity-next={30}:{31}:cancel={32} activity-final={33}:{34}:cancel={35} " +
-					"queue-depth={36} order-target={37}:{38}#{39}@{40} signature={41}.",
-					snapshot.Tick, owner.StealthSquadDefinition, owner.StealthSquadIndex,
+					"generation={1} squad={2}#{3} actor=stnk#{4} reason={5} cadence-age={6}/{7} role={8} mode={9} " +
+					"target={10} target-cell={11} can-attack={12} actor-cell={13} distance={14} " +
+					"route-queued={15} route-buffer={16} route-phase={17} progress-age={18} " +
+					"safety={19} escape={20} firing={21} max-fire-delay={22} hp={23}/{24} " +
+					"repair={25} repair-target={26} idle={27} activity-current={28}:{29}:cancel={30} " +
+					"activity-next={31}:{32}:cancel={33} activity-final={34}:{35}:cancel={36} " +
+					"queue-depth={37} order-target={38}:{39}#{40}@{41} signature={42}.",
+					snapshot.Tick, owner.StealthKillCadenceGeneration.GenerationId,
+					owner.StealthSquadDefinition, owner.StealthSquadIndex,
 					snapshot.ActorId, snapshot.Reason, snapshot.CadenceAge,
 					StealthKillCadenceMaximumTicks(owner), snapshot.Role, snapshot.Mode,
 					snapshot.HasTarget ? snapshot.TargetName + "#" + snapshot.TargetId : "none",
@@ -1887,17 +1889,13 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 		static void TickStealthDebugKillCadenceWatchdog(Squad owner)
 		{
-			if (owner.StealthProfile != "stealth-tank")
+			if (owner.StealthProfile != "stealth-tank" || owner.StealthKillCadenceGeneration == null)
 				return;
 
 			var tick = owner.World.WorldTick;
 			var maximumTicks = StealthKillCadenceMaximumTicks(owner);
-			if (owner.StealthKillCadenceLastTick < 0)
-			{
-				owner.StealthKillCadenceLastTick = tick;
+			if (owner.StealthDebugKillCadenceNextReportTick < 0)
 				owner.StealthDebugKillCadenceNextReportTick = tick + maximumTicks;
-				return;
-			}
 
 			// The squad owns the clock. Promotion, reinforcement, death, or ordinary membership
 			// churn changes the observed members without resetting or replacing its accumulated age.
@@ -1916,21 +1914,43 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var exempt = noStnk;
 			var members = stnks.OrderBy(unit => unit.ActorID)
 				.Select(unit => unit.Info.Name + "#" + unit.ActorID).JoinWith(",");
-			var elapsed = Math.Max(0, tick - owner.StealthKillCadenceLastTick);
-			owner.StealthKillCadenceAge = StealthAISpecialistPolicy.NextKillCadenceAge(
-				owner.StealthKillCadenceAge, elapsed, false, exempt);
-			owner.StealthKillCadenceLastTick = tick;
+			var mismatchDetected = owner.StealthKillCadenceGeneration.Observe(tick, !exempt);
+			if (mismatchDetected)
+			{
+				Log.Write("debug", "Stealth kill watchdog [stealth-tank] permanent generation-age mismatch: " +
+					"tick={0} generation={1} squad={2}#{3} generation-start={4} generation-elapsed={5} " +
+					"cadence-age={6} window-start={7} status=permanent-failure.", tick,
+					owner.StealthKillCadenceGeneration.GenerationId, owner.StealthSquadDefinition,
+					owner.StealthSquadIndex, owner.StealthKillCadenceGeneration.GenerationStartTick,
+					tick - owner.StealthKillCadenceGeneration.GenerationStartTick,
+					owner.StealthKillCadenceAge, owner.StealthKillCadenceGeneration.WindowStartTick);
+			}
+			if (owner.StealthKillCadenceGeneration.MismatchFailed && Game.Settings.Debug.BotDebug)
+			{
+				var message = $"Stealth kill watchdog permanent generation-age mismatch generation=" +
+					$"{owner.StealthKillCadenceGeneration.GenerationId} " +
+					$"squad={owner.StealthSquadDefinition}#{owner.StealthSquadIndex} tick={tick}: " +
+					$"generation-start={owner.StealthKillCadenceGeneration.GenerationStartTick} " +
+					$"generation-elapsed={tick - owner.StealthKillCadenceGeneration.GenerationStartTick} " +
+					$"cadence-age={owner.StealthKillCadenceAge}.";
+				Log.Write("debug", message);
+				throw new InvalidOperationException(message);
+			}
 
 			if (owner.SquadManager.Info.AirTargetDebugLogging && !owner.StealthDebugKillCadenceFailed &&
 				StealthAISpecialistPolicy.KillCadenceFailed(owner.StealthKillCadenceAge, maximumTicks))
 			{
 				RecordStealthDebugLifecycle(owner, true);
 				FlushStealthDebugLifecycle(owner, stnks);
-				owner.StealthDebugKillCadenceFailed = true;
+				owner.StealthKillCadenceGeneration.MarkCadenceFailed();
 				Log.Write("debug", "Stealth kill watchdog [stealth-tank] squad failure: tick={0} " +
-					"squad={1}#{2} cadence-age={3}/{4} stnks={5} formation={6} reinforcements={7} " +
-					"members=[{8}] target={9} firing={10} repairing={11} reachable-enemy={12}.",
-					tick, owner.StealthSquadDefinition, owner.StealthSquadIndex,
+					"generation={1} generation-start={2} window-start={3} squad={4}#{5} " +
+					"cadence-age={6}/{7} stnks={8} formation={9} reinforcements={10} " +
+					"members=[{11}] target={12} firing={13} repairing={14} reachable-enemy={15}.",
+					tick, owner.StealthKillCadenceGeneration.GenerationId,
+					owner.StealthKillCadenceGeneration.GenerationStartTick,
+					owner.StealthKillCadenceGeneration.WindowStartTick,
+					owner.StealthSquadDefinition, owner.StealthSquadIndex,
 					owner.StealthKillCadenceAge, maximumTicks, stnks.Length,
 					owner.AirFormationUnits().Count, owner.AirReinforcements.Count,
 					members,
@@ -1940,7 +1960,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			if (Game.Settings.Debug.BotDebug &&
 				StealthAISpecialistPolicy.KillCadenceFailed(owner.StealthKillCadenceAge, maximumTicks))
 			{
-				var message = $"Stealth kill watchdog failure squad={owner.StealthSquadDefinition}#" +
+				var message = $"Stealth kill watchdog failure generation=" +
+					$"{owner.StealthKillCadenceGeneration.GenerationId} squad={owner.StealthSquadDefinition}#" +
 					$"{owner.StealthSquadIndex} tick={tick}: cadence-age={owner.StealthKillCadenceAge}/" +
 					$"{maximumTicks} active-stnks={stnks.Length} attributed-kills=" +
 					$"{owner.StealthDebugKillCadenceKills}.";
@@ -1952,9 +1973,13 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				tick >= owner.StealthDebugKillCadenceNextReportTick)
 			{
 				Log.Write("debug", "Stealth kill watchdog [stealth-tank] squad acceptance: tick={0} " +
-					"squad={1}#{2} cadence-age={3}/{4} squad-kills={5} stnks={6} formation={7} " +
-					"reinforcements={8} members=[{9}] target={10} firing={11} repairing={12} " +
-					"reachable-enemy={13} exempt={14} status={15}.", tick, owner.StealthSquadDefinition,
+					"generation={1} generation-start={2} window-start={3} squad={4}#{5} " +
+					"cadence-age={6}/{7} generation-kills={8} stnks={9} formation={10} " +
+					"reinforcements={11} members=[{12}] target={13} firing={14} repairing={15} " +
+					"reachable-enemy={16} exempt={17} status={18}.", tick,
+					owner.StealthKillCadenceGeneration.GenerationId,
+					owner.StealthKillCadenceGeneration.GenerationStartTick,
+					owner.StealthKillCadenceGeneration.WindowStartTick, owner.StealthSquadDefinition,
 					owner.StealthSquadIndex, owner.StealthKillCadenceAge, maximumTicks,
 					owner.StealthDebugKillCadenceKills, stnks.Length, owner.AirFormationUnits().Count,
 					owner.AirReinforcements.Count, members,

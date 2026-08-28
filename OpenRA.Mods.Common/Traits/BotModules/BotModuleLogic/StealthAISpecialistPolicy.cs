@@ -50,6 +50,91 @@ namespace OpenRA.Mods.Common.Traits
 		Kite
 	}
 
+	// Persistent production state for one real stealth-squad generation. The configured
+	// definition/index is only a reusable slot label; GenerationId is the immutable identity.
+	public sealed class StealthKillCadenceGeneration
+	{
+		public int GenerationId { get; private set; }
+		public int GenerationStartTick { get; private set; }
+		public int WindowStartTick { get; private set; }
+		public int LastObservedTick { get; private set; }
+		public int CadenceAge { get; private set; }
+		public int AttributedKills { get; private set; }
+		public bool CadenceFailed { get; private set; }
+		public bool MismatchFailed { get; private set; }
+
+		public StealthKillCadenceGeneration(int generationId, int generationStartTick)
+		{
+			if (generationId <= 0)
+				throw new ArgumentOutOfRangeException(nameof(generationId));
+			if (generationStartTick < 0)
+				throw new ArgumentOutOfRangeException(nameof(generationStartTick));
+
+			GenerationId = generationId;
+			GenerationStartTick = generationStartTick;
+			WindowStartTick = generationStartTick;
+			LastObservedTick = generationStartTick;
+		}
+
+		public static StealthKillCadenceGeneration Restore(int generationId,
+			int generationStartTick, int windowStartTick, int lastObservedTick,
+			int cadenceAge, int attributedKills, bool cadenceFailed, bool mismatchFailed)
+		{
+			if (windowStartTick < generationStartTick || lastObservedTick < generationStartTick ||
+				cadenceAge < 0 || attributedKills < 0)
+				throw new ArgumentOutOfRangeException(nameof(cadenceAge));
+
+			var generation = new StealthKillCadenceGeneration(generationId, generationStartTick)
+			{
+				WindowStartTick = windowStartTick,
+				LastObservedTick = lastObservedTick,
+				CadenceAge = cadenceAge,
+				AttributedKills = attributedKills,
+				CadenceFailed = cadenceFailed,
+				MismatchFailed = mismatchFailed
+			};
+			generation.CheckMismatch(lastObservedTick);
+			return generation;
+		}
+
+		public bool Observe(int tick, bool active)
+		{
+			if (tick < LastObservedTick)
+				throw new ArgumentOutOfRangeException(nameof(tick));
+
+			var mismatchBefore = MismatchFailed;
+			if (active)
+				CadenceAge += tick - LastObservedTick;
+			LastObservedTick = tick;
+			CheckMismatch(tick);
+			return !mismatchBefore && MismatchFailed;
+		}
+
+		public bool AttributeKill(int tick)
+		{
+			Observe(tick, true);
+			if (MismatchFailed)
+				return false;
+
+			CadenceAge = 0;
+			WindowStartTick = tick;
+			AttributedKills++;
+			CadenceFailed = false;
+			return true;
+		}
+
+		public void MarkCadenceFailed()
+		{
+			CadenceFailed = true;
+		}
+
+		void CheckMismatch(int tick)
+		{
+			if (CadenceAge > tick - GenerationStartTick)
+				MismatchFailed = true;
+		}
+	}
+
 	public sealed class StealthTankReinforcementSaveGroup
 	{
 		public int GroupIndex;
@@ -788,6 +873,13 @@ namespace OpenRA.Mods.Common.Traits
 		public static bool KillCadenceFailed(int ageTicks, int maximumTicks)
 		{
 			return maximumTicks > 0 && ageTicks >= maximumTicks;
+		}
+
+		public static int KillTimeOwnerGeneration(uint attackerId,
+			IEnumerable<KeyValuePair<uint, int>> currentMembership)
+		{
+			return currentMembership.Where(entry => entry.Key == attackerId)
+				.Select(entry => entry.Value).FirstOrDefault();
 		}
 
 		public static bool IsObeliskAttributedStealthTankDeath(string victimType, string attackerType)

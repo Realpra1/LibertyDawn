@@ -120,11 +120,13 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		internal Dictionary<uint, Queue<StealthDebugLifecycleSnapshot>> StealthDebugLifecycle;
 		internal Dictionary<uint, (int Signature, int LastReportTick)> StealthDebugLifecycleState;
 		internal int StealthDebugLifecycleLastCadenceAge = -1;
-		internal int StealthKillCadenceAge;
-		internal int StealthKillCadenceLastTick = -1;
+		internal StealthKillCadenceGeneration StealthKillCadenceGeneration;
+		internal int StealthKillCadenceAge => StealthKillCadenceGeneration?.CadenceAge ?? 0;
 		internal int StealthDebugKillCadenceNextReportTick = -1;
-		internal int StealthDebugKillCadenceKills;
-		internal bool StealthDebugKillCadenceFailed;
+		internal int StealthDebugKillCadenceKills => StealthKillCadenceGeneration?.AttributedKills ?? 0;
+		internal bool StealthDebugKillCadenceFailed =>
+			StealthKillCadenceGeneration?.CadenceFailed == true ||
+			StealthKillCadenceGeneration?.MismatchFailed == true;
 		internal int StealthEmptySinceTick = -1;
 		WPos airLastFormationCenter;
 		bool hasAirFormationCenter;
@@ -605,6 +607,26 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				nodes.Nodes.Add(new MiniYamlNode("StealthSquadDefinition", StealthSquadDefinition));
 				nodes.Nodes.Add(new MiniYamlNode("StealthSquadIndex",
 					FieldSaver.FormatValue(StealthSquadIndex)));
+				if (StealthKillCadenceGeneration != null)
+				{
+					var generation = StealthKillCadenceGeneration;
+					nodes.Nodes.Add(new MiniYamlNode("StealthCadenceGenerationId",
+						FieldSaver.FormatValue(generation.GenerationId)));
+					nodes.Nodes.Add(new MiniYamlNode("StealthCadenceGenerationStartTick",
+						FieldSaver.FormatValue(generation.GenerationStartTick)));
+					nodes.Nodes.Add(new MiniYamlNode("StealthCadenceWindowStartTick",
+						FieldSaver.FormatValue(generation.WindowStartTick)));
+					nodes.Nodes.Add(new MiniYamlNode("StealthCadenceLastObservedTick",
+						FieldSaver.FormatValue(generation.LastObservedTick)));
+					nodes.Nodes.Add(new MiniYamlNode("StealthCadenceAge",
+						FieldSaver.FormatValue(generation.CadenceAge)));
+					nodes.Nodes.Add(new MiniYamlNode("StealthCadenceAttributedKills",
+						FieldSaver.FormatValue(generation.AttributedKills)));
+					nodes.Nodes.Add(new MiniYamlNode("StealthCadenceFailed",
+						FieldSaver.FormatValue(generation.CadenceFailed)));
+					nodes.Nodes.Add(new MiniYamlNode("StealthCadenceMismatchFailed",
+						FieldSaver.FormatValue(generation.MismatchFailed)));
+				}
 			}
 
 			if (AirUnitsRepairing.Count > 0)
@@ -654,6 +676,22 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				if (stealthIndexNode != null)
 					squad.StealthSquadIndex = FieldLoader.GetValue<int>(
 						"StealthSquadIndex", stealthIndexNode.Value.Value);
+
+				var generationNode = yaml.Nodes.FirstOrDefault(n => n.Key == "StealthCadenceGenerationId");
+				if (generationNode != null)
+				{
+					T Load<T>(string key) => FieldLoader.GetValue<T>(key,
+						yaml.Nodes.First(n => n.Key == key).Value.Value);
+					squad.StealthKillCadenceGeneration = StealthKillCadenceGeneration.Restore(
+						Load<int>("StealthCadenceGenerationId"),
+						Load<int>("StealthCadenceGenerationStartTick"),
+						Load<int>("StealthCadenceWindowStartTick"),
+						Load<int>("StealthCadenceLastObservedTick"),
+						Load<int>("StealthCadenceAge"),
+						Load<int>("StealthCadenceAttributedKills"),
+						Load<bool>("StealthCadenceFailed"),
+						Load<bool>("StealthCadenceMismatchFailed"));
+				}
 			}
 
 			var unitsNode = yaml.Nodes.FirstOrDefault(n => n.Key == "Units");
