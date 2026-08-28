@@ -7,6 +7,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using OpenRA.Traits;
 
 namespace OpenRA.Mods.Common.Traits
@@ -36,7 +37,7 @@ namespace OpenRA.Mods.Common.Traits
 		}
 	}
 
-	public sealed class BotOwnedStationaryWatchdog : ITick, INotifyAttack, INotifyKilled
+	public sealed class BotOwnedStationaryWatchdog : ITick, INotifyAttack, INotifyDamage, INotifyKilled
 	{
 		readonly BotOwnedStationaryWatchdogInfo info;
 		WPos lastCenterPosition;
@@ -47,6 +48,7 @@ namespace OpenRA.Mods.Common.Traits
 		OpenRA.Activities.Activity firingActivity;
 		Armament firingArmament;
 		int lastHealth;
+		bool lastCloaked;
 		BotStationaryWatchdogExemption exemption;
 		int exemptionStartTick;
 
@@ -55,6 +57,7 @@ namespace OpenRA.Mods.Common.Traits
 			this.info = info;
 			lastCenterPosition = self.CenterPosition;
 			lastHealth = self.TraitOrDefault<IHealth>()?.HP ?? 0;
+			lastCloaked = IsCloaked(self);
 		}
 
 		void ITick.Tick(Actor self)
@@ -70,6 +73,14 @@ namespace OpenRA.Mods.Common.Traits
 			}
 
 			var currentHealth = self.TraitOrDefault<IHealth>()?.HP ?? 0;
+			var currentCloaked = IsCloaked(self);
+			if (currentCloaked != lastCloaked)
+				Log.Write("debug", "AI stationary watchdog cloak-transition owner={0} unit={1}#{2} tick={3}: " +
+					"from={4} to={5} center={6} cell={7} hp={8} activity={9}.",
+					self.Owner.PlayerName, self.Info.Name, self.ActorID, self.World.WorldTick,
+					lastCloaked, currentCloaked, self.CenterPosition, self.Location, currentHealth,
+					ActivitySignature(self.CurrentActivity));
+			lastCloaked = currentCloaked;
 			var firingTargetValid = firingTarget != null && firingTarget.IsInWorld && !firingTarget.IsDead;
 			var sameFiringActivity = ContinuesConfirmedFiringActivity(firingActivity, self.CurrentActivity);
 			var sustainedFiring = StealthAISpecialistPolicy.IsSustainedFiringEpisode(
@@ -186,8 +197,28 @@ namespace OpenRA.Mods.Common.Traits
 
 		void INotifyAttack.PreparingAttack(Actor self, in Target target, Armament a, Barrel barrel) { }
 
+		void INotifyDamage.Damaged(Actor self, AttackInfo e)
+		{
+			if (!Game.Settings.Debug.BotDebug || !self.Owner.IsBot || e.Damage.Value <= 0)
+				return;
+
+			Log.Write("debug", "AI stationary watchdog damage owner={0} unit={1}#{2} tick={3}: " +
+				"attacker={4} damage={5} center={6} cell={7} cloaked={8} activity={9}.",
+				self.Owner.PlayerName, self.Info.Name, self.ActorID, self.World.WorldTick,
+				e.Attacker == null ? "none" : e.Attacker.Info.Name + "#" + e.Attacker.ActorID,
+				e.Damage.Value, self.CenterPosition, self.Location, IsCloaked(self),
+				ActivitySignature(self.CurrentActivity));
+		}
+
 		void INotifyKilled.Killed(Actor self, AttackInfo e)
 		{
+			if (Game.Settings.Debug.BotDebug && self.Owner.IsBot)
+				Log.Write("debug", "AI stationary watchdog death owner={0} unit={1}#{2} tick={3}: " +
+					"attacker={4} center={5} cell={6} cloaked={7} nonexempt-age={8} activity={9}.",
+					self.Owner.PlayerName, self.Info.Name, self.ActorID, self.World.WorldTick,
+					e.Attacker == null ? "none" : e.Attacker.Info.Name + "#" + e.Attacker.ActorID,
+					self.CenterPosition, self.Location, IsCloaked(self), stationaryAge,
+					ActivitySignature(self.CurrentActivity));
 			if (lastDischargeTick != int.MinValue)
 				EndFiringEpisode(self, "actor-killed");
 			UpdateExemption(self, BotStationaryWatchdogExemption.None);
@@ -221,6 +252,11 @@ namespace OpenRA.Mods.Common.Traits
 			for (var current = activity; current != null && chain.Count < 12; current = current.NextActivity)
 				chain.Add(current.GetType().Name + ":" + current.State);
 			return string.Join(">", chain);
+		}
+
+		static bool IsCloaked(Actor actor)
+		{
+			return actor.TraitsImplementing<Cloak>().Any(cloak => cloak.Cloaked);
 		}
 	}
 }

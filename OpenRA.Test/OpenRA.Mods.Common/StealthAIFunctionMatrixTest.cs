@@ -684,6 +684,58 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
+		public void OrdinaryAndStalledFireRoutesEndAtTheObeliskSafeCell()
+		{
+			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
+			var directSafeCellRoute =
+				"StealthRouteToCell(owner, formation[0], cache,\n" +
+				"\t\t\t\t\t\t\tCoarseCell(owner, firingCell.Value), stalledTarget)";
+			var directOrdinaryRoute =
+				"StealthRouteToCell(owner, representative, cache,\n" +
+				"\t\t\t\t\t\t\tCoarseCell(owner, firingCell.Value), actor)";
+
+			Assert.That(states, Does.Contain(directSafeCellRoute),
+				"A stalled STNK target must route to the selected safe firing cell, not the Obelisk cell.");
+			Assert.That(states, Does.Contain(directOrdinaryRoute),
+				"An ordinary STNK plan must discard the target-cell frontier endpoint before submission.");
+
+			var stalledFallback = states.Substring(states.IndexOf(
+				"var stalledTarget = owner.TargetActor;", StringComparison.Ordinal));
+			stalledFallback = stalledFallback.Substring(0, stalledFallback.IndexOf(
+				"BeginStealthSafetyReposition(owner);", StringComparison.Ordinal));
+			Assert.That(stalledFallback, Does.Not.Contain("stalledTarget.Location.X / StealthCoarseSize(owner)"));
+
+			var ordinaryPlan = states.Substring(states.IndexOf(
+				"if (firingCell != null)", StringComparison.Ordinal));
+			ordinaryPlan = ordinaryPlan.Substring(0, ordinaryPlan.IndexOf(
+				"var plan = new AirTargetPlan(actor", StringComparison.Ordinal));
+			Assert.That(ordinaryPlan, Does.Not.Contain("new List<CPos>(safeRoute)"),
+				"The target strategic-cell route must never be submitted ahead of the safe annulus endpoint.");
+			Assert.That(states, Does.Contain("LogObeliskSafeRouteEvidence(owner, cache, actor,"));
+			Assert.That(states, Does.Contain("minimum-distance-squared={11} all-outside={12}"),
+				"Debug evidence must classify every submitted Obelisk waypoint without changing release behavior.");
+			Assert.That(states, Does.Contain("threat.Actor != directObeliskTarget"));
+			Assert.That(states, Does.Contain("threat.Actor.Info.Name == \"obli\" && threat.WeaponRange > 0"));
+			Assert.That(states, Does.Contain("StealthAISpecialistPolicy.HardRouteDangerThreshold"),
+				"Cached live Obelisk weapon coverage must be impassable for every non-Obelisk route.");
+			var watchdog = Source("OpenRA.Mods.Common/Traits/BotOwnedStationaryWatchdog.cs");
+			Assert.That(watchdog, Does.Contain("AI stationary watchdog cloak-transition"));
+			Assert.That(watchdog, Does.Contain("AI stationary watchdog damage"));
+			Assert.That(watchdog, Does.Contain("AI stationary watchdog death"));
+
+			var obelisk = new CPos(30, 30);
+			var safeFiringCell = new CPos(38, 30);
+			var coarseSize = StealthAISpecialistPolicy.RequiredStrategicCellSize;
+			var safeCoarseCenter = new CPos(
+				safeFiringCell.X / coarseSize * coarseSize + coarseSize / 2,
+				safeFiringCell.Y / coarseSize * coarseSize + coarseSize / 2);
+			var submittedWaypoints = new[] { safeCoarseCenter, safeFiringCell };
+			Assert.That(submittedWaypoints.All(cell =>
+				(cell - obelisk).LengthSquared > 7 * 7), Is.True,
+				"Every submitted coarse/exact endpoint must remain outside Obelisk weapon range.");
+		}
+
+		[Test]
 		public void StationaryWatchdogExemptsOnlyObservedHealingAndShotConfirmedCadence()
 		{
 			var none = StealthAISpecialistPolicy.StationaryWatchdogExemption(false, false);

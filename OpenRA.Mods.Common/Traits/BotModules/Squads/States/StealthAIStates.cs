@@ -830,6 +830,40 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				.ThenBy(c => c.Y).ThenBy(c => c.X).Cast<CPos?>().FirstOrDefault();
 		}
 
+		static void LogObeliskSafeRouteEvidence(Squad owner, StealthInfluenceCache cache,
+			Actor target, CPos firingCell, IReadOnlyList<CPos> route, string phase)
+		{
+			if (!owner.SquadManager.Info.AirTargetDebugLogging ||
+				owner.StealthProfile != "stealth-tank" || target.Info.Name != "obli")
+				return;
+
+			var targetThreat = cache.ThreatByActor.TryGetValue(target, out var threat) ? threat : null;
+			var weaponRange = targetThreat?.WeaponRange ?? 0;
+			var weaponRangeSquared = weaponRange * weaponRange;
+			var waypointFacts = route.Take(16).Select(cell =>
+			{
+				var distanceSquared = (cell - target.Location).LengthSquared;
+				return string.Format("{0}:distance-squared={1}:outside={2}", cell,
+					distanceSquared, distanceSquared > weaponRangeSquared);
+			}).ToArray();
+			var allOutside = route.All(cell =>
+				(cell - target.Location).LengthSquared > weaponRangeSquared);
+			var minimumDistanceSquared = route.Select(cell =>
+				(cell - target.Location).LengthSquared).DefaultIfEmpty(int.MaxValue).Min();
+
+			Log.Write("debug", "Stealth Obelisk safe route [{0}] tick={1}: phase={2} target=obli#{3} " +
+				"target-cell={4} target-coarse={5} firing-cell={6} direct-coarse={7} " +
+				"weapon-range={8} weapon-range-squared={9} route-waypoints={10} " +
+				"minimum-distance-squared={11} all-outside={12} members={13} waypoint-facts=[{14}].",
+				owner.StealthProfile, owner.World.WorldTick, phase, target.ActorID, target.Location,
+				CoarseCell(owner, target.Location), firingCell, CoarseCell(owner, firingCell),
+				weaponRange, weaponRangeSquared, route.Count, minimumDistanceSquared, allOutside,
+				string.Join(",", owner.AirFormationUnits().OrderBy(unit => unit.ActorID).Select(unit =>
+					string.Format("stnk#{0}:cell={1}:cloaked={2}", unit.ActorID, unit.Location,
+						unit.TraitsImplementing<Cloak>().Any(cloak => cloak.Cloaked)))),
+				string.Join(",", waypointFacts));
+		}
+
 		static int CurrentGroundSpeed(Actor actor)
 		{
 			var mobile = actor.TraitOrDefault<Mobile>();
@@ -1173,17 +1207,35 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		}
 
 		static List<CPos> StealthRouteToCell(Squad owner, Actor unit,
-			StealthInfluenceCache cache, CPos goalCell)
+			StealthInfluenceCache cache, CPos goalCell, Actor directObeliskTarget = null)
 		{
-			return StealthRouteToCell(owner, unit, cache, goalCell, cache?.Danger);
+			return StealthRouteToCell(owner, unit, cache, goalCell, cache?.Danger,
+				false, directObeliskTarget);
 		}
 
 		static List<CPos> StealthRouteToCell(Squad owner, Actor unit,
-			StealthInfluenceCache cache, CPos goalCell, float[] danger, bool allowDangerousStart = false)
+			StealthInfluenceCache cache, CPos goalCell, float[] danger, bool allowDangerousStart = false,
+			Actor directObeliskTarget = null)
 		{
 			var definition = owner.StealthDefinition;
 			if (definition == null || cache == null || danger == null)
 				return null;
+
+			// Ordinary missions must treat every cached live Obelisk coverage cell as
+			// impassable. A mission targeting that Obelisk is the sole exception: its
+			// separately selected outrange firing cell remains the route destination.
+			var obeliskCoverage = cache.ThreatCoverageByCell.Where(coverage =>
+				coverage.Value.Any(threat => threat.Actor != directObeliskTarget &&
+					!threat.Actor.IsDead && threat.Actor.Info.Name == "obli" && threat.WeaponRange > 0))
+				.Select(coverage => coverage.Key).ToArray();
+			if (obeliskCoverage.Length > 0)
+			{
+				danger = (float[])danger.Clone();
+				foreach (var cell in obeliskCoverage)
+					danger[cell.Y * cache.Width + cell.X] = Math.Max(
+						danger[cell.Y * cache.Width + cell.X],
+						StealthAISpecialistPolicy.HardRouteDangerThreshold);
+			}
 
 			var coarseSize = StealthCoarseSize(owner);
 			var startX = Math.Clamp(unit.Location.X / coarseSize, 0, cache.Width - 1);
@@ -2357,14 +2409,15 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				{
 					var stalledTarget = owner.TargetActor;
 					var firingCell = SafeOrdinaryFiringCell(owner, formation[0], cache, stalledTarget);
-					var targetCell = new CPos(stalledTarget.Location.X / StealthCoarseSize(owner),
-						stalledTarget.Location.Y / StealthCoarseSize(owner));
 					var route = firingCell == null ? null :
-						StealthRouteToCell(owner, formation[0], cache, targetCell);
+						StealthRouteToCell(owner, formation[0], cache,
+							CoarseCell(owner, firingCell.Value), stalledTarget);
 					if (route != null)
 					{
 						if (route.Count == 0 || route[route.Count - 1] != firingCell.Value)
 							route.Add(firingCell.Value);
+						LogObeliskSafeRouteEvidence(owner, cache, stalledTarget,
+							firingCell.Value, route, "stalled-fallback");
 						if (owner.SquadManager.Info.AirTargetDebugLogging)
 							Log.Write("debug", "Stealth clear [{0}] bounded Crush fallback: tick={1} " +
 								"target={2}#{3} stalled={4} next=safe-fire route-waypoints={5}.",
@@ -2829,9 +2882,14 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 					if (firingCell != null)
 					{
-						var firingRoute = new List<CPos>(safeRoute);
+						var firingRoute = StealthRouteToCell(owner, representative, cache,
+							CoarseCell(owner, firingCell.Value), actor);
+						if (firingRoute == null)
+							continue;
 						if (firingRoute.Count == 0 || firingRoute[firingRoute.Count - 1] != firingCell.Value)
 							firingRoute.Add(firingCell.Value);
+						LogObeliskSafeRouteEvidence(owner, cache, actor,
+							firingCell.Value, firingRoute, "ordinary-plan");
 						var plan = new AirTargetPlan(actor, score, true, firingRoute);
 						var travel = RouteTravelMilliseconds(owner, representative, firingRoute, actor);
 						var killTicks = EstimatedKillTicks(formation, new[] { actor });
