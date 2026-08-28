@@ -37,6 +37,9 @@ namespace OpenRA.Test.Mods.Common
 
 		static string Source(string relativePath) => File.ReadAllText(Path.Combine(RepositoryRoot, relativePath));
 
+		static string StealthStateSources(params string[] names) => string.Join("\n", names.Select(name => Source(
+			$"OpenRA.Mods.Common/Traits/BotModules/Squads/States/{name}.cs")));
+
 		[Test]
 		public void OriginalManagerAndSquadRemainTheOnlyLiveOwners()
 		{
@@ -62,7 +65,7 @@ namespace OpenRA.Test.Mods.Common
 		[Test]
 		public void StateMachineTicksCopiedAirDecisionBodiesDirectly()
 		{
-			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
+			var states = StealthStateSources("StealthAIStates", "StealthAIIdleState");
 			Assert.That(states, Does.Contain("class StealthAIIdleState : StealthAIStateBase, IState"));
 			Assert.That(states, Does.Contain("var e = FindDefenselessTarget(owner);"));
 			Assert.That(states, Does.Contain("class StealthAIAttackState : StealthAIStateBase, IState"));
@@ -71,6 +74,24 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(states, Does.Contain("new Order(\"Attack\", a, Target.FromActor(owner.TargetActor), false)"));
 			Assert.That(states, Does.Not.Contain("TickAirOwned"));
 			Assert.That(states, Does.Not.Contain("StealthAISpecialistBehavior"));
+		}
+
+		[Test]
+		public void StealthBehaviorStagesAndPlanningRecordsAreSeparateModules()
+		{
+			var baseAndAttack = StealthStateSources("StealthAIStates");
+			var idle = StealthStateSources("StealthAIIdleState");
+			var flee = StealthStateSources("StealthAIFleeState");
+			var plans = StealthStateSources("StealthAIPlans");
+
+			Assert.That(baseAndAttack, Does.Not.Contain("class StealthAIIdleState"));
+			Assert.That(baseAndAttack, Does.Not.Contain("class StealthAIFleeState"));
+			Assert.That(idle, Does.Contain("class StealthAIIdleState : StealthAIStateBase, IState"));
+			Assert.That(flee, Does.Contain("class StealthAIFleeState : StealthAIStateBase, IState"));
+			Assert.That(plans, Does.Contain("sealed class StealthInfluenceCache"));
+			Assert.That(plans, Does.Contain("sealed class AirTargetPlan"));
+			Assert.That(baseAndAttack, Does.Not.Contain("sealed class StealthInfluenceCache"));
+			Assert.That(baseAndAttack, Does.Not.Contain("sealed class AirTargetPlan"));
 		}
 
 		[Test]
@@ -225,8 +246,6 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(states, Does.Contain("SafeOrdinaryFiringCell(owner, representative, cache, actor)"),
 				"Ordinary attacks must end at a cached all-threat-safe exact firing cell before revealing.");
 			var attackState = states.Substring(states.IndexOf("class StealthAIAttackState", StringComparison.Ordinal));
-			attackState = attackState.Substring(0,
-				attackState.IndexOf("class StealthAIFleeState", StringComparison.Ordinal));
 			Assert.That(attackState, Does.Not.Contain(
 				"RevealedAttackPositionIsCovered(owner.TargetActor, liveStealthThreats)"),
 				"A cached-safe exact firing-cell plan must not be discarded by the obsolete target-center reveal check.");

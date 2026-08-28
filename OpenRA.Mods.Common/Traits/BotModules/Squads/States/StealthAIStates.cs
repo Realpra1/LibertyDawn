@@ -34,33 +34,6 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		static readonly BitSet<TargetableType> StructureTargetTypes = new BitSet<TargetableType>("Structure");
 		// END CNC96A GROUND EXTENSION
 
-		sealed class AirInfluenceCache
-		{
-			public int Tick;
-			public int Width;
-			public int Height;
-			public float[] Danger;
-			public List<(Actor Actor, int Utility, float ConfiguredWeight)> Candidates;
-			public List<(Actor Actor, float StoppingWeight, int RangeCells)> Threats;
-		}
-
-		sealed class AirRepairPlan
-		{
-			public Actor Building;
-			public Actor FallbackBuilding;
-			public List<CPos> Route;
-			public bool RepairAtEnd;
-			public int CandidateCount;
-			public int RejectedByAa;
-		}
-
-		sealed class AirRepairHoldingPlan
-		{
-			public Actor Shelter;
-			public CPos Destination;
-			public List<CPos> Route;
-		}
-
 		// Bot logic is host-only. Sharing one cache per manager/profile prevents two same-type squads
 		// rebuilding the same world influence map during the configured strategic cache interval.
 		static readonly Dictionary<SquadManagerBotModule, Dictionary<string, AirInfluenceCache>> InfluenceCaches =
@@ -521,70 +494,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 		enum AirTargetClass { Unit, Wall, Building, Production, Harvester }
 
-		protected sealed class AirTargetPlan
-		{
-			public readonly Actor Actor;
-			public readonly int Score;
-			public readonly bool IsUndefended;
-			public readonly List<CPos> Route;
-			public readonly bool ClearsAa;
-			public readonly List<Squad> SupportSquads;
-			public readonly CPos? AaProtectedCell;
-			public readonly IReadOnlyCollection<uint> AaThreatIds;
-			public readonly StealthClearMode StealthMode;
-			public readonly IReadOnlyCollection<uint> StealthPackage;
-			public readonly CPos? StealthClearCenterCell;
-			public readonly bool StealthAggressiveMass;
-			public readonly CPos? StealthPostAttackCell;
-			public long ServiceMilliseconds = long.MaxValue;
-
-			public AirTargetPlan(Actor actor, int score, bool isUndefended, List<CPos> route,
-				bool clearsAa = false, List<Squad> supportSquads = null, CPos? aaProtectedCell = null,
-				IReadOnlyCollection<uint> aaThreatIds = null, StealthClearMode stealthMode = StealthClearMode.None,
-				IReadOnlyCollection<uint> stealthPackage = null, CPos? stealthClearCenterCell = null,
-				bool stealthAggressiveMass = false, CPos? stealthPostAttackCell = null)
-			{
-				Actor = actor;
-				Score = score;
-				IsUndefended = isUndefended;
-				Route = route;
-				ClearsAa = clearsAa;
-				SupportSquads = supportSquads;
-				AaProtectedCell = aaProtectedCell;
-				AaThreatIds = aaThreatIds;
-				StealthMode = stealthMode;
-				StealthPackage = stealthPackage;
-				StealthClearCenterCell = stealthClearCenterCell;
-				StealthAggressiveMass = stealthAggressiveMass;
-				StealthPostAttackCell = stealthPostAttackCell;
-			}
-		}
-
 		// BEGIN CNC96A GROUND EXTENSION
-		protected sealed class GroundThreat
-		{
-			public Actor Actor;
-			public int WeaponRange;
-			public int DetectorRange;
-			public int Speed;
-		}
-
-		protected sealed class StealthInfluenceCache
-		{
-			public int Tick;
-			public int Width;
-			public int Height;
-			public float[] Danger;
-			public float[] CloakedDanger;
-			public float[] MobilityDanger;
-			public List<(Actor Actor, int Priority)> Candidates;
-			public List<GroundThreat> Threats;
-			public Dictionary<Actor, GroundThreat> ThreatByActor;
-			public Dictionary<CPos, List<Actor>> EnemyActorsByCell;
-			public Dictionary<CPos, List<GroundThreat>> ThreatCoverageByCell;
-			public HashSet<CPos> PendingExplosionCells;
-		}
-
 		static readonly Dictionary<SquadManagerBotModule, Dictionary<string, StealthInfluenceCache>>
 			StealthInfluenceCaches =
 				new Dictionary<SquadManagerBotModule, Dictionary<string, StealthInfluenceCache>>();
@@ -599,21 +509,6 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				StealthInfluence(owner, representative);
 		}
 		// END CNC96A GROUND EXTENSION
-
-		sealed class DefendedCellPlan
-		{
-			public StealthAIDefendedAirAction Action;
-			public Actor ClearTarget;
-			public List<Squad> SupportSquads;
-			public List<uint> AaThreatIds;
-			public double DangerValue;
-			public long UnlockedValue;
-			public long CellKillTicks;
-			public long ProtectedKillTicks;
-			public long AaClearTicks;
-			public long ClearAircraftValue;
-			public float ClearReferenceWeight;
-		}
 
 		protected static AirTargetPlan FindDefenselessTarget(Squad owner)
 		{
@@ -5532,84 +5427,6 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		}
 	}
 
-	class StealthAIIdleState : StealthAIStateBase, IState
-	{
-		public void Activate(Squad owner) { }
-
-		public void Tick(Squad owner)
-		{
-			if (!owner.IsValid)
-				return;
-
-			if (owner.StealthProfile == "stealth-tank")
-			{
-				foreach (var unit in owner.Units)
-					SendHomeToRepair(owner, unit);
-				PromoteArrivedAirReinforcements(owner);
-			}
-
-			if (owner.AirEscapingLocalAa)
-			{
-				if (owner.Type != SquadType.Stealth || AdvanceStealthEscape(owner))
-					return;
-			}
-
-			if (owner.SquadManager.Info.AirTargetDebugLogging)
-				Log.Write("debug", "Air state [{0}] idle tick: units={1} no-target-scans={2}.",
-					owner.AirProfile, owner.Units.Count, owner.AirConsecutiveNoTargetScans);
-
-			// The continuous safety check watches the squad's surroundings on its own, much shorter
-			// interval, so this scan is pure duplicated work whenever that is switched on.
-			if (owner.SquadManager.Info.AirSafetyCheckInterval <= 0 && ShouldFlee(owner))
-			{
-				owner.FuzzyStateMachine.ChangeState(owner, new StealthAIFleeState(), true);
-				return;
-			}
-
-			var e = FindDefenselessTarget(owner);
-			if (e == null)
-			{
-				QueueStealthReinforcementsToFormation(owner);
-
-				// Given up waiting for a positive score: accept the best finite-cost route instead of idling
-				// forever. Threat costs remain intact, and squad size already scales acceptable risk.
-				var threshold = owner.SquadManager.Info.AirMassedAttackIdleThreshold;
-				if (threshold > 0)
-				{
-					owner.AirConsecutiveNoTargetScans++;
-					if (owner.AirConsecutiveNoTargetScans > threshold)
-					{
-						var massedTarget = FindBestAirTarget(owner, relaxed: true);
-						if (massedTarget != null)
-						{
-							owner.AirConsecutiveNoTargetScans = 0;
-							ApplyAirTargetPlan(owner, massedTarget);
-							owner.FuzzyStateMachine.ChangeState(owner, new StealthAIAttackState(), true);
-							return;
-						}
-					}
-				}
-
-				// Nothing worth hitting from where we are standing. If the squad remembers anti-air it is
-				// loitering next to an enemy base, so shuffle to a nearby point and try the scan again from
-				// there instead of hovering: this is the "if it cannot get there in a straight line, move
-				// around the base and try again" half of the loop, done the cheap way.
-				if (owner.Type == SquadType.Stealth)
-					BeginStealthSafetyReposition(owner);
-				else if (owner.SquadManager.Info.AirEvadeDistance > 0 && owner.AirThreatPositions.Count > 0)
-					Evade(owner, "no eligible target near remembered AA");
-
-				return;
-			}
-
-			owner.AirConsecutiveNoTargetScans = 0;
-			ApplyAirTargetPlan(owner, e);
-			owner.FuzzyStateMachine.ChangeState(owner, new StealthAIAttackState(), true);
-		}
-
-		public void Deactivate(Squad owner) { }
-	}
-
 	class StealthAIAttackState : StealthAIStateBase, IState
 	{
 		public void Activate(Squad owner)
@@ -6192,44 +6009,6 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					Log.Write("debug", "Air order [{0}] {1}#{2}: cannot attack selected {3}#{4}.",
 						owner.AirProfile, a.Info.Name, a.ActorID, owner.TargetActor.Info.Name, owner.TargetActor.ActorID);
 			}
-		}
-
-		public void Deactivate(Squad owner) { }
-	}
-
-	class StealthAIFleeState : StealthAIStateBase, IState
-	{
-		public void Activate(Squad owner) { }
-
-		public void Tick(Squad owner)
-		{
-			if (!owner.IsValid)
-				return;
-
-			// BEGIN CNC96A GROUND EXTENSION
-			// A loaded legacy state cannot turn a specialist plan into a retreat order.
-			if (owner.Type == SquadType.Stealth)
-			{
-				owner.FuzzyStateMachine.ChangeState(owner, new StealthAIIdleState(), true);
-				return;
-			}
-			// END CNC96A GROUND EXTENSION
-
-			if (owner.AirEscapingLocalAa)
-			{
-				if (owner.Units.Any(a => !owner.AirUnitsRepairing.Contains(a.ActorID) && !a.IsIdle))
-					return;
-
-				owner.AirEscapingLocalAa = false;
-				owner.FuzzyStateMachine.ChangeState(owner, new StealthAIIdleState(), true);
-				return;
-			}
-
-			Evade(owner, "flee-state continuation");
-
-			// Straight back to idle: the next scan - whichever of the state machine or the much faster
-			// safety check gets there first - re-targets from wherever the hop put us.
-			owner.FuzzyStateMachine.ChangeState(owner, new StealthAIIdleState(), true);
 		}
 
 		public void Deactivate(Squad owner) { }
