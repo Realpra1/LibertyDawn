@@ -93,10 +93,21 @@ namespace OpenRA.Test
 			Assert.That(launch.HeadlessValidationError(), Is.Null);
 		}
 
-		[TestCase("Launch.Headless=true", "Launch automation requires Launch.Map or Launch.GameSave.")]
+		[Test]
+		public void AcceptsHeadlessReplayScoringWithoutMutationControls()
+		{
+			var launch = new LaunchArguments(new Arguments(
+				"Launch.Headless=true",
+				"Launch.Replay=test.orarep"));
+
+			Assert.That(launch.HeadlessValidationError(), Is.Null);
+		}
+
+		[TestCase("Launch.Headless=true", "Launch automation requires Launch.Map, Launch.GameSave, or Launch.Replay.")]
 		[TestCase("Launch.Headless=true|Launch.Map=test.oramap|Launch.LobbyCommands=spectate;option gamespeed fastest", "Launch.Headless map games require 'option gamespeed max' in Launch.LobbyCommands.")]
 		[TestCase("Launch.Headless=true|Launch.Connect=localhost:1234|Launch.Map=test.oramap|Launch.LobbyCommands=option gamespeed max", "Launch automation supports local automated games only.")]
-		[TestCase("Launch.Headless=true|Launch.Replay=test.orarep", "Launch automation does not support replay playback.")]
+		[TestCase("Launch.Headless=true|Launch.Replay=test.orarep|Launch.Map=test.oramap|Launch.LobbyCommands=option gamespeed max", "Launch.Replay cannot be combined with Launch.Map or Launch.GameSave.")]
+		[TestCase("Launch.Headless=true|Launch.Replay=test.orarep|Launch.ExitAtTick=5000", "Launch.Replay does not support lobby, save, or configured-exit automation.")]
 		[TestCase("Launch.ExitAtTick=5000|Launch.Map=test.oramap", "Launch.ExitAtTick requires Launch.Headless=true or Launch.Paced=true.")]
 		[TestCase("Launch.Headless=true|Launch.Paced=true|Launch.Map=test.oramap|Launch.LobbyCommands=option gamespeed max", "Launch.Headless and Launch.Paced cannot both be enabled.")]
 		[TestCase("Launch.Paced=true|Launch.Map=test.oramap|Launch.LobbyCommands=option gamespeed max", "Launch.Paced map games require 'option gamespeed normal' in Launch.LobbyCommands.")]

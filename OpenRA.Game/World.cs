@@ -65,6 +65,7 @@ namespace OpenRA
 
 		public Player LocalPlayer { get; private set; }
 
+		public event Action GameEnding = () => { };
 		public event Action GameOver = () => { };
 		public bool IsGameOver { get; private set; }
 		public void EndGame()
@@ -72,6 +73,7 @@ namespace OpenRA
 			if (!IsGameOver)
 			{
 				IsGameOver = true;
+				GameEnding();
 
 				foreach (var t in WorldActor.TraitsImplementing<IGameOver>())
 					t.GameOver(this);

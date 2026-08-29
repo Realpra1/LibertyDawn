@@ -1,6 +1,6 @@
 ---
 name: review-cnc-policy
-description: Judge whether a Liberty Dawn AI policy or observed match behavior makes strategic sense using only the shared Liberty Dawn design reference, a short task/scope description, and a factual match or proposed-policy narrative. Use for Terra-medium post-match playtester feedback, Sol-high consultation during CNC task specification, or one Sol-xhigh escalation after a worker has at least ten persistent-problem game tests.
+description: Judge whether a Liberty Dawn AI policy or observed match behavior makes strategic sense using only the shared design references, a short task/scope description, and a factual match or proposed-policy narrative. Use for Terra-medium post-match playtester feedback, Sol-high consultation during CNC task specification, or one Sol-xhigh escalation after a worker has at least ten persistent-problem game tests.
 ---
 
 # Review CNC Policy
@@ -22,16 +22,18 @@ them with adversarial full-AI games; this role cannot certify completion.
 ## Strict context isolation
 
 Aside from these role instructions and a validated JSON job containing only the
-four paths `design_reference`, `task_context`, `narrative`, and `output`, read
-only. Assigned inputs are staged regular-file copies under `inputs/`:
+five paths `design_reference`, `task_context`, `narrative`, `scratchpad`, and `output`, read
+only. A stealth-tank job must also contain the single path `lifecycle_reference`.
+Assigned inputs are staged regular-file copies under `inputs/`:
 
 1. `.agents/references/LIBERTY-DAWN-DESIGN.md`.
-2. One short `TASK-CONTEXT.md` stating the task, why it exists, change category,
+2. For a stealth-tank job only, `.agents/references/STEALTH-TANK-LIFECYCLE.md`.
+3. One short `TASK-CONTEXT.md` stating the task, why it exists, change category,
    explicit in-scope/out-of-scope behavior, and balance authority.
-3. One assigned `NARRATIVE.md`. At spec time this is a proposed-policy narrative
+4. One assigned `NARRATIVE.md`. At spec time this is a proposed-policy narrative
    describing current behavior, intended behavior, control policy, predicted
    situations/counters, and questions rather than completed match events.
-4. `POLICY-SCRATCHPAD.md`, the current persistent strategic scratchpad.
+5. `POLICY-SCRATCHPAD.md`, the current persistent strategic scratchpad.
 
 Do not read logs, source code, diffs, task sheets, worker/spec state, reports, or
 other reviews. Ask for a better narrative when the supplied evidence is too thin;
@@ -49,7 +51,8 @@ task status, implementation details, source references, or raw match chronology.
    whether the narrative exercises and satisfies it. Help the Worker or Speccer
    understand the game and solve this assigned task sensibly; do not substitute a
    different objective merely because the observed AI won.
-2. Check whether the behavior follows Liberty Dawn's survival-first philosophy,
+2. Check whether the behavior follows Liberty Dawn's survival-first philosophy
+   and, for stealth tanks, the authoritative six-stage lifecycle, as well as its
    mixed-unit/counterplay design, cyclical technology, living-resource economy,
    structure/unit roles, and the intended personality of Brutalis, VIKI, Skynet,
    Iron Reaper, or the relevant easier AI.

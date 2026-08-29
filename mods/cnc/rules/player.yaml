@@ -12,6 +12,7 @@ EditorPlayer:
 
 Player:
 	Inherits: ^BasePlayer
+	StealthEfficiencyControlWatchdog:
 	PlaceBuilding:
 		NewOptionsNotification: NewOptions
 		CannotPlaceNotification: BuildingCannotPlaceAudio

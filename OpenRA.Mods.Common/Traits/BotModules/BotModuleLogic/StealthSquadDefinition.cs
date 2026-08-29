@@ -34,7 +34,7 @@ namespace OpenRA.Mods.Common.Traits
 		public readonly int TargetSwitchImprovementPercent = 25;
 		public readonly int HarassmentDistancePenalty = 1;
 		[Desc("Number of reachable target-bearing strategic cells collected by the STNK outward frontier.")]
-		public readonly int OutwardTargetCellLimit = 8;
+		public readonly int OutwardTargetCellLimit = 10;
 		[Desc("Preferred maximum driving time in seconds for an undefended target. Farther safe targets remain a fallback.")]
 		public readonly int MaximumUndefendedTargetTravelSeconds = 20;
 		public readonly bool EnableKiting = true;
