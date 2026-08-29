@@ -377,6 +377,7 @@ namespace OpenRA.Mods.Common.Traits
 			selectedActorsAtSelection = selectedRefinery ? baseBuilder.CountActors(refineryTypes) : liveHarvesters;
 
 			var canceled = 0;
+			var protectedOpeningResearch = 0;
 			var expectedRefund = 0;
 			cancellationSnapshots.Clear();
 			foreach (var queue in world.ActorsWithTrait<ProductionQueue>()
@@ -387,7 +388,15 @@ namespace OpenRA.Mods.Common.Traits
 				if (items.Any(i => i.Done))
 					continue;
 
-				var displaced = queue.Actor.ActorID == selectedQueueActorId ? items.Skip(1) : items.AsEnumerable();
+				var displacementCandidates = queue.Actor.ActorID == selectedQueueActorId ?
+					items.Skip(1) : items.AsEnumerable();
+				var displaced = displacementCandidates.Where(i =>
+				{
+					var protect = baseBuilder.ShouldProtectOpeningTechnologyResearch(i.Item, i.RemainingCost);
+					if (protect)
+						protectedOpeningResearch++;
+					return !protect;
+				});
 				foreach (var group in displaced.Where(i => !i.Done)
 					.GroupBy(i => i.Item, StringComparer.Ordinal).OrderBy(g => g.Key, StringComparer.Ordinal))
 				{
@@ -411,10 +420,12 @@ namespace OpenRA.Mods.Common.Traits
 			cancellationResolutionLogged = cancellationSnapshots.Count == 0;
 
 			Debug("{0} activated tick={1} reason=no-paid-progress evidence={2} fronts={3} " +
-				"live-harvesters={4}/5 selected={5}:{6}:{7} remaining={8}/{9} canceled={10} expected-refund={11}",
+				"live-harvesters={4}/5 selected={5}:{6}:{7} remaining={8}/{9} canceled={10} " +
+				"expected-refund={11} protected-opening-research={12}",
 				player, world.WorldTick, noProgressEvidenceTicks, fronts.Count, liveHarvesters,
 				selectedQueueActorId, selected.Queue.Info.Type, selectedItem,
-				selected.Item.RemainingCost, selected.Item.TotalCost, canceled, expectedRefund);
+				selected.Item.RemainingCost, selected.Item.TotalCost, canceled, expectedRefund,
+				protectedOpeningResearch);
 		}
 
 		void UpdateActiveRecovery()

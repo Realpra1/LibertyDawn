@@ -577,6 +577,11 @@ namespace OpenRA
 		{
 			Disposing = true;
 
+			// Replay disconnect can bypass the live victory path. Deliver the ordinary
+			// terminal callback while every diagnostic owner is still alive.
+			if (IsReplay)
+				EndGame();
+
 			OrderGenerator?.Deactivate();
 
 			frameEndActions.Clear();

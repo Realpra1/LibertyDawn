@@ -276,7 +276,6 @@ namespace OpenRA.Mods.Common.Traits
 		public const int NearbyReactionMaximumLatencyTicks = 25;
 		public const float HardRouteDangerThreshold = 1f;
 		public const float SoftResourceRouteCost = 0.05f;
-		public const float OrdinaryWeaponRouteInfluence = 0.2f;
 		public const float HardDetectorRouteInfluence = 1f;
 		public const int ReinforcementSaveVersion = 2;
 		public const int StealthGenerationEfficiencySaveVersion = 1;
@@ -516,6 +515,19 @@ namespace OpenRA.Mods.Common.Traits
 				.Select(candidate => candidate.Item).ToList();
 		}
 
+		public static IReadOnlyList<T> HighestPriorityFinalEngagements<T>(
+			IEnumerable<(T Item, int Priority, bool ApprovedDynamicLocal)> eligible)
+		{
+			if (eligible == null)
+				throw new ArgumentNullException(nameof(eligible));
+
+			var candidates = eligible.ToList();
+			var dynamicLocal = candidates.Where(candidate => candidate.ApprovedDynamicLocal).ToList();
+			var final = dynamicLocal.Count > 0 ? dynamicLocal : candidates;
+			return HighestPriorityEligibleEngagements(final.Select(candidate =>
+				(candidate.Item, candidate.Priority)));
+		}
+
 		public static int FirstUnoccupiedEnterableDestination(
 			IReadOnlyList<bool> occupied, IReadOnlyList<bool> enterable)
 		{
@@ -559,6 +571,19 @@ namespace OpenRA.Mods.Common.Traits
 			bool existingExposureException)
 		{
 			return existingExposureException || (!coveringWeapon && nextCellSafe);
+		}
+
+		public static bool CloakedCrushExposureIsSafe(bool formationCloaked,
+			bool targetDetectorCovered, bool nextCellDetectorCovered)
+		{
+			return formationCloaked && !targetDetectorCovered && !nextCellDetectorCovered;
+		}
+
+		public static bool CloakedCrushRouteIsSafe(bool formationCloaked,
+			IEnumerable<bool> waypointDetectorCoverage)
+		{
+			return formationCloaked && waypointDetectorCoverage != null &&
+				!waypointDetectorCoverage.Any(covered => covered);
 		}
 
 		public static long AccumulateActorTicks(long actorTicks, int liveActors)
@@ -1136,6 +1161,15 @@ namespace OpenRA.Mods.Common.Traits
 				ownSpeed * 100L >= enemySpeed * (long)minimumSpeedPercent;
 		}
 
+		public static bool MissingCanonicalThreatIsZero(int enabledWeaponRangeCells,
+			int enabledDetectorRangeCells)
+		{
+			// The shared calculator intentionally has no row for an actor that cannot threaten
+			// the formation. Absence is zero only when live traits independently confirm that
+			// the actor is neither armed nor a detector; missing armed data remains invalid.
+			return enabledWeaponRangeCells <= 0 && enabledDetectorRangeCells <= 0;
+		}
+
 		public static bool ShouldEnterMassClear(double overmatch, int entryPercent)
 		{
 			return double.IsFinite(overmatch) && overmatch * 100 > entryPercent;
@@ -1173,6 +1207,22 @@ namespace OpenRA.Mods.Common.Traits
 			// Keep the existing immediate response to a weapon that is already engaged, and
 			// otherwise require detector and ground-weapon coverage to overlap the firing cell.
 			return engagedWeaponExposure || (detectorExposure && armedCoverage);
+		}
+
+		public static bool IsHardPlannedDecloakThreat(bool plannedDecloak, double canonicalThreat)
+		{
+			return plannedDecloak && canonicalThreat >= HardRouteDangerThreshold;
+		}
+
+		public static double AccumulateMaximumCanonicalThreat(double maximumThreat, double canonicalThreat)
+		{
+			return Math.Max(maximumThreat, canonicalThreat);
+		}
+
+		public static int StrategicTargetReviewIntervalTicks(int timestep, int configuredInterval)
+		{
+			return Math.Max(Math.Max(1, configuredInterval),
+				(int)Math.Ceiling(5000d / Math.Max(1, timestep)));
 		}
 
 		public static bool ShouldRetainActiveEngagement(bool hasValidTarget, bool isEngaged,

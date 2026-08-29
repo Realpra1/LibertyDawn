@@ -287,8 +287,11 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(stnk, Does.Contain("EconomyMammothCrushMove:"));
 			Assert.That(states, Does.Contain("owner.Type != SquadType.Stealth && challenger != null"),
 				"A valid static STNK mission must reach service instead of restarting for every economic challenger.");
-			Assert.That(states, Does.Contain("if (cache == null || !cache.Threats.Any(t => t.Actor == target)"),
+			Assert.That(states, Does.Contain("if (cache == null || formation.Count == 0)"),
 				"An owned Kite must reject a transiently unavailable influence cache and use the existing safe replan path.");
+			Assert.That(states, Does.Contain("!cache.ThreatByActor.ContainsKey(target) &&"));
+			Assert.That(states, Does.Contain("!StealthAISpecialistPolicy.MissingCanonicalThreatIsZero("),
+				"Only a live-trait-confirmed zero-threat target may survive a missing canonical row.");
 			var watchdog = Source("OpenRA.Mods.Common/Traits/BotOwnedStationaryWatchdog.cs");
 			var watchdogGuard = watchdog.IndexOf(
 				"if (!Game.Settings.Debug.BotDebug || !self.Owner.IsBot)", StringComparison.Ordinal);
@@ -321,6 +324,40 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(yaml, Does.Not.Contain("StealthCrushTestTelemetry"));
 			Assert.That(StealthAISpecialistPolicy.IsEngagementThreat(true, true, false), Is.True);
 			Assert.That(StealthAISpecialistPolicy.IsEngagementThreat(false, true, false), Is.False);
+			Assert.That(StealthAISpecialistPolicy.IsEngagementThreat(false, true, true), Is.True,
+				"planned decloak under canonical armed coverage must trigger local safety");
+			Assert.That(StealthAISpecialistPolicy.IsHardPlannedDecloakThreat(true, 0.999), Is.False,
+				"low canonical threat must not make a planned shot abandon its approved engagement");
+			Assert.That(StealthAISpecialistPolicy.IsHardPlannedDecloakThreat(true, 1), Is.True,
+				"hard canonical threat at the actual decloak distance must remain responsive");
+			Assert.That(StealthAISpecialistPolicy.IsHardPlannedDecloakThreat(false, 100), Is.False,
+				"canonical magnitude alone is not planned-decloak context");
+			var lowThenObelisk = StealthAISpecialistPolicy.AccumulateMaximumCanonicalThreat(0, 0.2);
+			lowThenObelisk = StealthAISpecialistPolicy.AccumulateMaximumCanonicalThreat(lowThenObelisk, 4);
+			var obeliskThenLow = StealthAISpecialistPolicy.AccumulateMaximumCanonicalThreat(0, 4);
+			obeliskThenLow = StealthAISpecialistPolicy.AccumulateMaximumCanonicalThreat(obeliskThenLow, 0.2);
+			Assert.That(StealthAISpecialistPolicy.IsHardPlannedDecloakThreat(true, lowThenObelisk), Is.True,
+				"a low-threat rifle before a close Obelisk must not hide the hard planned-decloak threat");
+			Assert.That(StealthAISpecialistPolicy.IsHardPlannedDecloakThreat(true, obeliskThenLow), Is.True,
+				"a close Obelisk before a low-threat rifle must produce the same planned-decloak result");
+			Assert.That(StealthAISpecialistPolicy.IsHardPlannedDecloakThreat(true,
+				StealthAISpecialistPolicy.AccumulateMaximumCanonicalThreat(0, 0.2)), Is.False,
+				"low-threat-only planned decloak remains below the hard threshold");
+			Assert.That(states, Does.Contain("foreach (var threat in cache.Threats)"));
+			Assert.That(states, Does.Not.Contain("weaponExposure |= cache.Threats.Any(t =>"),
+				"planned-decloak threat aggregation must scan every covered defender");
+			Assert.That(StealthAISpecialistPolicy.StrategicTargetReviewIntervalTicks(40, 25), Is.EqualTo(125));
+			Assert.That(StealthAISpecialistPolicy.StrategicTargetReviewIntervalTicks(20, 125), Is.EqualTo(250));
+			Assert.That(states, Does.Contain("TryGetDefenderThreat"),
+				"stealth route and local safety must consume the standard calculator");
+			var calculator = Source("OpenRA.Mods.Common/Traits/BotModules/GeneralizedCombatThreat.cs");
+			Assert.That(calculator, Does.Contain(
+				"engagementDistanceCells == null ? pair.DefenderThreatInAttackerEquivalents"),
+				"the optional distance must leave the canonical default result unchanged");
+			Assert.That(states, Does.Contain("owner.StealthEscapePreserveEngagement"),
+				"a brief safety reposition must retain an approved live actor/cell engagement");
+			Assert.That(states, Does.Contain("strategic-event-review={1}"),
+				"route arrival must remain an event-driven exception to the five-second ordinary review floor");
 			Assert.That(StealthAISpecialistPolicy.NextKillCadenceAge(100, 25, false, false), Is.EqualTo(125));
 			Assert.That(StealthAISpecialistPolicy.NextKillCadenceAge(100, 25, false, true), Is.EqualTo(100));
 			Assert.That(StealthAISpecialistPolicy.NextKillCadenceAge(100, 25, true, false), Is.Zero);
@@ -518,6 +555,12 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(StealthAISpecialistPolicy.CanKite(120, 100, 8, 5, 1, 120), Is.True);
 			Assert.That(StealthAISpecialistPolicy.CanKite(119, 100, 8, 5, 1, 120), Is.False);
 			Assert.That(StealthAISpecialistPolicy.CanKite(120, 100, 6, 5, 1, 120), Is.False);
+			Assert.That(StealthAISpecialistPolicy.MissingCanonicalThreatIsZero(0, 0), Is.True,
+				"An actor confirmed unarmed and non-detecting is the canonical zero-threat case.");
+			Assert.That(StealthAISpecialistPolicy.MissingCanonicalThreatIsZero(1, 0), Is.False,
+				"An armed actor with missing calculator data must remain invalid.");
+			Assert.That(StealthAISpecialistPolicy.MissingCanonicalThreatIsZero(0, 1), Is.False,
+				"A detector with missing calculator data must remain invalid.");
 			Assert.That(StealthAISpecialistPolicy.ShouldEnterMassClear(2, 200), Is.False);
 			Assert.That(StealthAISpecialistPolicy.ShouldEnterMassClear(2.01, 200), Is.True);
 			Assert.That(StealthAISpecialistPolicy.ShouldAbortMassClear(1.01, 100), Is.False);
@@ -534,6 +577,9 @@ namespace OpenRA.Test.Mods.Common
 				"Aggressive Mass must route toward the selected high-value strategic destination.");
 			Assert.That(states, Does.Contain("else if (!aggressiveMass && CanAttackTarget"),
 				"Aggressive AttackMove must not divert into a targeted low-value scout hunt.");
+			Assert.That(states, Does.Contain("surrounding-threat-screen=required"));
+			Assert.That(states, Does.Contain("!packageThreats.Any(t => CachedThreatCoversReveal("),
+				"A zero-threat target must not bypass other canonical weapons around its firing cell.");
 			Assert.That(states, Does.Contain(
 				"plan.StealthAggressiveMass && plan.StealthClearCenterCell != null"),
 				"The latched high-value strategic destination must remain distinct from encountered threats.");
@@ -549,6 +595,37 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(pendingBlue, Is.GreaterThanOrEqualTo(0));
 			Assert.That(pendingBlue, Is.LessThan(massSafetyBypass),
 				"Pending Blue explosion escape must remain the mandatory override before Mass safety bypass.");
+			Assert.That(states, Does.Contain("entry=explicit-crossover"),
+				"The deliberate Mass safety policy must identify its approval authority.");
+			Assert.That(states, Does.Contain("ordinary-flee=bypassed-by-policy"),
+				"Mass danger acceptance must be explicit diagnostic policy, not an accidental silent return.");
+			Assert.That(states, Does.Contain("decision={10}"));
+			Assert.That(states, Does.Contain("continue-crossover-policy"));
+			Assert.That(states, Does.Contain("transition-reason=crossover-exit-threshold"));
+			Assert.That(states, Does.Contain("transition-reason=cell-clear/package-empty"));
+			Assert.That(states, Does.Contain("reason={6} mass-entry-approved={7}"));
+			Assert.That(states, Does.Contain("Stealth local safety watchdog"));
+			Assert.That(states, Does.Contain("canonical-current-range-max={10:0.###}"));
+			Assert.That(states, Does.Contain("verdict={15}"));
+			Assert.That(states, Does.Contain("Stealth crush decision"));
+			Assert.That(states, Does.Contain("detecting-infantry={4}"));
+			Assert.That(states, Does.Contain("target-detector-covered={8}"));
+			Assert.That(states, Does.Contain("next-cell-detector-covered={9}"));
+			Assert.That(states, Does.Contain(
+				"threat, target.CenterPosition, false, owner.StealthDefinition.DetectorRangeBufferCells)"),
+				"Crush admission must use real detector geometry at the target.");
+			Assert.That(states, Does.Contain(
+				"threat, owner.World.Map.CenterOfCell(next), false"),
+				"Crush admission must use real detector geometry at the post-Crush cell.");
+			Assert.That(states, Does.Contain("Stealth Kite decision"));
+			Assert.That(states, Does.Contain("reason=mobility-or-range"));
+			Assert.That(states, Does.Contain("Stealth owned engagement watchdog"));
+			Assert.That(states, Does.Contain("reason=approved-actor-in-live-package"));
+			Assert.That(states, Does.Contain("reason=no-safe-local-plan"));
+			Assert.That(states, Does.Contain("firing-cell={9} retreat={10}"));
+			Assert.That(states.IndexOf("ShouldEnterMassClear(", StringComparison.Ordinal),
+				Is.LessThan(states.IndexOf("stealthMode: StealthClearMode.Mass",
+					StringComparison.Ordinal)), "Mass plans require explicit crossover entry approval.");
 		}
 
 		[Test]
@@ -876,10 +953,40 @@ namespace OpenRA.Test.Mods.Common
 				"An approved ordinary attack requires the immediate recloak-window cell.");
 			Assert.That(StealthAISpecialistPolicy.PlannedExposureIsSafe(true, false, true), Is.True,
 				"The existing Kite/Mass crossover exception remains an explicit approval path.");
+			Assert.That(StealthAISpecialistPolicy.CloakedCrushExposureIsSafe(true, false, false), Is.True,
+				"Ordinary nondetecting weapons cannot acquire a cloaked Crush formation.");
+			Assert.That(StealthAISpecialistPolicy.CloakedCrushExposureIsSafe(
+				true, new[] { false, false }.Any(covered => covered), false), Is.True,
+				"Multiple nondetecting defenders remain harmless while Crush stays cloaked.");
+			Assert.That(StealthAISpecialistPolicy.CloakedCrushExposureIsSafe(true, true, false), Is.False,
+				"Actual detector coverage at the Crush target must reject the action.");
+			Assert.That(StealthAISpecialistPolicy.CloakedCrushExposureIsSafe(true, false, true), Is.False,
+				"Actual detector coverage at the post-Crush cell must reject the action.");
+			Assert.That(StealthAISpecialistPolicy.CloakedCrushExposureIsSafe(false, false, false), Is.False,
+				"A revealed formation cannot use the cloaked Crush exception.");
+			Assert.That(StealthAISpecialistPolicy.CloakedCrushExposureIsSafe(
+				true, new[] { false, true }.Any(covered => covered), false), Is.False);
+			Assert.That(StealthAISpecialistPolicy.CloakedCrushExposureIsSafe(
+				true, new[] { true, false }.Any(covered => covered), false), Is.False,
+				"Detector classification must be order-independent.");
+			Assert.That(StealthAISpecialistPolicy.CloakedCrushRouteIsSafe(
+				true, new[] { false, false, false }), Is.True,
+				"A cloaked Crush path outside real detector coverage stays eligible.");
+			Assert.That(StealthAISpecialistPolicy.CloakedCrushRouteIsSafe(
+				true, new[] { false, true }), Is.False,
+				"A real detector-covered waypoint, such as near an enabled detecting HQ, rejects Crush.");
+			Assert.That(StealthAISpecialistPolicy.CloakedCrushRouteIsSafe(
+				true, new[] { true, false }), Is.False,
+				"Crush path detector rejection must not depend on waypoint ordering.");
+			Assert.That(StealthAISpecialistPolicy.CloakedCrushRouteIsSafe(
+				false, new[] { false, false }), Is.False,
+				"A revealed formation cannot use a nominally detector-free cloaked Crush path.");
 
 			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
 			Assert.That(states, Does.Contain("cache?.CloakedDanger"));
 			Assert.That(states, Does.Contain("OrdinaryCrushExposureIsSafe("));
+			Assert.That(states, Does.Contain("CloakedCrushRouteIsSafe(owner, cache, crushRoute)"));
+			Assert.That(states, Does.Contain("CloakedCrushRouteIsSafe(owner, crushCache, route)"));
 			Assert.That(states, Does.Contain("SafePostAttackStrategicCell("));
 			var routeOwner = states.Substring(states.IndexOf(
 				"static List<CPos> StealthRouteToCell", StringComparison.Ordinal));
@@ -924,9 +1031,43 @@ namespace OpenRA.Test.Mods.Common
 				"Eligibility is resolved before priority, preserving fallback when the preferred actor is invalid or unsafe.");
 
 			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
-			Assert.That(states, Does.Contain("HighestPriorityEligibleEngagements("));
-			Assert.That(states, Does.Contain("cellSafePlans.Select(entry => (entry.Plan, entry.Priority))"),
+			Assert.That(states, Does.Contain("HighestPriorityFinalEngagements("));
+			Assert.That(states, Does.Contain("cellSafePlans.Select(entry => (entry.Plan, entry.Priority,"),
 				"The production selected-cell engagement path must pass its already safety-validated plans to the priority gate.");
+		}
+
+		[Test]
+		public void FinalArbitrationPreservesApprovedDynamicLocalPlans()
+		{
+			var kiteBeforeStatic = StealthAISpecialistPolicy.HighestPriorityFinalEngagements(new[]
+			{
+				(Item: "mtnk-kite", Priority: 100, ApprovedDynamicLocal: true),
+				(Item: "refinery", Priority: 2500, ApprovedDynamicLocal: false)
+			});
+			Assert.That(kiteBeforeStatic, Is.EqualTo(new[] { "mtnk-kite" }));
+
+			var kiteAfterStatic = StealthAISpecialistPolicy.HighestPriorityFinalEngagements(new[]
+			{
+				(Item: "refinery", Priority: 2500, ApprovedDynamicLocal: false),
+				(Item: "mtnk-kite", Priority: 100, ApprovedDynamicLocal: true)
+			});
+			Assert.That(kiteAfterStatic, Is.EqualTo(new[] { "mtnk-kite" }),
+				"Final arbitration must be independent of actor enumeration order.");
+
+			var mass = StealthAISpecialistPolicy.HighestPriorityFinalEngagements(new[]
+			{
+				(Item: "refinery", Priority: 2500, ApprovedDynamicLocal: false),
+				(Item: "obelisk-mass", Priority: 1, ApprovedDynamicLocal: true)
+			});
+			Assert.That(mass, Is.EqualTo(new[] { "obelisk-mass" }));
+
+			var ordinaryOnly = StealthAISpecialistPolicy.HighestPriorityFinalEngagements(new[]
+			{
+				(Item: "wall", Priority: 1, ApprovedDynamicLocal: false),
+				(Item: "refinery", Priority: 2500, ApprovedDynamicLocal: false)
+			});
+			Assert.That(ordinaryOnly, Is.EqualTo(new[] { "refinery" }),
+				"Without an approved Kite/Mass plan, configured static priority must remain unchanged.");
 		}
 
 		[Test]
@@ -1131,8 +1272,17 @@ namespace OpenRA.Test.Mods.Common
 		public void HumanReplayScorerGroupsControlAndFlushesThroughTheSharedExactlyOnceGuard()
 		{
 			var scorer = Source("OpenRA.Mods.Common/Traits/StealthEfficiencyControlWatchdog.cs");
-			Assert.That(scorer, Does.Contain("!self.Owner.IsBot"));
-			Assert.That(scorer, Does.Contain("control=human generation=1"));
+			Assert.That(scorer, Does.Contain("!self.Owner.IsBot || self.World.IsReplay"),
+				"Replay playback must score recorded owner actions even though replay metadata retains bot ownership.");
+			Assert.That(scorer, Does.Contain("control = self.World.IsReplay ? \"replay-owner\" : \"human\""));
+			Assert.That(scorer, Does.Contain("control={2} generation=1"));
+			Assert.That(scorer, Does.Contain("45000 / Math.Max(1, playerActor.World.Timestep)"));
+			Assert.That(scorer, Does.Contain("KillCadenceFailed(cadenceAge, maximumTicks)"));
+			Assert.That(scorer, Does.Contain("scope=replay-owner"));
+			Assert.That(scorer, Does.Contain("if (!playerActor.World.IsReplay)"),
+				"Non-comparable owner cadence context must remain replay-only.");
+			Assert.That(scorer, Does.Contain("comparable=false per-squad=unavailable"),
+				"Owner aggregation must not masquerade as live per-squad cadence.");
 			Assert.That(scorer, Does.Contain("actor-time-denominator=sum-live-member-ticks"));
 			Assert.That(scorer, Does.Contain("World.GameEnding += EmitTerminalSummary"));
 			Assert.That(scorer, Does.Contain("World.GameEnding -= EmitTerminalSummary"));
@@ -1146,9 +1296,12 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(StealthAISpecialistPolicy.TryBeginStealthTerminalSummary(
 				ref reported, true, true), Is.False);
 
-			var game = Source("OpenRA.Game/Game.cs");
-			Assert.That(game, Does.Contain("(IsHeadlessAutomation && logicWorld.IsReplay)"),
-				"Headless replay scoring must advance without presentation pacing.");
+			var world = Source("OpenRA.Game/World.cs");
+			var dispose = world.Substring(world.IndexOf("public void Dispose()", StringComparison.Ordinal));
+			dispose = dispose.Substring(0, dispose.IndexOf("OrderGenerator?.Deactivate();", StringComparison.Ordinal));
+			Assert.That(dispose, Does.Contain("if (IsReplay)"));
+			Assert.That(dispose, Does.Contain("EndGame();"),
+				"Replay world disposal must deliver the ordinary terminal callback before actors disappear.");
 		}
 
 		[Test]

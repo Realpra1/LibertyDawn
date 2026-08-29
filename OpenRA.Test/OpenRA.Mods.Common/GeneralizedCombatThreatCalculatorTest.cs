@@ -112,6 +112,30 @@ namespace OpenRA.Test
 		}
 
 		[Test]
+		public void SpecificDistanceThreatUsesCanonicalKillRatesAndVeterancyScaling()
+		{
+			Assert.That(GeneralizedCombatThreatCalculator.SpecificDistanceThreatEquivalent(4, 2),
+				Is.EqualTo(2));
+			Assert.That(GeneralizedCombatThreatCalculator.SpecificDistanceThreatEquivalent(4, 0),
+				Is.EqualTo(GeneralizedCombatThreatCalculator.MaximumThreatRating));
+			Assert.That(GeneralizedCombatThreatCalculator.SpecificDistanceThreatEquivalent(0, 2), Is.Zero,
+				"an outranged defender has no current-distance combat magnitude");
+			Assert.That(GeneralizedCombatThreatCalculator.SpecificDistanceThreatEquivalent(4, 2, 1.25, 1),
+				Is.EqualTo(2.5));
+		}
+
+		[Test]
+		public void SpecificDistanceDistinguishesCloseExposureFromOutranging()
+		{
+			Assert.That(GeneralizedCombatThreatCalculator.CanEngageAtDistance(
+				true, false, 0, 7, 0, 3), Is.True);
+			Assert.That(GeneralizedCombatThreatCalculator.CanEngageAtDistance(
+				true, false, 0, 7, 0, 8), Is.False);
+			Assert.That(GeneralizedCombatThreatCalculator.CanEngageAtDistance(
+				false, false, 0, 7, 0, 3), Is.False);
+		}
+
+		[Test]
 		public void CanonicalPairCountAndKeyDoNotRecalculateReverseMatchups()
 		{
 			Assert.That(GeneralizedCombatThreatCalculator.CanonicalPairCount(17), Is.EqualTo(153));

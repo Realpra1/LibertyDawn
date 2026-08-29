@@ -152,6 +152,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		internal bool StealthEscapePendingExplosion;
 		internal int StealthEscapeLastProgressTick = -1;
 		internal int StealthEscapeLastDistanceCells = int.MaxValue;
+		internal bool StealthEscapePreserveEngagement;
 		internal CPos? StealthKiteTargetCell;
 		internal CPos? StealthCrushTargetCell;
 		internal CPos? StealthPostAttackCell;
@@ -161,6 +162,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		internal uint StealthCrushLeaderActorId;
 		internal StealthClearMode StealthClearMode;
 		internal bool StealthAggressiveMass;
+		internal int StealthMassPolicyNextReportTick;
+		internal int StealthLocalPolicyNextReportTick;
+		internal int StealthEngagementNextReportTick;
 		internal readonly HashSet<uint> StealthClearPackage = new HashSet<uint>();
 		internal int StealthClearMembershipSignature;
 		internal CPos? StealthClearCenterCell;

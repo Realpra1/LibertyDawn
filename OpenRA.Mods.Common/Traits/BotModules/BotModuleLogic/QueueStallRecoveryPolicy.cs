@@ -113,5 +113,12 @@ namespace OpenRA.Mods.Common.Traits
 			return needBasedSiloAvailable ? QueueStallRecoveryConstructionChoice.NeedBasedSilo :
 				QueueStallRecoveryConstructionChoice.None;
 		}
+
+		public static bool ShouldProtectOpeningResearch(bool isNextOpeningResearch,
+			bool currentlyBuildable, int availableFunds, int remainingCost)
+		{
+			return isNextOpeningResearch && currentlyBuildable &&
+				Math.Max(0, availableFunds) >= Math.Max(0, remainingCost);
+		}
 	}
 }
