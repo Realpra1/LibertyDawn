@@ -40,6 +40,13 @@ namespace OpenRA.Test.Mods.Common
 		static string StealthStateSources(params string[] names) => string.Join("\n", names.Select(name => Source(
 			$"OpenRA.Mods.Common/Traits/BotModules/Squads/States/{name}.cs")));
 
+		static T InvokeInternal<T>(Type type, string method, params object[] arguments)
+		{
+			var target = type.GetMethod(method, BindingFlags.Static | BindingFlags.NonPublic);
+			Assert.That(target, Is.Not.Null, $"Missing internal method {type.Name}.{method}.");
+			return (T)target.Invoke(null, arguments);
+		}
+
 		[Test]
 		public void OriginalManagerAndSquadRemainTheOnlyLiveOwners()
 		{
@@ -552,9 +559,9 @@ namespace OpenRA.Test.Mods.Common
 			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
 			var bridge = states.IndexOf("best = clearPlans.Where(p => p.StealthMode == StealthClearMode.CrushBridge",
 				StringComparison.Ordinal);
-			var shortSafe = states.IndexOf("best = preferredSafePlans.Where",
+			var shortSafe = states.IndexOf("best = safePlans.Where",
 				bridge, StringComparison.Ordinal);
-			var safe = states.IndexOf("best = safePlans", shortSafe,
+			var safe = states.IndexOf("best = safePlans\n", shortSafe + 1,
 				StringComparison.Ordinal);
 			var kite = states.IndexOf("best = clearPlans.Where", safe, StringComparison.Ordinal);
 			var mass = states.IndexOf("best = clearPlans.Where", kite + 1, StringComparison.Ordinal);
@@ -794,6 +801,57 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(states, Does.Contain("owner.StealthLastFrontierTargetCells >= 10"));
 			Assert.That(states, Does.Contain("BeginStealthEnemyApproach(owner)"),
 				"A short frontier with no viable mission must take one bounded safe step toward enemies.");
+		}
+
+		[Test]
+		public void StealthTargetCellsFilterStrategicValueBeforeThreat()
+		{
+			Assert.That(InvokeInternal<long>(typeof(StealthAISpecialistPolicy),
+				"StrategicTargetValueByRemainingHealth", 5000, 1000, 100, 100), Is.EqualTo(5000000));
+			Assert.That(InvokeInternal<long>(typeof(StealthAISpecialistPolicy),
+				"StrategicTargetValueByRemainingHealth", 5000, 1000, 25, 100), Is.EqualTo(20000000),
+				"Remaining HP keeps the existing bounded finish-target boost.");
+			var selected = InvokeInternal<IReadOnlyList<int>>(typeof(StealthAIThreatGeometry),
+				"SelectOrderedTargetCellHalf",
+				new long[] { 100, 90, 80, 70, 60 },
+				new double[] { 10, 30, 20, 0, 0 },
+				new double[] { 1, 1, 1, 100, 100 });
+
+			Assert.That(selected, Is.EqualTo(new[] { 0, 2 }),
+				"Only the strategic top three may enter the lower-threat half; threat cannot rescue a low-value cell.");
+		}
+
+		[Test]
+		public void StealthTargetCellHalvesRoundUpAndRetainSingleton()
+		{
+			Assert.That(InvokeInternal<IReadOnlyList<int>>(typeof(StealthAIThreatGeometry),
+				"SelectOrderedTargetCellHalf", new long[] { 10 }, new double[] { 5 }, new double[] { 2 }),
+				Is.EqualTo(new[] { 0 }));
+			Assert.That(InvokeInternal<IReadOnlyList<int>>(typeof(StealthAIThreatGeometry),
+				"SelectOrderedTargetCellHalf",
+				new long[] { 50, 40, 30 }, new double[] { 3, 1, 0 }, new double[] { 1, 1, 100 }),
+				Is.EqualTo(new[] { 1 }),
+				"Three cells retain two by strategic value, then one by threat; the discarded third cell stays out.");
+		}
+
+		[Test]
+		public void StealthSeparationCannotResurrectFilteredTargetCell()
+		{
+			var selected = InvokeInternal<IReadOnlyList<int>>(typeof(StealthAIThreatGeometry),
+				"SelectOrderedTargetCellHalf",
+				new long[] { 100, 90, 80, 70 },
+				new double[] { 20, 10, 0, 0 },
+				new double[] { 1, 2, 100, 100 });
+			var separation = new long[] { 1, 2, 1000, 10000 };
+			var final = selected.OrderByDescending(index => separation[index]).First();
+
+			Assert.That(selected, Is.EqualTo(new[] { 1 }));
+			Assert.That(final, Is.EqualTo(1),
+				"The separation stage sees only the ordered-filter survivors.");
+			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
+			Assert.That(states.IndexOf("SelectOrderedTargetCellHalf", StringComparison.Ordinal),
+				Is.LessThan(states.IndexOf("long Separation(AirTargetPlan plan)", StringComparison.Ordinal)));
+			Assert.That(states, Does.Not.Contain("bestSafe.Plan.Score / 4"));
 		}
 
 		[Test]

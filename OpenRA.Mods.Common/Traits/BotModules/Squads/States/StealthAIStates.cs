@@ -2907,8 +2907,53 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				selectedIndices = selectedIndices.Concat(harvesterCells).Distinct().OrderBy(i => i).ToList();
 			}
 
+			if (owner.StealthProfile == "stealth-tank" && selectedIndices.Count > 0)
+			{
+				var strategicValues = new List<long>();
+				var threatValues = new List<double>();
+				var crossoverValues = new List<double>();
+				foreach (var selectedIndex in selectedIndices)
+				{
+					var cell = cells[selectedIndex];
+					strategicValues.Add(cell.Sum(candidate =>
+					{
+						var health = candidate.Actor.TraitOrDefault<IHealth>();
+						return StealthAISpecialistPolicy.StrategicTargetValueByRemainingHealth(
+							candidate.Priority,
+							candidate.Actor.Info.TraitInfoOrDefault<ValuedInfo>()?.Cost ?? 0,
+							health?.HP ?? 0, health?.MaxHP ?? 0);
+					}));
+					var defenders = cell.SelectMany(candidate => DefenderPackage(owner, cache, candidate.Actor))
+						.Distinct().OrderBy(actor => actor.ActorID).ToList();
+					threatValues.Add(defenders.Sum(defender => ThreatValue(owner, formation, defender)));
+					crossoverValues.Add(defenders.Count == 0 ? double.PositiveInfinity :
+						CrossoverOvermatch(owner, formation, defenders));
+				}
+
+				var survivors = StealthAIThreatGeometry.SelectOrderedTargetCellHalf(
+					strategicValues, threatValues, crossoverValues);
+				if (owner.SquadManager.Info.AirTargetDebugLogging)
+				{
+					var strategicHalf = Enumerable.Range(0, selectedIndices.Count)
+						.OrderByDescending(index => strategicValues[index]).ThenBy(index => index)
+						.Take((selectedIndices.Count + 1) / 2).ToHashSet();
+					var survivorSet = survivors.ToHashSet();
+					var ranking = Enumerable.Range(0, selectedIndices.Count).Select(index =>
+						$"{cells[selectedIndices[index]].Key}:value={strategicValues[index]}:" +
+						$"threat={threatValues[index]:0.###}:crossover={crossoverValues[index]:0.###}:" +
+						$"stage={(survivorSet.Contains(index) ? "survivor" : strategicHalf.Contains(index) ? "threat-rejected" : "value-rejected")}")
+						.JoinWith(",");
+					Log.Write("debug", "Stealth target cell filter [{0}] tick={1}: ordered=value-then-threat-then-separation " +
+						"frontier={2} strategic-keep={3} threat-keep={4} cells={5}.",
+						owner.StealthProfile, owner.World.WorldTick, selectedIndices.Count,
+						strategicHalf.Count, survivors.Count, ranking);
+				}
+				selectedIndices = survivors.Select(index => selectedIndices[index]).ToList();
+			}
+
 			var safePlans = new List<(AirTargetPlan Plan, long TravelMs, long ServiceMs)>();
 			var clearPlans = new List<AirTargetPlan>();
+			var strategicCellByPlan = new Dictionary<AirTargetPlan, CPos>();
 			var debugPlans = owner.SquadManager.Info.AirTargetDebugLogging ? new List<AirTargetPlan>() : null;
 			foreach (var selectedIndex in selectedIndices)
 			{
@@ -3034,6 +3079,10 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					.Select(entry => (entry.Plan, entry.TravelMs, entry.ServiceMs)));
 				clearPlans.AddRange(cellClearPlans.Where(entry => preferred.Contains(entry.Plan.Actor.ActorID))
 					.Select(entry => entry.Plan));
+				foreach (var plan in cellSafePlans.Select(entry => entry.Plan)
+					.Concat(cellClearPlans.Select(entry => entry.Plan))
+					.Where(plan => preferred.Contains(plan.Actor.ActorID)))
+					strategicCellByPlan[plan] = cell.Key;
 				if (incumbent != null)
 					incumbentPlan = cellSafePlans.Select(entry => entry.Plan)
 						.Concat(cellClearPlans.Select(entry => entry.Plan))
@@ -3048,14 +3097,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					squad.TargetActor.Location.X / coarseSize, squad.TargetActor.Location.Y / coarseSize))
 				.Distinct().OrderBy(cell => cell.Y).ThenBy(cell => cell.X).ToList();
 			long Separation(AirTargetPlan plan) => StealthAIThreatGeometry.MinimumCellSeparationSquared(
-				new CPos(plan.Actor.Location.X / coarseSize, plan.Actor.Location.Y / coarseSize),
+				strategicCellByPlan.TryGetValue(plan, out var strategicCell) ? strategicCell :
+					new CPos(plan.Actor.Location.X / coarseSize, plan.Actor.Location.Y / coarseSize),
 				otherStealthTargetCells);
-			var bestSafe = safePlans.OrderByDescending(p => p.Plan.Score).ThenByDescending(p => Separation(p.Plan))
-				.ThenBy(p => p.TravelMs)
-				.ThenBy(p => p.Plan.Actor.ActorID).FirstOrDefault();
-			var minimumComparableScore = bestSafe.Plan == null ? 1 : Math.Max(1, bestSafe.Plan.Score / 4);
-			var preferredSafePlans = formation.Count == 1 ? safePlans :
-				safePlans.Where(p => p.Plan.Score >= minimumComparableScore).ToList();
 			// Kill-cadence watchdog data is deliberately absent from this ordering. It is
 			// diagnostic output only and must never change target eligibility or routing.
 			AirTargetPlan best = null;
@@ -3064,7 +3108,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					.OrderByDescending(Separation).ThenByDescending(p => p.Score)
 					.ThenBy(p => p.Actor.ActorID).FirstOrDefault();
 			if (best == null)
-				best = preferredSafePlans.Where(p =>
+				best = safePlans.Where(p =>
 					StealthAISpecialistPolicy.IsWithinUndefendedTravelPreference(
 						p.ServiceMs, owner.StealthDefinition.MaximumUndefendedTargetTravelSeconds))
 				.OrderByDescending(p => Separation(p.Plan)).ThenBy(p => p.ServiceMs)
@@ -3076,14 +3120,12 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					.ThenByDescending(p => p.Plan.Score).ThenBy(p => p.TravelMs)
 					.ThenBy(p => p.Plan.Actor.ActorID).Select(p => p.Plan).FirstOrDefault();
 			if (best == null)
-				best = clearPlans.Where(p => p.Score >= minimumComparableScore &&
-					(p.StealthMode == StealthClearMode.Kite ||
-						p.StealthMode == StealthClearMode.CrushBridge))
+				best = clearPlans.Where(p => p.StealthMode == StealthClearMode.Kite ||
+						p.StealthMode == StealthClearMode.CrushBridge)
 					.OrderByDescending(Separation).ThenByDescending(p => p.Score)
 					.ThenBy(p => p.Actor.ActorID).FirstOrDefault();
 			if (best == null)
-				best = clearPlans.Where(p => p.Score >= minimumComparableScore &&
-					p.StealthMode == StealthClearMode.Mass)
+				best = clearPlans.Where(p => p.StealthMode == StealthClearMode.Mass)
 					.OrderByDescending(Separation).ThenByDescending(p => p.Score)
 					.ThenBy(p => p.Actor.ActorID).FirstOrDefault();
 			if (best == null)

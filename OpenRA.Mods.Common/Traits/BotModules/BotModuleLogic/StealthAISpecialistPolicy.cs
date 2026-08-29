@@ -241,6 +241,17 @@ namespace OpenRA.Mods.Common.Traits
 			return priority > 0 && actorValue > 0 ? priority * (long)actorValue : 0;
 		}
 
+		internal static long StrategicTargetValueByRemainingHealth(
+			int priority, int actorValue, int hitPoints, int maximumHitPoints)
+		{
+			var value = StrategicTargetValue(priority, actorValue);
+			if (value == 0 || maximumHitPoints <= 0)
+				return value;
+
+			var remaining = Math.Clamp(hitPoints, 1, maximumHitPoints);
+			return value * Math.Min(maximumHitPoints, remaining * 4L) / remaining;
+		}
+
 		public static bool MeetsMinimumStrategicCellValue(long value)
 		{
 			return value >= MinimumStrategicCellValue;

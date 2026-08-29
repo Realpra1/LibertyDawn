@@ -47,6 +47,29 @@ namespace OpenRA.Mods.Common.Traits
 			return minimum;
 		}
 
+		/// <summary>
+		/// Applies the lifecycle's ordered strategic-cell filters before any squad-separation tie-break.
+		/// Both halves round up so a singleton, and the best member of an odd-sized set, remain eligible.
+		/// </summary>
+		internal static IReadOnlyList<int> SelectOrderedTargetCellHalf(
+			IReadOnlyList<long> strategicValues, IReadOnlyList<double> threatValues,
+			IReadOnlyList<double> crossoverValues)
+		{
+			if (strategicValues == null || threatValues == null || crossoverValues == null)
+				throw new ArgumentNullException();
+			if (strategicValues.Count != threatValues.Count || strategicValues.Count != crossoverValues.Count)
+				throw new ArgumentException("Target-cell ranking inputs must have matching lengths.");
+
+			var strategicCount = (strategicValues.Count + 1) / 2;
+			var strategicHalf = Enumerable.Range(0, strategicValues.Count)
+				.OrderByDescending(index => strategicValues[index]).ThenBy(index => index)
+				.Take(strategicCount).ToList();
+			var threatCount = (strategicHalf.Count + 1) / 2;
+			return strategicHalf.OrderBy(index => threatValues[index])
+				.ThenByDescending(index => crossoverValues[index]).ThenBy(index => index)
+				.Take(threatCount).OrderBy(index => index).ToList();
+		}
+
 		public static bool IsOutsideWeaponRange(CPos waypoint, CPos target, int weaponRange)
 		{
 			return weaponRange <= 0 || (waypoint - target).LengthSquared > weaponRange * weaponRange;
