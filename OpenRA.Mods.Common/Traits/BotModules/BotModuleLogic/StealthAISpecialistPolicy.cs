@@ -218,6 +218,21 @@ namespace OpenRA.Mods.Common.Traits
 		}
 	}
 
+	public sealed class StealthCadenceGenerationRecord
+	{
+		public readonly string SquadDefinition;
+		public readonly int SquadIndex;
+		public readonly StealthKillCadenceGeneration Generation;
+
+		public StealthCadenceGenerationRecord(string squadDefinition, int squadIndex,
+			StealthKillCadenceGeneration generation)
+		{
+			SquadDefinition = squadDefinition ?? throw new ArgumentNullException(nameof(squadDefinition));
+			SquadIndex = squadIndex;
+			Generation = generation ?? throw new ArgumentNullException(nameof(generation));
+		}
+	}
+
 	public sealed class StealthTankReinforcementSaveGroup
 	{
 		public int GroupIndex;
@@ -265,6 +280,7 @@ namespace OpenRA.Mods.Common.Traits
 		public const float HardDetectorRouteInfluence = 1f;
 		public const int ReinforcementSaveVersion = 2;
 		public const int StealthGenerationEfficiencySaveVersion = 1;
+		public const int StealthCadenceGenerationSaveVersion = 1;
 		public const int AggressiveMassEntryCrossoverPercent = 500;
 		public const long MinimumStrategicCellValue = 5000L * 1100L;
 
@@ -330,6 +346,75 @@ namespace OpenRA.Mods.Common.Traits
 					return false;
 
 				windows = loaded;
+				return true;
+			}
+			catch (Exception)
+			{
+				return false;
+			}
+		}
+
+		public static MiniYamlNode SaveStealthCadenceGenerations(
+			IEnumerable<StealthCadenceGenerationRecord> records)
+		{
+			var nodes = new List<MiniYamlNode>
+			{
+				new MiniYamlNode("Version", FieldSaver.FormatValue(StealthCadenceGenerationSaveVersion))
+			};
+			nodes.AddRange(records.OrderBy(record => record.Generation.GenerationId).Select(record =>
+			{
+				var generation = record.Generation;
+				return new MiniYamlNode("Generation", "", new List<MiniYamlNode>
+				{
+					new MiniYamlNode("Id", FieldSaver.FormatValue(generation.GenerationId)),
+					new MiniYamlNode("Definition", record.SquadDefinition),
+					new MiniYamlNode("SquadIndex", FieldSaver.FormatValue(record.SquadIndex)),
+					new MiniYamlNode("StartTick", FieldSaver.FormatValue(generation.GenerationStartTick)),
+					new MiniYamlNode("WindowStartTick", FieldSaver.FormatValue(generation.WindowStartTick)),
+					new MiniYamlNode("LastObservedTick", FieldSaver.FormatValue(generation.LastObservedTick)),
+					new MiniYamlNode("CadenceAge", FieldSaver.FormatValue(generation.CadenceAge)),
+					new MiniYamlNode("AttributedKills", FieldSaver.FormatValue(generation.AttributedKills)),
+					new MiniYamlNode("CadenceFailed", FieldSaver.FormatValue(generation.CadenceFailed)),
+					new MiniYamlNode("MismatchFailed", FieldSaver.FormatValue(generation.MismatchFailed))
+				});
+			}));
+			return new MiniYamlNode("StealthCadenceGenerations", "", nodes);
+		}
+
+		public static bool TryLoadStealthCadenceGenerations(MiniYamlNode node,
+			out StealthCadenceGenerationRecord[] records)
+		{
+			records = Array.Empty<StealthCadenceGenerationRecord>();
+			if (node == null)
+				return false;
+
+			try
+			{
+				var version = node.Value.Nodes.Single(n => n.Key == "Version");
+				if (FieldLoader.GetValue<int>(version.Key, version.Value.Value) != StealthCadenceGenerationSaveVersion)
+					return false;
+
+				var loaded = node.Value.Nodes.Where(n => n.Key == "Generation").Select(generationNode =>
+				{
+					var fields = generationNode.Value.Nodes.ToDictionary(n => n.Key);
+					var generation = StealthKillCadenceGeneration.Restore(
+						FieldLoader.GetValue<int>("Id", fields["Id"].Value.Value),
+						FieldLoader.GetValue<int>("StartTick", fields["StartTick"].Value.Value),
+						FieldLoader.GetValue<int>("WindowStartTick", fields["WindowStartTick"].Value.Value),
+						FieldLoader.GetValue<int>("LastObservedTick", fields["LastObservedTick"].Value.Value),
+						FieldLoader.GetValue<int>("CadenceAge", fields["CadenceAge"].Value.Value),
+						FieldLoader.GetValue<int>("AttributedKills", fields["AttributedKills"].Value.Value),
+						FieldLoader.GetValue<bool>("CadenceFailed", fields["CadenceFailed"].Value.Value),
+						FieldLoader.GetValue<bool>("MismatchFailed", fields["MismatchFailed"].Value.Value));
+					return new StealthCadenceGenerationRecord(fields["Definition"].Value.Value,
+						FieldLoader.GetValue<int>("SquadIndex", fields["SquadIndex"].Value.Value), generation);
+				}).ToArray();
+
+				if (loaded.Any(record => string.IsNullOrEmpty(record.SquadDefinition) || record.SquadIndex < 0) ||
+					loaded.Select(record => record.Generation.GenerationId).Distinct().Count() != loaded.Length)
+					return false;
+
+				records = loaded;
 				return true;
 			}
 			catch (Exception)

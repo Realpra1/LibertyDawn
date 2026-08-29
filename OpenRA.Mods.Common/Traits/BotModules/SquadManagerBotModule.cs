@@ -633,6 +633,8 @@ namespace OpenRA.Mods.Common.Traits
 		readonly HashSet<uint> stealthEfficiencyActors = new HashSet<uint>();
 		readonly Dictionary<int, StealthEfficiencyWindow> stealthGenerationEfficiency =
 			new Dictionary<int, StealthEfficiencyWindow>();
+		readonly Dictionary<int, StealthCadenceGenerationRecord> stealthCadenceGenerations =
+			new Dictionary<int, StealthCadenceGenerationRecord>();
 		int stealthEfficiencyNextReportTick;
 		int stealthEfficiencyWindowStartTick;
 		bool stealthEfficiencyTerminalReported;
@@ -864,31 +866,42 @@ namespace OpenRA.Mods.Common.Traits
 
 		void EmitTerminalStealthCadenceSummaries()
 		{
-			var generations = StealthAISpecialistPolicy.TerminalStealthGenerationIds(
-				Squads.Where(s => s.Type == SquadType.Stealth)
-					.Select(s => s.StealthKillCadenceGeneration));
-			foreach (var generationId in generations)
+			foreach (var record in stealthCadenceGenerations.Values
+				.OrderBy(record => record.Generation.GenerationId))
 			{
-				var squad = Squads.Single(s => s.Type == SquadType.Stealth &&
-					s.StealthKillCadenceGeneration?.GenerationId == generationId);
-				var generation = squad.StealthKillCadenceGeneration;
-				var stnks = squad.Units.Where(unit => unit != null && !unit.IsDead && unit.IsInWorld &&
+				var generation = record.Generation;
+				var squad = Squads.SingleOrDefault(s => s.Type == SquadType.Stealth &&
+					s.StealthKillCadenceGeneration?.GenerationId == generation.GenerationId);
+				var stnks = squad?.Units.Where(unit => unit != null && !unit.IsDead && unit.IsInWorld &&
 					unit.Info.Name == "stnk").Distinct().OrderBy(unit => unit.ActorID).ToArray();
+				stnks = stnks ?? Array.Empty<Actor>();
 				generation.Observe(World.WorldTick, stnks.Length > 0);
 				var maximumTicks = Math.Max(1, 45000 / Math.Max(1, World.Timestep));
-				var status = generation.CadenceFailed || generation.MismatchFailed ? "failure" :
+				var cadenceFailed = generation.CadenceFailed || generation.MismatchFailed ||
+					StealthAISpecialistPolicy.KillCadenceFailed(generation.CadenceAge, maximumTicks);
+				var status = cadenceFailed ? "failure" :
 					stnks.Length == 0 ? "exempt" : "pass";
-				Log.Write("debug", "Stealth kill watchdog [stealth-tank] squad terminal: tick={0} " +
-					"generation={1} generation-start={2} window-start={3} squad={4}#{5} " +
-					"cadence-age={6}/{7} generation-kills={8} stnks={9} formation={10} " +
-					"reinforcements={11} members=[{12}] cadence-failed={13} status={14} summary=terminal.",
-					World.WorldTick, generation.GenerationId, generation.GenerationStartTick,
-					generation.WindowStartTick, squad.StealthSquadDefinition, squad.StealthSquadIndex,
+				Log.Write("debug", "Stealth kill watchdog [stealth-tank] squad terminal: owner={0} tick={1} " +
+					"generation={2} generation-start={3} window-start={4} squad={5}#{6} " +
+					"cadence-age={7}/{8} generation-kills={9} stnks={10} formation={11} " +
+					"reinforcements={12} members=[{13}] cadence-failed={14} status={15} summary=terminal.",
+					Player.PlayerName, World.WorldTick, generation.GenerationId, generation.GenerationStartTick,
+					generation.WindowStartTick, record.SquadDefinition, record.SquadIndex,
 					generation.CadenceAge, maximumTicks, generation.AttributedKills, stnks.Length,
-					squad.AirFormationUnits().Count, squad.AirReinforcements.Count,
+					squad?.AirFormationUnits().Count ?? 0, squad?.AirReinforcements.Count ?? 0,
 					stnks.Select(unit => unit.Info.Name + "#" + unit.ActorID).JoinWith(","),
-					generation.CadenceFailed || generation.MismatchFailed, status);
+					cadenceFailed, status);
 			}
+		}
+
+		void RegisterStealthCadenceGeneration(Squad squad)
+		{
+			var generation = squad.StealthKillCadenceGeneration;
+			if (generation == null)
+				return;
+
+			stealthCadenceGenerations[generation.GenerationId] = new StealthCadenceGenerationRecord(
+				squad.StealthSquadDefinition, squad.StealthSquadIndex, generation);
 		}
 
 		void EmitStealthEfficiencySummary(string summary)
@@ -1080,6 +1093,8 @@ namespace OpenRA.Mods.Common.Traits
 								assignedSquad.StealthSquadDefinition, assignedSquad.StealthSquadIndex,
 								actor.ActorID, remadeSquads.Contains(assignedSquad) ? "remake" : "initial");
 					}
+
+					RegisterStealthCadenceGeneration(assignedSquad);
 
 					assignedSquad.Units.Add(actor);
 					if (!previousMembership.ContainsKey(actor.ActorID) && assignedSquad.Units.Count > 1)
@@ -2049,6 +2064,7 @@ namespace OpenRA.Mods.Common.Traits
 				new MiniYamlNode("StealthEfficiencyNextReportTick", FieldSaver.FormatValue(stealthEfficiencyNextReportTick)),
 				new MiniYamlNode("StealthEfficiencyWindowStartTick", FieldSaver.FormatValue(stealthEfficiencyWindowStartTick)),
 				StealthAISpecialistPolicy.SaveStealthGenerationEfficiency(stealthGenerationEfficiency),
+				StealthAISpecialistPolicy.SaveStealthCadenceGenerations(stealthCadenceGenerations.Values),
 				new MiniYamlNode("FallbackReconsiderTicks", FieldSaver.FormatValue(fallbackReconsiderTicks)),
 				new MiniYamlNode("FallbackTarget", FieldSaver.FormatValue(fallbackTarget?.ActorID ?? 0)),
 				new MiniYamlNode("FallbackOrderedActors", FieldSaver.FormatValue(fallbackOrderedActors.ToArray())),
@@ -2160,6 +2176,15 @@ namespace OpenRA.Mods.Common.Traits
 					stealthGenerationEfficiency.Add(pair.Key, pair.Value);
 			}
 
+			var cadenceGenerationsNode = data.FirstOrDefault(n => n.Key == "StealthCadenceGenerations");
+			if (StealthAISpecialistPolicy.TryLoadStealthCadenceGenerations(
+				cadenceGenerationsNode, out var cadenceGenerations))
+			{
+				stealthCadenceGenerations.Clear();
+				foreach (var record in cadenceGenerations)
+					stealthCadenceGenerations.Add(record.Generation.GenerationId, record);
+			}
+
 			var fallbackTicksNode = data.FirstOrDefault(n => n.Key == "FallbackReconsiderTicks");
 			if (fallbackTicksNode != null)
 				fallbackReconsiderTicks = FieldLoader.GetValue<int>("FallbackReconsiderTicks", fallbackTicksNode.Value.Value);
@@ -2234,6 +2259,8 @@ namespace OpenRA.Mods.Common.Traits
 						!unit.IsDead && unit.IsInWorld && unit.Info.Name == "stnk")))
 					squad.StealthKillCadenceGeneration = new StealthKillCadenceGeneration(
 						nextStealthSquadGenerationId++, World.WorldTick);
+				foreach (var squad in Squads.Where(s => s.Type == SquadType.Stealth))
+					RegisterStealthCadenceGeneration(squad);
 
 				EnsureStealthSquads(bot);
 			}

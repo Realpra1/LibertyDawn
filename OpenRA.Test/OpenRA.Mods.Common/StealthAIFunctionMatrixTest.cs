@@ -1254,7 +1254,52 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(terminal, Does.Contain("EmitTerminalStealthCadenceSummaries();"));
 			Assert.That(terminal, Does.Contain("EmitStealthEfficiencySummary(\"terminal\");"));
 			Assert.That(terminal, Does.Contain("summary=terminal"));
-			Assert.That(terminal, Does.Contain("generation-kills={8}"));
+			Assert.That(terminal, Does.Contain("owner={0}"));
+			Assert.That(terminal, Does.Contain("generation-kills={9}"));
+			Assert.That(terminal, Does.Contain("KillCadenceFailed(generation.CadenceAge, maximumTicks)"),
+				"A retired generation must retain a factual threshold violation after its live squad disappears.");
+			Assert.That(terminal, Does.Contain("stealthCadenceGenerations.Values"),
+				"Terminal output must include retired generations after their reusable squad slots are removed.");
+			Assert.That(terminal, Does.Not.Contain("TerminalStealthGenerationIds("),
+				"Terminal output must not be limited to squads that remain active at game-over.");
+		}
+
+		[Test]
+		public void RetiredStealthCadenceGenerationsRoundTripForTerminalDiagnostics()
+		{
+			var generation = new StealthKillCadenceGeneration(7, 100);
+			generation.Observe(400, true);
+			Assert.That(generation.AttributeKill(400), Is.True);
+			generation.Observe(2800, true);
+			generation.MarkCadenceFailed();
+			var saved = StealthAISpecialistPolicy.SaveStealthCadenceGenerations(new[]
+			{
+				new StealthCadenceGenerationRecord("stealth-tank", 2, generation)
+			});
+
+			Assert.That(saved.Key, Is.EqualTo("StealthCadenceGenerations"));
+			Assert.That(StealthAISpecialistPolicy.TryLoadStealthCadenceGenerations(
+				saved, out var loaded), Is.True);
+			Assert.That(loaded, Has.Length.EqualTo(1));
+			Assert.That(loaded[0].SquadDefinition, Is.EqualTo("stealth-tank"));
+			Assert.That(loaded[0].SquadIndex, Is.EqualTo(2));
+			Assert.That(loaded[0].Generation.GenerationId, Is.EqualTo(7));
+			Assert.That(loaded[0].Generation.GenerationStartTick, Is.EqualTo(100));
+			Assert.That(loaded[0].Generation.WindowStartTick, Is.EqualTo(400));
+			Assert.That(loaded[0].Generation.LastObservedTick, Is.EqualTo(2800));
+			Assert.That(loaded[0].Generation.CadenceAge, Is.EqualTo(2400));
+			Assert.That(loaded[0].Generation.AttributedKills, Is.EqualTo(1));
+			Assert.That(loaded[0].Generation.CadenceFailed, Is.True);
+			Assert.That(StealthAISpecialistPolicy.TryLoadStealthCadenceGenerations(
+				null, out var absent), Is.False, "Old saves remain backward compatible.");
+			Assert.That(absent, Is.Empty);
+
+			var duplicate = StealthAISpecialistPolicy.SaveStealthCadenceGenerations(new[]
+			{
+				loaded[0], loaded[0]
+			});
+			Assert.That(StealthAISpecialistPolicy.TryLoadStealthCadenceGenerations(
+				duplicate, out _), Is.False, "One terminal record per generation is required.");
 		}
 
 		[Test]
