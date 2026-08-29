@@ -1218,6 +1218,8 @@ namespace OpenRA
 
 		public static void LoadMap(string launchMap, IEnumerable<string> lobbyCommands = null, int? randomSeed = null)
 		{
+			Log.Write("debug", "Automated local map launch: map={0} configured-random-seed={1}.",
+				launchMap, randomSeed?.ToString() ?? "time-derived");
 			var orders = new List<Order> { Order.Command("option gamespeed default") };
 			if (lobbyCommands != null)
 				orders.AddRange(lobbyCommands.Select(Order.Command));

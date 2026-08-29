@@ -560,6 +560,19 @@ namespace OpenRA.Mods.Common.Traits
 			return existingExposureException || (!coveringWeapon && nextCellSafe);
 		}
 
+		public static bool CloakedCrushExposureIsSafe(bool formationCloaked,
+			bool targetDetectorCovered, bool nextCellDetectorCovered)
+		{
+			return formationCloaked && !targetDetectorCovered && !nextCellDetectorCovered;
+		}
+
+		public static bool CloakedCrushRouteIsSafe(bool formationCloaked,
+			IEnumerable<bool> waypointDetectorCoverage)
+		{
+			return formationCloaked && waypointDetectorCoverage != null &&
+				!waypointDetectorCoverage.Any(covered => covered);
+		}
+
 		public static long AccumulateActorTicks(long actorTicks, int liveActors)
 		{
 			return actorTicks + Math.Max(0, liveActors);

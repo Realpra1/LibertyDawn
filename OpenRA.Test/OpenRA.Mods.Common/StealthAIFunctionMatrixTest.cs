@@ -592,6 +592,25 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(states, Does.Contain("transition-reason=crossover-exit-threshold"));
 			Assert.That(states, Does.Contain("transition-reason=cell-clear/package-empty"));
 			Assert.That(states, Does.Contain("reason={6} mass-entry-approved={7}"));
+			Assert.That(states, Does.Contain("Stealth local safety watchdog"));
+			Assert.That(states, Does.Contain("canonical-current-range-max={10:0.###}"));
+			Assert.That(states, Does.Contain("verdict={15}"));
+			Assert.That(states, Does.Contain("Stealth crush decision"));
+			Assert.That(states, Does.Contain("detecting-infantry={4}"));
+			Assert.That(states, Does.Contain("target-detector-covered={8}"));
+			Assert.That(states, Does.Contain("next-cell-detector-covered={9}"));
+			Assert.That(states, Does.Contain(
+				"threat, target.CenterPosition, false, owner.StealthDefinition.DetectorRangeBufferCells)"),
+				"Crush admission must use real detector geometry at the target.");
+			Assert.That(states, Does.Contain(
+				"threat, owner.World.Map.CenterOfCell(next), false"),
+				"Crush admission must use real detector geometry at the post-Crush cell.");
+			Assert.That(states, Does.Contain("Stealth Kite decision"));
+			Assert.That(states, Does.Contain("reason=mobility-or-range"));
+			Assert.That(states, Does.Contain("Stealth owned engagement watchdog"));
+			Assert.That(states, Does.Contain("reason=approved-actor-in-live-package"));
+			Assert.That(states, Does.Contain("reason=no-safe-local-plan"));
+			Assert.That(states, Does.Contain("firing-cell={9} retreat={10}"));
 			Assert.That(states.IndexOf("ShouldEnterMassClear(", StringComparison.Ordinal),
 				Is.LessThan(states.IndexOf("stealthMode: StealthClearMode.Mass",
 					StringComparison.Ordinal)), "Mass plans require explicit crossover entry approval.");
@@ -922,10 +941,40 @@ namespace OpenRA.Test.Mods.Common
 				"An approved ordinary attack requires the immediate recloak-window cell.");
 			Assert.That(StealthAISpecialistPolicy.PlannedExposureIsSafe(true, false, true), Is.True,
 				"The existing Kite/Mass crossover exception remains an explicit approval path.");
+			Assert.That(StealthAISpecialistPolicy.CloakedCrushExposureIsSafe(true, false, false), Is.True,
+				"Ordinary nondetecting weapons cannot acquire a cloaked Crush formation.");
+			Assert.That(StealthAISpecialistPolicy.CloakedCrushExposureIsSafe(
+				true, new[] { false, false }.Any(covered => covered), false), Is.True,
+				"Multiple nondetecting defenders remain harmless while Crush stays cloaked.");
+			Assert.That(StealthAISpecialistPolicy.CloakedCrushExposureIsSafe(true, true, false), Is.False,
+				"Actual detector coverage at the Crush target must reject the action.");
+			Assert.That(StealthAISpecialistPolicy.CloakedCrushExposureIsSafe(true, false, true), Is.False,
+				"Actual detector coverage at the post-Crush cell must reject the action.");
+			Assert.That(StealthAISpecialistPolicy.CloakedCrushExposureIsSafe(false, false, false), Is.False,
+				"A revealed formation cannot use the cloaked Crush exception.");
+			Assert.That(StealthAISpecialistPolicy.CloakedCrushExposureIsSafe(
+				true, new[] { false, true }.Any(covered => covered), false), Is.False);
+			Assert.That(StealthAISpecialistPolicy.CloakedCrushExposureIsSafe(
+				true, new[] { true, false }.Any(covered => covered), false), Is.False,
+				"Detector classification must be order-independent.");
+			Assert.That(StealthAISpecialistPolicy.CloakedCrushRouteIsSafe(
+				true, new[] { false, false, false }), Is.True,
+				"A cloaked Crush path outside real detector coverage stays eligible.");
+			Assert.That(StealthAISpecialistPolicy.CloakedCrushRouteIsSafe(
+				true, new[] { false, true }), Is.False,
+				"A real detector-covered waypoint, such as near an enabled detecting HQ, rejects Crush.");
+			Assert.That(StealthAISpecialistPolicy.CloakedCrushRouteIsSafe(
+				true, new[] { true, false }), Is.False,
+				"Crush path detector rejection must not depend on waypoint ordering.");
+			Assert.That(StealthAISpecialistPolicy.CloakedCrushRouteIsSafe(
+				false, new[] { false, false }), Is.False,
+				"A revealed formation cannot use a nominally detector-free cloaked Crush path.");
 
 			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
 			Assert.That(states, Does.Contain("cache?.CloakedDanger"));
 			Assert.That(states, Does.Contain("OrdinaryCrushExposureIsSafe("));
+			Assert.That(states, Does.Contain("CloakedCrushRouteIsSafe(owner, cache, crushRoute)"));
+			Assert.That(states, Does.Contain("CloakedCrushRouteIsSafe(owner, crushCache, route)"));
 			Assert.That(states, Does.Contain("SafePostAttackStrategicCell("));
 			var routeOwner = states.Substring(states.IndexOf(
 				"static List<CPos> StealthRouteToCell", StringComparison.Ordinal));
