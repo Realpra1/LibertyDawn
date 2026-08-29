@@ -3279,13 +3279,15 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					debugPlans?.Add(clear);
 				}
 
-				// Strategic-cell selection chooses where to engage; actor engagement within that
-				// cell must still obey the configured target priorities. Filter only after all
-				// safety/attackability checks above, so an invalid or unsafe preferred actor
-				// naturally leaves the next configured tier as the eligible fallback.
-				var preferred = StealthAISpecialistPolicy.HighestPriorityEligibleEngagements(
-					cellSafePlans.Select(entry => (entry.Plan, entry.Priority))
-						.Concat(cellClearPlans.Select(entry => (entry.Plan, entry.Priority))))
+				// Strategic-cell selection chooses where to engage. Preserve an already-approved
+				// dynamic Kite/Mass lifecycle through final actor arbitration; otherwise retain
+				// configured target priority across the already safety-validated fallback plans.
+				var preferred = StealthAISpecialistPolicy.HighestPriorityFinalEngagements(
+					cellSafePlans.Select(entry => (entry.Plan, entry.Priority,
+						ApprovedDynamicLocal: false))
+						.Concat(cellClearPlans.Select(entry => (entry.Plan, entry.Priority,
+							ApprovedDynamicLocal: entry.Plan.StealthMode == StealthClearMode.Kite ||
+								entry.Plan.StealthMode == StealthClearMode.Mass))))
 					.Select(plan => plan.Actor.ActorID).ToHashSet();
 				safePlans.AddRange(cellSafePlans.Where(entry => preferred.Contains(entry.Plan.Actor.ActorID))
 					.Select(entry => (entry.Plan, entry.TravelMs, entry.ServiceMs)));

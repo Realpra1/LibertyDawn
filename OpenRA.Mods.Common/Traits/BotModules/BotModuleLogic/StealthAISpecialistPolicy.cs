@@ -515,6 +515,19 @@ namespace OpenRA.Mods.Common.Traits
 				.Select(candidate => candidate.Item).ToList();
 		}
 
+		public static IReadOnlyList<T> HighestPriorityFinalEngagements<T>(
+			IEnumerable<(T Item, int Priority, bool ApprovedDynamicLocal)> eligible)
+		{
+			if (eligible == null)
+				throw new ArgumentNullException(nameof(eligible));
+
+			var candidates = eligible.ToList();
+			var dynamicLocal = candidates.Where(candidate => candidate.ApprovedDynamicLocal).ToList();
+			var final = dynamicLocal.Count > 0 ? dynamicLocal : candidates;
+			return HighestPriorityEligibleEngagements(final.Select(candidate =>
+				(candidate.Item, candidate.Priority)));
+		}
+
 		public static int FirstUnoccupiedEnterableDestination(
 			IReadOnlyList<bool> occupied, IReadOnlyList<bool> enterable)
 		{

@@ -1031,9 +1031,43 @@ namespace OpenRA.Test.Mods.Common
 				"Eligibility is resolved before priority, preserving fallback when the preferred actor is invalid or unsafe.");
 
 			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
-			Assert.That(states, Does.Contain("HighestPriorityEligibleEngagements("));
-			Assert.That(states, Does.Contain("cellSafePlans.Select(entry => (entry.Plan, entry.Priority))"),
+			Assert.That(states, Does.Contain("HighestPriorityFinalEngagements("));
+			Assert.That(states, Does.Contain("cellSafePlans.Select(entry => (entry.Plan, entry.Priority,"),
 				"The production selected-cell engagement path must pass its already safety-validated plans to the priority gate.");
+		}
+
+		[Test]
+		public void FinalArbitrationPreservesApprovedDynamicLocalPlans()
+		{
+			var kiteBeforeStatic = StealthAISpecialistPolicy.HighestPriorityFinalEngagements(new[]
+			{
+				(Item: "mtnk-kite", Priority: 100, ApprovedDynamicLocal: true),
+				(Item: "refinery", Priority: 2500, ApprovedDynamicLocal: false)
+			});
+			Assert.That(kiteBeforeStatic, Is.EqualTo(new[] { "mtnk-kite" }));
+
+			var kiteAfterStatic = StealthAISpecialistPolicy.HighestPriorityFinalEngagements(new[]
+			{
+				(Item: "refinery", Priority: 2500, ApprovedDynamicLocal: false),
+				(Item: "mtnk-kite", Priority: 100, ApprovedDynamicLocal: true)
+			});
+			Assert.That(kiteAfterStatic, Is.EqualTo(new[] { "mtnk-kite" }),
+				"Final arbitration must be independent of actor enumeration order.");
+
+			var mass = StealthAISpecialistPolicy.HighestPriorityFinalEngagements(new[]
+			{
+				(Item: "refinery", Priority: 2500, ApprovedDynamicLocal: false),
+				(Item: "obelisk-mass", Priority: 1, ApprovedDynamicLocal: true)
+			});
+			Assert.That(mass, Is.EqualTo(new[] { "obelisk-mass" }));
+
+			var ordinaryOnly = StealthAISpecialistPolicy.HighestPriorityFinalEngagements(new[]
+			{
+				(Item: "wall", Priority: 1, ApprovedDynamicLocal: false),
+				(Item: "refinery", Priority: 2500, ApprovedDynamicLocal: false)
+			});
+			Assert.That(ordinaryOnly, Is.EqualTo(new[] { "refinery" }),
+				"Without an approved Kite/Mass plan, configured static priority must remain unchanged.");
 		}
 
 		[Test]
