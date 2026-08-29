@@ -114,6 +114,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		internal int StealthReinforcementRoutePreserves;
 		internal int StealthCoreRouteIssues;
 		internal int StealthCoreRoutePreserves;
+		internal int StealthLastFrontierTargetCells;
 		internal CPos? StealthRouteLastCenterCell;
 		internal int StealthRouteLastCenterProgressTick;
 

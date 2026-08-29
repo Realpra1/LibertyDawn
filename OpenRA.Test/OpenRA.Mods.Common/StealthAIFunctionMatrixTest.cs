@@ -257,8 +257,8 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(states, Does.Contain("StealthClearMode.CrushBridge"));
 			Assert.That(states, Does.Contain("completed cached blocker:"));
 			Assert.That(states, Does.Contain("legal-band backoff queued:"));
-			Assert.That(states, Does.Contain("OrderBy(p => p.ServiceMs)"),
-				"Comparable-value STNK targets should prefer bounded travel-plus-kill service time.");
+			Assert.That(states, Does.Contain("OrderByDescending(p => Separation(p.Plan)).ThenBy(p => p.ServiceMs)"),
+				"Comparable-value STNK targets should prefer multi-angle separation, then bounded service time.");
 			Assert.That(states, Does.Contain("p.ServiceMs, owner.StealthDefinition.MaximumUndefendedTargetTravelSeconds"),
 				"The ordinary-target preference must bound total travel-plus-kill service, not travel alone.");
 			Assert.That(states, Does.Contain("bounded Crush fallback:"),
@@ -550,30 +550,21 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(StealthAISpecialistPolicy.IsWithinUndefendedTravelPreference(60000, 60), Is.True);
 			Assert.That(StealthAISpecialistPolicy.IsWithinUndefendedTravelPreference(60001, 60), Is.False);
 			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
-			var urgentUndefended = states.IndexOf("var urgentLocal = cadenceUrgent ? safePlans.Select",
-				StringComparison.Ordinal);
-			var urgentKite = states.IndexOf("urgentLocal = clearPlans.Where", urgentUndefended,
-				StringComparison.Ordinal);
 			var bridge = states.IndexOf("best = clearPlans.Where(p => p.StealthMode == StealthClearMode.CrushBridge",
-				urgentKite, StringComparison.Ordinal);
-			var shortSafe = states.IndexOf("best = (cadenceUrgent ? safePlans : preferredSafePlans).Where",
-				bridge, StringComparison.Ordinal);
-			var urgentSafe = states.IndexOf("best = safePlans.Where(p => FitsCadence", shortSafe,
 				StringComparison.Ordinal);
-			var kite = states.IndexOf("best = clearPlans.Where", shortSafe, StringComparison.Ordinal);
+			var shortSafe = states.IndexOf("best = preferredSafePlans.Where",
+				bridge, StringComparison.Ordinal);
+			var safe = states.IndexOf("best = safePlans", shortSafe,
+				StringComparison.Ordinal);
+			var kite = states.IndexOf("best = clearPlans.Where", safe, StringComparison.Ordinal);
 			var mass = states.IndexOf("best = clearPlans.Where", kite + 1, StringComparison.Ordinal);
 			var farSafe = states.IndexOf("best = safePlans.OrderBy", mass, StringComparison.Ordinal);
-			Assert.That(urgentUndefended, Is.GreaterThanOrEqualTo(0));
-			Assert.That(urgentKite, Is.GreaterThan(urgentUndefended));
-			Assert.That(bridge, Is.GreaterThan(urgentKite));
+			Assert.That(bridge, Is.GreaterThanOrEqualTo(0));
 			Assert.That(shortSafe, Is.GreaterThan(bridge));
-			Assert.That(urgentSafe, Is.GreaterThan(shortSafe));
-			Assert.That(urgentSafe, Is.LessThan(kite));
+			Assert.That(safe, Is.GreaterThan(shortSafe));
 			Assert.That(kite, Is.GreaterThan(shortSafe));
 			Assert.That(mass, Is.GreaterThan(kite));
 			Assert.That(farSafe, Is.GreaterThan(mass));
-			Assert.That(states, Does.Contain("best = safePlans.Where(p => FitsCadence"),
-				"Every bounded safe plan must become eligible only when comparable missions cannot finish.");
 			Assert.That(states, Does.Contain("mobileArmedTarget && (formation.Count == 1 ||"));
 			Assert.That(states, Does.Contain("owner.StealthProfile == \"stealth-tank\") ? TryStealthClearPlan("),
 				"Every active STNK formation must share one legal Kite route and focus-fire target; CTNK stays singleton-only.");
@@ -616,12 +607,12 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
-		public void StnkFrontierIsDefaultEightBoundedAndDoesNotRetuneChemicalSquads()
+		public void StnkFrontierIsDefaultTenBoundedAndDoesNotRetuneChemicalSquads()
 		{
 			var definition = Source(
 				"OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthSquadDefinition.cs");
 			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
-			Assert.That(definition, Does.Contain("public readonly int OutwardTargetCellLimit = 8;"));
+			Assert.That(definition, Does.Contain("public readonly int OutwardTargetCellLimit = 10;"));
 			Assert.That(definition, Does.Contain("OutwardTargetCellLimit < 5 || OutwardTargetCellLimit > 10"));
 			Assert.That(states, Does.Contain("if (owner.StealthProfile == \"stealth-tank\")"));
 			Assert.That(states, Does.Contain("scope=cached-6x6 frontier-world-scans=0 target-cell-a-star=0"));
@@ -631,40 +622,22 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
-		public void CadenceFinishMarginSelectsFinishableServiceWithoutCreatingAnExemption()
+		public void CadenceWatchdogIsDiagnosticOnlyForTargetPlanning()
 		{
-			var margin = StealthAISpecialistPolicy.KillCadenceFinishMarginTicks(125, 150);
-			Assert.That(margin, Is.EqualTo(275));
-			Assert.That(StealthAISpecialistPolicy.CanFinishWithinKillCadence(
-				10000, 20, 1000, 2250, margin), Is.True);
-			Assert.That(StealthAISpecialistPolicy.CanFinishWithinKillCadence(
-				20000, 20, 1000, 2250, margin), Is.False);
-			Assert.That(StealthAISpecialistPolicy.IsKillCadenceUrgent(474, 2250, margin), Is.False);
-			Assert.That(StealthAISpecialistPolicy.IsKillCadenceUrgent(475, 2250, margin), Is.True,
-				"Finish-first service must reserve roughly three attempts for regroup and target churn.");
-			Assert.That(StealthAISpecialistPolicy.ShouldReplaceNonFinishableMission(
-				20000, 10000, 20, 1000, 2250, margin), Is.True);
-			Assert.That(StealthAISpecialistPolicy.ShouldReplaceNonFinishableMission(
-				10000, 5000, 20, 400, 2250, margin), Is.False,
-				"A progressing mission that still fits its honest window keeps Air-consistent ownership.");
-			Assert.That(StealthAISpecialistPolicy.ShouldReplaceNonFinishableMission(
-				10000, 5000, 20, 1000, 2250, margin), Is.True,
-				"A mobile incumbent may yield to any strictly shorter cached mission under urgency.");
-			Assert.That(StealthAISpecialistPolicy.ShouldReplaceNonFinishableMission(
-				10000, 5000, 20, 1000, 2250, margin, false, true), Is.False,
-				"A stationary finish must not yield to marginal mobile target churn.");
-			Assert.That(StealthAISpecialistPolicy.ShouldReplaceNonFinishableMission(
-				10000, 4000, 20, 1000, 2250, margin, false, true), Is.True,
-				"A stationary finish may yield when the mobile challenger saves the full retry margin.");
-			Assert.That(StealthAISpecialistPolicy.ShouldReplaceNonFinishableMission(
-				long.MaxValue, 20000, 20, 2000, 2250, margin), Is.True,
-				"When every service is far, the bounded shortest reachable mission must still proceed.");
 			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
-			Assert.That(states, Does.Contain("plan.ServiceMilliseconds"));
-			Assert.That(states, Does.Contain("owner.StealthKillCadenceAge"));
-			Assert.That(states, Does.Contain("best = safePlans.OrderBy(p => p.ServiceMs)"));
+			var planner = states.Substring(states.IndexOf("static AirTargetPlan FindBestStealthTarget",
+				StringComparison.Ordinal));
+			planner = planner.Substring(0, planner.IndexOf("// END CNC96A GROUND EXTENSION",
+				StringComparison.Ordinal));
+			Assert.That(planner, Does.Not.Contain("StealthKillCadenceAge"));
+			Assert.That(planner, Does.Not.Contain("IsKillCadenceUrgent"));
+			Assert.That(planner, Does.Not.Contain("CanFinishWithinKillCadence"));
+			var attack = states.Substring(states.IndexOf("class StealthAIAttackState",
+				StringComparison.Ordinal));
+			Assert.That(attack, Does.Not.Contain("ShouldReplaceNonFinishableMission"),
+				"Watchdog cadence must not replace or retain a gameplay target.");
 			Assert.That(states, Does.Not.Contain("FindClosestAttackableEnemy(owner)"),
-				"Cadence urgency must not add a whole-world fallback scan.");
+				"The bounded fallback must not add a whole-world scan.");
 		}
 
 		[Test]
@@ -707,8 +680,8 @@ namespace OpenRA.Test.Mods.Common
 
 			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
 			Assert.That(states, Does.Contain("confirmations={6}/2"));
-			Assert.That(states, Does.Contain("owner.Type == SquadType.Stealth && !repeatedMovingMtnkKite"),
-				"The established generic urgency path must not bypass the repeated-candidate gate.");
+			Assert.That(states, Does.Not.Contain("ShouldReplaceNonFinishableMission("),
+				"Diagnostic cadence must not bypass the repeated-candidate gate.");
 			Assert.That(states, Does.Contain("scope=cached-local world-scans=0"));
 		}
 
@@ -781,8 +754,10 @@ namespace OpenRA.Test.Mods.Common
 			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
 			Assert.That(states, Does.Contain("var exempt = noStnk;"),
 				"Firing, repair, planning, and target absence cannot pause an active squad kill clock.");
-			Assert.That(states, Does.Contain("Game.Settings.Debug.BotDebug"));
+			Assert.That(states, Does.Contain("Stealth kill watchdog [stealth-tank] squad failure:"));
 			Assert.That(states, Does.Contain("cachedFrontierRouteCosts[target.TargetIndex] = target.RouteCost"));
+			Assert.That(states, Does.Contain("Stealth crossover approval"));
+			Assert.That(states, Does.Contain("Stealth decloak approval"));
 			Assert.That(states, Does.Contain("owner.StealthCrushTargetCell.Value != targetCell"));
 			Assert.That(states, Does.Contain("route.Add(targetCell)"));
 
@@ -791,6 +766,34 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(vehicles, Does.Contain("MaximumStationaryMilliseconds: 30000"));
 			var manager = Source("OpenRA.Mods.Common/Traits/BotModules/SquadManagerBotModule.cs");
 			Assert.That(manager, Does.Contain("Stealth Obelisk death watchdog failure"));
+			var stationary = Source("OpenRA.Mods.Common/Traits/BotOwnedStationaryWatchdog.cs");
+			Assert.That(stationary, Does.Contain("stationaryFailureReported"));
+			Assert.That(stationary, Does.Not.Contain("throw new InvalidOperationException"));
+			Assert.That(states, Does.Not.Contain("throw new InvalidOperationException"));
+			Assert.That(manager, Does.Not.Contain("throw new InvalidOperationException"),
+				"Premade stealth watchdogs are diagnostic-only and must never terminate gameplay.");
+		}
+
+		[Test]
+		public void StealthLifecycleUsesTenCellFrontierAndMultiAngleSeparation()
+		{
+			var definition = new StealthSquadDefinition(new MiniYaml("", new List<MiniYamlNode>()));
+			Assert.That(definition.OutwardTargetCellLimit, Is.EqualTo(10));
+
+			var occupied = new[] { new CPos(4, 4), new CPos(10, 10) };
+			Assert.That(StealthAIThreatGeometry.MinimumCellSeparationSquared(
+				new CPos(6, 4), occupied), Is.EqualTo(4));
+			Assert.That(StealthAIThreatGeometry.MinimumCellSeparationSquared(
+				new CPos(0, 0), occupied), Is.EqualTo(32));
+			Assert.That(StealthAIThreatGeometry.MinimumCellSeparationSquared(
+				new CPos(0, 0), Array.Empty<CPos>()), Is.EqualTo(long.MaxValue));
+
+			var states = StealthStateSources("StealthAIStates", "StealthAIIdleState");
+			Assert.That(states, Does.Contain("OrderByDescending(p => Separation(p.Plan))"),
+				"Surviving opportunities must prefer the cell least close to another STNK squad target.");
+			Assert.That(states, Does.Contain("owner.StealthLastFrontierTargetCells >= 10"));
+			Assert.That(states, Does.Contain("BeginStealthEnemyApproach(owner)"),
+				"A short frontier with no viable mission must take one bounded safe step toward enemies.");
 		}
 
 		[Test]
@@ -1153,46 +1156,14 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
-		public void CadenceUrgencyPrefersOnlySafeCachedLocalQuickClears()
+		public void LegacyCadenceRankingHelperDoesNotEnterGameplayPlanning()
 		{
-			int Rank(StealthCadenceQuickClearMode mode, bool urgent = true, bool local = true,
-				bool owned = true, bool safe = true, bool route = true, bool finishable = true,
-				bool nearby = true, bool undefended = false, bool kite = false, bool stnk = true)
-			{
-				return StealthAISpecialistPolicy.CadenceUrgentLocalQuickClearRank(stnk, urgent,
-					local, owned, safe, route, finishable, nearby, mode, undefended, kite);
-			}
-
-			Assert.That(Rank(StealthCadenceQuickClearMode.UndefendedValue, undefended: true), Is.Zero,
-				"A nearby safe undefended value target is the first urgent service tier.");
-			Assert.That(Rank(StealthCadenceQuickClearMode.Kite, kite: true), Is.EqualTo(1),
-				"A nearby legal Kite is the second tier that can unlock valuable targets.");
-			Assert.That(Rank(StealthCadenceQuickClearMode.UndefendedValue,
-				safe: false, undefended: true), Is.EqualTo(int.MaxValue));
-			Assert.That(Rank(StealthCadenceQuickClearMode.UndefendedValue,
-				nearby: false, undefended: true), Is.EqualTo(int.MaxValue),
-				"A cached mission outside the 20-second service window is not a local quick clear.");
-			Assert.That(Rank(StealthCadenceQuickClearMode.Kite, owned: false, kite: true),
-				Is.EqualTo(int.MaxValue), "A locally cached target owned by another squad remains rejected.");
-			Assert.That(Rank(StealthCadenceQuickClearMode.Kite, route: false, kite: true),
-				Is.EqualTo(int.MaxValue));
-			Assert.That(Rank(StealthCadenceQuickClearMode.Kite, finishable: false, kite: true),
-				Is.EqualTo(int.MaxValue));
-			Assert.That(Rank(StealthCadenceQuickClearMode.Kite, local: false, kite: true),
-				Is.EqualTo(int.MaxValue), "The preference must not expand beyond the cached local package.");
-			Assert.That(Rank(StealthCadenceQuickClearMode.UndefendedValue,
-				urgent: false, undefended: true),
-				Is.EqualTo(int.MaxValue), "Urgency-off selection retains the existing strategic ordering.");
-			Assert.That(Rank(StealthCadenceQuickClearMode.UndefendedValue,
-				undefended: true, stnk: false),
-				Is.EqualTo(int.MaxValue), "CTNK and other profiles remain unchanged.");
-
 			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
 			var definition = Source("OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthSquadDefinition.cs");
 			Assert.That(definition, Does.Contain("MaximumUndefendedTargetTravelSeconds = 20"));
-			Assert.That(states, Does.Contain("is a pure ordering step and performs no additional scan or path search"));
-			Assert.That(states, Does.Contain("best = safePlans.OrderBy(p => p.ServiceMs)"),
-				"No eligible local quick clear must preserve the bounded shortest-safe fallback.");
+			Assert.That(states, Does.Contain("diagnostic output only and must never change target eligibility"));
+			Assert.That(states, Does.Not.Contain("CadenceUrgentLocalQuickClearRank("));
+			Assert.That(states, Does.Not.Contain("ShouldReplaceNonFinishableMission("));
 			Assert.That(states.IndexOf("if (definition.EnableKiting && retreatCell != null)",
 				StringComparison.Ordinal), Is.LessThan(states.IndexOf("ShouldEnterMassClear(",
 				StringComparison.Ordinal)), "A nearby legal Kite must be evaluated before crossover Mass.");

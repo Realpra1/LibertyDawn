@@ -27,6 +27,26 @@ namespace OpenRA.Mods.Common.Traits
 	/// </summary>
 	public static class StealthAIThreatGeometry
 	{
+		/// <summary>
+		/// Returns the squared strategic-cell distance to the closest cell already owned by another
+		/// squad. No other cells means there is no separation constraint.
+		/// </summary>
+		public static long MinimumCellSeparationSquared(CPos candidate, IReadOnlyList<CPos> otherCells)
+		{
+			if (otherCells == null || otherCells.Count == 0)
+				return long.MaxValue;
+
+			var minimum = long.MaxValue;
+			foreach (var other in otherCells)
+			{
+				var dx = (long)candidate.X - other.X;
+				var dy = (long)candidate.Y - other.Y;
+				minimum = Math.Min(minimum, dx * dx + dy * dy);
+			}
+
+			return minimum;
+		}
+
 		public static bool IsOutsideWeaponRange(CPos waypoint, CPos target, int weaponRange)
 		{
 			return weaponRange <= 0 || (waypoint - target).LengthSquared > weaponRange * weaponRange;

@@ -74,7 +74,11 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				// there instead of hovering: this is the "if it cannot get there in a straight line, move
 				// around the base and try again" half of the loop, done the cheap way.
 				if (owner.Type == SquadType.Stealth)
-					BeginStealthSafetyReposition(owner);
+				{
+					if (owner.StealthProfile != "stealth-tank" ||
+						owner.StealthLastFrontierTargetCells >= 10 || !BeginStealthEnemyApproach(owner))
+						BeginStealthSafetyReposition(owner);
+				}
 				else if (owner.SquadManager.Info.AirEvadeDistance > 0 && owner.AirThreatPositions.Count > 0)
 					Evade(owner, "no eligible target near remembered AA");
 

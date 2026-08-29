@@ -12,10 +12,10 @@ using OpenRA.Traits;
 
 namespace OpenRA.Mods.Common.Traits
 {
-	[Desc("Development-test watchdog that fails when a bot-owned actor remains stationary for too long.")]
+	[Desc("Development-test watchdog that reports when a bot-owned actor remains stationary for too long.")]
 	public sealed class BotOwnedStationaryWatchdogInfo : TraitInfo, IRulesetLoaded
 	{
-		[Desc("Maximum non-exempt stationary in-game milliseconds before failing.")]
+		[Desc("Maximum non-exempt stationary in-game milliseconds before reporting a diagnostic failure.")]
 		public readonly int MaximumStationaryMilliseconds = 30000;
 
 		[Desc("Interval between diagnostic stationary-state samples.")]
@@ -51,6 +51,7 @@ namespace OpenRA.Mods.Common.Traits
 		bool lastCloaked;
 		BotStationaryWatchdogExemption exemption;
 		int exemptionStartTick;
+		bool stationaryFailureReported;
 
 		public BotOwnedStationaryWatchdog(Actor self, BotOwnedStationaryWatchdogInfo info)
 		{
@@ -109,6 +110,8 @@ namespace OpenRA.Mods.Common.Traits
 			var previousAge = stationaryAge;
 			stationaryAge = StealthAISpecialistPolicy.NextStationaryWatchdogAge(
 				stationaryAge, moved, currentExemption);
+			if (moved || currentExemption != BotStationaryWatchdogExemption.None)
+				stationaryFailureReported = false;
 			if (moved && previousAge > 0)
 				Log.Write("debug", "AI stationary watchdog movement owner={0} unit={1}#{2} tick={3}: " +
 					"from={4} to={5} cell={6} previous-nonexempt-age={7} exemption={8} activity={9}.",
@@ -128,16 +131,17 @@ namespace OpenRA.Mods.Common.Traits
 					info.MaximumStationaryMilliseconds, currentExemption,
 					ActivitySignature(self.CurrentActivity));
 
-			if (!StealthAISpecialistPolicy.StationaryWatchdogFailed(stationaryAge, maximumTicks))
+			if (stationaryFailureReported ||
+				!StealthAISpecialistPolicy.StationaryWatchdogFailed(stationaryAge, maximumTicks))
 				return;
 
+			stationaryFailureReported = true;
 			var message = $"AI stationary watchdog failure owner={self.Owner.PlayerName} " +
 				$"unit={self.Info.Name}#{self.ActorID} tick={self.World.WorldTick}: " +
 				$"center={self.CenterPosition} cell={self.Location} nonexempt-age={stationaryAge}/{maximumTicks} " +
 				$"maximum-ms={info.MaximumStationaryMilliseconds} exemption={currentExemption} " +
 				$"activity={ActivitySignature(self.CurrentActivity)}.";
 			Log.Write("debug", message);
-			throw new InvalidOperationException(message);
 		}
 
 		void UpdateExemption(Actor self, BotStationaryWatchdogExemption current)

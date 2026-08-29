@@ -74,10 +74,13 @@ assignment and not rely on prior-task context. Never share a mutable worktree.
 Analysis roles run in exclusive output directories under `workspace-write`.
 Commenter jobs contain `artifacts`, `task_context`, optional `design_reference`,
 and `output`. Policy jobs contain exactly `design_reference`, `task_context`,
-`narrative`, and `output`. Stage regular-file copies under `inputs/`; never pass
-source, diffs, full specs, or preferred conclusions. Serialize policy calls with
-the shared `policy-scratchpad` slot, stage the canonical scratchpad, and promote a
-valid replacement of at most 3,000 Unicode characters atomically.
+`narrative`, `scratchpad`, and `output`; stealth-tank jobs additionally contain
+exactly one `lifecycle_reference` for
+`.agents/references/STEALTH-TANK-LIFECYCLE.md`. Stage regular-file copies under
+`inputs/`; never pass source, diffs, full specs, or preferred conclusions.
+Serialize policy calls with the shared
+`policy-scratchpad` slot, stage the canonical scratchpad, and promote a valid
+replacement of at most 3,000 Unicode characters atomically.
 
 ## Task intake
 

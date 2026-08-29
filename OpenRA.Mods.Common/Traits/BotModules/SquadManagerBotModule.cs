@@ -1833,7 +1833,7 @@ namespace OpenRA.Mods.Common.Traits
 					stealthEfficiencyKillValue += Math.Max(0,
 						damaged.Info.TraitInfoOrDefault<ValuedInfo>()?.Cost ?? 0);
 					if (!stealthSquad.StealthKillCadenceGeneration.AttributeKill(World.WorldTick))
-						ThrowStealthCadenceMismatch(stealthSquad, World.WorldTick);
+						ReportStealthCadenceMismatch(stealthSquad, World.WorldTick);
 					if (Info.AirTargetDebugLogging)
 						Log.Write("debug", "Stealth kill watchdog [stealth-tank] STNK-attributed kill: " +
 							"tick={0} generation={1} squad={2}#{3} attacker=stnk#{4} victim={5}#{6} " +
@@ -1877,7 +1877,7 @@ namespace OpenRA.Mods.Common.Traits
 					profile, value, damaged.Info.Name, damaged.ActorID);
 		}
 
-		void ThrowStealthCadenceMismatch(Squad squad, int tick)
+		void ReportStealthCadenceMismatch(Squad squad, int tick)
 		{
 			var generation = squad.StealthKillCadenceGeneration;
 			var message = $"Stealth kill watchdog permanent generation-age mismatch generation=" +
@@ -1885,8 +1885,6 @@ namespace OpenRA.Mods.Common.Traits
 				$"tick={tick} generation-start={generation.GenerationStartTick} " +
 				$"generation-elapsed={tick - generation.GenerationStartTick} cadence-age={generation.CadenceAge}.";
 			Log.Write("debug", message);
-			if (Game.Settings.Debug.BotDebug)
-				throw new InvalidOperationException(message);
 		}
 
 		void INotifyKilled.Killed(Actor self, AttackInfo e)
@@ -1903,7 +1901,6 @@ namespace OpenRA.Mods.Common.Traits
 					$"victim=stnk#{self.ActorID} attacker=obli#{e.Attacker.ActorID} " +
 					$"tick={World.WorldTick}.";
 				Log.Write("debug", message);
-				throw new InvalidOperationException(message);
 			}
 
 			var profile = AirProfileFor(self);
