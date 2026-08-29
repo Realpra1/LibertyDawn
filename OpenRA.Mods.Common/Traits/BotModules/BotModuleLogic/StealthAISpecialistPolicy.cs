@@ -333,6 +333,22 @@ namespace OpenRA.Mods.Common.Traits
 			return botEnabled && traitEnabled;
 		}
 
+		public static bool TryBeginStealthTerminalSummary(ref bool reported, bool botEnabled, bool traitEnabled)
+		{
+			if (reported || !ShouldOwnStealthEfficiencyTerminal(botEnabled, traitEnabled))
+				return false;
+
+			reported = true;
+			return true;
+		}
+
+		public static int[] TerminalStealthGenerationIds(
+			IEnumerable<StealthKillCadenceGeneration> generations)
+		{
+			return generations.Where(generation => generation != null && generation.GenerationId > 0)
+				.Select(generation => generation.GenerationId).Distinct().OrderBy(id => id).ToArray();
+		}
+
 		public static StealthEfficiencySummary StealthEfficiency(long rawKilledValue,
 			long actorTicks, long totalDamage, int uniqueStnks)
 		{

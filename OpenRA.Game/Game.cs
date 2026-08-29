@@ -60,6 +60,7 @@ namespace OpenRA
 		static string automatedSaveName;
 		static int automatedExitTick = -1;
 		static bool automatedExitRequested;
+		static bool configuredExitInProgress;
 		public static bool IsAutomatedGameSaveLoad { get; private set; }
 		public static bool IsHeadlessAutomationRequested { get; private set; }
 		public static bool IsHeadlessAutomation { get; private set; }
@@ -1154,7 +1155,18 @@ namespace OpenRA
 			automatedExitTick = -1;
 			Log.Write("debug", "{0} automation reached configured exit at world tick {1}; exiting.",
 				IsHeadlessAutomation ? "Headless MAX" : "Paced rendered", world.WorldTick);
-			FinishBenchmark(false);
+
+			// Use the normal terminal notification path so diagnostic subscribers can
+			// flush their final state before the benchmark and process are closed.
+			configuredExitInProgress = true;
+			try
+			{
+				world.EndGame();
+			}
+			finally
+			{
+				configuredExitInProgress = false;
+			}
 		}
 
 		static void TryAutomatedSave(World world)
@@ -1223,7 +1235,7 @@ namespace OpenRA
 			CreateAndStartLocalServer(map.Uid, orders, randomSeed);
 		}
 
-		public static void FinishBenchmark() { FinishBenchmark(true); }
+		public static void FinishBenchmark() { FinishBenchmark(!configuredExitInProgress); }
 
 		static void FinishBenchmark(bool naturalGameOver)
 		{

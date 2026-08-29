@@ -1066,9 +1066,9 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(manager, Does.Contain("e.Attacker.Owner != Player"));
 			Assert.That(manager, Does.Contain("self.Owner == Player && self.Info.Name == \"stnk\""));
 			Assert.That(manager, Does.Contain("StealthEfficiencyWindowStartTick"));
-			Assert.That(manager.Split("World.GameOver += EmitTerminalStealthEfficiencySummary").Length - 1,
+			Assert.That(manager.Split("World.GameEnding += EmitTerminalStealthWatchdogSummaries").Length - 1,
 				Is.EqualTo(1));
-			Assert.That(manager, Does.Contain("World.GameOver -= EmitTerminalStealthEfficiencySummary"),
+			Assert.That(manager, Does.Contain("World.GameEnding -= EmitTerminalStealthWatchdogSummaries"),
 				"Only the enabled bot-specific module may own the terminal summary subscription.");
 			var traitEnabled = manager.Substring(manager.IndexOf(
 				"protected override void TraitEnabled", StringComparison.Ordinal));
@@ -1090,6 +1090,61 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(output, Does.Not.Contain("Target"));
 			Assert.That(output, Does.Not.Contain("Route"));
 			Assert.That(output, Does.Not.Contain("Priority"));
+		}
+
+		[Test]
+		public void AutomatedAndOrdinaryShutdownShareExactlyOnceTerminalNotification()
+		{
+			var game = Source("OpenRA.Game/Game.cs");
+			var automatedExit = game.Substring(game.IndexOf(
+				"static void TryAutomatedExit", StringComparison.Ordinal));
+			automatedExit = automatedExit.Substring(0, automatedExit.IndexOf(
+				"static void TryAutomatedSave", StringComparison.Ordinal));
+			Assert.That(automatedExit, Does.Contain("world.EndGame();"),
+				"A non-periodic configured boundary such as tick 3000 must use the ordinary terminal callback.");
+			Assert.That(automatedExit, Does.Not.Contain("FinishBenchmark(false)"));
+			Assert.That(automatedExit, Does.Contain("automatedExitTick = -1;"),
+				"The configured exit remains armed for one delivery only.");
+
+			var world = Source("OpenRA.Game/World.cs");
+			var endGame = world.Substring(world.IndexOf("public void EndGame()", StringComparison.Ordinal));
+			endGame = endGame.Substring(0, endGame.IndexOf("Player renderPlayer", StringComparison.Ordinal));
+			Assert.That(endGame, Does.Contain("if (!IsGameOver)"));
+			Assert.That(endGame.Split("GameEnding();").Length - 1, Is.EqualTo(1),
+				"Natural and configured termination must each deliver the terminal callback once.");
+			Assert.That(endGame.IndexOf("GameEnding();", StringComparison.Ordinal), Is.LessThan(
+				endGame.IndexOf("GameOver();", StringComparison.Ordinal)),
+				"Terminal diagnostics must flush before benchmark/game-over subscribers close output.");
+
+			var reported = false;
+			Assert.That(StealthAISpecialistPolicy.TryBeginStealthTerminalSummary(
+				ref reported, true, true), Is.True);
+			Assert.That(reported, Is.True);
+			Assert.That(StealthAISpecialistPolicy.TryBeginStealthTerminalSummary(
+				ref reported, true, true), Is.False,
+				"A second lifecycle hook must not duplicate terminal cadence or efficiency output.");
+		}
+
+		[Test]
+		public void TerminalWatchdogsIncludeEveryRealGenerationAndExcludeEmptySlots()
+		{
+			var first = new StealthKillCadenceGeneration(3, 100);
+			var second = new StealthKillCadenceGeneration(1, 200);
+			Assert.That(StealthAISpecialistPolicy.TerminalStealthGenerationIds(new[]
+			{
+				first, null, second, first
+			}), Is.EqualTo(new[] { 1, 3 }),
+				"Terminal output is ordered, includes active real generations, and excludes generation-0 slots.");
+
+			var manager = Source("OpenRA.Mods.Common/Traits/BotModules/SquadManagerBotModule.cs");
+			var terminal = manager.Substring(manager.IndexOf(
+				"void EmitTerminalStealthWatchdogSummaries", StringComparison.Ordinal));
+			terminal = terminal.Substring(0, terminal.IndexOf(
+				"void EmitStealthEfficiencySummary", StringComparison.Ordinal));
+			Assert.That(terminal, Does.Contain("EmitTerminalStealthCadenceSummaries();"));
+			Assert.That(terminal, Does.Contain("EmitStealthEfficiencySummary(\"terminal\");"));
+			Assert.That(terminal, Does.Contain("summary=terminal"));
+			Assert.That(terminal, Does.Contain("generation-kills={8}"));
 		}
 
 		[Test]
