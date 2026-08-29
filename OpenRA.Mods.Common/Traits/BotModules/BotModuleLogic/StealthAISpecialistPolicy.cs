@@ -1174,6 +1174,11 @@ namespace OpenRA.Mods.Common.Traits
 			return engagedWeaponExposure || (detectorExposure && armedCoverage);
 		}
 
+		public static bool IsHardPlannedDecloakThreat(bool plannedDecloak, double canonicalThreat)
+		{
+			return plannedDecloak && canonicalThreat >= HardRouteDangerThreshold;
+		}
+
 		public static int StrategicTargetReviewIntervalTicks(int timestep, int configuredInterval)
 		{
 			return Math.Max(Math.Max(1, configuredInterval),

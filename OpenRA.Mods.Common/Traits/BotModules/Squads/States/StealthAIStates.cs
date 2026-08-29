@@ -1925,8 +1925,10 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				unit.TraitsImplementing<Cloak>().Any(cloak => !cloak.Cloaked));
 			if (!pendingBlueExplosion && owner.StealthClearMode == StealthClearMode.Mass)
 				return;
+			var engagedWeaponExposure = weaponExposure && (revealed ||
+				StealthAISpecialistPolicy.IsHardPlannedDecloakThreat(plannedDecloak, maximumCanonicalThreat));
 			if (!pendingBlueExplosion && !StealthAISpecialistPolicy.IsEngagementThreat(
-				detectorExposure, weaponExposure, (revealed || plannedDecloak) && weaponExposure) &&
+				detectorExposure, weaponExposure, engagedWeaponExposure) &&
 				!resourceHazard)
 				return;
 

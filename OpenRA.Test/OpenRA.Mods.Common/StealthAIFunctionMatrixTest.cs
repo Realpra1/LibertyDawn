@@ -323,6 +323,12 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(StealthAISpecialistPolicy.IsEngagementThreat(false, true, false), Is.False);
 			Assert.That(StealthAISpecialistPolicy.IsEngagementThreat(false, true, true), Is.True,
 				"planned decloak under canonical armed coverage must trigger local safety");
+			Assert.That(StealthAISpecialistPolicy.IsHardPlannedDecloakThreat(true, 0.999), Is.False,
+				"low canonical threat must not make a planned shot abandon its approved engagement");
+			Assert.That(StealthAISpecialistPolicy.IsHardPlannedDecloakThreat(true, 1), Is.True,
+				"hard canonical threat at the actual decloak distance must remain responsive");
+			Assert.That(StealthAISpecialistPolicy.IsHardPlannedDecloakThreat(false, 100), Is.False,
+				"canonical magnitude alone is not planned-decloak context");
 			Assert.That(StealthAISpecialistPolicy.StrategicTargetReviewIntervalTicks(40, 25), Is.EqualTo(125));
 			Assert.That(StealthAISpecialistPolicy.StrategicTargetReviewIntervalTicks(20, 125), Is.EqualTo(250));
 			Assert.That(states, Does.Contain("TryGetDefenderThreat"),
