@@ -876,8 +876,9 @@ namespace OpenRA
 				var logicInterval = Ui.Timestep;
 				var logicWorld = worldRenderer?.World;
 				var runAtMaximumSpeed = logicWorld != null && logicWorld == OrderManager.World &&
-					logicWorld.GameSpeed.UsesMaximumSpeed(server?.Type == ServerType.Local,
-						logicWorld.IsReplay, logicWorld.IsLoadingGameSave);
+					(logicWorld.GameSpeed.UsesMaximumSpeed(server?.Type == ServerType.Local,
+						logicWorld.IsReplay, logicWorld.IsLoadingGameSave) ||
+						(IsHeadlessAutomation && logicWorld.IsReplay));
 
 				if (runAtMaximumSpeed != maximumSpeedActive)
 				{

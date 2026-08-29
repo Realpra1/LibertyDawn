@@ -20,6 +20,48 @@ namespace OpenRA.Mods.Common.Traits
 	public enum SpecialistDefenderClearAction { None, CrushInfantry, SnipeTank, AttackUnarmedDetector }
 	public enum SpecialistLostActivityRouteDecision { None, RetainShared, SameEndpointMemberRoute, AlternateEndpoint }
 	public enum SpecialistRepairDisposition { Active, Repair, Rejoin }
+	public sealed class StealthEfficiencyWindow
+	{
+		readonly HashSet<uint> actors = new HashSet<uint>();
+
+		public int StartTick { get; }
+		public long RawKilledValue { get; private set; }
+		public int KillCount { get; private set; }
+		public long ActorTicks { get; private set; }
+		public long TotalDamage { get; private set; }
+		public uint[] Actors => actors.OrderBy(id => id).ToArray();
+
+		public StealthEfficiencyWindow(int startTick)
+		{
+			StartTick = startTick;
+		}
+
+		public void Observe(IEnumerable<uint> liveActors)
+		{
+			var live = liveActors.Distinct().ToArray();
+			ActorTicks += live.Length;
+			actors.UnionWith(live);
+		}
+
+		public void RecordKill(long value)
+		{
+			KillCount++;
+			RawKilledValue += Math.Max(0, value);
+		}
+
+		public void RecordDamage(uint actorId, long value)
+		{
+			actors.Add(actorId);
+			TotalDamage += Math.Max(0, value);
+		}
+
+		public StealthAISpecialistPolicy.StealthEfficiencySummary Summary()
+		{
+			return StealthAISpecialistPolicy.StealthEfficiency(
+				RawKilledValue, ActorTicks, TotalDamage, actors.Count);
+		}
+	}
+
 	public enum StealthTankPlanInvalidation
 	{
 		None,

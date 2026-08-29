@@ -130,11 +130,15 @@ namespace OpenRA
 			if (!string.IsNullOrEmpty(Connect) || !string.IsNullOrEmpty(URI))
 				return "Launch automation supports local automated games only.";
 
-			if (!string.IsNullOrEmpty(Replay))
-				return "Launch automation does not support replay playback.";
+			if (string.IsNullOrEmpty(Map) && string.IsNullOrEmpty(GameSave) && string.IsNullOrEmpty(Replay))
+				return "Launch automation requires Launch.Map, Launch.GameSave, or Launch.Replay.";
 
-			if (string.IsNullOrEmpty(Map) && string.IsNullOrEmpty(GameSave))
-				return "Launch automation requires Launch.Map or Launch.GameSave.";
+			if (!string.IsNullOrEmpty(Replay) && (!string.IsNullOrEmpty(Map) || !string.IsNullOrEmpty(GameSave)))
+				return "Launch.Replay cannot be combined with Launch.Map or Launch.GameSave.";
+
+			if (!string.IsNullOrEmpty(Replay) && (ExitAtTick >= 0 || SaveGameAtTick >= 0 ||
+				!string.IsNullOrEmpty(LobbyCommands)))
+				return "Launch.Replay does not support lobby, save, or configured-exit automation.";
 
 			if (Headless && !string.IsNullOrEmpty(Map) && !GetLobbyCommands().Any(c =>
 				c.Equals("option gamespeed max", StringComparison.OrdinalIgnoreCase)))

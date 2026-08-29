@@ -1044,6 +1044,56 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
+		public void StealthEfficiencyWindowUsesTheProgramFormulaAndStableMemberDenominator()
+		{
+			var window = new StealthEfficiencyWindow(17);
+			window.Observe(new uint[] { 9, 4, 9 });
+			window.Observe(new uint[] { 4 });
+			window.RecordKill(3000);
+			window.RecordKill(-10);
+			window.RecordDamage(9, 400);
+			window.RecordDamage(12, 200);
+
+			Assert.That(window.StartTick, Is.EqualTo(17));
+			Assert.That(window.Actors, Is.EqualTo(new uint[] { 4, 9, 12 }));
+			var metric = window.Summary();
+			Assert.That(metric.RawKilledValue, Is.EqualTo(3000));
+			Assert.That(window.KillCount, Is.EqualTo(2),
+				"Kill count is factual even when a killed actor has zero configured value.");
+			Assert.That(metric.ActorTicks, Is.EqualTo(3));
+			Assert.That(metric.UniqueStnks, Is.EqualTo(3));
+			Assert.That(metric.TotalDamage, Is.EqualTo(600));
+			Assert.That(metric.ActorMinutes, Is.EqualTo(0.001));
+			Assert.That(metric.AverageDamage, Is.EqualTo(200));
+			Assert.That(metric.Primary, Is.EqualTo(3000000));
+			Assert.That(metric.DamageAdjusted, Is.EqualTo(15000));
+		}
+
+		[Test]
+		public void HumanReplayScorerGroupsControlAndFlushesThroughTheSharedExactlyOnceGuard()
+		{
+			var scorer = Source("OpenRA.Mods.Common/Traits/StealthEfficiencyControlWatchdog.cs");
+			Assert.That(scorer, Does.Contain("!self.Owner.IsBot"));
+			Assert.That(scorer, Does.Contain("control=human generation=1"));
+			Assert.That(scorer, Does.Contain("actor-time-denominator=sum-live-member-ticks"));
+			Assert.That(scorer, Does.Contain("World.GameEnding += EmitTerminalSummary"));
+			Assert.That(scorer, Does.Contain("World.GameEnding -= EmitTerminalSummary"));
+			Assert.That(scorer, Does.Contain("TryBeginStealthTerminalSummary"));
+			Assert.That(scorer.Split("FormatStealthEfficiencySummary(").Length - 1, Is.EqualTo(1),
+				"One human control group owns one terminal metric emission site.");
+
+			var reported = false;
+			Assert.That(StealthAISpecialistPolicy.TryBeginStealthTerminalSummary(
+				ref reported, true, true), Is.True);
+			Assert.That(StealthAISpecialistPolicy.TryBeginStealthTerminalSummary(
+				ref reported, true, true), Is.False);
+
+			var game = Source("OpenRA.Game/Game.cs");
+			Assert.That(game, Does.Contain("(IsHeadlessAutomation && logicWorld.IsReplay)"),
+				"Headless replay scoring must advance without presentation pacing.");
+		}
+
+		[Test]
 		public void StealthEfficiencyWatchdogOwnsOneBotScopeWindowAndSurvivesSaveLoad()
 		{
 			Assert.That(StealthAISpecialistPolicy.ShouldOwnStealthEfficiencyTerminal(true, true), Is.True);

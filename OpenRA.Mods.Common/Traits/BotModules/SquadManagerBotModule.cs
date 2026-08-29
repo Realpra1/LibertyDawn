@@ -631,6 +631,8 @@ namespace OpenRA.Mods.Common.Traits
 		long stealthEfficiencyActorTicks;
 		long stealthEfficiencyDamageTaken;
 		readonly HashSet<uint> stealthEfficiencyActors = new HashSet<uint>();
+		readonly Dictionary<int, StealthEfficiencyWindow> stealthGenerationEfficiency =
+			new Dictionary<int, StealthEfficiencyWindow>();
 		int stealthEfficiencyNextReportTick;
 		int stealthEfficiencyWindowStartTick;
 		bool stealthEfficiencyTerminalReported;
@@ -812,6 +814,20 @@ namespace OpenRA.Mods.Common.Traits
 			stealthEfficiencyActorTicks = StealthAISpecialistPolicy.AccumulateActorTicks(
 				stealthEfficiencyActorTicks, live.Length);
 			stealthEfficiencyActors.UnionWith(live.Select(actor => actor.ActorID));
+			foreach (var squad in Squads.Where(s => s.Type == SquadType.Stealth &&
+				s.StealthKillCadenceGeneration != null))
+			{
+				var generation = squad.StealthKillCadenceGeneration;
+				if (!stealthGenerationEfficiency.TryGetValue(generation.GenerationId, out var generationWindow))
+				{
+					generationWindow = new StealthEfficiencyWindow(generation.GenerationStartTick);
+					stealthGenerationEfficiency.Add(generation.GenerationId, generationWindow);
+				}
+
+				generationWindow.Observe(squad.Units.Where(unit => unit != null && unit.Owner == Player &&
+					unit.IsInWorld && !unit.IsDead && unit.Info.Name == "stnk").Select(unit => unit.ActorID));
+			}
+
 			if (World.WorldTick < stealthEfficiencyNextReportTick)
 				return;
 
@@ -826,7 +842,24 @@ namespace OpenRA.Mods.Common.Traits
 				return;
 
 			EmitTerminalStealthCadenceSummaries();
+			EmitTerminalStealthGenerationEfficiencySummaries();
 			EmitStealthEfficiencySummary("terminal");
+		}
+
+		void EmitTerminalStealthGenerationEfficiencySummaries()
+		{
+			foreach (var pair in stealthGenerationEfficiency.OrderBy(entry => entry.Key))
+			{
+				var window = pair.Value;
+				Log.Write("debug", "Stealth efficiency control membership owner={0} bot_id={1} " +
+					"control=bot generation={2} generation-start={3} generation-end={4} kills={5} members=[{6}] " +
+					"actor-time-denominator=sum-live-member-ticks summary=terminal diagnostic_only=true.",
+					Player.PlayerName, Player.PlayerActor.ActorID, pair.Key, window.StartTick, World.WorldTick,
+					window.KillCount, window.Actors.Select(id => "stnk#" + id).JoinWith(","));
+				Log.Write("debug", StealthAISpecialistPolicy.FormatStealthEfficiencySummary(
+					"terminal-generation-" + pair.Key, Player.PlayerActor.ActorID,
+					window.StartTick, World.WorldTick, window.Summary()));
+			}
 		}
 
 		void EmitTerminalStealthCadenceSummaries()
@@ -1859,8 +1892,16 @@ namespace OpenRA.Mods.Common.Traits
 				var stealthSquad = Squads.FirstOrDefault(s => s.StealthKillCadenceGeneration?.GenerationId == generationId);
 				if (stealthSquad != null)
 				{
-					stealthEfficiencyKillValue += Math.Max(0,
-						damaged.Info.TraitInfoOrDefault<ValuedInfo>()?.Cost ?? 0);
+					var killedValue = Math.Max(0, damaged.Info.TraitInfoOrDefault<ValuedInfo>()?.Cost ?? 0);
+					stealthEfficiencyKillValue += killedValue;
+					if (!stealthGenerationEfficiency.TryGetValue(generationId, out var generationWindow))
+					{
+						generationWindow = new StealthEfficiencyWindow(
+							stealthSquad.StealthKillCadenceGeneration.GenerationStartTick);
+						stealthGenerationEfficiency.Add(generationId, generationWindow);
+					}
+
+					generationWindow.RecordKill(killedValue);
 					if (!stealthSquad.StealthKillCadenceGeneration.AttributeKill(World.WorldTick))
 						ReportStealthCadenceMismatch(stealthSquad, World.WorldTick);
 					if (Info.AirTargetDebugLogging)
@@ -1949,6 +1990,19 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				stealthEfficiencyActors.Add(self.ActorID);
 				stealthEfficiencyDamageTaken += Math.Max(0, e.Damage.Value);
+				var squad = Squads.FirstOrDefault(candidate => candidate.Type == SquadType.Stealth &&
+					candidate.StealthKillCadenceGeneration != null && candidate.Units.Contains(self));
+				if (squad != null)
+				{
+					var generation = squad.StealthKillCadenceGeneration;
+					if (!stealthGenerationEfficiency.TryGetValue(generation.GenerationId, out var generationWindow))
+					{
+						generationWindow = new StealthEfficiencyWindow(generation.GenerationStartTick);
+						stealthGenerationEfficiency.Add(generation.GenerationId, generationWindow);
+					}
+
+					generationWindow.RecordDamage(self.ActorID, e.Damage.Value);
+				}
 			}
 
 			if (!IsPreferredEnemyUnit(e.Attacker))
