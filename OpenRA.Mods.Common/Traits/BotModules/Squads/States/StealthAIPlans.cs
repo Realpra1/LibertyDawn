@@ -86,6 +86,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		public int WeaponRange;
 		public int DetectorRange;
 		public int Speed;
+		public double CanonicalThreat;
 	}
 
 	sealed class StealthInfluenceCache

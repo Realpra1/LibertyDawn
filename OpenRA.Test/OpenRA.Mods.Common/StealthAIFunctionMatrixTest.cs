@@ -321,6 +321,20 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(yaml, Does.Not.Contain("StealthCrushTestTelemetry"));
 			Assert.That(StealthAISpecialistPolicy.IsEngagementThreat(true, true, false), Is.True);
 			Assert.That(StealthAISpecialistPolicy.IsEngagementThreat(false, true, false), Is.False);
+			Assert.That(StealthAISpecialistPolicy.IsEngagementThreat(false, true, true), Is.True,
+				"planned decloak under canonical armed coverage must trigger local safety");
+			Assert.That(StealthAISpecialistPolicy.StrategicTargetReviewIntervalTicks(40, 25), Is.EqualTo(125));
+			Assert.That(StealthAISpecialistPolicy.StrategicTargetReviewIntervalTicks(20, 125), Is.EqualTo(250));
+			Assert.That(states, Does.Contain("TryGetDefenderThreat"),
+				"stealth route and local safety must consume the standard calculator");
+			var calculator = Source("OpenRA.Mods.Common/Traits/BotModules/GeneralizedCombatThreat.cs");
+			Assert.That(calculator, Does.Contain(
+				"engagementDistanceCells == null ? pair.DefenderThreatInAttackerEquivalents"),
+				"the optional distance must leave the canonical default result unchanged");
+			Assert.That(states, Does.Contain("owner.StealthEscapePreserveEngagement"),
+				"a brief safety reposition must retain an approved live actor/cell engagement");
+			Assert.That(states, Does.Contain("strategic-event-review={1}"),
+				"route arrival must remain an event-driven exception to the five-second ordinary review floor");
 			Assert.That(StealthAISpecialistPolicy.NextKillCadenceAge(100, 25, false, false), Is.EqualTo(125));
 			Assert.That(StealthAISpecialistPolicy.NextKillCadenceAge(100, 25, false, true), Is.EqualTo(100));
 			Assert.That(StealthAISpecialistPolicy.NextKillCadenceAge(100, 25, true, false), Is.Zero);
@@ -1131,8 +1145,17 @@ namespace OpenRA.Test.Mods.Common
 		public void HumanReplayScorerGroupsControlAndFlushesThroughTheSharedExactlyOnceGuard()
 		{
 			var scorer = Source("OpenRA.Mods.Common/Traits/StealthEfficiencyControlWatchdog.cs");
-			Assert.That(scorer, Does.Contain("!self.Owner.IsBot"));
-			Assert.That(scorer, Does.Contain("control=human generation=1"));
+			Assert.That(scorer, Does.Contain("!self.Owner.IsBot || self.World.IsReplay"),
+				"Replay playback must score recorded owner actions even though replay metadata retains bot ownership.");
+			Assert.That(scorer, Does.Contain("control = self.World.IsReplay ? \"replay-owner\" : \"human\""));
+			Assert.That(scorer, Does.Contain("control={2} generation=1"));
+			Assert.That(scorer, Does.Contain("45000 / Math.Max(1, playerActor.World.Timestep)"));
+			Assert.That(scorer, Does.Contain("KillCadenceFailed(cadenceAge, maximumTicks)"));
+			Assert.That(scorer, Does.Contain("scope=replay-owner"));
+			Assert.That(scorer, Does.Contain("if (!playerActor.World.IsReplay)"),
+				"Non-comparable owner cadence context must remain replay-only.");
+			Assert.That(scorer, Does.Contain("comparable=false per-squad=unavailable"),
+				"Owner aggregation must not masquerade as live per-squad cadence.");
 			Assert.That(scorer, Does.Contain("actor-time-denominator=sum-live-member-ticks"));
 			Assert.That(scorer, Does.Contain("World.GameEnding += EmitTerminalSummary"));
 			Assert.That(scorer, Does.Contain("World.GameEnding -= EmitTerminalSummary"));
@@ -1146,9 +1169,12 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(StealthAISpecialistPolicy.TryBeginStealthTerminalSummary(
 				ref reported, true, true), Is.False);
 
-			var game = Source("OpenRA.Game/Game.cs");
-			Assert.That(game, Does.Contain("(IsHeadlessAutomation && logicWorld.IsReplay)"),
-				"Headless replay scoring must advance without presentation pacing.");
+			var world = Source("OpenRA.Game/World.cs");
+			var dispose = world.Substring(world.IndexOf("public void Dispose()", StringComparison.Ordinal));
+			dispose = dispose.Substring(0, dispose.IndexOf("OrderGenerator?.Deactivate();", StringComparison.Ordinal));
+			Assert.That(dispose, Does.Contain("if (IsReplay)"));
+			Assert.That(dispose, Does.Contain("EndGame();"),
+				"Replay world disposal must deliver the ordinary terminal callback before actors disappear.");
 		}
 
 		[Test]

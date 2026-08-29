@@ -1622,6 +1622,15 @@ namespace OpenRA.Mods.Common.Traits
 				.Any(queue => queue.BuildableItems().Any(item => item.Name == type)));
 		}
 
+		internal bool ShouldProtectOpeningTechnologyResearch(string type, int remainingCost)
+		{
+			var next = Info.OpeningTechnologyResearchSequence.FirstOrDefault(item =>
+				!techTree.HasPrerequisites(new[] { item }));
+			return QueueStallRecoveryPolicy.ShouldProtectOpeningResearch(
+				string.Equals(type, next, System.StringComparison.Ordinal), IsCurrentlyBuildable(type),
+				playerResources.Cash + playerResources.Resources, remainingCost);
+		}
+
 		void LogOpening(string format, params object[] args)
 		{
 			AIUtils.BotDebug(format, args);

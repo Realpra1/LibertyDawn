@@ -524,6 +524,63 @@ namespace OpenRA.Mods.Common.Traits
 			return TryGetCached(attacker.Info.Name, defender.Info.Name, attackerLevel, defenderLevel, out threat);
 		}
 
+		/// <summary>
+		/// Returns the canonical cached defender rating, optionally evaluated at a specific
+		/// engagement distance. Omitting the distance is exactly equivalent to TryGetCached.
+		/// </summary>
+		public bool TryGetDefenderThreat(Actor attacker, Actor defender, out double threat,
+			double? engagementDistanceCells = null)
+		{
+			if (!TryGetCached(attacker, defender, out var pair))
+			{
+				threat = 0;
+				return false;
+			}
+
+			threat = engagementDistanceCells == null ? pair.DefenderThreatInAttackerEquivalents :
+				DefenderThreatAtDistance(pair, engagementDistanceCells.Value);
+			return true;
+		}
+
+		public static double DefenderThreatAtDistance(PairThreat pair, double engagementDistanceCells)
+		{
+			if (pair == null)
+				throw new ArgumentNullException(nameof(pair));
+
+			var distance = Math.Max(0, engagementDistanceCells);
+			var incoming = CanEngageAtDistance(pair.Reverse, distance) ? pair.Reverse.RawKillRate : 0;
+			var outgoing = CanEngageAtDistance(pair.Forward, distance) ? pair.Forward.RawKillRate : 0;
+			return SpecificDistanceThreatEquivalent(incoming, outgoing,
+				pair.DefenderVeterancyFactor, pair.AttackerVeterancyFactor);
+		}
+
+		public static double SpecificDistanceThreatEquivalent(double incomingRawKillRate,
+			double outgoingRawKillRate, double defenderFactor = 1, double attackerFactor = 1)
+		{
+			return ScaleCachedExchange(ThreatEquivalent(incomingRawKillRate, outgoingRawKillRate),
+				defenderFactor, attackerFactor);
+		}
+
+		public static bool CanEngageAtDistance(DirectionalThreat direction, double engagementDistanceCells)
+		{
+			return direction != null && CanEngageAtDistance(direction.CanTarget, direction.ContactAttack,
+				direction.MinimumRangeCells, direction.RangeCells, direction.DefenderHitRadiusCells,
+				engagementDistanceCells);
+		}
+
+		public static bool CanEngageAtDistance(bool canTarget, bool contactAttack,
+			double minimumRangeCells, double maximumRangeCells, double defenderHitRadiusCells,
+			double engagementDistanceCells)
+		{
+			if (!canTarget)
+				return false;
+			if (contactAttack)
+				return engagementDistanceCells <= Math.Max(defenderHitRadiusCells, 1d / 1024);
+
+			return engagementDistanceCells >= minimumRangeCells &&
+				engagementDistanceCells <= maximumRangeCells;
+		}
+
 		public bool TryGetCached(string attacker, string defender, int attackerVeterancyLevel,
 			int defenderVeterancyLevel, out PairThreat threat)
 		{

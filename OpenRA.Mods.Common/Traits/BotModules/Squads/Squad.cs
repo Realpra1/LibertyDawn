@@ -152,6 +152,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		internal bool StealthEscapePendingExplosion;
 		internal int StealthEscapeLastProgressTick = -1;
 		internal int StealthEscapeLastDistanceCells = int.MaxValue;
+		internal bool StealthEscapePreserveEngagement;
 		internal CPos? StealthKiteTargetCell;
 		internal CPos? StealthCrushTargetCell;
 		internal CPos? StealthPostAttackCell;

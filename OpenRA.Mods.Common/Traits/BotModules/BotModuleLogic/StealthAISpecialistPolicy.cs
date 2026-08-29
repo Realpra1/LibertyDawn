@@ -276,7 +276,6 @@ namespace OpenRA.Mods.Common.Traits
 		public const int NearbyReactionMaximumLatencyTicks = 25;
 		public const float HardRouteDangerThreshold = 1f;
 		public const float SoftResourceRouteCost = 0.05f;
-		public const float OrdinaryWeaponRouteInfluence = 0.2f;
 		public const float HardDetectorRouteInfluence = 1f;
 		public const int ReinforcementSaveVersion = 2;
 		public const int StealthGenerationEfficiencySaveVersion = 1;
@@ -1173,6 +1172,12 @@ namespace OpenRA.Mods.Common.Traits
 			// Keep the existing immediate response to a weapon that is already engaged, and
 			// otherwise require detector and ground-weapon coverage to overlap the firing cell.
 			return engagedWeaponExposure || (detectorExposure && armedCoverage);
+		}
+
+		public static int StrategicTargetReviewIntervalTicks(int timestep, int configuredInterval)
+		{
+			return Math.Max(Math.Max(1, configuredInterval),
+				(int)Math.Ceiling(5000d / Math.Max(1, timestep)));
 		}
 
 		public static bool ShouldRetainActiveEngagement(bool hasValidTarget, bool isEngaged,

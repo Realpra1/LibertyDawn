@@ -116,6 +116,17 @@ namespace OpenRA.Test.Mods.Common
 				enclosureAvailable, siloAvailable), Is.EqualTo(expected));
 		}
 
+		[TestCase(true, true, 1000, 1000, true)]
+		[TestCase(true, true, 999, 1000, false)]
+		[TestCase(true, false, 1000, 1000, false)]
+		[TestCase(false, true, 1000, 1000, false)]
+		public void AffordableCurrentOpeningResearchSurvivesQueueRecovery(bool current,
+			bool buildable, int funds, int remaining, bool expected)
+		{
+			Assert.That(QueueStallRecoveryPolicy.ShouldProtectOpeningResearch(
+				current, buildable, funds, remaining), Is.EqualTo(expected));
+		}
+
 		[Test]
 		public void PostLoadSettlementDelaysOneSamplerWithoutOverflow()
 		{
