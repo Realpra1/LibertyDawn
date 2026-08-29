@@ -1070,6 +1070,64 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
+		public void StealthGenerationEfficiencySaveLoadPreservesCompleteTerminalWindowsExactlyOnce()
+		{
+			var generation1 = new StealthEfficiencyWindow(17);
+			generation1.Observe(new uint[] { 9, 4 });
+			generation1.Observe(new uint[] { 4 });
+			generation1.RecordKill(3000);
+			generation1.RecordDamage(9, 400);
+			var generation3 = new StealthEfficiencyWindow(41);
+			generation3.Observe(new uint[] { 12 });
+			generation3.RecordKill(0);
+			generation3.RecordDamage(12, 200);
+
+			var saved = StealthAISpecialistPolicy.SaveStealthGenerationEfficiency(
+				new Dictionary<int, StealthEfficiencyWindow>
+				{
+					{ 3, generation3 },
+					{ 1, generation1 }
+				});
+			Assert.That(saved.Key, Is.EqualTo("StealthGenerationEfficiency"));
+			Assert.That(saved.Value.Nodes.Count(n => n.Key == "Generation"), Is.EqualTo(2));
+			Assert.That(StealthAISpecialistPolicy.TryLoadStealthGenerationEfficiency(
+				saved, out var loaded), Is.True);
+			Assert.That(loaded.Select(pair => pair.Key), Is.EqualTo(new[] { 1, 3 }));
+
+			var restored = loaded.Single(pair => pair.Key == 1).Value;
+			var restoredState = restored.ExportState();
+			Assert.That(restoredState.StartTick, Is.EqualTo(17));
+			Assert.That(restoredState.RawKilledValue, Is.EqualTo(3000));
+			Assert.That(restoredState.KillCount, Is.EqualTo(1));
+			Assert.That(restoredState.ActorTicks, Is.EqualTo(3));
+			Assert.That(restoredState.TotalDamage, Is.EqualTo(400));
+			Assert.That(restoredState.Actors, Is.EqualTo(new uint[] { 4, 9 }));
+
+			generation1.Observe(new uint[] { 9, 15 });
+			restored.Observe(new uint[] { 9, 15 });
+			generation1.RecordKill(900);
+			restored.RecordKill(900);
+			generation1.RecordDamage(15, 250);
+			restored.RecordDamage(15, 250);
+			Assert.That(restored.KillCount, Is.EqualTo(generation1.KillCount));
+			Assert.That(restored.Actors, Is.EqualTo(generation1.Actors));
+			Assert.That(StealthAISpecialistPolicy.FormatStealthEfficiencySummary(
+				"terminal-generation-1", 7, restored.StartTick, 99, restored.Summary()), Is.EqualTo(
+				StealthAISpecialistPolicy.FormatStealthEfficiencySummary(
+					"terminal-generation-1", 7, generation1.StartTick, 99, generation1.Summary())));
+
+			Assert.That(StealthAISpecialistPolicy.TryLoadStealthGenerationEfficiency(
+				null, out var absent), Is.False, "Old saves without the new section remain loadable.");
+			Assert.That(absent, Is.Empty);
+			var terminalReported = false;
+			Assert.That(StealthAISpecialistPolicy.TryBeginStealthTerminalSummary(
+				ref terminalReported, true, true), Is.True);
+			Assert.That(StealthAISpecialistPolicy.TryBeginStealthTerminalSummary(
+				ref terminalReported, true, true), Is.False,
+				"Restored generation state must still use the shared exactly-once terminal guard.");
+		}
+
+		[Test]
 		public void HumanReplayScorerGroupsControlAndFlushesThroughTheSharedExactlyOnceGuard()
 		{
 			var scorer = Source("OpenRA.Mods.Common/Traits/StealthEfficiencyControlWatchdog.cs");
@@ -1116,6 +1174,8 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(manager, Does.Contain("e.Attacker.Owner != Player"));
 			Assert.That(manager, Does.Contain("self.Owner == Player && self.Info.Name == \"stnk\""));
 			Assert.That(manager, Does.Contain("StealthEfficiencyWindowStartTick"));
+			Assert.That(manager, Does.Contain("SaveStealthGenerationEfficiency(stealthGenerationEfficiency)"));
+			Assert.That(manager, Does.Contain("TryLoadStealthGenerationEfficiency("));
 			Assert.That(manager.Split("World.GameEnding += EmitTerminalStealthWatchdogSummaries").Length - 1,
 				Is.EqualTo(1));
 			Assert.That(manager, Does.Contain("World.GameEnding -= EmitTerminalStealthWatchdogSummaries"),

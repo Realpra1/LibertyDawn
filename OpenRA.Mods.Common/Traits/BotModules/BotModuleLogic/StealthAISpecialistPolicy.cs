@@ -20,6 +20,27 @@ namespace OpenRA.Mods.Common.Traits
 	public enum SpecialistDefenderClearAction { None, CrushInfantry, SnipeTank, AttackUnarmedDetector }
 	public enum SpecialistLostActivityRouteDecision { None, RetainShared, SameEndpointMemberRoute, AlternateEndpoint }
 	public enum SpecialistRepairDisposition { Active, Repair, Rejoin }
+	public readonly struct StealthEfficiencyWindowState
+	{
+		public int StartTick { get; }
+		public long RawKilledValue { get; }
+		public int KillCount { get; }
+		public long ActorTicks { get; }
+		public long TotalDamage { get; }
+		public uint[] Actors { get; }
+
+		public StealthEfficiencyWindowState(int startTick, long rawKilledValue, int killCount,
+			long actorTicks, long totalDamage, uint[] actors)
+		{
+			StartTick = startTick;
+			RawKilledValue = rawKilledValue;
+			KillCount = killCount;
+			ActorTicks = actorTicks;
+			TotalDamage = totalDamage;
+			Actors = actors ?? Array.Empty<uint>();
+		}
+	}
+
 	public sealed class StealthEfficiencyWindow
 	{
 		readonly HashSet<uint> actors = new HashSet<uint>();
@@ -34,6 +55,25 @@ namespace OpenRA.Mods.Common.Traits
 		public StealthEfficiencyWindow(int startTick)
 		{
 			StartTick = startTick;
+		}
+
+		public static StealthEfficiencyWindow Restore(StealthEfficiencyWindowState state)
+		{
+			var window = new StealthEfficiencyWindow(state.StartTick)
+			{
+				RawKilledValue = state.RawKilledValue,
+				KillCount = state.KillCount,
+				ActorTicks = state.ActorTicks,
+				TotalDamage = state.TotalDamage
+			};
+			window.actors.UnionWith(state.Actors);
+			return window;
+		}
+
+		public StealthEfficiencyWindowState ExportState()
+		{
+			return new StealthEfficiencyWindowState(
+				StartTick, RawKilledValue, KillCount, ActorTicks, TotalDamage, Actors);
 		}
 
 		public void Observe(IEnumerable<uint> liveActors)
@@ -224,8 +264,79 @@ namespace OpenRA.Mods.Common.Traits
 		public const float OrdinaryWeaponRouteInfluence = 0.2f;
 		public const float HardDetectorRouteInfluence = 1f;
 		public const int ReinforcementSaveVersion = 2;
+		public const int StealthGenerationEfficiencySaveVersion = 1;
 		public const int AggressiveMassEntryCrossoverPercent = 500;
 		public const long MinimumStrategicCellValue = 5000L * 1100L;
+
+		public static MiniYamlNode SaveStealthGenerationEfficiency(
+			IEnumerable<KeyValuePair<int, StealthEfficiencyWindow>> windows)
+		{
+			var nodes = new List<MiniYamlNode>
+			{
+				new MiniYamlNode("Version", FieldSaver.FormatValue(StealthGenerationEfficiencySaveVersion))
+			};
+			nodes.AddRange(windows.OrderBy(pair => pair.Key).Select(pair =>
+			{
+				var state = pair.Value.ExportState();
+				return new MiniYamlNode("Generation", "", new List<MiniYamlNode>
+				{
+					new MiniYamlNode("Id", FieldSaver.FormatValue(pair.Key)),
+					new MiniYamlNode("StartTick", FieldSaver.FormatValue(state.StartTick)),
+					new MiniYamlNode("RawKilledValue", FieldSaver.FormatValue(state.RawKilledValue)),
+					new MiniYamlNode("KillCount", FieldSaver.FormatValue(state.KillCount)),
+					new MiniYamlNode("ActorTicks", FieldSaver.FormatValue(state.ActorTicks)),
+					new MiniYamlNode("TotalDamage", FieldSaver.FormatValue(state.TotalDamage)),
+					new MiniYamlNode("Actors", FieldSaver.FormatValue(state.Actors))
+				});
+			}));
+			return new MiniYamlNode("StealthGenerationEfficiency", "", nodes);
+		}
+
+		public static bool TryLoadStealthGenerationEfficiency(MiniYamlNode node,
+			out KeyValuePair<int, StealthEfficiencyWindow>[] windows)
+		{
+			windows = Array.Empty<KeyValuePair<int, StealthEfficiencyWindow>>();
+			if (node == null)
+				return false;
+
+			try
+			{
+				var versionNode = node.Value.Nodes.Single(n => n.Key == "Version");
+				if (FieldLoader.GetValue<int>(versionNode.Key, versionNode.Value.Value) !=
+					StealthGenerationEfficiencySaveVersion)
+					return false;
+
+				var loaded = node.Value.Nodes.Where(n => n.Key == "Generation").Select(generation =>
+				{
+					var fields = generation.Value.Nodes.ToDictionary(n => n.Key);
+					var id = FieldLoader.GetValue<int>("Id", fields["Id"].Value.Value);
+					var state = new StealthEfficiencyWindowState(
+						FieldLoader.GetValue<int>("StartTick", fields["StartTick"].Value.Value),
+						FieldLoader.GetValue<long>("RawKilledValue", fields["RawKilledValue"].Value.Value),
+						FieldLoader.GetValue<int>("KillCount", fields["KillCount"].Value.Value),
+						FieldLoader.GetValue<long>("ActorTicks", fields["ActorTicks"].Value.Value),
+						FieldLoader.GetValue<long>("TotalDamage", fields["TotalDamage"].Value.Value),
+						FieldLoader.GetValue<uint[]>("Actors", fields["Actors"].Value.Value));
+					if (id <= 0 || state.StartTick < 0 || state.RawKilledValue < 0 || state.KillCount < 0 ||
+						state.ActorTicks < 0 || state.TotalDamage < 0 ||
+						state.Actors.Distinct().Count() != state.Actors.Length)
+						throw new InvalidOperationException();
+
+					return new KeyValuePair<int, StealthEfficiencyWindow>(
+						id, StealthEfficiencyWindow.Restore(state));
+				}).ToArray();
+
+				if (loaded.Select(pair => pair.Key).Distinct().Count() != loaded.Length)
+					return false;
+
+				windows = loaded;
+				return true;
+			}
+			catch (Exception)
+			{
+				return false;
+			}
+		}
 
 		public static BotStationaryWatchdogExemption StationaryWatchdogExemption(
 			bool sustainedFiring, bool observedHealing)

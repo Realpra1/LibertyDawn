@@ -2048,6 +2048,7 @@ namespace OpenRA.Mods.Common.Traits
 				new MiniYamlNode("StealthEfficiencyActors", FieldSaver.FormatValue(stealthEfficiencyActors.ToArray())),
 				new MiniYamlNode("StealthEfficiencyNextReportTick", FieldSaver.FormatValue(stealthEfficiencyNextReportTick)),
 				new MiniYamlNode("StealthEfficiencyWindowStartTick", FieldSaver.FormatValue(stealthEfficiencyWindowStartTick)),
+				StealthAISpecialistPolicy.SaveStealthGenerationEfficiency(stealthGenerationEfficiency),
 				new MiniYamlNode("FallbackReconsiderTicks", FieldSaver.FormatValue(fallbackReconsiderTicks)),
 				new MiniYamlNode("FallbackTarget", FieldSaver.FormatValue(fallbackTarget?.ActorID ?? 0)),
 				new MiniYamlNode("FallbackOrderedActors", FieldSaver.FormatValue(fallbackOrderedActors.ToArray())),
@@ -2150,6 +2151,15 @@ namespace OpenRA.Mods.Common.Traits
 			if (efficiencyWindowNode != null)
 				stealthEfficiencyWindowStartTick = FieldLoader.GetValue<int>(
 					"StealthEfficiencyWindowStartTick", efficiencyWindowNode.Value.Value);
+			var generationEfficiencyNode = data.FirstOrDefault(n => n.Key == "StealthGenerationEfficiency");
+			if (StealthAISpecialistPolicy.TryLoadStealthGenerationEfficiency(
+				generationEfficiencyNode, out var generationEfficiency))
+			{
+				stealthGenerationEfficiency.Clear();
+				foreach (var pair in generationEfficiency)
+					stealthGenerationEfficiency.Add(pair.Key, pair.Value);
+			}
+
 			var fallbackTicksNode = data.FirstOrDefault(n => n.Key == "FallbackReconsiderTicks");
 			if (fallbackTicksNode != null)
 				fallbackReconsiderTicks = FieldLoader.GetValue<int>("FallbackReconsiderTicks", fallbackTicksNode.Value.Value);
