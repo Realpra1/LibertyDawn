@@ -8,8 +8,8 @@ Evidence standard:
 Policy:
 - With a sparse frontier, bounded adjacent-safe movement toward enemies is
   sensible while fewer than ten target cells are available.
-- Repeated fallback must yield when target depletion or a route change produces a
-  valid safe mission; retain that route while its target and safety remain valid.
+- Repeated fallback must yield when target depletion or a route change produces
+  a valid safe mission; retain that route while its target and safety remain valid.
 - Detector danger remains a route and decloak gate. A `no-safe-firing-cell`
   rejection is evidence of lifecycle conformance, not evidence that all nearby
   combat outcomes are safe.
@@ -20,6 +20,11 @@ Policy:
   negative-overmatch crossover rejections are strong evidence that attack gates
   are being applied; a split-angle test is still needed to show they do not hide
   a reachable safe flank.
+- When a corrected matched set lowers aggregate damage-adjusted efficiency below
+  the exact base, classify it as a B behavior/policy consistency signal unless
+  explicit order, route, detector, or crossover evidence proves an A lifecycle
+  violation. Do not infer mechanism from efficiency alone; retain canonical
+  threat/default semantics and require further matched adversarial traces.
 
 Validation limit:
 - Distinguish B from A with adversarial detector-pressure games logging each

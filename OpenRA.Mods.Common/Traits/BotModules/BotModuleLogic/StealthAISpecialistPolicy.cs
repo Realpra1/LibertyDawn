@@ -1179,6 +1179,11 @@ namespace OpenRA.Mods.Common.Traits
 			return plannedDecloak && canonicalThreat >= HardRouteDangerThreshold;
 		}
 
+		public static double AccumulateMaximumCanonicalThreat(double maximumThreat, double canonicalThreat)
+		{
+			return Math.Max(maximumThreat, canonicalThreat);
+		}
+
 		public static int StrategicTargetReviewIntervalTicks(int timestep, int configuredInterval)
 		{
 			return Math.Max(Math.Max(1, configuredInterval),

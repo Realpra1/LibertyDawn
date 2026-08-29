@@ -329,6 +329,20 @@ namespace OpenRA.Test.Mods.Common
 				"hard canonical threat at the actual decloak distance must remain responsive");
 			Assert.That(StealthAISpecialistPolicy.IsHardPlannedDecloakThreat(false, 100), Is.False,
 				"canonical magnitude alone is not planned-decloak context");
+			var lowThenObelisk = StealthAISpecialistPolicy.AccumulateMaximumCanonicalThreat(0, 0.2);
+			lowThenObelisk = StealthAISpecialistPolicy.AccumulateMaximumCanonicalThreat(lowThenObelisk, 4);
+			var obeliskThenLow = StealthAISpecialistPolicy.AccumulateMaximumCanonicalThreat(0, 4);
+			obeliskThenLow = StealthAISpecialistPolicy.AccumulateMaximumCanonicalThreat(obeliskThenLow, 0.2);
+			Assert.That(StealthAISpecialistPolicy.IsHardPlannedDecloakThreat(true, lowThenObelisk), Is.True,
+				"a low-threat rifle before a close Obelisk must not hide the hard planned-decloak threat");
+			Assert.That(StealthAISpecialistPolicy.IsHardPlannedDecloakThreat(true, obeliskThenLow), Is.True,
+				"a close Obelisk before a low-threat rifle must produce the same planned-decloak result");
+			Assert.That(StealthAISpecialistPolicy.IsHardPlannedDecloakThreat(true,
+				StealthAISpecialistPolicy.AccumulateMaximumCanonicalThreat(0, 0.2)), Is.False,
+				"low-threat-only planned decloak remains below the hard threshold");
+			Assert.That(states, Does.Contain("foreach (var threat in cache.Threats)"));
+			Assert.That(states, Does.Not.Contain("weaponExposure |= cache.Threats.Any(t =>"),
+				"planned-decloak threat aggregation must scan every covered defender");
 			Assert.That(StealthAISpecialistPolicy.StrategicTargetReviewIntervalTicks(40, 25), Is.EqualTo(125));
 			Assert.That(StealthAISpecialistPolicy.StrategicTargetReviewIntervalTicks(20, 125), Is.EqualTo(250));
 			Assert.That(states, Does.Contain("TryGetDefenderThreat"),

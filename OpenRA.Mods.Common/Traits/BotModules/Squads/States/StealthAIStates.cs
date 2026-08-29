@@ -1901,20 +1901,21 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			{
 				detectorExposure |= cache.Threats.Any(t => ThreatCoversPosition(t, unit.CenterPosition,
 					false, definition.DetectorRangeBufferCells));
-				weaponExposure |= cache.Threats.Any(t =>
+				foreach (var threat in cache.Threats)
 				{
-					if ((safeKite && t.Actor == owner.TargetActor) ||
-						!ThreatCoversPosition(t, unit.CenterPosition, true, definition.ThreatRangeBufferCells))
-						return false;
+					if ((safeKite && threat.Actor == owner.TargetActor) ||
+						!ThreatCoversPosition(threat, unit.CenterPosition, true, definition.ThreatRangeBufferCells))
+						continue;
 
-					var distance = (t.Actor.CenterPosition - unit.CenterPosition).HorizontalLength / 1024d;
+					var distance = (threat.Actor.CenterPosition - unit.CenterPosition).HorizontalLength / 1024d;
 					if (!owner.SquadManager.CombatThreatCalculator.TryGetDefenderThreat(
-						unit, t.Actor, out var canonicalThreat, distance))
-						return false;
+						unit, threat.Actor, out var canonicalThreat, distance))
+						continue;
 
-					maximumCanonicalThreat = Math.Max(maximumCanonicalThreat, canonicalThreat);
-					return canonicalThreat > 0;
-				});
+					maximumCanonicalThreat = StealthAISpecialistPolicy.AccumulateMaximumCanonicalThreat(
+						maximumCanonicalThreat, canonicalThreat);
+					weaponExposure |= canonicalThreat > 0;
+				}
 			}
 			weaponExposure |= kiteParticipantDamaged;
 
