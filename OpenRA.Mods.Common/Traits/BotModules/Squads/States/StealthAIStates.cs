@@ -1925,7 +1925,31 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var revealed = decisionUnits.Any(unit =>
 				unit.TraitsImplementing<Cloak>().Any(cloak => !cloak.Cloaked));
 			if (!pendingBlueExplosion && owner.StealthClearMode == StealthClearMode.Mass)
+			{
+				if (Game.Settings.Debug.BotDebug &&
+					owner.World.WorldTick >= owner.StealthMassPolicyNextReportTick)
+				{
+					owner.StealthMassPolicyNextReportTick = owner.World.WorldTick + 250;
+					var package = LatchedDefenderPackage(owner, cache);
+					var overmatch = CrossoverOvermatch(owner, decisionUnits, package);
+					var policyOvermatch = overmatch < 0 ? double.MaxValue : overmatch;
+					var exitPending = StealthAISpecialistPolicy.ShouldAbortMassClear(
+						policyOvermatch, definition.MassClearAbortCrossoverPercent);
+					Log.Write("debug", "Stealth mass policy watchdog [{0}] tick={1}: mode=Mass " +
+						"entry=explicit-crossover exit-threshold={2} measured-overmatch={3:0.###} " +
+						"policy-overmatch={4:0.###} detector-exposure={5} weapon-exposure={6} " +
+						"revealed={7} planned-decloak={8} canonical-current-range-max={9:0.###} " +
+						"ordinary-flee=bypassed-by-policy decision={10} package={11} members={12}.",
+						owner.StealthProfile,
+						owner.World.WorldTick, definition.MassClearAbortCrossoverPercent / 100d,
+						overmatch, policyOvermatch, detectorExposure, weaponExposure,
+						revealed, plannedDecloak, maximumCanonicalThreat,
+						exitPending ? "exit-on-state-update" : "continue-crossover-policy",
+						package.Count, decisionUnits.Count);
+				}
+
 				return;
+			}
 			var engagedWeaponExposure = weaponExposure && (revealed ||
 				StealthAISpecialistPolicy.IsHardPlannedDecloakThreat(plannedDecloak, maximumCanonicalThreat));
 			if (!pendingBlueExplosion && !StealthAISpecialistPolicy.IsEngagementThreat(
@@ -2336,9 +2360,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				overmatch = double.MaxValue;
 			if (package.Count == 0)
 			{
-				if (owner.SquadManager.Info.AirTargetDebugLogging)
+				if (owner.SquadManager.Info.AirTargetDebugLogging || Game.Settings.Debug.BotDebug)
 					Log.Write("debug", "Stealth mass [{0}] cleared empty cached package at tick={1}; " +
-						"same-tick mission reacquisition, no completion retreat.",
+						"transition-reason=cell-clear/package-empty; same-tick mission reacquisition, no completion retreat.",
 						owner.StealthProfile, owner.World.WorldTick);
 				ClearAaTargetContext(owner);
 				owner.TargetActor = null;
@@ -2351,10 +2375,12 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			if (StealthAISpecialistPolicy.ShouldAbortMassClear(
 				overmatch, owner.StealthDefinition.MassClearAbortCrossoverPercent))
 			{
-				if (owner.SquadManager.Info.AirTargetDebugLogging)
+				if (owner.SquadManager.Info.AirTargetDebugLogging || Game.Settings.Debug.BotDebug)
 					Log.Write("debug", "Stealth mass [{0}] abort-flee: tick={1} overmatch={2:0.###} " +
-						"package={3} squad={4}.", owner.StealthProfile, owner.World.WorldTick,
-						overmatch, package.Count, formation.Count);
+						"package={3} squad={4} transition-reason=crossover-exit-threshold threshold={5}.",
+						owner.StealthProfile, owner.World.WorldTick,
+						overmatch, package.Count, formation.Count,
+						owner.StealthDefinition.MassClearAbortCrossoverPercent / 100d);
 				ClearAaTargetContext(owner);
 				owner.TargetActor = null;
 				BeginStealthSafetyReposition(owner);
@@ -2365,6 +2391,10 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			owner.StealthAggressiveMass = StealthAISpecialistPolicy.ShouldEnterAggressiveMass(overmatch);
 			if (wasAggressiveMass && !owner.StealthAggressiveMass)
 			{
+				if (Game.Settings.Debug.BotDebug)
+					Log.Write("debug", "Stealth mass [{0}] transition: tick={1} " +
+						"transition-reason=aggressive-threshold-exit-to-ordinary overmatch={2:0.###}.",
+						owner.StealthProfile, owner.World.WorldTick, overmatch);
 				// Leaving >5 immediately restores the full ordinary hierarchy instead of
 				// retaining the previous Mass victim or inventing a special downgrade tier.
 				ClearAaTargetContext(owner);
@@ -2384,6 +2414,12 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				MassClearRoute(owner, formation[0], cache, target);
 			if (target == null || route == null)
 			{
+				if (Game.Settings.Debug.BotDebug)
+					Log.Write("debug", "Stealth mass [{0}] transition: tick={1} " +
+						"transition-reason=no-live-target-or-route target={2} route={3}.",
+						owner.StealthProfile, owner.World.WorldTick,
+						target == null ? "none" : target.Info.Name + "#" + target.ActorID,
+						route == null ? "none" : "available");
 				ClearAaTargetContext(owner);
 				owner.TargetActor = null;
 				BeginStealthSafetyReposition(owner);
@@ -3912,6 +3948,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		protected static void ApplyAirTargetPlan(Squad owner, AirTargetPlan plan)
 		{
 			var info = owner.SquadManager.Info;
+			var previousStealthMode = owner.StealthClearMode;
+			var previousTarget = owner.TargetActor;
 			owner.StealthKiteSupersessionActorId = 0;
 			owner.StealthKiteSupersessionConfirmations = 0;
 			var preserveStealthRoute = StealthAISpecialistPolicy.ShouldPreserveOwnedMissionRoute(
@@ -3984,6 +4022,22 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					.Where(a => a != null && !a.IsDead && a.IsInWorld);
 				owner.StealthClearMembershipSignature = PackageSignature(
 					owner.AirFormationUnits(bootstrapIfEmpty: true), package);
+				if (Game.Settings.Debug.BotDebug &&
+					(previousStealthMode != plan.StealthMode || previousTarget != plan.Actor))
+				{
+					var transitionReason = enteringStealthMass ? "crossover-entry-approved" :
+						plan.StealthMode == StealthClearMode.Mass ? "crossover-continuation-retarget" :
+						"plan-selected";
+					Log.Write("debug", "Stealth lifecycle watchdog transition [{0}] tick={1}: " +
+						"from-mode={2} to-mode={3} from-target={4} to-target={5} " +
+						"reason={6} mass-entry-approved={7} package={8} clear-cell={9}.",
+						owner.StealthProfile, owner.World.WorldTick, previousStealthMode,
+						plan.StealthMode, previousTarget == null ? "none" :
+							previousTarget.Info.Name + "#" + previousTarget.ActorID,
+						plan.Actor.Info.Name + "#" + plan.Actor.ActorID, transitionReason,
+						enteringStealthMass, owner.StealthClearPackage.Count,
+						owner.StealthClearCenterCell?.ToString() ?? "none");
+				}
 				if (enteringStealthKite)
 				{
 					owner.StealthKiteTargetCell = plan.Actor.Location;

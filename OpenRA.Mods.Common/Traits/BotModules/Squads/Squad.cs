@@ -162,6 +162,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		internal uint StealthCrushLeaderActorId;
 		internal StealthClearMode StealthClearMode;
 		internal bool StealthAggressiveMass;
+		internal int StealthMassPolicyNextReportTick;
 		internal readonly HashSet<uint> StealthClearPackage = new HashSet<uint>();
 		internal int StealthClearMembershipSignature;
 		internal CPos? StealthClearCenterCell;

@@ -583,6 +583,18 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(pendingBlue, Is.GreaterThanOrEqualTo(0));
 			Assert.That(pendingBlue, Is.LessThan(massSafetyBypass),
 				"Pending Blue explosion escape must remain the mandatory override before Mass safety bypass.");
+			Assert.That(states, Does.Contain("entry=explicit-crossover"),
+				"The deliberate Mass safety policy must identify its approval authority.");
+			Assert.That(states, Does.Contain("ordinary-flee=bypassed-by-policy"),
+				"Mass danger acceptance must be explicit diagnostic policy, not an accidental silent return.");
+			Assert.That(states, Does.Contain("decision={10}"));
+			Assert.That(states, Does.Contain("continue-crossover-policy"));
+			Assert.That(states, Does.Contain("transition-reason=crossover-exit-threshold"));
+			Assert.That(states, Does.Contain("transition-reason=cell-clear/package-empty"));
+			Assert.That(states, Does.Contain("reason={6} mass-entry-approved={7}"));
+			Assert.That(states.IndexOf("ShouldEnterMassClear(", StringComparison.Ordinal),
+				Is.LessThan(states.IndexOf("stealthMode: StealthClearMode.Mass",
+					StringComparison.Ordinal)), "Mass plans require explicit crossover entry approval.");
 		}
 
 		[Test]
