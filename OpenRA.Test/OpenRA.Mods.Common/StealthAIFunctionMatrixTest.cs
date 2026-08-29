@@ -287,8 +287,11 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(stnk, Does.Contain("EconomyMammothCrushMove:"));
 			Assert.That(states, Does.Contain("owner.Type != SquadType.Stealth && challenger != null"),
 				"A valid static STNK mission must reach service instead of restarting for every economic challenger.");
-			Assert.That(states, Does.Contain("if (cache == null || !cache.Threats.Any(t => t.Actor == target)"),
+			Assert.That(states, Does.Contain("if (cache == null || formation.Count == 0)"),
 				"An owned Kite must reject a transiently unavailable influence cache and use the existing safe replan path.");
+			Assert.That(states, Does.Contain("!cache.ThreatByActor.ContainsKey(target) &&"));
+			Assert.That(states, Does.Contain("!StealthAISpecialistPolicy.MissingCanonicalThreatIsZero("),
+				"Only a live-trait-confirmed zero-threat target may survive a missing canonical row.");
 			var watchdog = Source("OpenRA.Mods.Common/Traits/BotOwnedStationaryWatchdog.cs");
 			var watchdogGuard = watchdog.IndexOf(
 				"if (!Game.Settings.Debug.BotDebug || !self.Owner.IsBot)", StringComparison.Ordinal);
@@ -552,6 +555,12 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(StealthAISpecialistPolicy.CanKite(120, 100, 8, 5, 1, 120), Is.True);
 			Assert.That(StealthAISpecialistPolicy.CanKite(119, 100, 8, 5, 1, 120), Is.False);
 			Assert.That(StealthAISpecialistPolicy.CanKite(120, 100, 6, 5, 1, 120), Is.False);
+			Assert.That(StealthAISpecialistPolicy.MissingCanonicalThreatIsZero(0, 0), Is.True,
+				"An actor confirmed unarmed and non-detecting is the canonical zero-threat case.");
+			Assert.That(StealthAISpecialistPolicy.MissingCanonicalThreatIsZero(1, 0), Is.False,
+				"An armed actor with missing calculator data must remain invalid.");
+			Assert.That(StealthAISpecialistPolicy.MissingCanonicalThreatIsZero(0, 1), Is.False,
+				"A detector with missing calculator data must remain invalid.");
 			Assert.That(StealthAISpecialistPolicy.ShouldEnterMassClear(2, 200), Is.False);
 			Assert.That(StealthAISpecialistPolicy.ShouldEnterMassClear(2.01, 200), Is.True);
 			Assert.That(StealthAISpecialistPolicy.ShouldAbortMassClear(1.01, 100), Is.False);
@@ -568,6 +577,9 @@ namespace OpenRA.Test.Mods.Common
 				"Aggressive Mass must route toward the selected high-value strategic destination.");
 			Assert.That(states, Does.Contain("else if (!aggressiveMass && CanAttackTarget"),
 				"Aggressive AttackMove must not divert into a targeted low-value scout hunt.");
+			Assert.That(states, Does.Contain("surrounding-threat-screen=required"));
+			Assert.That(states, Does.Contain("!packageThreats.Any(t => CachedThreatCoversReveal("),
+				"A zero-threat target must not bypass other canonical weapons around its firing cell.");
 			Assert.That(states, Does.Contain(
 				"plan.StealthAggressiveMass && plan.StealthClearCenterCell != null"),
 				"The latched high-value strategic destination must remain distinct from encountered threats.");

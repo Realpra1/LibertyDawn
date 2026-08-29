@@ -1148,6 +1148,15 @@ namespace OpenRA.Mods.Common.Traits
 				ownSpeed * 100L >= enemySpeed * (long)minimumSpeedPercent;
 		}
 
+		public static bool MissingCanonicalThreatIsZero(int enabledWeaponRangeCells,
+			int enabledDetectorRangeCells)
+		{
+			// The shared calculator intentionally has no row for an actor that cannot threaten
+			// the formation. Absence is zero only when live traits independently confirm that
+			// the actor is neither armed nor a detector; missing armed data remains invalid.
+			return enabledWeaponRangeCells <= 0 && enabledDetectorRangeCells <= 0;
+		}
+
 		public static bool ShouldEnterMassClear(double overmatch, int entryPercent)
 		{
 			return double.IsFinite(overmatch) && overmatch * 100 > entryPercent;

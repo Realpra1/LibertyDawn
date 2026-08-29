@@ -2176,15 +2176,24 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 						cache.Candidates.Where(candidate => candidate.Actor == a)
 							.Select(candidate => candidate.Priority).DefaultIfEmpty().Max(), a.ActorID)))
 				{
-					if (!cache.ThreatByActor.ContainsKey(defender))
+					var enemyThreat = LiveGroundThreat(defender);
+					var hasCanonicalThreat = cache.ThreatByActor.ContainsKey(defender);
+					if (!hasCanonicalThreat && !StealthAISpecialistPolicy.MissingCanonicalThreatIsZero(
+						enemyThreat.WeaponRange, enemyThreat.DetectorRange))
 					{
 						if (Game.Settings.Debug.BotDebug)
 							Log.Write("debug", "Stealth Kite decision [{0}] tick={1}: target={2}#{3} " +
-								"verdict=reject reason=no-cached-canonical-threat.", owner.StealthProfile,
-								owner.World.WorldTick, defender.Info.Name, defender.ActorID);
+								"verdict=reject reason=missing-armed-canonical-threat weapon-range={4} " +
+								"detector-range={5}.", owner.StealthProfile,
+								owner.World.WorldTick, defender.Info.Name, defender.ActorID,
+								enemyThreat.WeaponRange, enemyThreat.DetectorRange);
 						continue;
 					}
-					var enemyThreat = LiveGroundThreat(defender);
+					if (!hasCanonicalThreat && Game.Settings.Debug.BotDebug)
+						Log.Write("debug", "Stealth Kite decision [{0}] tick={1}: target={2}#{3} " +
+							"canonical-threat=zero reason=confirmed-unarmed-nondetector " +
+							"surrounding-threat-screen=required.", owner.StealthProfile,
+							owner.World.WorldTick, defender.Info.Name, defender.ActorID);
 
 					var ownSpeed = formation.Min(CurrentGroundSpeed);
 					var ownRange = formation.Min(unit => GroundWeaponRange(unit, defender));
@@ -2766,9 +2775,13 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			IReadOnlyList<Actor> formation, Actor target, out bool routeChanged)
 		{
 			routeChanged = false;
-			if (cache == null || !cache.Threats.Any(t => t.Actor == target) || formation.Count == 0)
+			if (cache == null || formation.Count == 0)
 				return false;
 			var threat = LiveGroundThreat(target);
+			if (!cache.ThreatByActor.ContainsKey(target) &&
+				!StealthAISpecialistPolicy.MissingCanonicalThreatIsZero(
+					threat.WeaponRange, threat.DetectorRange))
+				return false;
 
 			var definition = owner.StealthDefinition;
 			var ownSpeed = formation.Min(CurrentGroundSpeed);
