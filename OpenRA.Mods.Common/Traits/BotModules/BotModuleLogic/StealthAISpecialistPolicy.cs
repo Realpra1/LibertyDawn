@@ -587,6 +587,16 @@ namespace OpenRA.Mods.Common.Traits
 				.Select(generation => generation.GenerationId).Distinct().OrderBy(id => id).ToArray();
 		}
 
+		public static bool TryTakeStealthGeneration<T>(IDictionary<int, T> activeGenerations,
+			int generationId, out T generation)
+		{
+			if (!activeGenerations.TryGetValue(generationId, out generation))
+				return false;
+
+			activeGenerations.Remove(generationId);
+			return true;
+		}
+
 		public static StealthEfficiencySummary StealthEfficiency(long rawKilledValue,
 			long actorTicks, long totalDamage, int uniqueStnks)
 		{

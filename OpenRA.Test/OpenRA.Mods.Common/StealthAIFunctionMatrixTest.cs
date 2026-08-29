@@ -1253,7 +1253,7 @@ namespace OpenRA.Test.Mods.Common
 				"void EmitStealthEfficiencySummary", StringComparison.Ordinal));
 			Assert.That(terminal, Does.Contain("EmitTerminalStealthCadenceSummaries();"));
 			Assert.That(terminal, Does.Contain("EmitStealthEfficiencySummary(\"terminal\");"));
-			Assert.That(terminal, Does.Contain("summary=terminal"));
+			Assert.That(terminal, Does.Contain("EmitStealthCadenceSummary(record, squad, \"terminal\")"));
 			Assert.That(terminal, Does.Contain("owner={0}"));
 			Assert.That(terminal, Does.Contain("generation-kills={9}"));
 			Assert.That(terminal, Does.Contain("KillCadenceFailed(generation.CadenceAge, maximumTicks)"),
@@ -1265,7 +1265,48 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
-		public void RetiredStealthCadenceGenerationsRoundTripForTerminalDiagnostics()
+		public void RepeatedStealthGenerationRetirementEmitsOnceAndLeavesBoundedActiveState()
+		{
+			var activeCadence = new Dictionary<int, StealthCadenceGenerationRecord>();
+			var activeEfficiency = new Dictionary<int, StealthEfficiencyWindow>();
+			var retiredCadence = new List<int>();
+			var retiredEfficiency = new List<int>();
+			for (var id = 1; id <= 100; id++)
+			{
+				activeCadence.Add(id, new StealthCadenceGenerationRecord("stealth-tank", id % 3,
+					new StealthKillCadenceGeneration(id, id * 10)));
+				activeEfficiency.Add(id, new StealthEfficiencyWindow(id * 10));
+				Assert.That(StealthAISpecialistPolicy.TryTakeStealthGeneration(
+					activeCadence, id, out var cadence), Is.True);
+				retiredCadence.Add(cadence.Generation.GenerationId);
+				Assert.That(StealthAISpecialistPolicy.TryTakeStealthGeneration(
+					activeEfficiency, id, out _), Is.True);
+				retiredEfficiency.Add(id);
+				Assert.That(StealthAISpecialistPolicy.TryTakeStealthGeneration(
+					activeCadence, id, out _), Is.False, "A retired generation cannot emit twice.");
+				Assert.That(activeCadence, Is.Empty);
+				Assert.That(activeEfficiency, Is.Empty);
+			}
+
+			Assert.That(retiredCadence, Is.EqualTo(Enumerable.Range(1, 100)),
+				"Every retired cadence diagnostic must be delivered before pruning.");
+			Assert.That(retiredEfficiency, Is.EqualTo(Enumerable.Range(1, 100)),
+				"Every paired efficiency diagnostic must be delivered before pruning.");
+
+			var manager = Source("OpenRA.Mods.Common/Traits/BotModules/SquadManagerBotModule.cs");
+			var retirement = manager.IndexOf("FinalizeStealthGenerationDiagnostics(squad, \"retired\")",
+				StringComparison.Ordinal);
+			Assert.That(retirement, Is.GreaterThanOrEqualTo(0));
+			Assert.That(retirement, Is.LessThan(manager.IndexOf("Squads.Remove(squad)", retirement,
+				StringComparison.Ordinal)), "Diagnostics must emit and prune before the reusable slot retires.");
+			Assert.That(manager, Does.Contain("summary, stealthCadenceGenerations.Count"),
+				"Full-engine evidence must expose the retained active-generation bound.");
+			Assert.That(manager, Does.Contain("FinalizeOrphanedLoadedStealthGenerationDiagnostics();"),
+				"Old saves must not reinstall historical generations into active retained state.");
+		}
+
+		[Test]
+		public void ActiveStealthCadenceGenerationsRoundTripForTerminalDiagnostics()
 		{
 			var generation = new StealthKillCadenceGeneration(7, 100);
 			generation.Observe(400, true);
@@ -1278,6 +1319,8 @@ namespace OpenRA.Test.Mods.Common
 			});
 
 			Assert.That(saved.Key, Is.EqualTo("StealthCadenceGenerations"));
+			Assert.That(saved.Value.Nodes.Count(node => node.Key == "Generation"), Is.EqualTo(1),
+				"Only the active generation is persisted after retired generations are emitted and pruned.");
 			Assert.That(StealthAISpecialistPolicy.TryLoadStealthCadenceGenerations(
 				saved, out var loaded), Is.True);
 			Assert.That(loaded, Has.Length.EqualTo(1));

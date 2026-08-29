@@ -851,17 +851,20 @@ namespace OpenRA.Mods.Common.Traits
 		void EmitTerminalStealthGenerationEfficiencySummaries()
 		{
 			foreach (var pair in stealthGenerationEfficiency.OrderBy(entry => entry.Key))
-			{
-				var window = pair.Value;
-				Log.Write("debug", "Stealth efficiency control membership owner={0} bot_id={1} " +
-					"control=bot generation={2} generation-start={3} generation-end={4} kills={5} members=[{6}] " +
-					"actor-time-denominator=sum-live-member-ticks summary=terminal diagnostic_only=true.",
-					Player.PlayerName, Player.PlayerActor.ActorID, pair.Key, window.StartTick, World.WorldTick,
-					window.KillCount, window.Actors.Select(id => "stnk#" + id).JoinWith(","));
-				Log.Write("debug", StealthAISpecialistPolicy.FormatStealthEfficiencySummary(
-					"terminal-generation-" + pair.Key, Player.PlayerActor.ActorID,
-					window.StartTick, World.WorldTick, window.Summary()));
-			}
+				EmitStealthGenerationEfficiencySummary(pair.Key, pair.Value, "terminal");
+		}
+
+		void EmitStealthGenerationEfficiencySummary(int generationId,
+			StealthEfficiencyWindow window, string summary)
+		{
+			Log.Write("debug", "Stealth efficiency control membership owner={0} bot_id={1} " +
+				"control=bot generation={2} generation-start={3} generation-end={4} kills={5} members=[{6}] " +
+				"actor-time-denominator=sum-live-member-ticks summary={7} diagnostic_only=true.",
+				Player.PlayerName, Player.PlayerActor.ActorID, generationId, window.StartTick, World.WorldTick,
+				window.KillCount, window.Actors.Select(id => "stnk#" + id).JoinWith(","), summary);
+			Log.Write("debug", StealthAISpecialistPolicy.FormatStealthEfficiencySummary(
+				summary + "-generation-" + generationId, Player.PlayerActor.ActorID,
+				window.StartTick, World.WorldTick, window.Summary()));
 		}
 
 		void EmitTerminalStealthCadenceSummaries()
@@ -872,25 +875,63 @@ namespace OpenRA.Mods.Common.Traits
 				var generation = record.Generation;
 				var squad = Squads.SingleOrDefault(s => s.Type == SquadType.Stealth &&
 					s.StealthKillCadenceGeneration?.GenerationId == generation.GenerationId);
-				var stnks = squad?.Units.Where(unit => unit != null && !unit.IsDead && unit.IsInWorld &&
-					unit.Info.Name == "stnk").Distinct().OrderBy(unit => unit.ActorID).ToArray();
-				stnks = stnks ?? Array.Empty<Actor>();
-				generation.Observe(World.WorldTick, stnks.Length > 0);
-				var maximumTicks = Math.Max(1, 45000 / Math.Max(1, World.Timestep));
-				var cadenceFailed = generation.CadenceFailed || generation.MismatchFailed ||
-					StealthAISpecialistPolicy.KillCadenceFailed(generation.CadenceAge, maximumTicks);
-				var status = cadenceFailed ? "failure" :
-					stnks.Length == 0 ? "exempt" : "pass";
-				Log.Write("debug", "Stealth kill watchdog [stealth-tank] squad terminal: owner={0} tick={1} " +
-					"generation={2} generation-start={3} window-start={4} squad={5}#{6} " +
-					"cadence-age={7}/{8} generation-kills={9} stnks={10} formation={11} " +
-					"reinforcements={12} members=[{13}] cadence-failed={14} status={15} summary=terminal.",
-					Player.PlayerName, World.WorldTick, generation.GenerationId, generation.GenerationStartTick,
-					generation.WindowStartTick, record.SquadDefinition, record.SquadIndex,
-					generation.CadenceAge, maximumTicks, generation.AttributedKills, stnks.Length,
-					squad?.AirFormationUnits().Count ?? 0, squad?.AirReinforcements.Count ?? 0,
-					stnks.Select(unit => unit.Info.Name + "#" + unit.ActorID).JoinWith(","),
-					cadenceFailed, status);
+				EmitStealthCadenceSummary(record, squad, "terminal");
+			}
+		}
+
+		void EmitStealthCadenceSummary(StealthCadenceGenerationRecord record, Squad squad, string summary)
+		{
+			var generation = record.Generation;
+			var stnks = squad?.Units.Where(unit => unit != null && !unit.IsDead && unit.IsInWorld &&
+				unit.Info.Name == "stnk").Distinct().OrderBy(unit => unit.ActorID).ToArray();
+			stnks = stnks ?? Array.Empty<Actor>();
+			generation.Observe(World.WorldTick, stnks.Length > 0);
+			var maximumTicks = Math.Max(1, 45000 / Math.Max(1, World.Timestep));
+			var cadenceFailed = generation.CadenceFailed || generation.MismatchFailed ||
+				StealthAISpecialistPolicy.KillCadenceFailed(generation.CadenceAge, maximumTicks);
+			var status = cadenceFailed ? "failure" : stnks.Length == 0 ? "exempt" : "pass";
+			Log.Write("debug", "Stealth kill watchdog [stealth-tank] squad result: owner={0} tick={1} " +
+				"generation={2} generation-start={3} window-start={4} squad={5}#{6} " +
+				"cadence-age={7}/{8} generation-kills={9} stnks={10} formation={11} " +
+				"reinforcements={12} members=[{13}] cadence-failed={14} status={15} summary={16} " +
+				"retained-generations={17}.",
+				Player.PlayerName, World.WorldTick, generation.GenerationId, generation.GenerationStartTick,
+				generation.WindowStartTick, record.SquadDefinition, record.SquadIndex,
+				generation.CadenceAge, maximumTicks, generation.AttributedKills, stnks.Length,
+				squad?.AirFormationUnits().Count ?? 0, squad?.AirReinforcements.Count ?? 0,
+				stnks.Select(unit => unit.Info.Name + "#" + unit.ActorID).JoinWith(","),
+				cadenceFailed, status, summary, stealthCadenceGenerations.Count);
+		}
+
+		void FinalizeStealthGenerationDiagnostics(Squad squad, string summary)
+		{
+			var generation = squad.StealthKillCadenceGeneration;
+			if (generation == null)
+				return;
+
+			if (StealthAISpecialistPolicy.TryTakeStealthGeneration(stealthCadenceGenerations,
+				generation.GenerationId, out var cadence))
+				EmitStealthCadenceSummary(cadence, squad, summary);
+			if (StealthAISpecialistPolicy.TryTakeStealthGeneration(stealthGenerationEfficiency,
+				generation.GenerationId, out var efficiency))
+				EmitStealthGenerationEfficiencySummary(generation.GenerationId, efficiency, summary);
+		}
+
+		void FinalizeOrphanedLoadedStealthGenerationDiagnostics()
+		{
+			var activeGenerationIds = Squads.Where(squad => squad.Type == SquadType.Stealth &&
+				squad.StealthKillCadenceGeneration != null)
+				.Select(squad => squad.StealthKillCadenceGeneration.GenerationId).ToHashSet();
+			var orphanedIds = stealthCadenceGenerations.Keys.Concat(stealthGenerationEfficiency.Keys)
+				.Where(id => !activeGenerationIds.Contains(id)).Distinct().OrderBy(id => id).ToArray();
+			foreach (var generationId in orphanedIds)
+			{
+				if (StealthAISpecialistPolicy.TryTakeStealthGeneration(stealthCadenceGenerations,
+					generationId, out var cadence))
+					EmitStealthCadenceSummary(cadence, null, "retired-load");
+				if (StealthAISpecialistPolicy.TryTakeStealthGeneration(stealthGenerationEfficiency,
+					generationId, out var efficiency))
+					EmitStealthGenerationEfficiencySummary(generationId, efficiency, "retired-load");
 			}
 		}
 
@@ -902,6 +943,9 @@ namespace OpenRA.Mods.Common.Traits
 
 			stealthCadenceGenerations[generation.GenerationId] = new StealthCadenceGenerationRecord(
 				squad.StealthSquadDefinition, squad.StealthSquadIndex, generation);
+			if (!stealthGenerationEfficiency.ContainsKey(generation.GenerationId))
+				stealthGenerationEfficiency.Add(generation.GenerationId,
+					new StealthEfficiencyWindow(generation.GenerationStartTick));
 		}
 
 		void EmitStealthEfficiencySummary(string summary)
@@ -1126,6 +1170,7 @@ namespace OpenRA.Mods.Common.Traits
 					if (World.WorldTick - squad.StealthEmptySinceTick < configured.Value.ScanInterval)
 						continue;
 
+					FinalizeStealthGenerationDiagnostics(squad, "retired");
 					Squads.Remove(squad);
 					expiredStealthSquadSlots.Add((configured.Key, squad.StealthSquadIndex));
 					if (Info.AirTargetDebugLogging)
@@ -2261,6 +2306,7 @@ namespace OpenRA.Mods.Common.Traits
 						nextStealthSquadGenerationId++, World.WorldTick);
 				foreach (var squad in Squads.Where(s => s.Type == SquadType.Stealth))
 					RegisterStealthCadenceGeneration(squad);
+				FinalizeOrphanedLoadedStealthGenerationDiagnostics();
 
 				EnsureStealthSquads(bot);
 			}
