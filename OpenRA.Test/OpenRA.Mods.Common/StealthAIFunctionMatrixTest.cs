@@ -388,6 +388,15 @@ namespace OpenRA.Test.Mods.Common
 				"Cadence state must not be owner-wide.");
 			Assert.That(squad, Does.Contain("internal StealthKillCadenceGeneration StealthKillCadenceGeneration"),
 				"Every persistent configured STNK squad must own an independent cadence clock.");
+			Assert.That(squad, Does.Contain("new MiniYamlNode(\"AirEscapingLocalAa\""),
+				"An active local escape must use the existing squad game-save schema.");
+			Assert.That(squad, Does.Contain("squad.StealthEscapeDestinationCell = LoadEscape<CPos?>"));
+			Assert.That(squad, Does.Contain("squad.StealthEscapeNeedsActivityRestore = true"),
+				"Legacy saves without the latch schema must request bounded activity rehydration.");
+			Assert.That(states, Does.Contain("TryRestoreLoadedStealthEscape(owner, cache, AirDecisionUnits(owner))"));
+			Assert.That(states, Does.Contain("activity?.GetType().Name != \"Move\""));
+			Assert.That(states, Does.Contain("CombatThreatCalculator.TryGetDefenderThreat("),
+				"Loaded activity rehydration must use the canonical live threat calculator.");
 			var cadenceObserver = states.IndexOf("static void TickStealthDebugKillCadenceWatchdog",
 				StringComparison.Ordinal);
 			Assert.That(cadenceObserver, Is.GreaterThanOrEqualTo(0));

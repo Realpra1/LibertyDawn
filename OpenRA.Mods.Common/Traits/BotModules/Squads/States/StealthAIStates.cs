@@ -1492,6 +1492,84 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			return false;
 		}
 
+		static bool TryRestoreLoadedStealthEscape(Squad owner, StealthInfluenceCache cache,
+			IReadOnlyCollection<Actor> members)
+		{
+			if (!owner.StealthEscapeNeedsActivityRestore)
+				return false;
+
+			owner.StealthEscapeNeedsActivityRestore = false;
+			var definition = owner.StealthDefinition;
+			var center = ActiveStealthCenterCell(owner);
+			if (definition == null || cache == null || center == null || members.Count == 0)
+				return false;
+
+			var revealed = members.Any(unit =>
+				unit.TraitsImplementing<Cloak>().Any(cloak => !cloak.Cloaked));
+			var detectorExposure = false;
+			var weaponExposure = false;
+			var maximumCanonicalThreat = 0d;
+			foreach (var unit in members)
+			{
+				detectorExposure |= cache.Threats.Any(threat => ThreatCoversPosition(
+					threat, unit.CenterPosition, false, definition.DetectorRangeBufferCells));
+				foreach (var threat in cache.Threats)
+				{
+					if (!ThreatCoversPosition(threat, unit.CenterPosition, true,
+						definition.ThreatRangeBufferCells))
+						continue;
+
+					var distance = (threat.Actor.CenterPosition - unit.CenterPosition).HorizontalLength / 1024d;
+					if (!owner.SquadManager.CombatThreatCalculator.TryGetDefenderThreat(
+						unit, threat.Actor, out var canonicalThreat, distance))
+						continue;
+
+					maximumCanonicalThreat = StealthAISpecialistPolicy.AccumulateMaximumCanonicalThreat(
+						maximumCanonicalThreat, canonicalThreat);
+					weaponExposure |= canonicalThreat > 0;
+				}
+			}
+
+			if (!revealed || (!detectorExposure && !weaponExposure))
+				return false;
+
+			foreach (var member in members.OrderBy(unit => unit.ActorID))
+			{
+				var activity = member.CurrentActivity;
+				if (activity?.GetType().Name != "Move")
+					continue;
+
+				var target = activity.GetTargets(member).FirstOrDefault();
+				if (target.Type == TargetType.Invalid)
+					continue;
+
+				var exactDestination = owner.World.Map.CellContaining(target.CenterPosition);
+				var destination = CoarseCell(owner, exactDestination);
+				if (Math.Abs(destination.X - center.Value.X) > 1 ||
+					Math.Abs(destination.Y - center.Value.Y) > 1)
+					continue;
+
+				owner.AirEscapingLocalAa = true;
+				owner.StealthEscapeIssuedTick = owner.World.WorldTick;
+				owner.StealthEscapeLastProgressTick = owner.World.WorldTick;
+				owner.StealthEscapeDestination = exactDestination;
+				owner.StealthEscapeStartCell = center;
+				owner.StealthEscapeDestinationCell = destination;
+				owner.StealthEscapeLastDistanceCells = 0;
+				owner.StealthEscapeSafetyChecks = 0;
+				if (owner.SquadManager.Info.AirTargetDebugLogging || Game.Settings.Debug.BotDebug)
+					Log.Write("debug", "Stealth safety [{0}] restored loaded local escape: tick={1} " +
+						"actor={2}#{3} activity={4} start={5} destination={6} exact={7} " +
+						"revealed={8} detector={9} weapon={10} canonical-threat={11:0.###}.",
+						owner.StealthProfile, owner.World.WorldTick, member.Info.Name, member.ActorID,
+						activity.GetType().Name, center.Value, destination, exactDestination,
+						revealed, detectorExposure, weaponExposure, maximumCanonicalThreat);
+				return true;
+			}
+
+			return false;
+		}
+
 		protected static bool KiteParticipantTookDamage(Squad owner)
 		{
 			if (owner.StealthClearMode != StealthClearMode.Kite)
@@ -1924,12 +2002,15 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var activeMembers = liveMembers.Where(unit =>
 				!owner.AirUnitsRepairing.Contains(unit.ActorID)).ToArray();
 			var pendingBlueExplosion = PendingBlueExplosionInSquadCell(owner, activeMembers);
+			if (TryRestoreLoadedStealthEscape(owner, cache, AirDecisionUnits(owner)))
+				return;
 
 			if (owner.AirEscapingLocalAa)
 			{
 				if (AdvanceStealthEscape(owner))
 					return;
 			}
+
 			if (pendingBlueOnly && !pendingBlueExplosion)
 				return;
 
