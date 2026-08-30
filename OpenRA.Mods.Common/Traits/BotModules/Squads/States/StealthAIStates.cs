@@ -660,6 +660,29 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					t.Actor.Info.Name, t.Actor.ActorID, t.WeaponRange, t.DetectorRange))));
 		}
 
+		static bool LiveKitePositionIsCovered(Squad owner, Actor unit, Actor target, WPos position)
+		{
+			var definition = owner.StealthDefinition;
+			foreach (var actor in owner.World.Actors.Where(owner.SquadManager.IsPreferredEnemyUnit)
+				.Where(actor => actor != target && !actor.IsDead && actor.IsInWorld)
+				.OrderBy(actor => actor.ActorID))
+			{
+				var threat = LiveGroundThreat(actor);
+				if (ThreatCoversPosition(threat, position, false, definition.DetectorRangeBufferCells))
+					return true;
+
+				if (!ThreatCoversPosition(threat, position, true, definition.ThreatRangeBufferCells))
+					continue;
+
+				var distance = (actor.CenterPosition - position).HorizontalLength / 1024d;
+				if (owner.SquadManager.CombatThreatCalculator.TryGetDefenderThreat(
+					unit, actor, out var canonicalThreat, distance) && canonicalThreat > 0)
+					return true;
+			}
+
+			return false;
+		}
+
 		static List<GroundThreat> CachedPackageThreats(StealthInfluenceCache cache,
 			IEnumerable<Actor> package)
 		{
@@ -1502,16 +1525,11 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				return false;
 
 			var minimumRange = selectedThreat.WeaponRange + definition.KiteRangeMarginCells;
-			var packageThreats = CachedPackageThreats(cache, DefenderPackage(owner, cache, target));
 			return formation.All(unit =>
 			{
 				var distance = (unit.CenterPosition - target.CenterPosition).HorizontalLength / 1024f;
 				return distance >= minimumRange && distance <= ownRange &&
-					!packageThreats.Any(threat => threat.Actor != target &&
-						(ThreatCoversPosition(threat, unit.CenterPosition, true,
-							definition.ThreatRangeBufferCells) ||
-						ThreatCoversPosition(threat, unit.CenterPosition, false,
-							definition.DetectorRangeBufferCells))) &&
+					!LiveKitePositionIsCovered(owner, unit, target, unit.CenterPosition) &&
 					!ThreatCoversPosition(selectedThreat, unit.CenterPosition, false,
 						definition.DetectorRangeBufferCells);
 			});
@@ -2793,17 +2811,15 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				ownSpeed, threat.Speed, ownRange, threat.WeaponRange,
 				definition.KiteRangeMarginCells, definition.MinimumKiteSpeedPercent))
 				return false;
-			var packageThreats = CachedPackageThreats(cache, LatchedDefenderPackage(owner, cache));
-
 			foreach (var unit in formation)
 			{
-				if (packageThreats.Any(t => CachedThreatCoversReveal(owner, t, unit.CenterPosition, target)))
+				if (LiveKitePositionIsCovered(owner, unit, target, unit.CenterPosition))
 				{
 					if (owner.SquadManager.Info.AirTargetDebugLogging)
 						Log.Write("debug", "Stealth reveal safety [{0}] aborted Kite: tick={1} " +
-							"target={2}#{3} unit={4}#{5} reason=cached-non-target-coverage threats={6}.",
+							"target={2}#{3} unit={4}#{5} reason=live-non-target-coverage.",
 							owner.StealthProfile, owner.World.WorldTick, target.Info.Name, target.ActorID,
-							unit.Info.Name, unit.ActorID, CachedRevealThreatSummary(packageThreats, target));
+							unit.Info.Name, unit.ActorID);
 					return false;
 				}
 			}
@@ -2834,8 +2850,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var mobile = representative.TraitOrDefault<Mobile>();
 			var firing = owner.World.Map.FindTilesInAnnulus(target.Location, Math.Max(1, minimumRange), ownRange)
 				.Where(c => mobile.CanEnterCell(c, null, BlockedByActor.Immovable))
-				.Where(c => !packageThreats.Any(t => CachedThreatCoversReveal(
-					owner, t, owner.World.Map.CenterOfCell(c), target)))
+				.Where(c => formation.All(unit => !LiveKitePositionIsCovered(
+					owner, unit, target, owner.World.Map.CenterOfCell(c))))
 				.OrderBy(c => (owner.World.Map.CenterOfCell(c) - retreatPosition).LengthSquared)
 				.ThenBy(c => c.Y).ThenBy(c => c.X).Cast<CPos?>().FirstOrDefault();
 			if (firing == null)
@@ -2956,8 +2972,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			if (owner.StealthClearMode != StealthClearMode.Kite)
 				return;
 
-			// The strategic cadence owns cache rebuilds and target admission. Live micro may inspect
-			// only that already-owned actor and the last admitted local package.
+			// The strategic cadence owns cache rebuilds, target admission, and route topology. Live
+			// micro keeps the owned actor but must validate exact firing geometry against live actors.
 			var cache = CachedStealthInfluence(owner, formation[0]);
 			var valid = RefreshLiveKiteRoute(owner, cache, formation, owner.TargetActor,
 				out var routeChanged);
@@ -2965,8 +2981,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			{
 				if (owner.SquadManager.Info.AirTargetDebugLogging || Game.Settings.Debug.BotDebug)
 					Log.Write("debug", "Stealth live target [{0}] Kite check: tick={1} target={2}#{3} " +
-						"result=unsafe order-changed=False scope=cached-owned-target actor-checks=1 " +
-						"world-scans=0.", owner.StealthProfile, owner.World.WorldTick,
+						"result=unsafe order-changed=False scope=live-owned-target " +
+						"actor-checks=preferred-enemies world-scans=1.", owner.StealthProfile, owner.World.WorldTick,
 						owner.TargetActor.Info.Name, owner.TargetActor.ActorID);
 				BeginStealthSafetyReposition(owner);
 				return;
@@ -2996,8 +3012,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			if ((owner.SquadManager.Info.AirTargetDebugLogging || Game.Settings.Debug.BotDebug) &&
 				routeChanged)
 				Log.Write("debug", "Stealth live target [{0}] Kite check: tick={1} target={2}#{3} " +
-					"target-cell={4} order-changed={5} result={6} scope=cached-owned-target " +
-					"actor-checks=1 world-scans=0.", owner.StealthProfile,
+					"target-cell={4} order-changed={5} result={6} scope=live-owned-target " +
+					"actor-checks=preferred-enemies world-scans=1.", owner.StealthProfile,
 					owner.World.WorldTick, owner.TargetActor.Info.Name, owner.TargetActor.ActorID,
 					owner.TargetActor.Location, routeChanged, routeChanged ? "live-route" : "useful-order");
 		}

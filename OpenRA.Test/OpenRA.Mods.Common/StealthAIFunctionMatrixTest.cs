@@ -249,7 +249,17 @@ namespace OpenRA.Test.Mods.Common
 				"Local escape must not add an A* route or fan representative waypoints across the squad.");
 			Assert.That(states, Does.Contain("KiteParticipantTookDamage(owner)"));
 			Assert.That(states, Does.Contain("KiteFormationIsLocallySafe(owner, cache, decisionUnits, owner.TargetActor)"));
-			Assert.That(states, Does.Contain("CachedThreatCoversReveal(owner, t, unit.CenterPosition, target)"));
+			Assert.That(states, Does.Contain("LiveKitePositionIsCovered(owner, unit, target, unit.CenterPosition)"),
+				"An approved Kite must retain exact live safety instead of inheriting a whole strategic-cell aggregate.");
+			var liveKiteSafety = states.Substring(states.IndexOf(
+				"static bool LiveKitePositionIsCovered", StringComparison.Ordinal));
+			liveKiteSafety = liveKiteSafety.Substring(0, liveKiteSafety.IndexOf(
+				"static List<GroundThreat> CachedPackageThreats", StringComparison.Ordinal));
+			Assert.That(liveKiteSafety, Does.Contain("owner.World.Actors.Where(owner.SquadManager.IsPreferredEnemyUnit)"));
+			Assert.That(liveKiteSafety, Does.Contain("LiveGroundThreat(actor)"));
+			Assert.That(liveKiteSafety, Does.Contain("definition.DetectorRangeBufferCells"));
+			Assert.That(liveKiteSafety, Does.Contain("TryGetDefenderThreat("));
+			Assert.That(liveKiteSafety, Does.Contain("canonicalThreat > 0"));
 			Assert.That(states, Does.Contain("SafeOrdinaryFiringCell(owner, representative, cache, actor)"),
 				"Ordinary attacks must end at a cached all-threat-safe exact firing cell before revealing.");
 			var attackState = states.Substring(states.IndexOf("class StealthAIAttackState", StringComparison.Ordinal));
@@ -279,8 +289,9 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(states, Does.Contain("routeChanged ? \"live-route\" : \"useful-order\""),
 				"A 12-tick live check must expose useful-order preservation instead of unconditional churn.");
 			Assert.That(states, Does.Contain("var cache = CachedStealthInfluence(owner, formation[0])"));
-			Assert.That(states, Does.Contain("world-scans=0"),
-				"Live micro telemetry must prove that owned-target checks do not trigger a world scan.");
+			Assert.That(states, Does.Contain("scope=live-owned-target"));
+			Assert.That(states, Does.Contain("actor-checks=preferred-enemies world-scans=1"),
+				"Live Kite telemetry must disclose its exact-geometry actor scan.");
 			var vehicles = Source("mods/cnc/rules/vehicles.yaml");
 			var stnk = vehicles.Substring(vehicles.IndexOf("STNK:", StringComparison.Ordinal));
 			stnk = stnk.Substring(0, stnk.IndexOf("\nMHQ:", StringComparison.Ordinal));
