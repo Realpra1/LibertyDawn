@@ -634,20 +634,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 						FieldSaver.FormatValue(generation.MismatchFailed)));
 				}
 
-				if (AirEscapingLocalAa)
-				{
-					nodes.Nodes.Add(new MiniYamlNode("AirEscapingLocalAa", FieldSaver.FormatValue(true)));
-					nodes.Nodes.Add(new MiniYamlNode("StealthEscapeIssuedTick", FieldSaver.FormatValue(StealthEscapeIssuedTick)));
-					nodes.Nodes.Add(new MiniYamlNode("StealthEscapeSafetyChecks", FieldSaver.FormatValue(StealthEscapeSafetyChecks)));
-					nodes.Nodes.Add(new MiniYamlNode("StealthEscapeDestination", FieldSaver.FormatValue(StealthEscapeDestination)));
-					nodes.Nodes.Add(new MiniYamlNode("StealthEscapeStartCell", FieldSaver.FormatValue(StealthEscapeStartCell)));
-					nodes.Nodes.Add(new MiniYamlNode("StealthEscapeDestinationCell", FieldSaver.FormatValue(StealthEscapeDestinationCell)));
-					nodes.Nodes.Add(new MiniYamlNode("StealthEscapePendingExplosion", FieldSaver.FormatValue(StealthEscapePendingExplosion)));
-					nodes.Nodes.Add(new MiniYamlNode("StealthEscapeLastProgressTick", FieldSaver.FormatValue(StealthEscapeLastProgressTick)));
-					nodes.Nodes.Add(new MiniYamlNode("StealthEscapeLastDistanceCells", FieldSaver.FormatValue(StealthEscapeLastDistanceCells)));
-					nodes.Nodes.Add(new MiniYamlNode("StealthEscapePreserveEngagement", FieldSaver.FormatValue(StealthEscapePreserveEngagement)));
-					nodes.Nodes.Add(new MiniYamlNode("AirTargetStrategicCell", FieldSaver.FormatValue(AirTargetStrategicCell)));
-				}
+				SerializeStealthEscapeState(this, nodes);
 			}
 
 			if (AirUnitsRepairing.Count > 0)
@@ -669,6 +656,45 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				nodes.Nodes.Add(new MiniYamlNode("GroundFormationCenter", FieldSaver.FormatValue(groundLastFormationCenter)));
 
 			return nodes;
+		}
+
+		static void SerializeStealthEscapeState(Squad squad, MiniYaml yaml)
+		{
+			yaml.Nodes.Add(new MiniYamlNode("AirEscapingLocalAa", FieldSaver.FormatValue(squad.AirEscapingLocalAa)));
+			yaml.Nodes.Add(new MiniYamlNode("StealthEscapeIssuedTick", FieldSaver.FormatValue(squad.StealthEscapeIssuedTick)));
+			yaml.Nodes.Add(new MiniYamlNode("StealthEscapeSafetyChecks", FieldSaver.FormatValue(squad.StealthEscapeSafetyChecks)));
+			yaml.Nodes.Add(new MiniYamlNode("StealthEscapeDestination", FieldSaver.FormatValue(squad.StealthEscapeDestination)));
+			yaml.Nodes.Add(new MiniYamlNode("StealthEscapeStartCell", FieldSaver.FormatValue(squad.StealthEscapeStartCell)));
+			yaml.Nodes.Add(new MiniYamlNode("StealthEscapeDestinationCell", FieldSaver.FormatValue(squad.StealthEscapeDestinationCell)));
+			yaml.Nodes.Add(new MiniYamlNode("StealthEscapePendingExplosion", FieldSaver.FormatValue(squad.StealthEscapePendingExplosion)));
+			yaml.Nodes.Add(new MiniYamlNode("StealthEscapeLastProgressTick", FieldSaver.FormatValue(squad.StealthEscapeLastProgressTick)));
+			yaml.Nodes.Add(new MiniYamlNode("StealthEscapeLastDistanceCells", FieldSaver.FormatValue(squad.StealthEscapeLastDistanceCells)));
+			yaml.Nodes.Add(new MiniYamlNode("StealthEscapePreserveEngagement", FieldSaver.FormatValue(squad.StealthEscapePreserveEngagement)));
+			yaml.Nodes.Add(new MiniYamlNode("AirTargetStrategicCell", FieldSaver.FormatValue(squad.AirTargetStrategicCell)));
+		}
+
+		static void DeserializeStealthEscapeState(Squad squad, MiniYaml yaml)
+		{
+			var escapeNode = yaml.Nodes.FirstOrDefault(n => n.Key == "AirEscapingLocalAa");
+			if (escapeNode != null)
+			{
+				T LoadEscape<T>(string key) => FieldLoader.GetValue<T>(key,
+					yaml.Nodes.First(n => n.Key == key).Value.Value);
+				squad.AirEscapingLocalAa = FieldLoader.GetValue<bool>("AirEscapingLocalAa", escapeNode.Value.Value);
+				squad.StealthEscapeIssuedTick = LoadEscape<int>("StealthEscapeIssuedTick");
+				squad.StealthEscapeSafetyChecks = LoadEscape<int>("StealthEscapeSafetyChecks");
+				squad.StealthEscapeDestination = LoadEscape<CPos?>("StealthEscapeDestination");
+				squad.StealthEscapeStartCell = LoadEscape<CPos?>("StealthEscapeStartCell");
+				squad.StealthEscapeDestinationCell = LoadEscape<CPos?>("StealthEscapeDestinationCell");
+				squad.StealthEscapePendingExplosion = LoadEscape<bool>("StealthEscapePendingExplosion");
+				squad.StealthEscapeLastProgressTick = LoadEscape<int>("StealthEscapeLastProgressTick");
+				squad.StealthEscapeLastDistanceCells = LoadEscape<int>("StealthEscapeLastDistanceCells");
+				squad.StealthEscapePreserveEngagement = LoadEscape<bool>("StealthEscapePreserveEngagement");
+				squad.AirTargetStrategicCell = LoadEscape<CPos?>("AirTargetStrategicCell");
+				squad.StealthEscapeNeedsActivityRestore = false;
+			}
+			else
+				squad.StealthEscapeNeedsActivityRestore = true;
 		}
 
 		public static Squad Deserialize(IBot bot, SquadManagerBotModule squadManager, MiniYaml yaml)
@@ -714,25 +740,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 						Load<bool>("StealthCadenceMismatchFailed"));
 				}
 
-				var escapeNode = yaml.Nodes.FirstOrDefault(n => n.Key == "AirEscapingLocalAa");
-				if (escapeNode != null)
-				{
-					T LoadEscape<T>(string key) => FieldLoader.GetValue<T>(key,
-						yaml.Nodes.First(n => n.Key == key).Value.Value);
-					squad.AirEscapingLocalAa = FieldLoader.GetValue<bool>("AirEscapingLocalAa", escapeNode.Value.Value);
-					squad.StealthEscapeIssuedTick = LoadEscape<int>("StealthEscapeIssuedTick");
-					squad.StealthEscapeSafetyChecks = LoadEscape<int>("StealthEscapeSafetyChecks");
-					squad.StealthEscapeDestination = LoadEscape<CPos?>("StealthEscapeDestination");
-					squad.StealthEscapeStartCell = LoadEscape<CPos?>("StealthEscapeStartCell");
-					squad.StealthEscapeDestinationCell = LoadEscape<CPos?>("StealthEscapeDestinationCell");
-					squad.StealthEscapePendingExplosion = LoadEscape<bool>("StealthEscapePendingExplosion");
-					squad.StealthEscapeLastProgressTick = LoadEscape<int>("StealthEscapeLastProgressTick");
-					squad.StealthEscapeLastDistanceCells = LoadEscape<int>("StealthEscapeLastDistanceCells");
-					squad.StealthEscapePreserveEngagement = LoadEscape<bool>("StealthEscapePreserveEngagement");
-					squad.AirTargetStrategicCell = LoadEscape<CPos?>("AirTargetStrategicCell");
-				}
-				else
-					squad.StealthEscapeNeedsActivityRestore = true;
+				DeserializeStealthEscapeState(squad, yaml);
 			}
 
 			var unitsNode = yaml.Nodes.FirstOrDefault(n => n.Key == "Units");

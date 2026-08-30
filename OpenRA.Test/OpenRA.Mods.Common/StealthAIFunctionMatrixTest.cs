@@ -12,6 +12,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using NUnit.Framework;
 using OpenRA.Mods.Common.Traits;
@@ -47,6 +48,27 @@ namespace OpenRA.Test.Mods.Common
 			return (T)target.Invoke(null, arguments);
 		}
 
+		static void InvokeInternal(Type type, string method, params object[] arguments)
+		{
+			var target = type.GetMethod(method, BindingFlags.Static | BindingFlags.NonPublic);
+			Assert.That(target, Is.Not.Null, $"Missing internal method {type.Name}.{method}.");
+			target.Invoke(null, arguments);
+		}
+
+		static void SetSquadField(Squad squad, string name, object value)
+		{
+			var field = typeof(Squad).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic);
+			Assert.That(field, Is.Not.Null, $"Missing Squad.{name}.");
+			field.SetValue(squad, value);
+		}
+
+		static T GetSquadField<T>(Squad squad, string name)
+		{
+			var field = typeof(Squad).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic);
+			Assert.That(field, Is.Not.Null, $"Missing Squad.{name}.");
+			return (T)field.GetValue(squad);
+		}
+
 		[Test]
 		public void OriginalManagerAndSquadRemainTheOnlyLiveOwners()
 		{
@@ -67,6 +89,51 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(squadLists.Select(owner => owner.Type), Is.EqualTo(new[] { typeof(SquadManagerBotModule) }));
 			Assert.That(squadLists.Single().Field.Name, Is.EqualTo("Squads"));
 			Assert.That(Enum.IsDefined(typeof(SquadType), "Stealth"), Is.True);
+		}
+
+		[Test]
+		public void NewInactiveEscapeSaveRoundTripDoesNotRequestLegacyActivityRestore()
+		{
+			var saved = (Squad)RuntimeHelpers.GetUninitializedObject(typeof(Squad));
+			SetSquadField(saved, "StealthEscapeIssuedTick", -1);
+			SetSquadField(saved, "StealthEscapeLastProgressTick", -1);
+			SetSquadField(saved, "StealthEscapeLastDistanceCells", int.MaxValue);
+			var yaml = new MiniYaml("", new List<MiniYamlNode>());
+			InvokeInternal(typeof(Squad), "SerializeStealthEscapeState", saved, yaml);
+
+			var serialized = new List<MiniYamlNode> { new MiniYamlNode("Squad", yaml) }.WriteToString();
+			var roundTripped = MiniYaml.FromString(serialized).Single().Value;
+			Assert.That(roundTripped.Nodes.Single(n => n.Key == "AirEscapingLocalAa").Value.Value,
+				Is.EqualTo(FieldSaver.FormatValue(false)),
+				"Every new inactive stealth-squad save must carry an explicit inactive schema value.");
+
+			var loaded = (Squad)RuntimeHelpers.GetUninitializedObject(typeof(Squad));
+			SetSquadField(loaded, "StealthEscapeNeedsActivityRestore", true);
+			InvokeInternal(typeof(Squad), "DeserializeStealthEscapeState", loaded, roundTripped);
+			Assert.That(GetSquadField<bool>(loaded, "AirEscapingLocalAa"), Is.False);
+			Assert.That(GetSquadField<bool>(loaded, "StealthEscapeNeedsActivityRestore"), Is.False,
+				"A new inactive save must not enter legacy reconstruction even if its restored STNK " +
+				"is moving, revealed, and under detector/weapon coverage.");
+
+			var legacyLoaded = (Squad)RuntimeHelpers.GetUninitializedObject(typeof(Squad));
+			InvokeInternal(typeof(Squad), "DeserializeStealthEscapeState", legacyLoaded,
+				new MiniYaml("", new List<MiniYamlNode>()));
+			Assert.That(GetSquadField<bool>(legacyLoaded, "StealthEscapeNeedsActivityRestore"), Is.True,
+				"A legacy save without the complete group must retain one-shot live reconstruction.");
+
+			SetSquadField(saved, "AirEscapingLocalAa", true);
+			SetSquadField(saved, "StealthEscapeDestination", new CPos(48, 4));
+			var activeYaml = new MiniYaml("", new List<MiniYamlNode>());
+			InvokeInternal(typeof(Squad), "SerializeStealthEscapeState", saved, activeYaml);
+			var activeLoaded = (Squad)RuntimeHelpers.GetUninitializedObject(typeof(Squad));
+			InvokeInternal(typeof(Squad), "DeserializeStealthEscapeState", activeLoaded,
+				MiniYaml.FromString(new List<MiniYamlNode> { new MiniYamlNode("Squad", activeYaml) }
+					.WriteToString()).Single().Value);
+			Assert.That(GetSquadField<bool>(activeLoaded, "AirEscapingLocalAa"), Is.True);
+			Assert.That(GetSquadField<CPos?>(activeLoaded, "StealthEscapeDestination"),
+				Is.EqualTo(new CPos(48, 4)));
+			Assert.That(GetSquadField<bool>(activeLoaded, "StealthEscapeNeedsActivityRestore"), Is.False,
+				"The explicit active group must round-trip without invoking legacy reconstruction.");
 		}
 
 		[Test]
