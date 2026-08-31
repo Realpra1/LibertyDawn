@@ -104,6 +104,262 @@ namespace OpenRA.Mods.Common.Traits
 			public int ExpandedCells { get; set; }
 		}
 
+		public sealed class ReachableTargetCellSearch
+		{
+			enum SearchPhase
+			{
+				InitializeCosts,
+				IndexTargets,
+				InitializeStart,
+				ExpandCell,
+				InsertTarget,
+				BuildReverseRoute,
+				BuildForwardRoute,
+				FinalizeTarget,
+				ExpandEdge
+			}
+
+			readonly float[] danger;
+			readonly int width;
+			readonly int height;
+			readonly IReadOnlyList<CPos> targetCells;
+			readonly float dangerCost;
+			readonly int maximumResults;
+			readonly int requiredIndex;
+			readonly Dictionary<int, List<int>> targetsByCell = new Dictionary<int, List<int>>();
+			readonly HashSet<int> selectedIndices = new HashSet<int>();
+			readonly List<ReachableTargetCell> selected = new List<ReachableTargetCell>();
+			readonly List<CPos> reversedRoute = new List<CPos>();
+			readonly List<CPos> forwardRoute = new List<CPos>();
+			readonly SortedSet<(float Cost, int Index)> open;
+			readonly float[] cost;
+			readonly int[] previous;
+			readonly int start;
+			SearchPhase phase;
+			int initializationIndex;
+			int targetInputIndex;
+			int current;
+			List<int> currentTargetIndices;
+			int currentTargetIndex;
+			int pendingTargetIndex;
+			bool pendingTargetRequired;
+			int routeAt;
+			int forwardRouteIndex;
+			int direction;
+			int regularResults;
+			bool requiredFound;
+
+			internal ReachableTargetCellSearch(float[] danger, int width, int height,
+				int startX, int startY, IReadOnlyList<CPos> targetCells, float dangerCost,
+				int maximumResults, int requiredIndex)
+			{
+				if (danger == null || width <= 0 || height <= 0 || danger.Length != width * height ||
+					startX < 0 || startY < 0 || startX >= width || startY >= height ||
+					targetCells == null || maximumResults <= 0)
+				{
+					Complete = true;
+					return;
+				}
+
+				this.danger = danger;
+				this.width = width;
+				this.height = height;
+				this.targetCells = targetCells;
+				this.dangerCost = dangerCost;
+				this.maximumResults = maximumResults;
+				this.requiredIndex = requiredIndex;
+				start = startY * width + startX;
+				cost = new float[danger.Length];
+				previous = new int[danger.Length];
+				open = new SortedSet<(float Cost, int Index)>(
+					Comparer<(float Cost, int Index)>.Create((a, b) =>
+					{
+						if (a.Cost < b.Cost)
+							return -1;
+						if (a.Cost > b.Cost)
+							return 1;
+
+						return a.Index.CompareTo(b.Index);
+					}));
+				requiredFound = requiredIndex < 0 || requiredIndex >= targetCells.Count;
+				phase = SearchPhase.InitializeCosts;
+			}
+
+			public bool Complete { get; private set; }
+			public int PrimitiveOperations { get; private set; }
+			public int ExpandedCells { get; private set; }
+			public ReachableTargetCells Result { get; private set; }
+
+			public int Advance(int maximumOperations)
+			{
+				if (maximumOperations <= 0)
+					throw new ArgumentOutOfRangeException(nameof(maximumOperations));
+
+				var started = PrimitiveOperations;
+				while (!Complete && PrimitiveOperations - started < maximumOperations)
+					Step();
+
+				return PrimitiveOperations - started;
+			}
+
+			void Step()
+			{
+				PrimitiveOperations++;
+				switch (phase)
+				{
+					case SearchPhase.InitializeCosts:
+						cost[initializationIndex] = float.MaxValue;
+						previous[initializationIndex] = -1;
+						initializationIndex++;
+						if (initializationIndex == danger.Length)
+							phase = SearchPhase.IndexTargets;
+						break;
+
+					case SearchPhase.IndexTargets:
+						if (targetInputIndex == targetCells.Count)
+						{
+							phase = SearchPhase.InitializeStart;
+							break;
+						}
+
+						var targetCell = targetCells[targetInputIndex];
+						if (targetCell.X >= 0 && targetCell.Y >= 0 &&
+							targetCell.X < width && targetCell.Y < height)
+						{
+							var cellIndex = targetCell.Y * width + targetCell.X;
+							if (!targetsByCell.TryGetValue(cellIndex, out var targetIndices))
+								targetsByCell.Add(cellIndex, targetIndices = new List<int>());
+							targetIndices.Add(targetInputIndex);
+						}
+
+						targetInputIndex++;
+						break;
+
+					case SearchPhase.InitializeStart:
+						cost[start] = 0;
+						open.Add((0, start));
+						phase = SearchPhase.ExpandCell;
+						break;
+
+					case SearchPhase.ExpandCell:
+						if (open.Count == 0 || (regularResults >= maximumResults && requiredFound))
+						{
+							CompleteSearch();
+							break;
+						}
+
+						var nextCell = open.Min;
+						open.Remove(nextCell);
+						current = nextCell.Index;
+						ExpandedCells++;
+						targetsByCell.TryGetValue(current, out currentTargetIndices);
+						currentTargetIndex = 0;
+						phase = SearchPhase.InsertTarget;
+						break;
+
+					case SearchPhase.InsertTarget:
+						if (currentTargetIndices == null || currentTargetIndex == currentTargetIndices.Count)
+						{
+							direction = 0;
+							phase = SearchPhase.ExpandEdge;
+							break;
+						}
+
+						pendingTargetIndex = currentTargetIndices[currentTargetIndex++];
+						pendingTargetRequired = pendingTargetIndex == requiredIndex;
+						if ((!pendingTargetRequired && regularResults >= maximumResults) ||
+							!selectedIndices.Add(pendingTargetIndex))
+							break;
+
+						reversedRoute.Clear();
+						forwardRoute.Clear();
+						routeAt = current;
+						phase = SearchPhase.BuildReverseRoute;
+						break;
+
+					case SearchPhase.BuildReverseRoute:
+						if (routeAt == start || routeAt < 0)
+						{
+							forwardRouteIndex = reversedRoute.Count - 1;
+							phase = SearchPhase.BuildForwardRoute;
+							break;
+						}
+
+						reversedRoute.Add(new CPos(routeAt % width, routeAt / width));
+						routeAt = previous[routeAt];
+						break;
+
+					case SearchPhase.BuildForwardRoute:
+						if (forwardRouteIndex < 0)
+						{
+							phase = SearchPhase.FinalizeTarget;
+							break;
+						}
+
+						var routeCell = reversedRoute[forwardRouteIndex--];
+						if (StealthAISpecialistPolicy.IsHardRouteDanger(
+							danger[routeCell.Y * width + routeCell.X]))
+							forwardRouteIndex = -1;
+						else
+							forwardRoute.Add(routeCell);
+						break;
+
+					case SearchPhase.FinalizeTarget:
+						selected.Add(new ReachableTargetCell
+						{
+							TargetIndex = pendingTargetIndex,
+							RouteCost = cost[current],
+							Route = new List<CPos>(forwardRoute),
+							IsRequired = pendingTargetRequired
+						});
+						if (pendingTargetRequired)
+							requiredFound = true;
+						else
+							regularResults++;
+						phase = SearchPhase.InsertTarget;
+						break;
+
+					case SearchPhase.ExpandEdge:
+						if (direction == 4)
+						{
+							phase = SearchPhase.ExpandCell;
+							break;
+						}
+
+						var cx = current % width;
+						var cy = current / width;
+						var nx = cx + (direction == 0 ? -1 : direction == 1 ? 1 : 0);
+						var ny = cy + (direction == 2 ? -1 : direction == 3 ? 1 : 0);
+						direction++;
+						if (nx < 0 || ny < 0 || nx >= width || ny >= height)
+							break;
+
+						var next = ny * width + nx;
+						var nextCost = cost[current] + 1 +
+							Math.Max(0, danger[next]) * Math.Max(0, dangerCost);
+						if (nextCost >= cost[next])
+							break;
+
+						if (cost[next] != float.MaxValue)
+							open.Remove((cost[next], next));
+						cost[next] = nextCost;
+						previous[next] = current;
+						open.Add((nextCost, next));
+						break;
+				}
+			}
+
+			void CompleteSearch()
+			{
+				Result = new ReachableTargetCells
+				{
+					Targets = selected,
+					ExpandedCells = ExpandedCells
+				};
+				Complete = true;
+			}
+		}
+
 		/// <summary>
 		/// True when another damaged aircraft has already selected a facility, including assignments made
 		/// earlier in the current bot tick before the engine has processed its reservation order.
@@ -160,115 +416,31 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		/// <summary>
-		/// Expands one deterministic lowest-cost frontier from the active coarse cell and returns the
-		/// first bounded target-bearing cells that are reachable without crossing hard danger. A valid
-		/// required target is retained in addition to the normal result limit. The returned routes all
-		/// share the same cost/previous search state, so callers do not need a route search per target.
+		/// Expands one deterministic lowest-cost discovery frontier from the active coarse cell and
+		/// returns the first bounded target-bearing cells. Danger ranks discovery cost but never removes
+		/// a target cell. Returned approach routes stop before their first hard-danger cell, so discovery
+		/// cannot become movement authority. A valid required target remains an extra bounded option.
 		/// </summary>
 		public static ReachableTargetCells SelectReachableTargetCells(
 			float[] danger, int width, int height, int startX, int startY,
 			IReadOnlyList<CPos> targetCells, float dangerCost, int maximumResults,
 			int requiredIndex = -1)
 		{
-			if (danger == null || width <= 0 || height <= 0 || danger.Length != width * height ||
-				startX < 0 || startY < 0 || startX >= width || startY >= height ||
-				targetCells == null || maximumResults <= 0)
-				return null;
+			var search = StartReachableTargetCellSearch(danger, width, height, startX, startY,
+				targetCells, dangerCost, maximumResults, requiredIndex);
+			while (!search.Complete)
+				search.Advance(int.MaxValue);
 
-			var targetsByCell = new Dictionary<int, List<int>>();
-			for (var i = 0; i < targetCells.Count; i++)
-			{
-				var cell = targetCells[i];
-				if (cell.X < 0 || cell.Y < 0 || cell.X >= width || cell.Y >= height)
-					continue;
+			return search.Result;
+		}
 
-				var cellIndex = cell.Y * width + cell.X;
-				if (!targetsByCell.TryGetValue(cellIndex, out var targetIndices))
-					targetsByCell.Add(cellIndex, targetIndices = new List<int>());
-				targetIndices.Add(i);
-			}
-
-			var cost = Enumerable.Repeat(float.MaxValue, danger.Length).ToArray();
-			var previous = Enumerable.Repeat(-1, danger.Length).ToArray();
-			var open = new List<int>();
-			var start = startY * width + startX;
-			cost[start] = 0;
-			open.Add(start);
-			var selected = new List<ReachableTargetCell>();
-			var selectedIndices = new HashSet<int>();
-			var regularResults = 0;
-			var requiredFound = requiredIndex < 0 || requiredIndex >= targetCells.Count;
-			var expanded = 0;
-
-			List<CPos> RouteTo(int goal)
-			{
-				var route = new List<CPos>();
-				for (var at = goal; at != start && at >= 0; at = previous[at])
-					route.Add(new CPos(at % width, at / width));
-
-				route.Reverse();
-				return route;
-			}
-
-			while (open.Count > 0 && (regularResults < maximumResults || !requiredFound))
-			{
-				var bestOpen = 0;
-				for (var i = 1; i < open.Count; i++)
-					if (cost[open[i]] < cost[open[bestOpen]] ||
-						(cost[open[i]] == cost[open[bestOpen]] && open[i] < open[bestOpen]))
-						bestOpen = i;
-
-				var current = open[bestOpen];
-				open.RemoveAt(bestOpen);
-				expanded++;
-				if (targetsByCell.TryGetValue(current, out var targetIndices))
-					foreach (var targetIndex in targetIndices.OrderBy(i => i))
-					{
-						var required = targetIndex == requiredIndex;
-						if (!required && regularResults >= maximumResults)
-							continue;
-
-						if (!selectedIndices.Add(targetIndex))
-							continue;
-
-						selected.Add(new ReachableTargetCell
-						{
-							TargetIndex = targetIndex,
-							RouteCost = cost[current],
-							Route = RouteTo(current),
-							IsRequired = required,
-						});
-						if (required)
-							requiredFound = true;
-						else
-							regularResults++;
-					}
-
-				var cx = current % width;
-				var cy = current / width;
-				for (var direction = 0; direction < 4; direction++)
-				{
-					var nx = cx + (direction == 0 ? -1 : direction == 1 ? 1 : 0);
-					var ny = cy + (direction == 2 ? -1 : direction == 3 ? 1 : 0);
-					if (nx < 0 || ny < 0 || nx >= width || ny >= height)
-						continue;
-
-					var next = ny * width + nx;
-					if (StealthAISpecialistPolicy.IsHardRouteDanger(danger[next]))
-						continue;
-
-					var nextCost = cost[current] + 1 + Math.Max(0, danger[next]) * Math.Max(0, dangerCost);
-					if (nextCost >= cost[next])
-						continue;
-
-					cost[next] = nextCost;
-					previous[next] = current;
-					if (!open.Contains(next))
-						open.Add(next);
-				}
-			}
-
-			return new ReachableTargetCells { Targets = selected, ExpandedCells = expanded };
+		public static ReachableTargetCellSearch StartReachableTargetCellSearch(
+			float[] danger, int width, int height, int startX, int startY,
+			IReadOnlyList<CPos> targetCells, float dangerCost, int maximumResults,
+			int requiredIndex = -1)
+		{
+			return new ReachableTargetCellSearch(danger, width, height, startX, startY,
+				targetCells, dangerCost, maximumResults, requiredIndex);
 		}
 
 		/// <summary>

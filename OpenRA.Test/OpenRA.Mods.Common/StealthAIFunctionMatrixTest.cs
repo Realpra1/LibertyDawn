@@ -62,6 +62,151 @@ namespace OpenRA.Test.Mods.Common
 			field.SetValue(squad, value);
 		}
 
+		[Test]
+		public void LocalStealthPackageMembershipAndPriorityAreLive()
+		{
+			var states = StealthStateSources("StealthAIStates");
+			var livePackage = states.Substring(states.IndexOf(
+				"static bool IsLiveLocalCombatActor", StringComparison.Ordinal));
+			livePackage = livePackage.Substring(0, livePackage.IndexOf(
+				"static List<Actor> DefenderPackage(StealthInfluenceCache", StringComparison.Ordinal));
+			Assert.That(livePackage, Does.Contain("owner.World.Actors.Where"));
+			Assert.That(livePackage, Does.Contain("activeMembers.Any(actor.AppearsHostileTo)"),
+				"Every currently hostile player must contribute local defenders, including a second " +
+				"enemy allied to the strategically preferred opponent.");
+			Assert.That(livePackage, Does.Contain("actor.OccupiesSpace == null"));
+			Assert.That(livePackage, Does.Contain("IsNotHiddenUnit(actor)"));
+			Assert.That(livePackage, Does.Not.Contain("IsPreferredEnemyUnit"),
+				"Strategic preferred-owner selection must not filter local combat membership.");
+			Assert.That(livePackage, Does.Contain("OrderByDescending(actor => StealthPriority(owner, actor))"));
+			Assert.That(livePackage, Does.Not.Contain("EnemyActorsByCell"));
+			Assert.That(livePackage, Does.Not.Contain("cache.Threats"));
+
+			var continuationPackage = states.Substring(states.IndexOf(
+				"static List<Actor> LiveLatchedDefenderPackage", StringComparison.Ordinal));
+			continuationPackage = continuationPackage.Substring(0, continuationPackage.IndexOf(
+				"static GeneralizedCombatThreatCalculator.GroupTypeCount", StringComparison.Ordinal));
+			Assert.That(continuationPackage, Does.Contain("LiveDefenderPackage(owner"));
+			Assert.That(continuationPackage, Does.Not.Contain("GetActorById"),
+				"Latched ids are intent only and must not admit stale actors into a local package.");
+			Assert.That(continuationPackage, Does.Not.Contain("StealthClearPackage.Contains"));
+		}
+
+		[Test]
+		public void CloakedCrushDetectorSafetyUsesLiveHostileWorldActors()
+		{
+			var states = StealthStateSources("StealthAIStates");
+			var liveThreats = states.Substring(states.IndexOf(
+				"static List<GroundThreat> LiveHostileGroundThreats", StringComparison.Ordinal));
+			liveThreats = liveThreats.Substring(0, liveThreats.IndexOf(
+				"protected static bool OrdinaryAttackExposureIsSafe", StringComparison.Ordinal));
+			Assert.That(liveThreats, Does.Contain("owner.World.Actors.Where"));
+			Assert.That(liveThreats, Does.Contain("activeMembers.Any(actor.AppearsHostileTo)"));
+			Assert.That(liveThreats, Does.Contain("Select(LiveGroundThreat)"));
+			Assert.That(liveThreats, Does.Contain("LiveHostileGroundThreats(owner)"));
+			Assert.That(liveThreats, Does.Not.Contain("cache.Threats"));
+			Assert.That(liveThreats, Does.Not.Contain("IsPreferredEnemyUnit"));
+
+			var clearPlan = states.Substring(states.IndexOf(
+				"static AirTargetPlan TryStealthClearPlan", StringComparison.Ordinal));
+			clearPlan = clearPlan.Substring(0, clearPlan.IndexOf(
+				"protected static bool ContinueOrAbortMassClear", StringComparison.Ordinal));
+			Assert.That(clearPlan, Does.Contain("var threat = LiveGroundThreat(a);"));
+			Assert.That(clearPlan, Does.Contain("CloakedCrushRouteIsSafe(owner, route)"));
+			Assert.That(clearPlan, Does.Contain("OrdinaryCrushExposureIsSafe(\n\t\t\t\t\t\towner, crush"));
+		}
+
+		[Test]
+		public void KiteLocalTargetSafetyAndFiringRouteAreLiveAndCacheIndependent()
+		{
+			var states = StealthStateSources("StealthAIStates");
+			var firingSafety = states.Substring(states.IndexOf(
+				"static bool LiveKiteThreatCoversPosition", StringComparison.Ordinal));
+			firingSafety = firingSafety.Substring(0, firingSafety.IndexOf(
+				"static List<GroundThreat> CachedPackageThreats", StringComparison.Ordinal));
+			Assert.That(firingSafety, Does.Contain("LiveHostileGroundThreats(owner)"));
+			Assert.That(firingSafety, Does.Contain("unit, threat.Actor, GroundTargetTypes, true)"),
+				"Kite must ask the standard live calculator to evaluate the planned revealed ground targetability.");
+			Assert.That(firingSafety, Does.Contain("DefenderThreatAtDistance("),
+				"Every other live hostile guard must use live traits plus the canonical exact-distance override.");
+			var calculator = Source("OpenRA.Mods.Common/Traits/BotModules/GeneralizedCombatThreat.cs");
+			Assert.That(calculator, Does.Contain(
+				"BitSet<TargetableType>? plannedAttackerTargetTypesOverride = null"));
+			Assert.That(calculator, Does.Contain("bool plannedCurrentRangeEngagement = false"));
+			Assert.That(calculator, Does.Contain(
+				"attackerIsImmobile && !plannedCurrentRangeEngagement"),
+				"Only the immobile range-control zero may be bypassed for an exact planned local shot.");
+			Assert.That(calculator, Does.Contain(
+				"defenderTargetTypesOverride ?? defender.GetEnabledTargetTypes()"),
+				"The planned-decloak override must be optional so every existing calculator caller is unchanged.");
+			Assert.That(firingSafety, Does.Not.Contain("IsPreferredEnemyUnit"),
+				"A guard owned by a second hostile allied player must cover local firing cells.");
+			Assert.That(firingSafety, Does.Not.Contain("cache."));
+
+			var liveRoute = states.Substring(states.IndexOf(
+				"static List<CPos> LiveKiteFiringRoute", StringComparison.Ordinal));
+			liveRoute = liveRoute.Substring(0, liveRoute.IndexOf(
+				"static List<GroundThreat> CachedPackageThreats", StringComparison.Ordinal));
+			Assert.That(liveRoute, Does.Contain("mobile.Pathfinder.FindUnitPath"));
+			Assert.That(liveRoute, Does.Contain("ForwardExactGroundRoute"));
+			Assert.That(liveRoute, Does.Contain("LiveHostileGroundThreats(owner)"));
+			Assert.That(liveRoute, Does.Not.Contain("StealthRouteToCell"));
+			Assert.That(liveRoute, Does.Not.Contain("cache."));
+
+			var initialKite = states.Substring(states.IndexOf(
+				"static AirTargetPlan TryStealthClearPlan", StringComparison.Ordinal));
+			initialKite = initialKite.Substring(0, initialKite.IndexOf(
+				"var crushableInfantryRemain", StringComparison.Ordinal));
+			Assert.That(initialKite, Does.Contain("StealthPriority(owner, a)"));
+			Assert.That(initialKite, Does.Contain("LiveKiteFiringRoute(owner, formation"));
+			Assert.That(initialKite, Does.Contain("Stealth Kite firing candidate"));
+			Assert.That(initialKite, Does.Contain("live-guard-covered=True"));
+			Assert.That(initialKite, Does.Contain("LiveKiteCoveringThreatSummary"));
+			Assert.That(initialKite, Does.Not.Contain("cache.Candidates"));
+			Assert.That(initialKite, Does.Not.Contain("cache.ThreatByActor"));
+			Assert.That(initialKite, Does.Not.Contain("CachedPackageThreats"));
+
+			var admission = states.Substring(states.IndexOf(
+				"var liveArmedGuards = package.Where", StringComparison.Ordinal));
+			admission = admission.Substring(0, admission.IndexOf(
+				"if (firingCell != null)", StringComparison.Ordinal));
+			Assert.That(admission, Does.Contain("Select(LiveGroundThreat)"));
+			Assert.That(admission, Does.Contain("package.Contains(actor)"));
+			Assert.That(admission, Does.Contain("if (requiresDynamicKite)"));
+			Assert.That(admission, Does.Contain("ordinary-fallback=False"));
+			Assert.That(admission, Does.Not.Contain("cache.Threats"));
+			Assert.That(states, Does.Contain("survivors.Concat(locallyArrived).Distinct()"),
+				"A live target cell already reached by the STNK formation must survive strategic filtering.");
+			Assert.That(states, Does.Contain("locallyArrived ? new List<CPos> { representative.Location }"),
+				"Strategic routing may hand an arrived cell to live Kite evaluation without authorizing cached local fire.");
+			Assert.That(states, Does.Contain("plan.StealthMode == StealthClearMode.Kite &&"));
+			Assert.That(states, Does.Contain("OrderByDescending(plan => StealthPriority(owner, plan.Actor))"),
+				"Final arbitration must not replace an approved local live Kite with a remote static target.");
+
+			var manager = Source("OpenRA.Mods.Common/Traits/BotModules/SquadManagerBotModule.cs");
+			var handoff = manager.Substring(manager.IndexOf(
+				"bool AdoptCurrentSquadUnit", StringComparison.Ordinal));
+			handoff = handoff.Substring(0, handoff.IndexOf(
+				"void AdoptLegacyFallbackAssault", StringComparison.Ordinal));
+			Assert.That(handoff, Does.Contain("Info.StealthSquadDefinitions.Values.Any"));
+			Assert.That(handoff, Does.Contain("bot.QueueOrder(new Order(\"Move\", actor"));
+			Assert.That(handoff, Does.Contain("generic-attackmove=False"),
+				"A configured cloaked specialist must not inherit ordinary opportunistic fire before claim.");
+
+			var continuation = states.Substring(states.IndexOf(
+				"protected static bool ContinueStealthClear", StringComparison.Ordinal));
+			continuation = continuation.Substring(0, continuation.IndexOf(
+				"protected static bool RefreshLiveKiteRoute", StringComparison.Ordinal));
+			Assert.That(continuation, Does.Contain(
+				"owner.StealthClearPackage.Contains(owner.TargetActor.ActorID)"));
+			Assert.That(continuation, Does.Contain(
+				"Successful damage is engagement progress, not target invalidation"));
+			Assert.That(continuation, Does.Not.Contain("ApplyAirTargetPlan(owner, livePlan)"));
+			Assert.That(continuation, Does.Not.Contain("bounded live package retarget"));
+			Assert.That(continuation, Does.Not.Contain("cache.Candidates"));
+			Assert.That(continuation, Does.Not.Contain("cache.ThreatByActor"));
+		}
+
 		static T GetSquadField<T>(Squad squad, string name)
 		{
 			var field = typeof(Squad).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic);
@@ -271,9 +416,16 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(states, Does.Contain("AirReinforcementFallbackTicks.TryGetValue"));
 			Assert.That(states, Does.Contain("QueueStealthReinforcementsToFormation(owner);"),
 				"STNK squads must service formation-owned reinforcement catch-up with and without a mission target.");
-			Assert.That(states, Does.Contain("AirReinforcementJoinCells.TryGetValue"));
-			Assert.That(states, Does.Contain("if (!reinforcement.IsIdle && routedAnchorValid)"),
-				"A progressing catch-up route must survive formation-center and mission-target movement.");
+			Assert.That(states, Does.Contain("QueueSafeRouteForReinforcement(owner, reinforcement, anchor)"),
+				"Strategic reinforcement catch-up must retain the cached route flow.");
+			Assert.That(states, Does.Contain("Stealth specialist claim [{0}] accepted"));
+			Assert.That(states, Does.Contain("foreach (var member in joinedFormation)"));
+			Assert.That(states, Does.Contain("stale-pre-claim-movement=cancelled-all"),
+				"A specialist claim must atomically cancel incumbent and joiner pre-claim movement.");
+			Assert.That(states, Does.Contain("RegisterStealthOwnershipTransferLocalReview(owner);"));
+			Assert.That(states, Does.Contain("ResumeCachedStealthStrategicRouteAfterJoin("),
+				"A far ownership transfer must immediately resume cached strategic routing.");
+			Assert.That(states, Does.Contain("strategic-authority=cached-influence local-authority=current-live-review"));
 			Assert.That(states, Does.Contain("preserveStealthRoute"));
 			Assert.That(states, Does.Contain("ShouldPreserveOwnedMissionRoute("));
 			Assert.That(states, Does.Contain("owner.TargetActor == plan.Actor,"));
@@ -298,8 +450,8 @@ namespace OpenRA.Test.Mods.Common
 				"An invalid target must release its transient shared-route latch before reacquisition.");
 			Assert.That(states, Does.Not.Contain("nearestCell: true"),
 				"Unavailable reinforcement routes must not churn through neighboring-cell retries.");
-			Assert.That(states, Does.Contain("groupedActors: members"),
-				"Local escape must use one ordinary grouped Move and leave ground pathing to the engine.");
+			Assert.That(states, Does.Contain("TryLiveStealthMemberRoutes(owner, members, destination"),
+				"Local escape must revalidate the exact live route for every active joined member before dispatch.");
 			Assert.That(states, Does.Contain("ReachedOrPassedStealthEscapeCell(start, destination, center.Value)"),
 				"The escape latch must release when the squad center enters or crosses the adjacent strategic cell.");
 			Assert.That(states, Does.Contain("pendingBlueExplosion, ActiveStealthCenterCell(owner)"),
@@ -315,17 +467,23 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(states, Does.Not.Contain("StealthRouteToCell(owner, representative, cache, goal, cache.Danger, true)"),
 				"Local escape must not add an A* route or fan representative waypoints across the squad.");
 			Assert.That(states, Does.Contain("KiteParticipantTookDamage(owner)"));
-			Assert.That(states, Does.Contain("KiteFormationIsLocallySafe(owner, cache, decisionUnits, owner.TargetActor)"));
+			Assert.That(states, Does.Contain("KiteFormationIsLocallySafe(owner, decisionUnits, owner.TargetActor)"));
 			Assert.That(states, Does.Contain("LiveKitePositionIsCovered(owner, unit, target, unit.CenterPosition)"),
 				"An approved Kite must retain exact live safety instead of inheriting a whole strategic-cell aggregate.");
 			var liveKiteSafety = states.Substring(states.IndexOf(
-				"static bool LiveKitePositionIsCovered", StringComparison.Ordinal));
+				"static bool LiveKiteThreatCoversPosition", StringComparison.Ordinal));
 			liveKiteSafety = liveKiteSafety.Substring(0, liveKiteSafety.IndexOf(
 				"static List<GroundThreat> CachedPackageThreats", StringComparison.Ordinal));
-			Assert.That(liveKiteSafety, Does.Contain("owner.World.Actors.Where(owner.SquadManager.IsPreferredEnemyUnit)"));
-			Assert.That(liveKiteSafety, Does.Contain("LiveGroundThreat(actor)"));
+			Assert.That(liveKiteSafety, Does.Contain("LiveHostileGroundThreats(owner)"));
+			Assert.That(liveKiteSafety, Does.Not.Contain("IsPreferredEnemyUnit"),
+				"A second hostile allied player must cover a Kite firing position even when it is not the strategic preferred owner.");
+			Assert.That(liveKiteSafety, Does.Not.Contain("cache."),
+				"Exact Kite firing-position safety must not depend on strategic cache membership or threat rows.");
+			Assert.That(liveKiteSafety, Does.Contain(
+				"unit, threat.Actor, GroundTargetTypes, true"),
+				"Each planned revealed unit must be evaluated against the live hostile actor.");
 			Assert.That(liveKiteSafety, Does.Contain("definition.DetectorRangeBufferCells"));
-			Assert.That(liveKiteSafety, Does.Contain("TryGetDefenderThreat("));
+			Assert.That(liveKiteSafety, Does.Contain("DefenderThreatAtDistance("));
 			Assert.That(liveKiteSafety, Does.Contain("canonicalThreat > 0"));
 			Assert.That(states, Does.Contain("SafeOrdinaryFiringCell(owner, representative, cache, actor)"),
 				"Ordinary attacks must end at a cached all-threat-safe exact firing cell before revealing.");
@@ -335,8 +493,8 @@ namespace OpenRA.Test.Mods.Common
 				"A cached-safe exact firing-cell plan must not be discarded by the obsolete target-center reveal check.");
 			Assert.That(states, Does.Contain("definition.DetectorRangeBufferCells"),
 				"Kite and ordinary reveal safety must include cached non-target detection coverage.");
-			Assert.That(states, Does.Contain("Stealth crush bridge [{0}] selected cached blocker:"),
-				"An eligible cached infantry blocker must bridge a rejected MTNK Kite into crush then backoff/Kite progress.");
+			Assert.That(states, Does.Contain("Stealth crush bridge [{0}] selected live blocker:"),
+				"An eligible live infantry blocker must bridge a rejected MTNK Kite into crush then backoff/Kite progress.");
 			Assert.That(states, Does.Contain("next=backoff-and-kite"));
 			Assert.That(states, Does.Contain("StealthClearMode.CrushBridge"));
 			Assert.That(states, Does.Contain("completed cached blocker:"));
@@ -355,9 +513,10 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(states, Does.Contain("Stealth live target [{0}] Kite check:"));
 			Assert.That(states, Does.Contain("routeChanged ? \"live-route\" : \"useful-order\""),
 				"A 12-tick live check must expose useful-order preservation instead of unconditional churn.");
-			Assert.That(states, Does.Contain("var cache = CachedStealthInfluence(owner, formation[0])"));
+			Assert.That(states, Does.Contain("var threat = LiveGroundThreat(target);"),
+				"Owned Kite refresh must rebuild the target threat from live traits rather than a cached row.");
 			Assert.That(states, Does.Contain("scope=live-owned-target"));
-			Assert.That(states, Does.Contain("actor-checks=preferred-enemies world-scans=1"),
+			Assert.That(states, Does.Contain("actor-checks=live-hostiles world-scans=1"),
 				"Live Kite telemetry must disclose its exact-geometry actor scan.");
 			var vehicles = Source("mods/cnc/rules/vehicles.yaml");
 			var stnk = vehicles.Substring(vehicles.IndexOf("STNK:", StringComparison.Ordinal));
@@ -365,11 +524,11 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(stnk, Does.Contain("EconomyMammothCrushMove:"));
 			Assert.That(states, Does.Contain("owner.Type != SquadType.Stealth && challenger != null"),
 				"A valid static STNK mission must reach service instead of restarting for every economic challenger.");
-			Assert.That(states, Does.Contain("if (cache == null || formation.Count == 0)"),
-				"An owned Kite must reject a transiently unavailable influence cache and use the existing safe replan path.");
-			Assert.That(states, Does.Contain("!cache.ThreatByActor.ContainsKey(target) &&"));
-			Assert.That(states, Does.Contain("!StealthAISpecialistPolicy.MissingCanonicalThreatIsZero("),
-				"Only a live-trait-confirmed zero-threat target may survive a missing canonical row.");
+			Assert.That(states, Does.Contain(
+				"if (formation.Count == 0 || !IsLiveLocalCombatActor(owner, formation, target))"),
+				"An owned Kite must require a live formation and live-local target without depending on a strategic cache.");
+			Assert.That(states, Does.Not.Contain("!cache.ThreatByActor.ContainsKey(target) &&"),
+				"A live owned Kite target must not be invalidated by a missing strategic cache threat row.");
 			var watchdog = Source("OpenRA.Mods.Common/Traits/BotOwnedStationaryWatchdog.cs");
 			var watchdogGuard = watchdog.IndexOf(
 				"if (!Game.Settings.Debug.BotDebug || !self.Owner.IsBot)", StringComparison.Ordinal);
@@ -444,8 +603,10 @@ namespace OpenRA.Test.Mods.Common
 			var manager = Source("OpenRA.Mods.Common/Traits/BotModules/SquadManagerBotModule.cs");
 			var squad = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/Squad.cs");
 			Assert.That(manager, Does.Contain("StealthLiveTargetCheckInterval = 12"));
-			Assert.That(manager, Does.Contain("s.TickStealthLiveTarget()"),
-				"Owned Crush/Kite live checks must run independently of the 75-tick strategy interval.");
+			Assert.That(manager, Does.Contain("squad.TickStealthLiveTarget()"));
+			Assert.That(manager, Does.Contain("squad.StealthLiveTargetRequested = true"),
+				"Owned Crush/Kite checks must retain their 12-tick demand independently of strategy, " +
+				"then execute through the whole-manager allowance.");
 			Assert.That(manager, Does.Contain("status=timed-out cadence-age={6}/{7}"),
 				"Debug acceptance runs must account for an expired STNK squad without changing cadence state.");
 			Assert.That(manager, Does.Contain("e.Attacker.Info.Name == \"stnk\""));
@@ -520,10 +681,12 @@ namespace OpenRA.Test.Mods.Common
 				"Temporary control or reservation must retain affinity and not trigger an empty lifecycle reset.");
 			Assert.That(states, Does.Contain("Stealth target service [stealth-tank] destination owned"),
 				"Focused games need explicit destination ownership and queued target-service evidence.");
-			Assert.That(states, Does.Contain("already-owned alternatives."),
-				"Independent STNK squads should avoid competing for one final-kill credit when bounded alternatives exist.");
-			Assert.That(states, Does.Contain("if (deconflicted.Count > 0)"),
-				"Target deconfliction must remain a preference and fall back to shared service instead of idling.");
+			Assert.That(states, Does.Not.Contain("var deconflicted = candidates.Where"),
+				"Another squad's target must never remove an otherwise-live candidate.");
+			Assert.That(states, Does.Not.Contain("squad.IsTargetValid && squad.TargetActor == plan.Actor) &&"),
+				"The moving-MTNK challenger must remain eligible when a peer already targets it.");
+			Assert.That(states, Does.Contain("OrderByDescending(Separation)"),
+				"Multi-angle service remains a final ranking preference rather than eligibility.");
 			Assert.That(states, Does.Contain("var stnks = owner.Units.Where"),
 				"Formation promotion and reinforcement membership must share one squad clock.");
 			Assert.That(states, Does.Not.Contain(
@@ -659,14 +822,17 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(states, Does.Contain("owner.StealthAggressiveMass = " +
 				"StealthAISpecialistPolicy.ShouldEnterAggressiveMass(overmatch)"),
 				">5 enters aggressive Mass and <=5 downgrades to normal committed Mass.");
-			Assert.That(states, Does.Contain("aggressiveMass ? \"AttackMove\" : \"Move\""));
-			Assert.That(states, Does.Contain("aggressiveMass ? wanted : threatTarget"),
-				"Aggressive Mass must route toward the selected high-value strategic destination.");
-			Assert.That(states, Does.Contain("else if (!aggressiveMass && CanAttackTarget"),
-				"Aggressive AttackMove must not divert into a targeted low-value scout hunt.");
-			Assert.That(states, Does.Contain("surrounding-threat-screen=required"));
-			Assert.That(states, Does.Contain("!packageThreats.Any(t => CachedThreatCoversReveal("),
-				"A zero-threat target must not bypass other canonical weapons around its firing cell.");
+			Assert.That(states, Does.Not.Contain("aggressiveMass ? \"AttackMove\" : \"Move\""));
+			Assert.That(states, Does.Contain("MassClearRoute(owner, representative,\n\t\t\t\tthreatTarget)"),
+				"Every approved Mass tier must route toward its highest live-threat actor first.");
+			Assert.That(states, Does.Contain(
+				"else if (CanAttackTarget(a, owner.TargetActor) && owner.Type == SquadType.Stealth)"),
+				"High-crossover Mass must keep explicit focus orders instead of opportunistic AttackMove fire.");
+			Assert.That(states, Does.Contain("LiveKitePositionIsCovered("),
+				"Kite admission must screen every firing position against surrounding live threats.");
+			Assert.That(states, Does.Contain(
+				"formation.Any(unit => LiveKitePositionIsCovered("),
+				"A zero-threat target must not bypass other live canonical weapons around its firing cell.");
 			Assert.That(states, Does.Contain(
 				"plan.StealthAggressiveMass && plan.StealthClearCenterCell != null"),
 				"The latched high-value strategic destination must remain distinct from encountered threats.");
@@ -736,7 +902,7 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(kite, Is.GreaterThan(shortSafe));
 			Assert.That(mass, Is.GreaterThan(kite));
 			Assert.That(farSafe, Is.GreaterThan(mass));
-			Assert.That(states, Does.Contain("mobileArmedTarget && (formation.Count == 1 ||"));
+			Assert.That(states, Does.Contain("requiresDynamicKite && (formation.Count == 1 ||"));
 			Assert.That(states, Does.Contain("owner.StealthProfile == \"stealth-tank\") ? TryStealthClearPlan("),
 				"Every active STNK formation must share one legal Kite route and focus-fire target; CTNK stays singleton-only.");
 			Assert.That(states, Does.Contain("StealthCrushLeader(owner, formationUnits, owner.TargetActor)"),
@@ -775,6 +941,78 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(result.Targets.SelectMany(target => target.Route), Does.Not.Contain(new CPos(3, 1)));
 			Assert.That(result.ExpandedCells, Is.LessThanOrEqualTo(Width * Height),
 				"One frontier may expand each cached coarse cell at most once.");
+		}
+
+		[Test]
+		public void CachedStrategicFrontierMatchesBoundedPrimitiveAndRunsSynchronously()
+		{
+			const int Width = 7;
+			const int Height = 5;
+			var danger = new float[Width * Height];
+			danger[1 * Width + 2] = .25f;
+			danger[2 * Width + 3] = StealthAISpecialistPolicy.HardRouteDangerThreshold;
+			danger[3 * Width + 4] = .5f;
+			var targets = new[]
+			{
+				new CPos(6, 2),
+				new CPos(1, 4),
+				new CPos(5, 0),
+				new CPos(3, 2),
+			};
+
+			var unbounded = StealthAIThreatGeometry.SelectReachableTargetCells(
+				danger, Width, Height, 0, 2, targets, 4, 2, requiredIndex: 0);
+			var bounded = StealthAIThreatGeometry.StartReachableTargetCellSearch(
+				danger, Width, Height, 0, 2, targets, 4, 2, requiredIndex: 0);
+			var advances = 0;
+			while (!bounded.Complete)
+			{
+				var operations = bounded.Advance(7);
+				Assert.That(operations, Is.InRange(1, 7));
+				advances++;
+			}
+
+			Assert.That(advances, Is.GreaterThan(1));
+			Assert.That(bounded.Result.ExpandedCells, Is.EqualTo(unbounded.ExpandedCells));
+			Assert.That(bounded.Result.Targets.Select(target => target.TargetIndex),
+				Is.EqualTo(unbounded.Targets.Select(target => target.TargetIndex)));
+			Assert.That(bounded.Result.Targets.Select(target => target.RouteCost),
+				Is.EqualTo(unbounded.Targets.Select(target => target.RouteCost)));
+			Assert.That(bounded.Result.Targets.Select(target => target.IsRequired),
+				Is.EqualTo(unbounded.Targets.Select(target => target.IsRequired)));
+			Assert.That(bounded.Result.Targets.Select(target => target.Route.ToArray()),
+				Is.EqualTo(unbounded.Targets.Select(target => target.Route.ToArray())));
+
+			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
+			var strategic = states.Substring(states.IndexOf(
+				"static AirTargetPlan FindBestStealthTarget(Squad owner", StringComparison.Ordinal));
+			strategic = strategic.Substring(0, strategic.IndexOf(
+				"// END CNC96A GROUND EXTENSION", StringComparison.Ordinal));
+			Assert.That(strategic, Does.Contain("StealthAIThreatGeometry.SelectReachableTargetCells("));
+			Assert.That(strategic, Does.Not.Contain("StartReachableTargetCellSearch("));
+			Assert.That(strategic, Does.Not.Contain("yield return"));
+			Assert.That(strategic, Does.Not.Contain("LiveStealthStrategicSearchSignature"));
+			Assert.That(strategic, Does.Not.Contain("TryConsumeStealthStrategicSearchBudget"));
+			Assert.That(strategic, Does.Contain("return best;"),
+				"The cached strategic scan must publish its complete result in the same bot invocation.");
+		}
+
+		[Test]
+		public void TargetCellDiscoveryRanksHardDangerWithoutEnteringIt()
+		{
+			const int Width = 4;
+			const int Height = 3;
+			var danger = new float[Width * Height];
+			danger[1 * Width + 2] = StealthAISpecialistPolicy.HardRouteDangerThreshold;
+			var result = StealthAIThreatGeometry.SelectReachableTargetCells(
+				danger, Width, Height, 0, 1, new[] { new CPos(2, 1) }, 4, 10);
+
+			Assert.That(result, Is.Not.Null);
+			Assert.That(result.Targets.Select(target => target.TargetIndex), Is.EqualTo(new[] { 0 }),
+				"Hard danger ranks a target cell but must never erase it from lifecycle §3 discovery.");
+			Assert.That(result.Targets[0].Route, Does.Not.Contain(new CPos(2, 1)),
+				"The discovery result must stop its approach before danger and confer no route authority.");
+			Assert.That(result.Targets[0].Route.Last(), Is.EqualTo(new CPos(1, 1)));
 		}
 
 		[Test]
@@ -962,14 +1200,25 @@ namespace OpenRA.Test.Mods.Common
 			var states = StealthStateSources("StealthAIStates", "StealthAIIdleState");
 			Assert.That(states, Does.Contain("OrderByDescending(p => Separation(p.Plan))"),
 				"Surviving opportunities must prefer the cell least close to another STNK squad target.");
-			Assert.That(states, Does.Contain("owner.StealthLastFrontierTargetCells >= 10"));
 			Assert.That(states, Does.Contain("BeginStealthEnemyApproach(owner)"),
-				"A short frontier with no viable mission must take one bounded safe step toward enemies.");
+				"A targetless squad must take one bounded safe step toward live enemies even after a full frontier scan.");
+			Assert.That(states, Does.Not.Contain("owner.StealthLastFrontierTargetCells >= 10 || " +
+				"!BeginStealthEnemyApproach(owner)"),
+				"A full bounded frontier must not turn live target depletion into undirected oscillation.");
 		}
 
 		[Test]
 		public void StealthTargetCellsFilterStrategicValueBeforeThreat()
 		{
+			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
+			var traversal = states.Substring(states.IndexOf(
+				"static AirTargetPlan FindBestStealthTarget(Squad owner", StringComparison.Ordinal));
+			traversal = traversal.Substring(0, traversal.IndexOf(
+				"// END CNC96A GROUND EXTENSION", StringComparison.Ordinal));
+			Assert.That(traversal, Does.Contain(
+				"var cells = groupedCells.OrderBy(g => g.Key.Y).ThenBy(g => g.Key.X).ToList();"));
+			Assert.That(traversal, Does.Not.Contain("TargetCellIsInActiveTier"),
+				"Lifecycle §3 discovery must not pre-filter the options before §4A's comparative value half.");
 			Assert.That(InvokeInternal<long>(typeof(StealthAISpecialistPolicy),
 				"StrategicTargetValueByRemainingHealth", 5000, 1000, 100, 100), Is.EqualTo(5000000));
 			Assert.That(InvokeInternal<long>(typeof(StealthAISpecialistPolicy),
@@ -1016,6 +1265,20 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(states.IndexOf("SelectOrderedTargetCellHalf", StringComparison.Ordinal),
 				Is.LessThan(states.IndexOf("long Separation(AirTargetPlan plan)", StringComparison.Ordinal)));
 			Assert.That(states, Does.Not.Contain("bestSafe.Plan.Score / 4"));
+		}
+
+		[Test]
+		public void TargetlessStrategicScanApproachesAndRescansWithoutWaitLatch()
+		{
+			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
+			var idle = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIIdleState.cs");
+			Assert.That(states, Does.Contain("StealthAIThreatGeometry.SelectReachableTargetCells("));
+			Assert.That(states, Does.Contain("IssueCachedStealthStrategicStep("));
+			Assert.That(idle, Does.Contain("BeginStealthEnemyApproach(owner)"),
+				"A scan with fewer than ten useful cells must move closer through the cached strategic layer and rescan.");
+			Assert.That(states, Does.Not.Contain("StealthStrategicNoTargetWaitSignature"));
+			Assert.That(states, Does.Not.Contain("HoldIncompleteStealthStrategicSearch"));
+			Assert.That(idle, Does.Not.Contain("StealthStrategicSearchWaiting"));
 		}
 
 		[Test]
@@ -1072,8 +1335,9 @@ namespace OpenRA.Test.Mods.Common
 			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
 			Assert.That(states, Does.Contain("cache?.CloakedDanger"));
 			Assert.That(states, Does.Contain("OrdinaryCrushExposureIsSafe("));
-			Assert.That(states, Does.Contain("CloakedCrushRouteIsSafe(owner, cache, crushRoute)"));
-			Assert.That(states, Does.Contain("CloakedCrushRouteIsSafe(owner, crushCache, route)"));
+			Assert.That(states, Does.Contain("CloakedCrushRouteIsSafe(owner, crushRoute)"),
+				"Crush route detector safety must use current hostile actors rather than a strategic cache.");
+			Assert.That(states, Does.Contain("CloakedCrushRouteIsSafe(owner, route)"));
 			Assert.That(states, Does.Contain("SafePostAttackStrategicCell("));
 			var routeOwner = states.Substring(states.IndexOf(
 				"static List<CPos> StealthRouteToCell", StringComparison.Ordinal));
@@ -1158,22 +1422,372 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
-		public void GroupedEscapeChoosesAnUnoccupiedEnterableExactCell()
+		public void GroupEscapeRequiresPerMemberExactLiveSafeRoutes()
 		{
-			Assert.That(StealthAISpecialistPolicy.FirstUnoccupiedEnterableDestination(
-				new[] { true, false, false }, new[] { true, false, true }), Is.EqualTo(2),
-				"An occupied approved-cell center must advance to a passable unoccupied exact cell.");
-			Assert.That(StealthAISpecialistPolicy.FirstUnoccupiedEnterableDestination(
-				new[] { true, false }, new[] { true, false }), Is.EqualTo(-1));
-
 			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
+			var selector = states.Substring(states.IndexOf(
+				"static bool TryLiveStealthMemberRoutes", StringComparison.Ordinal));
+			selector = selector.Substring(0, selector.IndexOf(
+				"static CPos? NearestLiveStealthEscape", StringComparison.Ordinal));
+			Assert.That(selector, Does.Contain("foreach (var member in activeMembers"));
+			Assert.That(selector, Does.Contain("mobile.Pathfinder.FindUnitPath(member.Location, destination"),
+				"Every member needs an exact live locomotor route from its own current position.");
+			Assert.That(selector, Does.Contain("foreach (var routeCell in route)"));
+			Assert.That(selector, Does.Contain("ThreatCoversPosition(threat, position, false"));
+			Assert.That(selector, Does.Contain("LiveStealthMemberCellDanger(owner, member, position, threats"));
+			Assert.That(selector, Does.Contain("member, threat.Actor, GroundTargetTypes, true"),
+				"Every member route must use the standard live calculator with that member as attacker.");
+
 			var escape = states.Substring(states.IndexOf(
 				"static bool IssueStealthEscape", StringComparison.Ordinal));
 			escape = escape.Substring(0, escape.IndexOf(
+				"static bool IssueCachedStealthStrategicStep", StringComparison.Ordinal));
+			Assert.That(escape, Does.Contain("members.Length > 1 && (detectorSteps > 0 || aggregateDanger > 0)"),
+				"A common group flank must be rejected if any member route has detector or weapon exposure.");
+			var issue = states.Substring(states.IndexOf(
+				"static bool IssueValidatedStealthEscape", StringComparison.Ordinal));
+			issue = issue.Substring(0, issue.IndexOf(
 				"protected static int StealthKillCadenceMaximumTicks", StringComparison.Ordinal));
-			Assert.That(escape, Does.Contain("FirstUnoccupiedEnterableDestination("));
-			Assert.That(escape, Does.Contain("groupedActors: members"),
-				"The correction must preserve one bounded grouped escape order.");
+			Assert.That(issue, Does.Contain(".OrderBy(unit => unit.ActorID).ToArray()"));
+			Assert.That(issue, Does.Contain("foreach (var waypoint in memberRoutes[member.ActorID])"),
+				"Each member must receive its own validated exact route to the common flank.");
+			Assert.That(issue, Does.Not.Contain("groupedActors: members"));
+
+			var reposition = states.Substring(states.IndexOf(
+				"protected static bool BeginStealthSafetyReposition", StringComparison.Ordinal));
+			reposition = reposition.Substring(0, reposition.IndexOf(
+				"protected static bool BeginStealthEnemyApproach", StringComparison.Ordinal));
+			Assert.That(reposition, Does.Contain("owner.Bot.QueueOrder(new Order(\"Stop\", member, false))"),
+				"If no common live-safe flank exists, stale member-specific movement must be cancelled.");
+			Assert.That(reposition, Does.Contain("action=hold-and-replan"));
+		}
+
+		[Test]
+		public void OwnershipTransferAtomicallySplitsCachedStrategicAndLiveLocalAuthority()
+		{
+			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
+			var promotion = states.Substring(states.IndexOf(
+				"protected static void PromoteArrivedAirReinforcements", StringComparison.Ordinal));
+			promotion = promotion.Substring(0, promotion.IndexOf(
+				"protected static void RoutePendingStealthReinforcements", StringComparison.Ordinal));
+			Assert.That(promotion, Does.Contain("new Order(\"Stop\", member, false)"));
+			Assert.That(promotion, Does.Contain("owner.AirRoute.Clear();"));
+			Assert.That(promotion, Does.Contain(
+				"StealthAIThreatGeometry.IsSameOrAdjacentCoarseCell(joinedCell.Value, strategicCell.Value)"));
+			Assert.That(promotion, Does.Contain("RegisterStealthOwnershipTransferLocalReview(owner);"),
+				"Only an arrived formation may enter ordinary current-live local review.");
+			Assert.That(promotion, Does.Contain(
+				"ResumeCachedStealthStrategicRouteAfterJoin(owner, joinedFormation, strategicCell.Value);"),
+				"A non-local formation must resume its cached strategic route without an idle gap.");
+			Assert.That(promotion, Does.Not.Contain("TickStealthFormationJoinSafety"));
+
+			var resume = promotion.Substring(promotion.IndexOf(
+				"static bool ResumeCachedStealthStrategicRouteAfterJoin", StringComparison.Ordinal));
+			Assert.That(resume, Does.Contain("StealthInfluence(owner, representative)"));
+			Assert.That(resume, Does.Contain("StealthRouteToCell(owner, member, cache, strategicCell"));
+			Assert.That(resume, Does.Not.Contain("LiveHostileGroundThreats(owner)"));
+		}
+
+		[Test]
+		public void ReinforcementCatchUpPreservesIncumbentActivityUntilAtomicJoin()
+		{
+			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
+			var catchUp = states.Substring(states.IndexOf(
+				"protected static void RoutePendingStealthReinforcements", StringComparison.Ordinal));
+			catchUp = catchUp.Substring(0, catchUp.IndexOf("/// <summary>", StringComparison.Ordinal));
+			Assert.That(catchUp, Does.Contain("!owner.AirUnitsRepairing.Contains(unit.ActorID)"));
+			Assert.That(catchUp, Does.Contain("pending.Length == 0 || incumbents.Length == 0"));
+			Assert.That(catchUp, Does.Contain("QueueStealthReinforcementsToFormation(owner);"));
+			Assert.That(catchUp, Does.Not.Contain("new Order(\"Stop\""),
+				"Pending catch-up is not an incumbent lifecycle invalidation.");
+			Assert.That(catchUp, Does.Not.Contain("owner.AirRoute.Clear();"));
+			Assert.That(catchUp, Does.Not.Contain("owner.AirRouteQueued = false;"));
+			Assert.That(states, Does.Not.Contain("HoldPendingStealthOwnership"));
+			var idle = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIIdleState.cs");
+			Assert.That(idle, Does.Contain("RoutePendingStealthReinforcements(owner);"));
+			Assert.That(idle, Does.Not.Contain("HoldPendingStealthOwnership"));
+			Assert.That(idle, Does.Not.Contain(
+				"if (RoutePendingStealthReinforcements(owner))"));
+			Assert.That(states, Does.Not.Contain(
+				"if (RoutePendingStealthReinforcements(owner))"),
+				"State and safety callers must continue their existing serviced lifecycle checks.");
+		}
+
+		[Test]
+		public void ReinforcementCatchUpUsesCachedRoutesWithinWholeManagerAllowance()
+		{
+			var manager = Source("OpenRA.Mods.Common/Traits/BotModules/SquadManagerBotModule.cs");
+			Assert.That(manager, Does.Contain("TryConsumeStealthCatchUpRoutingAllowance"));
+			Assert.That(manager, Does.Contain(
+				"TryConsumeStealthManagerAllowance(requester, StealthCatchUpWorkKind)"));
+
+			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
+			var catchUp = states.Substring(states.IndexOf(
+				"protected static void QueueStealthReinforcementsToFormation", StringComparison.Ordinal));
+			catchUp = catchUp.Substring(0, catchUp.IndexOf(
+				"protected static void QueueSafeRouteForReinforcement", StringComparison.Ordinal));
+			Assert.That(catchUp, Does.Contain("TryConsumeStealthCatchUpRoutingAllowance(owner)"));
+			Assert.That(catchUp, Does.Contain("QueueSafeRouteForReinforcement(owner, reinforcement, anchor)"));
+			Assert.That(catchUp, Does.Contain("preserved progressing \" +\n" +
+				"\t\t\t\t\t\t\t\"formation catch-up route"));
+			Assert.That(catchUp, Does.Not.Contain("TryLiveStealthMemberRoutes"));
+			Assert.That(catchUp, Does.Not.Contain("LiveHostileGroundThreats"));
+		}
+
+		[Test]
+		public void WholeManagerAllowanceUsesOldestContinuousDemandAndClearsCanceledAge()
+		{
+			var manager = Source("OpenRA.Mods.Common/Traits/BotModules/SquadManagerBotModule.cs");
+			var demand = manager.Substring(manager.IndexOf(
+				"bool HasStealthCatchUpManagerWork", StringComparison.Ordinal));
+			demand = demand.Substring(0, demand.IndexOf("IBot bot;", StringComparison.Ordinal));
+			Assert.That(demand, Does.Contain("if (StealthManagerWorkRequestedTick(squad, kind) >= 0)\n\t\t\t\treturn;"),
+				"Continuously denied demand must retain its first observed due tick.");
+			Assert.That(demand, Does.Contain("void RefreshStealthManagerWorkDemands()"));
+			Assert.That(demand, Does.Contain("if (HasStealthCatchUpManagerWork(squad))"));
+			Assert.That(demand, Does.Not.Contain("HasStealthStrategicManagerWork"),
+				"Cached strategic acquisition completes synchronously and must not enter the action scheduler.");
+			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
+			var ownership = states.Substring(states.IndexOf(
+				"protected static void RoutePendingStealthReinforcements", StringComparison.Ordinal));
+			ownership = ownership.Substring(0, ownership.IndexOf("/// <summary>", StringComparison.Ordinal));
+			Assert.That(ownership, Does.Contain("!owner.AirUnitsRepairing.Contains(unit.ActorID)"),
+				"Repair-owned members must not block the incumbent or advertise catch-up work that cannot run.");
+			Assert.That(ownership, Does.Contain("pending.Length == 0 || incumbents.Length == 0"),
+				"Ownership hold requires the same executable formation anchor as scheduled catch-up work.");
+			Assert.That(demand, Does.Contain("else\n\t\t\t\t\tClearStealthManagerWorkDemand(squad, StealthCatchUpWorkKind)"),
+				"A joined, dead, repairing, or otherwise canceled catch-up must lose its old age.");
+			Assert.That(demand, Does.Contain("ClearStealthManagerWorkDemand(squad, StealthLiveLocalPlanningWorkKind)"));
+			Assert.That(demand, Does.Not.Contain("StealthStrategicSearchWorkKind"));
+			Assert.That(demand, Does.Contain("var oldestDueTick = eligible.Min(work => work.DueTick)"));
+			Assert.That(demand, Does.Contain("eligible.Where(work => work.DueTick == oldestDueTick)"));
+			Assert.That(demand, Does.Contain("ThenBy(work => work.Kind)"),
+				"Equal-age action work must retain the deterministic squad/work-kind cursor order.");
+			Assert.That(demand, Does.Contain("ClearStealthManagerWorkDemand(selected.Squad, selected.Kind)"),
+				"Serviced work must rejoin with a new age if it remains incomplete.");
+
+			var assign = manager.Substring(manager.IndexOf(
+				"void AssignRolesToIdleUnits(IBot bot)", StringComparison.Ordinal));
+			assign = assign.Substring(0, assign.IndexOf(
+				"void AssignRolesToIdleUnitsDegraded", StringComparison.Ordinal));
+			Assert.That(assign.IndexOf("RefreshStealthManagerWorkDemands();", StringComparison.Ordinal),
+				Is.LessThan(assign.IndexOf("squad.StealthLocalSafetyRequested = true", StringComparison.Ordinal)),
+				"Ineligibility must be observed before a genuinely new cadence request is timestamped.");
+			Assert.That(assign, Does.Contain("RegisterStealthManagerWorkDemand(squad, StealthLiveLocalPlanningWorkKind)"));
+
+			var squad = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/Squad.cs");
+			Assert.That(squad, Does.Contain("StealthCatchUpWorkRequestedTick = -1"));
+			Assert.That(squad, Does.Contain("StealthLocalPlanningWorkRequestedTick = -1"));
+			Assert.That(squad, Does.Not.Contain("StealthStrategicWorkRequestedTick"));
+		}
+
+		[Test]
+		public void StrategicTargetSearchCompletesSynchronouslyOutsideManagerAllowance()
+		{
+			var manager = Source("OpenRA.Mods.Common/Traits/BotModules/SquadManagerBotModule.cs");
+			var budget = manager.Substring(manager.IndexOf(
+				"bool TryConsumeStealthManagerAllowance", StringComparison.Ordinal));
+			budget = budget.Substring(0, budget.IndexOf("IBot bot;", StringComparison.Ordinal));
+			Assert.That(budget, Does.Contain("stealthManagerAllowanceTick != World.WorldTick"));
+			Assert.That(budget, Does.Contain("if (stealthManagerAllowanceConsumed)\n\t\t\t\treturn false;"));
+			Assert.That(budget, Does.Not.Contain("HasStealthStrategicManagerWork"));
+			Assert.That(budget, Does.Not.Contain("StealthStrategicSearchWorkKind"));
+			Assert.That(budget, Does.Contain("OrderBy(work => work.Squad.StealthSquadDefinition, StringComparer.Ordinal)"));
+			Assert.That(budget, Does.Contain("work.Squad.StealthSquadIndex > stealthManagerRoundRobinIndex"));
+			Assert.That(manager, Does.Not.Contain("StealthStrategicTargetSearch"));
+			Assert.That(manager, Does.Not.Contain("TryConsumeStealthStrategicSearchBudget"));
+
+			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
+			var traversal = states.Substring(states.IndexOf(
+				"static AirTargetPlan FindBestStealthTarget(Squad owner", StringComparison.Ordinal));
+			traversal = traversal.Substring(0, traversal.IndexOf(
+				"// END CNC96A GROUND EXTENSION", StringComparison.Ordinal));
+			Assert.That(traversal, Does.Contain("StealthAIThreatGeometry.SelectReachableTargetCells("));
+			Assert.That(traversal, Does.Not.Contain("yield return"));
+			Assert.That(traversal, Does.Not.Contain("LiveStealthStrategicSearchSignature"));
+			Assert.That(traversal, Does.Not.Contain("TryConsumeStealthStrategicSearchBudget"));
+			Assert.That(traversal, Does.Contain("SelectOrderedTargetCellHalf("));
+			Assert.That(traversal, Does.Contain("selectedIndices = survivors.Concat(locallyArrived).Distinct()"));
+			Assert.That(traversal, Does.Contain("HighestPriorityFinalEngagements("));
+			Assert.That(traversal, Does.Contain("OrderByDescending(p => Separation(p.Plan)).ThenBy(p => p.ServiceMs)"));
+			Assert.That(traversal, Does.Contain("ThenByDescending(p => p.Plan.Score).ThenBy(p => p.TravelMs)"),
+				"Synchronous completion must retain the exact final ranking chain.");
+			Assert.That(traversal, Does.Contain("return best;"));
+		}
+
+		[Test]
+		public void DeferredLiveLocalPlanningPreservesOwnedActivityUntilServiced()
+		{
+			var manager = Source("OpenRA.Mods.Common/Traits/BotModules/SquadManagerBotModule.cs");
+			var allowance = manager.Substring(manager.IndexOf(
+				"bool TryConsumeStealthManagerAllowance", StringComparison.Ordinal));
+			allowance = allowance.Substring(0, allowance.IndexOf("IBot bot;", StringComparison.Ordinal));
+			Assert.That(allowance, Does.Contain("StealthLiveLocalPlanningWorkKind"));
+			Assert.That(allowance, Does.Contain("squad.StealthRevealedIdleSafetyRequested"));
+			Assert.That(allowance, Does.Contain("squad.StealthLocalSafetyRequested"));
+			Assert.That(allowance, Does.Contain("squad.StealthLiveTargetRequested"));
+			Assert.That(allowance, Does.Not.Contain("SquadType.Stealth &&\n\t\t\t\tsquad.StealthProfile == \"stealth-tank\""),
+				"All stealth profiles with queued local demand must remain eligible instead of being held forever.");
+			Assert.That(allowance, Does.Contain("if (HasStealthCatchUpManagerWork(squad))"),
+				"Catch-up retains its existing STNK-only scope.");
+			Assert.That(allowance, Does.Not.Contain("HasStealthStrategicManagerWork"),
+				"Synchronous cached strategic acquisition must not consume action scheduling capacity.");
+			Assert.That(allowance, Does.Contain("TryConsumeStealthManagerAllowance(requester, StealthLiveLocalPlanningWorkKind)"),
+				"Live-local planning must continue to share one allowance with reinforcement catch-up.");
+
+			var assign = manager.Substring(manager.IndexOf(
+				"void AssignRolesToIdleUnits(IBot bot)", StringComparison.Ordinal));
+			assign = assign.Substring(0, assign.IndexOf(
+				"void AssignRolesToIdleUnitsDegraded", StringComparison.Ordinal));
+			var demand = assign.IndexOf("squad.StealthLocalSafetyRequested = true", StringComparison.Ordinal);
+			var strategy = assign.IndexOf("foreach (var s in Squads)\n\t\t\t\t\ts.Update();", StringComparison.Ordinal);
+			Assert.That(demand, Is.GreaterThanOrEqualTo(0));
+			Assert.That(demand, Is.LessThan(strategy),
+				"All due live-local demand must be visible before squad state updates run.");
+			Assert.That(assign, Does.Contain("squad.StealthLiveTargetRequested = true"));
+			Assert.That(assign, Does.Contain("squad.StealthBlueSafetyRequested = true"));
+			Assert.That(assign, Does.Contain("if (!TryConsumeStealthLiveLocalPlanningAllowance(squad))"));
+			Assert.That(assign, Does.Contain("if (runSafety)\n\t\t\t\t\tsquad.TickAirSafety();\n\t\t\t\telse if (runBlueSafety)"),
+				"A full safety pass must subsume the narrower pending-blue pass under one allowance.");
+			Assert.That(assign, Does.Contain("if (runLiveTarget)\n\t\t\t\t\tsquad.TickStealthLiveTarget();"));
+			Assert.That(assign, Does.Contain(
+				"if (!TryConsumeStealthLiveLocalPlanningAllowance(squad))\n\t\t\t\t\tcontinue;"),
+				"Denied local work must stay pending without running an unserviced lifecycle decision.");
+			Assert.That(assign, Does.Not.Contain("HoldDeferredStealthLocalPlanning"),
+				"Scheduler denial is not a lifecycle invalidation and must not preempt owned activity.");
+
+			var squad = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/Squad.cs");
+			Assert.That(squad, Does.Not.Contain("HoldDeferredStealthLocalPlanning"));
+			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
+			Assert.That(states, Does.Not.Contain("HoldDeferredStealthLocalPlanning"));
+			Assert.That(assign, Does.Not.Contain("new Order(\"Stop\""));
+			Assert.That(assign, Does.Not.Contain("AirRoute.Clear()"),
+				"The manager must leave owned movement, attack, and escape routes intact until serviced work proves invalidation.");
+		}
+
+		[Test]
+		public void RecurringStealthDiagnosticsAreChangePeriodicAndTerminalBounded()
+		{
+			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
+			var local = states.Substring(states.IndexOf(
+				"static void RecordStealthLiveLocalDiagnostic", StringComparison.Ordinal));
+			local = local.Substring(0, local.IndexOf(
+				"static List<Actor> DefenderPackage", StringComparison.Ordinal));
+			Assert.That(local, Does.Contain("var first = !owner.StealthLiveLocalDiagnosticHasSignature"));
+			Assert.That(local, Does.Contain("var changed = !first && owner.StealthLiveLocalDiagnosticSignature != signature"));
+			Assert.That(local, Does.Contain("owner.StealthLiveLocalDiagnosticNextSummaryTick = owner.World.WorldTick + 250"));
+			Assert.That(local, Does.Contain("if (!first && !changed && !periodic)\n\t\t\t\treturn;"));
+			Assert.That(local, Does.Contain("first ? \"first\" : changed ? \"change\" : \"periodic\""),
+				"First observation, changed output state, and deterministic periodic receipt must remain visible.");
+			Assert.That(local, Does.Contain("EmitStealthLiveLocalDiagnosticSummary(owner, \"periodic\")"));
+			Assert.That(local.IndexOf("if (!first && !changed && !periodic)", StringComparison.Ordinal),
+				Is.LessThan(local.IndexOf("BeginStealthManagerAttributionPhase()", StringComparison.Ordinal)),
+				"Suppressed recurring diagnostics must not be timed or counted as emissions.");
+			Assert.That(local, Does.Contain("finally\n\t\t\t{\n\t\t\t\towner.SquadManager.RecordStealthManagerAttributionPhase("));
+			Assert.That(local, Does.Contain("if (Game.Settings.Debug.BotDebug)\n" +
+				"\t\t\t\t\towner.SquadManager.AddStealthManagerAttributionOperations("),
+				"Only a successfully emitted permanent diagnostic may add an enabled attribution operation.");
+			Assert.That(local, Does.Not.Contain("emittedOperations"),
+				"Debug-disabled output must not maintain attribution-only local counters.");
+
+			Assert.That(states, Does.Not.Contain("RecordStealthStrategicDiagnostic"));
+			Assert.That(states, Does.Not.Contain("Stealth strategic search budget-token"));
+			Assert.That(states, Does.Not.Contain("Stealth strategic search budget-summary"));
+			var recurringSummary = states.Substring(states.IndexOf(
+				"internal static void EmitStealthRecurringDiagnosticSummary", StringComparison.Ordinal));
+			recurringSummary = recurringSummary.Substring(0, recurringSummary.IndexOf(
+				"static AirTargetPlan FindBestStealthTarget", StringComparison.Ordinal));
+			Assert.That(recurringSummary, Does.Contain("EmitStealthLiveLocalDiagnosticSummary(owner, summary);"));
+			Assert.That(recurringSummary, Does.Not.Contain("BeginStealthManagerAttributionPhase"),
+				"The composite recurring-summary helper must not double count its instrumented leaf emitters.");
+
+			var manager = Source("OpenRA.Mods.Common/Traits/BotModules/SquadManagerBotModule.cs");
+			var allowance = manager.Substring(manager.IndexOf(
+				"bool TryConsumeStealthManagerAllowance", StringComparison.Ordinal));
+			allowance = allowance.Substring(0, allowance.IndexOf("IBot bot;", StringComparison.Ordinal));
+			Assert.That(allowance, Does.Not.Contain("DiagnosticWorkKind"),
+				"Recurring output may accompany serviced action work but cannot preempt it as independent demand.");
+			var terminal = manager.Substring(manager.IndexOf(
+				"void EmitTerminalStealthWatchdogSummaries", StringComparison.Ordinal));
+			terminal = terminal.Substring(0, terminal.IndexOf(
+				"void EmitTerminalStealthGenerationEfficiencySummaries", StringComparison.Ordinal));
+			Assert.That(terminal, Does.Contain("EmitStealthRecurringDiagnosticSummary(squad, \"terminal\")"));
+			Assert.That(terminal, Does.Contain("EmitTerminalStealthCadenceSummaries()"));
+			Assert.That(terminal, Does.Contain("EmitStealthEfficiencySummary(\"terminal\")"),
+				"Final aggregates must not replace cadence or comparable efficiency output.");
+			Assert.That(terminal, Does.Not.Contain("BeginStealthManagerAttributionPhase"),
+				"Terminal aggregation must not double count its instrumented permanent leaf emitters.");
+			Assert.That(manager, Does.Contain("StealthAIStateBase.EmitStealthRecurringDiagnosticSummary(squad, summary);"),
+				"Retired squads must flush their exact aggregate before removal.");
+			foreach (var helper in new[] { "void EmitStealthGenerationEfficiencySummary(",
+				"void EmitStealthCadenceSummary(", "void EmitStealthEfficiencySummary(" })
+			{
+				var emission = manager.Substring(manager.IndexOf(helper, StringComparison.Ordinal));
+				emission = emission.Substring(0, emission.IndexOf("\n\t\tvoid ", StringComparison.Ordinal));
+				Assert.That(emission, Does.Contain("BeginStealthManagerAttributionPhase()"));
+				Assert.That(emission, Does.Contain("finally"),
+					"Permanent manager diagnostics must record partial successful emission even if a later write fails.");
+				Assert.That(emission, Does.Contain("StealthManagerAttributionPhase.DiagnosticEmission"));
+				Assert.That(emission, Does.Contain("if (Game.Settings.Debug.BotDebug)"));
+				Assert.That(emission, Does.Contain("AddStealthManagerAttributionOperations("));
+				Assert.That(emission, Does.Not.Contain("emittedOperations"));
+			}
+
+			var stationary = Source("OpenRA.Mods.Common/Traits/BotOwnedStationaryWatchdog.cs");
+			Assert.That(stationary, Does.Contain("AI stationary watchdog failure"));
+			Assert.That(states, Does.Contain("Stealth kill watchdog [stealth-tank] squad failure:"));
+			Assert.That(manager, Does.Contain("Stealth Obelisk death watchdog failure"));
+			Assert.That(manager, Does.Contain("stealthEfficiencyDamageTaken += Math.Max(0, e.Damage.Value)"),
+				"Damage and efficiency evidence remains event-driven and unbounded by recurring log suppression.");
+
+			Assert.That(manager, Does.Contain("stealth_manager_phase_attribution|summary={0}"));
+			foreach (var phase in new[] { "manager_tick", "scheduler_selection", "guard_dirty_check",
+				"incremental_path", "dependency_validation", "threat_route_cell",
+				"local_planning_inclusive", "diagnostic_emission" })
+				Assert.That(manager, Does.Contain(phase + "={"));
+			Assert.That(manager, Does.Contain("units=milliseconds/calls/operations"));
+			Assert.That(manager, Does.Contain("diagnostic_only=true"));
+			Assert.That(manager, Does.Contain(
+				"return Game.Settings.Debug.BotDebug ? Stopwatch.GetTimestamp() : 0;"));
+			Assert.That(manager, Does.Contain(
+				"if (!Game.Settings.Debug.BotDebug)\n\t\t\t\treturn;"),
+				"Attribution must have zero timing/counter overhead when bot diagnostics are disabled.");
+			var attributionEmitter = manager.Substring(manager.IndexOf(
+				"void EmitStealthManagerAttribution(", StringComparison.Ordinal));
+			attributionEmitter = attributionEmitter.Substring(0, attributionEmitter.IndexOf(
+				"bool HasStealthCatchUpManagerWork", StringComparison.Ordinal));
+			var disabledBranch = attributionEmitter.Substring(attributionEmitter.IndexOf(
+				"if (!Game.Settings.Debug.BotDebug)", StringComparison.Ordinal));
+			disabledBranch = disabledBranch.Substring(0, disabledBranch.IndexOf(
+				"string Phase(", StringComparison.Ordinal));
+			Assert.That(disabledBranch, Does.Not.Contain("stealthManagerAttribution"));
+			Assert.That(disabledBranch, Does.Not.Contain("stealthManagerAttributionWindowStartTick"),
+				"A debug-disabled aligned failsafe callback must return without counter or window maintenance.");
+			Assert.That(manager.Split(new[] { "EmitStealthManagerAttribution(" },
+				StringSplitOptions.None).Length - 1, Is.EqualTo(3),
+				"Attribution may emit only from its definition, the failsafe-window hook, and terminal output.");
+			Assert.That(manager, Does.Contain(
+				"IAdvancedBotFailsafeWindowDiagnostics.EmitAdvancedFailsafeWindowDiagnostics("));
+			Assert.That(terminal.IndexOf("EmitStealthEfficiencySummary(\"terminal\")", StringComparison.Ordinal),
+				Is.LessThan(terminal.IndexOf("EmitStealthManagerAttribution(\"terminal\"", StringComparison.Ordinal)),
+				"Terminal phase attribution must follow every permanent terminal diagnostic.");
+			var modular = Source("OpenRA.Mods.Common/Traits/Player/ModularBot.cs");
+			Assert.That(modular, Does.Contain("OfType<IAdvancedBotFailsafeWindowDiagnostics>()"));
+			Assert.That(modular, Does.Contain(
+				"diagnostics.EmitAdvancedFailsafeWindowDiagnostics(\n" +
+				"\t\t\t\t\tinfo.AdvancedSquadSampleInterval, decision.Transition);"));
+			Assert.That(allowance, Does.Contain("StealthManagerAttributionPhase.SchedulerSelection"));
+			Assert.That(allowance, Does.Contain("if (Game.Settings.Debug.BotDebug)\n" +
+				"\t\t\t\tAddStealthManagerAttributionOperations("));
+			Assert.That(allowance, Does.Not.Contain("attributionOperations"),
+				"Debug-disabled scheduler selection must not maintain an attribution-only accumulator.");
+			Assert.That(allowance, Does.Not.Contain("ElapsedTicks"),
+				"Measured time must never participate in deterministic work selection.");
+			Assert.That(manager, Does.Contain("IncrementalPath"));
+			Assert.That(manager, Does.Contain("GuardDirtyCheck"));
+			Assert.That(manager, Does.Contain("DependencyValidation"));
+			Assert.That(manager, Does.Contain("ThreatRouteCell"),
+				"Permanent attribution fields remain present even when removed drift contributes zero work.");
 		}
 
 		[Test]
@@ -1707,6 +2321,21 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
+		public void StationaryWatchdogStopsAccumulatingAfterOwnerTerminalState()
+		{
+			var watchdog = Source("OpenRA.Mods.Common/Traits/BotOwnedStationaryWatchdog.cs");
+			var terminalGuard = watchdog.IndexOf(
+				"if (self.Owner.WinState != WinState.Undefined)", StringComparison.Ordinal);
+			Assert.That(terminalGuard, Is.GreaterThanOrEqualTo(0));
+			var terminalBlock = watchdog.Substring(terminalGuard,
+				watchdog.IndexOf("var currentHealth", terminalGuard, StringComparison.Ordinal) - terminalGuard);
+			Assert.That(terminalBlock, Does.Contain("stationaryAge = 0;"));
+			Assert.That(terminalBlock, Does.Contain("stationaryFailureReported = false;"));
+			Assert.That(terminalBlock, Does.Contain("UpdateExemption(self, BotStationaryWatchdogExemption.None);"));
+			Assert.That(terminalBlock, Does.Contain("return;"));
+		}
+
+		[Test]
 		public void LegacyCadenceRankingHelperDoesNotEnterGameplayPlanning()
 		{
 			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
@@ -1723,7 +2352,7 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
-		public void CachedLocalKiteOrderingIsDistanceFirstWhileMassRemainsThreatFirst()
+		public void CachedLocalKiteOrderingIsDistanceFirstWhileOwnedTargetPersistsAfterDamage()
 		{
 			var nearLowThreat = StealthAISpecialistPolicy.CachedLocalKiteOrderKey(25, 1, 1, 9);
 			var farHighThreat = StealthAISpecialistPolicy.CachedLocalKiteOrderKey(36, 100, 100, 1);
@@ -1743,22 +2372,142 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(states, Does.Contain("a.CenterPosition - owner.AirFormationCenter"));
 			Assert.That(states, Does.Contain("var threatTarget = HighestThreatActor(owner, formation, package)"),
 				"Existing Mass semantics must remain highest-threat-first.");
-			Assert.That(states, Does.Contain("LiveKiteTargetAtCurrentSafeCell"));
-			Assert.That(states, Does.Contain("targetHP < owner.AirTargetLastHP"),
-				"A completed shot must repeat the bounded live nearest-enemy selection.");
-			Assert.That(states, Does.Contain("livePlan.Actor != owner.TargetActor"),
-				"An unchanged nearest target must preserve its destination and orders.");
-			var liveLoop = states.IndexOf("static AirTargetPlan LiveKiteTargetAtCurrentSafeCell",
+			Assert.That(states, Does.Not.Contain("LiveKiteTargetAtCurrentSafeCell"));
+			Assert.That(states, Does.Not.Contain("bounded live package retarget"),
+				"Successful damage must not rerank the live package or replace its owned Kite target.");
+			Assert.That(states, Does.Contain("Successful damage is engagement progress, not target invalidation"));
+			Assert.That(states, Does.Contain("scope=live-owned-target"),
+				"The existing bounded live service must continue revalidating the same owned actor.");
+		}
+
+		[Test]
+		public void MassCrossoverThreatAndRouteUseLiveActorsAndLocomotion()
+		{
+			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
+			var calculator = Source("OpenRA.Mods.Common/Traits/BotModules/GeneralizedCombatThreat.cs");
+			var crossoverStart = states.IndexOf("static double CrossoverOvermatch", StringComparison.Ordinal);
+			var massRouteEnd = states.IndexOf("static CPos? NearestSafeStealthNeighbor",
+				crossoverStart, StringComparison.Ordinal);
+			Assert.That(crossoverStart, Is.GreaterThanOrEqualTo(0));
+			Assert.That(massRouteEnd, Is.GreaterThan(crossoverStart));
+			var liveMassSource = states.Substring(crossoverStart, massRouteEnd - crossoverStart);
+			Assert.That(liveMassSource, Does.Contain("EstimateLiveMixedGroupCrossover"),
+				"Mass entry and exit crossover must evaluate the current live actor set.");
+			Assert.That(liveMassSource, Does.Contain("CalculateLive(\n\t\t\t\t\tactor, enemy, GroundTargetTypes, true)"),
+				"Highest-threat-first Mass targeting must rate each current live actor pair.");
+			Assert.That(liveMassSource, Does.Contain("mobile.Pathfinder.FindUnitPath"),
+				"The local Mass approach must use the current live locomotor/path geometry.");
+			Assert.That(states, Does.Contain("MassClearRoute(owner, representative,\n\t\t\t\tthreatTarget)"),
+				"Every approved Mass tier must route toward its highest live-threat actor first.");
+			Assert.That(states, Does.Not.Contain("aggressiveMass ? \"AttackMove\" : \"Move\""),
+				"High crossover must not permit opportunistic AttackMove target churn.");
+			Assert.That(states, Does.Contain(
+				"else if (CanAttackTarget(a, owner.TargetActor) && owner.Type == SquadType.Stealth)"),
+				"The route dispatch must queue explicit attacks on the ranked live target.");
+			Assert.That(states, Does.Contain("massAlreadyInRange ? (IReadOnlyList<CPos>)Array.Empty<CPos>() :\n" +
+				"\t\t\t\t\t\t\tMassClearRoute(owner, a, owner.TargetActor)"),
+				"Mass dispatch must hold every attacker already in its own live range and route only out-of-range units.");
+			Assert.That(states, Does.Contain("Target.FromActor(owner.TargetActor), queued)"),
+				"An in-range Mass focus order must replace stale movement instead of waiting behind it.");
+			Assert.That(states, Does.Contain("Stealth mass focus dispatch"),
+				"The discriminator must expose each unit's live distance, range, hold, and route decision.");
+			Assert.That(states, Does.Contain("HoldUnsafeClaimedStealthApproach(owner, formationUnits)"));
+			Assert.That(states, Does.Contain("PlannedDecloakThreatCoversPosition(owner, unit, nextPosition, threat)"));
+			Assert.That(states, Does.Contain("CombatThreatCalculator.CalculateLive(\n\t\t\t\tunit, threat.Actor, GroundTargetTypes, true)"),
+				"Pre-dispatch safety must use live World actors and the standard planned-current-range calculator.");
+			Assert.That(states, Does.Contain("new Order(\"Stop\", unit, false)"));
+			Assert.That(states, Does.Contain("owner.AirNextTargetReviewTick, owner.World.WorldTick"),
+				"A dangerous next movement must hold only that unit and trigger immediate local arbitration.");
+			Assert.That(liveMassSource, Does.Not.Contain("cache.MobilityDanger"),
+				"Explicit crossover may authorize danger, but cached danger cannot authorize the local route.");
+			var arrivedMass = states.IndexOf(
+				"plan.StealthMode == StealthClearMode.Mass &&", StringComparison.Ordinal);
+			var remoteSafe = states.IndexOf("best = safePlans.Where(p =>", arrivedMass,
 				StringComparison.Ordinal);
-			Assert.That(liveLoop, Is.GreaterThanOrEqualTo(0));
-			var liveLoopEnd = states.IndexOf("protected static bool ContinueOrAbortMassClear",
-				liveLoop, StringComparison.Ordinal);
-			Assert.That(liveLoopEnd, Is.GreaterThan(liveLoop));
-			var liveLoopSource = states.Substring(liveLoop, liveLoopEnd - liveLoop);
-			Assert.That(liveLoopSource, Does.Not.Contain("FindActorsInCircle"),
-				"The live Kite loop must never broaden into a world or radius scan.");
-			Assert.That(liveLoopSource, Does.Not.Contain("StealthRouteToCell("),
-				"The after-shot live scan must not add A* or path search.");
+			Assert.That(arrivedMass, Is.GreaterThanOrEqualTo(0));
+			Assert.That(remoteSafe, Is.GreaterThan(arrivedMass),
+				"An arrived, live-crossover-approved Mass plan must outrank a remote ordinary safe plan.");
+			var arrivedMassSource = states.Substring(arrivedMass, remoteSafe - arrivedMass);
+			Assert.That(arrivedMassSource, Does.Contain(
+				"Math.Abs(planCell.X - activeLocalCell.X) <= 1"),
+				"Only a Mass plan that the live squad has locally reached may receive this arbitration preference.");
+			Assert.That(states, Does.Contain("approvedArrivedMass ||"),
+				"An approved arrived Mass plan must be allowed to supersede a remote static incumbent.");
+			Assert.That(states, Does.Contain("challenger.StealthPackage?.Count > 0 && " +
+				"challenger.StealthClearCenterCell != null"),
+				"Static-incumbent supersession must remain limited to an owned live Mass package and arrived cell.");
+			Assert.That(states, Does.Contain("Stealth mass live threat ranking"));
+			Assert.That(states, Does.Contain("source=live-standard-calculator"),
+				"Mass diagnostics must expose the full per-actor live ranking used for highest-threat-first selection.");
+			Assert.That(states, Does.Contain("crushable-live=[{7}]"));
+			Assert.That(states, Does.Contain("ThreatCoversPosition(threat, actor.CenterPosition"),
+				"The pre-Mass Crush rejection diagnostic must expose current live detector coverage.");
+			Assert.That(calculator, Does.Contain("public double EstimateLiveMixedGroupCrossover"));
+			Assert.That(calculator, Does.Contain(
+				"CalculateLive(attacker, defender, plannedAttackerTargetTypesOverride"),
+				"The live crossover overload must preserve actor-local HP, conditions, ammo, and armaments.");
+		}
+
+		[Test]
+		public void FleeRepositionUsesLiveWholeRouteDangerOnlyAfterExistingFleeDecision()
+		{
+			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
+			var selectorStart = states.IndexOf("static bool TryLiveStealthMemberRoutes", StringComparison.Ordinal);
+			var selectorEnd = states.IndexOf("static bool PendingBlueExplosionInSquadCell",
+				selectorStart, StringComparison.Ordinal);
+			Assert.That(selectorStart, Is.GreaterThanOrEqualTo(0));
+			Assert.That(selectorEnd, Is.GreaterThan(selectorStart));
+			var selector = states.Substring(selectorStart, selectorEnd - selectorStart);
+			Assert.That(selector, Does.Contain("LiveHostileGroundThreats(owner)"));
+			Assert.That(selector, Does.Contain("mobile.Pathfinder.FindUnitPath"));
+			Assert.That(selector, Does.Contain("foreach (var routeCell in route)"),
+				"Every exact live route waypoint must contribute to escape safety.");
+			Assert.That(selector, Does.Contain("CombatThreatCalculator.CalculateLive("));
+			Assert.That(selector, Does.Contain("DefenderThreatAtDistance(pair, distance)"));
+			Assert.That(selector, Does.Contain("candidate.AggregateDanger"));
+			Assert.That(selector, Does.Contain("candidate.MaximumDanger"));
+			Assert.That(selector, Does.Contain("ThenBy(candidate => candidate.RouteLength)"),
+				"Equal live danger must use deterministic shortest-route tie-breaking.");
+			Assert.That(selector, Does.Contain("selected-rank=0 selected-minimum=True"));
+			Assert.That(selector, Does.Not.Contain("cache."),
+				"No strategic cache may select or rate a local escape route.");
+
+			var repositionStart = states.IndexOf("protected static bool BeginStealthSafetyReposition",
+				StringComparison.Ordinal);
+			var approachStart = states.IndexOf("protected static bool BeginStealthEnemyApproach",
+				repositionStart, StringComparison.Ordinal);
+			var reposition = states.Substring(repositionStart, approachStart - repositionStart);
+			Assert.That(reposition, Does.Contain("NearestLiveStealthEscape("));
+			Assert.That(reposition, Does.Not.Contain("StealthInfluence("));
+			var approach = states.Substring(approachStart, states.IndexOf(
+				"static bool CoarseCellHasForbiddenResource", approachStart, StringComparison.Ordinal) - approachStart);
+			Assert.That(approach, Does.Contain("StealthInfluence(owner, representative)"));
+			Assert.That(approach, Does.Contain("cache.Candidates.Select"));
+			Assert.That(approach, Does.Contain("NearestSafeStealthNeighbor("));
+			Assert.That(approach, Does.Contain("IssueCachedStealthStrategicStep("),
+				"Targetless strategic scanning and movement must use the lifecycle's cached route layer.");
+			Assert.That(approach, Does.Not.Contain("NearestLiveStealthEscape("));
+			Assert.That(approach, Does.Not.Contain("LiveHostileGroundThreats(owner)"));
+			Assert.That(selector, Does.Contain("targetDistance >= originTargetDistance"));
+			Assert.That(selector, Does.Contain("detectorSteps > 0 || aggregateDanger > 0"),
+				"Target-directed reacquisition may not relax detector or planned-decloak route safety.");
+			Assert.That(selector, Does.Contain("target-distance-ascending"));
+			Assert.That(selector, Does.Contain("strict-decrease={9}"));
+
+			var targetlessBranch = states.IndexOf("if (nextTarget == null)", StringComparison.Ordinal);
+			Assert.That(targetlessBranch, Is.GreaterThanOrEqualTo(0));
+			var targetlessEnd = states.IndexOf("ApplyAirTargetPlan(owner, nextTarget);",
+				targetlessBranch, StringComparison.Ordinal);
+			var targetless = states.Substring(targetlessBranch, targetlessEnd - targetlessBranch);
+			Assert.That(targetless, Does.Contain("if (!BeginStealthEnemyApproach(owner))"));
+			Assert.That(targetless, Does.Not.Contain("BeginStealthSafetyReposition(owner)"),
+				"Target depletion must not fall through to an undirected local flee step.");
+
+			var massAbort = states.IndexOf("ShouldAbortMassClear(", StringComparison.Ordinal);
+			var massFlee = states.IndexOf("BeginStealthSafetyReposition(owner);", massAbort,
+				StringComparison.Ordinal);
+			Assert.That(massFlee, Is.GreaterThan(massAbort),
+				"Least-danger routing is authorized only after the existing crossover policy decides to flee.");
 		}
 
 		[Test]
@@ -1784,6 +2533,136 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(states, Does.Contain("owner.AirRoute.Count, owner.AirRouteQueued))"));
 			Assert.That(states, Does.Not.Contain("StealthKillCadenceAge = 0"),
 				"Attack activation must not reset or game a continuing squad clock.");
+		}
+
+		[Test]
+		public void LivePlannedDecloakAuthorityWaitsForTheValidatedFiringCell()
+		{
+			Assert.That(StealthAISpecialistPolicy.ShouldWithholdLivePlannedDecloakEngagement(
+				true, true, true), Is.True,
+				"A positive live planned-decloak threat vetoes even an otherwise reached attack.");
+			Assert.That(StealthAISpecialistPolicy.ShouldWithholdLivePlannedDecloakEngagement(
+				false, true, false), Is.True,
+				"A queued or immediate attack has no authority before its validated firing cell is reached.");
+			Assert.That(StealthAISpecialistPolicy.ShouldWithholdLivePlannedDecloakEngagement(
+				false, true, true), Is.False,
+				"The exact reached firing cell retains combat authority when no live threat covers it.");
+			Assert.That(StealthAISpecialistPolicy.ShouldWithholdLivePlannedDecloakEngagement(
+				false, false, false), Is.False,
+				"A separately live-approved current-cell engagement has no stale firing-cell requirement.");
+
+			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
+			Assert.That(states, Does.Contain("phase=initial-issue"));
+			Assert.That(states, Does.Contain("phase=live-kite-issue"));
+			Assert.That(states, Does.Contain("phase=continuation"));
+			Assert.That(states, Does.Contain("phase=immediate-issue"));
+			Assert.That(states, Does.Contain(
+				"CancelUnsafeLivePlannedDecloakContinuation(owner, formationUnits)"),
+				"Continuation cancellation must execute before the generic BusyAttack early return.");
+			Assert.That(states, Does.Contain("CombatThreatCalculator.CalculateLive(\n"));
+			Assert.That(states, Does.Contain("unit, actor, GroundTargetTypes, true)"));
+			Assert.That(states, Does.Contain("DefenderThreatAtDistance("));
+			Assert.That(states, Does.Not.Contain("Info.Name.Equals(\"obli\""),
+				"Threat authority must remain generic; actor identity belongs only to watchdog evidence.");
+			var calculator = Source("OpenRA.Mods.Common/Traits/BotModules/GeneralizedCombatThreat.cs");
+			Assert.That(calculator, Does.Contain(
+				"plannedCurrentRangeEngagement ? EnabledLiveAttackArmaments(defender) :"));
+			Assert.That(calculator, Does.Contain(
+				"plannedCurrentRangeEngagement ? EnabledLiveAttackArmaments(attacker) :"));
+			Assert.That(calculator, Does.Contain(
+				"Where(attack => !attack.IsTraitDisabled && !attack.IsTraitPaused)"));
+			Assert.That(calculator, Does.Contain(
+				"attacker.TraitsImplementing<Armament>()\n" +
+				"\t\t\t\t\t.Where(a => !a.IsTraitDisabled && !a.IsTraitPaused);"),
+				"Default CalculateLive must retain its established direct enabled-armament enumeration.");
+			Assert.That(states, Does.Contain("combat-order=withhold safe-route=continue"),
+				"The engagement veto must preserve movement toward the exact validated safe cell.");
+		}
+
+		[Test]
+		public void RevealedIdleSafetyIsTransitionDrivenActionWork()
+		{
+			Assert.That(StealthAISpecialistPolicy.IsRevealedIdleSafetyEligible(
+				true, true, true, false, true, true), Is.True);
+			Assert.That(StealthAISpecialistPolicy.IsRevealedIdleSafetyEligible(
+				true, true, true, true, true, true), Is.False,
+				"Repair ownership must exclude its movement and Repair order from this safety action.");
+			Assert.That(StealthAISpecialistPolicy.IsRevealedIdleSafetyEligible(
+				true, true, true, false, false, true), Is.False);
+			Assert.That(StealthAISpecialistPolicy.IsRevealedIdleSafetyEligible(
+				true, true, true, false, true, false), Is.False);
+			Assert.That(StealthAISpecialistPolicy.IsRevealedIdleSafetyEligible(
+				true, false, true, false, true, true), Is.False);
+			Assert.That(StealthAISpecialistPolicy.IsRevealedIdleSafetyEligible(
+				false, true, true, false, true, true), Is.False,
+				"Initial visibility without a consumed cloak arm is not a reveal transition.");
+
+			var manager = Source("OpenRA.Mods.Common/Traits/BotModules/SquadManagerBotModule.cs");
+			var refresh = manager.Substring(manager.IndexOf(
+				"static void RefreshStealthRevealedIdleSafetyDemand", StringComparison.Ordinal));
+			refresh = refresh.Substring(0, refresh.IndexOf(
+				"static int StealthManagerWorkRequestedTick", StringComparison.Ordinal));
+			Assert.That(refresh, Does.Contain(
+				"StealthRevealedIdleSafetyPending.RemoveWhere(actorId =>"),
+				"Ineligible work must lose its pending transition instead of retaining stale age.");
+			Assert.That(refresh, Does.Contain(
+				"StealthRevealedIdleSafetyCloakArmed.Add(unit.ActorID)"),
+				"A live cloak observation must arm exactly the next reveal.");
+			Assert.That(refresh, Does.Contain(
+				"if (!squad.StealthRevealedIdleSafetyCloakArmed.Remove(unit.ActorID))"),
+				"Every reveal observation must consume the arm before idle eligibility is considered.");
+			Assert.That(refresh, Does.Contain(
+				"squad.StealthRevealedIdleSafetyPending.Add(unit.ActorID)"));
+			Assert.That(manager, Does.Contain("live && squad.AirUnitsRepairing.Contains(unit.ActorID)"),
+				"The scheduler predicate must preserve repair-owned authority.");
+
+			var assign = manager.Substring(manager.IndexOf(
+				"void AssignRolesToIdleUnits(IBot bot)", StringComparison.Ordinal));
+			assign = assign.Substring(0, assign.IndexOf(
+				"void AssignRolesToIdleUnitsDegraded", StringComparison.Ordinal));
+			Assert.That(assign.IndexOf("RefreshStealthManagerWorkDemands();", StringComparison.Ordinal),
+				Is.LessThan(assign.IndexOf("foreach (var s in Squads)\n\t\t\t\t\ts.Update();", StringComparison.Ordinal)),
+				"The new transition must enter oldest-due action scheduling before strategic traversal.");
+			var revealedService = assign.IndexOf(
+				"if (squad.StealthRevealedIdleSafetyRequested)", StringComparison.Ordinal);
+			Assert.That(revealedService, Is.GreaterThanOrEqualTo(0));
+			Assert.That(revealedService, Is.LessThan(assign.IndexOf(
+				"var runSafety = squad.StealthLocalSafetyRequested", StringComparison.Ordinal)),
+				"Revealed-idle action must run before recurring local safety/diagnostic work.");
+			Assert.That(assign.Substring(revealedService), Does.Contain(
+				"squad.StealthRevealedIdleSafetyPending.Clear()"));
+			Assert.That(assign.Substring(revealedService), Does.Contain(
+				"if (!complete || repositionIssued)"));
+			Assert.That(assign.Substring(revealedService), Does.Contain(
+				"if (repositionIssued)\n\t\t\t\t\t\t{"));
+			Assert.That(assign.Substring(revealedService), Does.Contain(
+				"squad.StealthLocalSafetyRequested = false;"),
+				"A completed urgent move must supersede the stale lower-priority local snapshot instead of immediately rechecking its new route.");
+			Assert.That(assign.Substring(revealedService), Does.Contain(
+				"if (!complete || repositionIssued)\n\t\t\t\t\t{\n"),
+				"No-threat completion must fall through and service already-due ordinary local work under the same allowance.");
+
+			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
+			var action = states.Substring(states.IndexOf(
+				"internal static bool TickStealthRevealedIdleSafety", StringComparison.Ordinal));
+			action = action.Substring(0, action.IndexOf(
+				"protected static bool BeginStealthSafetyReposition", StringComparison.Ordinal));
+			Assert.That(action, Does.Contain("LivePlannedDecloakThreatCoversPosition("));
+			Assert.That(action, Does.Contain("new Order(\"Stop\", member, false)"));
+			Assert.That(action.IndexOf("new Order(\"Stop\", member, false)", StringComparison.Ordinal),
+				Is.LessThan(action.IndexOf("BeginStealthSafetyReposition(owner)", StringComparison.Ordinal)),
+				"Residual combat authority must be canceled before safe reposition/recalculation.");
+			Assert.That(action, Does.Contain("repositionIssued = true"));
+			Assert.That(action, Does.Contain("!owner.AirUnitsRepairing.Contains(unit.ActorID)"));
+			var liveThreat = states.Substring(states.IndexOf(
+				"static bool LivePlannedDecloakThreatCoversPosition", StringComparison.Ordinal));
+			liveThreat = liveThreat.Substring(0, liveThreat.IndexOf(
+				"protected static bool ShouldWithholdLivePlannedDecloakEngagement", StringComparison.Ordinal));
+			Assert.That(liveThreat, Does.Contain("CombatThreatCalculator.CalculateLive("));
+			Assert.That(liveThreat, Does.Contain("unit, actor, GroundTargetTypes, true)"));
+			Assert.That(liveThreat, Does.Contain("DefenderThreatAtDistance("));
+			Assert.That(liveThreat, Does.Not.Contain("obli"),
+				"Current-position safety authority must remain actor-identity agnostic.");
 		}
 
 		[Test]

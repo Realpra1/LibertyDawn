@@ -243,6 +243,13 @@ namespace OpenRA.Mods.Common.Traits
 
 	public static class StealthAISpecialistPolicy
 	{
+		public static bool MayReuseHeldLiveRejection(int cachedTick, int currentTick,
+			int cachedSignature, int currentSignature, bool cachedRejected, int retryTicks)
+		{
+			return cachedRejected && cachedSignature == currentSignature &&
+				currentTick >= cachedTick && currentTick - cachedTick < Math.Max(1, retryTicks);
+		}
+
 		public readonly struct StealthEfficiencySummary
 		{
 			public readonly long RawKilledValue;
@@ -1261,6 +1268,19 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			return string.Equals(victimType, "stnk", StringComparison.OrdinalIgnoreCase) &&
 				string.Equals(attackerType, "obli", StringComparison.OrdinalIgnoreCase);
+		}
+
+		public static bool ShouldWithholdLivePlannedDecloakEngagement(bool currentCellCovered,
+			bool hasValidatedFiringCell, bool reachedValidatedFiringCell)
+		{
+			return currentCellCovered || hasValidatedFiringCell && !reachedValidatedFiringCell;
+		}
+
+		public static bool IsRevealedIdleSafetyEligible(bool cloakRevealArmed,
+			bool isStealthTank, bool isLive,
+			bool repairOwned, bool idle, bool revealed)
+		{
+			return cloakRevealArmed && isStealthTank && isLive && !repairOwned && idle && revealed;
 		}
 
 		public static bool ShouldDispatchOwnedMissionImmediately(bool isStealthTank,

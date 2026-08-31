@@ -398,6 +398,45 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		/// <summary>
+		/// Applies the standard mixed-group crossover formula to actual live actors.
+		/// Each selected type-pair rating is the mean of every live actor-pair rating,
+		/// preserving current HP, conditions, ammo, and enabled armaments without changing
+		/// the existing cached overload or the bounded type-pair selection policy.
+		/// </summary>
+		public double EstimateLiveMixedGroupCrossover(IEnumerable<Actor> ourActors,
+			IEnumerable<Actor> theirActors,
+			BitSet<TargetableType>? plannedAttackerTargetTypesOverride = null,
+			bool plannedCurrentRangeEngagement = false)
+		{
+			if (ourActors == null)
+				throw new ArgumentNullException(nameof(ourActors));
+			if (theirActors == null)
+				throw new ArgumentNullException(nameof(theirActors));
+
+			var ours = ourActors.Where(actor => actor != null && !actor.IsDead && actor.IsInWorld).ToArray();
+			var theirs = theirActors.Where(actor => actor != null && !actor.IsDead && actor.IsInWorld).ToArray();
+			var ourGroup = ours.GroupBy(actor => actor.Info.Name, StringComparer.OrdinalIgnoreCase)
+				.Select(group => new GroupTypeCount(group.Key, group.Count(), group
+					.Select(actor => actor.Info.TraitInfoOrDefault<ValuedInfo>()?.Cost ?? 0)
+					.DefaultIfEmpty().Max())).ToArray();
+			var theirGroup = theirs.GroupBy(actor => actor.Info.Name, StringComparer.OrdinalIgnoreCase)
+				.Select(group => new GroupTypeCount(group.Key, group.Count(), group
+					.Select(actor => actor.Info.TraitInfoOrDefault<ValuedInfo>()?.Cost ?? 0)
+					.DefaultIfEmpty().Max())).ToArray();
+
+			return EstimateMixedGroupCrossover(ourGroup, theirGroup, (ourType, theirType) =>
+			{
+				var pairThreats = ours.Where(actor => actor.Info.Name.Equals(
+					ourType, StringComparison.OrdinalIgnoreCase)).SelectMany(attacker =>
+					theirs.Where(actor => actor.Info.Name.Equals(theirType,
+						StringComparison.OrdinalIgnoreCase)).Select(defender =>
+							CalculateLive(attacker, defender, plannedAttackerTargetTypesOverride,
+								plannedCurrentRangeEngagement).DefenderThreatInAttackerEquivalents));
+				return pairThreats.DefaultIfEmpty().Average();
+			});
+		}
+
+		/// <summary>
 		/// Applies a caller-adjustable engagement policy to the raw mixed-group crossover.
 		/// A separate economic-mass floor covers enemy types omitted from the three-type
 		/// comparison. Neither policy changes the cached matchup ratings.
@@ -824,10 +863,13 @@ namespace OpenRA.Mods.Common.Traits
 		/// This intentionally bypasses the rules cache so veterancy, conditions, current HP,
 		/// ammo exhaustion, disabled armaments, and transformations cannot return stale data.
 		/// </summary>
-		public PairThreat CalculateLive(Actor attacker, Actor defender)
+		public PairThreat CalculateLive(Actor attacker, Actor defender,
+			BitSet<TargetableType>? plannedAttackerTargetTypesOverride = null,
+			bool plannedCurrentRangeEngagement = false)
 		{
 			var forward = CalculateLiveDirection(attacker, defender);
-			var reverse = CalculateLiveDirection(defender, attacker);
+			var reverse = CalculateLiveDirection(
+				defender, attacker, plannedAttackerTargetTypesOverride, plannedCurrentRangeEngagement);
 			return CreatePair(forward, reverse);
 		}
 
@@ -993,21 +1035,26 @@ namespace OpenRA.Mods.Common.Traits
 				applicable.Select(a => a.Threat).ToArray(), healing, ammoProfile);
 		}
 
-		DirectionalThreat CalculateLiveDirection(Actor attacker, Actor defender)
+		DirectionalThreat CalculateLiveDirection(Actor attacker, Actor defender,
+			BitSet<TargetableType>? defenderTargetTypesOverride = null,
+			bool plannedCurrentRangeEngagement = false)
 		{
 			var health = defender.TraitOrDefault<IHealth>();
 			var hp = health?.HP ?? 0;
 			var sharesCell = defender.Info.TraitInfoOrDefault<MobileInfo>()?.LocomotorInfo.SharesCell == true;
 			var attackerTargetTypes = attacker.GetEnabledTargetTypes();
-			var targetTypes = defender.GetEnabledTargetTypes();
+			var targetTypes = defenderTargetTypesOverride ?? defender.GetEnabledTargetTypes();
 			var armor = defender.TraitsImplementing<Armor>()
 				.Where(a => !a.IsTraitDisabled).Select(a => a.Info.Type).FirstOrDefault(a => a != null);
 			var hitRadius = defender.TraitsImplementing<HitShape>()
 				.Where(h => !h.IsTraitDisabled).Select(h => Cells(h.Info.Type.OuterRadius)).DefaultIfEmpty(0.5).Max();
 			var attackerSpeed = MovementSpeedCellsPerTick(attacker);
 			var targetSpeed = MovementSpeedCellsPerTick(defender);
-			var targetEngagementRange = defender.TraitsImplementing<Armament>()
-				.Where(a => !a.IsTraitDisabled && !a.IsTraitPaused && a.Weapon.IsValidTarget(attackerTargetTypes))
+			var targetArmaments = plannedCurrentRangeEngagement ? EnabledLiveAttackArmaments(defender) :
+				defender.TraitsImplementing<Armament>()
+					.Where(a => !a.IsTraitDisabled && !a.IsTraitPaused);
+			var targetEngagementRange = targetArmaments
+				.Where(a => a.Weapon.IsValidTarget(attackerTargetTypes))
 				.Select(a => Cells(a.MaxRange())).DefaultIfEmpty(0).Max();
 			var healing = HealingProfiles(defender);
 			if (TryGetLiveContactAttack(attacker, defender,
@@ -1019,17 +1066,29 @@ namespace OpenRA.Mods.Common.Traits
 			var reloadModifiers = attacker.TraitsImplementing<IReloadModifier>().Select(m => m.GetReloadModifier()).ToArray();
 			var inaccuracyModifiers = attacker.TraitsImplementing<IInaccuracyModifier>().Select(m => m.GetInaccuracyModifier()).ToArray();
 			var ammoPools = attacker.TraitsImplementing<AmmoPool>().ToArray();
-			var applicable = attacker.TraitsImplementing<Armament>()
-				.Where(a => !a.IsTraitDisabled && !a.IsTraitPaused && a.Weapon.IsValidTarget(targetTypes))
+			var attackerArmaments = plannedCurrentRangeEngagement ? EnabledLiveAttackArmaments(attacker) :
+				attacker.TraitsImplementing<Armament>()
+					.Where(a => !a.IsTraitDisabled && !a.IsTraitPaused);
+			var applicable = attackerArmaments
+				.Where(a => a.Weapon.IsValidTarget(targetTypes))
 				.Where(a => ammoPools.Where(p => p.Info.Armaments.Contains(a.Info.Name))
 					.All(p => p.CurrentAmmoCount >= a.Info.AmmoUsage))
 				.Select(a => CalculateArmament(a.Info, hp, armor, hitRadius, sharesCell,
 					attackerSpeed <= 0, a.MaxRange(),
 					firepowerModifiers, reloadModifiers, inaccuracyModifiers, attacker, defender,
-					targetSpeed, targetEngagementRange, targetTypes))
+					targetSpeed, targetEngagementRange, targetTypes, plannedCurrentRangeEngagement))
 				.ToArray();
 
 			return CombineDirections(attacker.Info.Name, defender.Info.Name, hp, armor, hitRadius, applicable, healing);
+		}
+
+		static IEnumerable<Armament> EnabledLiveAttackArmaments(Actor actor)
+		{
+			return actor.TraitsImplementing<AttackBase>()
+				.Where(attack => !attack.IsTraitDisabled && !attack.IsTraitPaused)
+				.SelectMany(attack => attack.Armaments)
+				.Where(armament => !armament.IsTraitDisabled && !armament.IsTraitPaused)
+				.Distinct();
 		}
 
 		static bool TryGetCachedContactAttack(ActorInfo attacker, ActorInfo defender,
@@ -1340,7 +1399,7 @@ namespace OpenRA.Mods.Common.Traits
 			double hitRadius, bool defenderSharesCell, bool attackerIsImmobile,
 			WDist effectiveRange, int[] firepowerModifiers, int[] reloadModifiers, int[] inaccuracyModifiers,
 			Actor attacker, Actor defender, double targetSpeedCellsPerTick, double targetEngagementRangeCells,
-			BitSet<TargetableType> targetTypes)
+			BitSet<TargetableType> targetTypes, bool plannedCurrentRangeEngagement = false)
 		{
 			var weapon = armament.WeaponInfo;
 			var damagingWarheads = weapon.Warheads.OfType<DamageWarhead>()
@@ -1354,7 +1413,8 @@ namespace OpenRA.Mods.Common.Traits
 			var minimumRangeCells = Cells(weapon.MinRange);
 			var movementLimitedRangeCells = EffectiveRangeCells(nominalRangeCells, minimumRangeCells,
 				projectile.SpeedCellsPerTick, targetSpeedCellsPerTick, effectiveHitRadius,
-				projectile.IsInstant, projectile.IsHoming, targetEngagementRangeCells, attackerIsImmobile);
+				projectile.IsInstant, projectile.IsHoming, targetEngagementRangeCells,
+				attackerIsImmobile && !plannedCurrentRangeEngagement);
 			effectiveRange = new WDist((int)(movementLimitedRangeCells * 1024));
 			var inaccuracy = weapon.TargetActorCenter && weapon.Projectile is InstantHitInfo ? 0 :
 				ProjectileInaccuracyCells(weapon.Projectile, effectiveRange, inaccuracyModifiers);

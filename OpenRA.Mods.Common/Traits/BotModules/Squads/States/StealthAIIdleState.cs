@@ -25,6 +25,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				foreach (var unit in owner.Units)
 					SendHomeToRepair(owner, unit);
 				PromoteArrivedAirReinforcements(owner);
+				RoutePendingStealthReinforcements(owner);
 			}
 
 			if (owner.AirEscapingLocalAa)
@@ -75,8 +76,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				// around the base and try again" half of the loop, done the cheap way.
 				if (owner.Type == SquadType.Stealth)
 				{
-					if (owner.StealthProfile != "stealth-tank" ||
-						owner.StealthLastFrontierTargetCells >= 10 || !BeginStealthEnemyApproach(owner))
+					if (owner.StealthProfile == "stealth-tank")
+						BeginStealthEnemyApproach(owner);
+					else
 						BeginStealthSafetyReposition(owner);
 				}
 				else if (owner.SquadManager.Info.AirEvadeDistance > 0 && owner.AirThreatPositions.Count > 0)

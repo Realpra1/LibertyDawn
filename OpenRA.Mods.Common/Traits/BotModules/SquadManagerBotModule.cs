@@ -27,6 +27,33 @@ namespace OpenRA.Mods.Common.Traits
 		Ready
 	}
 
+	enum StealthManagerAttributionPhase
+	{
+		ManagerTick,
+		SchedulerSelection,
+		GuardDirtyCheck,
+		IncrementalPath,
+		DependencyValidation,
+		ThreatRouteCell,
+		LocalPlanning,
+		DiagnosticEmission,
+		Count
+	}
+
+	sealed class StealthManagerAttributionCounter
+	{
+		public long ElapsedTicks;
+		public long Calls;
+		public long Operations;
+
+		public void Clear()
+		{
+			ElapsedTicks = 0;
+			Calls = 0;
+			Operations = 0;
+		}
+	}
+
 	[Desc("Manages AI squads.")]
 	public class SquadManagerBotModuleInfo : ConditionalTraitInfo
 	{
@@ -567,7 +594,8 @@ namespace OpenRA.Mods.Common.Traits
 	}
 
 	public class SquadManagerBotModule : ConditionalTrait<SquadManagerBotModuleInfo>, IBotEnabled, IBotTick, IBotRespondToAttack,
-		IBotPositionsUpdated, INotifyKilled, INotifyAppliedDamage, IGameSaveTraitData, IAdvancedBotTick
+		IBotPositionsUpdated, INotifyKilled, INotifyAppliedDamage, IGameSaveTraitData, IAdvancedBotTick,
+		IAdvancedBotFailsafeWindowDiagnostics
 	{
 		public CPos GetRandomBaseCenter()
 		{
@@ -594,11 +622,276 @@ namespace OpenRA.Mods.Common.Traits
 		readonly HashSet<(string Definition, int Index)> expiredStealthSquadSlots =
 			new HashSet<(string Definition, int Index)>();
 		int nextStealthSquadGenerationId = 1;
+		int stealthManagerAllowanceTick = -1;
+		bool stealthManagerAllowanceConsumed;
+		string stealthManagerRoundRobinDefinition;
+		int stealthManagerRoundRobinIndex = -1;
+		int stealthManagerRoundRobinKind = -1;
+		readonly StealthManagerAttributionCounter[] stealthManagerAttribution =
+			Enumerable.Range(0, (int)StealthManagerAttributionPhase.Count)
+				.Select(_ => new StealthManagerAttributionCounter()).ToArray();
+		int stealthManagerAttributionWindowStartTick;
 
 		// Units that the bot already knows about. Any unit not on this list needs to be given a role.
 		readonly List<Actor> activeUnits = new List<Actor>();
 
 		public List<Squad> Squads = new List<Squad>();
+
+		const int StealthCatchUpWorkKind = 0;
+		const int StealthLiveLocalPlanningWorkKind = 1;
+
+		internal static long BeginStealthManagerAttributionPhase()
+		{
+			return Game.Settings.Debug.BotDebug ? Stopwatch.GetTimestamp() : 0;
+		}
+
+		internal void RecordStealthManagerAttributionPhase(
+			StealthManagerAttributionPhase phase, long started, int operations)
+		{
+			if (!Game.Settings.Debug.BotDebug)
+				return;
+
+			var counter = stealthManagerAttribution[(int)phase];
+			counter.ElapsedTicks += Math.Max(0, Stopwatch.GetTimestamp() - started);
+			counter.Calls++;
+			counter.Operations += Math.Max(0, operations);
+		}
+
+		internal void AddStealthManagerAttributionOperations(
+			StealthManagerAttributionPhase phase, int operations)
+		{
+			if (!Game.Settings.Debug.BotDebug)
+				return;
+
+			stealthManagerAttribution[(int)phase].Operations += Math.Max(0, operations);
+		}
+
+		void EmitStealthManagerAttribution(string summary, int windowTicks, string transition)
+		{
+			if (!Game.Settings.Debug.BotDebug)
+				return;
+
+			string Phase(StealthManagerAttributionPhase phase)
+			{
+				var counter = stealthManagerAttribution[(int)phase];
+				var milliseconds = 1000d * counter.ElapsedTicks / Stopwatch.Frequency;
+				return string.Format("{0:0.###}/{1}/{2}", milliseconds,
+					counter.Calls, counter.Operations);
+			}
+
+			var emissionStarted = BeginStealthManagerAttributionPhase();
+			Log.Write("debug", "stealth_manager_phase_attribution|summary={0}|tick={1}|" +
+				"window_start_tick={2}|window_ticks={3}|transition={4}|units=milliseconds/calls/operations|" +
+				"manager_tick={5}|scheduler_selection={6}|guard_dirty_check={7}|incremental_path={8}|" +
+				"dependency_validation={9}|threat_route_cell={10}|local_planning_inclusive={11}|" +
+				"diagnostic_emission={12}|overlap=manager-and-local-inclusive,child-phases-nested|" +
+				"diagnostic_only=true", summary, World.WorldTick,
+				stealthManagerAttributionWindowStartTick, windowTicks, transition,
+				Phase(StealthManagerAttributionPhase.ManagerTick),
+				Phase(StealthManagerAttributionPhase.SchedulerSelection),
+				Phase(StealthManagerAttributionPhase.GuardDirtyCheck),
+				Phase(StealthManagerAttributionPhase.IncrementalPath),
+				Phase(StealthManagerAttributionPhase.DependencyValidation),
+				Phase(StealthManagerAttributionPhase.ThreatRouteCell),
+				Phase(StealthManagerAttributionPhase.LocalPlanning),
+				Phase(StealthManagerAttributionPhase.DiagnosticEmission));
+
+			foreach (var counter in stealthManagerAttribution)
+				counter.Clear();
+			stealthManagerAttributionWindowStartTick = World.WorldTick;
+			RecordStealthManagerAttributionPhase(
+				StealthManagerAttributionPhase.DiagnosticEmission, emissionStarted, 1);
+		}
+
+		bool HasStealthCatchUpManagerWork(Squad squad)
+		{
+			return squad.Type == SquadType.Stealth && squad.StealthProfile == "stealth-tank" &&
+				squad.AirFormationUnits().Count > 0 && squad.Units.Any(unit =>
+					unit != null && !unit.IsDead && unit.IsInWorld &&
+					squad.AirReinforcements.Contains(unit.ActorID) &&
+					!squad.AirUnitsRepairing.Contains(unit.ActorID));
+		}
+
+		static bool IsRevealedIdleStealthSafetyMember(Squad squad, Actor unit,
+			bool activeLocalMember, bool cloakRevealArmed)
+		{
+			var live = unit != null && !unit.IsDead && unit.IsInWorld;
+			var revealed = live && unit.TraitsImplementing<Cloak>().Any(cloak => !cloak.Cloaked);
+			return StealthAISpecialistPolicy.IsRevealedIdleSafetyEligible(
+				cloakRevealArmed, activeLocalMember && squad.StealthProfile == "stealth-tank" &&
+					live && unit.Info.Name == "stnk", live,
+				live && squad.AirUnitsRepairing.Contains(unit.ActorID), live && unit.IsIdle, revealed);
+		}
+
+		static void RefreshStealthRevealedIdleSafetyDemand(Squad squad)
+		{
+			var owned = squad.Type == SquadType.Stealth ? squad.Units.Where(unit => unit != null &&
+				!unit.IsDead && unit.IsInWorld && unit.Info.Name == "stnk")
+				.OrderBy(unit => unit.ActorID).ToArray() : Array.Empty<Actor>();
+			var ownedIds = new HashSet<uint>(owned.Select(unit => unit.ActorID));
+			var activeLocalIds = new HashSet<uint>(squad.Type == SquadType.Stealth ?
+				squad.AirFormationUnits().Where(unit => unit != null && !unit.IsDead && unit.IsInWorld)
+					.Select(unit => unit.ActorID) : Enumerable.Empty<uint>());
+			squad.StealthRevealedIdleSafetyCloakArmed.RemoveWhere(actorId => !ownedIds.Contains(actorId));
+			squad.StealthRevealedIdleSafetyPending.RemoveWhere(actorId =>
+			{
+				var unit = owned.FirstOrDefault(actor => actor.ActorID == actorId);
+				return !IsRevealedIdleStealthSafetyMember(squad, unit,
+					activeLocalIds.Contains(actorId), true);
+			});
+			foreach (var unit in owned)
+			{
+				var cloaked = unit.TraitsImplementing<Cloak>().Any(cloak => cloak.Cloaked);
+				if (cloaked)
+				{
+					squad.StealthRevealedIdleSafetyCloakArmed.Add(unit.ActorID);
+					continue;
+				}
+
+				if (!squad.StealthRevealedIdleSafetyCloakArmed.Remove(unit.ActorID))
+					continue;
+				if (IsRevealedIdleStealthSafetyMember(squad, unit,
+					activeLocalIds.Contains(unit.ActorID), true))
+					squad.StealthRevealedIdleSafetyPending.Add(unit.ActorID);
+			}
+
+			squad.StealthRevealedIdleSafetyRequested =
+				squad.StealthRevealedIdleSafetyPending.Count > 0;
+		}
+
+		internal void RegisterStealthOwnershipTransferLocalReview(Squad squad)
+		{
+			squad.StealthLocalSafetyRequested = true;
+			squad.StealthLiveTargetRequested = true;
+			RegisterStealthManagerWorkDemand(squad, StealthLiveLocalPlanningWorkKind);
+		}
+
+		static int StealthManagerWorkRequestedTick(Squad squad, int kind)
+		{
+			if (kind == StealthCatchUpWorkKind)
+				return squad.StealthCatchUpWorkRequestedTick;
+			return squad.StealthLocalPlanningWorkRequestedTick;
+		}
+
+		void RegisterStealthManagerWorkDemand(Squad squad, int kind)
+		{
+			if (StealthManagerWorkRequestedTick(squad, kind) >= 0)
+				return;
+
+			if (kind == StealthCatchUpWorkKind)
+				squad.StealthCatchUpWorkRequestedTick = World.WorldTick;
+			else
+				squad.StealthLocalPlanningWorkRequestedTick = World.WorldTick;
+		}
+
+		static void ClearStealthManagerWorkDemand(Squad squad, int kind)
+		{
+			if (kind == StealthCatchUpWorkKind)
+				squad.StealthCatchUpWorkRequestedTick = -1;
+			else
+				squad.StealthLocalPlanningWorkRequestedTick = -1;
+		}
+
+		void RefreshStealthManagerWorkDemands()
+		{
+			foreach (var squad in Squads)
+			{
+				RefreshStealthRevealedIdleSafetyDemand(squad);
+				if (HasStealthCatchUpManagerWork(squad))
+					RegisterStealthManagerWorkDemand(squad, StealthCatchUpWorkKind);
+				else
+					ClearStealthManagerWorkDemand(squad, StealthCatchUpWorkKind);
+
+				if (squad.Type == SquadType.Stealth && (squad.StealthRevealedIdleSafetyRequested ||
+					squad.StealthLocalSafetyRequested ||
+					squad.StealthLiveTargetRequested || squad.StealthBlueSafetyRequested))
+					RegisterStealthManagerWorkDemand(squad, StealthLiveLocalPlanningWorkKind);
+				else
+					ClearStealthManagerWorkDemand(squad, StealthLiveLocalPlanningWorkKind);
+			}
+		}
+
+		bool TryConsumeStealthManagerAllowance(Squad requester, int requestedKind)
+		{
+			var attributionStarted = BeginStealthManagerAttributionPhase();
+			try
+			{
+			RegisterStealthManagerWorkDemand(requester, requestedKind);
+			if (stealthManagerAllowanceTick != World.WorldTick)
+			{
+				stealthManagerAllowanceTick = World.WorldTick;
+				stealthManagerAllowanceConsumed = false;
+			}
+
+			if (stealthManagerAllowanceConsumed)
+				return false;
+
+			var eligible = Squads.Where(squad => squad.Type == SquadType.Stealth).SelectMany(squad =>
+			{
+				var work = new List<(Squad Squad, int Kind, int DueTick)>();
+				if (HasStealthCatchUpManagerWork(squad))
+					work.Add((squad, StealthCatchUpWorkKind,
+						squad.StealthCatchUpWorkRequestedTick));
+				if (squad.StealthRevealedIdleSafetyRequested || squad.StealthLocalSafetyRequested ||
+					squad.StealthLiveTargetRequested ||
+					squad.StealthBlueSafetyRequested)
+					work.Add((squad, StealthLiveLocalPlanningWorkKind,
+						squad.StealthLocalPlanningWorkRequestedTick));
+				return work;
+			}).ToArray();
+			if (Game.Settings.Debug.BotDebug)
+				AddStealthManagerAttributionOperations(
+					StealthManagerAttributionPhase.SchedulerSelection, eligible.Length);
+			if (eligible.Length == 0)
+				return false;
+
+			// Age is reset only by service or observed ineligibility, so continuously denied action work
+			// outranks newer demand. The established cursor remains the deterministic fairness tie-break.
+			var oldestDueTick = eligible.Min(work => work.DueTick);
+			var oldestWork = eligible.Where(work => work.DueTick == oldestDueTick)
+				.OrderBy(work => work.Squad.StealthSquadDefinition, StringComparer.Ordinal)
+				.ThenBy(work => work.Squad.StealthSquadIndex)
+				.ThenBy(work => work.Kind).ToArray();
+			if (Game.Settings.Debug.BotDebug)
+				AddStealthManagerAttributionOperations(
+					StealthManagerAttributionPhase.SchedulerSelection, oldestWork.Length);
+
+			var selected = oldestWork.FirstOrDefault(work => stealthManagerRoundRobinDefinition == null ||
+				string.CompareOrdinal(work.Squad.StealthSquadDefinition,
+					stealthManagerRoundRobinDefinition) > 0 ||
+				(work.Squad.StealthSquadDefinition == stealthManagerRoundRobinDefinition &&
+					(work.Squad.StealthSquadIndex > stealthManagerRoundRobinIndex ||
+					work.Squad.StealthSquadIndex == stealthManagerRoundRobinIndex &&
+					work.Kind > stealthManagerRoundRobinKind)));
+			if (selected.Squad == null)
+				selected = oldestWork[0];
+			if (requester != selected.Squad || requestedKind != selected.Kind)
+				return false;
+
+			stealthManagerAllowanceConsumed = true;
+			stealthManagerRoundRobinDefinition = selected.Squad.StealthSquadDefinition;
+			stealthManagerRoundRobinIndex = selected.Squad.StealthSquadIndex;
+			stealthManagerRoundRobinKind = selected.Kind;
+			ClearStealthManagerWorkDemand(selected.Squad, selected.Kind);
+			return true;
+			}
+			finally
+			{
+				RecordStealthManagerAttributionPhase(
+					StealthManagerAttributionPhase.SchedulerSelection,
+					attributionStarted, 0);
+			}
+		}
+
+		internal bool TryConsumeStealthCatchUpRoutingAllowance(Squad requester)
+		{
+			return TryConsumeStealthManagerAllowance(requester, StealthCatchUpWorkKind);
+		}
+
+		bool TryConsumeStealthLiveLocalPlanningAllowance(Squad requester)
+		{
+			return TryConsumeStealthManagerAllowance(requester, StealthLiveLocalPlanningWorkKind);
+		}
 
 		IBot bot;
 		IBotPositionsUpdated[] notifyPositionsUpdated;
@@ -790,6 +1083,9 @@ namespace OpenRA.Mods.Common.Traits
 
 		void IBotTick.BotTick(IBot bot)
 		{
+			var attributionStarted = BeginStealthManagerAttributionPhase();
+			try
+			{
 			UpdateStealthEfficiencyTelemetry();
 			EnsureStealthSquads(bot);
 			if (advancedBehaviorEnabled && --stealthRecruitTicks <= 0)
@@ -807,6 +1103,12 @@ namespace OpenRA.Mods.Common.Traits
 			}
 			else
 				AssignRolesToIdleUnitsDegraded(bot);
+			}
+			finally
+			{
+				RecordStealthManagerAttributionPhase(
+					StealthManagerAttributionPhase.ManagerTick, attributionStarted, 1);
+			}
 		}
 
 		void UpdateStealthEfficiencyTelemetry()
@@ -843,9 +1145,15 @@ namespace OpenRA.Mods.Common.Traits
 				ref stealthEfficiencyTerminalReported, bot != null, !IsTraitDisabled))
 				return;
 
+			foreach (var squad in Squads.Where(squad => squad.Type == SquadType.Stealth)
+				.OrderBy(squad => squad.StealthSquadDefinition, StringComparer.Ordinal)
+				.ThenBy(squad => squad.StealthSquadIndex))
+				StealthAIStateBase.EmitStealthRecurringDiagnosticSummary(squad, "terminal");
 			EmitTerminalStealthCadenceSummaries();
 			EmitTerminalStealthGenerationEfficiencySummaries();
 			EmitStealthEfficiencySummary("terminal");
+			EmitStealthManagerAttribution("terminal",
+				Math.Max(0, World.WorldTick - stealthManagerAttributionWindowStartTick), "game-ending");
 		}
 
 		void EmitTerminalStealthGenerationEfficiencySummaries()
@@ -857,14 +1165,30 @@ namespace OpenRA.Mods.Common.Traits
 		void EmitStealthGenerationEfficiencySummary(int generationId,
 			StealthEfficiencyWindow window, string summary)
 		{
-			Log.Write("debug", "Stealth efficiency control membership owner={0} bot_id={1} " +
-				"control=bot generation={2} generation-start={3} generation-end={4} kills={5} members=[{6}] " +
-				"actor-time-denominator=sum-live-member-ticks summary={7} diagnostic_only=true.",
-				Player.PlayerName, Player.PlayerActor.ActorID, generationId, window.StartTick, World.WorldTick,
-				window.KillCount, window.Actors.Select(id => "stnk#" + id).JoinWith(","), summary);
-			Log.Write("debug", StealthAISpecialistPolicy.FormatStealthEfficiencySummary(
-				summary + "-generation-" + generationId, Player.PlayerActor.ActorID,
-				window.StartTick, World.WorldTick, window.Summary()));
+			var attributionStarted = BeginStealthManagerAttributionPhase();
+			try
+			{
+				Log.Write("debug", "Stealth efficiency control membership owner={0} bot_id={1} " +
+					"control=bot generation={2} generation-start={3} generation-end={4} kills={5} members=[{6}] " +
+					"actor-time-denominator=sum-live-member-ticks summary={7} diagnostic_only=true.",
+					Player.PlayerName, Player.PlayerActor.ActorID, generationId, window.StartTick, World.WorldTick,
+					window.KillCount, window.Actors.Select(id => "stnk#" + id).JoinWith(","), summary);
+				if (Game.Settings.Debug.BotDebug)
+					AddStealthManagerAttributionOperations(
+						StealthManagerAttributionPhase.DiagnosticEmission, 1);
+				Log.Write("debug", StealthAISpecialistPolicy.FormatStealthEfficiencySummary(
+					summary + "-generation-" + generationId, Player.PlayerActor.ActorID,
+					window.StartTick, World.WorldTick, window.Summary()));
+				if (Game.Settings.Debug.BotDebug)
+					AddStealthManagerAttributionOperations(
+						StealthManagerAttributionPhase.DiagnosticEmission, 1);
+			}
+			finally
+			{
+				RecordStealthManagerAttributionPhase(
+					StealthManagerAttributionPhase.DiagnosticEmission,
+					attributionStarted, 0);
+			}
 		}
 
 		void EmitTerminalStealthCadenceSummaries()
@@ -890,21 +1214,35 @@ namespace OpenRA.Mods.Common.Traits
 			var cadenceFailed = generation.CadenceFailed || generation.MismatchFailed ||
 				StealthAISpecialistPolicy.KillCadenceFailed(generation.CadenceAge, maximumTicks);
 			var status = cadenceFailed ? "failure" : stnks.Length == 0 ? "exempt" : "pass";
-			Log.Write("debug", "Stealth kill watchdog [stealth-tank] squad result: owner={0} tick={1} " +
-				"generation={2} generation-start={3} window-start={4} squad={5}#{6} " +
-				"cadence-age={7}/{8} generation-kills={9} stnks={10} formation={11} " +
-				"reinforcements={12} members=[{13}] cadence-failed={14} status={15} summary={16} " +
-				"retained-generations={17}.",
-				Player.PlayerName, World.WorldTick, generation.GenerationId, generation.GenerationStartTick,
-				generation.WindowStartTick, record.SquadDefinition, record.SquadIndex,
-				generation.CadenceAge, maximumTicks, generation.AttributedKills, stnks.Length,
-				squad?.AirFormationUnits().Count ?? 0, squad?.AirReinforcements.Count ?? 0,
-				stnks.Select(unit => unit.Info.Name + "#" + unit.ActorID).JoinWith(","),
-				cadenceFailed, status, summary, stealthCadenceGenerations.Count);
+			var attributionStarted = BeginStealthManagerAttributionPhase();
+			try
+			{
+				Log.Write("debug", "Stealth kill watchdog [stealth-tank] squad result: owner={0} tick={1} " +
+					"generation={2} generation-start={3} window-start={4} squad={5}#{6} " +
+					"cadence-age={7}/{8} generation-kills={9} stnks={10} formation={11} " +
+					"reinforcements={12} members=[{13}] cadence-failed={14} status={15} summary={16} " +
+					"retained-generations={17}.",
+					Player.PlayerName, World.WorldTick, generation.GenerationId, generation.GenerationStartTick,
+					generation.WindowStartTick, record.SquadDefinition, record.SquadIndex,
+					generation.CadenceAge, maximumTicks, generation.AttributedKills, stnks.Length,
+					squad?.AirFormationUnits().Count ?? 0, squad?.AirReinforcements.Count ?? 0,
+					stnks.Select(unit => unit.Info.Name + "#" + unit.ActorID).JoinWith(","),
+					cadenceFailed, status, summary, stealthCadenceGenerations.Count);
+				if (Game.Settings.Debug.BotDebug)
+					AddStealthManagerAttributionOperations(
+						StealthManagerAttributionPhase.DiagnosticEmission, 1);
+			}
+			finally
+			{
+				RecordStealthManagerAttributionPhase(
+					StealthManagerAttributionPhase.DiagnosticEmission,
+					attributionStarted, 0);
+			}
 		}
 
 		void FinalizeStealthGenerationDiagnostics(Squad squad, string summary)
 		{
+			StealthAIStateBase.EmitStealthRecurringDiagnosticSummary(squad, summary);
 			var generation = squad.StealthKillCadenceGeneration;
 			if (generation == null)
 				return;
@@ -950,12 +1288,25 @@ namespace OpenRA.Mods.Common.Traits
 
 		void EmitStealthEfficiencySummary(string summary)
 		{
-			var metric = StealthAISpecialistPolicy.StealthEfficiency(
-				stealthEfficiencyKillValue, stealthEfficiencyActorTicks,
-				stealthEfficiencyDamageTaken, stealthEfficiencyActors.Count);
-			Log.Write("debug", StealthAISpecialistPolicy.FormatStealthEfficiencySummary(
-				summary, Player.PlayerActor.ActorID, stealthEfficiencyWindowStartTick,
-				World.WorldTick, metric));
+			var attributionStarted = BeginStealthManagerAttributionPhase();
+			try
+			{
+				var metric = StealthAISpecialistPolicy.StealthEfficiency(
+					stealthEfficiencyKillValue, stealthEfficiencyActorTicks,
+					stealthEfficiencyDamageTaken, stealthEfficiencyActors.Count);
+				Log.Write("debug", StealthAISpecialistPolicy.FormatStealthEfficiencySummary(
+					summary, Player.PlayerActor.ActorID, stealthEfficiencyWindowStartTick,
+					World.WorldTick, metric));
+				if (Game.Settings.Debug.BotDebug)
+					AddStealthManagerAttributionOperations(
+						StealthManagerAttributionPhase.DiagnosticEmission, 1);
+			}
+			finally
+			{
+				RecordStealthManagerAttributionPhase(
+					StealthManagerAttributionPhase.DiagnosticEmission,
+					attributionStarted, 0);
+			}
 		}
 
 		void RunFailsafeTestPressure()
@@ -972,6 +1323,12 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		string IAdvancedBotTick.FailsafeModuleId => "SquadManagerBotModule";
+
+		void IAdvancedBotFailsafeWindowDiagnostics.EmitAdvancedFailsafeWindowDiagnostics(
+			int sampleInterval, string transition)
+		{
+			EmitStealthManagerAttribution("failsafe-window", sampleInterval, transition);
+		}
 
 		void IAdvancedBotTick.SetAdvancedBehaviorEnabled(bool enabled)
 		{
@@ -1387,6 +1744,7 @@ namespace OpenRA.Mods.Common.Traits
 		void AssignRolesToIdleUnits(IBot bot)
 		{
 			CleanSquads();
+			RefreshStealthManagerWorkDemands();
 
 			activeUnits.RemoveAll(unitCannotBeOrdered);
 			activeUnits.RemoveAll(IsReservedForSpecialBehavior);
@@ -1394,6 +1752,39 @@ namespace OpenRA.Mods.Common.Traits
 			unitsHangingAroundTheBase.RemoveAll(IsReservedForSpecialBehavior);
 			foreach (var n in notifyIdleBaseUnits)
 				n.UpdatedIdleBaseUnits(unitsHangingAroundTheBase);
+
+			// Record every due live-local request before any strategic state can consume the shared
+			// allowance. Requests persist and coalesce by squad until serviced; scheduler denial does
+			// not invalidate the activity already owned by the squad lifecycle.
+			if (Info.StealthSafetyCheckInterval > 0 && --stealthSafetyTicks <= 0)
+			{
+				stealthSafetyTicks = Info.StealthSafetyCheckInterval;
+				foreach (var squad in Squads.Where(squad => squad.Type == SquadType.Stealth))
+				{
+					squad.StealthLocalSafetyRequested = true;
+					RegisterStealthManagerWorkDemand(squad, StealthLiveLocalPlanningWorkKind);
+				}
+			}
+
+			if (Info.StealthLiveTargetCheckInterval > 0 && --stealthLiveTargetTicks <= 0)
+			{
+				stealthLiveTargetTicks = Info.StealthLiveTargetCheckInterval;
+				foreach (var squad in Squads.Where(squad => squad.Type == SquadType.Stealth))
+				{
+					squad.StealthLiveTargetRequested = true;
+					RegisterStealthManagerWorkDemand(squad, StealthLiveLocalPlanningWorkKind);
+				}
+			}
+
+			if (Info.StealthBlueSafetyCheckInterval > 0 && --stealthBlueSafetyTicks <= 0)
+			{
+				stealthBlueSafetyTicks = Info.StealthBlueSafetyCheckInterval;
+				foreach (var squad in Squads.Where(squad => squad.Type == SquadType.Stealth))
+				{
+					squad.StealthBlueSafetyRequested = true;
+					RegisterStealthManagerWorkDemand(squad, StealthLiveLocalPlanningWorkKind);
+				}
+			}
 
 			if (--rushTicks <= 0)
 			{
@@ -1418,25 +1809,61 @@ namespace OpenRA.Mods.Common.Traits
 					s.TickAirSafety();
 			}
 
-			if (Info.StealthSafetyCheckInterval > 0 && --stealthSafetyTicks <= 0)
+			foreach (var squad in Squads.Where(squad => squad.Type == SquadType.Stealth)
+				.OrderBy(squad => squad.StealthSquadDefinition, StringComparer.Ordinal)
+				.ThenBy(squad => squad.StealthSquadIndex))
 			{
-				stealthSafetyTicks = Info.StealthSafetyCheckInterval;
-				foreach (var s in Squads.Where(s => s.Type == SquadType.Stealth))
-					s.TickAirSafety();
-			}
+				if (!squad.StealthRevealedIdleSafetyRequested && !squad.StealthLocalSafetyRequested &&
+					!squad.StealthLiveTargetRequested &&
+					!squad.StealthBlueSafetyRequested)
+					continue;
+				if (!TryConsumeStealthLiveLocalPlanningAllowance(squad))
+					continue;
 
-			if (Info.StealthLiveTargetCheckInterval > 0 && --stealthLiveTargetTicks <= 0)
-			{
-				stealthLiveTargetTicks = Info.StealthLiveTargetCheckInterval;
-				foreach (var s in Squads.Where(s => s.Type == SquadType.Stealth))
-					s.TickStealthLiveTarget();
-			}
+				var attributionStarted = BeginStealthManagerAttributionPhase();
+				try
+				{
+				if (squad.StealthRevealedIdleSafetyRequested)
+				{
+					var complete = squad.TickStealthRevealedIdleSafety(out var repositionIssued);
+					if (complete)
+					{
+						squad.StealthRevealedIdleSafetyRequested = false;
+						squad.StealthRevealedIdleSafetyPending.Clear();
+					}
 
-			if (Info.StealthBlueSafetyCheckInterval > 0 && --stealthBlueSafetyTicks <= 0)
-			{
-				stealthBlueSafetyTicks = Info.StealthBlueSafetyCheckInterval;
-				foreach (var s in Squads.Where(s => s.Type == SquadType.Stealth))
-					s.TickStealthBlueSafety();
+					if (!complete || repositionIssued)
+					{
+						if (repositionIssued)
+						{
+							squad.StealthLocalSafetyRequested = false;
+							squad.StealthLiveTargetRequested = false;
+							squad.StealthBlueSafetyRequested = false;
+						}
+
+						continue;
+					}
+				}
+
+				var runSafety = squad.StealthLocalSafetyRequested;
+				var runLiveTarget = squad.StealthLiveTargetRequested;
+				var runBlueSafety = squad.StealthBlueSafetyRequested;
+				squad.StealthLocalSafetyRequested = false;
+				squad.StealthLiveTargetRequested = false;
+				squad.StealthBlueSafetyRequested = false;
+				if (runSafety)
+					squad.TickAirSafety();
+				else if (runBlueSafety)
+					squad.TickStealthBlueSafety();
+				if (runLiveTarget)
+					squad.TickStealthLiveTarget();
+				}
+				finally
+				{
+					RecordStealthManagerAttributionPhase(
+						StealthManagerAttributionPhase.LocalPlanning,
+						attributionStarted, 1);
+				}
 			}
 
 			if (Info.AirAdaptiveRiskInterval > 0 && --adaptiveAirRiskTicks <= 0)
@@ -1639,6 +2066,27 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				if (!activeUnits.Contains(actor))
 					activeUnits.Add(actor);
+				return true;
+			}
+
+			// Configured stealth specialists can enter the registry one tick before their persistent
+			// specialist squad claims them. Preserve the ordinary strategic destination during that
+			// handoff, but never give the temporary ground owner an opportunistic AttackMove that can
+			// decloak the unit before live local threat/firing-cell safety has run.
+			if (Info.StealthSquadDefinitions.Values.Any(definition =>
+				definition.UnitTypes.Contains(actor.Info.Name)))
+			{
+				var destination = FindClosestEnemy(actor.CenterPosition);
+				if (destination != null)
+					bot.QueueOrder(new Order("Move", actor,
+						Target.FromCell(World, destination.Location), false));
+				if (!activeUnits.Contains(actor))
+					activeUnits.Add(actor);
+				if (Info.GroundTargetDebugLogging || Info.AirTargetDebugLogging || Game.Settings.Debug.BotDebug)
+					Log.Write("debug", "Stealth strategic handoff [{0}]: actor={1}#{2} " +
+						"destination={3} generic-attackmove=False specialist-claim=pending.",
+						Player.PlayerName, actor.Info.Name, actor.ActorID,
+						destination?.Location.ToString() ?? "none");
 				return true;
 			}
 

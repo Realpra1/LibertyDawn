@@ -112,9 +112,28 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		internal readonly Dictionary<uint, int> AirReinforcementFallbackTicks = new Dictionary<uint, int>();
 		internal int StealthReinforcementRouteIssues;
 		internal int StealthReinforcementRoutePreserves;
+		internal int StealthCatchUpWorkRequestedTick = -1;
+		internal int StealthLocalPlanningWorkRequestedTick = -1;
+		internal bool StealthLocalSafetyRequested;
+		internal bool StealthLiveTargetRequested;
+		internal bool StealthBlueSafetyRequested;
+		internal bool StealthRevealedIdleSafetyRequested;
+		internal readonly HashSet<uint> StealthRevealedIdleSafetyCloakArmed = new HashSet<uint>();
+		internal readonly HashSet<uint> StealthRevealedIdleSafetyPending = new HashSet<uint>();
+
+		internal long StealthLiveLocalDiagnosticSamples;
+		internal long StealthLiveLocalDiagnosticEmitted;
+		internal long StealthLiveLocalDiagnosticChanges;
+		internal bool StealthLiveLocalDiagnosticHasSignature;
+		internal int StealthLiveLocalDiagnosticSignature;
+		internal int StealthLiveLocalDiagnosticNextSummaryTick = -1;
 		internal int StealthCoreRouteIssues;
 		internal int StealthCoreRoutePreserves;
 		internal int StealthLastFrontierTargetCells;
+		internal CPos? StealthTargetlessApproachCell;
+		internal int StealthTargetlessApproachStartedTick = -1;
+		internal int StealthTargetlessApproachSteps;
+		internal readonly HashSet<CPos> StealthTargetlessRejectedCells = new HashSet<CPos>();
 		internal CPos? StealthRouteLastCenterCell;
 		internal int StealthRouteLastCenterProgressTick;
 
@@ -157,6 +176,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		internal CPos? StealthKiteTargetCell;
 		internal CPos? StealthCrushTargetCell;
 		internal CPos? StealthPostAttackCell;
+		internal readonly Dictionary<uint, CPos> StealthValidatedFiringCells = new Dictionary<uint, CPos>();
 		internal uint StealthKiteSupersessionActorId;
 		internal int StealthKiteSupersessionConfirmations;
 		internal readonly Dictionary<uint, int> StealthKiteParticipantHealth = new Dictionary<uint, int>();
@@ -269,6 +289,13 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		{
 			if (IsValid && Type == SquadType.Stealth)
 				StealthAIStateBase.TickStealthLiveTarget(this);
+		}
+
+		public bool TickStealthRevealedIdleSafety(out bool repositionIssued)
+		{
+			repositionIssued = false;
+			return !IsValid || Type != SquadType.Stealth ||
+				StealthAIStateBase.TickStealthRevealedIdleSafety(this, out repositionIssued);
 		}
 
 		void BenchmarkAirWork(string phase, Action work)
