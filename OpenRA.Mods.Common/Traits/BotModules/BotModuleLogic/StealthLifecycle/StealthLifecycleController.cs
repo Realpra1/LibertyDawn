@@ -118,6 +118,19 @@ namespace OpenRA.Mods.Common.Traits
 			return true;
 		}
 
+		public bool TryAccept(StealthTargetDistanceChoiceResult result,
+			out StealthApproachHandoff nextHandoff)
+		{
+			nextHandoff = null;
+			if (result == null || !result.IsReadyForApproach || owner != BehaviorId.TargetDistanceChoice ||
+				result.Handoff.Owner != owner || result.Handoff.Epoch != epoch)
+				return false;
+
+			nextHandoff = new StealthApproachHandoff(
+				AdvanceTo(BehaviorId.Approach), result.Mission);
+			return true;
+		}
+
 		StealthBehaviorHandoff AdvanceTo(BehaviorId nextOwner)
 		{
 			if (epoch.Value == long.MaxValue)

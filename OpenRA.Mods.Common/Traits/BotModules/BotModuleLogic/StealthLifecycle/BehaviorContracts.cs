@@ -23,6 +23,7 @@ namespace OpenRA.Mods.Common.Traits
 		TargetValueFilter,
 		TargetThreatFilter,
 		TargetDistanceChoice,
+		Approach,
 		Engagement,
 		Damage
 	}
