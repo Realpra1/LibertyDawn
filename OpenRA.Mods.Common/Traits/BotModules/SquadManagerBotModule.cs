@@ -861,8 +861,8 @@ namespace OpenRA.Mods.Common.Traits
 					stealthManagerRoundRobinDefinition) > 0 ||
 				(work.Squad.StealthSquadDefinition == stealthManagerRoundRobinDefinition &&
 					(work.Squad.StealthSquadIndex > stealthManagerRoundRobinIndex ||
-					work.Squad.StealthSquadIndex == stealthManagerRoundRobinIndex &&
-					work.Kind > stealthManagerRoundRobinKind)));
+						(work.Squad.StealthSquadIndex == stealthManagerRoundRobinIndex &&
+							work.Kind > stealthManagerRoundRobinKind))));
 			if (selected.Squad == null)
 				selected = oldestWork[0];
 			if (requester != selected.Squad || requestedKind != selected.Kind)

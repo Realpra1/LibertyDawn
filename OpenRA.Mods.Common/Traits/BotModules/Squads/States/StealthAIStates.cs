@@ -1057,7 +1057,6 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				.OrderBy(threat => threat.Actor.ActorID).ToList();
 		}
 
-
 		static bool OrdinaryCrushExposureIsSafe(Squad owner,
 			Actor target, CPos? nextStrategicCell)
 		{
@@ -1915,7 +1914,6 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			}
 		}
 
-
 		static readonly CPos[] LiveStealthAdjacentOffsets =
 		{
 			new CPos(-1, -1), new CPos(0, -1), new CPos(1, -1), new CPos(-1, 0),
@@ -2358,7 +2356,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					LiveHostileGroundThreats(owner), out var memberRoutes,
 					out var detectorSteps, out var aggregateDanger, out var maximumDanger,
 					out var memberRouteSummary) ||
-				members.Length > 1 && (detectorSteps > 0 || aggregateDanger > 0))
+				(members.Length > 1 && (detectorSteps > 0 || aggregateDanger > 0)))
 				return false;
 
 			return IssueValidatedStealthEscape(owner, members, destination, pendingBlueExplosion,
@@ -2973,7 +2971,6 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			owner.FuzzyStateMachine.ChangeState(owner, new StealthAIIdleState(), true);
 			return false;
 		}
-
 
 		protected static bool BeginStealthSafetyReposition(Squad owner)
 		{

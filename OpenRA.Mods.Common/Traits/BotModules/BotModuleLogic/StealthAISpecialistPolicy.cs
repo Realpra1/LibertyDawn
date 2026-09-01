@@ -1273,7 +1273,7 @@ namespace OpenRA.Mods.Common.Traits
 		public static bool ShouldWithholdLivePlannedDecloakEngagement(bool currentCellCovered,
 			bool hasValidatedFiringCell, bool reachedValidatedFiringCell)
 		{
-			return currentCellCovered || hasValidatedFiringCell && !reachedValidatedFiringCell;
+			return currentCellCovered || (hasValidatedFiringCell && !reachedValidatedFiringCell);
 		}
 
 		public static bool IsRevealedIdleSafetyEligible(bool cloakRevealArmed,

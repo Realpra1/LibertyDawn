@@ -102,7 +102,6 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		public Dictionary<uint, List<CPos>> Routes;
 	}
 
-
 	sealed class StealthInfluenceCache
 	{
 		public int Tick;
