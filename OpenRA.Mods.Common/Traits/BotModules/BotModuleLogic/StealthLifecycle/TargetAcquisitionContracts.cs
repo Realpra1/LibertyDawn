@@ -23,6 +23,70 @@ namespace OpenRA.Mods.Common.Traits
 		AwaitingCache
 	}
 
+	public sealed class StealthCombatGroupSnapshot
+	{
+		public string ActorType { get; }
+		public int Count { get; }
+		public int EconomicValue { get; }
+
+		public StealthCombatGroupSnapshot(string actorType, int count, int economicValue)
+		{
+			if (string.IsNullOrWhiteSpace(actorType))
+				throw new ArgumentException("Actor types must be non-empty.", nameof(actorType));
+			if (count <= 0)
+				throw new ArgumentOutOfRangeException(nameof(count));
+			if (economicValue < 0)
+				throw new ArgumentOutOfRangeException(nameof(economicValue));
+
+			ActorType = actorType.ToLowerInvariant();
+			Count = count;
+			EconomicValue = economicValue;
+		}
+	}
+
+	/// <summary>Immutable strategic-cache combat facts for one candidate cell.</summary>
+	public sealed class StealthTargetThreatFacts
+	{
+		readonly ReadOnlyCollection<StealthCombatGroupSnapshot> friendlyGroup;
+		readonly ReadOnlyCollection<StealthCombatGroupSnapshot> enemyGroup;
+
+		public CPos StrategicCell { get; }
+		public IReadOnlyList<StealthCombatGroupSnapshot> FriendlyGroup => friendlyGroup;
+		public IReadOnlyList<StealthCombatGroupSnapshot> EnemyGroup => enemyGroup;
+		public bool FormationCloaked { get; }
+		public bool HasDetectorCoverage { get; }
+		public bool PlannedActionRevealsFormation { get; }
+
+		public StealthTargetThreatFacts(CPos strategicCell,
+			IEnumerable<StealthCombatGroupSnapshot> friendlyGroup,
+			IEnumerable<StealthCombatGroupSnapshot> enemyGroup,
+			bool formationCloaked, bool hasDetectorCoverage,
+			bool plannedActionRevealsFormation = true)
+		{
+			StrategicCell = strategicCell;
+			this.friendlyGroup = NormalizeGroup(friendlyGroup, nameof(friendlyGroup));
+			this.enemyGroup = NormalizeGroup(enemyGroup, nameof(enemyGroup));
+			FormationCloaked = formationCloaked;
+			HasDetectorCoverage = hasDetectorCoverage;
+			PlannedActionRevealsFormation = plannedActionRevealsFormation;
+		}
+
+		static ReadOnlyCollection<StealthCombatGroupSnapshot> NormalizeGroup(
+			IEnumerable<StealthCombatGroupSnapshot> group, string parameterName)
+		{
+			if (group == null)
+				throw new ArgumentNullException(parameterName);
+
+			var snapshots = group.ToArray();
+			if (snapshots.Any(snapshot => snapshot == null) || snapshots
+				.Select(snapshot => snapshot.ActorType).Distinct(StringComparer.Ordinal).Count() != snapshots.Length)
+				throw new ArgumentException("Combat group actor types must be unique.", parameterName);
+
+			return Array.AsReadOnly(snapshots.OrderBy(snapshot => snapshot.ActorType,
+				StringComparer.Ordinal).ToArray());
+		}
+	}
+
 	/// <summary>
 	/// Immutable strategic-cache view. No live actor or combat state is exposed to TargetAcquisition.
 	/// Route-cost units are converted to estimated movement time by SecondsPerCostUnit.
@@ -32,6 +96,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly ReadOnlyCollection<float> danger;
 		readonly ReadOnlyCollection<CPos> enemyStrategicCells;
 		readonly ReadOnlyCollection<StealthStrategicTargetSnapshot> strategicTargets;
+		readonly ReadOnlyCollection<StealthTargetThreatFacts> threatFacts;
 
 		public int Width { get; }
 		public int Height { get; }
@@ -39,11 +104,13 @@ namespace OpenRA.Mods.Common.Traits
 		public IReadOnlyList<float> Danger => danger;
 		public IReadOnlyList<CPos> EnemyStrategicCells => enemyStrategicCells;
 		public IReadOnlyList<StealthStrategicTargetSnapshot> StrategicTargets => strategicTargets;
+		public IReadOnlyList<StealthTargetThreatFacts> ThreatFacts => threatFacts;
 
 		public StealthTargetAcquisitionCacheSnapshot(int width, int height,
 			IEnumerable<float> danger, IEnumerable<CPos> enemyStrategicCells,
 			float secondsPerCostUnit,
-			IEnumerable<StealthStrategicTargetSnapshot> strategicTargets = null)
+			IEnumerable<StealthStrategicTargetSnapshot> strategicTargets = null,
+			IEnumerable<StealthTargetThreatFacts> threatFacts = null)
 		{
 			if (width <= 0 || height <= 0 || (long)width * height > int.MaxValue)
 				throw new ArgumentOutOfRangeException(nameof(width));
@@ -71,6 +138,12 @@ namespace OpenRA.Mods.Common.Traits
 			if (targets.Select(target => target.StableActorId).Distinct().Count() != targets.Length)
 				throw new ArgumentException("Strategic target snapshots must have unique stable identities.",
 					nameof(strategicTargets));
+			var facts = (threatFacts ?? Array.Empty<StealthTargetThreatFacts>()).ToArray();
+			if (facts.Any(fact => fact == null || fact.StrategicCell.X < 0 || fact.StrategicCell.Y < 0 ||
+				fact.StrategicCell.X >= width || fact.StrategicCell.Y >= height) ||
+				facts.Select(fact => fact.StrategicCell).Distinct().Count() != facts.Length)
+				throw new ArgumentException("Threat facts must have unique cells inside the cached grid.",
+					nameof(threatFacts));
 
 			Width = width;
 			Height = height;
@@ -79,6 +152,8 @@ namespace OpenRA.Mods.Common.Traits
 			this.enemyStrategicCells = Array.AsReadOnly(enemies);
 			this.strategicTargets = Array.AsReadOnly(targets.OrderBy(target => target.StrategicCell.Y)
 				.ThenBy(target => target.StrategicCell.X).ThenBy(target => target.StableActorId).ToArray());
+			this.threatFacts = Array.AsReadOnly(facts.OrderBy(fact => fact.StrategicCell.Y)
+				.ThenBy(fact => fact.StrategicCell.X).ToArray());
 		}
 	}
 
@@ -127,10 +202,12 @@ namespace OpenRA.Mods.Common.Traits
 		public int? EstimatedTravelMilliseconds { get; }
 		public bool IsIncumbent { get; }
 		public IReadOnlyList<StealthStrategicTargetSnapshot> StrategicTargets => strategicTargets;
+		public StealthTargetThreatFacts ThreatFacts { get; }
 
 		internal StealthTargetOption(CPos strategicCell,
 			int? estimatedTravelMilliseconds, bool isIncumbent,
-			IEnumerable<StealthStrategicTargetSnapshot> strategicTargets = null)
+			IEnumerable<StealthStrategicTargetSnapshot> strategicTargets = null,
+			StealthTargetThreatFacts threatFacts = null)
 		{
 			if (estimatedTravelMilliseconds < 0)
 				throw new ArgumentOutOfRangeException(nameof(estimatedTravelMilliseconds));
@@ -140,12 +217,17 @@ namespace OpenRA.Mods.Common.Traits
 				throw new ArgumentException(
 					"Strategic target snapshots must be unique and belong to the option cell.",
 					nameof(strategicTargets));
+			if (threatFacts != null && threatFacts.StrategicCell != strategicCell)
+				throw new ArgumentException("Threat facts must belong to the option cell.", nameof(threatFacts));
 
 			StrategicCell = strategicCell;
 			EstimatedTravelMilliseconds = estimatedTravelMilliseconds;
 			IsIncumbent = isIncumbent;
 			this.strategicTargets = Array.AsReadOnly(
 				targets.OrderBy(target => target.StableActorId).ToArray());
+			ThreatFacts = threatFacts ?? new StealthTargetThreatFacts(strategicCell,
+				Array.Empty<StealthCombatGroupSnapshot>(), Array.Empty<StealthCombatGroupSnapshot>(),
+				false, false);
 		}
 	}
 

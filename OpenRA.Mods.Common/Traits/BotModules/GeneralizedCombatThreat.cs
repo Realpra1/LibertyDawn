@@ -241,6 +241,18 @@ namespace OpenRA.Mods.Common.Traits
 			public bool CrossesOver => DefenderThreatToGroup <= 1 && GroupThreatToDefender >= 1;
 		}
 
+		public sealed class MixedGroupThreat
+		{
+			public double ThreatRating { get; }
+			public double Crossover { get; }
+
+			public MixedGroupThreat(double threatRating, double crossover)
+			{
+				ThreatRating = threatRating;
+				Crossover = crossover;
+			}
+		}
+
 		public sealed class CrossoverResult
 		{
 			public bool Found { get; internal set; }
@@ -496,6 +508,16 @@ namespace OpenRA.Mods.Common.Traits
 		public static double EstimateMixedGroupCrossover(IEnumerable<GroupTypeCount> ourGroup,
 			IEnumerable<GroupTypeCount> theirGroup, Func<string, string, double> theirThreatToUs)
 		{
+			return CalculateMixedGroupThreat(ourGroup, theirGroup, theirThreatToUs).Crossover;
+		}
+
+		/// <summary>
+		/// Returns both the standard representative-pair threat rating and the crossover derived
+		/// from it. This keeps strategic callers from reproducing the mixed-group aggregation.
+		/// </summary>
+		public static MixedGroupThreat CalculateMixedGroupThreat(IEnumerable<GroupTypeCount> ourGroup,
+			IEnumerable<GroupTypeCount> theirGroup, Func<string, string, double> theirThreatToUs)
+		{
 			if (ourGroup == null)
 				throw new ArgumentNullException(nameof(ourGroup));
 
@@ -507,13 +529,13 @@ namespace OpenRA.Mods.Common.Traits
 
 			var normalizedTheirs = NormalizeTypes(theirGroup);
 			if (normalizedTheirs.Length == 0)
-				return 0;
+				return new MixedGroupThreat(0, 0);
 
 			var theirCount = normalizedTheirs.Sum(t => (double)t.Count);
 
 			var ours = RepresentativeTypes(ourGroup, MixedGroupMaximumAttackerTypes);
 			if (ours.Length == 0)
-				return double.PositiveInfinity;
+				return new MixedGroupThreat(MaximumThreatRating, double.PositiveInfinity);
 
 			var enemyRepresentativeLimit = MixedGroupLookupBudget / ours.Length;
 			var theirs = RepresentativeTypes(normalizedTheirs, enemyRepresentativeLimit);
@@ -530,7 +552,8 @@ namespace OpenRA.Mods.Common.Traits
 
 			var theirGroupThreat = totalWeight > 0 ? weightedThreat / totalWeight : 0;
 			var requiredPotential = Math.Max(0, theirGroupThreat) * DiscreteCombatPotential(theirCount);
-			return ActorCountForDiscreteCombatPotential(requiredPotential) / theirCount;
+			var crossover = ActorCountForDiscreteCombatPotential(requiredPotential) / theirCount;
+			return new MixedGroupThreat(theirGroupThreat, crossover);
 		}
 
 		static GroupTypeCount[] RepresentativeTypes(IEnumerable<GroupTypeCount> group, int maximumTypes)

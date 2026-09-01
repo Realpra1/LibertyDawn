@@ -25,6 +25,7 @@ namespace OpenRA.Mods.Common.Traits
 		public int? EstimatedTravelMilliseconds { get; }
 		public bool IsIncumbent { get; }
 		public IReadOnlyList<StealthStrategicTargetSnapshot> StrategicTargets => strategicTargets;
+		public StealthTargetThreatFacts ThreatFacts { get; }
 		public long StrategicValue { get; }
 		public uint StableIdentity => strategicTargets.Count == 0 ? uint.MaxValue :
 			strategicTargets[0].StableActorId;
@@ -41,6 +42,7 @@ namespace OpenRA.Mods.Common.Traits
 			IsIncumbent = option.IsIncumbent;
 			strategicTargets = Array.AsReadOnly(option.StrategicTargets.ToArray());
 			StrategicValue = strategicValue;
+			ThreatFacts = option.ThreatFacts;
 		}
 	}
 

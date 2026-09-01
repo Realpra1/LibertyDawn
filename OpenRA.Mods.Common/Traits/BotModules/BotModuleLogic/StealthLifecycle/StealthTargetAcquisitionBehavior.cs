@@ -22,7 +22,7 @@ namespace OpenRA.Mods.Common.Traits
 	/// </summary>
 	public sealed class StealthTargetAcquisitionBehavior
 	{
-		const int PrivateSaveVersion = 1;
+		const int PrivateSaveVersion = 2;
 		const float DangerCost = 1f;
 		public const int MaximumOptions = 10;
 		public const int MaximumTravelSeconds = 30;
@@ -88,7 +88,8 @@ namespace OpenRA.Mods.Common.Traits
 					candidate.Cell == incumbentStrategicCell.Value);
 				options.Add(new StealthTargetOption(incumbentStrategicCell.Value,
 					incumbent?.TravelMilliseconds, true,
-					TargetsAt(snapshot, incumbentStrategicCell.Value)));
+					TargetsAt(snapshot, incumbentStrategicCell.Value),
+					ThreatFactsAt(snapshot, incumbentStrategicCell.Value)));
 			}
 
 			foreach (var candidate in candidates)
@@ -99,7 +100,8 @@ namespace OpenRA.Mods.Common.Traits
 					continue;
 
 				options.Add(new StealthTargetOption(candidate.Cell,
-					candidate.TravelMilliseconds, false, TargetsAt(snapshot, candidate.Cell)));
+					candidate.TravelMilliseconds, false, TargetsAt(snapshot, candidate.Cell),
+					ThreatFactsAt(snapshot, candidate.Cell)));
 			}
 
 			var needsRescan = options.Count < MaximumOptions;
@@ -140,10 +142,20 @@ namespace OpenRA.Mods.Common.Traits
 					new MiniYamlNode("StrategicCell", FieldSaver.FormatValue(option.StrategicCell)),
 					new MiniYamlNode("EstimatedTravelMilliseconds",
 						FieldSaver.FormatValue(option.EstimatedTravelMilliseconds)),
-					new MiniYamlNode("IsIncumbent", FieldSaver.FormatValue(option.IsIncumbent))
+					new MiniYamlNode("IsIncumbent", FieldSaver.FormatValue(option.IsIncumbent)),
+					new MiniYamlNode("FormationCloaked",
+						FieldSaver.FormatValue(option.ThreatFacts.FormationCloaked)),
+					new MiniYamlNode("HasDetectorCoverage",
+						FieldSaver.FormatValue(option.ThreatFacts.HasDetectorCoverage)),
+					new MiniYamlNode("PlannedActionRevealsFormation",
+						FieldSaver.FormatValue(option.ThreatFacts.PlannedActionRevealsFormation))
 				};
 				foreach (var target in option.StrategicTargets)
 					optionNodes.Add(SerializeTarget(target));
+				foreach (var member in option.ThreatFacts.FriendlyGroup)
+					optionNodes.Add(SerializeGroupMember("Friendly", member));
+				foreach (var member in option.ThreatFacts.EnemyGroup)
+					optionNodes.Add(SerializeGroupMember("Enemy", member));
 				nodes.Add(new MiniYamlNode("Option", "", optionNodes));
 			}
 
@@ -183,12 +195,38 @@ namespace OpenRA.Mods.Common.Traits
 
 		static StealthTargetOption RestoreOption(MiniYamlNode node)
 		{
-			var values = ReadUniqueValues(node.Value.Nodes.Where(child => child.Key != "Target"),
+			var values = ReadUniqueValues(node.Value.Nodes.Where(child => child.Key != "Target" &&
+				child.Key != "Friendly" && child.Key != "Enemy"),
 				"TargetAcquisition option");
-			return new StealthTargetOption(Read<CPos>(values, "StrategicCell"),
+			var cell = Read<CPos>(values, "StrategicCell");
+			var facts = new StealthTargetThreatFacts(cell,
+				node.Value.Nodes.Where(child => child.Key == "Friendly").Select(RestoreGroupMember),
+				node.Value.Nodes.Where(child => child.Key == "Enemy").Select(RestoreGroupMember),
+				Read<bool>(values, "FormationCloaked"), Read<bool>(values, "HasDetectorCoverage"),
+				Read<bool>(values, "PlannedActionRevealsFormation"));
+			return new StealthTargetOption(cell,
 				Read<int?>(values, "EstimatedTravelMilliseconds"),
 				Read<bool>(values, "IsIncumbent"),
-				node.Value.Nodes.Where(child => child.Key == "Target").Select(RestoreTarget));
+				node.Value.Nodes.Where(child => child.Key == "Target").Select(RestoreTarget), facts);
+		}
+
+		static MiniYamlNode SerializeGroupMember(string key, StealthCombatGroupSnapshot member)
+		{
+			return new MiniYamlNode(key, "", new List<MiniYamlNode>
+			{
+				new MiniYamlNode("ActorType", member.ActorType),
+				new MiniYamlNode("Count", FieldSaver.FormatValue(member.Count)),
+				new MiniYamlNode("EconomicValue", FieldSaver.FormatValue(member.EconomicValue))
+			});
+		}
+
+		static StealthCombatGroupSnapshot RestoreGroupMember(MiniYamlNode node)
+		{
+			var values = ReadUniqueValues(node.Value.Nodes, "TargetAcquisition combat group member");
+			if (!values.TryGetValue("ActorType", out var actorType))
+				throw new InvalidOperationException("Missing TargetAcquisition private state field: ActorType");
+			return new StealthCombatGroupSnapshot(actorType,
+				Read<int>(values, "Count"), Read<int>(values, "EconomicValue"));
 		}
 
 		static MiniYamlNode SerializeTarget(StealthStrategicTargetSnapshot target)
@@ -217,6 +255,12 @@ namespace OpenRA.Mods.Common.Traits
 			StealthTargetAcquisitionCacheSnapshot snapshot, CPos cell)
 		{
 			return snapshot.StrategicTargets.Where(target => target.StrategicCell == cell);
+		}
+
+		static StealthTargetThreatFacts ThreatFactsAt(
+			StealthTargetAcquisitionCacheSnapshot snapshot, CPos cell)
+		{
+			return snapshot.ThreatFacts.FirstOrDefault(facts => facts.StrategicCell == cell);
 		}
 
 		static CPos? MoveCloser(CPos start, IReadOnlyList<CPos> enemies,

@@ -17,44 +17,49 @@ using System.Linq;
 namespace OpenRA.Mods.Common.Traits
 {
 	/// <summary>
-	/// Disabled TargetValueFilter owner. It evaluates only immutable configured value facts supplied
-	/// by TargetAcquisition; travel, threat, detection, local combat, and orders are outside this owner.
+	/// Disabled TargetThreatFilter owner. It ranks only immutable Step 4A options using the
+	/// standard combat adapter; routing, distance, live combat, and orders belong elsewhere.
 	/// </summary>
-	public sealed class StealthTargetValueFilterBehavior
+	public sealed class StealthTargetThreatFilterBehavior
 	{
-		const int PrivateSaveVersion = 2;
+		const int PrivateSaveVersion = 1;
 
 		sealed class PersistedOption
 		{
-			public StealthTargetOption Option { get; }
-			public long StrategicValue { get; }
+			public StealthTargetValueOption Option { get; }
+			public StealthTargetThreatScore Score { get; }
 			public bool Retained { get; }
 
-			public PersistedOption(StealthTargetOption option, long strategicValue, bool retained)
+			public PersistedOption(StealthTargetValueOption option,
+				StealthTargetThreatScore score, bool retained)
 			{
 				Option = option;
-				StrategicValue = strategicValue;
+				Score = score;
 				Retained = retained;
 			}
 		}
 
-		readonly StealthTargetValueFilterHandoff handoff;
+		readonly StealthTargetThreatFilterHandoff handoff;
+		readonly IStealthTargetThreatAdapter adapter;
 
-		public StealthTargetValueFilterBehavior(StealthTargetValueFilterHandoff handoff)
+		public StealthTargetThreatFilterBehavior(StealthTargetThreatFilterHandoff handoff,
+			IStealthTargetThreatAdapter adapter)
 		{
 			this.handoff = handoff ?? throw new ArgumentNullException(nameof(handoff));
-			if (handoff.Owner != BehaviorId.TargetValueFilter)
+			if (handoff.Owner != BehaviorId.TargetThreatFilter)
 				throw new ArgumentException(
-					"The TargetValueFilter behavior requires TargetValueFilter ownership.", nameof(handoff));
+					"The TargetThreatFilter behavior requires TargetThreatFilter ownership.", nameof(handoff));
+
+			this.adapter = adapter ?? throw new ArgumentNullException(nameof(adapter));
 		}
 
-		public StealthTargetValueFilterResult Execute()
+		public StealthTargetThreatFilterResult Execute()
 		{
-			return BuildResult(handoff.Options);
+			return BuildResult();
 		}
 
-		public MiniYamlNode SerializePrivateState(StealthTargetValueFilterResult result,
-			string key = "TargetValueFilter")
+		public MiniYamlNode SerializePrivateState(StealthTargetThreatFilterResult result,
+			string key = "TargetThreatFilter")
 		{
 			ValidateOwnedResult(result);
 			var retainedCells = result.Options.Select(option => option.StrategicCell).ToHashSet();
@@ -66,91 +71,76 @@ namespace OpenRA.Mods.Common.Traits
 			};
 
 			foreach (var option in handoff.Options)
-				nodes.Add(SerializeOption(option, Score(option), retainedCells.Contains(option.StrategicCell)));
+				nodes.Add(SerializeOption(option, adapter.Calculate(option.ThreatFacts),
+					retainedCells.Contains(option.StrategicCell)));
 
 			return new MiniYamlNode(key, "", nodes);
 		}
 
-		public StealthTargetValueFilterResult RestorePrivateState(MiniYamlNode node)
+		public StealthTargetThreatFilterResult RestorePrivateState(MiniYamlNode node)
 		{
 			if (node == null)
 				throw new ArgumentNullException(nameof(node));
 
 			var values = ReadUniqueValues(node.Value.Nodes.Where(child => child.Key != "Option"),
-				"TargetValueFilter private state");
+				"TargetThreatFilter private state");
 			if (!TryReadInt(values, "Version", out var version) || version != PrivateSaveVersion)
-				throw new InvalidOperationException("Unsupported stealth TargetValueFilter private save schema.");
+				throw new InvalidOperationException("Unsupported stealth TargetThreatFilter private save schema.");
 			if (!values.TryGetValue("Owner", out var ownerText) ||
-				!Enum.TryParse(ownerText, out BehaviorId owner) || owner != BehaviorId.TargetValueFilter)
-				throw new InvalidOperationException("Invalid stealth TargetValueFilter owner in private save state.");
+				!Enum.TryParse(ownerText, out BehaviorId owner) || owner != BehaviorId.TargetThreatFilter)
+				throw new InvalidOperationException("Invalid stealth TargetThreatFilter owner in private save state.");
 			if (!TryReadLong(values, "Epoch", out var epoch) || epoch <= 0 ||
 				owner != handoff.Owner || epoch != handoff.Epoch.Value)
-				throw new InvalidOperationException("Stale stealth TargetValueFilter ownership in private save state.");
+				throw new InvalidOperationException("Stale stealth TargetThreatFilter ownership in private save state.");
 
 			var persisted = node.Value.Nodes.Where(child => child.Key == "Option")
 				.Select(RestoreOption).ToArray();
 			if (persisted.Length != handoff.Options.Count ||
-				!persisted.Select(option => option.Option).Zip(handoff.Options, SameOption).All(equal => equal))
+				!persisted.Select(option => option.Option).Zip(handoff.Options, SameValueOption).All(equal => equal))
 				throw new InvalidOperationException(
-					"TargetValueFilter private state does not match its immutable input handoff.");
+					"TargetThreatFilter private state does not match its immutable input handoff.");
 
-			var result = BuildResult(handoff.Options);
-			var retainedCells = result.Options.Select(option => option.StrategicCell).ToHashSet();
-			if (persisted.Any(option => option.StrategicValue != Score(option.Option) ||
-				option.Retained != retainedCells.Contains(option.Option.StrategicCell)))
-				throw new InvalidOperationException("Invalid normalized TargetValueFilter private state.");
+			var result = BuildResult();
+			var expectedRetained = result.Options.Select(option => option.StrategicCell).ToHashSet();
+			if (persisted.Any(option => !SameScore(option.Score, adapter.Calculate(option.Option.ThreatFacts)) ||
+				option.Retained != expectedRetained.Contains(option.Option.StrategicCell)))
+				throw new InvalidOperationException("Invalid normalized TargetThreatFilter private state.");
 
 			return result;
 		}
 
-		StealthTargetValueFilterResult BuildResult(IReadOnlyList<StealthTargetOption> options)
+		StealthTargetThreatFilterResult BuildResult()
 		{
-			var scored = options.Select(option => new StealthTargetValueOption(option, Score(option))).ToList();
-			var highTier = scored.Where(option =>
-				StealthAISpecialistPolicy.MeetsMinimumStrategicCellValue(option.StrategicValue)).ToList();
-			var eligible = highTier.Count == 0 ? scored : highTier;
-			var retainCount = (eligible.Count + 1) / 2;
-			var retained = eligible.OrderByDescending(option => option.StrategicValue)
+			var scored = handoff.Options.Select(option => new StealthTargetThreatOption(
+				option, adapter.Calculate(option.ThreatFacts))).ToArray();
+			var retainCount = (scored.Length + 1) / 2;
+			var retained = scored.OrderBy(option => option.ThreatRating)
+				.ThenBy(option => option.Crossover)
 				.ThenBy(option => option.StableIdentity)
 				.ThenBy(option => option.StrategicCell.Y)
 				.ThenBy(option => option.StrategicCell.X)
 				.Take(retainCount).ToArray();
 
-			return new StealthTargetValueFilterResult(handoff.Handoff, retained, true);
+			return new StealthTargetThreatFilterResult(handoff.Handoff, retained, true);
 		}
 
-		static long Score(StealthTargetOption option)
+		static MiniYamlNode SerializeOption(StealthTargetValueOption option,
+			StealthTargetThreatScore score, bool retained)
 		{
-			long total = 0;
-			foreach (var target in option.StrategicTargets)
-			{
-				var value = StealthAISpecialistPolicy.StrategicTargetValueByRemainingHealth(
-					target.ConfiguredPriority, target.ActorValue, target.HitPoints, target.MaximumHitPoints);
-				if (value <= 0)
-					continue;
-				if (long.MaxValue - total < value)
-					return long.MaxValue;
-				total += value;
-			}
-
-			return total;
-		}
-
-		static MiniYamlNode SerializeOption(StealthTargetOption option,
-			long strategicValue, bool retained)
-		{
+			var facts = option.ThreatFacts;
 			var nodes = new List<MiniYamlNode>
 			{
 				new MiniYamlNode("StrategicCell", FieldSaver.FormatValue(option.StrategicCell)),
 				new MiniYamlNode("EstimatedTravelMilliseconds",
 					FieldSaver.FormatValue(option.EstimatedTravelMilliseconds)),
 				new MiniYamlNode("IsIncumbent", FieldSaver.FormatValue(option.IsIncumbent)),
-				new MiniYamlNode("StrategicValue", strategicValue.ToString(CultureInfo.InvariantCulture)),
-				new MiniYamlNode("FormationCloaked", FieldSaver.FormatValue(option.ThreatFacts.FormationCloaked)),
-				new MiniYamlNode("HasDetectorCoverage",
-					FieldSaver.FormatValue(option.ThreatFacts.HasDetectorCoverage)),
+				new MiniYamlNode("StrategicValue", option.StrategicValue.ToString(CultureInfo.InvariantCulture)),
+				new MiniYamlNode("FormationCloaked", FieldSaver.FormatValue(facts.FormationCloaked)),
+				new MiniYamlNode("HasDetectorCoverage", FieldSaver.FormatValue(facts.HasDetectorCoverage)),
 				new MiniYamlNode("PlannedActionRevealsFormation",
-					FieldSaver.FormatValue(option.ThreatFacts.PlannedActionRevealsFormation)),
+					FieldSaver.FormatValue(facts.PlannedActionRevealsFormation)),
+				new MiniYamlNode("ThreatRating", FormatDouble(score.ThreatRating)),
+				new MiniYamlNode("Crossover", FormatDouble(score.Crossover)),
 				new MiniYamlNode("Retained", FieldSaver.FormatValue(retained))
 			};
 
@@ -163,9 +153,10 @@ namespace OpenRA.Mods.Common.Traits
 					new MiniYamlNode("HitPoints", FieldSaver.FormatValue(target.HitPoints)),
 					new MiniYamlNode("MaximumHitPoints", FieldSaver.FormatValue(target.MaximumHitPoints))
 				}));
-			foreach (var member in option.ThreatFacts.FriendlyGroup)
+
+			foreach (var member in facts.FriendlyGroup)
 				nodes.Add(SerializeGroupMember("Friendly", member));
-			foreach (var member in option.ThreatFacts.EnemyGroup)
+			foreach (var member in facts.EnemyGroup)
 				nodes.Add(SerializeGroupMember("Enemy", member));
 
 			return new MiniYamlNode("Option", "", nodes);
@@ -183,9 +174,9 @@ namespace OpenRA.Mods.Common.Traits
 
 		static PersistedOption RestoreOption(MiniYamlNode node)
 		{
-			var values = ReadUniqueValues(node.Value.Nodes.Where(child => child.Key != "Target" &&
-				child.Key != "Friendly" && child.Key != "Enemy"),
-				"TargetValueFilter option");
+			var values = ReadUniqueValues(node.Value.Nodes.Where(child =>
+				child.Key != "Target" && child.Key != "Friendly" && child.Key != "Enemy"),
+				"TargetThreatFilter option");
 			var cell = Read<CPos>(values, "StrategicCell");
 			var targets = node.Value.Nodes.Where(child => child.Key == "Target")
 				.Select(child => RestoreTarget(child, cell));
@@ -194,55 +185,61 @@ namespace OpenRA.Mods.Common.Traits
 				node.Value.Nodes.Where(child => child.Key == "Enemy").Select(RestoreGroupMember),
 				Read<bool>(values, "FormationCloaked"), Read<bool>(values, "HasDetectorCoverage"),
 				Read<bool>(values, "PlannedActionRevealsFormation"));
-			return new PersistedOption(new StealthTargetOption(cell,
-				Read<int?>(values, "EstimatedTravelMilliseconds"),
-				Read<bool>(values, "IsIncumbent"), targets, facts),
-				ReadNonnegativeLong(values, "StrategicValue"), Read<bool>(values, "Retained"));
-		}
-
-		static StealthCombatGroupSnapshot RestoreGroupMember(MiniYamlNode node)
-		{
-			var values = ReadUniqueValues(node.Value.Nodes, "TargetValueFilter combat group member");
-			if (!values.TryGetValue("ActorType", out var actorType))
-				throw new InvalidOperationException("Missing TargetValueFilter private state field: ActorType");
-			return new StealthCombatGroupSnapshot(actorType,
-				Read<int>(values, "Count"), Read<int>(values, "EconomicValue"));
+			var source = new StealthTargetOption(cell,
+				Read<int?>(values, "EstimatedTravelMilliseconds"), Read<bool>(values, "IsIncumbent"),
+				targets, facts);
+			var option = new StealthTargetValueOption(source, ReadNonnegativeLong(values, "StrategicValue"));
+			return new PersistedOption(option, new StealthTargetThreatScore(
+				ReadNonnegativeDouble(values, "ThreatRating", false),
+				ReadNonnegativeDouble(values, "Crossover", true)), Read<bool>(values, "Retained"));
 		}
 
 		static StealthStrategicTargetSnapshot RestoreTarget(MiniYamlNode node, CPos cell)
 		{
-			var values = ReadUniqueValues(node.Value.Nodes, "TargetValueFilter target");
+			var values = ReadUniqueValues(node.Value.Nodes, "TargetThreatFilter target");
 			return new StealthStrategicTargetSnapshot(Read<uint>(values, "StableActorId"), cell,
 				Read<int>(values, "ConfiguredPriority"), Read<int>(values, "ActorValue"),
 				Read<int>(values, "HitPoints"), Read<int>(values, "MaximumHitPoints"));
 		}
 
-		void ValidateOwnedResult(StealthTargetValueFilterResult result)
+		static StealthCombatGroupSnapshot RestoreGroupMember(MiniYamlNode node)
+		{
+			var values = ReadUniqueValues(node.Value.Nodes, "TargetThreatFilter combat group member");
+			if (!values.TryGetValue("ActorType", out var actorType))
+				throw new InvalidOperationException("Missing TargetThreatFilter private state field: ActorType");
+			return new StealthCombatGroupSnapshot(actorType,
+				Read<int>(values, "Count"), Read<int>(values, "EconomicValue"));
+		}
+
+		void ValidateOwnedResult(StealthTargetThreatFilterResult result)
 		{
 			if (result == null)
 				throw new ArgumentNullException(nameof(result));
 			if (result.Handoff.Owner != handoff.Owner || result.Handoff.Epoch != handoff.Epoch)
 				throw new ArgumentException(
-					"The TargetValueFilter result belongs to another ownership epoch.", nameof(result));
+					"The TargetThreatFilter result belongs to another ownership epoch.", nameof(result));
 
-			var expected = BuildResult(handoff.Options);
-			if (!result.IsReadyForThreatFilter || result.Options.Count != expected.Options.Count ||
-				!result.Options.Zip(expected.Options, SameValueOption).All(equal => equal))
-				throw new InvalidOperationException("Invalid normalized TargetValueFilter private state.");
+			var expected = BuildResult();
+			if (!result.IsReadyForDistanceChoice || result.Options.Count != expected.Options.Count ||
+				!result.Options.Zip(expected.Options, SameThreatOption).All(equal => equal))
+				throw new InvalidOperationException("Invalid normalized TargetThreatFilter private state.");
+		}
+
+		static bool SameThreatOption(StealthTargetThreatOption left, StealthTargetThreatOption right)
+		{
+			return SameValueOption(left.ValueOption, right.ValueOption) &&
+				left.ThreatRating.Equals(right.ThreatRating) && left.Crossover.Equals(right.Crossover);
+		}
+
+		static bool SameScore(StealthTargetThreatScore left, StealthTargetThreatScore right)
+		{
+			return left.ThreatRating.Equals(right.ThreatRating) && left.Crossover.Equals(right.Crossover);
 		}
 
 		static bool SameValueOption(StealthTargetValueOption left, StealthTargetValueOption right)
 		{
 			return left.StrategicValue == right.StrategicValue && left.StableIdentity == right.StableIdentity &&
 				left.StrategicCell == right.StrategicCell && left.IsIncumbent == right.IsIncumbent &&
-				left.EstimatedTravelMilliseconds == right.EstimatedTravelMilliseconds &&
-				SameTargets(left.StrategicTargets, right.StrategicTargets) &&
-				SameFacts(left.ThreatFacts, right.ThreatFacts);
-		}
-
-		static bool SameOption(StealthTargetOption left, StealthTargetOption right)
-		{
-			return left.StrategicCell == right.StrategicCell && left.IsIncumbent == right.IsIncumbent &&
 				left.EstimatedTravelMilliseconds == right.EstimatedTravelMilliseconds &&
 				SameTargets(left.StrategicTargets, right.StrategicTargets) &&
 				SameFacts(left.ThreatFacts, right.ThreatFacts);
@@ -292,15 +289,29 @@ namespace OpenRA.Mods.Common.Traits
 		static T Read<T>(Dictionary<string, string> values, string key)
 		{
 			if (!values.TryGetValue(key, out var text))
-				throw new InvalidOperationException("Missing TargetValueFilter private state field: " + key);
+				throw new InvalidOperationException("Missing TargetThreatFilter private state field: " + key);
 			return FieldLoader.GetValue<T>(key, text);
 		}
 
 		static long ReadNonnegativeLong(Dictionary<string, string> values, string key)
 		{
 			if (!TryReadLong(values, key, out var value) || value < 0)
-				throw new InvalidOperationException("Invalid TargetValueFilter private state field: " + key);
+				throw new InvalidOperationException("Invalid TargetThreatFilter private state field: " + key);
 			return value;
+		}
+
+		static double ReadNonnegativeDouble(Dictionary<string, string> values, string key, bool allowInfinity)
+		{
+			if (!values.TryGetValue(key, out var text) ||
+				!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value) ||
+				double.IsNaN(value) || value < 0 || (!allowInfinity && double.IsInfinity(value)))
+				throw new InvalidOperationException("Invalid TargetThreatFilter private state field: " + key);
+			return value;
+		}
+
+		static string FormatDouble(double value)
+		{
+			return value.ToString("R", CultureInfo.InvariantCulture);
 		}
 
 		static bool TryReadInt(Dictionary<string, string> values, string key, out int value)
