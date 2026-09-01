@@ -385,6 +385,21 @@ namespace OpenRA.Mods.Common.Traits
 			return true;
 		}
 
+		/// <summary>Bounded Damage-to-Repair seam; Damage itself remains unimplemented here.</summary>
+		public bool TryAccept(StealthDamageRepairRequest request,
+			out StealthRepairHandoff repairHandoff)
+		{
+			return StealthRepairControllerSeams.TryAccept(request, owner, epoch,
+				AdvanceTo, out repairHandoff);
+		}
+
+		/// <summary>Bounded Repair yield seam; no runtime controller loop is registered.</summary>
+		public bool TryAccept(StealthRepairResult result, out StealthRepairTransition transition)
+		{
+			return StealthRepairControllerSeams.TryAccept(result, owner, epoch,
+				CurrentHandoff, AdvanceTo, out transition);
+		}
+
 		static bool ValidMassTarget(StealthMassAttackResult result)
 		{
 			var facts = result.ThreatFacts;
