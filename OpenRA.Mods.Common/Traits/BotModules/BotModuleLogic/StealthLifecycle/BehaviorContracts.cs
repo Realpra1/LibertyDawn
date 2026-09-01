@@ -25,7 +25,9 @@ namespace OpenRA.Mods.Common.Traits
 		TargetDistanceChoice,
 		Approach,
 		Engagement,
-		Damage
+		Damage,
+		UndefendedAttack,
+		CrushEvaluation
 	}
 
 	public enum StealthLifecycleObservationKind

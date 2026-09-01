@@ -131,6 +131,40 @@ namespace OpenRA.Mods.Common.Traits
 			return true;
 		}
 
+		public bool TryAccept(StealthApproachResult result,
+			out StealthApproachTransition transition)
+		{
+			transition = null;
+			if (result == null || owner != BehaviorId.Approach ||
+				result.Handoff.Owner != owner || result.Handoff.Epoch != epoch)
+				return false;
+
+			BehaviorId nextOwner;
+			switch (result.Disposition)
+			{
+				case StealthApproachDisposition.Reacquire:
+					nextOwner = BehaviorId.TargetAcquisition;
+					break;
+				case StealthApproachDisposition.UndefendedAttack:
+					if (result.ArrivalClassification != StealthApproachArrivalClassification.Undefended ||
+						result.LiveDefenderActorIds.Count != 0)
+						return false;
+					nextOwner = BehaviorId.UndefendedAttack;
+					break;
+				case StealthApproachDisposition.CrushEvaluation:
+					if (result.ArrivalClassification != StealthApproachArrivalClassification.Defended ||
+						result.LiveDefenderActorIds.Count == 0)
+						return false;
+					nextOwner = BehaviorId.CrushEvaluation;
+					break;
+				default:
+					return false;
+			}
+
+			transition = new StealthApproachTransition(AdvanceTo(nextOwner), result);
+			return true;
+		}
+
 		StealthBehaviorHandoff AdvanceTo(BehaviorId nextOwner)
 		{
 			if (epoch.Value == long.MaxValue)
