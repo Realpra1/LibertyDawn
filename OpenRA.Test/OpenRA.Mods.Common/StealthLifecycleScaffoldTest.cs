@@ -65,6 +65,17 @@ namespace OpenRA.Test.Mods.Common
 			return new StealthLifecycleObservationFrame(tick, observations);
 		}
 
+		static StealthStartBehavior Start(StealthLifecycleController controller)
+		{
+			return new StealthStartBehavior(controller.CurrentHandoff);
+		}
+
+		static StealthStartMemberSnapshot Member(uint actorId,
+			bool isInWorld = true, bool isDead = false)
+		{
+			return new StealthStartMemberSnapshot(actorId, isInWorld, isDead);
+		}
+
 		static MiniYamlNode SaveNode(string version = "1", string enabled = "False",
 			string owner = "Start", string epoch = "1", string lastObservedTick = "-1")
 		{
@@ -92,8 +103,10 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(controller.Epoch, Is.EqualTo(new OwnershipEpoch(1)));
 			Assert.That(controller.LastObservedTick, Is.EqualTo(20));
 
-			var accepted = controller.TryAccept(
-				StealthBehaviorResult.Complete(start, BehaviorId.SquadConstruction), out var handoff);
+			var result = new StealthStartBehavior(start).Execute(
+				new StealthLifecycleObservation(StealthLifecycleObservationKind.UnitBuilt, 17),
+				new[] { Member(17) });
+			var accepted = controller.TryAccept(result, out var handoff);
 
 			Assert.That(accepted, Is.True);
 			Assert.That(controller.Owner, Is.EqualTo(BehaviorId.SquadConstruction));
@@ -106,19 +119,17 @@ namespace OpenRA.Test.Mods.Common
 		public void StaleOwnershipEpochCannotStealTheController()
 		{
 			var controller = new StealthLifecycleController();
-			var staleStartHandoff = controller.CurrentHandoff;
-			Assert.That(controller.TryAccept(StealthBehaviorResult.Complete(
-				staleStartHandoff, BehaviorId.SquadConstruction), out var currentHandoff), Is.True);
+			var staleStartResult = Start(controller).Execute(
+				new StealthLifecycleObservation(StealthLifecycleObservationKind.UnitBuilt, 14),
+				new[] { Member(14) });
+			Assert.That(controller.TryAccept(staleStartResult, out var currentHandoff), Is.True);
 
-			Assert.That(controller.TryAccept(StealthBehaviorResult.Complete(
-				staleStartHandoff, BehaviorId.Damage), out var rejectedHandoff), Is.False);
+			Assert.That(controller.TryAccept(staleStartResult, out var rejectedHandoff), Is.False);
 			Assert.That(rejectedHandoff, Is.Null);
 			Assert.That(controller.Owner, Is.EqualTo(BehaviorId.SquadConstruction));
 			Assert.That(controller.Epoch, Is.EqualTo(new OwnershipEpoch(2)));
-
-			Assert.That(controller.TryAccept(StealthBehaviorResult.Complete(
-				currentHandoff, BehaviorId.TargetAcquisition), out var nextHandoff), Is.True);
-			Assert.That(nextHandoff.Epoch, Is.EqualTo(new OwnershipEpoch(3)));
+			Assert.That(currentHandoff.Owner, Is.EqualTo(BehaviorId.SquadConstruction));
+			Assert.That(currentHandoff.Epoch, Is.EqualTo(new OwnershipEpoch(2)));
 		}
 
 		[Test]
@@ -179,17 +190,17 @@ namespace OpenRA.Test.Mods.Common
 				.SelectMany(method => method.GetParameters())
 				.All(parameter => parameter.ParameterType != typeof(StealthLifecycleController) &&
 					parameter.ParameterType != typeof(StealthBehaviorHandoff) &&
-					parameter.ParameterType != typeof(StealthBehaviorResult)), Is.True);
+					parameter.ParameterType != typeof(StealthStartResult)), Is.True);
 		}
 
 		[Test]
 		public void SavePayloadRoundTripsOwnerEpochAndObservationTickWhileDisabled()
 		{
 			var controller = new StealthLifecycleController();
-			Assert.That(controller.TryAccept(StealthBehaviorResult.Complete(
-				controller.CurrentHandoff, BehaviorId.SquadConstruction), out var handoff), Is.True);
-			Assert.That(controller.TryAccept(StealthBehaviorResult.Complete(
-				handoff, BehaviorId.TargetAcquisition), out _), Is.True);
+			var startResult = Start(controller).Execute(
+				new StealthLifecycleObservation(StealthLifecycleObservationKind.UnitBuilt, 31),
+				new[] { Member(31) });
+			Assert.That(controller.TryAccept(startResult, out _), Is.True);
 			controller.Observe(Frame(123, new StealthLifecycleObservation(
 				StealthLifecycleObservationKind.RepairCompleted, 31)));
 
@@ -198,8 +209,8 @@ namespace OpenRA.Test.Mods.Common
 			var roundTripped = StealthLifecycleSavePayload.Deserialize(MiniYaml.FromString(serialized).Single());
 			var restored = StealthLifecycleController.Restore(roundTripped);
 
-			Assert.That(restored.Owner, Is.EqualTo(BehaviorId.TargetAcquisition));
-			Assert.That(restored.Epoch, Is.EqualTo(new OwnershipEpoch(3)));
+			Assert.That(restored.Owner, Is.EqualTo(BehaviorId.SquadConstruction));
+			Assert.That(restored.Epoch, Is.EqualTo(new OwnershipEpoch(2)));
 			Assert.That(restored.LastObservedTick, Is.EqualTo(123));
 			Assert.That(new List<MiniYamlNode> { roundTripped.Serialize() }.WriteToString(),
 				Is.EqualTo(serialized));
@@ -220,6 +231,143 @@ namespace OpenRA.Test.Mods.Common
 				StealthLifecycleSavePayload.Deserialize(SaveNode(epoch: "0")));
 			Assert.Throws<InvalidOperationException>(() =>
 				StealthLifecycleSavePayload.Deserialize(SaveNode(lastObservedTick: "-2")));
+		}
+
+		[TestCase(StealthLifecycleObservationKind.UnitBuilt)]
+		[TestCase(StealthLifecycleObservationKind.RepairCompleted)]
+		public void StartHandsNewAndRepairedMembersOnlyToSquadConstruction(
+			StealthLifecycleObservationKind source)
+		{
+			var controller = new StealthLifecycleController();
+			var result = Start(controller).Execute(new StealthLifecycleObservation(source, 12),
+				new[] { Member(12) });
+
+			Assert.That(result.HasTransition, Is.True);
+			Assert.That(result.IsTerminated, Is.False);
+			Assert.That(result.Source, Is.EqualTo(source));
+			Assert.That(controller.TryAccept(result, out var handoff), Is.True);
+			Assert.That(handoff.Owner, Is.EqualTo(BehaviorId.SquadConstruction));
+			Assert.That(controller.Owner, Is.EqualTo(BehaviorId.SquadConstruction));
+		}
+
+		[Test]
+		public void StartDeterministicallyNormalizesLiveMemberIdentityWithoutOrders()
+		{
+			var result = Start(new StealthLifecycleController()).Execute(
+				new StealthLifecycleObservation(StealthLifecycleObservationKind.UnitBuilt, 12),
+				new[]
+				{
+					Member(12), Member(7), Member(12), Member(4, isInWorld: false),
+					Member(5, isDead: true), Member(0), Member(9)
+				});
+
+			Assert.That(result.MemberActorIds, Is.EqualTo(new uint[] { 7, 9, 12 }));
+			Assert.That(typeof(StealthStartResult).GetProperties()
+				.All(property => !property.PropertyType.Name.Contains("Order", StringComparison.Ordinal)), Is.True);
+			Assert.That(typeof(StealthStartBehavior).GetMethods()
+				.Where(method => method.DeclaringType == typeof(StealthStartBehavior))
+				.All(method => !method.ReturnType.Name.Contains("Order", StringComparison.Ordinal)), Is.True);
+		}
+
+		[Test]
+		public void ExternalObservationsCannotProduceAStartTransition()
+		{
+			var controller = new StealthLifecycleController();
+			var start = Start(controller);
+			foreach (var source in new[]
+			{
+				StealthLifecycleObservationKind.Timer,
+				StealthLifecycleObservationKind.Damage,
+				StealthLifecycleObservationKind.WorldEvent
+			})
+			{
+				var result = start.Execute(new StealthLifecycleObservation(source, 8), new[] { Member(8) });
+				Assert.That(result.Disposition, Is.EqualTo(StealthStartDisposition.ObservationOnly));
+				Assert.That(result.MemberActorIds, Is.Empty);
+				Assert.That(controller.TryAccept(result, out var handoff), Is.False);
+				Assert.That(handoff, Is.Null);
+			}
+
+			Assert.That(controller.Owner, Is.EqualTo(BehaviorId.Start));
+			Assert.That(controller.Epoch, Is.EqualTo(new OwnershipEpoch(1)));
+		}
+
+		[Test]
+		public void InvalidOrDeletedStartInputTerminatesStructurally()
+		{
+			var controller = new StealthLifecycleController();
+			var start = Start(controller);
+			var invalidResults = new[]
+			{
+				start.Execute(new StealthLifecycleObservation(
+					StealthLifecycleObservationKind.UnitBuilt), Array.Empty<StealthStartMemberSnapshot>()),
+				start.Execute(new StealthLifecycleObservation(
+					StealthLifecycleObservationKind.UnitBuilt, 4), new[] { Member(4, isDead: true) }),
+				start.Execute(new StealthLifecycleObservation(
+					StealthLifecycleObservationKind.RepairCompleted, 6), new[] { Member(7) })
+			};
+
+			foreach (var result in invalidResults)
+			{
+				Assert.That(result.IsTerminated, Is.True);
+				Assert.That(result.HasTransition, Is.False);
+				Assert.That(result.MemberActorIds, Is.Empty);
+				Assert.That(controller.TryAccept(result, out var handoff), Is.False);
+				Assert.That(handoff, Is.Null);
+			}
+
+			Assert.That(controller.Owner, Is.EqualTo(BehaviorId.Start));
+		}
+
+		[Test]
+		public void StartPrivateStateRoundTripsTheTypedPendingHandoff()
+		{
+			var controller = new StealthLifecycleController();
+			var start = Start(controller);
+			var result = start.Execute(new StealthLifecycleObservation(
+				StealthLifecycleObservationKind.RepairCompleted, 17),
+				new[] { Member(21), Member(17), Member(21) });
+
+			var serialized = new List<MiniYamlNode> { start.SerializePrivateState(result) }.WriteToString();
+			var restored = start.RestorePrivateState(MiniYaml.FromString(serialized).Single());
+
+			Assert.That(restored.Source, Is.EqualTo(StealthLifecycleObservationKind.RepairCompleted));
+			Assert.That(restored.SubjectActorId, Is.EqualTo(17));
+			Assert.That(restored.MemberActorIds, Is.EqualTo(new uint[] { 17, 21 }));
+			Assert.That(controller.TryAccept(restored, out var handoff), Is.True);
+			Assert.That(handoff.Owner, Is.EqualTo(BehaviorId.SquadConstruction));
+		}
+
+		[Test]
+		public void StartPrivateStateCannotRebindAcrossOwnershipEpochs()
+		{
+			var original = new StealthLifecycleController();
+			var originalStart = Start(original);
+			var result = originalStart.Execute(new StealthLifecycleObservation(
+				StealthLifecycleObservationKind.UnitBuilt, 17), new[] { Member(17) });
+			var serialized = new List<MiniYamlNode> { originalStart.SerializePrivateState(result) }.WriteToString();
+			var newer = StealthLifecycleController.Restore(new StealthLifecycleSavePayload(
+				BehaviorId.Start, new OwnershipEpoch(2), -1));
+
+			Assert.Throws<InvalidOperationException>(() =>
+				Start(newer).RestorePrivateState(MiniYaml.FromString(serialized).Single()));
+			Assert.That(newer.Owner, Is.EqualTo(BehaviorId.Start));
+			Assert.That(newer.Epoch, Is.EqualTo(new OwnershipEpoch(2)));
+		}
+
+		[Test]
+		public void OnlyATypedStartResultCanEnterSquadConstruction()
+		{
+			var controller = new StealthLifecycleController();
+			var tryAccept = typeof(StealthLifecycleController).GetMethods()
+				.Single(method => method.Name == nameof(StealthLifecycleController.TryAccept));
+
+			Assert.That(tryAccept.GetParameters()[0].ParameterType, Is.EqualTo(typeof(StealthStartResult)));
+			Assert.That(typeof(StealthStartResult).GetConstructors(), Is.Empty);
+			Assert.Throws<ArgumentException>(() => new StealthStartBehavior(
+				StealthLifecycleController.Restore(new StealthLifecycleSavePayload(
+					BehaviorId.SquadConstruction, new OwnershipEpoch(2), -1)).CurrentHandoff));
+			Assert.That(controller.Owner, Is.EqualTo(BehaviorId.Start));
 		}
 	}
 }

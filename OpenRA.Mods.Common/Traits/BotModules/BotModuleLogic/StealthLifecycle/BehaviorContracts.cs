@@ -104,25 +104,57 @@ namespace OpenRA.Mods.Common.Traits
 		}
 	}
 
-	public sealed class StealthBehaviorResult
+	public enum StealthStartDisposition
 	{
-		internal StealthBehaviorHandoff Handoff { get; }
-		internal BehaviorId NextOwner { get; }
+		ObservationOnly,
+		Transition,
+		Terminated
+	}
 
-		StealthBehaviorResult(StealthBehaviorHandoff handoff, BehaviorId nextOwner)
+	public readonly struct StealthStartMemberSnapshot
+	{
+		public uint ActorId { get; }
+		public bool IsInWorld { get; }
+		public bool IsDead { get; }
+
+		public StealthStartMemberSnapshot(uint actorId, bool isInWorld = true, bool isDead = false)
 		{
-			Handoff = handoff;
-			NextOwner = nextOwner;
+			ActorId = actorId;
+			IsInWorld = isInWorld;
+			IsDead = isDead;
 		}
+	}
 
-		public static StealthBehaviorResult Complete(StealthBehaviorHandoff handoff, BehaviorId nextOwner)
+	public sealed class StealthStartResult
+	{
+		readonly ReadOnlyCollection<uint> memberActorIds;
+
+		internal StealthBehaviorHandoff Handoff { get; }
+		public StealthLifecycleObservationKind Source { get; }
+		public uint SubjectActorId { get; }
+		public StealthStartDisposition Disposition { get; }
+		public IReadOnlyList<uint> MemberActorIds => memberActorIds;
+		public bool HasTransition => Disposition == StealthStartDisposition.Transition;
+		public bool IsTerminated => Disposition == StealthStartDisposition.Terminated;
+
+		internal StealthStartResult(StealthBehaviorHandoff handoff,
+			StealthLifecycleObservationKind source, uint subjectActorId,
+			StealthStartDisposition disposition, IEnumerable<uint> memberActorIds)
 		{
 			if (handoff == null)
 				throw new ArgumentNullException(nameof(handoff));
-			if (!Enum.IsDefined(typeof(BehaviorId), nextOwner))
-				throw new ArgumentOutOfRangeException(nameof(nextOwner));
+			if (!Enum.IsDefined(typeof(StealthLifecycleObservationKind), source))
+				throw new ArgumentOutOfRangeException(nameof(source));
+			if (!Enum.IsDefined(typeof(StealthStartDisposition), disposition))
+				throw new ArgumentOutOfRangeException(nameof(disposition));
+			if (memberActorIds == null)
+				throw new ArgumentNullException(nameof(memberActorIds));
 
-			return new StealthBehaviorResult(handoff, nextOwner);
+			Handoff = handoff;
+			Source = source;
+			SubjectActorId = subjectActorId;
+			Disposition = disposition;
+			this.memberActorIds = Array.AsReadOnly(new List<uint>(memberActorIds).ToArray());
 		}
 	}
 }

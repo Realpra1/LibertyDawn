@@ -56,15 +56,16 @@ namespace OpenRA.Mods.Common.Traits
 			lastObservedTick = frame.Tick;
 		}
 
-		public bool TryAccept(StealthBehaviorResult result, out StealthBehaviorHandoff nextHandoff)
+		public bool TryAccept(StealthStartResult result, out StealthBehaviorHandoff nextHandoff)
 		{
 			nextHandoff = null;
-			if (result == null || result.Handoff.Owner != owner || result.Handoff.Epoch != epoch)
+			if (result == null || !result.HasTransition || owner != BehaviorId.Start ||
+				result.Handoff.Owner != owner || result.Handoff.Epoch != epoch)
 				return false;
 			if (epoch.Value == long.MaxValue)
 				throw new InvalidOperationException("The stealth lifecycle ownership epoch is exhausted.");
 
-			owner = result.NextOwner;
+			owner = BehaviorId.SquadConstruction;
 			epoch = new OwnershipEpoch(epoch.Value + 1);
 			nextHandoff = CurrentHandoff;
 			return true;
