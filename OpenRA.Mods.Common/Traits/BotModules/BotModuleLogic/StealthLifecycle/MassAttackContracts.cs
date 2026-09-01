@@ -17,7 +17,15 @@ using System.Linq;
 namespace OpenRA.Mods.Common.Traits
 {
 	public enum StealthMassAttackPhase { Advance, Attack }
-	public enum StealthMassAttackDisposition { Retain, UndefendedAttack, Reacquire, RecalculateFlee }
+	public enum StealthMassAttackDisposition
+	{
+		Retain,
+		UndefendedAttack,
+		Reacquire,
+		RecalculateFlee,
+		StrategicRecalculation
+	}
+
 	enum StealthMassAttackEntryState { Pristine, Validated, SkippedZeroMembers, ExitedRecalculate }
 
 	public sealed class StealthMassAttackEntryEvidence
@@ -121,11 +129,12 @@ namespace OpenRA.Mods.Common.Traits
 		public int MaximumHitPoints { get; }
 		public bool IsInWorld { get; }
 		public bool IsDead { get; }
+		public bool NeedsMovementOrder { get; }
 		public bool IsValid => IsInWorld && !IsDead && (MaximumHitPoints <= 0 || HitPoints > 0);
 
 		public StealthMassAttackMemberSnapshot(uint actorId, CPos currentCell,
 			int currentWeaponRangeCells, int hitPoints = 100, int maximumHitPoints = 100,
-			bool isInWorld = true, bool isDead = false)
+			bool isInWorld = true, bool isDead = false, bool needsMovementOrder = false)
 		{
 			if (actorId == 0 || currentWeaponRangeCells < 0 || hitPoints < 0 || maximumHitPoints < 0)
 				throw new ArgumentOutOfRangeException(nameof(actorId));
@@ -136,6 +145,7 @@ namespace OpenRA.Mods.Common.Traits
 			MaximumHitPoints = maximumHitPoints;
 			IsInWorld = isInWorld;
 			IsDead = isDead;
+			NeedsMovementOrder = needsMovementOrder;
 		}
 	}
 
@@ -242,6 +252,8 @@ namespace OpenRA.Mods.Common.Traits
 		readonly ReadOnlyCollection<StealthMassAttackActorSnapshot> enemies;
 		public uint SelectedTargetActorId { get; }
 		public CPos SelectedTargetCurrentCell { get; }
+		public CPos PlannedCell { get; }
+		public int FormationRadiusCells { get; }
 		public IReadOnlyList<uint> FriendlyActorIds => friendlyActorIds;
 		public IReadOnlyList<uint> EnemyActorIds => enemyActorIds;
 		public IReadOnlyList<StealthMassAttackActorSnapshot> Enemies => enemies;
@@ -251,11 +263,11 @@ namespace OpenRA.Mods.Common.Traits
 		public bool PlannedAttack => true;
 		public bool FullCurrentFiringRangeExposure => true;
 
-		public StealthMassAttackThreatFacts(uint targetId, CPos targetCell,
+		public StealthMassAttackThreatFacts(uint targetId, CPos targetCell, CPos plannedCell,
 			IEnumerable<uint> friendIds, IEnumerable<StealthMassAttackActorSnapshot> enemies,
-			bool formationCloaked)
+			bool formationCloaked, int formationRadiusCells = 0)
 		{
-			if (targetId == 0 || friendIds == null || enemies == null)
+			if (targetId == 0 || friendIds == null || enemies == null || formationRadiusCells < 0)
 				throw new ArgumentException("Invalid MassAttack threat facts.");
 			var friends = friendIds.OrderBy(id => id).ToArray();
 			var enemyCopy = enemies.OrderBy(enemy => enemy?.ActorId).ToArray();
@@ -267,6 +279,8 @@ namespace OpenRA.Mods.Common.Traits
 				throw new ArgumentException("MassAttack facts require exact live participants and target.");
 			SelectedTargetActorId = targetId;
 			SelectedTargetCurrentCell = targetCell;
+			PlannedCell = plannedCell;
+			FormationRadiusCells = formationRadiusCells;
 			friendlyActorIds = Array.AsReadOnly(friends);
 			this.enemies = Array.AsReadOnly(enemyCopy);
 			enemyActorIds = Array.AsReadOnly(enemyCopy.Select(enemy => enemy.ActorId).ToArray());
@@ -278,13 +292,16 @@ namespace OpenRA.Mods.Common.Traits
 	{
 		public StealthTargetThreatScore StandardScore { get; }
 		public double SelectedTargetThreat { get; }
-		public StealthMassAttackThreatResult(StealthTargetThreatScore score, double selectedTargetThreat)
+		public bool AttackApproved { get; }
+		public StealthMassAttackThreatResult(StealthTargetThreatScore score,
+			double selectedTargetThreat, bool attackApproved)
 		{
 			if (double.IsNaN(selectedTargetThreat) || double.IsInfinity(selectedTargetThreat) ||
 				selectedTargetThreat < 0)
 				throw new ArgumentOutOfRangeException(nameof(selectedTargetThreat));
 			StandardScore = score;
 			SelectedTargetThreat = selectedTargetThreat;
+			AttackApproved = attackApproved;
 		}
 	}
 
@@ -296,7 +313,7 @@ namespace OpenRA.Mods.Common.Traits
 	public interface IStealthMassAttackOrders
 	{
 		void IssueMove(BehaviorId owner, OwnershipEpoch epoch, IReadOnlyList<uint> actorIds,
-			uint targetActorId, CPos targetCurrentCell, StealthMassAttackOrderToken token);
+			uint targetActorId, CPos destinationCell, StealthMassAttackOrderToken token);
 		void IssueAttack(BehaviorId owner, OwnershipEpoch epoch, IReadOnlyList<uint> actorIds,
 			uint targetActorId, CPos targetCurrentCell, StealthMassAttackOrderToken token);
 	}

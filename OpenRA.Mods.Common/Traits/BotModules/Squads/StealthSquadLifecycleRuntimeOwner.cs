@@ -16,41 +16,45 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		IStealthLifecycleRuntimeDamageOwner
 	{
 		readonly Func<object> execute;
-		readonly Func<string, MiniYamlNode> serialize;
 		readonly Func<object, StealthLifecycleDamageObservation, long,
 			StealthLifecycleDamageYield> captureDamage;
 		object lastResult;
+		StealthLifecycleDamageYield pendingDamage;
 
 		public BehaviorId Owner { get; }
 		public OwnershipEpoch Epoch { get; }
 
 		public StealthSquadLifecycleRuntimeOwner(BehaviorId owner, OwnershipEpoch epoch,
-			Func<object> execute, Func<string, MiniYamlNode> serialize,
+			Func<object> execute,
 			Func<object, StealthLifecycleDamageObservation, long,
 				StealthLifecycleDamageYield> captureDamage = null)
 		{
 			Owner = owner;
 			Epoch = epoch;
 			this.execute = execute ?? throw new ArgumentNullException(nameof(execute));
-			this.serialize = serialize ?? throw new ArgumentNullException(nameof(serialize));
 			this.captureDamage = captureDamage;
 		}
 
 		public object Execute()
 		{
+			if (pendingDamage != null)
+				return pendingDamage;
 			return lastResult = execute();
 		}
 
 		public bool TryCaptureDamage(StealthLifecycleDamageObservation observation, long eventId,
 			out StealthLifecycleDamageYield yielded)
 		{
-			yielded = captureDamage?.Invoke(lastResult, observation, eventId);
-			return yielded != null;
-		}
+			if (pendingDamage != null)
+			{
+				yielded = null;
+				return false;
+			}
 
-		public MiniYamlNode Serialize(string key = "ActiveOwner")
-		{
-			return serialize(key);
+			yielded = captureDamage?.Invoke(lastResult, observation, eventId);
+			if (yielded != null)
+				pendingDamage = yielded;
+			return yielded != null;
 		}
 	}
 }

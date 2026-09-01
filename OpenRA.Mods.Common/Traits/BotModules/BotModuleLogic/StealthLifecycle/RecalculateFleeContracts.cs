@@ -16,7 +16,14 @@ using System.Linq;
 
 namespace OpenRA.Mods.Common.Traits
 {
-	public enum StealthRecalculateFleeSource { KiteNoSafePlan, MassAttackCrossover }
+	public enum StealthRecalculateFleeSource
+	{
+		KiteNoSafePlan,
+		KiteUnsafeCurrentPosition,
+		ApproachUnsafeCurrentPosition,
+		MassAttackCrossover
+	}
+
 	public enum StealthRecalculateFleeDisposition { Retain, TargetAcquisition }
 	public enum StealthRecalculateFleeLiveCause { Traversing, NoTarget, NoRoute, MemberLoss, Completed }
 
@@ -26,8 +33,9 @@ namespace OpenRA.Mods.Common.Traits
 		readonly ReadOnlyCollection<uint> memberIds;
 		readonly ReadOnlyCollection<uint> enemyIds;
 		public StealthRecalculateFleeSource Source { get; }
-		public BehaviorId SourceOwner => Source == StealthRecalculateFleeSource.KiteNoSafePlan ?
-			BehaviorId.Kite : BehaviorId.MassAttack;
+		public BehaviorId SourceOwner => Source == StealthRecalculateFleeSource.MassAttackCrossover ?
+			BehaviorId.MassAttack : Source == StealthRecalculateFleeSource.ApproachUnsafeCurrentPosition ?
+			BehaviorId.Approach : BehaviorId.Kite;
 		public OwnershipEpoch SourceEpoch { get; }
 		public string LiveFingerprint { get; }
 		public uint SelectedTargetActorId { get; }
@@ -45,16 +53,20 @@ namespace OpenRA.Mods.Common.Traits
 			var evidence = source?.FallbackEvidence;
 			if (source == null || source.Handoff == null || source.Handoff.Owner != BehaviorId.Kite ||
 				source.Disposition != StealthKiteDisposition.RecalculateFlee ||
-				evidence?.Reason != StealthKiteFallbackReason.NoSafePlan ||
+				(evidence?.Reason != StealthKiteFallbackReason.NoSafePlan &&
+					evidence?.Reason != StealthKiteFallbackReason.UnsafeCurrentPosition) ||
 				evidence.AttackFacts == null || !evidence.AttackScore.HasValue ||
-				evidence.AttackScore.Value.Crossover > 2 ||
+				(evidence.Reason == StealthKiteFallbackReason.NoSafePlan &&
+					evidence.AttackScore.Value.Crossover > 2) ||
 				!source.ActiveMemberActorIds.SequenceEqual(evidence.AttackFacts.FriendlyActorIds) ||
 				!source.LiveDefenderActorIds.SequenceEqual(evidence.AttackFacts.EnemyActorIds) ||
 				!source.LiveDefenderActorIds.SequenceEqual(evidence.DefenderActorIds) ||
 				source.SelectedTargetActorId != evidence.AttackFacts.SelectedTargetActorId ||
 				source.SelectedTargetCurrentCell != evidence.AttackFacts.SelectedTargetCurrentCell)
-				throw new ArgumentException("RecalculateFlee requires canonical Kite <=2 no-safe-plan evidence.", nameof(source));
-			Source = StealthRecalculateFleeSource.KiteNoSafePlan;
+				throw new ArgumentException("RecalculateFlee requires canonical Kite escape evidence.", nameof(source));
+			Source = evidence.Reason == StealthKiteFallbackReason.NoSafePlan ?
+				StealthRecalculateFleeSource.KiteNoSafePlan :
+				StealthRecalculateFleeSource.KiteUnsafeCurrentPosition;
 			SourceEpoch = source.Handoff.Epoch;
 			LiveFingerprint = evidence.LiveFingerprint;
 			SelectedTargetActorId = evidence.AttackFacts.SelectedTargetActorId;
@@ -87,6 +99,26 @@ namespace OpenRA.Mods.Common.Traits
 			StandardScore = source.Threat.Value.StandardScore;
 		}
 
+		internal StealthRecalculateFleeEntryEvidence(StealthApproachResult source)
+		{
+			if (source == null || source.Handoff == null || source.Handoff.Owner != BehaviorId.Approach ||
+				source.Disposition != StealthApproachDisposition.RecalculateFlee ||
+				source.CurrentPositionSafe || !source.ImmediateThreatActorId.HasValue ||
+				!source.ImmediateThreatCurrentCell.HasValue || !source.LocalThreatScore.HasValue ||
+				!source.LiveDefenderActorIds.Contains(source.ImmediateThreatActorId.Value))
+				throw new ArgumentException("RecalculateFlee requires canonical unsafe Approach evidence.", nameof(source));
+			Source = StealthRecalculateFleeSource.ApproachUnsafeCurrentPosition;
+			SourceEpoch = source.Handoff.Epoch;
+			LiveFingerprint = string.Join("|", "approach", string.Join(",", source.ActiveMemberActorIds),
+				string.Join(",", source.LiveDefenderActorIds));
+			SelectedTargetActorId = source.ImmediateThreatActorId.Value;
+			SelectedTargetCurrentCell = source.ImmediateThreatCurrentCell.Value;
+			memberIds = CopyIds(source.ActiveMemberActorIds, nameof(source));
+			enemyIds = CopyIds(source.LiveDefenderActorIds, nameof(source));
+			FormationCloaked = source.FormationCloaked;
+			StandardScore = source.LocalThreatScore.Value;
+		}
+
 		internal StealthRecalculateFleeEntryEvidence(StealthRecalculateFleeSource source,
 			OwnershipEpoch sourceEpoch, string fingerprint, uint targetId, CPos targetCell,
 			IEnumerable<uint> members, IEnumerable<uint> enemies, bool formationCloaked,
@@ -94,8 +126,10 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			if (!Enum.IsDefined(typeof(StealthRecalculateFleeSource), source) ||
 				string.IsNullOrEmpty(fingerprint) || targetId == 0 ||
-				(source == StealthRecalculateFleeSource.KiteNoSafePlan ?
-					standardScore.Crossover > 2 : standardScore.Crossover > 1))
+				(source == StealthRecalculateFleeSource.KiteNoSafePlan &&
+					standardScore.Crossover > 2) ||
+				(source == StealthRecalculateFleeSource.MassAttackCrossover &&
+					standardScore.Crossover > 1))
 				throw new ArgumentException("Invalid persisted RecalculateFlee entry evidence.");
 			Source = source;
 			SourceEpoch = sourceEpoch;
@@ -148,6 +182,15 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		internal StealthRecalculateFleeHandoff(StealthBehaviorHandoff handoff,
+			StealthApproachResult source)
+		{
+			Handoff = RequireHandoff(handoff);
+			Mission = source?.Mission ?? throw new ArgumentNullException(nameof(source));
+			Evidence = new StealthRecalculateFleeEntryEvidence(source);
+			ValidateEpoch();
+		}
+
+		internal StealthRecalculateFleeHandoff(StealthBehaviorHandoff handoff,
 			StealthApproachMission mission, StealthRecalculateFleeEntryEvidence evidence)
 		{
 			Handoff = RequireHandoff(handoff);
@@ -180,12 +223,13 @@ namespace OpenRA.Mods.Common.Traits
 		public int MaximumHitPoints { get; }
 		public bool IsInWorld { get; }
 		public bool IsDead { get; }
+		public bool NeedsMovementOrder { get; }
 		public bool IsValid => IsInWorld && !IsDead &&
 			(MaximumHitPoints <= 0 || HitPoints > 0);
 
 		public StealthRecalculateFleeMemberSnapshot(uint actorId, CPos currentCell,
 			int currentWeaponRangeCells, int hitPoints = 100, int maximumHitPoints = 100,
-			bool isInWorld = true, bool isDead = false)
+			bool isInWorld = true, bool isDead = false, bool needsMovementOrder = false)
 		{
 			if (actorId == 0 || currentWeaponRangeCells < 0 || hitPoints < 0 || maximumHitPoints < 0)
 				throw new ArgumentException("Invalid RecalculateFlee live member.");
@@ -196,6 +240,7 @@ namespace OpenRA.Mods.Common.Traits
 			MaximumHitPoints = maximumHitPoints;
 			IsInWorld = isInWorld;
 			IsDead = isDead;
+			NeedsMovementOrder = needsMovementOrder;
 		}
 	}
 

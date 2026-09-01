@@ -60,7 +60,10 @@ namespace OpenRA.Mods.Common.Traits
 			var standard = new StealthTargetThreatScore(pairThreats.DefaultIfEmpty().Max(), crossover);
 			var targetThreat = friendly.Sum(attacker => calculator.CalculateLive(attacker, target,
 				plannedTargetTypesOverride, true).DefenderThreatInAttackerEquivalents);
-			return new StealthMassAttackThreatResult(standard, targetThreat);
+			var attackApproved = GeneralizedCombatLiveCellSafety.CanAttackSafely(calculator,
+				friendly, enemy, target, facts.PlannedCell, facts.FormationRadiusCells,
+				plannedTargetTypesOverride);
+			return new StealthMassAttackThreatResult(standard, targetThreat, attackApproved);
 		}
 
 		Actor Resolve(uint actorId)

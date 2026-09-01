@@ -17,47 +17,116 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 	/// <summary>Owns the concrete services and sole lifecycle runtime registered for one Squad.</summary>
 	sealed class StealthSquadLifecycleRuntimeHost
 	{
+		const int MaxImmediateHandoffs = 16;
+
 		readonly Squad squad;
 		readonly StealthSquadLifecycleStrategicAdapter strategic;
+		readonly StealthSquadLifecycleOwnerFactory factory;
 		readonly StealthLifecycleRuntime runtime;
 
 		public StealthSquadLifecycleRuntimeHost(Squad squad)
 		{
 			this.squad = squad ?? throw new ArgumentNullException(nameof(squad));
 			strategic = new StealthSquadLifecycleStrategicAdapter(squad);
+			factory = new StealthSquadLifecycleOwnerFactory(squad, strategic);
 			var passive = new StealthLifecyclePassiveServices();
 			runtime = new StealthLifecycleRuntime(
-				new StealthSquadLifecycleOwnerFactory(squad, strategic),
-				new StealthSquadLifecycleOrderTarget(squad), strategic, passive, passive, passive);
+				factory,
+				new StealthSquadLifecycleOrderTarget(squad), strategic, passive, passive,
+				new StealthSquadLifecycleTelemetry(squad));
+			StealthSquadLifecycleTelemetry.RecordActivation(squad, runtime, false);
 		}
 
-		StealthSquadLifecycleRuntimeHost(Squad squad, MiniYamlNode saved)
+		StealthSquadLifecycleRuntimeHost(Squad squad, bool loaded)
 		{
 			this.squad = squad ?? throw new ArgumentNullException(nameof(squad));
 			strategic = new StealthSquadLifecycleStrategicAdapter(squad);
+			factory = new StealthSquadLifecycleOwnerFactory(squad, strategic);
 			var passive = new StealthLifecyclePassiveServices();
-			runtime = StealthLifecycleRuntime.Restore(saved,
-				new StealthSquadLifecycleOwnerFactory(squad, strategic),
-				new StealthSquadLifecycleOrderTarget(squad), strategic, passive, passive, passive);
+			runtime = new StealthLifecycleRuntime(BehaviorId.TargetAcquisition, factory,
+				new StealthSquadLifecycleOrderTarget(squad), strategic, passive, passive,
+				new StealthSquadLifecycleTelemetry(squad));
+			StealthSquadLifecycleTelemetry.RecordActivation(squad, runtime, loaded);
 		}
 
-		public static StealthSquadLifecycleRuntimeHost Restore(Squad squad, MiniYamlNode saved)
+		public static StealthSquadLifecycleRuntimeHost ForLoadedSquad(Squad squad)
 		{
-			return new StealthSquadLifecycleRuntimeHost(squad, saved);
+			return new StealthSquadLifecycleRuntimeHost(squad, true);
 		}
 
 		public void Tick()
 		{
+			EnforceLifecycleStance();
+			PromoteArrivedReinforcements();
+			StealthAIStateBase.RoutePendingStealthReinforcementsForModularLifecycle(squad);
 			var observations = squad.Units.Where(actor => actor != null && actor.IsInWorld && !actor.IsDead)
 				.Select(actor => new StealthLifecycleObservation(
 					StealthLifecycleObservationKind.Timer, actor.ActorID)).ToArray();
 			runtime.Observe(new StealthLifecycleObservationFrame(squad.World.WorldTick, observations));
-			runtime.Tick();
+			AdvanceUntilRetained();
 		}
 
-		public MiniYamlNode Serialize()
+		public void TickLocalSafety()
 		{
-			return runtime.Serialize();
+			EnforceLifecycleStance();
+			PromoteArrivedReinforcements();
+			StealthAIStateBase.RoutePendingStealthReinforcementsForModularLifecycle(squad);
+			if (runtime.Owner == BehaviorId.Approach ||
+				StealthRepairResumeContext.IsFightOwner(runtime.Owner) ||
+				runtime.Owner == BehaviorId.RecalculateFlee ||
+				runtime.Owner == BehaviorId.Repair)
+				AdvanceUntilRetained();
+		}
+
+		void AdvanceUntilRetained()
+		{
+			// Decision-only owners hand control on immediately. Stop when an owner retains control
+			// (usually after issuing an order) so one scheduler interval cannot delay the next action.
+			for (var i = 0; i < MaxImmediateHandoffs; i++)
+			{
+				var previousOwner = runtime.Owner;
+				var previousEpoch = runtime.Epoch;
+				var accepted = runtime.Tick();
+				var handedOff = accepted && (runtime.Owner != previousOwner || runtime.Epoch != previousEpoch);
+				if (handedOff && previousOwner == BehaviorId.SquadConstruction)
+					factory.CommitConstructionMembership(previousEpoch);
+				StealthSquadLifecycleTelemetry.RecordHandoff(squad, previousOwner, previousEpoch,
+					runtime.Owner, runtime.Epoch);
+				if (!handedOff)
+					break;
+			}
+		}
+
+		void EnforceLifecycleStance()
+		{
+			foreach (var actor in squad.Units.Where(actor => actor != null && actor.IsInWorld &&
+				!actor.IsDead).OrderBy(actor => actor.ActorID))
+				if (actor.TraitOrDefault<AutoTarget>() is AutoTarget autoTarget &&
+					autoTarget.Stance != UnitStance.HoldFire)
+					squad.Bot.QueueOrder(new Order("SetUnitStance", actor, false)
+					{
+						ExtraData = (uint)UnitStance.HoldFire
+					});
+		}
+
+		void PromoteArrivedReinforcements()
+		{
+			var formation = squad.AirFormationUnits();
+			if (formation.Count == 0 || squad.AirReinforcements.Count == 0)
+				return;
+			var size = Math.Max(1, squad.StealthDefinition?.StrategicCellSize ?? 1);
+			var center = squad.World.Map.CellContaining(
+				formation.Select(actor => actor.CenterPosition).Average());
+			var strategicCenter = new CPos(center.X / size, center.Y / size);
+			foreach (var actor in squad.Units.Where(actor => actor != null && actor.IsInWorld &&
+				!actor.IsDead && squad.AirReinforcements.Contains(actor.ActorID) &&
+				!squad.AirUnitsRepairing.Contains(actor.ActorID)).ToArray())
+			{
+				var cell = new CPos(actor.Location.X / size, actor.Location.Y / size);
+				if (Math.Abs(cell.X - strategicCenter.X) <= 1 &&
+					Math.Abs(cell.Y - strategicCenter.Y) <= 1)
+					squad.JoinAirFormation(actor);
+			}
 		}
 
 		public void ObserveDamage(Actor damaged, AttackInfo attack)
@@ -67,9 +136,15 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var health = damaged.TraitOrDefault<IHealth>();
 			if (health == null || health.HP <= 0 || health.MaxHP <= 0)
 				return;
-			runtime.ObserveDamage(new StealthLifecycleDamageObservation(squad.World.WorldTick,
+			var threshold = squad.SquadManager.Info.HealthRetreatThreshold;
+			if (threshold <= 0 || health.HP >= health.MaxHP * threshold)
+				return;
+			var owner = runtime.Owner;
+			var epoch = runtime.Epoch;
+			var accepted = runtime.ObserveDamage(new StealthLifecycleDamageObservation(squad.World.WorldTick,
 				attack.Attacker.ActorID, attack.Attacker.Location, attack.Damage.Value,
 				new StealthRepairDamagedMember(damaged.ActorID, health.HP, health.MaxHP)));
+			StealthSquadLifecycleTelemetry.RecordDamageObservation(squad, owner, epoch, accepted);
 		}
 	}
 }

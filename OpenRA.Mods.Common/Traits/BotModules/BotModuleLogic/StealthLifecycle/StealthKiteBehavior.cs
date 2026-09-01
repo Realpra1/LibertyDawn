@@ -4,8 +4,7 @@
  * This file is part of OpenRA, which is free software. It is made
  * available to you under the terms of the GNU General Public License
  * as published by the Free Software Foundation, either version 3 of
- * the License, or (at your option) any later version. For more
- * information, see COPYING.
+ * the License, or (at your option) any later version.
  */
 #endregion
 
@@ -14,39 +13,9 @@ using System.Linq;
 
 namespace OpenRA.Mods.Common.Traits
 {
-	/// <summary>
-	/// Disabled local live-world owner for Engagement/Kite. Every safety-affecting live fact is
-	/// fingerprinted; strategic/actor caches and target claims are deliberately absent.
-	/// </summary>
+	/// <summary>Reactive live Kite owner: fire safely now, move to one safe cell, or hand off.</summary>
 	public sealed class StealthKiteBehavior
 	{
-		sealed class OwnerState
-		{
-			public int LastObservedTick = -1;
-			public int LastPlanTick = -1;
-			public StealthKitePhase Phase;
-			public StealthKiteDisposition Disposition = StealthKiteDisposition.Reacquire;
-			public uint? TargetId;
-			public CPos? TargetCell;
-			public int TargetHitPoints;
-			public int TargetMaximumHitPoints;
-			public int FireBaselineTargetHitPoints = -1;
-			public StealthKiteLiveFingerprint Fingerprint;
-			public StealthKitePlan Plan;
-			public StealthKiteFallbackEvidence FallbackEvidence;
-			public uint[] DefenderIds = Array.Empty<uint>();
-			public uint[] ObjectiveIds = Array.Empty<uint>();
-			public StealthKiteOrderToken LastOrderToken;
-
-			public OwnerState Clone()
-			{
-				var clone = (OwnerState)MemberwiseClone();
-				clone.DefenderIds = DefenderIds.ToArray();
-				clone.ObjectiveIds = ObjectiveIds.ToArray();
-				return clone;
-			}
-		}
-
 		readonly StealthKiteHandoff handoff;
 		readonly StealthApproachMission mission;
 		readonly IStealthLifecycleOwnershipGuard ownershipGuard;
@@ -54,7 +23,8 @@ namespace OpenRA.Mods.Common.Traits
 		readonly IStealthKiteThreatAdapter threatAdapter;
 		readonly IStealthKiteOrders orders;
 		readonly StealthBehaviorExecutionLease executionLease = new StealthBehaviorExecutionLease();
-		OwnerState state = new OwnerState();
+		uint? targetId;
+		StealthKiteOrderToken lastOrder;
 
 		public StealthKiteBehavior(StealthKiteHandoff handoff,
 			IStealthLifecycleOwnershipGuard ownershipGuard, IStealthKiteLiveWorld liveWorld,
@@ -80,173 +50,129 @@ namespace OpenRA.Mods.Common.Traits
 
 		StealthKiteResult Execute(long revision)
 		{
-			var live = ReadLive("execute", revision);
-			var decision = StealthKiteLiveDecision.Create(live);
-			var prospective = state.Clone();
-			if (live.Tick < prospective.LastObservedTick)
-				throw new InvalidOperationException("Live Kite ticks must not move backwards.");
-			prospective.LastObservedTick = live.Tick;
-			prospective.DefenderIds = decision.DefenderActorIds.ToArray();
-			prospective.ObjectiveIds = decision.ObjectiveActorIds.ToArray();
+			var decision = StealthKiteLiveDecision.Create(ReadLive(revision));
 			if (decision.Defenders.Length == 0)
-			{
-				ClearTarget(prospective);
-				prospective.Disposition = decision.TargetlessDisposition.Value;
-				return CommitAndResult(prospective, decision, revision);
-			}
+				return Result(decision, decision.TargetlessDisposition.Value,
+					StealthKitePhase.Position, null, null, null, null, revision);
 
 			if (decision.Members.Length == 0)
 			{
-				ClearTarget(prospective);
-				prospective.Fingerprint = decision.Fingerprint(null);
-				prospective.FallbackEvidence = StealthKitePlanBuilder.NoLiveMembers(
-					decision, prospective.Fingerprint);
-				prospective.Disposition = StealthKiteDisposition.RecalculateFlee;
-				return CommitAndResult(prospective, decision, revision);
+				var empty = new StealthKiteFallbackEvidence(StealthKiteFallbackReason.NoLiveMembers,
+					"no-live-members", decision.DefenderActorIds, null, null);
+				return Result(decision, StealthKiteDisposition.RecalculateFlee,
+					StealthKitePhase.Position, null, null, null, empty, revision);
 			}
 
-			var target = decision.ResolveTarget(prospective.TargetId);
-			var targetIdentityChanged = prospective.TargetId != target.ActorId;
-			var fingerprint = decision.Fingerprint(target);
-			var fingerprintChanged = !fingerprint.Equals(prospective.Fingerprint);
-			var completedFire = prospective.Phase == StealthKitePhase.Fire &&
-				!targetIdentityChanged && StealthKitePhaseMachine.FireCompleted(decision, target,
-					prospective.FireBaselineTargetHitPoints, prospective.LastOrderToken);
-			SetTarget(prospective, target);
-			if (decision.CanReturnToCrush(target))
+			var target = decision.ResolveTarget(targetId);
+			var currentCell = decision.CurrentFormationCell();
+			if (currentCell.HasValue)
 			{
-				ClearPlan(prospective);
-				prospective.Fingerprint = fingerprint;
-				prospective.LastPlanTick = -1;
-				prospective.Disposition = StealthKiteDisposition.CrushEvaluation;
-				return CommitAndResult(prospective, decision, revision);
+				var liveSafety = decision.MemberCells.Select(cell =>
+					Calculate(decision.ThreatFacts(target, cell), revision)).ToArray();
+				if (liveSafety.All(safety => safety.Approved))
+					return Retain(decision, target, currentCell.Value, liveSafety[0],
+						StealthKiteAction.Fire, revision);
+				if (decision.FormationExposed)
+					return FleeUnsafeCurrentPosition(decision, target, revision);
 			}
 
-			if (fingerprintChanged)
+			foreach (var cell in decision.OrderedCandidateCells(target, currentCell))
 			{
-				prospective.Plan = StealthKitePlanBuilder.Build(decision, target,
-					fingerprint, facts => CalculateSafety(facts, revision));
-				prospective.Fingerprint = fingerprint;
-				prospective.LastPlanTick = live.Tick;
+				var safety = Calculate(decision.ThreatFacts(target, cell), revision);
+				if (safety.Approved)
+					return Retain(decision, target, cell, safety, StealthKiteAction.Position, revision);
 			}
 
-			if (prospective.Plan == null)
-			{
-				prospective.FallbackEvidence = StealthKitePlanBuilder.NoSafePlan(decision,
-					target, fingerprint, facts => CalculateFallback(facts, revision));
-				prospective.Disposition = prospective.FallbackEvidence.AttackScore.Value.Crossover > 2 ?
-					StealthKiteDisposition.MassAttack : StealthKiteDisposition.RecalculateFlee;
-				prospective.LastOrderToken = null;
-				prospective.FireBaselineTargetHitPoints = -1;
-				prospective.Phase = StealthKitePhase.Position;
-				return CommitAndResult(prospective, decision, revision);
-			}
-
-			prospective.FallbackEvidence = null;
-			var phase = StealthKitePhaseMachine.Advance(handoff, decision, target, prospective.Plan,
-				prospective.Phase, prospective.FireBaselineTargetHitPoints,
-				prospective.LastOrderToken, fingerprintChanged && !completedFire &&
-					prospective.Phase != StealthKitePhase.Withdraw);
-			if (phase.ShouldApplyOrder)
-				ApplyOrder(phase.DesiredOrder, revision);
-			prospective.Phase = phase.Phase;
-			prospective.FireBaselineTargetHitPoints = phase.FireBaselineTargetHitPoints;
-			prospective.LastOrderToken = phase.DesiredOrder;
-			prospective.Disposition = StealthKiteDisposition.Retain;
-			return CommitAndResult(prospective, decision, revision);
+			var fallbackFacts = decision.FallbackFacts(target);
+			var score = CalculateFallback(fallbackFacts, revision);
+			var fallback = new StealthKiteFallbackEvidence(StealthKiteFallbackReason.NoSafePlan,
+				decision.LiveIdentity(target), decision.DefenderActorIds, fallbackFacts, score);
+			var disposition = score.Crossover > 2 ?
+				StealthKiteDisposition.MassAttack : StealthKiteDisposition.RecalculateFlee;
+			return Result(decision, disposition, StealthKitePhase.Position,
+				target, null, null, fallback, revision);
 		}
 
-		public MiniYamlNode SerializePrivateState(string key = "Kite")
+		StealthKiteResult FleeUnsafeCurrentPosition(StealthKiteLiveDecision decision,
+			StealthKiteActorSnapshot target, long revision)
 		{
-			return StealthKitePersistence.Serialize(key, handoff, mission, ToPrivateState(state));
+			var facts = decision.FallbackFacts(target);
+			var score = CalculateFallback(facts, revision);
+			var fallback = new StealthKiteFallbackEvidence(
+				StealthKiteFallbackReason.UnsafeCurrentPosition,
+				decision.LiveIdentity(target), decision.DefenderActorIds, facts, score);
+			return Result(decision, StealthKiteDisposition.RecalculateFlee,
+				StealthKitePhase.Position, target, null, null, fallback, revision);
 		}
 
-		public void RestorePrivateState(MiniYamlNode node)
+		StealthKiteResult Retain(StealthKiteLiveDecision decision,
+			StealthKiteActorSnapshot target, CPos cell, StealthKiteSafetyResult safety,
+			StealthKiteAction action, long revision)
 		{
-			var revision = executionLease.Acquire("Kite", EnsureActiveOwnership);
-			try
-			{
-				var restored = StealthKitePersistence.Restore(node, handoff, mission);
-				var live = ReadLive("restore", revision);
-				ValidateRestored(restored, live, revision);
-				var prospective = FromPrivateState(restored);
-				executionLease.Commit(revision, "Kite", EnsureActiveOwnership,
-					() => state = prospective);
-			}
-			finally { executionLease.Release(revision); }
+			var token = DesiredOrder(decision, target, cell, action);
+			var shouldApply = !SameIntent(token, lastOrder) ||
+				(action == StealthKiteAction.Position &&
+					decision.Members.Any(member => member.NeedsMovementOrder));
+			if (shouldApply)
+				ApplyOrder(token, revision);
+			return Result(decision, StealthKiteDisposition.Retain,
+				action == StealthKiteAction.Fire ? StealthKitePhase.Fire : StealthKitePhase.Position,
+				target, cell, safety, null, revision, token);
 		}
 
-		void ValidateRestored(StealthKitePrivateState restored,
-			StealthKiteLiveSnapshot live, long revision)
+		StealthKiteOrderToken DesiredOrder(StealthKiteLiveDecision decision,
+			StealthKiteActorSnapshot target, CPos cell, StealthKiteAction action)
 		{
-			var decision = StealthKiteLiveDecision.Create(live);
-			if (live.Tick < restored.LastObservedTick ||
-				!restored.DefenderIds.SequenceEqual(decision.DefenderActorIds) ||
-				!restored.ObjectiveIds.SequenceEqual(decision.ObjectiveActorIds))
-				throw new InvalidOperationException("Saved Kite classification is not current live state.");
-			if (decision.Defenders.Length == 0)
-			{
-				if (restored.TargetId.HasValue || restored.Disposition != decision.TargetlessDisposition.Value)
-					throw new InvalidOperationException("Saved Kite targetless handoff has no live cause.");
-				return;
-			}
-
-			if (decision.Members.Length == 0)
-			{
-				var fingerprint = decision.Fingerprint(null);
-				if (restored.Disposition != StealthKiteDisposition.RecalculateFlee ||
-					restored.FallbackEvidence?.Reason != StealthKiteFallbackReason.NoLiveMembers ||
-					restored.Fingerprint == null || !restored.Fingerprint.Equals(fingerprint) ||
-					restored.FallbackEvidence.LiveFingerprint != fingerprint.Canonical)
-					throw new InvalidOperationException("Saved zero-member fallback has no current live cause.");
-				return;
-			}
-
-			var target = decision.ResolveTarget(restored.TargetId);
-			if (!restored.TargetId.HasValue || restored.TargetId != target.ActorId ||
-				restored.TargetCell != target.CurrentCell || restored.TargetHitPoints != target.HitPoints ||
-				restored.TargetMaximumHitPoints != target.MaximumHitPoints)
-				throw new InvalidOperationException("Saved Kite target is not current live state.");
-			var currentFingerprint = decision.Fingerprint(target);
-			if (restored.Fingerprint == null || !restored.Fingerprint.Equals(currentFingerprint))
-				throw new InvalidOperationException("Saved Kite safety fingerprint is stale.");
-			if (restored.Disposition == StealthKiteDisposition.CrushEvaluation)
-			{
-				if (!decision.CanReturnToCrush(target))
-					throw new InvalidOperationException("Saved Kite-to-Crush handoff has no live cause.");
-				return;
-			}
-
-			var currentPlan = StealthKitePlanBuilder.Build(decision, target, currentFingerprint,
-				facts => CalculateSafety(facts, revision));
-			if (currentPlan == null)
-			{
-				var evidence = StealthKitePlanBuilder.NoSafePlan(decision, target, currentFingerprint,
-					facts => CalculateFallback(facts, revision));
-				if (!StealthKitePersistence.SameFallback(restored.FallbackEvidence, evidence) ||
-					restored.Disposition != (evidence.AttackScore.Value.Crossover > 2 ?
-						StealthKiteDisposition.MassAttack : StealthKiteDisposition.RecalculateFlee))
-					throw new InvalidOperationException("Saved Kite fallback does not match live standard safety.");
-				return;
-			}
-
-			if (restored.Disposition != StealthKiteDisposition.Retain ||
-				!StealthKitePersistence.SamePlan(restored.Plan, currentPlan))
-				throw new InvalidOperationException("Saved Kite plan does not match live standard safety.");
-			StealthKitePhaseMachine.ValidateSaved(decision, target, currentPlan, restored.Phase,
-				restored.FireBaselineTargetHitPoints, restored.LastOrderToken);
+			var targetActorId = action == StealthKiteAction.Fire ? target.ActorId : (uint?)null;
+			var comparable = new StealthKiteOrderToken(handoff.Owner, handoff.Epoch, action,
+				decision.Members.Select(member => member.ActorId), targetActorId,
+				action == StealthKiteAction.Fire ? target.CurrentCell : cell,
+				lastOrder?.PhaseRevision ?? 0, 0);
+			if (action == StealthKiteAction.Fire && SameIntent(comparable, lastOrder))
+				return comparable;
+			return new StealthKiteOrderToken(handoff.Owner, handoff.Epoch, action,
+				comparable.ActorIds, targetActorId, comparable.Cell,
+				(lastOrder?.PhaseRevision ?? -1) + 1, comparable.ActivityRevision);
 		}
 
-		StealthKiteLiveSnapshot ReadLive(string operation, long revision)
+		void ApplyOrder(StealthKiteOrderToken token, long revision)
 		{
 			executionLease.Verify(revision, "Kite", EnsureActiveOwnership);
-			var live = liveWorld.Read(mission) ?? throw new InvalidOperationException(
-				"The live Kite view returned no snapshot during " + operation + ".");
+			if (token.Action == StealthKiteAction.Fire)
+				orders.IssueAttack(handoff.Owner, handoff.Epoch, token.ActorIds,
+					token.TargetActorId.Value, token.Cell, token);
+			else
+				orders.IssueMove(handoff.Owner, handoff.Epoch, token.ActorIds, token.Cell, token);
+			executionLease.Verify(revision, "Kite", EnsureActiveOwnership);
+		}
+
+		StealthKiteResult Result(StealthKiteLiveDecision decision,
+			StealthKiteDisposition disposition, StealthKitePhase phase,
+			StealthKiteActorSnapshot target, CPos? fireCell, StealthKiteSafetyResult? safety,
+			StealthKiteFallbackEvidence fallback, long revision, StealthKiteOrderToken order = null)
+		{
+			var result = new StealthKiteResult(handoff.Handoff, mission, disposition, phase,
+				target?.ActorId, target?.CurrentCell, fireCell,
+				decision.Members.Select(member => member.ActorId), decision.DefenderActorIds,
+				decision.ObjectiveActorIds, safety, fallback);
+			executionLease.Commit(revision, "Kite", EnsureActiveOwnership, () =>
+			{
+				targetId = target?.ActorId;
+				lastOrder = order;
+			});
+			return result;
+		}
+
+		StealthKiteLiveSnapshot ReadLive(long revision)
+		{
+			executionLease.Verify(revision, "Kite", EnsureActiveOwnership);
+			var live = liveWorld.Read(mission) ??
+				throw new InvalidOperationException("The live Kite view returned no snapshot.");
 			executionLease.Verify(revision, "Kite", EnsureActiveOwnership);
 			return live;
 		}
 
-		StealthKiteSafetyResult CalculateSafety(StealthKiteThreatFacts facts, long revision)
+		StealthKiteSafetyResult Calculate(StealthKiteThreatFacts facts, long revision)
 		{
 			executionLease.Verify(revision, "Kite", EnsureActiveOwnership);
 			var result = threatAdapter.Calculate(facts);
@@ -262,93 +188,18 @@ namespace OpenRA.Mods.Common.Traits
 			return result;
 		}
 
-		void ApplyOrder(StealthKiteOrderToken token, long revision)
+		static bool SameIntent(StealthKiteOrderToken left, StealthKiteOrderToken right)
 		{
-			executionLease.Verify(revision, "Kite", EnsureActiveOwnership);
-			if (token.Action == StealthKiteAction.Fire)
-				orders.IssueAttack(handoff.Owner, handoff.Epoch, token.ActorIds,
-					token.TargetActorId.Value, token.Cell, token);
-			else
-				orders.IssueMove(handoff.Owner, handoff.Epoch, token.ActorIds, token.Cell, token);
-			executionLease.Verify(revision, "Kite", EnsureActiveOwnership);
-		}
-
-		StealthKiteResult CommitAndResult(OwnerState prospective,
-			StealthKiteLiveDecision decision, long revision)
-		{
-			var result = new StealthKiteResult(handoff.Handoff, mission, prospective.Disposition,
-				prospective.Phase, prospective.TargetId, prospective.TargetCell,
-				prospective.Plan?.FireCell, prospective.Plan?.WithdrawCell,
-				decision.Members.Select(member => member.ActorId), prospective.DefenderIds,
-				prospective.ObjectiveIds, prospective.Plan?.FireSafety,
-				prospective.FallbackEvidence);
-			executionLease.Commit(revision, "Kite", EnsureActiveOwnership, () => state = prospective);
-			return result;
-		}
-
-		static void SetTarget(OwnerState state, StealthKiteActorSnapshot target)
-		{
-			state.TargetId = target.ActorId;
-			state.TargetCell = target.CurrentCell;
-			state.TargetHitPoints = target.HitPoints;
-			state.TargetMaximumHitPoints = target.MaximumHitPoints;
-		}
-
-		static void ClearPlan(OwnerState state)
-		{
-			state.Plan = null;
-			state.FallbackEvidence = null;
-			state.LastOrderToken = null;
-			state.FireBaselineTargetHitPoints = -1;
-			state.Phase = StealthKitePhase.Position;
-		}
-
-		static void ClearTarget(OwnerState state)
-		{
-			state.TargetId = null;
-			state.TargetCell = null;
-			state.TargetHitPoints = 0;
-			state.TargetMaximumHitPoints = 0;
-			state.Fingerprint = null;
-			state.LastPlanTick = -1;
-			ClearPlan(state);
+			return left != null && right != null && left.Owner == right.Owner &&
+				left.Epoch == right.Epoch && left.Action == right.Action &&
+				left.TargetActorId == right.TargetActorId && left.Cell == right.Cell &&
+				left.ActorIds.SequenceEqual(right.ActorIds);
 		}
 
 		void EnsureActiveOwnership()
 		{
 			if (!ownershipGuard.IsActive(handoff.Owner, handoff.Epoch))
-				throw new InvalidOperationException("Stale Kite ownership cannot execute or restore state.");
-		}
-
-		static StealthKitePrivateState ToPrivateState(OwnerState state)
-		{
-			return new StealthKitePrivateState(state.LastObservedTick, state.LastPlanTick,
-				state.Phase, state.Disposition, state.TargetId, state.TargetCell,
-				state.TargetHitPoints, state.TargetMaximumHitPoints,
-				state.FireBaselineTargetHitPoints, state.Fingerprint, state.Plan,
-				state.FallbackEvidence, state.DefenderIds, state.ObjectiveIds, state.LastOrderToken);
-		}
-
-		static OwnerState FromPrivateState(StealthKitePrivateState state)
-		{
-			return new OwnerState
-			{
-				LastObservedTick = state.LastObservedTick,
-				LastPlanTick = state.LastPlanTick,
-				Phase = state.Phase,
-				Disposition = state.Disposition,
-				TargetId = state.TargetId,
-				TargetCell = state.TargetCell,
-				TargetHitPoints = state.TargetHitPoints,
-				TargetMaximumHitPoints = state.TargetMaximumHitPoints,
-				FireBaselineTargetHitPoints = state.FireBaselineTargetHitPoints,
-				Fingerprint = state.Fingerprint,
-				Plan = state.Plan,
-				FallbackEvidence = state.FallbackEvidence,
-				DefenderIds = state.DefenderIds.ToArray(),
-				ObjectiveIds = state.ObjectiveIds.ToArray(),
-				LastOrderToken = state.LastOrderToken
-			};
+				throw new InvalidOperationException("Stale Kite ownership cannot execute.");
 		}
 	}
 }

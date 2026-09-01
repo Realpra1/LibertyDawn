@@ -13,7 +13,6 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using System.Text;
 
 namespace OpenRA.Mods.Common.Traits
 {
@@ -27,12 +26,12 @@ namespace OpenRA.Mods.Common.Traits
 		public long AttemptRevision { get; }
 		public IReadOnlyList<uint> ActorIds => actorIds;
 		public uint TargetActorId { get; }
-		public CPos TargetCurrentCell { get; }
+		public CPos OrderCell { get; }
 
 		internal StealthMassAttackOrderToken(BehaviorId owner, OwnershipEpoch epoch,
 			StealthMassAttackPhase phase, long activityRevision, long attemptRevision,
 			IEnumerable<uint> actorIds,
-			uint targetActorId, CPos targetCurrentCell)
+			uint targetActorId, CPos orderCell)
 		{
 			var actors = actorIds?.OrderBy(id => id).ToArray();
 			if (owner != BehaviorId.MassAttack || !Enum.IsDefined(typeof(StealthMassAttackPhase), phase) ||
@@ -47,7 +46,7 @@ namespace OpenRA.Mods.Common.Traits
 			AttemptRevision = attemptRevision;
 			this.actorIds = Array.AsReadOnly(actors);
 			TargetActorId = targetActorId;
-			TargetCurrentCell = targetCurrentCell;
+			OrderCell = orderCell;
 		}
 
 		public bool Equals(StealthMassAttackOrderToken other)
@@ -55,7 +54,7 @@ namespace OpenRA.Mods.Common.Traits
 			return other != null && Owner == other.Owner && Epoch == other.Epoch &&
 				Phase == other.Phase && ActivityRevision == other.ActivityRevision &&
 				AttemptRevision == other.AttemptRevision &&
-				TargetActorId == other.TargetActorId && TargetCurrentCell == other.TargetCurrentCell &&
+				TargetActorId == other.TargetActorId && OrderCell == other.OrderCell &&
 				actorIds.SequenceEqual(other.actorIds);
 		}
 
@@ -69,90 +68,11 @@ namespace OpenRA.Mods.Common.Traits
 				hash = (hash * 397) ^ ActivityRevision.GetHashCode();
 				hash = (hash * 397) ^ AttemptRevision.GetHashCode();
 				hash = (hash * 397) ^ TargetActorId.GetHashCode();
-				hash = (hash * 397) ^ TargetCurrentCell.GetHashCode();
+				hash = (hash * 397) ^ OrderCell.GetHashCode();
 				foreach (var actorId in actorIds)
 					hash = (hash * 397) ^ actorId.GetHashCode();
 				return hash;
 			}
-		}
-	}
-
-	sealed class StealthMassAttackLiveFingerprint : IEquatable<StealthMassAttackLiveFingerprint>
-	{
-		public string Canonical { get; }
-		public StealthMassAttackLiveFingerprint(string canonical)
-		{
-			Canonical = !string.IsNullOrEmpty(canonical) ? canonical :
-				throw new ArgumentException("MassAttack fingerprints must be non-empty.", nameof(canonical));
-		}
-
-		public static StealthMassAttackLiveFingerprint CreateEntry(StealthMassAttackLiveSnapshot live,
-			IEnumerable<StealthMassAttackActorSnapshot> defenders,
-			StealthMassAttackActorSnapshot target)
-		{
-			var text = new StringBuilder();
-			text.Append("C=").Append(live.FormationCloaked ? 1 : 0).Append(";R=1;M=");
-			foreach (var member in live.Members.OrderBy(member => member.ActorId))
-				text.Append(member.ActorId).Append(',').Append(member.CurrentCell.Bits).Append(',')
-					.Append(member.CurrentWeaponRangeCells).Append(',').Append(member.HitPoints).Append(',')
-					.Append(member.MaximumHitPoints).Append(',').Append(member.IsInWorld ? 1 : 0).Append(',')
-					.Append(member.IsDead ? 1 : 0).Append('|');
-			text.Append(";T=").Append(target?.ActorId ?? 0).Append(',').Append(target?.CurrentCell.Bits ?? 0)
-				.Append(',').Append(target?.HitPoints ?? 0).Append(',').Append(target?.MaximumHitPoints ?? 0)
-				.Append(',').Append(target?.CurrentWeaponRangeCells ?? 0).Append(";E=");
-			foreach (var enemy in defenders.OrderBy(enemy => enemy.ActorId))
-				text.Append(enemy.ActorId).Append(',').Append(enemy.CurrentCell.Bits).Append(',')
-					.Append(enemy.HitPoints).Append(',').Append(enemy.MaximumHitPoints).Append(',')
-					.Append(enemy.CurrentWeaponRangeCells).Append(',')
-					.Append(enemy.HasDetectorCoverage ? 1 : 0).Append('|');
-			text.Append(";P=");
-			foreach (var cell in live.CandidateCells)
-				text.Append(cell.Bits).Append('|');
-			return new StealthMassAttackLiveFingerprint(text.ToString());
-		}
-
-		public static StealthMassAttackLiveFingerprint CreateCurrent(
-			StealthMassAttackLiveSnapshot live, StealthMassAttackActorSnapshot target)
-		{
-			var text = new StringBuilder();
-			text.Append("C=").Append(live.FormationCloaked ? 1 : 0).Append(";M=");
-			foreach (var member in live.Members)
-				text.Append(member.ActorId).Append(',').Append(member.CurrentCell.Bits).Append(',')
-					.Append(member.CurrentWeaponRangeCells).Append(',').Append(member.HitPoints).Append(',')
-					.Append(member.MaximumHitPoints).Append(',').Append(member.IsInWorld ? 1 : 0).Append(',')
-					.Append(member.IsDead ? 1 : 0).Append('|');
-			text.Append(";T=").Append(target?.ActorId ?? 0).Append(";A=");
-			foreach (var actor in live.Actors)
-				text.Append(actor.ActorId).Append(',').Append(actor.ActorType).Append(',')
-					.Append(actor.CurrentCell.Bits).Append(',').Append(actor.HitPoints).Append(',')
-					.Append(actor.MaximumHitPoints).Append(',').Append(actor.CurrentWeaponRangeCells).Append(',')
-					.Append(actor.IsInLocalEngagementArea ? 1 : 0).Append(',')
-					.Append(actor.IsDefender ? 1 : 0).Append(',')
-					.Append(actor.IsMissionObjective ? 1 : 0).Append(',')
-					.Append(actor.HasDetectorCoverage ? 1 : 0).Append(',')
-					.Append(actor.IsInWorld ? 1 : 0).Append(',').Append(actor.IsDead ? 1 : 0).Append(',')
-					.Append(actor.IsTargetable ? 1 : 0).Append('|');
-			return new StealthMassAttackLiveFingerprint(text.ToString());
-		}
-
-		public bool Equals(StealthMassAttackLiveFingerprint other)
-		{
-			return other != null && Canonical == other.Canonical;
-		}
-
-		public override bool Equals(object obj) { return Equals(obj as StealthMassAttackLiveFingerprint); }
-		public override int GetHashCode() { return Canonical.GetHashCode(); }
-	}
-
-	sealed class StealthMassAttackEvaluation
-	{
-		public StealthMassAttackThreatFacts Facts { get; }
-		public StealthMassAttackThreatResult Threat { get; }
-		public StealthMassAttackEvaluation(StealthMassAttackThreatFacts facts,
-			StealthMassAttackThreatResult threat)
-		{
-			Facts = facts ?? throw new ArgumentNullException(nameof(facts));
-			Threat = threat;
 		}
 	}
 
@@ -228,6 +148,14 @@ namespace OpenRA.Mods.Common.Traits
 				return;
 			}
 
+			if (Disposition == StealthMassAttackDisposition.StrategicRecalculation)
+			{
+				if (!TargetShape() || LastOrderToken != null ||
+					Threat.Value.StandardScore.Crossover <= 1)
+					throw new ArgumentException("MassAttack strategic recalculation has no exact live cause.");
+				return;
+			}
+
 			if (!TargetShape() || (Disposition == StealthMassAttackDisposition.Retain) !=
 				(LastOrderToken != null) ||
 				(Disposition == StealthMassAttackDisposition.Retain &&
@@ -256,8 +184,7 @@ namespace OpenRA.Mods.Common.Traits
 				(LastOrderToken == null || (LastOrderToken.Owner == BehaviorId.MassAttack &&
 					LastOrderToken.Epoch == Handoff.Epoch && LastOrderToken.Phase == Phase &&
 					LastOrderToken.ActorIds.SequenceEqual(memberIds) &&
-					LastOrderToken.TargetActorId == SelectedTargetActorId &&
-					LastOrderToken.TargetCurrentCell == SelectedTargetCurrentCell));
+					LastOrderToken.TargetActorId == SelectedTargetActorId));
 		}
 
 		static ReadOnlyCollection<uint> Canonical(IEnumerable<uint> ids, string parameter)
@@ -288,6 +215,8 @@ namespace OpenRA.Mods.Common.Traits
 			else if (result.Disposition == StealthMassAttackDisposition.UndefendedAttack)
 				UndefendedAttack = new StealthUndefendedAttackHandoff(handoff, result.Mission);
 			else if (result.Disposition == StealthMassAttackDisposition.Reacquire)
+				Reacquisition = handoff;
+			else if (result.Disposition == StealthMassAttackDisposition.StrategicRecalculation)
 				Reacquisition = handoff;
 			else if (handoff.Owner == BehaviorId.RecalculateFlee)
 			{

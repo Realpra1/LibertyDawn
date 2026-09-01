@@ -13,7 +13,6 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using System.Text;
 
 namespace OpenRA.Mods.Common.Traits
 {
@@ -77,7 +76,7 @@ namespace OpenRA.Mods.Common.Traits
 		}
 	}
 
-	public enum StealthKiteFallbackReason { NoLiveMembers, NoSafePlan }
+	public enum StealthKiteFallbackReason { NoLiveMembers, UnsafeCurrentPosition, NoSafePlan }
 
 	public sealed class StealthKiteFallbackFacts
 	{
@@ -140,7 +139,7 @@ namespace OpenRA.Mods.Common.Traits
 			if (defenders.Length == 0 || defenders.Any(id => id == 0) ||
 				defenders.Distinct().Count() != defenders.Length)
 				throw new ArgumentException("Fallback evidence requires current defenders.");
-			if (reason == StealthKiteFallbackReason.NoSafePlan ?
+			if (reason != StealthKiteFallbackReason.NoLiveMembers ?
 				attackFacts == null || !attackScore.HasValue : attackFacts != null || attackScore.HasValue)
 				throw new ArgumentException("Fallback evidence does not match its reason.");
 			Reason = reason;
@@ -148,78 +147,6 @@ namespace OpenRA.Mods.Common.Traits
 			this.defenderActorIds = Array.AsReadOnly(defenders);
 			AttackFacts = attackFacts;
 			AttackScore = attackScore;
-		}
-	}
-
-	sealed class StealthKiteLiveFingerprint : IEquatable<StealthKiteLiveFingerprint>
-	{
-		public string Canonical { get; }
-		public StealthKiteLiveFingerprint(string canonical)
-		{
-			Canonical = !string.IsNullOrEmpty(canonical) ? canonical :
-				throw new ArgumentException("Kite fingerprints must be non-empty.", nameof(canonical));
-		}
-
-		public static StealthKiteLiveFingerprint Create(StealthKiteLiveSnapshot live,
-			StealthKiteLiveDecision decision, StealthKiteActorSnapshot target)
-		{
-			var text = new StringBuilder();
-			text.Append("C=").Append(live.FormationCloaked ? 1 : 0).Append(";R=1;M=");
-			foreach (var member in live.Members.OrderBy(member => member.ActorId))
-				text.Append(member.ActorId).Append(',').Append(member.CurrentCell.Bits).Append(',')
-					.Append(member.CurrentWeaponRangeCells).Append(',').Append(member.HitPoints).Append(',')
-					.Append(member.MaximumHitPoints).Append(',').Append(member.IsInWorld ? 1 : 0).Append(',')
-					.Append(member.IsDead ? 1 : 0).Append('|');
-			text.Append(";T=").Append(target?.ActorId ?? 0).Append(',').Append(target?.CurrentCell.Bits ?? 0)
-				.Append(',').Append(target?.HitPoints ?? 0).Append(',').Append(target?.MaximumHitPoints ?? 0)
-				.Append(',').Append(target?.CurrentWeaponRangeCells ?? 0).Append(";E=");
-			foreach (var enemy in decision.Defenders)
-				text.Append(enemy.ActorId).Append(',').Append(enemy.CurrentCell.Bits).Append(',')
-					.Append(enemy.HitPoints).Append(',').Append(enemy.MaximumHitPoints).Append(',')
-					.Append(enemy.CurrentWeaponRangeCells).Append(',')
-					.Append(enemy.HasDetectorCoverage ? 1 : 0).Append('|');
-			text.Append(";P=");
-			foreach (var cell in decision.CandidateCells)
-				text.Append(cell.Bits).Append('|');
-			return new StealthKiteLiveFingerprint(text.ToString());
-		}
-
-		public bool Equals(StealthKiteLiveFingerprint other)
-		{
-			return other != null && Canonical == other.Canonical;
-		}
-
-		public override bool Equals(object obj) { return Equals(obj as StealthKiteLiveFingerprint); }
-		public override int GetHashCode() { return Canonical.GetHashCode(); }
-	}
-
-	sealed class StealthKitePlan
-	{
-		public StealthKiteLiveFingerprint Fingerprint { get; }
-		public CPos FireCell { get; }
-		public CPos WithdrawCell { get; }
-		public bool PlannedDecloak => true;
-		public StealthKiteThreatFacts FireFacts { get; }
-		public StealthKiteSafetyResult FireSafety { get; }
-		public StealthKiteThreatFacts WithdrawFacts { get; }
-		public StealthKiteSafetyResult WithdrawSafety { get; }
-
-		public StealthKitePlan(StealthKiteLiveFingerprint fingerprint, CPos fireCell,
-			CPos withdrawCell, StealthKiteThreatFacts fireFacts, StealthKiteSafetyResult fireSafety,
-			StealthKiteThreatFacts withdrawFacts, StealthKiteSafetyResult withdrawSafety)
-		{
-			Fingerprint = fingerprint ?? throw new ArgumentNullException(nameof(fingerprint));
-			if (fireFacts == null || withdrawFacts == null || !fireSafety.Approved ||
-				!withdrawSafety.Approved || fireFacts.Action != StealthKiteAction.Fire ||
-				withdrawFacts.Action != StealthKiteAction.Withdraw || fireFacts.PlannedCell != fireCell ||
-				withdrawFacts.PlannedCell != withdrawCell)
-				throw new ArgumentException("Invalid Kite live plan.");
-			FireCell = fireCell;
-			WithdrawCell = withdrawCell;
-			FireFacts = fireFacts;
-			FireSafety = fireSafety;
-			WithdrawFacts = withdrawFacts;
-			WithdrawSafety = withdrawSafety;
 		}
 	}
 }

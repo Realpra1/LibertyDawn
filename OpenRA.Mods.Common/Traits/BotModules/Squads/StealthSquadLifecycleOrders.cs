@@ -30,9 +30,10 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		}
 
 		void IStealthApproachMovementOrders.IssueMove(BehaviorId owner, OwnershipEpoch epoch,
-			IReadOnlyList<uint> actorIds, CPos destinationStrategicCell)
+			IReadOnlyList<uint> actorIds, CPos destinationStrategicCell, long orderRevision)
 		{
-			Issue(owner, epoch, StealthLifecycleRuntimeOrderKind.Move, "approach", actorIds,
+			Issue(owner, epoch, StealthLifecycleRuntimeOrderKind.Move,
+				"approach-" + orderRevision.ToString(CultureInfo.InvariantCulture), actorIds,
 				targetCell: destinationStrategicCell);
 		}
 
@@ -44,9 +45,11 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		}
 
 		void IStealthCrushOrders.IssueCrush(BehaviorId owner, OwnershipEpoch epoch,
-			IReadOnlyList<uint> actorIds, uint targetActorId, CPos targetCurrentCell)
+			IReadOnlyList<uint> actorIds, uint targetActorId, CPos targetCurrentCell,
+			long attemptRevision)
 		{
-			Issue(owner, epoch, StealthLifecycleRuntimeOrderKind.Crush, "crush", actorIds,
+			Issue(owner, epoch, StealthLifecycleRuntimeOrderKind.Crush,
+				"crush-" + attemptRevision.ToString(CultureInfo.InvariantCulture), actorIds,
 				targetActorId, targetCurrentCell);
 		}
 
@@ -68,12 +71,12 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		}
 
 		void IStealthMassAttackOrders.IssueMove(BehaviorId owner, OwnershipEpoch epoch,
-			IReadOnlyList<uint> actorIds, uint targetActorId, CPos targetCurrentCell,
+			IReadOnlyList<uint> actorIds, uint targetActorId, CPos destinationCell,
 			StealthMassAttackOrderToken token)
 		{
 			Issue(owner, epoch, StealthLifecycleRuntimeOrderKind.Move,
 				"mass-" + Token(token.Phase, token.AttemptRevision, token.ActivityRevision), actorIds,
-				targetActorId, targetCurrentCell);
+				targetActorId, destinationCell);
 		}
 
 		void IStealthMassAttackOrders.IssueAttack(BehaviorId owner, OwnershipEpoch epoch,
@@ -168,7 +171,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 						return new Order("Attack", null, Target.FromActor(target), false,
 							groupedActors: actors);
 					case StealthLifecycleRuntimeOrderKind.Crush:
-						return new Order("AttackMove", null,
+						return new Order("Move", null,
 							Target.FromCell(squad.World, targetCell.Value), false, groupedActors: actors);
 					case StealthLifecycleRuntimeOrderKind.Repair:
 						if (order.Action.Contains("Repair-Repair", StringComparison.OrdinalIgnoreCase))
@@ -181,7 +184,11 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 							false, groupedActors: actors);
 				}
 			});
-			return () => squad.Bot.QueueOrder(prepared);
+			return () =>
+			{
+				StealthSquadLifecycleTelemetry.RecordOrder(squad, order);
+				squad.Bot.QueueOrder(prepared);
+			};
 		}
 
 		CPos ResolveCell(StealthLifecycleRuntimeOrder order)

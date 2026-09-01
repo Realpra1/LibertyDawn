@@ -728,6 +728,14 @@ namespace OpenRA.Mods.Common.Traits
 
 		static void RefreshStealthRevealedIdleSafetyDemand(Squad squad)
 		{
+			if (squad.UsesModularStealthLifecycle)
+			{
+				squad.StealthRevealedIdleSafetyCloakArmed.Clear();
+				squad.StealthRevealedIdleSafetyPending.Clear();
+				squad.StealthRevealedIdleSafetyRequested = false;
+				return;
+			}
+
 			var owned = squad.Type == SquadType.Stealth ? squad.Units.Where(unit => unit != null &&
 				!unit.IsDead && unit.IsInWorld && unit.Info.Name == "stnk")
 				.OrderBy(unit => unit.ActorID).ToArray() : Array.Empty<Actor>();
@@ -764,6 +772,9 @@ namespace OpenRA.Mods.Common.Traits
 
 		internal void RegisterStealthOwnershipTransferLocalReview(Squad squad)
 		{
+			if (squad.UsesModularStealthLifecycle)
+				return;
+
 			squad.StealthLocalSafetyRequested = true;
 			squad.StealthLiveTargetRequested = true;
 			RegisterStealthManagerWorkDemand(squad, StealthLiveLocalPlanningWorkKind);
@@ -799,6 +810,17 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			foreach (var squad in Squads)
 			{
+				if (squad.UsesModularStealthLifecycle)
+				{
+					squad.StealthLocalSafetyRequested = false;
+					squad.StealthLiveTargetRequested = false;
+					squad.StealthBlueSafetyRequested = false;
+					squad.StealthRevealedIdleSafetyRequested = false;
+					ClearStealthManagerWorkDemand(squad, StealthCatchUpWorkKind);
+					ClearStealthManagerWorkDemand(squad, StealthLiveLocalPlanningWorkKind);
+					continue;
+				}
+
 				RefreshStealthRevealedIdleSafetyDemand(squad);
 				if (HasStealthCatchUpManagerWork(squad))
 					RegisterStealthManagerWorkDemand(squad, StealthCatchUpWorkKind);
@@ -829,7 +851,8 @@ namespace OpenRA.Mods.Common.Traits
 			if (stealthManagerAllowanceConsumed)
 				return false;
 
-			var eligible = Squads.Where(squad => squad.Type == SquadType.Stealth).SelectMany(squad =>
+			var eligible = Squads.Where(squad => squad.Type == SquadType.Stealth &&
+				!squad.UsesModularStealthLifecycle).SelectMany(squad =>
 			{
 				var work = new List<(Squad Squad, int Kind, int DueTick)>();
 				if (HasStealthCatchUpManagerWork(squad))
@@ -1764,6 +1787,12 @@ namespace OpenRA.Mods.Common.Traits
 				stealthSafetyTicks = Info.StealthSafetyCheckInterval;
 				foreach (var squad in Squads.Where(squad => squad.Type == SquadType.Stealth))
 				{
+					if (squad.UsesModularStealthLifecycle)
+					{
+						squad.TickModularStealthLocalSafety();
+						continue;
+					}
+
 					squad.StealthLocalSafetyRequested = true;
 					RegisterStealthManagerWorkDemand(squad, StealthLiveLocalPlanningWorkKind);
 				}
@@ -1772,7 +1801,8 @@ namespace OpenRA.Mods.Common.Traits
 			if (Info.StealthLiveTargetCheckInterval > 0 && --stealthLiveTargetTicks <= 0)
 			{
 				stealthLiveTargetTicks = Info.StealthLiveTargetCheckInterval;
-				foreach (var squad in Squads.Where(squad => squad.Type == SquadType.Stealth))
+				foreach (var squad in Squads.Where(squad => squad.Type == SquadType.Stealth &&
+					!squad.UsesModularStealthLifecycle))
 				{
 					squad.StealthLiveTargetRequested = true;
 					RegisterStealthManagerWorkDemand(squad, StealthLiveLocalPlanningWorkKind);
@@ -1782,7 +1812,8 @@ namespace OpenRA.Mods.Common.Traits
 			if (Info.StealthBlueSafetyCheckInterval > 0 && --stealthBlueSafetyTicks <= 0)
 			{
 				stealthBlueSafetyTicks = Info.StealthBlueSafetyCheckInterval;
-				foreach (var squad in Squads.Where(squad => squad.Type == SquadType.Stealth))
+				foreach (var squad in Squads.Where(squad => squad.Type == SquadType.Stealth &&
+					!squad.UsesModularStealthLifecycle))
 				{
 					squad.StealthBlueSafetyRequested = true;
 					RegisterStealthManagerWorkDemand(squad, StealthLiveLocalPlanningWorkKind);
@@ -1812,7 +1843,8 @@ namespace OpenRA.Mods.Common.Traits
 					s.TickAirSafety();
 			}
 
-			foreach (var squad in Squads.Where(squad => squad.Type == SquadType.Stealth)
+			foreach (var squad in Squads.Where(squad => squad.Type == SquadType.Stealth &&
+				!squad.UsesModularStealthLifecycle)
 				.OrderBy(squad => squad.StealthSquadDefinition, StringComparer.Ordinal)
 				.ThenBy(squad => squad.StealthSquadIndex))
 			{

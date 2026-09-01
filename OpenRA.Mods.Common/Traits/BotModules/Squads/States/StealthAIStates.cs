@@ -299,6 +299,11 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					pending.Select(unit => $"{unit.Info.Name}#{unit.ActorID}@{unit.Location}").JoinWith(","));
 		}
 
+		internal static void RoutePendingStealthReinforcementsForModularLifecycle(Squad owner)
+		{
+			RoutePendingStealthReinforcements(owner);
+		}
+
 		/// <summary>Largest <see cref="DamageWarhead.Damage"/> among a weapon's warheads, or 0.</summary>
 		static int WeaponDamage(WeaponInfo weapon)
 		{

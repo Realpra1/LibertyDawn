@@ -16,30 +16,28 @@ namespace OpenRA.Mods.Common.Traits
 {
 	sealed class StealthMassAttackLiveDecision
 	{
-		readonly StealthMassAttackLiveSnapshot live;
-		public int Tick => live.Tick;
-		public bool FormationCloaked => live.FormationCloaked;
-		public bool HasActivityObservation => live.HasActivityObservation;
-		public long ActivityRevision => live.ActivityRevision;
-		public StealthMassAttackOrderToken ActiveOrderToken => live.ActiveOrderToken;
-		public StealthMassAttackOrderToken CompletedOrderToken => live.CompletedOrderToken;
+		readonly bool formationCloaked;
+		public bool FormationCloaked => formationCloaked;
 		public StealthMassAttackMemberSnapshot[] Members { get; }
 		public StealthMassAttackActorSnapshot[] Defenders { get; }
 		public StealthMassAttackActorSnapshot[] Objectives { get; }
+		public CPos[] CandidateCells { get; }
 		public uint[] MemberActorIds { get; }
+		public CPos[] MemberCells => Members.Select(member => member.CurrentCell).Distinct().ToArray();
 		public uint[] DefenderActorIds { get; }
 		public uint[] ObjectiveActorIds { get; }
 		public StealthMassAttackDisposition? TargetlessDisposition { get; }
 
 		StealthMassAttackLiveDecision(StealthMassAttackLiveSnapshot live)
 		{
-			this.live = live;
+			formationCloaked = live.FormationCloaked;
 			Members = live.Members.Where(member => member.IsValid)
 				.OrderBy(member => member.ActorId).ToArray();
 			var local = live.Actors.Where(actor => actor.IsValid && actor.IsInLocalEngagementArea)
 				.OrderBy(actor => actor.ActorId).ToArray();
 			Defenders = local.Where(actor => actor.IsDefender).ToArray();
 			Objectives = local.Where(actor => actor.IsMissionObjective).ToArray();
+			CandidateCells = live.CandidateCells.ToArray();
 			MemberActorIds = Members.Select(member => member.ActorId).ToArray();
 			DefenderActorIds = Defenders.Select(actor => actor.ActorId).ToArray();
 			ObjectiveActorIds = Objectives.Select(actor => actor.ActorId).ToArray();
@@ -61,31 +59,28 @@ namespace OpenRA.Mods.Common.Traits
 			return Defenders.SingleOrDefault(actor => actor.ActorId == targetId);
 		}
 
-		public StealthMassAttackThreatFacts Facts(StealthMassAttackActorSnapshot target)
+		public StealthMassAttackThreatFacts Facts(StealthMassAttackActorSnapshot target, CPos plannedCell)
 		{
 			if (target == null || !Defenders.Contains(target) || Members.Length == 0)
 				throw new ArgumentException("MassAttack evaluation requires a current live target.", nameof(target));
-			return new StealthMassAttackThreatFacts(target.ActorId, target.CurrentCell,
-				MemberActorIds, Defenders, FormationCloaked);
+			return new StealthMassAttackThreatFacts(target.ActorId, target.CurrentCell, plannedCell,
+				MemberActorIds, Defenders, FormationCloaked, 0);
 		}
 
-		public StealthMassAttackLiveFingerprint Fingerprint(StealthMassAttackActorSnapshot target)
+		public CPos CurrentFormationCell()
 		{
-			return StealthMassAttackLiveFingerprint.CreateCurrent(live, target);
+			if (Members.Length == 0)
+				throw new InvalidOperationException("MassAttack has no current formation cell.");
+			return Members[0].CurrentCell;
 		}
 
-		public StealthMassAttackLiveFingerprint EntryFingerprint(StealthMassAttackActorSnapshot target)
+		public CPos[] OrderedCandidateCells(StealthMassAttackActorSnapshot target, CPos currentCell)
 		{
-			return StealthMassAttackLiveFingerprint.CreateEntry(live, Defenders, target);
-		}
-
-		public StealthMassAttackPhase PhaseFor(StealthMassAttackActorSnapshot target)
-		{
-			if (target == null || Members.Length == 0)
-				throw new ArgumentException("MassAttack phase requires current members and target.");
-			return Members.All(member => DistanceSquared(member.CurrentCell, target.CurrentCell) <=
-				(long)member.CurrentWeaponRangeCells * member.CurrentWeaponRangeCells) ?
-				StealthMassAttackPhase.Attack : StealthMassAttackPhase.Advance;
+			var occupied = MemberCells.ToHashSet();
+			return CandidateCells.Where(cell => !occupied.Contains(cell))
+				.OrderBy(cell => DistanceSquared(cell, currentCell))
+				.ThenByDescending(cell => DistanceSquared(cell, target.CurrentCell))
+				.ThenBy(cell => cell.Y).ThenBy(cell => cell.X).ToArray();
 		}
 
 		static long DistanceSquared(CPos left, CPos right)

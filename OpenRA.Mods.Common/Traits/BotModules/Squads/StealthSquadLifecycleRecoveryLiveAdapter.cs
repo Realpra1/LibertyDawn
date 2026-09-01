@@ -33,7 +33,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			{
 				var health = Health(actor);
 				return new StealthRecalculateFleeMemberSnapshot(actor.ActorID, actor.Location,
-					WeaponRange(actor), health.HP, health.Max);
+					WeaponRange(actor), health.HP, health.Max,
+					needsMovementOrder: actor.IsIdle);
 			}).ToArray();
 			var enemies = LocalEnemies().Select(actor =>
 			{
@@ -42,8 +43,10 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					actor.Location, health.HP, health.Max, WeaponRange(actor), IsDetector(actor));
 			}).ToArray();
 			var center = Center();
+			var mobile = Members().Select(actor => actor.TraitOrDefault<Mobile>()).FirstOrDefault();
 			var candidates = CandidateCells(center, 8).Select(cell =>
-				new StealthRecalculateFleeCandidateSnapshot(cell, true,
+				new StealthRecalculateFleeCandidateSnapshot(cell, mobile != null &&
+					mobile.CanEnterCell(cell, null, BlockedByActor.Immovable),
 					(cell - center).LengthSquared > 16, HasDetectorCoverage(cell))).ToArray();
 			return new StealthRecalculateFleeLiveSnapshot(squad.World.WorldTick, members, enemies,
 				candidates, FormationCloaked(), sourceFingerprint);
@@ -55,7 +58,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			{
 				var health = Health(actor);
 				return new StealthRepairMemberSnapshot(actor.ActorID, actor.Location,
-					WeaponRange(actor), health.HP, health.Max);
+					WeaponRange(actor), health.HP, health.Max,
+					needsMovementOrder: actor.IsIdle);
 			}).ToArray();
 			var options = squad.World.ActorsHavingTrait<RepairsUnits>()
 				.Where(actor => Live(actor) && actor.Owner.IsAlliedWith(squad.Bot.Player))
@@ -86,7 +90,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 		IReadOnlyList<Actor> Members()
 		{
-			return squad.Units.Where(Live).OrderBy(actor => actor.ActorID).ToArray();
+			return squad.AirFormationUnits(bootstrapIfEmpty: true).Where(Live)
+				.OrderBy(actor => actor.ActorID).ToArray();
 		}
 
 		IEnumerable<Actor> LocalEnemies()

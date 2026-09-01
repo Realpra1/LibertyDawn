@@ -16,8 +16,8 @@ using System.Linq;
 
 namespace OpenRA.Mods.Common.Traits
 {
-	public enum StealthKitePhase { Position, Fire, Withdraw }
-	public enum StealthKiteAction { Position, Fire, Withdraw }
+	public enum StealthKitePhase { Position, Fire }
+	public enum StealthKiteAction { Position, Fire }
 	public enum StealthKiteDisposition
 	{
 		Retain,
@@ -37,12 +37,14 @@ namespace OpenRA.Mods.Common.Traits
 		public int MaximumHitPoints { get; }
 		public bool IsInWorld { get; }
 		public bool IsDead { get; }
+		public bool NeedsMovementOrder { get; }
 		public bool IsValid => IsInWorld && !IsDead &&
 			(MaximumHitPoints <= 0 || HitPoints > 0);
 
 		public StealthKiteMemberSnapshot(uint actorId, CPos currentCell,
 			int currentWeaponRangeCells, bool isInWorld = true, bool isDead = false,
-			int hitPoints = 100, int maximumHitPoints = 100)
+			int hitPoints = 100, int maximumHitPoints = 100,
+			bool needsMovementOrder = false)
 		{
 			if (actorId == 0 || currentWeaponRangeCells < 0 || hitPoints < 0 || maximumHitPoints < 0)
 				throw new ArgumentOutOfRangeException(actorId == 0 ? nameof(actorId) : nameof(currentWeaponRangeCells));
@@ -53,6 +55,7 @@ namespace OpenRA.Mods.Common.Traits
 			MaximumHitPoints = maximumHitPoints;
 			IsInWorld = isInWorld;
 			IsDead = isDead;
+			NeedsMovementOrder = needsMovementOrder;
 		}
 	}
 
@@ -117,6 +120,7 @@ namespace OpenRA.Mods.Common.Traits
 		public IReadOnlyList<StealthKiteActorSnapshot> Actors => actors;
 		public IReadOnlyList<CPos> CandidateCells => candidateCells;
 		public bool FormationCloaked { get; }
+		public bool FormationDetected { get; }
 		public bool HasActivityObservation { get; }
 		public long ActivityRevision { get; }
 		public StealthKiteOrderToken ActiveOrderToken { get; }
@@ -126,7 +130,8 @@ namespace OpenRA.Mods.Common.Traits
 			IEnumerable<StealthKiteActorSnapshot> actors, IEnumerable<CPos> candidateCells,
 			bool formationCloaked, bool hasActivityObservation = false,
 			long activityRevision = 0, StealthKiteOrderToken activeOrderToken = null,
-			StealthKiteOrderToken completedOrderToken = null)
+			StealthKiteOrderToken completedOrderToken = null,
+			bool formationDetected = false)
 		{
 			if (tick < 0 || activityRevision < 0)
 				throw new ArgumentOutOfRangeException(nameof(tick));
@@ -151,6 +156,7 @@ namespace OpenRA.Mods.Common.Traits
 			this.actors = Array.AsReadOnly(normalizedActors);
 			this.candidateCells = Array.AsReadOnly(cells);
 			FormationCloaked = formationCloaked;
+			FormationDetected = formationDetected;
 			HasActivityObservation = hasActivityObservation;
 			ActivityRevision = activityRevision;
 			ActiveOrderToken = activeOrderToken;
@@ -173,6 +179,7 @@ namespace OpenRA.Mods.Common.Traits
 		public CPos SelectedTargetCurrentCell { get; }
 		public CPos PlannedCell { get; }
 		public int FriendlyCurrentFiringRangeCells { get; }
+		public int FormationRadiusCells { get; }
 		public IReadOnlyList<uint> FriendlyActorIds => friendlyActorIds;
 		public IReadOnlyList<uint> EnemyActorIds => enemyActorIds;
 		public IReadOnlyList<StealthKiteActorSnapshot> Enemies => enemies;
@@ -184,10 +191,11 @@ namespace OpenRA.Mods.Common.Traits
 		public StealthKiteThreatFacts(StealthKiteAction action, uint selectedTargetActorId,
 			CPos selectedTargetCurrentCell, CPos plannedCell, int friendlyCurrentFiringRangeCells,
 			IEnumerable<uint> friendlyActorIds, IEnumerable<StealthKiteActorSnapshot> enemies,
-			bool formationCloaked, bool plannedDecloak, bool plannedAttack)
+			bool formationCloaked, bool plannedDecloak, bool plannedAttack,
+			int formationRadiusCells = 0)
 		{
 			if (!Enum.IsDefined(typeof(StealthKiteAction), action) || selectedTargetActorId == 0 ||
-				friendlyCurrentFiringRangeCells < 0)
+				friendlyCurrentFiringRangeCells < 0 || formationRadiusCells < 0)
 				throw new ArgumentOutOfRangeException(nameof(action));
 			var friendIds = Normalize(friendlyActorIds, nameof(friendlyActorIds));
 			if (enemies == null)
@@ -202,6 +210,7 @@ namespace OpenRA.Mods.Common.Traits
 			SelectedTargetCurrentCell = selectedTargetCurrentCell;
 			PlannedCell = plannedCell;
 			FriendlyCurrentFiringRangeCells = friendlyCurrentFiringRangeCells;
+			FormationRadiusCells = formationRadiusCells;
 			this.friendlyActorIds = friendIds;
 			this.enemies = Array.AsReadOnly(enemyActors);
 			enemyActorIds = Array.AsReadOnly(enemyActors.Select(enemy => enemy.ActorId).ToArray());
@@ -263,7 +272,6 @@ namespace OpenRA.Mods.Common.Traits
 		public uint? SelectedTargetActorId { get; }
 		public CPos? SelectedTargetCurrentCell { get; }
 		public CPos? FireCell { get; }
-		public CPos? WithdrawCell { get; }
 		public IReadOnlyList<uint> ActiveMemberActorIds => memberIds;
 		public IReadOnlyList<uint> LiveDefenderActorIds => defenderIds;
 		public IReadOnlyList<uint> LiveObjectiveActorIds => objectiveIds;
@@ -272,7 +280,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		internal StealthKiteResult(StealthBehaviorHandoff handoff, StealthApproachMission mission,
 			StealthKiteDisposition disposition, StealthKitePhase phase, uint? selectedTargetActorId,
-			CPos? selectedTargetCurrentCell, CPos? fireCell, CPos? withdrawCell,
+			CPos? selectedTargetCurrentCell, CPos? fireCell,
 			IEnumerable<uint> members, IEnumerable<uint> defenders, IEnumerable<uint> objectives,
 			StealthKiteSafetyResult? safety, StealthKiteFallbackEvidence fallbackEvidence)
 		{
@@ -283,7 +291,6 @@ namespace OpenRA.Mods.Common.Traits
 			SelectedTargetActorId = selectedTargetActorId;
 			SelectedTargetCurrentCell = selectedTargetCurrentCell;
 			FireCell = fireCell;
-			WithdrawCell = withdrawCell;
 			memberIds = Array.AsReadOnly(members.ToArray());
 			defenderIds = Array.AsReadOnly(defenders.ToArray());
 			objectiveIds = Array.AsReadOnly(objectives.ToArray());

@@ -31,6 +31,7 @@ review contracts.
 - Create or amend a task only after the user explicitly asks. Put worthwhile
   unrequested ideas in `DEFERRED_WORK.md`; do not route them to Task Maker.
 - Freeze balance unless the selected task expressly authorizes the exact surface.
+- Require short modular code: classes should stay below 400 lines when practical and must not exceed 500 lines.
 - Never push or merge `bleed`. Preserve unrelated work and use isolated worktrees.
 
 After compaction, interruption, or a test cycle, reread this skill and coordinator
@@ -74,13 +75,11 @@ assignment and not rely on prior-task context. Never share a mutable worktree.
 Analysis roles run in exclusive output directories under `workspace-write`.
 Commenter jobs contain `artifacts`, `task_context`, optional `design_reference`,
 and `output`. Policy jobs contain exactly `design_reference`, `task_context`,
-`narrative`, `scratchpad`, and `output`; stealth-tank jobs additionally contain
+`narrative`, and `output`; stealth-tank jobs additionally contain
 exactly one `lifecycle_reference` for
 `.agents/references/STEALTH-TANK-LIFECYCLE.md`. Stage regular-file copies under
-`inputs/`; never pass source, diffs, full specs, or preferred conclusions.
-Serialize policy calls with the shared
-`policy-scratchpad` slot, stage the canonical scratchpad, and promote a valid
-replacement of at most 3,000 Unicode characters atomically.
+`inputs/`; never pass source, diffs, full specs, aged task memory, or preferred
+conclusions.
 
 ## Task intake
 

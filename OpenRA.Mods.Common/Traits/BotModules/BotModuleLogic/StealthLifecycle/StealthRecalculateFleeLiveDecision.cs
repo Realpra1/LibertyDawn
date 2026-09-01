@@ -18,13 +18,7 @@ namespace OpenRA.Mods.Common.Traits
 	sealed class StealthRecalculateFleeLiveDecision
 	{
 		readonly StealthRecalculateFleeLiveSnapshot live;
-		public int Tick => live.Tick;
 		public bool FormationCloaked => live.FormationCloaked;
-		public string SourceFingerprint => live.SourceFingerprint;
-		public bool HasActivityObservation => live.HasActivityObservation;
-		public long ActivityRevision => live.ActivityRevision;
-		public StealthRecalculateFleeOrderToken ActiveOrderToken => live.ActiveOrderToken;
-		public StealthRecalculateFleeOrderToken CompletedOrderToken => live.CompletedOrderToken;
 		public StealthRecalculateFleeMemberSnapshot[] Members { get; }
 		public StealthRecalculateFleeEnemySnapshot[] Enemies { get; }
 		public StealthRecalculateFleeCandidateSnapshot[] PassableCandidates { get; }
@@ -51,16 +45,6 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			return new StealthRecalculateFleeLiveDecision(live ??
 				throw new ArgumentNullException(nameof(live)));
-		}
-
-		public StealthRecalculateFleeEntryThreatFacts EntryFacts(
-			StealthRecalculateFleeEntryEvidence evidence)
-		{
-			if (evidence == null)
-				throw new ArgumentNullException(nameof(evidence));
-			return new StealthRecalculateFleeEntryThreatFacts(evidence.Source,
-				evidence.SelectedTargetActorId, evidence.SelectedTargetCurrentCell,
-				MemberActorIds, Enemies, FormationCloaked);
 		}
 
 		public StealthRecalculateFleeRouteEvaluation Evaluate(
@@ -90,38 +74,13 @@ namespace OpenRA.Mods.Common.Traits
 
 		public bool Arrived(CPos destination)
 		{
-			return Members.Length != 0 && Members.All(member => member.CurrentCell == destination);
-		}
-	}
-
-	sealed class StealthRecalculateFleeOwnerState
-	{
-		public bool EntryValidated;
-		public int LastObservedTick = -1;
-		public int LastEvaluationTick = -1;
-		public StealthRecalculateFleeDisposition Disposition = StealthRecalculateFleeDisposition.Retain;
-		public StealthRecalculateFleeLiveCause LiveCause = StealthRecalculateFleeLiveCause.NoRoute;
-		public string Fingerprint;
-		public uint[] MemberIds = Array.Empty<uint>();
-		public uint[] EnemyIds = Array.Empty<uint>();
-		public StealthRecalculateFleeRouteEvaluation[] Evaluations =
-			Array.Empty<StealthRecalculateFleeRouteEvaluation>();
-		public CPos? Destination;
-		public StealthTargetThreatScore? Danger;
-		public long RouteRevision;
-		public StealthRecalculateFleeOrderToken LastOrderToken;
-		public long? LongRouteCacheRevision;
-		public CPos[] OrderedRoute = Array.Empty<CPos>();
-		public int RouteProgress;
-
-		public StealthRecalculateFleeOwnerState Clone()
-		{
-			var clone = (StealthRecalculateFleeOwnerState)MemberwiseClone();
-			clone.MemberIds = MemberIds.ToArray();
-			clone.EnemyIds = EnemyIds.ToArray();
-			clone.Evaluations = Evaluations.ToArray();
-			clone.OrderedRoute = OrderedRoute.ToArray();
-			return clone;
+			if (Members.Length == 0)
+				return false;
+			var center = new CPos(
+				(int)Math.Round(Members.Average(member => member.CurrentCell.X)),
+				(int)Math.Round(Members.Average(member => member.CurrentCell.Y)));
+			return Math.Abs(center.X - destination.X) <= 1 &&
+				Math.Abs(center.Y - destination.Y) <= 1;
 		}
 	}
 }

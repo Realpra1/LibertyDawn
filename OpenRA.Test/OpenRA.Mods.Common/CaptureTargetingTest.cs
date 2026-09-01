@@ -185,14 +185,14 @@ namespace OpenRA.Test.Mods.Common
 			var moduleType = typeof(CaptureManagerBotModule);
 			var confirmation = new MiniYamlNode("Confirmation", "", new List<MiniYamlNode>
 			{
-				new MiniYamlNode("Specialist", FieldSaver.FormatValue((uint)17)),
+				new MiniYamlNode("Specialist", FieldSaver.FormatValue(17u)),
 				new MiniYamlNode("IdleSinceTick", FieldSaver.FormatValue(193))
 			});
 			var fallback = new MiniYamlNode("Fallback", "", new List<MiniYamlNode>
 			{
-				new MiniYamlNode("Specialist", FieldSaver.FormatValue((uint)23)),
+				new MiniYamlNode("Specialist", FieldSaver.FormatValue(23u)),
 				new MiniYamlNode("Purpose", FieldSaver.FormatValue(1)),
-				new MiniYamlNode("Target", FieldSaver.FormatValue((uint)0)),
+				new MiniYamlNode("Target", FieldSaver.FormatValue(0u)),
 				new MiniYamlNode("Destination", FieldSaver.FormatValue(new CPos(41, 29))),
 				new MiniYamlNode("AssignedTick", FieldSaver.FormatValue(200)),
 				new MiniYamlNode("ReconsiderTick", FieldSaver.FormatValue(325)),

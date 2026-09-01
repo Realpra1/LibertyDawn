@@ -17,13 +17,12 @@ using System.Linq;
 
 namespace OpenRA.Mods.Common.Traits
 {
-	/// <summary>The only object allowed to execute or persist one lifecycle owner.</summary>
+	/// <summary>The only object allowed to execute one lifecycle owner.</summary>
 	public interface IStealthLifecycleRuntimeOwner
 	{
 		BehaviorId Owner { get; }
 		OwnershipEpoch Epoch { get; }
 		object Execute();
-		MiniYamlNode Serialize(string key = "ActiveOwner");
 	}
 
 	public sealed class StealthLifecycleDamageObservation
@@ -62,9 +61,6 @@ namespace OpenRA.Mods.Common.Traits
 		IStealthLifecycleRuntimeOwner Create(StealthLifecycleRuntimeEntry entry,
 			IStealthLifecycleOwnershipGuard ownershipGuard,
 			IStealthLifecycleRuntimeOrders orders);
-		IStealthLifecycleRuntimeOwner Restore(StealthBehaviorHandoff handoff,
-			IStealthLifecycleOwnershipGuard ownershipGuard,
-			IStealthLifecycleRuntimeOrders orders, MiniYamlNode privateState);
 	}
 
 	/// <summary>Exact accepted handoff plus its immutable typed entry context.</summary>
@@ -212,8 +208,6 @@ namespace OpenRA.Mods.Common.Traits
 	public interface IStealthLifecycleRuntimeOrders
 	{
 		void Issue(StealthLifecycleRuntimeOrder order);
-		MiniYamlNode Serialize(string key = "OrderSink");
-		void Restore(MiniYamlNode node, BehaviorId owner, OwnershipEpoch epoch);
 		void Reset(BehaviorId owner, OwnershipEpoch epoch);
 	}
 }

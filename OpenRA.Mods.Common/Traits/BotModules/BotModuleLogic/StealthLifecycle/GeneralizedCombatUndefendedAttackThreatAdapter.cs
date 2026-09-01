@@ -40,22 +40,22 @@ namespace OpenRA.Mods.Common.Traits
 				throw new InvalidOperationException(
 					"UndefendedAttack safety requires the standard current-range override.");
 
-			if (facts.FormationCloaked && !facts.HasDetectorCoverage &&
-				!facts.PlannedActionRevealsFormation)
-				return new StealthUndefendedAttackSafetyResult(
-					new StealthTargetThreatScore(0, double.PositiveInfinity), true, false);
-
 			var friendly = facts.FriendlyActorIds.Select(Resolve).ToArray();
 			var enemy = facts.EnemyActorIds.Select(Resolve).ToArray();
 			var crossover = calculator.EstimateLiveMixedGroupCrossover(
 				friendly, enemy, null, plannedCurrentRangeEngagement: true);
 			var maximumThreat = friendly.SelectMany(attacker => enemy.Select(defender =>
-				calculator.CalculateLive(attacker, defender, null,
-					plannedCurrentRangeEngagement: true).DefenderThreatInAttackerEquivalents))
-				.DefaultIfEmpty().Max();
+			{
+				var pair = calculator.CalculateLive(attacker, defender, null,
+					plannedCurrentRangeEngagement: true);
+				var dx = (long)attacker.Location.X - defender.Location.X;
+				var dy = (long)attacker.Location.Y - defender.Location.Y;
+				return GeneralizedCombatThreatCalculator.DefenderThreatAtDistance(
+					pair, Math.Sqrt(dx * dx + dy * dy));
+			})).DefaultIfEmpty().Max();
 			var score = new StealthTargetThreatScore(maximumThreat, crossover);
-			return new StealthUndefendedAttackSafetyResult(
-				score, maximumThreat <= 0, maximumThreat > 0);
+			return new StealthUndefendedAttackSafetyResult(score,
+				GeneralizedCombatLiveCellSafety.IsCurrentAttackSafe(calculator, friendly, enemy), false);
 		}
 
 		Actor Resolve(uint actorId)

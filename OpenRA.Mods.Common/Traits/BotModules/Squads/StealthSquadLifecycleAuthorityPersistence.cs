@@ -15,15 +15,17 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 	/// <summary>Validates the serialized authority mode before Squad construction or live lookup.</summary>
 	static class StealthSquadLifecycleAuthorityPersistence
 	{
-		internal const string RuntimeKey = "StealthLifecycleRuntime";
 		static readonly IReadOnlyList<string> RequiredModularKeys = Array.AsReadOnly(new[]
 		{
-			"Type", "Units", "StealthSquadDefinition", "StealthSquadIndex", RuntimeKey
+			"Type", "Units", "StealthSquadDefinition", "StealthSquadIndex"
 		});
 		static readonly IReadOnlyList<string> OptionalModularKeys = Array.AsReadOnly(new[]
 		{
 			"Target", "AirSquadDefinition", "AirUnitsRepairing", "AirReinforcements",
-			"AirFormationCenter", "GroundReinforcements", "GroundFormationCenter"
+			"AirFormationCenter", "GroundReinforcements", "GroundFormationCenter",
+
+			// Old modular saves are accepted, but their tactical runtime state is ignored.
+			"StealthLifecycleRuntime"
 		});
 		internal static readonly IReadOnlyList<string> LegacyAuthorityKeys = Array.AsReadOnly(new[]
 		{
@@ -41,17 +43,16 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		{
 			if (yaml == null)
 				throw new ArgumentNullException(nameof(yaml));
-			var runtimeCount = yaml.Nodes.Count(node => node.Key == RuntimeKey);
 			if (!modularAuthority)
 			{
-				if (runtimeCount != 0)
+				if (yaml.Nodes.Any(node => node.Key == "StealthLifecycleRuntime"))
 					throw new InvalidOperationException(
 						"Legacy authority saves cannot contain modular lifecycle state.");
 				return;
 			}
 
 			var allowed = RequiredModularKeys.Concat(OptionalModularKeys).ToHashSet(StringComparer.Ordinal);
-			if (runtimeCount != 1 || RequiredModularKeys.Any(key =>
+			if (RequiredModularKeys.Any(key =>
 					yaml.Nodes.Count(node => node.Key == key) != 1) ||
 				yaml.Nodes.Any(node => !allowed.Contains(node.Key)) ||
 				OptionalModularKeys.Any(key => yaml.Nodes.Count(node => node.Key == key) > 1))

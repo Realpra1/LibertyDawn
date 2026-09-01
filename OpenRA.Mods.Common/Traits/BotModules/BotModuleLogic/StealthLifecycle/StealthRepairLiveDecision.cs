@@ -20,17 +20,7 @@ namespace OpenRA.Mods.Common.Traits
 	{
 		readonly StealthRepairLiveSnapshot live;
 		public int Tick => live.Tick;
-		public long DamageEventId => live.DamageEventId;
-		public int DamageTick => live.DamageTick;
-		public uint DamageSourceActorId => live.DamageSourceActorId;
-		public int DamageAmount => live.DamageAmount;
-		public string ResumeFingerprint => live.ResumeFingerprint;
 		public bool FormationCloaked => live.FormationCloaked;
-		public bool HasActivityObservation => live.HasActivityObservation;
-		public long ActivityRevision => live.ActivityRevision;
-		public int RouteProgress => live.RouteProgress;
-		public StealthRepairOrderToken ActiveOrderToken => live.ActiveOrderToken;
-		public StealthRepairOrderToken CompletedOrderToken => live.CompletedOrderToken;
 		public StealthRepairMemberSnapshot[] Members { get; }
 		public StealthRepairOptionSnapshot[] Options { get; }
 		public StealthRepairEnemySnapshot[] Enemies { get; }
@@ -97,8 +87,20 @@ namespace OpenRA.Mods.Common.Traits
 			IEnumerable<StealthRepairMemberSnapshot> repairMembers)
 		{
 			var exact = ExactOrderedRepairMembers(repairMembers);
-			return option != null && exact.Length != 0 &&
-				exact.All(member => member.CurrentCell == option.CurrentCell);
+			return option != null && Arrived(option.CurrentCell, exact);
+		}
+
+		public bool Arrived(CPos destination,
+			IEnumerable<StealthRepairMemberSnapshot> repairMembers)
+		{
+			var exact = ExactOrderedRepairMembers(repairMembers);
+			if (exact.Length == 0)
+				return false;
+			var center = new CPos(
+				(int)Math.Round(exact.Average(member => member.CurrentCell.X)),
+				(int)Math.Round(exact.Average(member => member.CurrentCell.Y)));
+			return Math.Abs(center.X - destination.X) <= 1 &&
+				Math.Abs(center.Y - destination.Y) <= 1;
 		}
 
 		public StealthRepairCompletionEvidence Completion(
@@ -123,37 +125,6 @@ namespace OpenRA.Mods.Common.Traits
 				throw new ArgumentException("Repair arrival requires the exact ordered damaged-member subset.",
 					nameof(repairMembers));
 			return exact;
-		}
-	}
-
-	sealed class StealthRepairOwnerState
-	{
-		public bool EntryValidated;
-		public int LastObservedTick = -1;
-		public StealthRepairDisposition Disposition = StealthRepairDisposition.Retain;
-		public StealthRepairLiveCause LiveCause = StealthRepairLiveCause.NoSafeRepair;
-		public string Fingerprint;
-		public uint[] MemberIds = Array.Empty<uint>();
-		public uint[] EnemyIds = Array.Empty<uint>();
-		public StealthRepairRouteEvaluation[] Evaluations = Array.Empty<StealthRepairRouteEvaluation>();
-		public uint? OptionId;
-		public uint? RouteId;
-		public int RouteProgress;
-		public StealthTargetThreatScore? Danger;
-		public long RouteRevision;
-		public StealthRepairOrderToken LastOrderToken;
-		public StealthRepairCompletionEvidence Completion;
-		public long? LongRouteCacheRevision;
-		public CPos[] OrderedRoute = Array.Empty<CPos>();
-
-		public StealthRepairOwnerState Clone()
-		{
-			var clone = (StealthRepairOwnerState)MemberwiseClone();
-			clone.MemberIds = MemberIds.ToArray();
-			clone.EnemyIds = EnemyIds.ToArray();
-			clone.Evaluations = Evaluations.ToArray();
-			clone.OrderedRoute = OrderedRoute.ToArray();
-			return clone;
 		}
 	}
 

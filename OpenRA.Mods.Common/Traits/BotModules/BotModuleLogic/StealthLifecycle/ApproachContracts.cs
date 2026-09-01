@@ -21,6 +21,7 @@ namespace OpenRA.Mods.Common.Traits
 		Moving,
 		AwaitingSafeRoute,
 		Reacquire,
+		RecalculateFlee,
 		UndefendedAttack,
 		CrushEvaluation
 	}
@@ -119,8 +120,10 @@ namespace OpenRA.Mods.Common.Traits
 		public uint ActorId { get; }
 		public CPos StrategicCell { get; }
 		public bool IsReinforcement { get; }
+		public bool NeedsMovementOrder { get; }
 
-		public StealthApproachMemberSnapshot(uint actorId, CPos strategicCell, bool isReinforcement = false)
+		public StealthApproachMemberSnapshot(uint actorId, CPos strategicCell,
+			bool isReinforcement = false, bool needsMovementOrder = false)
 		{
 			if (actorId == 0)
 				throw new ArgumentOutOfRangeException(nameof(actorId));
@@ -128,6 +131,7 @@ namespace OpenRA.Mods.Common.Traits
 			ActorId = actorId;
 			StrategicCell = strategicCell;
 			IsReinforcement = isReinforcement;
+			NeedsMovementOrder = needsMovementOrder;
 		}
 	}
 
@@ -146,6 +150,10 @@ namespace OpenRA.Mods.Common.Traits
 		public bool FormationCloaked { get; }
 		public bool HasDetectorCoverage { get; }
 		public bool PlannedActionRevealsFormation { get; }
+		public bool CurrentPositionSafe { get; }
+		public uint? ImmediateThreatActorId { get; }
+		public CPos? ImmediateThreatCurrentCell { get; }
+		public StealthTargetThreatScore CurrentThreatScore { get; }
 
 		public StealthApproachLiveSnapshot(bool targetIsValid,
 			IEnumerable<StealthApproachMemberSnapshot> members,
@@ -153,7 +161,10 @@ namespace OpenRA.Mods.Common.Traits
 			IEnumerable<StealthCombatGroupSnapshot> localEnemyGroup,
 			IEnumerable<uint> liveDefenderActorIds,
 			bool formationCloaked, bool hasDetectorCoverage,
-			bool plannedActionRevealsFormation = false)
+			bool plannedActionRevealsFormation = false,
+			bool currentPositionSafe = true, uint? immediateThreatActorId = null,
+			CPos? immediateThreatCurrentCell = null,
+			StealthTargetThreatScore? currentThreatScore = null)
 		{
 			if (members == null)
 				throw new ArgumentNullException(nameof(members));
@@ -168,6 +179,10 @@ namespace OpenRA.Mods.Common.Traits
 			var defenders = liveDefenderActorIds.OrderBy(id => id).ToArray();
 			if (defenders.Any(id => id == 0) || defenders.Distinct().Count() != defenders.Length)
 				throw new ArgumentException("Live defender identities must be unique and nonzero.", nameof(liveDefenderActorIds));
+			if ((!currentPositionSafe && (!immediateThreatActorId.HasValue ||
+					!immediateThreatCurrentCell.HasValue || !defenders.Contains(immediateThreatActorId.Value))) ||
+				(currentPositionSafe && (immediateThreatActorId.HasValue || immediateThreatCurrentCell.HasValue)))
+				throw new ArgumentException("Approach current safety must identify one live immediate threat.");
 
 			TargetIsValid = targetIsValid;
 			this.members = Array.AsReadOnly(normalizedMembers);
@@ -179,6 +194,10 @@ namespace OpenRA.Mods.Common.Traits
 			FormationCloaked = formationCloaked;
 			HasDetectorCoverage = hasDetectorCoverage;
 			PlannedActionRevealsFormation = plannedActionRevealsFormation;
+			CurrentPositionSafe = currentPositionSafe;
+			ImmediateThreatActorId = immediateThreatActorId;
+			ImmediateThreatCurrentCell = immediateThreatCurrentCell;
+			CurrentThreatScore = currentThreatScore ?? new StealthTargetThreatScore(0, 0);
 		}
 	}
 
@@ -190,7 +209,7 @@ namespace OpenRA.Mods.Common.Traits
 	public interface IStealthApproachMovementOrders
 	{
 		void IssueMove(BehaviorId owner, OwnershipEpoch epoch,
-			IReadOnlyList<uint> actorIds, CPos destinationStrategicCell);
+			IReadOnlyList<uint> actorIds, CPos destinationStrategicCell, long orderRevision);
 	}
 
 	public sealed class StealthApproachResult
@@ -209,12 +228,18 @@ namespace OpenRA.Mods.Common.Traits
 		public IReadOnlyList<uint> ActiveMemberActorIds => activeMemberActorIds;
 		public IReadOnlyList<uint> LiveDefenderActorIds => liveDefenderActorIds;
 		public StealthTargetThreatScore? LocalThreatScore { get; }
+		public bool CurrentPositionSafe { get; }
+		public uint? ImmediateThreatActorId { get; }
+		public CPos? ImmediateThreatCurrentCell { get; }
+		public bool FormationCloaked { get; }
 
 		internal StealthApproachResult(StealthBehaviorHandoff handoff, StealthApproachMission mission,
 			StealthApproachDisposition disposition, StealthApproachArrivalClassification arrivalClassification,
 			CPos activeSquadCenter, IEnumerable<CPos> route, int routeIndex,
 			IEnumerable<uint> activeMemberActorIds, IEnumerable<uint> liveDefenderActorIds,
-			StealthTargetThreatScore? localThreatScore)
+			StealthTargetThreatScore? localThreatScore, bool currentPositionSafe = true,
+			uint? immediateThreatActorId = null, CPos? immediateThreatCurrentCell = null,
+			bool formationCloaked = true)
 		{
 			Handoff = handoff ?? throw new ArgumentNullException(nameof(handoff));
 			Mission = mission ?? throw new ArgumentNullException(nameof(mission));
@@ -228,6 +253,10 @@ namespace OpenRA.Mods.Common.Traits
 			this.liveDefenderActorIds = Array.AsReadOnly(
 				(liveDefenderActorIds ?? throw new ArgumentNullException(nameof(liveDefenderActorIds))).ToArray());
 			LocalThreatScore = localThreatScore;
+			CurrentPositionSafe = currentPositionSafe;
+			ImmediateThreatActorId = immediateThreatActorId;
+			ImmediateThreatCurrentCell = immediateThreatCurrentCell;
+			FormationCloaked = formationCloaked;
 		}
 	}
 
@@ -282,12 +311,15 @@ namespace OpenRA.Mods.Common.Traits
 		public StealthBehaviorHandoff Reacquisition { get; }
 		public StealthUndefendedAttackHandoff UndefendedAttack { get; }
 		public StealthCrushEvaluationHandoff CrushEvaluation { get; }
+		public StealthRecalculateFleeHandoff RecalculateFlee { get; }
 
 		internal StealthApproachTransition(StealthBehaviorHandoff handoff,
 			StealthApproachResult result)
 		{
 			if (result.Disposition == StealthApproachDisposition.Reacquire)
 				Reacquisition = handoff;
+			else if (result.Disposition == StealthApproachDisposition.RecalculateFlee)
+				RecalculateFlee = new StealthRecalculateFleeHandoff(handoff, result);
 			else if (result.Disposition == StealthApproachDisposition.UndefendedAttack)
 				UndefendedAttack = new StealthUndefendedAttackHandoff(handoff, result.Mission);
 			else

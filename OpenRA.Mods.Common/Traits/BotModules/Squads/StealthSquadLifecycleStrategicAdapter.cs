@@ -11,6 +11,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 {
@@ -82,8 +83,20 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		public bool TryFindSafeRoute(uint actorId, CPos startStrategicCell,
 			CPos destinationStrategicCell, out IReadOnlyList<CPos> route)
 		{
-			return StealthAIStateBase.TryReadLifecycleStrategicRoute(squad, actorId,
-				startStrategicCell, destinationStrategicCell, true, out _, out route);
+			var approaches = new[]
+			{
+				new CVec(-1, -1), new CVec(0, -1), new CVec(1, -1), new CVec(-1, 0),
+				new CVec(1, 0), new CVec(-1, 1), new CVec(0, 1), new CVec(1, 1)
+			}.Select(offset => destinationStrategicCell + offset)
+				.Where(cell => cell.X >= 0 && cell.Y >= 0)
+				.OrderBy(cell => (cell - startStrategicCell).LengthSquared)
+				.ThenBy(cell => cell.Y).ThenBy(cell => cell.X);
+			foreach (var approach in approaches)
+				if (StealthAIStateBase.TryReadLifecycleStrategicRoute(squad, actorId,
+					startStrategicCell, approach, true, true, out _, out route))
+					return true;
+			route = Array.Empty<CPos>();
+			return false;
 		}
 
 		StealthLifecycleStrategicView Current()

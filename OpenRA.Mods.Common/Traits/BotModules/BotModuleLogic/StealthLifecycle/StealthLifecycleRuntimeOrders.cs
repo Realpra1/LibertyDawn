@@ -10,9 +10,6 @@
 #endregion
 
 using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
 
 namespace OpenRA.Mods.Common.Traits
 {
@@ -23,7 +20,6 @@ namespace OpenRA.Mods.Common.Traits
 	/// </summary>
 	public sealed class StealthLifecycleRuntimeOrders : IStealthLifecycleRuntimeOrders
 	{
-		const int Version = 1;
 		readonly IStealthLifecycleOwnershipGuard guard;
 		readonly IStealthLifecycleRuntimeOrderTarget target;
 		BehaviorId owner;
@@ -78,41 +74,6 @@ namespace OpenRA.Mods.Common.Traits
 			owner = nextOwner;
 			epoch = nextEpoch;
 			acceptedFingerprint = null;
-		}
-
-		public MiniYamlNode Serialize(string key = "OrderSink")
-		{
-			if (issuing)
-				throw new InvalidOperationException("Cannot save during an external order callback.");
-			return new MiniYamlNode(key, "", new List<MiniYamlNode>
-			{
-				new MiniYamlNode("Version", Version.ToString(CultureInfo.InvariantCulture)),
-				new MiniYamlNode("Owner", owner.ToString()),
-				new MiniYamlNode("Epoch", epoch.Value.ToString(CultureInfo.InvariantCulture)),
-				new MiniYamlNode("AcceptedFingerprint", acceptedFingerprint ?? "")
-			});
-		}
-
-		public void Restore(MiniYamlNode node, BehaviorId expectedOwner, OwnershipEpoch expectedEpoch)
-		{
-			if (node == null)
-				throw new ArgumentNullException(nameof(node));
-			if (issuing)
-				throw new InvalidOperationException("Cannot restore during an external order callback.");
-			var values = node.Value.Nodes.ToDictionary(child => child.Key, child => child.Value.Value,
-				StringComparer.Ordinal);
-			if (values.Count != 4 || !values.TryGetValue("Version", out var versionText) ||
-				!int.TryParse(versionText, NumberStyles.None, CultureInfo.InvariantCulture, out var version) ||
-				version != Version || !values.TryGetValue("Owner", out var ownerText) ||
-				!Enum.TryParse(ownerText, out BehaviorId savedOwner) || savedOwner != expectedOwner ||
-				!values.TryGetValue("Epoch", out var epochText) ||
-				!long.TryParse(epochText, NumberStyles.None, CultureInfo.InvariantCulture, out var savedEpoch) ||
-				savedEpoch != expectedEpoch.Value || !values.TryGetValue("AcceptedFingerprint", out var fingerprint))
-				throw new InvalidOperationException("Invalid stealth runtime order-sink state.");
-
-			owner = expectedOwner;
-			epoch = expectedEpoch;
-			acceptedFingerprint = string.IsNullOrEmpty(fingerprint) ? null : fingerprint;
 		}
 
 		void EnsureActive(BehaviorId candidateOwner, OwnershipEpoch candidateEpoch)

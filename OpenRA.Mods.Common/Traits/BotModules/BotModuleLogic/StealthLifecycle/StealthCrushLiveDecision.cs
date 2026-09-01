@@ -16,19 +16,6 @@ namespace OpenRA.Mods.Common.Traits
 {
 	sealed class StealthCrushLiveDecision
 	{
-		public readonly struct TargetResolution
-		{
-			public StealthCrushActorSnapshot Selected { get; }
-			public bool RequiresRefresh { get; }
-
-			public TargetResolution(StealthCrushActorSnapshot selected, bool requiresRefresh)
-			{
-				Selected = selected;
-				RequiresRefresh = requiresRefresh;
-			}
-		}
-
-		readonly int liveTick;
 		readonly bool formationCloaked;
 
 		public StealthCrushMemberSnapshot[] Members { get; }
@@ -41,17 +28,17 @@ namespace OpenRA.Mods.Common.Traits
 		StealthCrushLiveDecision(StealthCrushLiveSnapshot live,
 			StealthApproachMission mission)
 		{
-			liveTick = live.Tick;
 			formationCloaked = live.FormationCloaked;
 			Members = live.Members.Where(member => member.IsValid)
 				.OrderBy(member => member.ActorId).ToArray();
-			var actors = live.Actors.Where(actor => actor.IsValid &&
-				actor.StrategicCell == mission.StrategicCell).OrderBy(actor => actor.ActorId).ToArray();
+			var actors = live.Actors.Where(actor => actor.IsValid)
+				.OrderBy(actor => actor.ActorId).ToArray();
 			Defenders = actors.Where(actor => actor.IsDefender).ToArray();
 			Candidates = Defenders.Where(actor => actor.IsInfantry &&
 				actor.CanBeCrushedByFormation).ToArray();
 			DefenderActorIds = Defenders.Select(actor => actor.ActorId).ToArray();
-			ObjectiveActorIds = actors.Where(actor => actor.IsMissionObjective)
+			ObjectiveActorIds = actors.Where(actor => actor.IsMissionObjective &&
+				actor.StrategicCell == mission.StrategicCell)
 				.Select(actor => actor.ActorId).ToArray();
 
 			if (Defenders.Length == 0)
@@ -69,20 +56,13 @@ namespace OpenRA.Mods.Common.Traits
 			return new StealthCrushLiveDecision(live, mission);
 		}
 
-		public TargetResolution ResolveTarget(uint? selectedActorId,
-			CPos? selectedCurrentCell, int nextRefreshTick)
+		public StealthCrushActorSnapshot SelectTarget(uint? retainedActorId)
 		{
 			if (TargetlessDisposition.HasValue)
 				throw new InvalidOperationException("A targetless Crush decision cannot select infantry.");
-			var selected = selectedActorId.HasValue ? Candidates.FirstOrDefault(
-				candidate => candidate.ActorId == selectedActorId.Value) : null;
-			if (selected == null)
-				return new TargetResolution(SelectTarget(), true);
-			if (selectedCurrentCell != selected.CurrentCell)
-				return new TargetResolution(selected, true);
-			if (nextRefreshTick < 0 || liveTick >= nextRefreshTick)
-				return new TargetResolution(SelectTarget(), true);
-			return new TargetResolution(selected, false);
+			var retained = retainedActorId.HasValue ? Candidates.FirstOrDefault(
+				candidate => candidate.ActorId == retainedActorId.Value) : null;
+			return retained ?? SelectClosestHighestPriorityTarget();
 		}
 
 		public StealthCrushThreatFacts ThreatFacts(StealthCrushActorSnapshot selected)
@@ -94,7 +74,7 @@ namespace OpenRA.Mods.Common.Traits
 				formationCloaked, selected.HasDetectorCoverage);
 		}
 
-		StealthCrushActorSnapshot SelectTarget()
+		StealthCrushActorSnapshot SelectClosestHighestPriorityTarget()
 		{
 			var priority = StealthAISpecialistPolicy.HighestPriorityEligibleEngagements(
 				Candidates.Select(candidate => (candidate, candidate.ConfiguredPriority)));

@@ -57,16 +57,9 @@ namespace OpenRA.Mods.Common.Traits
 				throw new InvalidOperationException("The selected Kite target position is inconsistent.");
 
 			var score = StandardScore(friendly, enemy, facts.PlannedCurrentRangeEngagement);
-
-			var canFire = !facts.PlannedAttack || DistanceSquared(facts.PlannedCell,
-				facts.SelectedTargetCurrentCell) <= (long)facts.FriendlyCurrentFiringRangeCells *
-				facts.FriendlyCurrentFiringRangeCells;
-			var outsideCurrentRanges = facts.Enemies.All(actor =>
-				DistanceSquared(facts.PlannedCell, actor.CurrentCell) >
-				(long)actor.CurrentWeaponRangeCells * actor.CurrentWeaponRangeCells);
-			var concealedMove = !facts.PlannedAttack && facts.FormationCloaked &&
-				!facts.Enemies.Any(actor => actor.HasDetectorCoverage);
-			var approved = canFire && (outsideCurrentRanges || concealedMove);
+			var approved = GeneralizedCombatLiveCellSafety.CanAttackSafely(calculator,
+				friendly, enemy, Resolve(target.ActorId), facts.PlannedCell,
+				facts.FormationRadiusCells, plannedTargetTypesOverride);
 			return new StealthKiteSafetyResult(score, approved);
 		}
 
@@ -86,13 +79,9 @@ namespace OpenRA.Mods.Common.Traits
 		StealthTargetThreatScore StandardScore(Actor[] friendly, Actor[] enemy,
 			bool plannedCurrentRangeEngagement)
 		{
-			var crossover = calculator.EstimateLiveMixedGroupCrossover(friendly, enemy,
+			var result = calculator.CalculateLiveMixedGroupThreat(friendly, enemy,
 				plannedTargetTypesOverride, plannedCurrentRangeEngagement);
-			var maximumThreat = friendly.SelectMany(attacker => enemy.Select(defender =>
-				calculator.CalculateLive(attacker, defender, plannedTargetTypesOverride,
-					plannedCurrentRangeEngagement).DefenderThreatInAttackerEquivalents))
-				.DefaultIfEmpty().Max();
-			return new StealthTargetThreatScore(maximumThreat, crossover);
+			return new StealthTargetThreatScore(result.ThreatRating, result.Crossover);
 		}
 
 		Actor Resolve(uint actorId)
@@ -101,13 +90,6 @@ namespace OpenRA.Mods.Common.Traits
 			if (actor == null || actor.IsDead || !actor.IsInWorld || actor.ActorID != actorId)
 				throw new InvalidOperationException($"Kite actor {actorId} is not valid in the live World.");
 			return actor;
-		}
-
-		static long DistanceSquared(CPos left, CPos right)
-		{
-			var dx = (long)left.X - right.X;
-			var dy = (long)left.Y - right.Y;
-			return dx * dx + dy * dy;
 		}
 	}
 }

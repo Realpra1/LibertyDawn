@@ -12,6 +12,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using OpenRA.Primitives;
 using OpenRA.Traits;
 
 namespace OpenRA.Mods.Common.Traits.BotModules.Squads
@@ -21,6 +22,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		IStealthUndefendedAttackLiveWorld, IStealthCrushLiveWorld, IStealthKiteLiveWorld,
 		IStealthMassAttackLiveWorld
 	{
+		static readonly BitSet<TargetableType> GroundTargetTypes =
+			new BitSet<TargetableType>("Ground");
 		readonly Squad squad;
 
 		public StealthSquadLifecycleCombatLiveAdapter(Squad squad)
@@ -30,12 +33,42 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 		StealthApproachLiveSnapshot IStealthApproachLiveWorld.Read(StealthApproachMission mission)
 		{
-			var members = Members().Select(actor => new StealthApproachMemberSnapshot(actor.ActorID,
-				Coarse(actor.Location), squad.AirReinforcements.Contains(actor.ActorID))).ToArray();
+			var memberActors = Members();
+			var members = memberActors.Select(actor => new StealthApproachMemberSnapshot(actor.ActorID,
+				Coarse(actor.Location), squad.AirReinforcements.Contains(actor.ActorID), actor.IsIdle)).ToArray();
 			var enemies = LocalEnemies(mission).ToArray();
-			var defenders = enemies.Where(IsDefender).Select(actor => actor.ActorID).ToArray();
-			return new StealthApproachLiveSnapshot(TargetValid(mission), members, Group(Members()),
-				Group(enemies), defenders, FormationCloaked(), enemies.Any(IsDetector), true);
+			var defenderActors = enemies.Where(IsDefender).ToArray();
+			var cloaked = FormationCloaked();
+			var detected = memberActors.Any(actor => HasDetectorCoverage(actor.Location));
+			var safety = CurrentPositionSafety(memberActors, defenderActors, cloaked, detected);
+			return new StealthApproachLiveSnapshot(TargetValid(mission), members, Group(memberActors),
+				Group(enemies), defenderActors.Select(actor => actor.ActorID), cloaked,
+				detected, true, safety.Threat == null,
+				safety.Threat?.ActorID, safety.Threat?.Location, safety.Score);
+		}
+
+		(StealthTargetThreatScore Score, Actor Threat) CurrentPositionSafety(
+			IReadOnlyList<Actor> members, IReadOnlyList<Actor> defenders,
+			bool formationCloaked, bool detected)
+		{
+			if ((formationCloaked && !detected) || defenders.Count == 0)
+				return (new StealthTargetThreatScore(0, 0), null);
+
+			var calculator = squad.SquadManager.CombatThreatCalculator;
+			var threats = members.SelectMany(member => defenders.Select(defender =>
+			{
+				var pair = calculator.CalculateLive(member, defender, GroundTargetTypes, true);
+				var dx = (long)member.Location.X - defender.Location.X;
+				var dy = (long)member.Location.Y - defender.Location.Y;
+				var distance = Math.Sqrt(dx * dx + dy * dy);
+				return (Actor: defender, Rating:
+					GeneralizedCombatThreatCalculator.DefenderThreatAtDistance(pair, distance));
+			})).OrderByDescending(item => item.Rating).ThenBy(item => item.Actor.ActorID).ToArray();
+			var immediate = threats.FirstOrDefault();
+			var crossover = calculator.EstimateLiveMixedGroupCrossover(
+				members, defenders, GroundTargetTypes, true);
+			var score = new StealthTargetThreatScore(immediate.Rating, crossover);
+			return immediate.Rating > 0 ? (score, immediate.Actor) : (score, null);
 		}
 
 		StealthUndefendedAttackLiveSnapshot IStealthUndefendedAttackLiveWorld.Read(
@@ -58,7 +91,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				}).ToArray();
 			var defenders = enemies.Where(IsDefender).Select(actor => actor.ActorID).ToArray();
 			return new StealthUndefendedAttackLiveSnapshot(squad.World.WorldTick, members, targets,
-				defenders, FormationCloaked(), enemies.Any(IsDetector), true);
+				defenders, FormationCloaked(),
+				Members().Any(actor => HasDetectorCoverage(actor.Location)), true);
 		}
 
 		StealthCrushLiveSnapshot IStealthCrushLiveWorld.Read(StealthApproachMission mission)
@@ -68,7 +102,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var actors = LocalEnemies(mission).Select(actor => new StealthCrushActorSnapshot(
 				actor.ActorID, actor.Info.Name, Coarse(actor.Location), actor.Location, Priority(actor),
 				IsDefender(actor), IsObjective(actor, mission), IsInfantry(actor), CanCrush(actor),
-				IsDetector(actor))).ToArray();
+				HasDetectorCoverage(actor.Location))).ToArray();
 			return new StealthCrushLiveSnapshot(squad.World.WorldTick, members, actors, FormationCloaked());
 		}
 
@@ -78,17 +112,20 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			{
 				var health = Health(actor);
 				return new StealthKiteMemberSnapshot(actor.ActorID, actor.Location, WeaponRange(actor),
-					hitPoints: health.HP, maximumHitPoints: health.Max);
+					hitPoints: health.HP, maximumHitPoints: health.Max,
+					needsMovementOrder: actor.IsIdle);
 			}).ToArray();
 			var actors = LocalEnemies(mission).Select(actor =>
 			{
 				var health = Health(actor);
 				return new StealthKiteActorSnapshot(actor.ActorID, actor.Info.Name, actor.Location,
 					health.HP, health.Max, WeaponRange(actor), IsDefender(actor),
-					IsObjective(actor, mission), IsInfantry(actor), CanCrush(actor), IsDetector(actor));
+					IsObjective(actor, mission), IsInfantry(actor), CanCrush(actor),
+					HasDetectorCoverage(actor.Location));
 			}).ToArray();
 			return new StealthKiteLiveSnapshot(squad.World.WorldTick, members, actors,
-				CandidateCells(), FormationCloaked());
+				CandidateCells(4), FormationCloaked(),
+				formationDetected: Members().Any(actor => HasDetectorCoverage(actor.Location)));
 		}
 
 		StealthMassAttackLiveSnapshot IStealthMassAttackLiveWorld.Read(StealthApproachMission mission)
@@ -97,17 +134,18 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			{
 				var health = Health(actor);
 				return new StealthMassAttackMemberSnapshot(actor.ActorID, actor.Location,
-					WeaponRange(actor), health.HP, health.Max);
+					WeaponRange(actor), health.HP, health.Max,
+					needsMovementOrder: actor.IsIdle);
 			}).ToArray();
 			var actors = LocalEnemies(mission).Select(actor =>
 			{
 				var health = Health(actor);
 				return new StealthMassAttackActorSnapshot(actor.ActorID, actor.Info.Name, actor.Location,
 					health.HP, health.Max, WeaponRange(actor), IsDefender(actor),
-					IsObjective(actor, mission), IsDetector(actor));
+					IsObjective(actor, mission), HasDetectorCoverage(actor.Location));
 			}).ToArray();
 			return new StealthMassAttackLiveSnapshot(squad.World.WorldTick, members, actors,
-				CandidateCells(), FormationCloaked());
+				CandidateCells(Math.Max(4, squad.SquadManager.Info.DangerScanRadius)), FormationCloaked());
 		}
 
 		public Actor Resolve(uint actorId)
@@ -140,17 +178,37 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 		IEnumerable<Actor> LocalEnemies(StealthApproachMission mission)
 		{
+			var members = Members();
 			return squad.World.Actors.Where(actor => Live(actor) &&
 				squad.SquadManager.IsPreferredEnemyUnit(actor) &&
-				StealthAIThreatGeometry.IsSameOrAdjacentCoarseCell(Coarse(actor.Location),
-					mission.StrategicCell)).OrderBy(actor => actor.ActorID);
+				(StealthAIThreatGeometry.IsSameOrAdjacentCoarseCell(Coarse(actor.Location),
+					mission.StrategicCell) || CanThreatenLocalAction(actor, members)))
+				.OrderBy(actor => actor.ActorID);
 		}
 
-		IEnumerable<CPos> CandidateCells()
+		static bool CanThreatenLocalAction(Actor enemy, IReadOnlyList<Actor> members)
+		{
+			var range = WeaponRange(enemy) + 4;
+			if (range <= 4)
+				return false;
+			var rangeSquared = (long)range * range;
+			return members.Any(member =>
+			{
+				var dx = (long)member.Location.X - enemy.Location.X;
+				var dy = (long)member.Location.Y - enemy.Location.Y;
+				return dx * dx + dy * dy <= rangeSquared;
+			});
+		}
+
+		IEnumerable<CPos> CandidateCells(int radius)
 		{
 			var center = squad.World.Map.CellContaining(squad.AirFormationCenter);
-			return Enumerable.Range(-4, 9).SelectMany(y => Enumerable.Range(-4, 9)
+			var mobile = Members().Select(actor => actor.TraitOrDefault<Mobile>()).FirstOrDefault();
+			return Enumerable.Range(-radius, radius * 2 + 1).SelectMany(y =>
+				Enumerable.Range(-radius, radius * 2 + 1)
 				.Select(x => squad.World.Map.Clamp(new CPos(center.X + x, center.Y + y))))
+				.Where(cell => mobile != null &&
+					mobile.CanEnterCell(cell, null, BlockedByActor.Immovable))
 				.Distinct().OrderBy(cell => cell.Y).ThenBy(cell => cell.X);
 		}
 
@@ -167,6 +225,15 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		}
 
 		bool IsDefender(Actor actor) { return WeaponRange(actor) > 0 || IsDetector(actor); }
+
+		bool HasDetectorCoverage(CPos cell)
+		{
+			var position = squad.World.Map.CenterOfCell(cell);
+			return squad.World.Actors.Where(actor => Live(actor) &&
+				squad.SquadManager.IsPreferredEnemyUnit(actor)).Any(actor =>
+				actor.TraitsImplementing<DetectCloaked>().Where(detector => !detector.IsTraitDisabled)
+					.Any(detector => (actor.CenterPosition - position).HorizontalLength <= detector.Range.Length));
+		}
 
 		bool CanCrush(Actor target)
 		{

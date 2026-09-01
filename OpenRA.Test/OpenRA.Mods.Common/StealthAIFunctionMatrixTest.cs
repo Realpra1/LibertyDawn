@@ -1137,9 +1137,9 @@ namespace OpenRA.Test.Mods.Common
 		{
 			var yaml = Source("mods/cnc/rules/ai.yaml");
 			Assert.That(yaml.Split("stealth-tank:").Length - 1, Is.EqualTo(10));
-			Assert.That(yaml.Split('\n').Count(line => line.Trim() == "vice: -1"), Is.EqualTo(20),
-				"Every harassment and attack STNK profile must reject both Visceroid actor types.");
-			Assert.That(yaml.Split('\n').Count(line => line.Trim() == "pvice: -1"), Is.EqualTo(20));
+			Assert.That(yaml.Split('\n').Count(line => line.Trim() == "vice: -1"), Is.EqualTo(30),
+				"Every STNK and chemical stealth profile must reject both Visceroid actor types.");
+			Assert.That(yaml.Split('\n').Count(line => line.Trim() == "pvice: -1"), Is.EqualTo(30));
 
 			Assert.That(StealthAISpecialistPolicy.MinimumStrategicCellValue,
 				Is.EqualTo(5000L * 1100L));
@@ -1719,8 +1719,12 @@ namespace OpenRA.Test.Mods.Common
 				"Terminal aggregation must not double count its instrumented permanent leaf emitters.");
 			Assert.That(manager, Does.Contain("StealthAIStateBase.EmitStealthRecurringDiagnosticSummary(squad, summary);"),
 				"Retired squads must flush their exact aggregate before removal.");
-			foreach (var helper in new[] { "void EmitStealthGenerationEfficiencySummary(",
-				"void EmitStealthCadenceSummary(", "void EmitStealthEfficiencySummary(" })
+			foreach (var helper in new[]
+			{
+				"void EmitStealthGenerationEfficiencySummary(",
+				"void EmitStealthCadenceSummary(",
+				"void EmitStealthEfficiencySummary("
+			})
 			{
 				var emission = manager.Substring(manager.IndexOf(helper, StringComparison.Ordinal));
 				emission = emission.Substring(0, emission.IndexOf("\n\t\tvoid ", StringComparison.Ordinal));
@@ -1741,9 +1745,12 @@ namespace OpenRA.Test.Mods.Common
 				"Damage and efficiency evidence remains event-driven and unbounded by recurring log suppression.");
 
 			Assert.That(manager, Does.Contain("stealth_manager_phase_attribution|summary={0}"));
-			foreach (var phase in new[] { "manager_tick", "scheduler_selection", "guard_dirty_check",
+			foreach (var phase in new[]
+			{
+				"manager_tick", "scheduler_selection", "guard_dirty_check",
 				"incremental_path", "dependency_validation", "threat_route_cell",
-				"local_planning_inclusive", "diagnostic_emission" })
+				"local_planning_inclusive", "diagnostic_emission"
+			})
 				Assert.That(manager, Does.Contain(phase + "={"));
 			Assert.That(manager, Does.Contain("units=milliseconds/calls/operations"));
 			Assert.That(manager, Does.Contain("diagnostic_only=true"));

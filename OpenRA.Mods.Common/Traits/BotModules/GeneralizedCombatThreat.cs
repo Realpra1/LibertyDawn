@@ -420,6 +420,16 @@ namespace OpenRA.Mods.Common.Traits
 			BitSet<TargetableType>? plannedAttackerTargetTypesOverride = null,
 			bool plannedCurrentRangeEngagement = false)
 		{
+			return CalculateLiveMixedGroupThreat(ourActors, theirActors,
+				plannedAttackerTargetTypesOverride, plannedCurrentRangeEngagement).Crossover;
+		}
+
+		/// <summary>Returns the standard live threat rating and crossover in one aggregation.</summary>
+		public MixedGroupThreat CalculateLiveMixedGroupThreat(IEnumerable<Actor> ourActors,
+			IEnumerable<Actor> theirActors,
+			BitSet<TargetableType>? plannedAttackerTargetTypesOverride = null,
+			bool plannedCurrentRangeEngagement = false)
+		{
 			if (ourActors == null)
 				throw new ArgumentNullException(nameof(ourActors));
 			if (theirActors == null)
@@ -436,7 +446,7 @@ namespace OpenRA.Mods.Common.Traits
 					.Select(actor => actor.Info.TraitInfoOrDefault<ValuedInfo>()?.Cost ?? 0)
 					.DefaultIfEmpty().Max())).ToArray();
 
-			return EstimateMixedGroupCrossover(ourGroup, theirGroup, (ourType, theirType) =>
+			return CalculateMixedGroupThreat(ourGroup, theirGroup, (ourType, theirType) =>
 			{
 				var pairThreats = ours.Where(actor => actor.Info.Name.Equals(
 					ourType, StringComparison.OrdinalIgnoreCase)).SelectMany(attacker =>
@@ -1289,7 +1299,10 @@ namespace OpenRA.Mods.Common.Traits
 
 		static HealingProfile[] HealingProfiles(Actor actor)
 		{
-			var health = actor.Trait<IHealth>();
+			var health = actor.TraitOrDefault<IHealth>();
+			if (health == null)
+				return Array.Empty<HealingProfile>();
+
 			return actor.TraitsImplementing<ChangesHealth>()
 				.Where(h => !h.IsTraitDisabled && h.Info.DamageCooldown == 0 && h.Info.Delay > 0)
 				.Select(h => CreateHealingProfile(h.Info, health.MaxHP)).Where(h => h.HealingPerTick > 0).ToArray();

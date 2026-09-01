@@ -101,7 +101,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		}
 
 		internal static bool TryReadLifecycleStrategicRoute(Squad owner, uint actorId,
-			CPos expectedStart, CPos destination, bool strategicCells,
+			CPos expectedStart, CPos destination, bool strategicCells, bool allowDangerousStart,
 			out long revision, out IReadOnlyList<CPos> route)
 		{
 			revision = 0;
@@ -116,7 +116,10 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			if (cache == null || destination.X < 0 || destination.Y < 0 ||
 				destination.X >= cache.Width || destination.Y >= cache.Height)
 				return false;
-			var exact = StealthRouteToCell(owner, actor, cache, destination);
+			var danger = actor.TraitsImplementing<Cloak>().Any(cloak => cloak.Cloaked) ?
+				cache.CloakedDanger : cache.Danger;
+			var exact = StealthRouteToCell(owner, actor, cache, destination,
+				danger, allowDangerousStart);
 			if (exact == null)
 				return false;
 			revision = cache.Tick;
@@ -140,7 +143,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var coarseSize = StealthCoarseSize(owner);
 			return TryReadLifecycleStrategicRoute(owner, representative.ActorID,
 				LifecycleCoarseCell(representative.Location, coarseSize),
-				LifecycleCoarseCell(liveDestination, coarseSize), false, out revision, out route);
+				LifecycleCoarseCell(liveDestination, coarseSize), false, true,
+				out revision, out route);
 		}
 
 		internal static IReadOnlyList<CPos> ReadLifecycleApproachRoute(Squad owner,
@@ -149,12 +153,28 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var representative = AirDecisionUnits(owner).Where(LiveLifecycleActor)
 				.OrderBy(actor => actor.ActorID).FirstOrDefault();
 			var coarseSize = StealthCoarseSize(owner);
-			if (representative == null || originStrategicCell.X < 0 || originStrategicCell.Y < 0 ||
-				!TryReadLifecycleStrategicRoute(owner, representative.ActorID,
-					LifecycleCoarseCell(representative.Location, coarseSize), destinationStrategicCell,
-					true, out _, out var route))
+			if (representative == null || originStrategicCell.X < 0 || originStrategicCell.Y < 0)
 				return Array.Empty<CPos>();
-			return route;
+
+			var cache = StealthInfluence(owner, representative);
+			if (cache == null)
+				return Array.Empty<CPos>();
+			var danger = representative.TraitsImplementing<Cloak>().Any(cloak => cloak.Cloaked) ?
+				cache.CloakedDanger : cache.Danger;
+			var current = LifecycleCoarseCell(representative.Location, coarseSize);
+			var approaches = Enumerable.Range(-1, 3).SelectMany(y => Enumerable.Range(-1, 3)
+				.Where(x => x != 0 || y != 0).Select(x => new CPos(
+					destinationStrategicCell.X + x, destinationStrategicCell.Y + y)))
+				.Where(cell => cell.X >= 0 && cell.Y >= 0 && cell.X < cache.Width && cell.Y < cache.Height)
+				.OrderBy(cell => danger[cell.Y * cache.Width + cell.X])
+				.ThenBy(cell => (cell - current).LengthSquared)
+				.ThenBy(cell => cell.Y).ThenBy(cell => cell.X);
+			foreach (var approach in approaches)
+				if (TryReadLifecycleStrategicRoute(owner, representative.ActorID, current, approach,
+					true, true, out _, out var route))
+					return route;
+
+			return Array.Empty<CPos>();
 		}
 
 		static StealthCombatGroupSnapshot[] LifecycleGroup(IEnumerable<Actor> actors)

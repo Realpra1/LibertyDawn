@@ -118,10 +118,35 @@ class ParallelLauncherTest(unittest.TestCase):
             parallel.load_manifest(invalid, 10)
 
         self.assertEqual(parallel.maximum_world_tick("fixture evidence tick=1251"), 0)
+        self.assertEqual(parallel.maximum_world_tick(
+            "stealth_efficiency_watchdog|summary=terminal|bot_id=3|window_end_tick=4505"), 4505)
         self.assertEqual(
             parallel.maximum_world_tick("fixture evidence tick=1251", include_readiness=True),
             1251,
         )
+
+    def test_natural_game_over_is_valid_before_a_configured_upper_bound(self):
+        game_map = self.map("natural.oramap", "sequence:\n" + "\n".join([
+            "Headless MAX automation enabled",
+            "Headless MAX automation started map 'Fixture' with bots: Multi0: bot=viki.",
+            "MAX game speed enabled at world tick 0.",
+            "MAX progress: world=7",
+            "Headless MAX automation reached natural game over; exiting.",
+        ]))
+        manifest = self.write_manifest([{
+            "name": "natural", "map": str(game_map),
+            "lobby_commands": "option gamespeed max", "exit_at_tick": 50,
+            "minimum_world_tick": 1,
+        }])
+        output = self.root / "natural-output"
+        exit_code = parallel.main([
+            "--manifest", str(manifest), "--output", str(output), "--jobs", "1",
+            "--launcher", str(self.launcher), "--content", str(self.content), "--no-xvfb",
+            "--poll-interval", "0.02", "--progress-interval", "1",
+        ])
+        self.assertEqual(exit_code, 0)
+        result = json.loads((output / "natural" / "summary.json").read_text(encoding="utf-8"))
+        self.assertEqual(result["status"], "passed")
 
     def test_readiness_accepts_ordered_evidence_then_marker(self):
         result, summary = self.run_readiness_sequence(

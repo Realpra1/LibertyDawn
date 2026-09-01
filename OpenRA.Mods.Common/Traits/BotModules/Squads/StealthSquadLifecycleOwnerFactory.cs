@@ -25,6 +25,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		readonly StealthSquadLifecycleStrategicAdapter strategic;
 		readonly StealthSquadLifecycleCombatLiveAdapter combat;
 		readonly StealthSquadLifecycleRecoveryLiveAdapter recovery;
+		StealthSquadConstructionMembershipPlan pendingConstructionMembership;
 
 		public StealthSquadLifecycleOwnerFactory(Squad squad,
 			StealthSquadLifecycleStrategicAdapter strategic)
@@ -75,51 +76,14 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			}
 		}
 
-		public IStealthLifecycleRuntimeOwner Restore(StealthBehaviorHandoff handoff,
-			IStealthLifecycleOwnershipGuard ownershipGuard,
-			IStealthLifecycleRuntimeOrders orders, MiniYamlNode privateState)
-		{
-			if (handoff == null || privateState == null)
-				throw new ArgumentNullException(handoff == null ? nameof(handoff) : nameof(privateState));
-			if (privateState.Value.Value == "Pristine" &&
-				(handoff.Owner == BehaviorId.Start || handoff.Owner == BehaviorId.TargetAcquisition))
-				return Create(new StealthLifecycleRuntimeEntry(handoff), ownershipGuard, orders);
-			var runtimeOrders = new StealthSquadLifecycleOrders(orders);
-			switch (handoff.Owner)
-			{
-				case BehaviorId.Start:
-					var start = new StealthStartBehavior(handoff);
-					var startResult = start.RestorePrivateState(privateState);
-					return Owner(handoff, () => startResult = start.Execute(
-						new StealthLifecycleObservation(startResult.Source, startResult.SubjectActorId),
-						combat.Members().Select(actor => new StealthStartMemberSnapshot(
-							actor.ActorID, actor.IsInWorld, actor.IsDead))),
-						key => start.SerializePrivateState(startResult, key));
-				case BehaviorId.TargetAcquisition:
-					var acquisition = new StealthTargetAcquisitionBehavior(handoff, strategic);
-					var acquisitionResult = acquisition.RestorePrivateState(privateState);
-					return Owner(handoff, () => acquisitionResult = ExecuteAcquisition(
-						acquisition, orders),
-						key => acquisition.SerializePrivateState(acquisitionResult, key));
-				case BehaviorId.TargetValueFilter:
-					return RestoreTargetValue(handoff, privateState);
-				case BehaviorId.TargetThreatFilter:
-					return RestoreTargetThreat(handoff, privateState);
-				case BehaviorId.TargetDistanceChoice:
-					return RestoreTargetDistance(handoff, privateState);
-				default:
-					return RestoreLiveOwner(handoff, ownershipGuard, runtimeOrders, privateState);
-			}
-		}
-
 		IStealthLifecycleRuntimeOwner Start(StealthLifecycleRuntimeEntry entry)
 		{
 			var behavior = new StealthStartBehavior(entry.Handoff);
 			StealthStartResult result = null;
 			object Execute()
 			{
-				var members = combat.Members().Select(actor =>
-					new StealthStartMemberSnapshot(actor.ActorID, actor.IsInWorld, actor.IsDead)).ToArray();
+				var members = ConstructionMembers().Select(member =>
+					new StealthStartMemberSnapshot(member.ActorId, member.IsInWorld, member.IsDead)).ToArray();
 				var repair = entry.Context as StealthRepairTransition;
 				var subject = repair?.StartEntries.Select(item => item.ActorId).FirstOrDefault() ??
 					members.Select(member => member.ActorId).FirstOrDefault();
@@ -128,8 +92,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				return result = behavior.Execute(new StealthLifecycleObservation(source, subject), members);
 			}
 
-			return Owner(entry, Execute,
-				key => result == null ? Pristine(key) : behavior.SerializePrivateState(result, key));
+			return Owner(entry, Execute);
 		}
 
 		IStealthLifecycleRuntimeOwner SquadConstruction(StealthLifecycleRuntimeEntry entry,
@@ -141,7 +104,12 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			StealthSquadConstructionResult result = null;
 			object Execute()
 			{
-				result = behavior.Execute(ConstructionMembers(), ConstructionSquads());
+				var members = ConstructionMembers().ToArray();
+				result = behavior.Execute(members, ConstructionSquads());
+				pendingConstructionMembership = result.IsComplete ?
+					StealthSquadConstructionMembershipPlan.Create(result, squad.StealthSquadIndex,
+						members.Where(member => member.IsInWorld && !member.IsDead && member.IsStealthTank)
+							.Select(member => member.ActorId)) : null;
 				foreach (var assignment in result.Assignments.Where(item =>
 					item.Disposition == StealthSquadAssignmentDisposition.RoutedReinforcement))
 					runtimeOrders.Issue(new StealthLifecycleRuntimeOrder(entry.Owner, entry.Epoch,
@@ -152,9 +120,27 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				return result;
 			}
 
-			return Owner(entry, Execute,
-				key => result == null ? StealthSquadLifecycleFactoryPersistence.PristineConstruction(
-					key, expected) : behavior.SerializePrivateState(result, key));
+			return Owner(entry, Execute);
+		}
+
+		internal void CommitConstructionMembership(OwnershipEpoch epoch)
+		{
+			var plan = pendingConstructionMembership;
+			if (plan == null || plan.Epoch != epoch)
+				throw new InvalidOperationException("Accepted construction membership plan is missing or stale.");
+			var actorIds = plan.ActiveActorIds.Concat(plan.PendingActorIds).ToArray();
+			var actors = actorIds.Select(actorId => squad.World.GetActorById(actorId)).ToArray();
+			if (actors.Any(actor => actor == null || actor.IsDead || !actor.IsInWorld ||
+				!squad.Units.Contains(actor)) ||
+				!actors.Select(actor => actor.ActorID).SequenceEqual(actorIds))
+				throw new InvalidOperationException("Accepted construction membership changed before commit.");
+
+			var byId = actors.ToDictionary(actor => actor.ActorID);
+			foreach (var actorId in plan.ActiveActorIds)
+				squad.JoinAirFormation(byId[actorId]);
+			foreach (var actorId in plan.PendingActorIds)
+				squad.MarkAirReinforcement(byId[actorId]);
+			pendingConstructionMembership = null;
 		}
 
 		IStealthLifecycleRuntimeOwner TargetAcquisition(StealthLifecycleRuntimeEntry entry,
@@ -163,8 +149,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var behavior = new StealthTargetAcquisitionBehavior(entry.Handoff, strategic);
 			StealthTargetAcquisitionResult result = null;
 			object Execute() { return result = ExecuteAcquisition(behavior, runtimeOrders); }
-			return Owner(entry, Execute,
-				key => result == null ? Pristine(key) : behavior.SerializePrivateState(result, key));
+			return Owner(entry, Execute);
 		}
 
 		StealthTargetAcquisitionResult ExecuteAcquisition(
@@ -189,18 +174,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var handoff = (StealthTargetValueFilterHandoff)entry.Context;
 			var behavior = new StealthTargetValueFilterBehavior(handoff);
 			StealthTargetValueFilterResult result = null;
-			return Owner(entry, () => result = behavior.Execute(),
-				key => behavior.SerializePrivateState(result ?? (result = behavior.Execute()), key));
-		}
-
-		IStealthLifecycleRuntimeOwner RestoreTargetValue(
-			StealthBehaviorHandoff handoff, MiniYamlNode state)
-		{
-			var typed = StealthTargetValueFilterBehavior.RestoreHandoff(handoff, state);
-			var behavior = new StealthTargetValueFilterBehavior(typed);
-			var result = behavior.RestorePrivateState(state);
-			return Owner(handoff, () => result = behavior.Execute(),
-				key => behavior.SerializePrivateState(result, key));
+			return Owner(entry, () => result = behavior.Execute());
 		}
 
 		IStealthLifecycleRuntimeOwner TargetThreat(StealthLifecycleRuntimeEntry entry)
@@ -209,19 +183,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var behavior = new StealthTargetThreatFilterBehavior(handoff,
 				new GeneralizedCombatTargetThreatAdapter(squad.SquadManager.CombatThreatCalculator));
 			StealthTargetThreatFilterResult result = null;
-			return Owner(entry, () => result = behavior.Execute(),
-				key => behavior.SerializePrivateState(result ?? (result = behavior.Execute()), key));
-		}
-
-		IStealthLifecycleRuntimeOwner RestoreTargetThreat(
-			StealthBehaviorHandoff handoff, MiniYamlNode state)
-		{
-			var typed = StealthTargetThreatFilterBehavior.RestoreHandoff(handoff, state);
-			var behavior = new StealthTargetThreatFilterBehavior(typed,
-				new GeneralizedCombatTargetThreatAdapter(squad.SquadManager.CombatThreatCalculator));
-			var result = behavior.RestorePrivateState(state);
-			return Owner(handoff, () => result = behavior.Execute(),
-				key => behavior.SerializePrivateState(result, key));
+			return Owner(entry, () => result = behavior.Execute());
 		}
 
 		IStealthLifecycleRuntimeOwner TargetDistance(StealthLifecycleRuntimeEntry entry)
@@ -231,132 +193,15 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var behavior = new StealthTargetDistanceChoiceBehavior(
 				handoff, combat.OtherActiveSquads(), policy);
 			StealthTargetDistanceChoiceResult result = null;
-			return Owner(entry, () => result = behavior.Execute(),
-				key => behavior.SerializePrivateState(result ?? (result = behavior.Execute()), key));
-		}
-
-		IStealthLifecycleRuntimeOwner RestoreTargetDistance(
-			StealthBehaviorHandoff handoff, MiniYamlNode state)
-		{
-			var typed = StealthTargetDistanceChoiceBehavior.RestoreHandoff(handoff, state);
-			var behavior = new StealthTargetDistanceChoiceBehavior(typed,
-				combat.OtherActiveSquads(), new StealthTargetDistanceChoicePolicy(1000, 3000));
-			var result = behavior.RestorePrivateState(state);
-			return Owner(handoff, () => result = behavior.Execute(),
-				key => behavior.SerializePrivateState(result, key));
-		}
-
-		IStealthLifecycleRuntimeOwner RestoreLiveOwner(StealthBehaviorHandoff handoff,
-			IStealthLifecycleOwnershipGuard guard, StealthSquadLifecycleOrders orders,
-			MiniYamlNode state)
-		{
-			var missionNode = state.Value.Nodes.SingleOrDefault(child => child.Key == "Mission");
-			var mission = missionNode == null ? null : StealthApproachPersistence.RestoreMission(missionNode);
-			switch (handoff.Owner)
-			{
-				case BehaviorId.SquadConstruction:
-					var pristineConstruction = state.Value.Value == "Pristine";
-					var expected = pristineConstruction ?
-						StealthSquadLifecycleFactoryPersistence.RestorePristineConstruction(state) :
-						squad.Units.Where(actor => actor != null)
-							.Select(actor => actor.ActorID).OrderBy(id => id).ToArray();
-					var construction = new StealthSquadConstructionBehavior(handoff, expected, strategic);
-					StealthSquadConstructionResult constructionResult = null;
-					if (!pristineConstruction)
-						constructionResult = construction.RestorePrivateState(state);
-					return Owner(handoff, () => constructionResult = construction.Execute(
-						ConstructionMembers(), ConstructionSquads()),
-						key => constructionResult == null ?
-							StealthSquadLifecycleFactoryPersistence.PristineConstruction(key, expected) :
-							construction.SerializePrivateState(constructionResult, key));
-				case BehaviorId.Approach:
-					var approach = new StealthApproachBehavior(
-						new StealthApproachHandoff(handoff, mission), strategic, combat,
-						new GeneralizedCombatTargetThreatAdapter(
-							squad.SquadManager.CombatThreatCalculator), orders);
-					approach.RestorePrivateState(state);
-					return Owner(handoff, approach.Execute, approach.SerializePrivateState);
-				case BehaviorId.UndefendedAttack:
-					var undefendedHandoff = new StealthUndefendedAttackHandoff(handoff, mission);
-					var undefended = new StealthUndefendedAttackBehavior(
-						undefendedHandoff, guard, combat,
-						new GeneralizedCombatUndefendedAttackThreatAdapter(
-							squad.SquadManager.CombatThreatCalculator, combat.Resolve), orders);
-					undefended.RestorePrivateState(state);
-					return FightOwner(new StealthLifecycleRuntimeEntry(handoff, undefendedHandoff),
-						undefended.Execute, undefended.SerializePrivateState);
-				case BehaviorId.CrushEvaluation:
-					var crushHandoff = new StealthCrushEvaluationHandoff(
-						handoff, mission, ReadIds(state, "IncomingDefenderActorId"));
-					var crush = new StealthCrushBehavior(crushHandoff, guard, combat,
-						new GeneralizedCombatCrushThreatAdapter(
-							squad.SquadManager.CombatThreatCalculator, combat.Resolve), orders);
-					crush.RestorePrivateState(state);
-					return FightOwner(new StealthLifecycleRuntimeEntry(handoff, crushHandoff),
-						crush.Execute, crush.SerializePrivateState);
-				case BehaviorId.Kite:
-					var kiteHandoff = new StealthKiteHandoff(
-						handoff, mission, ReadIds(state, "IncomingDefenderId"));
-					var kite = new StealthKiteBehavior(kiteHandoff, guard, combat,
-						new GeneralizedCombatKiteThreatAdapter(squad.SquadManager.CombatThreatCalculator,
-							combat.Resolve, GroundTargetTypes), orders);
-					kite.RestorePrivateState(state);
-					return FightOwner(new StealthLifecycleRuntimeEntry(handoff, kiteHandoff),
-						kite.Execute, kite.SerializePrivateState);
-				case BehaviorId.MassAttack:
-					var massHandoff = new StealthMassAttackHandoff(handoff, mission,
-						StealthMassAttackPersistenceNodes.RestoreEntry(Required(state, "Entry")));
-					var mass = new StealthMassAttackBehavior(massHandoff,
-						guard, combat, new GeneralizedCombatMassAttackThreatAdapter(
-							squad.SquadManager.CombatThreatCalculator, combat.Resolve, GroundTargetTypes), orders);
-					mass.RestorePersistedState(state);
-					return FightOwner(new StealthLifecycleRuntimeEntry(handoff, massHandoff),
-						mass.Execute, mass.SerializePrivateState);
-				case BehaviorId.RecalculateFlee:
-					var fleeHandoff = new StealthRecalculateFleeHandoff(handoff, mission,
-						StealthRecalculateFleePersistence.RestoreEntry(Required(state, "Entry")));
-					var flee = new StealthRecalculateFleeBehavior(fleeHandoff, guard,
-						new StealthRecalculateFleeLiveWorld(recovery, fleeHandoff.Evidence.LiveFingerprint),
-						new GeneralizedCombatRecalculateFleeThreatAdapter(
-							squad.SquadManager.CombatThreatCalculator, combat.Resolve, GroundTargetTypes),
-						strategic, orders);
-					flee.RestorePersistedState(state);
-					return Owner(handoff, flee.Execute, flee.SerializePrivateState);
-				case BehaviorId.Repair:
-					var repairHandoff = StealthRepairPersistence.RestoreHandoff(handoff, state);
-					var repair = new StealthRepairBehavior(repairHandoff, guard,
-						new StealthRepairLiveWorld(recovery, repairHandoff),
-						new GeneralizedCombatRepairThreatAdapter(squad.SquadManager.CombatThreatCalculator,
-							combat.Resolve, GroundTargetTypes), strategic, orders);
-					repair.RestorePersistedState(state);
-					return Owner(handoff, repair.Execute, repair.SerializePrivateState);
-				default:
-					throw new InvalidOperationException(
-						"Live modular owner restore is not registered for " + handoff.Owner + ".");
-			}
-		}
-
-		static MiniYamlNode Required(MiniYamlNode parent, string key)
-		{
-			var nodes = parent.Value.Nodes.Where(child => child.Key == key).ToArray();
-			if (nodes.Length != 1)
-				throw new InvalidOperationException("Expected exactly one " + key + " persistence node.");
-			return nodes[0];
-		}
-
-		static uint[] ReadIds(MiniYamlNode parent, string key)
-		{
-			return parent.Value.Nodes.Where(child => child.Key == key)
-				.Select(child => FieldLoader.GetValue<uint>(key, child.Value.Value)).ToArray();
+			return Owner(entry, () => result = behavior.Execute());
 		}
 
 		IStealthLifecycleRuntimeOwner Approach(StealthLifecycleRuntimeEntry entry,
 			StealthSquadLifecycleOrders orders)
 		{
 			var handoff = (StealthApproachHandoff)entry.Context;
-			var behavior = new StealthApproachBehavior(handoff, strategic, combat,
-				new GeneralizedCombatTargetThreatAdapter(squad.SquadManager.CombatThreatCalculator), orders);
-			return Owner(entry, behavior.Execute, behavior.SerializePrivateState);
+			var behavior = new StealthApproachBehavior(handoff, strategic, combat, orders);
+			return Owner(entry, behavior.Execute);
 		}
 
 		IStealthLifecycleRuntimeOwner Undefended(StealthLifecycleRuntimeEntry entry,
@@ -366,7 +211,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var behavior = new StealthUndefendedAttackBehavior(handoff, guard, combat,
 				new GeneralizedCombatUndefendedAttackThreatAdapter(
 					squad.SquadManager.CombatThreatCalculator, combat.Resolve), orders);
-			return FightOwner(entry, behavior.Execute, behavior.SerializePrivateState);
+			return FightOwner(entry, behavior.Execute);
 		}
 
 		IStealthLifecycleRuntimeOwner Crush(StealthLifecycleRuntimeEntry entry,
@@ -376,7 +221,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var behavior = new StealthCrushBehavior(handoff, guard, combat,
 				new GeneralizedCombatCrushThreatAdapter(
 					squad.SquadManager.CombatThreatCalculator, combat.Resolve), orders);
-			return FightOwner(entry, behavior.Execute, behavior.SerializePrivateState);
+			return FightOwner(entry, behavior.Execute);
 		}
 
 		IStealthLifecycleRuntimeOwner Kite(StealthLifecycleRuntimeEntry entry,
@@ -386,7 +231,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var behavior = new StealthKiteBehavior(handoff, guard, combat,
 				new GeneralizedCombatKiteThreatAdapter(squad.SquadManager.CombatThreatCalculator,
 					combat.Resolve, GroundTargetTypes), orders);
-			return FightOwner(entry, behavior.Execute, behavior.SerializePrivateState);
+			return FightOwner(entry, behavior.Execute);
 		}
 
 		IStealthLifecycleRuntimeOwner MassAttack(StealthLifecycleRuntimeEntry entry,
@@ -404,7 +249,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var behavior = new StealthMassAttackBehavior(handoff, guard, combat,
 				new GeneralizedCombatMassAttackThreatAdapter(squad.SquadManager.CombatThreatCalculator,
 					combat.Resolve, GroundTargetTypes), orders);
-			return FightOwner(entry, behavior.Execute, behavior.SerializePrivateState);
+			return FightOwner(entry, behavior.Execute);
 		}
 
 		IStealthLifecycleRuntimeOwner RecalculateFlee(StealthLifecycleRuntimeEntry entry,
@@ -416,7 +261,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				new GeneralizedCombatRecalculateFleeThreatAdapter(
 					squad.SquadManager.CombatThreatCalculator, combat.Resolve, GroundTargetTypes),
 				strategic, orders);
-			return Owner(entry, behavior.Execute, behavior.SerializePrivateState);
+			return Owner(entry, behavior.Execute);
 		}
 
 		IStealthLifecycleRuntimeOwner Repair(StealthLifecycleRuntimeEntry entry,
@@ -427,7 +272,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				new StealthRepairLiveWorld(recovery, handoff),
 				new GeneralizedCombatRepairThreatAdapter(squad.SquadManager.CombatThreatCalculator,
 					combat.Resolve, GroundTargetTypes), strategic, orders);
-			return Owner(entry, behavior.Execute, behavior.SerializePrivateState);
+			return Owner(entry, behavior.Execute);
 		}
 
 		StealthUndefendedAttackHandoff UndefendedHandoff(StealthLifecycleRuntimeEntry entry)
@@ -472,29 +317,17 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			};
 		}
 
-		static IStealthLifecycleRuntimeOwner Owner(StealthLifecycleRuntimeEntry entry, Func<object> execute,
-			Func<string, MiniYamlNode> serialize)
+		static IStealthLifecycleRuntimeOwner Owner(StealthLifecycleRuntimeEntry entry, Func<object> execute)
 		{
-			return new StealthSquadLifecycleRuntimeOwner(entry.Owner, entry.Epoch, execute, serialize);
+			return new StealthSquadLifecycleRuntimeOwner(entry.Owner, entry.Epoch, execute);
 		}
 
 		IStealthLifecycleRuntimeOwner FightOwner(StealthLifecycleRuntimeEntry entry,
-			Func<object> execute, Func<string, MiniYamlNode> serialize)
+			Func<object> execute)
 		{
 			var damage = new StealthSquadLifecycleDamageAdapter(entry, combat);
-			return new StealthSquadLifecycleRuntimeOwner(entry.Owner, entry.Epoch, execute, serialize, damage.Capture);
-		}
-
-		static IStealthLifecycleRuntimeOwner Owner(StealthBehaviorHandoff handoff,
-			Func<object> execute, Func<string, MiniYamlNode> serialize)
-		{
 			return new StealthSquadLifecycleRuntimeOwner(
-				handoff.Owner, handoff.Epoch, execute, serialize);
-		}
-
-		static MiniYamlNode Pristine(string key)
-		{
-			return new MiniYamlNode(key, "Pristine", new List<MiniYamlNode>());
+				entry.Owner, entry.Epoch, execute, damage.Capture);
 		}
 	}
 }

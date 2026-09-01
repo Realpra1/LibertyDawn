@@ -143,7 +143,7 @@ namespace OpenRA.Mods.Common.Traits
 					info.MaximumStationaryMilliseconds, currentExemption,
 					ActivitySignature(self.CurrentActivity));
 
-			if (stationaryFailureReported ||
+			if (stationaryFailureReported || currentExemption != BotStationaryWatchdogExemption.None ||
 				!StealthAISpecialistPolicy.StationaryWatchdogFailed(stationaryAge, maximumTicks))
 				return;
 

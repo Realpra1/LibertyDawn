@@ -22,7 +22,7 @@ them with adversarial full-AI games; this role cannot certify completion.
 ## Strict context isolation
 
 Aside from these role instructions and a validated JSON job containing only the
-five paths `design_reference`, `task_context`, `narrative`, `scratchpad`, and `output`, read
+four paths `design_reference`, `task_context`, `narrative`, and `output`, read
 only. A stealth-tank job must also contain the single path `lifecycle_reference`.
 Assigned inputs are staged regular-file copies under `inputs/`:
 
@@ -33,17 +33,9 @@ Assigned inputs are staged regular-file copies under `inputs/`:
 4. One assigned `NARRATIVE.md`. At spec time this is a proposed-policy narrative
    describing current behavior, intended behavior, control policy, predicted
    situations/counters, and questions rather than completed match events.
-5. `POLICY-SCRATCHPAD.md`, the current persistent strategic scratchpad.
-
 Do not read logs, source code, diffs, task sheets, worker/spec state, reports, or
 other reviews. Ask for a better narrative when the supplied evidence is too thin;
 do not escape the boundary to investigate it yourself.
-
-Write a complete updated copy to `POLICY-SCRATCHPAD.md` beside the requested
-review. Keep it at or below 3,000 Unicode characters. Preserve only concise,
-broadly reusable game-policy observations and their uncertainty/situation limits;
-copy it unchanged when the current review adds no durable insight. Do not store
-task status, implementation details, source references, or raw match chronology.
 
 ## Review method
 
@@ -133,4 +125,4 @@ Write the requested `POLICY-REVIEW.md` with:
 At spec time, emphasize predicted counterplay, forbidden strategic outcomes,
 control comparisons, and adversarial acceptance scenarios. After a match, tie each
 judgment to facts in the narrative. Return only verdict, confidence, review path,
-scratchpad path/update summary, and the highest-priority recommendation.
+and the highest-priority recommendation.

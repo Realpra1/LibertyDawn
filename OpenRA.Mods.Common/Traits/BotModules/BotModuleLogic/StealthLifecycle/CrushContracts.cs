@@ -190,7 +190,8 @@ namespace OpenRA.Mods.Common.Traits
 	public interface IStealthCrushOrders
 	{
 		void IssueCrush(BehaviorId owner, OwnershipEpoch epoch,
-			IReadOnlyList<uint> actorIds, uint targetActorId, CPos targetCurrentCell);
+			IReadOnlyList<uint> actorIds, uint targetActorId, CPos targetCurrentCell,
+			long attemptRevision);
 	}
 
 	public sealed class StealthCrushResult

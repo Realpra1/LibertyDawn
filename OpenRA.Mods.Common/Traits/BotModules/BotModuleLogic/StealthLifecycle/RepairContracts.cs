@@ -170,12 +170,13 @@ namespace OpenRA.Mods.Common.Traits
 		public int MaximumHitPoints { get; }
 		public bool IsInWorld { get; }
 		public bool IsDead { get; }
+		public bool NeedsMovementOrder { get; }
 		public bool IsValid => IsInWorld && !IsDead && HitPoints > 0 && MaximumHitPoints > 0;
 		public bool IsRepaired => IsValid && HitPoints >= MaximumHitPoints;
 
 		public StealthRepairMemberSnapshot(uint actorId, CPos currentCell,
 			int currentWeaponRangeCells, int hitPoints, int maximumHitPoints,
-			bool isInWorld = true, bool isDead = false)
+			bool isInWorld = true, bool isDead = false, bool needsMovementOrder = false)
 		{
 			if (actorId == 0 || currentWeaponRangeCells < 0 || hitPoints < 0 || maximumHitPoints < 0)
 				throw new ArgumentException("Invalid live Repair member.");
@@ -186,6 +187,7 @@ namespace OpenRA.Mods.Common.Traits
 			MaximumHitPoints = maximumHitPoints;
 			IsInWorld = isInWorld;
 			IsDead = isDead;
+			NeedsMovementOrder = needsMovementOrder;
 		}
 	}
 

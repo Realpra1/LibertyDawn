@@ -10,9 +10,6 @@
 #endregion
 
 using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
 
 namespace OpenRA.Mods.Common.Traits
 {
@@ -22,13 +19,11 @@ namespace OpenRA.Mods.Common.Traits
 	/// </summary>
 	public sealed class StealthLifecycleRuntime
 	{
-		const int SaveVersion = 1;
 		readonly IStealthLifecycleRuntimeOwnerFactory factory;
 		readonly StealthLifecycleContext observations;
 		readonly StealthLifecycleRuntimeOrders orders;
 		readonly StealthLifecycleController controller;
 		IStealthLifecycleRuntimeOwner active;
-		StealthLifecycleDamageYield pendingDamage;
 		long nextDamageEventId;
 		bool executing;
 
@@ -42,25 +37,30 @@ namespace OpenRA.Mods.Common.Traits
 			IStealthLifecycleCacheService cache, IStealthLifecycleThreatService threats,
 			IStealthLifecycleRouteService routes, IStealthLifecycleDiagnosticService diagnostics)
 			: this(new StealthLifecycleController(), factory, orderTarget, cache, threats, routes,
-				diagnostics, null, null, null, 1) { }
+				diagnostics) { }
+
+		public StealthLifecycleRuntime(BehaviorId initialOwner,
+			IStealthLifecycleRuntimeOwnerFactory factory,
+			IStealthLifecycleRuntimeOrderTarget orderTarget,
+			IStealthLifecycleCacheService cache, IStealthLifecycleThreatService threats,
+			IStealthLifecycleRouteService routes, IStealthLifecycleDiagnosticService diagnostics)
+			: this(new StealthLifecycleController(initialOwner), factory, orderTarget, cache, threats,
+				routes, diagnostics) { }
 
 		StealthLifecycleRuntime(StealthLifecycleController controller,
 			IStealthLifecycleRuntimeOwnerFactory factory,
 			IStealthLifecycleRuntimeOrderTarget orderTarget,
 			IStealthLifecycleCacheService cache, IStealthLifecycleThreatService threats,
-			IStealthLifecycleRouteService routes, IStealthLifecycleDiagnosticService diagnostics,
-			IStealthLifecycleRuntimeOwner restoredOwner, StealthLifecycleRuntimeOrders restoredOrders,
-			StealthLifecycleDamageYield restoredDamage, long nextDamageEventId)
+			IStealthLifecycleRouteService routes, IStealthLifecycleDiagnosticService diagnostics)
 		{
 			this.controller = controller ?? throw new ArgumentNullException(nameof(controller));
 			this.factory = factory ?? throw new ArgumentNullException(nameof(factory));
 			observations = new StealthLifecycleContext(controller, cache, threats, routes, diagnostics, true);
-			orders = restoredOrders ?? new StealthLifecycleRuntimeOrders(controller,
+			orders = new StealthLifecycleRuntimeOrders(controller,
 				orderTarget ?? throw new ArgumentNullException(nameof(orderTarget)),
 				controller.Owner, controller.Epoch);
-			active = restoredOwner ?? Create(new StealthLifecycleRuntimeEntry(controller.CurrentHandoff));
-			pendingDamage = restoredDamage;
-			this.nextDamageEventId = nextDamageEventId;
+			active = Create(new StealthLifecycleRuntimeEntry(controller.CurrentHandoff));
+			nextDamageEventId = 1;
 			ValidateActive();
 		}
 
@@ -70,12 +70,11 @@ namespace OpenRA.Mods.Common.Traits
 				throw new ArgumentNullException(nameof(observation));
 			if (executing)
 				throw new InvalidOperationException("Damage cannot interrupt an active owner execution.");
-			if (pendingDamage != null || Epoch.Value > long.MaxValue - 2 ||
+			if (Epoch.Value > long.MaxValue - 2 ||
 				nextDamageEventId == long.MaxValue ||
 				!(active is IStealthLifecycleRuntimeDamageOwner fight) ||
-				!fight.TryCaptureDamage(observation, nextDamageEventId, out var yielded))
+				!fight.TryCaptureDamage(observation, nextDamageEventId, out _))
 				return false;
-			pendingDamage = yielded;
 			nextDamageEventId++;
 			return true;
 		}
@@ -95,13 +94,9 @@ namespace OpenRA.Mods.Common.Traits
 			executing = true;
 			try
 			{
-				var consumingDamage = pendingDamage != null;
-				var result = pendingDamage ?? active.Execute();
+				var result = active.Execute();
 				ValidateActive();
-				var accepted = Accept(result);
-				if (consumingDamage && accepted)
-					pendingDamage = null;
-				return accepted;
+				return Accept(result);
 			}
 			finally
 			{
@@ -201,7 +196,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		bool AcceptDamage(StealthLifecycleDamageYield yielded)
 		{
-			var before = controller.ExportState();
+			var before = controller.CaptureState();
 			try
 			{
 				if (!controller.TryAccept(yielded, out var request) ||
@@ -219,7 +214,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		void Install(StealthLifecycleRuntimeEntry entry)
 		{
-			var previousController = controller.ExportState();
+			var previousController = controller.CaptureState();
 			var previousOwner = active;
 			try
 			{
@@ -260,6 +255,8 @@ namespace OpenRA.Mods.Common.Traits
 		static StealthLifecycleRuntimeEntry Entry(StealthApproachTransition value)
 		{
 			if (value.Reacquisition != null) return new StealthLifecycleRuntimeEntry(value.Reacquisition);
+			if (value.RecalculateFlee != null) return new StealthLifecycleRuntimeEntry(
+				value.RecalculateFlee.Handoff, value.RecalculateFlee);
 			if (value.UndefendedAttack != null) return new StealthLifecycleRuntimeEntry(value.UndefendedAttack.Handoff, value.UndefendedAttack);
 			return new StealthLifecycleRuntimeEntry(value.CrushEvaluation.Handoff, value.CrushEvaluation);
 		}
@@ -305,83 +302,6 @@ namespace OpenRA.Mods.Common.Traits
 			if (value.ResumedFight != null) return new StealthLifecycleRuntimeEntry(value.ResumedFight.Handoff, value.ResumedFight);
 			if (value.StartEntries.Count != 0) return new StealthLifecycleRuntimeEntry(value.StartEntries[0].Handoff, value);
 			return new StealthLifecycleRuntimeEntry(value.SquadConstructionEntry.Handoff, value.SquadConstructionEntry);
-		}
-
-		public MiniYamlNode Serialize(string key = "StealthLifecycleRuntime")
-		{
-			if (executing)
-				throw new InvalidOperationException("Cannot save during stealth owner execution.");
-			ValidateActive();
-			var node = new MiniYamlNode(key, "", new List<MiniYamlNode>
-			{
-				new MiniYamlNode("Version", SaveVersion.ToString(CultureInfo.InvariantCulture)),
-				new MiniYamlNode("Enabled", FieldSaver.FormatValue(true)),
-				new MiniYamlNode("Owner", Owner.ToString()),
-				new MiniYamlNode("Epoch", Epoch.Value.ToString(CultureInfo.InvariantCulture)),
-				new MiniYamlNode("LastObservedTick", LastObservedTick.ToString(CultureInfo.InvariantCulture)),
-				new MiniYamlNode("NextDamageEventId", nextDamageEventId.ToString(CultureInfo.InvariantCulture)),
-				active.Serialize(), orders.Serialize()
-			});
-			if (pendingDamage != null)
-				node.Value.Nodes.Add(StealthRepairPersistence.SerializePendingDamage(pendingDamage));
-			return node;
-		}
-
-		public static StealthLifecycleRuntime Restore(MiniYamlNode node,
-			IStealthLifecycleRuntimeOwnerFactory factory,
-			IStealthLifecycleRuntimeOrderTarget orderTarget,
-			IStealthLifecycleCacheService cache, IStealthLifecycleThreatService threats,
-			IStealthLifecycleRouteService routes, IStealthLifecycleDiagnosticService diagnostics)
-		{
-			if (node == null)
-				throw new ArgumentNullException(nameof(node));
-			var children = node.Value.Nodes;
-			var scalars = children.Where(child => child.Key != "ActiveOwner" &&
-				child.Key != "OrderSink" && child.Key != "PendingDamage")
-				.ToDictionary(child => child.Key, child => child.Value.Value, StringComparer.Ordinal);
-			if (scalars.Count != 6 || children.Count(child => child.Key == "ActiveOwner") != 1 ||
-				children.Count(child => child.Key == "OrderSink") != 1 ||
-				children.Count(child => child.Key == "PendingDamage") > 1 ||
-				ReadInt(scalars, "Version") != SaveVersion || !ReadBool(scalars, "Enabled") ||
-				!Enum.TryParse(scalars["Owner"], out BehaviorId owner) || !Enum.IsDefined(typeof(BehaviorId), owner) ||
-				!long.TryParse(scalars["Epoch"], NumberStyles.None, CultureInfo.InvariantCulture, out var epoch) || epoch <= 0)
-				throw new InvalidOperationException("Invalid canonical stealth runtime save shape.");
-			var tick = ReadInt(scalars, "LastObservedTick");
-			if (tick < -1 || !long.TryParse(scalars["NextDamageEventId"], NumberStyles.None,
-				CultureInfo.InvariantCulture, out var nextDamageEventId) || nextDamageEventId <= 0)
-				throw new InvalidOperationException("Invalid stealth runtime observation tick.");
-
-			var controller = StealthLifecycleController.Restore(
-				new StealthLifecycleSavePayload(owner, new OwnershipEpoch(epoch), tick));
-			var orderState = children.Single(child => child.Key == "OrderSink");
-			var temporaryOrders = new StealthLifecycleRuntimeOrders(controller, orderTarget, owner, controller.Epoch);
-			temporaryOrders.Restore(orderState, owner, controller.Epoch);
-			var restoredOwner = factory.Restore(controller.CurrentHandoff, controller, temporaryOrders,
-				children.Single(child => child.Key == "ActiveOwner"));
-			if (restoredOwner == null || restoredOwner.Owner != owner || restoredOwner.Epoch != controller.Epoch)
-				throw new InvalidOperationException("Restored stealth owner does not match the saved controller.");
-			var pendingNode = children.SingleOrDefault(child => child.Key == "PendingDamage");
-			var pending = pendingNode == null ? null :
-				StealthRepairPersistence.RestorePendingDamage(controller.CurrentHandoff, pendingNode);
-			if (pending != null && pending.DamageEventId >= nextDamageEventId)
-				throw new InvalidOperationException("Pending Damage event sequence is not canonical.");
-			return new StealthLifecycleRuntime(controller, factory, orderTarget, cache, threats, routes,
-				diagnostics, restoredOwner, temporaryOrders, pending, nextDamageEventId);
-		}
-
-		static int ReadInt(Dictionary<string, string> values, string key)
-		{
-			if (!values.TryGetValue(key, out var text) ||
-				!int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value))
-				throw new InvalidOperationException("Invalid stealth runtime integer field " + key + ".");
-			return value;
-		}
-
-		static bool ReadBool(Dictionary<string, string> values, string key)
-		{
-			if (!values.TryGetValue(key, out var text) || !bool.TryParse(text, out var value))
-				throw new InvalidOperationException("Invalid stealth runtime Boolean field " + key + ".");
-			return value;
 		}
 	}
 }

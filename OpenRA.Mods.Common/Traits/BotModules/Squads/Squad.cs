@@ -83,8 +83,15 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		internal Target Target;
 		internal StateMachine FuzzyStateMachine;
 		StealthSquadLifecycleRuntimeHost stealthLifecycleRuntime;
-		bool UsesModularStealthLifecycle => Type == SquadType.Stealth &&
-			SquadManager.Info.UseModularStealthLifecycle;
+		internal bool UsesModularStealthLifecycle => UsesModularStealthLifecycleFor(
+			Type, StealthSquadDefinition, SquadManager.Info.UseModularStealthLifecycle);
+		internal static bool UsesModularStealthLifecycleFor(SquadType type,
+			string definition, bool managerEnabled)
+		{
+			return managerEnabled && type == SquadType.Stealth &&
+				string.Equals(definition, "stealth-tank", StringComparison.Ordinal);
+		}
+
 		internal static bool LegacyStealthAuthorityAllowed(bool modularRuntimeEnabled)
 		{
 			return !modularRuntimeEnabled;
@@ -290,6 +297,15 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				else
 					AirStateBase.TickAirSafety(this);
 			}
+		}
+
+		internal void TickModularStealthLocalSafety()
+		{
+			if (!UsesModularStealthLifecycle || !IsValid)
+				return;
+			if (stealthLifecycleRuntime == null)
+				stealthLifecycleRuntime = new StealthSquadLifecycleRuntimeHost(this);
+			stealthLifecycleRuntime.TickLocalSafety();
 		}
 
 		public void TickStealthBlueSafety()
@@ -681,7 +697,6 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				{
 					if (stealthLifecycleRuntime == null)
 						stealthLifecycleRuntime = new StealthSquadLifecycleRuntimeHost(this);
-					nodes.Nodes.Add(stealthLifecycleRuntime.Serialize());
 				}
 				else
 				{
@@ -848,11 +863,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 			squad.CleanAirMembership();
 			if (squad.UsesModularStealthLifecycle)
-			{
-				squad.stealthLifecycleRuntime = StealthSquadLifecycleRuntimeHost.Restore(squad,
-					yaml.Nodes.Single(node => node.Key ==
-						StealthSquadLifecycleAuthorityPersistence.RuntimeKey));
-			}
+				squad.stealthLifecycleRuntime = StealthSquadLifecycleRuntimeHost.ForLoadedSquad(squad);
 
 			if (squad.Type == SquadType.GeneralAttack)
 				squad.CleanGroundMembership();

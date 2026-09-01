@@ -42,7 +42,10 @@ Target-cell filtering selects where to engage; it must not alter routing.
 
 ## 5. Engagement
 
-Periodically return to target acquisition and choosing for recalculation.
+Engagement is live local work. It must use current actor positions and current
+threat facts, never the strategic cache. The active behavior owns the squad
+until that behavior explicitly completes or hands control to another lifecycle
+stage. Outside timers and events must not bypass the active owner.
 
 - At an undefended cell, attack the highest-priority actors first.
 - At a defended cell, crush only when infantry and detection safety permit;
@@ -59,6 +62,15 @@ Periodically return to target acquisition and choosing for recalculation.
 - Obelisks remain passable while the squad is cloaked. Never decloak or attack
   unsafely near an Obelisk.
 
+Use one shared squad action. Design the decision so a one-tank squad behaves
+exactly; larger squads use the same order and may absorb formation error. Do not
+pre-plan tactical phase sequences. Each owner chooses its current safe action
+from one current live snapshot, retains only the minimum intent needed to avoid
+order churn, and yields explicitly when its job is done.
+
+Normal strategic recalculation may occur after arrival, a kill, an emptied cell,
+or mission completion. It must not continuously interrupt active local combat.
+
 ## 6. Damage
 
 Route damaged tanks safely to repair options. If no repair option is safe, keep
@@ -66,7 +78,11 @@ them active in the fight. After repair, return to step 1.
 
 ## Preservation boundary
 
-Keep serialization and save/load behavior, public APIs and configuration,
-diagnostic-only cadence output, watchdogs, target priorities, cloak and detector
-safety, and existing balance unchanged. Split behavior into independently
-maintainable stages only where a concrete lifecycle gap justifies it.
+Save squad membership/allocation only. On load, preserve those allocations and
+restart each squad at TargetAcquisition; tactical behavior state, phase plans,
+fingerprints, timers, and pending orders are deliberately not serialized.
+
+Keep public configuration, diagnostic-only cadence output, watchdogs, target
+priorities, cloak and detector safety, and existing balance unchanged. Keep each
+lifecycle owner short, modular, and independently testable. A behavior class
+should remain below 400 lines; a supporting class must not exceed 500 lines.

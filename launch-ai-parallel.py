@@ -22,6 +22,7 @@ from typing import Any
 ENGINE_TICK_PATTERNS = (
     re.compile(r"MAX progress: world=(\d+)"),
     re.compile(r"world tick (\d+)", re.IGNORECASE),
+    re.compile(r"stealth_efficiency_watchdog\|summary=terminal\|[^\n]*window_end_tick=(\d+)"),
 )
 READINESS_TICK_PATTERN = re.compile(r"\btick=(\d+)\b")
 HEADLESS_MARKER = "Headless MAX automation enabled"
@@ -578,14 +579,18 @@ def finalize_run(run: ActiveRun) -> dict[str, Any]:
     started_marker = STARTED_MARKER if run.spec.mode == "headless" else "Paced rendered automation started map"
     if started_marker not in text:
         reasons.append("actual map/bot start marker missing")
-    if run.spec.mode == "paced":
-        exit_marker = (
-            "Paced rendered automation reached configured exit"
-            if run.spec.exit_at_tick is not None else "Paced rendered automation reached natural game over"
-        )
-    else:
-        exit_marker = BOUNDED_MARKER if run.spec.exit_at_tick is not None else NATURAL_MARKER
-    if exit_marker not in text:
+    configured_marker = (
+        "Paced rendered automation reached configured exit"
+        if run.spec.mode == "paced" else BOUNDED_MARKER
+    )
+    natural_marker = (
+        "Paced rendered automation reached natural game over"
+        if run.spec.mode == "paced" else NATURAL_MARKER
+    )
+    exit_reached = natural_marker in text or (
+        run.spec.exit_at_tick is not None and configured_marker in text
+    )
+    if not exit_reached:
         reasons.append(
             "configured exit marker missing"
             if run.spec.exit_at_tick is not None else "natural game-over marker missing"

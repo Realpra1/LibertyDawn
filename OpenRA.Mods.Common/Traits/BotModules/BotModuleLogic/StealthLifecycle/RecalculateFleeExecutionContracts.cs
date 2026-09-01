@@ -224,7 +224,8 @@ namespace OpenRA.Mods.Common.Traits
 			if (!Enum.IsDefined(typeof(StealthRecalculateFleeDisposition), Disposition) ||
 				!Enum.IsDefined(typeof(StealthRecalculateFleeLiveCause), LiveCause) ||
 				Disposition == StealthRecalculateFleeDisposition.TargetAcquisition !=
-					(LiveCause == StealthRecalculateFleeLiveCause.Completed))
+					(LiveCause == StealthRecalculateFleeLiveCause.Completed ||
+						LiveCause == StealthRecalculateFleeLiveCause.NoTarget))
 				throw new ArgumentException("Invalid RecalculateFlee result disposition.");
 			var hasRoute = SelectedDestinationCell.HasValue && SelectedStandardDanger.HasValue &&
 				LastOrderToken != null && evaluations.Any(route => route.Candidate.Cell == SelectedDestinationCell &&
