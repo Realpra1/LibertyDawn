@@ -80,11 +80,17 @@ namespace OpenRA.Mods.Common.Traits
 		public static StealthRepairRouteEvaluation SelectSafest(
 			IEnumerable<StealthRepairRouteEvaluation> evaluations)
 		{
+			return OrderedSafe(evaluations).FirstOrDefault();
+		}
+
+		public static IEnumerable<StealthRepairRouteEvaluation> OrderedSafe(
+			IEnumerable<StealthRepairRouteEvaluation> evaluations)
+		{
 			return evaluations.Where(route => route.IsSafe)
 				.OrderBy(route => route.StandardDanger.ThreatRating)
 				.ThenBy(route => route.StandardDanger.Crossover)
 				.ThenBy(route => route.Option.ActorId)
-				.ThenBy(route => route.Route.StableIdentity).FirstOrDefault();
+				.ThenBy(route => route.Route.StableIdentity);
 		}
 
 		public bool AtOption(StealthRepairOptionSnapshot option,
@@ -138,6 +144,7 @@ namespace OpenRA.Mods.Common.Traits
 		public StealthRepairOrderToken LastOrderToken;
 		public StealthRepairCompletionEvidence Completion;
 		public long? LongRouteCacheRevision;
+		public CPos[] OrderedRoute = Array.Empty<CPos>();
 
 		public StealthRepairOwnerState Clone()
 		{
@@ -145,6 +152,7 @@ namespace OpenRA.Mods.Common.Traits
 			clone.MemberIds = MemberIds.ToArray();
 			clone.EnemyIds = EnemyIds.ToArray();
 			clone.Evaluations = Evaluations.ToArray();
+			clone.OrderedRoute = OrderedRoute.ToArray();
 			return clone;
 		}
 	}

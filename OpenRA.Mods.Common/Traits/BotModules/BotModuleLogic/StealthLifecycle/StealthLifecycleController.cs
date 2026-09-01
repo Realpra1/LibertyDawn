@@ -18,7 +18,7 @@ namespace OpenRA.Mods.Common.Traits
 	/// Disconnected lifecycle scaffold. Ownership changes only when the current handoff is returned
 	/// in a behavior result; observing time or world events can never select another owner.
 	/// </summary>
-	public sealed class StealthLifecycleController : IStealthLifecycleOwnershipGuard
+	public sealed partial class StealthLifecycleController : IStealthLifecycleOwnershipGuard
 	{
 		BehaviorId owner;
 		OwnershipEpoch epoch;
@@ -28,6 +28,14 @@ namespace OpenRA.Mods.Common.Traits
 		public OwnershipEpoch Epoch => epoch;
 		public int LastObservedTick => lastObservedTick;
 		public StealthBehaviorHandoff CurrentHandoff => new StealthBehaviorHandoff(owner, epoch);
+
+		internal void RestoreState(StealthLifecycleSavePayload payload)
+		{
+			var restored = Restore(payload);
+			owner = restored.owner;
+			epoch = restored.epoch;
+			lastObservedTick = restored.lastObservedTick;
+		}
 
 		public bool IsActive(BehaviorId candidateOwner, OwnershipEpoch candidateEpoch)
 		{

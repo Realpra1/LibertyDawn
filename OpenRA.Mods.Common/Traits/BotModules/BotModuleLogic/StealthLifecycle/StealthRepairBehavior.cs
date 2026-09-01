@@ -10,14 +10,11 @@
 #endregion
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace OpenRA.Mods.Common.Traits
 {
-	/// <summary>
-	/// Disabled Step 6 owner. Only this instance may read Repair live safety, issue owner-bound
-	/// orders, commit private state, or yield. Every decision is reconstructed from the live World.
-	/// </summary>
 	public sealed class StealthRepairBehavior
 	{
 		readonly StealthRepairHandoff handoff;
@@ -98,48 +95,52 @@ namespace OpenRA.Mods.Common.Traits
 
 			var evaluated = decision.PassableRoutes.Select(route => decision.Evaluate(route,
 				repairMembers, facts => CalculateDanger(facts, revision))).ToArray();
-			var selected = StealthRepairLiveDecision.SelectSafest(evaluated);
-			if (selected == null)
+			if (!TrySelectRoute(evaluated, prospective, decision, repairMembers, revision,
+				out var selected, out var orderedRoute, out var cacheRevision))
 			{
-				prospective.Evaluations = evaluated;
-				return ResumeFight(prospective, repairIds, revision, false);
+				return ResumeFight(prospective, repairIds, revision);
 			}
 
 			var atOption = decision.AtOption(selected.Option, repairMembers);
 			var kind = atOption ? StealthRepairOrderKind.Repair : StealthRepairOrderKind.Retreat;
-			var previous = prospective.RouteId.HasValue ? prospective.Evaluations.FirstOrDefault(
-				evaluation => evaluation.Route.StableIdentity == prospective.RouteId.Value) : null;
 			var routeChanged = !prospective.OptionId.HasValue ||
 				prospective.OptionId.Value != selected.Option.ActorId ||
 				prospective.RouteId != selected.Route.StableIdentity ||
-				previous == null || !SameEvaluation(previous, selected) ||
+				!prospective.OrderedRoute.SequenceEqual(orderedRoute) ||
 				prospective.LastOrderToken == null || prospective.LastOrderToken.Kind != kind ||
 				!prospective.LastOrderToken.ActorIds.SequenceEqual(repairIds);
 			if (routeChanged && prospective.LastOrderToken != null)
+				AdvanceRouteRevision(prospective);
+			if (routeChanged)
 			{
-				if (prospective.RouteRevision == long.MaxValue)
-					throw new InvalidOperationException("Repair route revision is exhausted.");
-				prospective.RouteRevision++;
+				prospective.RouteProgress = selected.Route.RequiresStrategicRouting && !atOption ?
+					0 : orderedRoute.Length - 1;
+				prospective.LastOrderToken = null;
 			}
 
 			prospective.Evaluations = evaluated;
 			prospective.OptionId = selected.Option.ActorId;
 			prospective.RouteId = selected.Route.StableIdentity;
-			prospective.RouteProgress = decision.RouteProgress;
 			prospective.Danger = selected.StandardDanger;
-			if (selected.Route.RequiresStrategicRouting &&
-				(routeChanged || !prospective.LongRouteCacheRevision.HasValue))
-				prospective.LongRouteCacheRevision = ReadLongRoute(selected, revision).Revision;
-			else if (!selected.Route.RequiresStrategicRouting)
-				prospective.LongRouteCacheRevision = null;
+			prospective.OrderedRoute = orderedRoute;
+			prospective.LongRouteCacheRevision = cacheRevision;
+			if (!routeChanged && kind == StealthRepairOrderKind.Retreat &&
+				prospective.LastOrderToken != null && prospective.RouteProgress < orderedRoute.Length - 1 &&
+				repairMembers.All(member => member.CurrentCell == orderedRoute[prospective.RouteProgress]))
+			{
+				AdvanceRouteRevision(prospective);
+				prospective.RouteProgress++;
+				prospective.LastOrderToken = null;
+			}
 
-			var desired = routeChanged ? new StealthRepairOrderToken(handoff.Owner, handoff.Epoch,
+			var desired = prospective.LastOrderToken ?? new StealthRepairOrderToken(handoff.Owner, handoff.Epoch,
 				repairIds, selected.Option.ActorId, selected.Route.StableIdentity, kind,
-				prospective.RouteRevision, decision.ActivityRevision) : prospective.LastOrderToken;
+				prospective.RouteRevision, decision.ActivityRevision);
 			var observed = decision.HasActivityObservation &&
 				(desired.Equals(decision.ActiveOrderToken) || desired.Equals(decision.CompletedOrderToken));
 			if (!observed)
-				ApplyOrder(selected, desired, revision);
+				ApplyOrder(selected, desired, prospective.OrderedRoute,
+					prospective.RouteProgress, revision);
 			prospective.LastOrderToken = desired;
 			prospective.LiveCause = atOption ? StealthRepairLiveCause.Healing :
 				StealthRepairLiveCause.Retreating;
@@ -153,15 +154,25 @@ namespace OpenRA.Mods.Common.Traits
 
 		public void RestorePrivateState(MiniYamlNode node)
 		{
+			RestoreState(node, true);
+		}
+
+		internal void RestorePersistedState(MiniYamlNode node)
+		{
+			RestoreState(node, false);
+		}
+
+		void RestoreState(MiniYamlNode node, bool validateLive)
+		{
 			var revision = executionLease.Acquire("Repair", EnsureActiveOwnership);
 			try
 			{
 				var restored = StealthRepairPersistence.Restore(node, handoff);
-				var decision = StealthRepairLiveDecision.Create(ReadLive("restore", revision));
-				ValidateRestored(restored, decision, revision);
-				var prospective = restored.Clone();
+				if (validateLive)
+					ValidateRestored(restored,
+						StealthRepairLiveDecision.Create(ReadLive("restore", revision)), revision);
 				executionLease.Commit(revision, "Repair", EnsureActiveOwnership,
-					() => state = prospective);
+					() => state = restored.Clone());
 			}
 			finally { executionLease.Release(revision); }
 		}
@@ -203,7 +214,7 @@ namespace OpenRA.Mods.Common.Traits
 				!restored.EnemyIds.SequenceEqual(decision.EnemyActorIds))
 				throw new InvalidOperationException("Saved Repair live facts are stale.");
 
-			var expected = EvaluateCurrent(decision, revision);
+			var expected = EvaluateCurrent(restored, decision, revision);
 			if (!SameDecision(restored, expected))
 				throw new InvalidOperationException("Saved Repair route, safety, progress, or completion was altered.");
 			if (restored.LastOrderToken != null &&
@@ -215,23 +226,27 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				var selected = restored.Evaluations.Single(evaluation =>
 					evaluation.Route.StableIdentity == restored.RouteId);
-				if (ReadLongRoute(selected, revision).Revision != restored.LongRouteCacheRevision)
+				var cached = ReadLongRoute(selected, revision);
+				if (cached.Revision != restored.LongRouteCacheRevision ||
+					!cached.Waypoints.SequenceEqual(restored.OrderedRoute))
 					throw new InvalidOperationException("Saved passive Repair long-route revision is stale.");
 			}
 		}
 
-		StealthRepairOwnerState EvaluateCurrent(StealthRepairLiveDecision decision, long revision)
+		StealthRepairOwnerState EvaluateCurrent(StealthRepairOwnerState restored,
+			StealthRepairLiveDecision decision, long revision)
 		{
-			var expected = new StealthRepairOwnerState
-			{
-				EntryValidated = true,
-				LastObservedTick = decision.Tick,
-				Fingerprint = decision.Fingerprint,
-				MemberIds = decision.MemberActorIds,
-				EnemyIds = decision.EnemyActorIds
-			};
+			var expected = restored.Clone();
+			expected.EntryValidated = true;
+			expected.LastObservedTick = decision.Tick;
+			expected.Fingerprint = decision.Fingerprint;
+			expected.MemberIds = decision.MemberActorIds;
+			expected.EnemyIds = decision.EnemyActorIds;
+			expected.Disposition = StealthRepairDisposition.Retain;
+			expected.Completion = null;
 			if (decision.Members.Length == 0)
 			{
+				ClearRoute(expected, true, true);
 				expected.Disposition = StealthRepairDisposition.SquadConstruction;
 				expected.LiveCause = StealthRepairLiveCause.NoLiveMembers;
 
@@ -244,6 +259,7 @@ namespace OpenRA.Mods.Common.Traits
 				var completion = decision.Completion(CompletionMembers(decision));
 				if (completion != null)
 				{
+					ClearRoute(expected, false);
 					expected.Disposition = StealthRepairDisposition.Start;
 					expected.LiveCause = StealthRepairLiveCause.RepairComplete;
 					expected.Completion = completion;
@@ -254,6 +270,7 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (repairMembers.Length == 0 || decision.PassableRoutes.Length == 0)
 			{
+				ClearRoute(expected, true, true);
 				expected.Disposition = StealthRepairDisposition.ResumeFight;
 				expected.LiveCause = StealthRepairLiveCause.NoSafeRepair;
 
@@ -262,9 +279,10 @@ namespace OpenRA.Mods.Common.Traits
 
 			expected.Evaluations = decision.PassableRoutes.Select(route => decision.Evaluate(route,
 				repairMembers, facts => CalculateDanger(facts, revision))).ToArray();
-			var selected = StealthRepairLiveDecision.SelectSafest(expected.Evaluations);
-			if (selected == null)
+			if (!TrySelectRoute(expected.Evaluations, restored, decision, repairMembers, revision,
+				out var selected, out var orderedRoute, out var cacheRevision))
 			{
+				ClearRoute(expected, true, true);
 				expected.Disposition = StealthRepairDisposition.ResumeFight;
 				expected.LiveCause = StealthRepairLiveCause.NoSafeRepair;
 
@@ -273,7 +291,8 @@ namespace OpenRA.Mods.Common.Traits
 
 			expected.OptionId = selected.Option.ActorId;
 			expected.RouteId = selected.Route.StableIdentity;
-			expected.RouteProgress = decision.RouteProgress;
+			expected.OrderedRoute = orderedRoute;
+			expected.LongRouteCacheRevision = cacheRevision;
 			expected.Danger = selected.StandardDanger;
 			expected.LiveCause = decision.AtOption(selected.Option, repairMembers) ?
 				StealthRepairLiveCause.Healing : StealthRepairLiveCause.Retreating;
@@ -332,13 +351,56 @@ namespace OpenRA.Mods.Common.Traits
 			return cached;
 		}
 
+		bool TrySelectRoute(IReadOnlyList<StealthRepairRouteEvaluation> evaluations,
+			StealthRepairOwnerState current, StealthRepairLiveDecision decision,
+			IReadOnlyList<StealthRepairMemberSnapshot> repairMembers, long revision,
+			out StealthRepairRouteEvaluation selected, out CPos[] orderedRoute,
+			out long? cacheRevision)
+		{
+			foreach (var candidate in StealthRepairLiveDecision.OrderedSafe(evaluations))
+			{
+				if (!candidate.Route.RequiresStrategicRouting ||
+					decision.AtOption(candidate.Option, repairMembers))
+				{
+					selected = candidate;
+					orderedRoute = candidate.Route.Cells.ToArray();
+					cacheRevision = null;
+					return true;
+				}
+
+				if (current.RouteId == candidate.Route.StableIdentity && current.OrderedRoute.Length != 0 &&
+					current.LongRouteCacheRevision.HasValue)
+				{
+					selected = candidate;
+					orderedRoute = current.OrderedRoute.ToArray();
+					cacheRevision = current.LongRouteCacheRevision;
+					return true;
+				}
+
+				var cached = ReadLongRoute(candidate, revision);
+				var waypoints = cached.Waypoints.ToArray();
+				if (waypoints.Length == 0 || waypoints.Distinct().Count() != waypoints.Length)
+					continue;
+				selected = candidate;
+				orderedRoute = waypoints;
+				cacheRevision = cached.Revision;
+				return true;
+			}
+
+			selected = null;
+			orderedRoute = Array.Empty<CPos>();
+			cacheRevision = null;
+			return false;
+		}
+
 		void ApplyOrder(StealthRepairRouteEvaluation selected,
-			StealthRepairOrderToken token, long revision)
+			StealthRepairOrderToken token, IReadOnlyList<CPos> orderedRoute,
+			int routeProgress, long revision)
 		{
 			executionLease.Verify(revision, "Repair", EnsureActiveOwnership);
 			orders.IssueRepair(handoff.Owner, handoff.Epoch,
 				Array.AsReadOnly(token.ActorIds.ToArray()), selected.Option.ActorId,
-				Array.AsReadOnly(selected.Route.Cells.ToArray()), token.Kind, token);
+				Array.AsReadOnly(orderedRoute.ToArray()), routeProgress, token.Kind, token);
 			executionLease.Verify(revision, "Repair", EnsureActiveOwnership);
 		}
 
@@ -372,6 +434,7 @@ namespace OpenRA.Mods.Common.Traits
 			if (retireToken)
 				state.LastOrderToken = null;
 			state.LongRouteCacheRevision = null;
+			state.OrderedRoute = Array.Empty<CPos>();
 		}
 
 		static bool SameDecision(StealthRepairOwnerState saved, StealthRepairOwnerState expected)
@@ -380,6 +443,7 @@ namespace OpenRA.Mods.Common.Traits
 			if (saved.Disposition != expected.Disposition || saved.LiveCause != expected.LiveCause ||
 				saved.OptionId != expected.OptionId || saved.RouteId != expected.RouteId ||
 				saved.RouteProgress != expected.RouteProgress ||
+				!saved.OrderedRoute.SequenceEqual(expected.OrderedRoute) ||
 				saved.Danger.HasValue != expected.Danger.HasValue ||
 				(compareEvaluations && saved.Evaluations.Length != expected.Evaluations.Length) ||
 				(saved.Danger.HasValue && !StealthRepairResult.SameScore(saved.Danger.Value,
@@ -393,6 +457,13 @@ namespace OpenRA.Mods.Common.Traits
 				return false;
 			return !compareEvaluations ||
 				saved.Evaluations.Zip(expected.Evaluations, SameEvaluation).All(equal => equal);
+		}
+
+		static void AdvanceRouteRevision(StealthRepairOwnerState state)
+		{
+			if (state.RouteRevision == long.MaxValue)
+				throw new InvalidOperationException("Repair route revision is exhausted.");
+			state.RouteRevision++;
 		}
 
 		static bool SameEvaluation(StealthRepairRouteEvaluation left,

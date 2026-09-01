@@ -103,6 +103,16 @@ namespace OpenRA.Mods.Common.Traits
 			return result;
 		}
 
+		internal static StealthTargetValueFilterHandoff RestoreHandoff(
+			StealthBehaviorHandoff handoff, MiniYamlNode node)
+		{
+			if (handoff == null || handoff.Owner != BehaviorId.TargetValueFilter || node == null)
+				throw new ArgumentException("TargetValueFilter restore requires its exact active handoff.");
+			var options = node.Value.Nodes.Where(child => child.Key == "Option")
+				.Select(RestoreOption).Select(saved => saved.Option).ToArray();
+			return new StealthTargetValueFilterHandoff(handoff, options);
+		}
+
 		StealthTargetValueFilterResult BuildResult(IReadOnlyList<StealthTargetOption> options)
 		{
 			var scored = options.Select(option => new StealthTargetValueOption(option, Score(option))).ToList();

@@ -101,6 +101,7 @@ namespace OpenRA.Mods.Common.Traits
 		public int Width { get; }
 		public int Height { get; }
 		public float SecondsPerCostUnit { get; }
+		public float RouteThreatPenalty { get; }
 		public IReadOnlyList<float> Danger => danger;
 		public IReadOnlyList<CPos> EnemyStrategicCells => enemyStrategicCells;
 		public IReadOnlyList<StealthStrategicTargetSnapshot> StrategicTargets => strategicTargets;
@@ -110,7 +111,8 @@ namespace OpenRA.Mods.Common.Traits
 			IEnumerable<float> danger, IEnumerable<CPos> enemyStrategicCells,
 			float secondsPerCostUnit,
 			IEnumerable<StealthStrategicTargetSnapshot> strategicTargets = null,
-			IEnumerable<StealthTargetThreatFacts> threatFacts = null)
+			IEnumerable<StealthTargetThreatFacts> threatFacts = null,
+			float routeThreatPenalty = 1f)
 		{
 			if (width <= 0 || height <= 0 || (long)width * height > int.MaxValue)
 				throw new ArgumentOutOfRangeException(nameof(width));
@@ -120,6 +122,8 @@ namespace OpenRA.Mods.Common.Traits
 				throw new ArgumentNullException(nameof(enemyStrategicCells));
 			if (!float.IsFinite(secondsPerCostUnit) || secondsPerCostUnit <= 0)
 				throw new ArgumentOutOfRangeException(nameof(secondsPerCostUnit));
+			if (!float.IsFinite(routeThreatPenalty) || routeThreatPenalty < 0)
+				throw new ArgumentOutOfRangeException(nameof(routeThreatPenalty));
 
 			var dangerCells = danger.ToArray();
 			if (dangerCells.Length != width * height || dangerCells.Any(value => !float.IsFinite(value)))
@@ -148,6 +152,7 @@ namespace OpenRA.Mods.Common.Traits
 			Width = width;
 			Height = height;
 			SecondsPerCostUnit = secondsPerCostUnit;
+			RouteThreatPenalty = routeThreatPenalty;
 			this.danger = Array.AsReadOnly(dangerCells);
 			this.enemyStrategicCells = Array.AsReadOnly(enemies);
 			this.strategicTargets = Array.AsReadOnly(targets.OrderBy(target => target.StrategicCell.Y)

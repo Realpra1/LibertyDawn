@@ -101,9 +101,15 @@ namespace OpenRA.Test.Mods.Common
 			public StealthTargetAcquisitionCacheSnapshot ReadSnapshot() { return snapshot; }
 		}
 
-		sealed class ApproachCache : IStealthApproachStrategicCache
+		sealed class ApproachCache : IStealthApproachStrategicCache,
+			IStealthApproachStrategicRouteCache
 		{
 			public StealthApproachStrategicCacheSnapshot ReadSnapshot()
+			{
+				throw new InvalidOperationException("Arrival must not read the strategic cache.");
+			}
+
+			public IReadOnlyList<CPos> ReadRoute(CPos origin, CPos destination)
 			{
 				throw new InvalidOperationException("Arrival must not read the strategic cache.");
 			}

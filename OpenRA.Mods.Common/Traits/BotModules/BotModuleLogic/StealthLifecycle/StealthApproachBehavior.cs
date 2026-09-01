@@ -21,11 +21,10 @@ namespace OpenRA.Mods.Common.Traits
 	/// </summary>
 	public sealed class StealthApproachBehavior
 	{
-		const float DangerCost = 1f;
-
 		readonly StealthApproachHandoff handoff;
 		readonly StealthApproachMission mission;
 		readonly IStealthApproachStrategicCache cache;
+		readonly IStealthApproachStrategicRouteCache routeCache;
 		readonly IStealthApproachLiveWorld liveWorld;
 		readonly IStealthTargetThreatAdapter threatAdapter;
 		readonly IStealthApproachMovementOrders movementOrders;
@@ -49,6 +48,8 @@ namespace OpenRA.Mods.Common.Traits
 
 			mission = handoff.Missions[0];
 			this.cache = cache ?? throw new ArgumentNullException(nameof(cache));
+			routeCache = cache as IStealthApproachStrategicRouteCache ?? throw new ArgumentException(
+				"Approach requires the established strategic route cache.", nameof(cache));
 			this.liveWorld = liveWorld ?? throw new ArgumentNullException(nameof(liveWorld));
 			this.threatAdapter = threatAdapter ?? throw new ArgumentNullException(nameof(threatAdapter));
 			this.movementOrders = movementOrders ?? throw new ArgumentNullException(nameof(movementOrders));
@@ -94,10 +95,9 @@ namespace OpenRA.Mods.Common.Traits
 
 			var cellThreats = CalculateStrategicThreats(strategic);
 			AdvanceRoute(center);
-			if (route.Count != 0 &&
-				(routeIndex >= route.Count || !IsCardinalAdjacent(center, route[routeIndex])))
+			if (route.Count != 0 && routeIndex >= route.Count)
 				ClearRouteOwnership();
-			if (!RemainingRouteIsSafe(strategic, cellThreats) &&
+			if (!RemainingRouteIsSafe(strategic, cellThreats, center) &&
 				!TryBuildRoute(strategic, cellThreats, center))
 				return Result(StealthApproachDisposition.AwaitingSafeRoute,
 					StealthApproachArrivalClassification.None, center, activeIds, Array.Empty<uint>(), localScore);
@@ -157,7 +157,7 @@ namespace OpenRA.Mods.Common.Traits
 			for (var i = 0; i < state.Route.Length; i++)
 			{
 				var cell = state.Route[i];
-				if (!Inside(strategic, cell) || (i != 0 && !IsCardinalAdjacent(state.Route[i - 1], cell)))
+				if (!Inside(strategic, cell))
 					throw new InvalidOperationException("Invalid normalized Approach route in private save state.");
 				var cacheCell = strategic.Cells[cell.Y * strategic.Width + cell.X];
 				var saved = state.RouteThreats[i];
@@ -206,9 +206,12 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		bool RemainingRouteIsSafe(StealthApproachStrategicCacheSnapshot strategic,
-			IReadOnlyList<StealthTargetThreatScore> threats)
+			IReadOnlyList<StealthTargetThreatScore> threats, CPos center)
 		{
 			if (routeIndex >= route.Count || !IsSameOrAdjacent(route[route.Count - 1], mission.StrategicCell))
+				return false;
+			var canonical = routeCache.ReadRoute(center, mission.StrategicCell);
+			if (canonical == null || !route.Skip(routeIndex).SequenceEqual(canonical))
 				return false;
 
 			for (var i = routeIndex; i < route.Count; i++)
@@ -231,30 +234,11 @@ namespace OpenRA.Mods.Common.Traits
 		bool TryBuildRoute(StealthApproachStrategicCacheSnapshot strategic,
 			IReadOnlyList<StealthTargetThreatScore> threats, CPos center)
 		{
-			var danger = threats.Select(score => (float)Math.Min(score.ThreatRating,
-				float.MaxValue / 4)).ToArray();
-			var endpoints = new[]
-			{
-				mission.StrategicCell,
-				mission.StrategicCell + new CVec(-1, 0),
-				mission.StrategicCell + new CVec(1, 0),
-				mission.StrategicCell + new CVec(0, -1),
-				mission.StrategicCell + new CVec(0, 1)
-			}.Where(cell => Inside(strategic, cell))
-				.Distinct().ToArray();
-			var selected = endpoints.Select(endpoint => new
-			{
-				Endpoint = endpoint,
-				Route = ThreatAwareRoutePlanner.FindRoute(danger, strategic.Width, strategic.Height,
-					center.X, center.Y, endpoint.X, endpoint.Y, DangerCost)
-			}).Where(candidate => candidate.Route != null)
-				.OrderBy(candidate => RouteCost(candidate.Route, danger, strategic.Width))
-				.ThenBy(candidate => candidate.Route.Count)
-				.ThenBy(candidate => candidate.Endpoint.Y)
-				.ThenBy(candidate => candidate.Endpoint.X)
-				.FirstOrDefault();
-			var candidates = selected?.Route;
-			if (candidates == null)
+			var candidates = routeCache.ReadRoute(center, mission.StrategicCell)?.ToArray();
+			if (candidates == null || candidates.Length == 0 ||
+				candidates.Distinct().Count() != candidates.Length ||
+				candidates.Any(cell => !Inside(strategic, cell)) ||
+				!IsSameOrAdjacent(candidates[candidates.Length - 1], mission.StrategicCell))
 				return false;
 
 			route.Clear();
@@ -277,11 +261,6 @@ namespace OpenRA.Mods.Common.Traits
 			routeIndex = 0;
 			lastIssuedActorIds = Array.Empty<uint>();
 			lastIssuedDestination = null;
-		}
-
-		static double RouteCost(IEnumerable<CPos> candidate, IReadOnlyList<float> danger, int width)
-		{
-			return candidate.Sum(cell => 1d + danger[cell.Y * width + cell.X] * DangerCost);
 		}
 
 		void AdvanceRoute(CPos center)
@@ -319,11 +298,6 @@ namespace OpenRA.Mods.Common.Traits
 		static bool IsSameOrAdjacent(CPos left, CPos right)
 		{
 			return Math.Abs(left.X - right.X) <= 1 && Math.Abs(left.Y - right.Y) <= 1;
-		}
-
-		static bool IsCardinalAdjacent(CPos left, CPos right)
-		{
-			return Math.Abs(left.X - right.X) + Math.Abs(left.Y - right.Y) == 1;
 		}
 	}
 }

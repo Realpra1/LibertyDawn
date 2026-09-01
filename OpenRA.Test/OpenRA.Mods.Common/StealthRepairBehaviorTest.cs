@@ -32,8 +32,10 @@ namespace OpenRA.Test.Mods.Common
 		{
 			public StealthRepairLiveSnapshot Snapshot;
 			public Action OnRead;
+			public int Reads;
 			public StealthRepairLiveSnapshot Read(StealthApproachMission mission)
 			{
+				Reads++;
 				OnRead?.Invoke();
 				return Snapshot;
 			}
@@ -58,12 +60,14 @@ namespace OpenRA.Test.Mods.Common
 		{
 			public int Reads;
 			public Action OnRead;
+			public Func<uint, IReadOnlyList<CPos>, StealthRepairStrategicCacheSnapshot> Route =
+				(option, live) => new StealthRepairStrategicCacheSnapshot(12, live);
 			public StealthRepairStrategicCacheSnapshot ReadLongRoute(StealthApproachMission mission,
 				uint repairOptionActorId, IReadOnlyList<CPos> liveRoute)
 			{
 				Reads++;
 				OnRead?.Invoke();
-				return new StealthRepairStrategicCacheSnapshot(12, liveRoute);
+				return Route(repairOptionActorId, liveRoute);
 			}
 		}
 
@@ -71,12 +75,14 @@ namespace OpenRA.Test.Mods.Common
 		{
 			public readonly List<StealthRepairOrderToken> Calls = new List<StealthRepairOrderToken>();
 			public readonly List<StealthRepairOrderToken> Issued = new List<StealthRepairOrderToken>();
+			public readonly List<(CPos[] Route, int Progress)> Routes =
+				new List<(CPos[], int)>();
 			readonly HashSet<StealthRepairOrderToken> accepted = new HashSet<StealthRepairOrderToken>();
 			public Action OnIssue;
 			public bool MutationSucceeded;
 			public void IssueRepair(BehaviorId owner, OwnershipEpoch epoch,
 				IReadOnlyList<uint> actorIds, uint repairOptionActorId,
-				IReadOnlyList<CPos> liveRoute, StealthRepairOrderKind kind,
+				IReadOnlyList<CPos> orderedRoute, int routeProgress, StealthRepairOrderKind kind,
 				StealthRepairOrderToken token)
 			{
 				Calls.Add(token);
@@ -89,6 +95,7 @@ namespace OpenRA.Test.Mods.Common
 				if (accepted.Add(token))
 				{
 					Issued.Add(token);
+					Routes.Add((orderedRoute.ToArray(), routeProgress));
 					OnIssue?.Invoke();
 				}
 			}
@@ -523,6 +530,123 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(orders.Issued.Single().RepairOptionActorId, Is.EqualTo(100));
 			behavior.Execute();
 			Assert.That(cache.Reads, Is.EqualTo(1));
+		}
+
+		[Test]
+		public void StrategicRepairOrdersOnlyTheCachedWaypointWithoutLiveRouteConcatenation()
+		{
+			var input = CreateInput();
+			var routes = new[] { Route(1000, 100, 5, strategic: true) };
+			var behavior = Behavior(input, Live(1, routes: routes), out _, out _,
+				out var cache, out var orders);
+			cache.Route = (_, __) => new StealthRepairStrategicCacheSnapshot(21,
+				new[] { new CPos(2, 1), new CPos(5, 0) });
+
+			var result = behavior.Execute();
+
+			Assert.That(result.LongRouteCacheRevision, Is.EqualTo(21));
+			Assert.That(orders.Routes.Single().Route,
+				Is.EqualTo(new[] { new CPos(2, 1), new CPos(5, 0) }));
+			Assert.That(orders.Routes.Single().Progress, Is.Zero);
+			Assert.That(orders.Routes.Single().Route, Does.Not.Contain(new CPos(1, 0)));
+		}
+
+		[TestCase(false, 200u, StealthRepairDisposition.Retain)]
+		[TestCase(true, null, StealthRepairDisposition.ResumeFight)]
+		public void EmptyStrategicRepairRouteTriesNextSafeOptionOrResumesFight(
+			bool allEmpty, uint? expectedOption, StealthRepairDisposition expectedDisposition)
+		{
+			var input = CreateInput();
+			var routes = new[]
+			{
+				Route(1000, 100, 5, strategic: true), Route(2000, 200, 6, strategic: true)
+			};
+			var behavior = Behavior(input, Live(1, routes: routes), out _, out var threats,
+				out var cache, out var orders);
+			threats.Score = facts => new StealthTargetThreatScore(0,
+				facts.RepairOptionActorId == 100 ? 0 : 1);
+			cache.Route = (option, _) => new StealthRepairStrategicCacheSnapshot(22,
+				allEmpty || option == 100 ? Array.Empty<CPos>() : new[] { new CPos(6, 0) });
+
+			var result = behavior.Execute();
+
+			Assert.That(result.Disposition, Is.EqualTo(expectedDisposition));
+			Assert.That(result.SelectedRepairOptionActorId, Is.EqualTo(expectedOption));
+			Assert.That(cache.Reads, Is.EqualTo(allEmpty ? 2 : 2));
+			Assert.That(orders.Issued.Count, Is.EqualTo(allEmpty ? 0 : 1));
+		}
+
+		[Test]
+		public void StrategicRepairAdvancesOneWaypointPerArrivalAndRoundTripsMidRoute()
+		{
+			var input = CreateInput();
+			var routes = new[] { Route(1000, 100, 5, strategic: true) };
+			var behavior = Behavior(input, Live(1, routes: routes), out var live, out _,
+				out var cache, out var orders);
+			cache.Route = (_, __) => new StealthRepairStrategicCacheSnapshot(23,
+				new[] { new CPos(1, 0), new CPos(5, 0) });
+			behavior.Execute();
+			live.Snapshot = Live(2, new[] { Member(1, 1), Member(2, 1, 60) }, routes: routes);
+
+			behavior.Execute();
+
+			Assert.That(orders.Routes.Select(route => route.Progress), Is.EqualTo(new[] { 0, 1 }));
+			Assert.That(orders.Routes.All(route => route.Route.SequenceEqual(
+				new[] { new CPos(1, 0), new CPos(5, 0) })), Is.True);
+			var saved = new List<MiniYamlNode> { behavior.SerializePrivateState() }.WriteToString();
+			var restored = Behavior(input, live.Snapshot, out _, out _, out var restoredCache, out _);
+			restoredCache.Route = cache.Route;
+			restored.RestorePrivateState(MiniYaml.FromString(saved).Single());
+			Assert.That(new List<MiniYamlNode> { restored.SerializePrivateState() }.WriteToString(),
+				Is.EqualTo(saved));
+		}
+
+		[Test]
+		public void StrategicRepairCallbackFailureRetriesExactWaypointTokenWithoutSkipping()
+		{
+			var input = CreateInput();
+			var routes = new[] { Route(1000, 100, 5, strategic: true) };
+			var behavior = Behavior(input, Live(1, routes: routes), out _, out _,
+				out var cache, out var orders);
+			cache.Route = (_, __) => new StealthRepairStrategicCacheSnapshot(24,
+				new[] { new CPos(2, 0), new CPos(5, 0) });
+			orders.OnIssue = () => throw new InvalidOperationException("issued then throw");
+
+			Assert.Throws<InvalidOperationException>(() => behavior.Execute());
+			orders.OnIssue = null;
+			behavior.Execute();
+
+			Assert.That(orders.Calls[1], Is.EqualTo(orders.Calls[0]));
+			Assert.That(orders.Routes, Has.Count.EqualTo(1));
+			Assert.That(orders.Routes.Single().Progress, Is.Zero);
+		}
+
+		[Test]
+		public void ScheduledRestoreKeepsHistoricalTickWithoutCallbacksThenReplansLive()
+		{
+			var input = CreateInput();
+			var original = Behavior(input, Live(10), out _, out _, out _, out _);
+			original.Execute();
+			var saved = new List<MiniYamlNode> { original.SerializePrivateState() }.WriteToString();
+			var restored = Behavior(input, Live(14), out var live, out var threats,
+				out var cache, out var orders);
+			threats.Score = facts => facts.RepairOptionActorId == 200 ?
+				new StealthTargetThreatScore(0, 0) : new StealthTargetThreatScore(4, 0);
+
+			typeof(StealthRepairBehavior).GetMethod("RestorePersistedState",
+				BindingFlags.Instance | BindingFlags.NonPublic).Invoke(restored,
+					new object[] { MiniYaml.FromString(saved).Single() });
+
+			Assert.That(live.Reads, Is.Zero);
+			Assert.That(threats.Facts, Is.Empty);
+			Assert.That(cache.Reads, Is.Zero);
+			Assert.That(orders.Issued, Is.Empty);
+			Assert.That(new List<MiniYamlNode> { restored.SerializePrivateState() }.WriteToString(),
+				Is.EqualTo(saved));
+			var replanned = restored.Execute();
+			Assert.That(replanned.SelectedRepairOptionActorId, Is.EqualTo(200));
+			Assert.That(live.Reads, Is.EqualTo(1));
+			Assert.That(orders.Issued, Has.Count.EqualTo(1));
 		}
 
 		[Test]

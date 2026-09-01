@@ -76,13 +76,14 @@ namespace OpenRA.Test.Mods.Common
 		{
 			public int Reads;
 			public Action OnRead { get; set; }
+			public Func<CPos, StealthRecalculateFleeStrategicCacheSnapshot> Route = destination =>
+				new StealthRecalculateFleeStrategicCacheSnapshot(7, new[] { destination });
 			public StealthRecalculateFleeStrategicCacheSnapshot ReadLongRoute(
 				StealthApproachMission mission, CPos liveDestination)
 			{
 				Reads++;
 				OnRead?.Invoke();
-				return new StealthRecalculateFleeStrategicCacheSnapshot(7,
-					new[] { liveDestination });
+				return Route(liveDestination);
 			}
 		}
 
@@ -92,12 +93,15 @@ namespace OpenRA.Test.Mods.Common
 				new List<StealthRecalculateFleeOrderToken>();
 			public readonly List<StealthRecalculateFleeOrderToken> Issued =
 				new List<StealthRecalculateFleeOrderToken>();
+			public readonly List<(CPos[] Route, int Progress)> Routes =
+				new List<(CPos[], int)>();
 			readonly HashSet<StealthRecalculateFleeOrderToken> accepted =
 				new HashSet<StealthRecalculateFleeOrderToken>();
 			public Action OnIssue;
 			public bool MutationSucceeded;
 			public void IssueMove(BehaviorId owner, OwnershipEpoch epoch,
 				IReadOnlyList<uint> actorIds, CPos destinationCell,
+				IReadOnlyList<CPos> orderedRoute, int routeProgress,
 				StealthRecalculateFleeOrderToken token)
 			{
 				Calls.Add(token);
@@ -110,6 +114,7 @@ namespace OpenRA.Test.Mods.Common
 				if (accepted.Add(token))
 				{
 					Issued.Add(token);
+					Routes.Add((orderedRoute.ToArray(), routeProgress));
 					OnIssue?.Invoke();
 				}
 			}
@@ -276,6 +281,176 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(orders.Issued.Single().DestinationCell, Is.EqualTo(new CPos(-5, 0)));
 			behavior.Execute();
 			Assert.That(cache.Reads, Is.EqualTo(1));
+		}
+
+		[Test]
+		public void StrategicFleeOrdersOnlyCachedWaypointsWithoutLiveRouteConcatenation()
+		{
+			var input = CreateInput();
+			var destination = new CPos(-5, 0);
+			var behavior = Behavior(input, Live(1, candidates: new[]
+			{
+				new StealthRecalculateFleeCandidateSnapshot(destination, true, true)
+			}), out _, out _, out var cache, out var orders);
+			cache.Route = _ => new StealthRecalculateFleeStrategicCacheSnapshot(31,
+				new[] { new CPos(-1, 1), destination });
+
+			var result = behavior.Execute();
+
+			Assert.That(result.LongRouteCacheRevision, Is.EqualTo(31));
+			Assert.That(orders.Routes.Single().Route,
+				Is.EqualTo(new[] { new CPos(-1, 1), destination }));
+			Assert.That(orders.Routes.Single().Progress, Is.Zero);
+			Assert.That(orders.Issued.Single().DestinationCell, Is.EqualTo(new CPos(-1, 1)));
+		}
+
+		[TestCase(false, 5)]
+		[TestCase(true, null)]
+		public void EmptyStrategicFleeRouteTriesNextLeastDangerCandidateOrNoRoute(
+			bool allEmpty, int? expectedX)
+		{
+			var input = CreateInput();
+			var first = new CPos(-5, 0);
+			var second = new CPos(5, 0);
+			var behavior = Behavior(input, Live(1, candidates: new[]
+			{
+				new StealthRecalculateFleeCandidateSnapshot(first, true, true),
+				new StealthRecalculateFleeCandidateSnapshot(second, true, true)
+			}), out _, out var threats, out var cache, out var orders);
+			threats.Dangers[first] = new StealthTargetThreatScore(0, 0);
+			threats.Dangers[second] = new StealthTargetThreatScore(0, 1);
+			cache.Route = destination => new StealthRecalculateFleeStrategicCacheSnapshot(32,
+				allEmpty || destination == first ? Array.Empty<CPos>() : new[] { second });
+
+			var result = behavior.Execute();
+
+			Assert.That(result.SelectedDestinationCell?.X, Is.EqualTo(expectedX));
+			Assert.That(result.LiveCause, Is.EqualTo(allEmpty ?
+				StealthRecalculateFleeLiveCause.NoRoute : StealthRecalculateFleeLiveCause.Traversing));
+			Assert.That(cache.Reads, Is.EqualTo(2));
+			Assert.That(orders.Issued.Count, Is.EqualTo(allEmpty ? 0 : 1));
+		}
+
+		[Test]
+		public void StrategicFleeAdvancesOneWaypointPerArrivalAndRoundTripsMidRoute()
+		{
+			var input = CreateInput();
+			var destination = new CPos(-5, 0);
+			var candidates = new[]
+			{
+				new StealthRecalculateFleeCandidateSnapshot(destination, true, true)
+			};
+			var behavior = Behavior(input, Live(1, candidates: candidates), out var live,
+				out _, out var cache, out var orders);
+			cache.Route = _ => new StealthRecalculateFleeStrategicCacheSnapshot(33,
+				new[] { new CPos(-1, 0), destination });
+			behavior.Execute();
+			live.Snapshot = Live(2, new[] { Member(1, -1), Member(2, -1) }, candidates: candidates);
+
+			behavior.Execute();
+
+			Assert.That(orders.Routes.Select(route => route.Progress), Is.EqualTo(new[] { 0, 1 }));
+			Assert.That(orders.Issued.Select(token => token.DestinationCell),
+				Is.EqualTo(new[] { new CPos(-1, 0), destination }));
+			var saved = new List<MiniYamlNode> { behavior.SerializePrivateState() }.WriteToString();
+			var restored = Behavior(input, live.Snapshot, out _, out _, out var restoredCache, out _);
+			restoredCache.Route = cache.Route;
+			restored.RestorePrivateState(MiniYaml.FromString(saved).Single());
+			Assert.That(new List<MiniYamlNode> { restored.SerializePrivateState() }.WriteToString(),
+				Is.EqualTo(saved));
+		}
+
+		[Test]
+		public void StrategicFleeCallbackFailureRetriesExactWaypointWithoutSkipping()
+		{
+			var input = CreateInput();
+			var destination = new CPos(-5, 0);
+			var behavior = Behavior(input, Live(1, candidates: new[]
+			{
+				new StealthRecalculateFleeCandidateSnapshot(destination, true, true)
+			}), out _, out _, out var cache, out var orders);
+			cache.Route = _ => new StealthRecalculateFleeStrategicCacheSnapshot(34,
+				new[] { new CPos(-2, 0), destination });
+			orders.OnIssue = () => throw new InvalidOperationException("issued then throw");
+
+			Assert.Throws<InvalidOperationException>(() => behavior.Execute());
+			orders.OnIssue = null;
+			behavior.Execute();
+
+			Assert.That(orders.Calls[1], Is.EqualTo(orders.Calls[0]));
+			Assert.That(orders.Routes, Has.Count.EqualTo(1));
+			Assert.That(orders.Routes.Single().Progress, Is.Zero);
+		}
+
+		[Test]
+		public void ScheduledRestoreKeepsHistoricalTickWithoutCallbacksThenReplansLive()
+		{
+			var input = CreateInput();
+			var left = new CPos(-2, 0);
+			var right = new CPos(2, 0);
+			var candidates = new[]
+			{
+				new StealthRecalculateFleeCandidateSnapshot(left, true),
+				new StealthRecalculateFleeCandidateSnapshot(right, true)
+			};
+			var original = Behavior(input, Live(10, candidates: candidates), out _,
+				out var originalThreats, out _, out _);
+			originalThreats.Dangers[left] = new StealthTargetThreatScore(0, 0);
+			originalThreats.Dangers[right] = new StealthTargetThreatScore(2, 0);
+			original.Execute();
+			var saved = new List<MiniYamlNode> { original.SerializePrivateState() }.WriteToString();
+			var restored = Behavior(input, Live(14, candidates: candidates), out var live,
+				out var threats, out var cache, out var orders);
+			threats.Dangers[left] = new StealthTargetThreatScore(3, 0);
+			threats.Dangers[right] = new StealthTargetThreatScore(0, 0);
+
+			typeof(StealthRecalculateFleeBehavior).GetMethod("RestorePersistedState",
+				BindingFlags.Instance | BindingFlags.NonPublic).Invoke(restored,
+					new object[] { MiniYaml.FromString(saved).Single() });
+
+			Assert.That(live.Reads, Is.Zero);
+			Assert.That(threats.RouteFacts, Is.Empty);
+			Assert.That(cache.Reads, Is.Zero);
+			Assert.That(orders.Issued, Is.Empty);
+			Assert.That(new List<MiniYamlNode> { restored.SerializePrivateState() }.WriteToString(),
+				Is.EqualTo(saved));
+			var replanned = restored.Execute();
+			Assert.That(replanned.SelectedDestinationCell, Is.EqualTo(right));
+			Assert.That(live.Reads, Is.EqualTo(1));
+			Assert.That(orders.Issued, Has.Count.EqualTo(1));
+		}
+
+		[TestCase("route")]
+		[TestCase("token")]
+		[TestCase("epoch")]
+		public void ScheduledRestoreStillRejectsMalformedStructuralState(string field)
+		{
+			var input = CreateInput();
+			var original = Behavior(input, Live(10), out _, out _, out _, out _);
+			original.Execute();
+			var saved = original.SerializePrivateState();
+			var forged = MiniYaml.FromString(
+				new List<MiniYamlNode> { saved }.WriteToString()).Single();
+			if (field == "route")
+				forged.Value.Nodes.Single(node => node.Key == "RouteWaypoint").Value.Value = "7,7";
+			else if (field == "token")
+				forged.Value.Nodes.Single(node => node.Key == "LastOrder").Value.Nodes
+					.Single(node => node.Key == "Destination").Value.Value = "7,7";
+			else
+				forged.Value.Nodes.Single(node => node.Key == "Epoch").Value.Value = "999";
+			var restored = Behavior(input, Live(14), out var live, out var threats,
+				out var cache, out var orders);
+
+			var error = Assert.Throws<TargetInvocationException>(() =>
+				typeof(StealthRecalculateFleeBehavior).GetMethod("RestorePersistedState",
+					BindingFlags.Instance | BindingFlags.NonPublic).Invoke(restored,
+						new object[] { forged }));
+
+			Assert.That(error.InnerException, Is.TypeOf<InvalidOperationException>());
+			Assert.That(live.Reads, Is.Zero);
+			Assert.That(threats.RouteFacts, Is.Empty);
+			Assert.That(cache.Reads, Is.Zero);
+			Assert.That(orders.Issued, Is.Empty);
 		}
 
 		[Test]

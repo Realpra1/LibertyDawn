@@ -23,7 +23,6 @@ namespace OpenRA.Mods.Common.Traits
 	public sealed class StealthTargetAcquisitionBehavior
 	{
 		const int PrivateSaveVersion = 2;
-		const float DangerCost = 1f;
 		public const int MaximumOptions = 10;
 		public const int MaximumTravelSeconds = 30;
 		public const int MaximumPrimitiveOperations = 65536;
@@ -62,7 +61,7 @@ namespace OpenRA.Mods.Common.Traits
 			var regularLimit = incumbentStrategicCell == null ? MaximumOptions : MaximumOptions - 1;
 			var search = StealthAIThreatGeometry.StartReachableTargetCellSearch(
 				snapshot.Danger.ToArray(), snapshot.Width, snapshot.Height,
-				activeSquadCenter.X, activeSquadCenter.Y, enemyCells, DangerCost,
+				activeSquadCenter.X, activeSquadCenter.Y, enemyCells, snapshot.RouteThreatPenalty,
 				regularLimit, requiredIndex,
 				MaximumTravelSeconds / snapshot.SecondsPerCostUnit);
 			search.Advance(MaximumPrimitiveOperations);

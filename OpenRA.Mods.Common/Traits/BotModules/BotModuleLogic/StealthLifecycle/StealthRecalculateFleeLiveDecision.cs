@@ -77,10 +77,15 @@ namespace OpenRA.Mods.Common.Traits
 		public static StealthRecalculateFleeRouteEvaluation SelectLeastDanger(
 			IEnumerable<StealthRecalculateFleeRouteEvaluation> evaluations)
 		{
+			return OrderedBySafety(evaluations).FirstOrDefault();
+		}
+
+		public static IEnumerable<StealthRecalculateFleeRouteEvaluation> OrderedBySafety(
+			IEnumerable<StealthRecalculateFleeRouteEvaluation> evaluations)
+		{
 			return evaluations.OrderBy(route => route.StandardDanger.ThreatRating)
 				.ThenBy(route => route.StandardDanger.Crossover)
-				.ThenBy(route => route.Candidate.Cell.Y)
-				.ThenBy(route => route.Candidate.Cell.X).FirstOrDefault();
+				.ThenBy(route => route.Candidate.Cell.Y).ThenBy(route => route.Candidate.Cell.X);
 		}
 
 		public bool Arrived(CPos destination)
@@ -106,6 +111,8 @@ namespace OpenRA.Mods.Common.Traits
 		public long RouteRevision;
 		public StealthRecalculateFleeOrderToken LastOrderToken;
 		public long? LongRouteCacheRevision;
+		public CPos[] OrderedRoute = Array.Empty<CPos>();
+		public int RouteProgress;
 
 		public StealthRecalculateFleeOwnerState Clone()
 		{
@@ -113,6 +120,7 @@ namespace OpenRA.Mods.Common.Traits
 			clone.MemberIds = MemberIds.ToArray();
 			clone.EnemyIds = EnemyIds.ToArray();
 			clone.Evaluations = Evaluations.ToArray();
+			clone.OrderedRoute = OrderedRoute.ToArray();
 			return clone;
 		}
 	}

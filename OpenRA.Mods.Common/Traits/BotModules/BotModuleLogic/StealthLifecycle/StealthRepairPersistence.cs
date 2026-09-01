@@ -16,9 +16,11 @@ using System.Linq;
 
 namespace OpenRA.Mods.Common.Traits
 {
-	static class StealthRepairPersistence
+	#pragma warning disable SA1205
+	static partial class StealthRepairPersistence
+	#pragma warning restore SA1205
 	{
-		const int Version = 1;
+		const int Version = 2;
 		static readonly string[] RootScalars =
 		{
 			"Version", "Owner", "Epoch", "EntryValidated", "LastObservedTick",
@@ -58,6 +60,8 @@ namespace OpenRA.Mods.Common.Traits
 			AddIds(nodes, "EnemyId", state.EnemyIds);
 			foreach (var evaluation in state.Evaluations)
 				nodes.Add(SerializeEvaluation(evaluation));
+			foreach (var waypoint in state.OrderedRoute)
+				nodes.Add(Field("RouteWaypoint", waypoint));
 			if (state.LastOrderToken != null)
 				nodes.Add(SerializeOrder(state.LastOrderToken));
 			if (state.Completion != null)
@@ -73,7 +77,7 @@ namespace OpenRA.Mods.Common.Traits
 			var repeated = new HashSet<string>(StringComparer.Ordinal)
 			{
 				"Mission", "Cause", "Resume", "MemberId", "EnemyId", "Evaluation",
-				"LastOrder", "Completion"
+				"RouteWaypoint", "LastOrder", "Completion"
 			};
 			var values = Unique(node.Value.Nodes.Where(child => !repeated.Contains(child.Key)));
 			if (values.Count != RootScalars.Length || RootScalars.Any(key => !values.ContainsKey(key)) ||
@@ -122,7 +126,9 @@ namespace OpenRA.Mods.Common.Traits
 				RouteRevision = Read<long>(values, "RouteRevision"),
 				LastOrderToken = ReadOptional(node, "LastOrder", RestoreOrder),
 				Completion = ReadOptional(node, "Completion", RestoreCompletion),
-				LongRouteCacheRevision = hasCache ? cacheRevision : (long?)null
+				LongRouteCacheRevision = hasCache ? cacheRevision : (long?)null,
+				OrderedRoute = node.Value.Nodes.Where(child => child.Key == "RouteWaypoint")
+					.Select(child => FieldLoader.GetValue<CPos>("RouteWaypoint", child.Value.Value)).ToArray()
 			};
 			if (values["LastTokenFingerprint"] != TokenFingerprint(restored.LastOrderToken))
 				throw new InvalidOperationException("Saved Repair token fingerprint was altered.");
@@ -130,11 +136,29 @@ namespace OpenRA.Mods.Common.Traits
 			return restored;
 		}
 
+		internal static StealthRepairHandoff RestoreHandoff(
+			StealthBehaviorHandoff handoff, MiniYamlNode node)
+		{
+			if (handoff == null || handoff.Owner != BehaviorId.Repair || node == null ||
+				handoff.Epoch.Value <= 1)
+				throw new InvalidOperationException("Repair restore requires its exact active handoff.");
+			var mission = StealthApproachPersistence.RestoreMission(Required(node, "Mission"));
+			var resume = RestoreResume(Required(node, "Resume"), mission);
+			var cause = RestoreCause(Required(node, "Cause"));
+			var damageHandoff = new StealthBehaviorHandoff(BehaviorId.Damage,
+				new OwnershipEpoch(handoff.Epoch.Value - 1));
+			var request = new StealthDamageRepairRequest(damageHandoff, cause.EventId, cause.Tick,
+				cause.Source, cause.Amount, cause.Members, resume);
+			return new StealthRepairHandoff(handoff, request);
+		}
+
 		static void Validate(StealthRepairOwnerState state, StealthRepairHandoff handoff)
 		{
 			if (state.LastObservedTick < -1 || state.RouteProgress < 0 || state.RouteRevision < 0 ||
 				state.LongRouteCacheRevision < 0 || !Ordered(state.MemberIds) || !Ordered(state.EnemyIds) ||
-				state.Evaluations == null || state.Evaluations.Any(evaluation => evaluation == null) ||
+				state.Evaluations == null || state.OrderedRoute == null ||
+				state.OrderedRoute.Distinct().Count() != state.OrderedRoute.Length ||
+				state.Evaluations.Any(evaluation => evaluation == null) ||
 				state.Evaluations.Select(evaluation => evaluation.Route.StableIdentity).Distinct().Count() !=
 					state.Evaluations.Length || !Enum.IsDefined(typeof(StealthRepairDisposition), state.Disposition) ||
 				!Enum.IsDefined(typeof(StealthRepairLiveCause), state.LiveCause))
@@ -145,7 +169,8 @@ namespace OpenRA.Mods.Common.Traits
 					state.EnemyIds.Length != 0 || state.Evaluations.Length != 0 || state.OptionId.HasValue ||
 					state.RouteId.HasValue || state.RouteProgress != 0 || state.Danger.HasValue ||
 					state.RouteRevision != 0 || state.LastOrderToken != null || state.Completion != null ||
-					state.LongRouteCacheRevision.HasValue || state.Disposition != StealthRepairDisposition.Retain ||
+					state.LongRouteCacheRevision.HasValue || state.OrderedRoute.Length != 0 ||
+					state.Disposition != StealthRepairDisposition.Retain ||
 					state.LiveCause != StealthRepairLiveCause.NoSafeRepair)
 					throw new InvalidOperationException("Unvalidated Repair state must be pristine.");
 				return;
@@ -158,11 +183,15 @@ namespace OpenRA.Mods.Common.Traits
 			var retaining = state.LiveCause == StealthRepairLiveCause.Retreating ||
 				state.LiveCause == StealthRepairLiveCause.Healing;
 			if (routed != retaining || retaining != (state.Disposition == StealthRepairDisposition.Retain) ||
+				(routed && (state.OrderedRoute.Length == 0 ||
+					state.RouteProgress >= state.OrderedRoute.Length)) ||
 				(routed && !state.Evaluations.Any(evaluation =>
 					evaluation.Option.ActorId == state.OptionId && evaluation.Route.StableIdentity == state.RouteId &&
 					evaluation.IsSafe && StealthRepairResult.SameScore(evaluation.StandardDanger,
 						state.Danger.Value))))
 				throw new InvalidOperationException("Saved Repair route is inconsistent.");
+			if (!routed && (state.OrderedRoute.Length != 0 || state.RouteProgress != 0))
+				throw new InvalidOperationException("Terminal Repair state cannot retain route progress.");
 			if ((state.Disposition == StealthRepairDisposition.ResumeFight) !=
 					(state.LiveCause == StealthRepairLiveCause.NoSafeRepair) ||
 				(state.Disposition == StealthRepairDisposition.Start) !=
@@ -196,8 +225,15 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (state.LongRouteCacheRevision.HasValue && !state.Evaluations.Any(evaluation =>
 				evaluation.Route.StableIdentity == state.RouteId &&
-				evaluation.Route.RequiresStrategicRouting))
+					evaluation.Route.RequiresStrategicRouting))
 				throw new InvalidOperationException("Saved Repair cache metadata is not bound to a long route.");
+			if (routed && !state.LongRouteCacheRevision.HasValue)
+			{
+				var selected = state.Evaluations.Single(evaluation =>
+					evaluation.Route.StableIdentity == state.RouteId);
+				if (!state.OrderedRoute.SequenceEqual(selected.Route.Cells))
+					throw new InvalidOperationException("Saved direct Repair route differs from live geometry.");
+			}
 		}
 
 		static MiniYamlNode SerializeCause(StealthRepairHandoff handoff)
@@ -250,12 +286,14 @@ namespace OpenRA.Mods.Common.Traits
 			};
 			AddIds(nodes, "MemberId", resume.MemberActorIds);
 			AddIds(nodes, "EnemyId", resume.EnemyActorIds);
+			if (resume.MassAttackEntryEvidence != null)
+				nodes.Add(StealthMassAttackPersistenceNodes.SerializeEntry(resume.MassAttackEntryEvidence));
 			return Node("Resume", nodes);
 		}
 
 		static StealthRepairResumeContext RestoreResume(MiniYamlNode node, StealthApproachMission mission)
 		{
-			var values = UniqueExcept(node, "MemberId", "EnemyId");
+			var values = UniqueExcept(node, "MemberId", "EnemyId", "Entry");
 			if (values.Count != 6)
 				throw new InvalidOperationException("Invalid Repair resume field set.");
 			var hasTarget = Read<bool>(values, "HasTarget");
@@ -263,10 +301,15 @@ namespace OpenRA.Mods.Common.Traits
 			var cell = Read<CPos>(values, "TargetCell");
 			if (!hasTarget && (target != 0 || cell != default(CPos)))
 				throw new InvalidOperationException("Noncanonical absent Repair resume target.");
-			return new StealthRepairResumeContext(Read<BehaviorId>(values, "Owner"),
+			var owner = Read<BehaviorId>(values, "Owner");
+			var entries = node.Value.Nodes.Where(child => child.Key == "Entry").ToArray();
+			if ((owner == BehaviorId.MassAttack) != (entries.Length == 1))
+				throw new InvalidOperationException("Repair MassAttack resume entry evidence is incomplete.");
+			return new StealthRepairResumeContext(owner,
 				new OwnershipEpoch(Read<long>(values, "Epoch")), mission,
 				ReadIds(node, "MemberId"), ReadIds(node, "EnemyId"),
-				hasTarget ? target : (uint?)null, hasTarget ? cell : (CPos?)null, values["Fingerprint"]);
+				hasTarget ? target : (uint?)null, hasTarget ? cell : (CPos?)null, values["Fingerprint"],
+				entries.Length == 0 ? null : StealthMassAttackPersistenceNodes.RestoreEntry(entries[0]));
 		}
 
 		static bool SameResume(StealthRepairResumeContext left, StealthRepairResumeContext right)
@@ -276,7 +319,11 @@ namespace OpenRA.Mods.Common.Traits
 				left.MemberActorIds.SequenceEqual(right.MemberActorIds) &&
 				left.EnemyActorIds.SequenceEqual(right.EnemyActorIds) &&
 				left.SelectedTargetActorId == right.SelectedTargetActorId &&
-				left.SelectedTargetCurrentCell == right.SelectedTargetCurrentCell;
+				left.SelectedTargetCurrentCell == right.SelectedTargetCurrentCell &&
+				((left.MassAttackEntryEvidence == null && right.MassAttackEntryEvidence == null) ||
+					(left.MassAttackEntryEvidence != null && right.MassAttackEntryEvidence != null &&
+						StealthMassAttackPersistenceNodes.SameEntry(
+							left.MassAttackEntryEvidence, right.MassAttackEntryEvidence)));
 		}
 
 		static MiniYamlNode SerializeEvaluation(StealthRepairRouteEvaluation evaluation)

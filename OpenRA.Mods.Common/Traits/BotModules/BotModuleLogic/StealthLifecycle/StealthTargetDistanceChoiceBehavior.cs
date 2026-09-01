@@ -158,6 +158,16 @@ namespace OpenRA.Mods.Common.Traits
 			return BuildResult(expected, selected);
 		}
 
+		internal static StealthTargetDistanceChoiceHandoff RestoreHandoff(
+			StealthBehaviorHandoff handoff, MiniYamlNode node)
+		{
+			if (handoff == null || handoff.Owner != BehaviorId.TargetDistanceChoice || node == null)
+				throw new ArgumentException("TargetDistanceChoice restore requires its exact active handoff.");
+			var options = node.Value.Nodes.Where(child => child.Key == "Option")
+				.Select(RestoreFact).Select(saved => saved.Fact.Option).ToArray();
+			return new StealthTargetDistanceChoiceHandoff(handoff, options);
+		}
+
 		DistanceFact[] BuildFacts()
 		{
 			var peerCells = otherActiveSquads.Select(squad => squad.StrategicCell).ToArray();

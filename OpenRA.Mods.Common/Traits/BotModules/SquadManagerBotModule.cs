@@ -94,6 +94,9 @@ namespace OpenRA.Mods.Common.Traits
 		public readonly Dictionary<string, StealthSquadDefinition> StealthSquadDefinitions =
 			new Dictionary<string, StealthSquadDefinition>();
 
+		[Desc("Use the modular stealth lifecycle runtime. Disabled until integration review and game validation.")]
+		public readonly bool UseModularStealthLifecycle = false;
+
 		static object LoadStealthSquadDefinitions(MiniYaml yaml)
 		{
 			var ret = new Dictionary<string, StealthSquadDefinition>();
@@ -2512,6 +2515,11 @@ namespace OpenRA.Mods.Common.Traits
 					generationWindow.RecordDamage(self.ActorID, e.Damage.Value);
 				}
 			}
+
+			var modularStealth = Squads.FirstOrDefault(candidate => candidate.Type == SquadType.Stealth &&
+				candidate.Units.Contains(self));
+			if (modularStealth?.ObserveModularStealthDamage(self, e) == true)
+				return;
 
 			if (!IsPreferredEnemyUnit(e.Attacker))
 				return;

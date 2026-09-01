@@ -176,6 +176,19 @@ namespace OpenRA.Mods.Common.Traits
 			finally { executionLease.Release(revision); }
 		}
 
+		internal void RestorePersistedState(MiniYamlNode node)
+		{
+			var revision = executionLease.Acquire("MassAttack", EnsureActiveOwnership);
+			try
+			{
+				var restored = StealthMassAttackPersistence.Restore(node, handoff, mission);
+				var prospective = FromPrivateState(restored);
+				executionLease.Commit(revision, "MassAttack", EnsureActiveOwnership,
+					() => state = prospective);
+			}
+			finally { executionLease.Release(revision); }
+		}
+
 		void ValidateEntry(StealthMassAttackLiveDecision decision, long revision)
 		{
 			var evidence = handoff.Evidence;

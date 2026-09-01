@@ -18,13 +18,13 @@ namespace OpenRA.Mods.Common.Traits
 {
 	static class StealthRecalculateFleePersistence
 	{
-		const int Version = 1;
+		const int Version = 2;
 		static readonly string[] RootScalars =
 		{
 			"Version", "Owner", "Epoch", "EntryValidated", "LastObservedTick",
 			"LastEvaluationTick", "Disposition", "LiveCause", "Fingerprint",
 			"HasDestination", "Destination", "HasDanger", "DangerThreat", "DangerCrossover",
-			"RouteRevision", "HasLongRouteCache", "LongRouteCacheRevision"
+			"RouteRevision", "RouteProgress", "HasLongRouteCache", "LongRouteCacheRevision"
 		};
 
 		public static MiniYamlNode Serialize(string key, StealthRecalculateFleeHandoff handoff,
@@ -50,6 +50,7 @@ namespace OpenRA.Mods.Common.Traits
 				new MiniYamlNode("DangerThreat", Format(state.Danger?.ThreatRating ?? 0)),
 				new MiniYamlNode("DangerCrossover", Format(state.Danger?.Crossover ?? 0)),
 				Field("RouteRevision", state.RouteRevision),
+				Field("RouteProgress", state.RouteProgress),
 				Field("HasLongRouteCache", state.LongRouteCacheRevision.HasValue),
 				Field("LongRouteCacheRevision", state.LongRouteCacheRevision ?? 0),
 				StealthApproachPersistence.SerializeMission(handoff.Mission),
@@ -57,6 +58,8 @@ namespace OpenRA.Mods.Common.Traits
 			};
 			AddIds(nodes, "MemberId", state.MemberIds);
 			AddIds(nodes, "EnemyId", state.EnemyIds);
+			foreach (var waypoint in state.OrderedRoute)
+				nodes.Add(Field("RouteWaypoint", waypoint));
 			foreach (var evaluation in state.Evaluations)
 				nodes.Add(SerializeEvaluation(evaluation));
 			if (state.LastOrderToken != null)
@@ -71,7 +74,7 @@ namespace OpenRA.Mods.Common.Traits
 				throw new ArgumentNullException(node == null ? nameof(node) : nameof(handoff));
 			var repeated = new HashSet<string>(StringComparer.Ordinal)
 			{
-				"Mission", "Entry", "MemberId", "EnemyId", "Evaluation", "LastOrder"
+				"Mission", "Entry", "MemberId", "EnemyId", "Evaluation", "LastOrder", "RouteWaypoint"
 			};
 			var values = Unique(node.Value.Nodes.Where(child => !repeated.Contains(child.Key)));
 			if (values.Count != RootScalars.Length || RootScalars.Any(key => !values.ContainsKey(key)) ||
@@ -114,6 +117,9 @@ namespace OpenRA.Mods.Common.Traits
 				Danger = hasDanger ? new StealthTargetThreatScore(dangerThreat, dangerCrossover) :
 					(StealthTargetThreatScore?)null,
 				RouteRevision = Read<long>(values, "RouteRevision"),
+				RouteProgress = Read<int>(values, "RouteProgress"),
+				OrderedRoute = node.Value.Nodes.Where(child => child.Key == "RouteWaypoint")
+					.Select(child => FieldLoader.GetValue<CPos>("RouteWaypoint", child.Value.Value)).ToArray(),
 				LastOrderToken = ReadOptional(node, "LastOrder", RestoreOrder),
 				LongRouteCacheRevision = hasCache ? cacheRevision : (long?)null
 			};
@@ -124,14 +130,15 @@ namespace OpenRA.Mods.Common.Traits
 		static void Validate(StealthRecalculateFleeOwnerState state,
 			StealthRecalculateFleeHandoff handoff)
 		{
-			if (state.LastObservedTick < -1 || state.LastEvaluationTick < -1 ||
+			if (state.LastObservedTick < -1 || state.LastEvaluationTick < -1 || state.RouteProgress < 0 ||
 				state.LastEvaluationTick > state.LastObservedTick || state.RouteRevision < 0 ||
 				state.LongRouteCacheRevision < 0 || !Ordered(state.MemberIds) || !Ordered(state.EnemyIds) ||
 				state.Evaluations == null || state.Evaluations.Any(evaluation => evaluation == null) ||
 				state.Evaluations.Select(evaluation => evaluation.Candidate.Cell).Distinct().Count() !=
 					state.Evaluations.Length ||
 				!Enum.IsDefined(typeof(StealthRecalculateFleeDisposition), state.Disposition) ||
-				!Enum.IsDefined(typeof(StealthRecalculateFleeLiveCause), state.LiveCause))
+				!Enum.IsDefined(typeof(StealthRecalculateFleeLiveCause), state.LiveCause) ||
+				state.OrderedRoute == null || state.OrderedRoute.Distinct().Count() != state.OrderedRoute.Length)
 				throw new InvalidOperationException("Invalid RecalculateFlee private state.");
 			if (!state.EntryValidated)
 			{
@@ -139,6 +146,7 @@ namespace OpenRA.Mods.Common.Traits
 					state.MemberIds.Length != 0 || state.EnemyIds.Length != 0 || state.Evaluations.Length != 0 ||
 					state.Destination.HasValue || state.Danger.HasValue || state.LastOrderToken != null ||
 					state.RouteRevision != 0 || state.LongRouteCacheRevision.HasValue ||
+					state.OrderedRoute.Length != 0 || state.RouteProgress != 0 ||
 					state.Disposition != StealthRecalculateFleeDisposition.Retain ||
 					state.LiveCause != StealthRecalculateFleeLiveCause.NoRoute)
 					throw new InvalidOperationException("Unvalidated RecalculateFlee state must be pristine.");
@@ -150,7 +158,8 @@ namespace OpenRA.Mods.Common.Traits
 				(state.Disposition == StealthRecalculateFleeDisposition.TargetAcquisition) !=
 					(state.LiveCause == StealthRecalculateFleeLiveCause.Completed))
 				throw new InvalidOperationException("Validated RecalculateFlee state has no canonical progress.");
-			var hasRoute = state.Destination.HasValue && state.Danger.HasValue && state.LastOrderToken != null;
+			var hasRoute = state.Destination.HasValue && state.Danger.HasValue && state.LastOrderToken != null &&
+				state.OrderedRoute.Length != 0 && state.RouteProgress < state.OrderedRoute.Length;
 			var routeCause = state.LiveCause == StealthRecalculateFleeLiveCause.Traversing ||
 				state.LiveCause == StealthRecalculateFleeLiveCause.Completed ||
 				(state.LiveCause == StealthRecalculateFleeLiveCause.MemberLoss && state.MemberIds.Length != 0);
@@ -168,12 +177,15 @@ namespace OpenRA.Mods.Common.Traits
 				(state.LastOrderToken.Owner != handoff.Owner || state.LastOrderToken.Epoch != handoff.Epoch ||
 				state.LastOrderToken.RouteRevision != state.RouteRevision ||
 				!state.LastOrderToken.ActorIds.SequenceEqual(state.MemberIds) ||
-				state.LastOrderToken.DestinationCell != state.Destination))
+				state.LastOrderToken.DestinationCell != state.OrderedRoute[state.RouteProgress]))
 				throw new InvalidOperationException("Saved RecalculateFlee token is forged.");
 			if (state.LongRouteCacheRevision.HasValue && !state.Evaluations.Any(evaluation =>
 				evaluation.Candidate.Cell == state.Destination &&
 				evaluation.Candidate.RequiresStrategicRouting))
 				throw new InvalidOperationException("Saved cache metadata is not bound to a live long route.");
+			if (!state.LongRouteCacheRevision.HasValue && hasRoute &&
+				(state.OrderedRoute.Length != 1 || state.OrderedRoute[0] != state.Destination))
+				throw new InvalidOperationException("Saved direct Flee route is not canonical.");
 		}
 
 		static MiniYamlNode SerializeEntry(StealthRecalculateFleeEntryEvidence entry)
@@ -194,7 +206,7 @@ namespace OpenRA.Mods.Common.Traits
 			return Node("Entry", nodes);
 		}
 
-		static StealthRecalculateFleeEntryEvidence RestoreEntry(MiniYamlNode node)
+		internal static StealthRecalculateFleeEntryEvidence RestoreEntry(MiniYamlNode node)
 		{
 			var values = UniqueExcept(node, "MemberId", "EnemyId");
 			if (values.Count != 8)

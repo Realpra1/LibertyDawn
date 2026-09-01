@@ -162,7 +162,8 @@ namespace OpenRA.Mods.Common.Traits
 	public interface IStealthRecalculateFleeOrders
 	{
 		void IssueMove(BehaviorId owner, OwnershipEpoch epoch, IReadOnlyList<uint> actorIds,
-			CPos destinationCell, StealthRecalculateFleeOrderToken token);
+			CPos destinationCell, IReadOnlyList<CPos> orderedRoute, int routeProgress,
+			StealthRecalculateFleeOrderToken token);
 	}
 
 	public sealed class StealthRecalculateFleeResult
@@ -181,6 +182,8 @@ namespace OpenRA.Mods.Common.Traits
 		public IReadOnlyList<StealthRecalculateFleeRouteEvaluation> RouteEvaluations => evaluations;
 		public CPos? SelectedDestinationCell { get; }
 		public StealthTargetThreatScore? SelectedStandardDanger { get; }
+		public IReadOnlyList<CPos> OrderedRoute { get; }
+		public int RouteProgress { get; }
 		public StealthRecalculateFleeOrderToken LastOrderToken { get; }
 		public string LiveFingerprint { get; }
 		public long? LongRouteCacheRevision { get; }
@@ -190,6 +193,7 @@ namespace OpenRA.Mods.Common.Traits
 			IEnumerable<uint> members, IEnumerable<uint> enemies,
 			IEnumerable<StealthRecalculateFleeRouteEvaluation> evaluations,
 			CPos? destination, StealthTargetThreatScore? danger,
+			IEnumerable<CPos> orderedRoute, int routeProgress,
 			StealthRecalculateFleeOrderToken lastOrderToken, string fingerprint,
 			long? longRouteCacheRevision)
 		{
@@ -205,6 +209,9 @@ namespace OpenRA.Mods.Common.Traits
 			this.evaluations = Array.AsReadOnly(routes);
 			SelectedDestinationCell = destination;
 			SelectedStandardDanger = danger;
+			OrderedRoute = Array.AsReadOnly(orderedRoute?.ToArray() ??
+				throw new ArgumentNullException(nameof(orderedRoute)));
+			RouteProgress = routeProgress;
 			LastOrderToken = lastOrderToken;
 			LiveFingerprint = !string.IsNullOrEmpty(fingerprint) ? fingerprint :
 				throw new ArgumentException("Results require a live fingerprint.", nameof(fingerprint));
@@ -230,9 +237,14 @@ namespace OpenRA.Mods.Common.Traits
 			if (hasRoute && (memberIds.Count == 0 || enemyIds.Count == 0 ||
 				LastOrderToken.Owner != BehaviorId.RecalculateFlee ||
 				LastOrderToken.Epoch != Handoff.Epoch ||
-				!LastOrderToken.ActorIds.SequenceEqual(memberIds) ||
-				LastOrderToken.DestinationCell != SelectedDestinationCell))
+				!LastOrderToken.ActorIds.SequenceEqual(memberIds) || OrderedRoute.Count == 0 ||
+				RouteProgress < 0 || RouteProgress >= OrderedRoute.Count ||
+				LastOrderToken.DestinationCell != OrderedRoute[RouteProgress] ||
+				(LongRouteCacheRevision == null &&
+					(OrderedRoute.Count != 1 || OrderedRoute[0] != SelectedDestinationCell))))
 				throw new ArgumentException("Flee route token is not exact.");
+			if (!hasRoute && (OrderedRoute.Count != 0 || RouteProgress != 0))
+				throw new ArgumentException("Flee terminal result cannot retain route progress.");
 			if ((LiveCause == StealthRecalculateFleeLiveCause.NoTarget && enemyIds.Count != 0) ||
 				(LiveCause == StealthRecalculateFleeLiveCause.NoRoute &&
 					(enemyIds.Count == 0 || evaluations.Count != 0)) ||

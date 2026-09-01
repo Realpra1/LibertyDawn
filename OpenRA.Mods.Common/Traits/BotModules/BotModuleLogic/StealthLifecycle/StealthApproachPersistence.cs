@@ -204,6 +204,48 @@ namespace OpenRA.Mods.Common.Traits
 			return new MiniYamlNode("Mission", "", nodes);
 		}
 
+		internal static StealthApproachMission RestoreMission(MiniYamlNode node)
+		{
+			if (node == null || node.Key != "Mission")
+				throw new InvalidOperationException("Approach persistence requires one Mission node.");
+			var values = Unique(node.Value.Nodes.Where(child => child.Key != "Target" &&
+				child.Key != "Friendly" && child.Key != "Enemy"), "Approach mission");
+			var cell = Read<CPos>(values, "StrategicCell");
+			var facts = new StealthTargetThreatFacts(cell,
+				node.Value.Nodes.Where(child => child.Key == "Friendly").Select(RestoreGroup),
+				node.Value.Nodes.Where(child => child.Key == "Enemy").Select(RestoreGroup),
+				Read<bool>(values, "FormationCloaked"), Read<bool>(values, "HasDetectorCoverage"),
+				Read<bool>(values, "PlannedActionRevealsFormation"));
+			var source = new StealthTargetOption(cell,
+				Read<int?>(values, "EstimatedTravelMilliseconds"), Read<bool>(values, "IsIncumbent"),
+				node.Value.Nodes.Where(child => child.Key == "Target").Select(RestoreTarget), facts);
+			var valued = new StealthTargetValueOption(source, Read<long>(values, "StrategicValue"));
+			if (!ReadDouble(values, "ThreatRating", false, out var threat) ||
+				!ReadDouble(values, "Crossover", true, out var crossover))
+				throw new InvalidOperationException("Invalid Approach mission threat score.");
+			return new StealthApproachMission(new StealthTargetThreatOption(valued,
+				new StealthTargetThreatScore(threat, crossover)),
+				Read<long>(values, "MinimumSquadSeparationSquared"),
+				Read<int>(values, "SeparationCreditMilliseconds"),
+				Read<long>(values, "AdjustedTravelCostMilliseconds"));
+		}
+
+		static StealthStrategicTargetSnapshot RestoreTarget(MiniYamlNode node)
+		{
+			var values = Unique(node.Value.Nodes, "Approach mission target");
+			return new StealthStrategicTargetSnapshot(Read<uint>(values, "StableActorId"),
+				Read<CPos>(values, "StrategicCell"), Read<int>(values, "ConfiguredPriority"),
+				Read<int>(values, "ActorValue"), Read<int>(values, "HitPoints"),
+				Read<int>(values, "MaximumHitPoints"));
+		}
+
+		static StealthCombatGroupSnapshot RestoreGroup(MiniYamlNode node)
+		{
+			var values = Unique(node.Value.Nodes, "Approach mission combat group");
+			return new StealthCombatGroupSnapshot(Read<string>(values, "ActorType"),
+				Read<int>(values, "Count"), Read<int>(values, "EconomicValue"));
+		}
+
 		static MiniYamlNode SerializeGroup(string key, StealthCombatGroupSnapshot member)
 		{
 			return new MiniYamlNode(key, "", new List<MiniYamlNode>

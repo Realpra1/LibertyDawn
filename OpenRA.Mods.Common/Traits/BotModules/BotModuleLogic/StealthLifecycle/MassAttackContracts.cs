@@ -100,6 +100,16 @@ namespace OpenRA.Mods.Common.Traits
 			Mission = mission ?? throw new ArgumentNullException(nameof(mission));
 			Evidence = new StealthMassAttackEntryEvidence(evidence);
 		}
+
+		internal StealthMassAttackHandoff(StealthBehaviorHandoff handoff,
+			StealthApproachMission mission, StealthMassAttackEntryEvidence evidence)
+		{
+			Handoff = handoff ?? throw new ArgumentNullException(nameof(handoff));
+			if (handoff.Owner != BehaviorId.MassAttack)
+				throw new ArgumentException("The handoff must belong to MassAttack.", nameof(handoff));
+			Mission = mission ?? throw new ArgumentNullException(nameof(mission));
+			Evidence = evidence ?? throw new ArgumentNullException(nameof(evidence));
+		}
 	}
 
 	public sealed class StealthMassAttackMemberSnapshot

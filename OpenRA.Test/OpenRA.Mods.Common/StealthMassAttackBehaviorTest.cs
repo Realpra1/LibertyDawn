@@ -1144,5 +1144,31 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(fields.Any(field => field.Name.IndexOf("claim", StringComparison.OrdinalIgnoreCase) >= 0 ||
 				field.Name.IndexOf("exclusive", StringComparison.OrdinalIgnoreCase) >= 0), Is.False);
 		}
+
+		[Test]
+		public void ScheduledRestoreKeepsHistoricalTickWithoutCallbacksThenReselectsLiveTarget()
+		{
+			var snapshot = Live(10, new[] { Actor(10), Actor(20) });
+			var input = CreateInput(snapshot);
+			var original = Behavior(input, snapshot, out _, out _, out _);
+			original.Execute();
+			var saved = new List<MiniYamlNode> { original.SerializePrivateState() }.WriteToString();
+			var changed = Live(14, new[] { Actor(10, dead: true), Actor(20, x: 7) });
+			var restored = Behavior(input, changed, out var live, out var threats, out var orders);
+
+			typeof(StealthMassAttackBehavior).GetMethod("RestorePersistedState",
+				BindingFlags.Instance | BindingFlags.NonPublic).Invoke(restored,
+					new object[] { MiniYaml.FromString(saved).Single() });
+
+			Assert.That(live.Reads, Is.Zero);
+			Assert.That(threats.Facts, Is.Empty);
+			Assert.That(orders.Issued, Is.Empty);
+			Assert.That(new List<MiniYamlNode> { restored.SerializePrivateState() }.WriteToString(),
+				Is.EqualTo(saved));
+			var replanned = restored.Execute();
+			Assert.That(replanned.SelectedTargetActorId, Is.EqualTo(20));
+			Assert.That(live.Reads, Is.EqualTo(1));
+			Assert.That(orders.Issued, Has.Count.EqualTo(1));
+		}
 	}
 }

@@ -10,6 +10,7 @@
 #endregion
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace OpenRA.Mods.Common.Traits
@@ -94,47 +95,55 @@ namespace OpenRA.Mods.Common.Traits
 
 			var evaluated = decision.PassableCandidates.Select(candidate =>
 				decision.Evaluate(candidate, facts => CalculateRoute(facts, revision))).ToArray();
-			var selected = StealthRecalculateFleeLiveDecision.SelectLeastDanger(evaluated);
+			if (!TrySelectRoute(evaluated, prospective, revision, out var selected,
+				out var orderedRoute, out var cacheRevision))
+			{
+				ClearRoute(prospective);
+				prospective.LiveCause = StealthRecalculateFleeLiveCause.NoRoute;
+				return CommitAndResult(prospective, revision);
+			}
+
 			var routeChanged = !prospective.Destination.HasValue ||
 				prospective.Destination.Value != selected.Candidate.Cell ||
+				!prospective.OrderedRoute.SequenceEqual(orderedRoute) ||
 				prospective.LastOrderToken == null ||
 				!prospective.LastOrderToken.ActorIds.SequenceEqual(decision.MemberActorIds);
 			if (routeChanged && prospective.LastOrderToken != null)
+				AdvanceRouteRevision(prospective);
+			if (routeChanged)
 			{
-				if (prospective.RouteRevision == long.MaxValue)
-					throw new InvalidOperationException("RecalculateFlee route revision is exhausted.");
-				prospective.RouteRevision++;
+				prospective.RouteProgress = 0;
+				prospective.LastOrderToken = null;
 			}
 
 			prospective.Evaluations = evaluated;
 			prospective.Destination = selected.Candidate.Cell;
 			prospective.Danger = selected.StandardDanger;
-			if (selected.Candidate.RequiresStrategicRouting &&
-				(routeChanged || !prospective.LongRouteCacheRevision.HasValue))
+			prospective.OrderedRoute = orderedRoute;
+			prospective.LongRouteCacheRevision = cacheRevision;
+			if (!routeChanged && prospective.LastOrderToken != null &&
+				decision.Arrived(prospective.OrderedRoute[prospective.RouteProgress]))
 			{
-				var cached = ReadLongRoute(selected.Candidate.Cell, revision);
-				prospective.LongRouteCacheRevision = cached.Revision;
-			}
-			else if (!selected.Candidate.RequiresStrategicRouting)
-				prospective.LongRouteCacheRevision = null;
+				if (prospective.RouteProgress == prospective.OrderedRoute.Length - 1)
+				{
+					prospective.LiveCause = StealthRecalculateFleeLiveCause.Completed;
+					prospective.Disposition = StealthRecalculateFleeDisposition.TargetAcquisition;
+					return CommitAndResult(prospective, revision);
+				}
 
-			var desired = routeChanged ? new StealthRecalculateFleeOrderToken(
-				handoff.Owner, handoff.Epoch, decision.MemberActorIds, selected.Candidate.Cell,
-				prospective.RouteRevision, decision.ActivityRevision) : prospective.LastOrderToken;
-			var completed = decision.HasActivityObservation &&
-				desired.Equals(decision.CompletedOrderToken) && decision.Arrived(selected.Candidate.Cell);
-			if (completed)
-			{
-				prospective.LastOrderToken = desired;
-				prospective.LiveCause = StealthRecalculateFleeLiveCause.Completed;
-				prospective.Disposition = StealthRecalculateFleeDisposition.TargetAcquisition;
-				return CommitAndResult(prospective, revision);
+				AdvanceRouteRevision(prospective);
+				prospective.RouteProgress++;
+				prospective.LastOrderToken = null;
 			}
 
+			var waypoint = prospective.OrderedRoute[prospective.RouteProgress];
+			var desired = prospective.LastOrderToken ?? new StealthRecalculateFleeOrderToken(
+				handoff.Owner, handoff.Epoch, decision.MemberActorIds, waypoint,
+				prospective.RouteRevision, decision.ActivityRevision);
 			var observed = decision.HasActivityObservation &&
 				(desired.Equals(decision.ActiveOrderToken) || desired.Equals(decision.CompletedOrderToken));
 			if (!observed)
-				ApplyOrder(desired, revision);
+				ApplyOrder(desired, prospective.OrderedRoute, prospective.RouteProgress, revision);
 			prospective.LastOrderToken = desired;
 			prospective.LiveCause = decision.MemberActorIds.SequenceEqual(handoff.Evidence.MemberActorIds) ?
 				StealthRecalculateFleeLiveCause.Traversing : StealthRecalculateFleeLiveCause.MemberLoss;
@@ -157,6 +166,18 @@ namespace OpenRA.Mods.Common.Traits
 				var prospective = restored.Clone();
 				executionLease.Commit(revision, "RecalculateFlee", EnsureActiveOwnership,
 					() => state = prospective);
+			}
+			finally { executionLease.Release(revision); }
+		}
+
+		internal void RestorePersistedState(MiniYamlNode node)
+		{
+			var revision = executionLease.Acquire("RecalculateFlee", EnsureActiveOwnership);
+			try
+			{
+				var restored = StealthRecalculateFleePersistence.Restore(node, handoff);
+				executionLease.Commit(revision, "RecalculateFlee", EnsureActiveOwnership,
+					() => state = restored.Clone());
 			}
 			finally { executionLease.Release(revision); }
 		}
@@ -195,7 +216,7 @@ namespace OpenRA.Mods.Common.Traits
 				!restored.MemberIds.SequenceEqual(decision.MemberActorIds) ||
 				!restored.EnemyIds.SequenceEqual(decision.EnemyActorIds))
 				throw new InvalidOperationException("Saved RecalculateFlee live facts are stale.");
-			var expected = EvaluateForRestore(decision, revision);
+			var expected = EvaluateForRestore(restored, decision, revision);
 			if (!SameStateDecision(restored, expected))
 				throw new InvalidOperationException("Saved RecalculateFlee route or standard scores are stale.");
 			var expectedCause = ExpectedCause(restored, decision);
@@ -207,14 +228,21 @@ namespace OpenRA.Mods.Common.Traits
 			if (restored.LastOrderToken != null &&
 				(restored.LastOrderToken.Epoch != handoff.Epoch ||
 				restored.LastOrderToken.ActivityRevision > decision.ActivityRevision ||
-				(!decision.HasActivityObservation && restored.LastOrderToken.ActivityRevision != 0)))
+					(!decision.HasActivityObservation && restored.LastOrderToken.ActivityRevision != 0)))
 				throw new InvalidOperationException("Saved RecalculateFlee token has a stale epoch.");
+			if (restored.LongRouteCacheRevision.HasValue)
+			{
+				var cached = ReadLongRoute(restored.Destination.Value, revision);
+				if (cached.Revision != restored.LongRouteCacheRevision ||
+					!cached.Waypoints.SequenceEqual(restored.OrderedRoute))
+					throw new InvalidOperationException("Saved RecalculateFlee cached route was altered or stale.");
+			}
 		}
 
-		StealthRecalculateFleeOwnerState EvaluateForRestore(
+		StealthRecalculateFleeOwnerState EvaluateForRestore(StealthRecalculateFleeOwnerState restored,
 			StealthRecalculateFleeLiveDecision decision, long revision)
 		{
-			var expected = state.Clone();
+			var expected = restored.Clone();
 			expected.MemberIds = decision.MemberActorIds;
 			expected.EnemyIds = decision.EnemyActorIds;
 			if (decision.Members.Length == 0) { ClearRoute(expected); expected.LiveCause = StealthRecalculateFleeLiveCause.MemberLoss; return expected; }
@@ -222,9 +250,18 @@ namespace OpenRA.Mods.Common.Traits
 			if (decision.PassableCandidates.Length == 0) { ClearRoute(expected); expected.LiveCause = StealthRecalculateFleeLiveCause.NoRoute; return expected; }
 			expected.Evaluations = decision.PassableCandidates.Select(candidate =>
 				decision.Evaluate(candidate, facts => CalculateRoute(facts, revision))).ToArray();
-			var selected = StealthRecalculateFleeLiveDecision.SelectLeastDanger(expected.Evaluations);
+			if (!TrySelectRoute(expected.Evaluations, expected, revision, out var selected,
+				out var orderedRoute, out var cacheRevision))
+			{
+				ClearRoute(expected);
+				expected.LiveCause = StealthRecalculateFleeLiveCause.NoRoute;
+				return expected;
+			}
+
 			expected.Destination = selected.Candidate.Cell;
 			expected.Danger = selected.StandardDanger;
+			expected.OrderedRoute = orderedRoute;
+			expected.LongRouteCacheRevision = cacheRevision;
 			return expected;
 		}
 
@@ -237,9 +274,9 @@ namespace OpenRA.Mods.Common.Traits
 				return StealthRecalculateFleeLiveCause.NoTarget;
 			if (decision.PassableCandidates.Length == 0)
 				return StealthRecalculateFleeLiveCause.NoRoute;
-			if (restored.LastOrderToken != null && decision.HasActivityObservation &&
-				restored.LastOrderToken.Equals(decision.CompletedOrderToken) &&
-				restored.Destination.HasValue && decision.Arrived(restored.Destination.Value))
+			if (restored.LastOrderToken != null && restored.OrderedRoute.Length != 0 &&
+				restored.RouteProgress == restored.OrderedRoute.Length - 1 &&
+				decision.Arrived(restored.OrderedRoute[restored.RouteProgress]))
 				return StealthRecalculateFleeLiveCause.Completed;
 			return decision.MemberActorIds.SequenceEqual(handoff.Evidence.MemberActorIds) ?
 				StealthRecalculateFleeLiveCause.Traversing :
@@ -280,11 +317,53 @@ namespace OpenRA.Mods.Common.Traits
 			return cached;
 		}
 
-		void ApplyOrder(StealthRecalculateFleeOrderToken token, long revision)
+		bool TrySelectRoute(IReadOnlyList<StealthRecalculateFleeRouteEvaluation> evaluations,
+			StealthRecalculateFleeOwnerState current, long revision,
+			out StealthRecalculateFleeRouteEvaluation selected, out CPos[] orderedRoute,
+			out long? cacheRevision)
+		{
+			foreach (var candidate in StealthRecalculateFleeLiveDecision.OrderedBySafety(evaluations))
+			{
+				if (!candidate.Candidate.RequiresStrategicRouting)
+				{
+					selected = candidate;
+					orderedRoute = new[] { candidate.Candidate.Cell };
+					cacheRevision = null;
+					return true;
+				}
+
+				if (current.Destination == candidate.Candidate.Cell && current.OrderedRoute.Length != 0 &&
+					current.LongRouteCacheRevision.HasValue)
+				{
+					selected = candidate;
+					orderedRoute = current.OrderedRoute.ToArray();
+					cacheRevision = current.LongRouteCacheRevision;
+					return true;
+				}
+
+				var cached = ReadLongRoute(candidate.Candidate.Cell, revision);
+				var waypoints = cached.Waypoints.ToArray();
+				if (waypoints.Length == 0 || waypoints.Distinct().Count() != waypoints.Length)
+					continue;
+				selected = candidate;
+				orderedRoute = waypoints;
+				cacheRevision = cached.Revision;
+				return true;
+			}
+
+			selected = null;
+			orderedRoute = Array.Empty<CPos>();
+			cacheRevision = null;
+			return false;
+		}
+
+		void ApplyOrder(StealthRecalculateFleeOrderToken token,
+			IReadOnlyList<CPos> orderedRoute, int routeProgress, long revision)
 		{
 			executionLease.Verify(revision, "RecalculateFlee", EnsureActiveOwnership);
 			orders.IssueMove(handoff.Owner, handoff.Epoch,
-				Array.AsReadOnly(token.ActorIds.ToArray()), token.DestinationCell, token);
+				Array.AsReadOnly(token.ActorIds.ToArray()), token.DestinationCell,
+				Array.AsReadOnly(orderedRoute.ToArray()), routeProgress, token);
 			executionLease.Verify(revision, "RecalculateFlee", EnsureActiveOwnership);
 		}
 
@@ -294,6 +373,7 @@ namespace OpenRA.Mods.Common.Traits
 			var result = new StealthRecalculateFleeResult(handoff, prospective.Disposition,
 				prospective.LiveCause, prospective.MemberIds, prospective.EnemyIds,
 				prospective.Evaluations, prospective.Destination, prospective.Danger,
+				prospective.OrderedRoute, prospective.RouteProgress,
 				prospective.LastOrderToken, prospective.Fingerprint,
 				prospective.LongRouteCacheRevision);
 			executionLease.Commit(revision, "RecalculateFlee", EnsureActiveOwnership,
@@ -314,13 +394,24 @@ namespace OpenRA.Mods.Common.Traits
 			state.Danger = null;
 			state.LastOrderToken = null;
 			state.LongRouteCacheRevision = null;
+			state.OrderedRoute = Array.Empty<CPos>();
+			state.RouteProgress = 0;
+		}
+
+		static void AdvanceRouteRevision(StealthRecalculateFleeOwnerState state)
+		{
+			if (state.RouteRevision == long.MaxValue)
+				throw new InvalidOperationException("RecalculateFlee route revision is exhausted.");
+			state.RouteRevision++;
 		}
 
 		static bool SameStateDecision(StealthRecalculateFleeOwnerState saved,
 			StealthRecalculateFleeOwnerState expected)
 		{
 			if (saved.Evaluations.Length != expected.Evaluations.Length ||
-				saved.Destination != expected.Destination || saved.Danger.HasValue != expected.Danger.HasValue)
+				saved.Destination != expected.Destination || saved.Danger.HasValue != expected.Danger.HasValue ||
+				saved.RouteProgress != expected.RouteProgress ||
+				!saved.OrderedRoute.SequenceEqual(expected.OrderedRoute))
 				return false;
 			if (saved.Danger.HasValue && !SameScore(saved.Danger.Value, expected.Danger.Value))
 				return false;

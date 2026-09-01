@@ -1,0 +1,56 @@
+#region Copyright & License Information
+/*
+ * Copyright 2007-2021 The OpenRA Developers (see AUTHORS)
+ * This file is part of OpenRA, which is free software. It is made
+ * available to you under the terms of the GNU General Public License
+ * as published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ */
+#endregion
+
+using System;
+
+namespace OpenRA.Mods.Common.Traits.BotModules.Squads
+{
+	sealed class StealthSquadLifecycleRuntimeOwner : IStealthLifecycleRuntimeOwner,
+		IStealthLifecycleRuntimeDamageOwner
+	{
+		readonly Func<object> execute;
+		readonly Func<string, MiniYamlNode> serialize;
+		readonly Func<object, StealthLifecycleDamageObservation, long,
+			StealthLifecycleDamageYield> captureDamage;
+		object lastResult;
+
+		public BehaviorId Owner { get; }
+		public OwnershipEpoch Epoch { get; }
+
+		public StealthSquadLifecycleRuntimeOwner(BehaviorId owner, OwnershipEpoch epoch,
+			Func<object> execute, Func<string, MiniYamlNode> serialize,
+			Func<object, StealthLifecycleDamageObservation, long,
+				StealthLifecycleDamageYield> captureDamage = null)
+		{
+			Owner = owner;
+			Epoch = epoch;
+			this.execute = execute ?? throw new ArgumentNullException(nameof(execute));
+			this.serialize = serialize ?? throw new ArgumentNullException(nameof(serialize));
+			this.captureDamage = captureDamage;
+		}
+
+		public object Execute()
+		{
+			return lastResult = execute();
+		}
+
+		public bool TryCaptureDamage(StealthLifecycleDamageObservation observation, long eventId,
+			out StealthLifecycleDamageYield yielded)
+		{
+			yielded = captureDamage?.Invoke(lastResult, observation, eventId);
+			return yielded != null;
+		}
+
+		public MiniYamlNode Serialize(string key = "ActiveOwner")
+		{
+			return serialize(key);
+		}
+	}
+}

@@ -29,15 +29,25 @@ namespace OpenRA.Mods.Common.Traits
 		public uint? SelectedTargetActorId { get; }
 		public CPos? SelectedTargetCurrentCell { get; }
 		public string ContextFingerprint { get; }
+		public StealthMassAttackEntryEvidence MassAttackEntryEvidence { get; }
 
 		internal StealthRepairResumeContext(BehaviorId owner, OwnershipEpoch epoch,
 			StealthApproachMission mission, IEnumerable<uint> memberActorIds,
 			IEnumerable<uint> enemyActorIds, uint? selectedTargetActorId,
 			CPos? selectedTargetCurrentCell, string contextFingerprint)
+			: this(owner, epoch, mission, memberActorIds, enemyActorIds, selectedTargetActorId,
+				selectedTargetCurrentCell, contextFingerprint, null) { }
+
+		internal StealthRepairResumeContext(BehaviorId owner, OwnershipEpoch epoch,
+			StealthApproachMission mission, IEnumerable<uint> memberActorIds,
+			IEnumerable<uint> enemyActorIds, uint? selectedTargetActorId,
+			CPos? selectedTargetCurrentCell, string contextFingerprint,
+			StealthMassAttackEntryEvidence massAttackEntryEvidence)
 		{
 			if (!IsFightOwner(owner) || mission == null ||
 				selectedTargetActorId.HasValue != selectedTargetCurrentCell.HasValue ||
-				string.IsNullOrEmpty(contextFingerprint))
+				string.IsNullOrEmpty(contextFingerprint) ||
+				(owner == BehaviorId.MassAttack) != (massAttackEntryEvidence != null))
 				throw new ArgumentException("Repair requires one exact active-fight context.");
 			Owner = owner;
 			Epoch = epoch;
@@ -49,6 +59,7 @@ namespace OpenRA.Mods.Common.Traits
 			SelectedTargetActorId = selectedTargetActorId;
 			SelectedTargetCurrentCell = selectedTargetCurrentCell;
 			ContextFingerprint = contextFingerprint;
+			MassAttackEntryEvidence = massAttackEntryEvidence;
 		}
 
 		internal static bool IsFightOwner(BehaviorId owner)

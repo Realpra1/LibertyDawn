@@ -147,6 +147,15 @@ namespace OpenRA.Mods.Common.Traits
 			ValidateEpoch();
 		}
 
+		internal StealthRecalculateFleeHandoff(StealthBehaviorHandoff handoff,
+			StealthApproachMission mission, StealthRecalculateFleeEntryEvidence evidence)
+		{
+			Handoff = RequireHandoff(handoff);
+			Mission = mission ?? throw new ArgumentNullException(nameof(mission));
+			Evidence = evidence ?? throw new ArgumentNullException(nameof(evidence));
+			ValidateEpoch();
+		}
+
 		void ValidateEpoch()
 		{
 			if (Evidence.SourceEpoch.Value == long.MaxValue ||

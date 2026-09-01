@@ -150,7 +150,7 @@ namespace OpenRA.Mods.Common.Traits
 	{
 		void IssueRepair(BehaviorId owner, OwnershipEpoch epoch,
 			IReadOnlyList<uint> actorIds, uint repairOptionActorId,
-			IReadOnlyList<CPos> liveRoute, StealthRepairOrderKind kind,
+			IReadOnlyList<CPos> orderedRoute, int routeProgress, StealthRepairOrderKind kind,
 			StealthRepairOrderToken token);
 	}
 

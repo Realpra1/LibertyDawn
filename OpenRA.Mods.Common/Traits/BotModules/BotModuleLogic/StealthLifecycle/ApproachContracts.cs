@@ -74,15 +74,19 @@ namespace OpenRA.Mods.Common.Traits
 
 		public int Width { get; }
 		public int Height { get; }
+		public float RouteThreatPenalty { get; }
 		public IReadOnlyList<StealthApproachStrategicCellSnapshot> Cells => cells;
 
 		public StealthApproachStrategicCacheSnapshot(int width, int height,
-			IEnumerable<StealthApproachStrategicCellSnapshot> cells)
+			IEnumerable<StealthApproachStrategicCellSnapshot> cells,
+			float routeThreatPenalty = 1f)
 		{
 			if (width <= 0 || height <= 0 || (long)width * height > int.MaxValue)
 				throw new ArgumentOutOfRangeException(nameof(width));
 			if (cells == null)
 				throw new ArgumentNullException(nameof(cells));
+			if (!float.IsFinite(routeThreatPenalty) || routeThreatPenalty < 0)
+				throw new ArgumentOutOfRangeException(nameof(routeThreatPenalty));
 
 			var normalized = cells.OrderBy(cell => cell?.StrategicCell.Y)
 				.ThenBy(cell => cell?.StrategicCell.X).ToArray();
@@ -94,6 +98,7 @@ namespace OpenRA.Mods.Common.Traits
 
 			Width = width;
 			Height = height;
+			RouteThreatPenalty = routeThreatPenalty;
 			this.cells = Array.AsReadOnly(normalized);
 		}
 	}
@@ -101,6 +106,12 @@ namespace OpenRA.Mods.Common.Traits
 	public interface IStealthApproachStrategicCache
 	{
 		StealthApproachStrategicCacheSnapshot ReadSnapshot();
+	}
+
+	/// <summary>Passive access to the established cached and smoothed strategic A* route.</summary>
+	public interface IStealthApproachStrategicRouteCache
+	{
+		IReadOnlyList<CPos> ReadRoute(CPos originStrategicCell, CPos destinationStrategicCell);
 	}
 
 	public sealed class StealthApproachMemberSnapshot

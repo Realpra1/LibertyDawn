@@ -72,8 +72,9 @@ namespace OpenRA.Mods.Common.Traits
 		readonly IStealthLifecycleThreatService threats;
 		readonly IStealthLifecycleRouteService routes;
 		readonly IStealthLifecycleDiagnosticService diagnostics;
+		readonly bool enabled;
 
-		public bool Enabled => false;
+		public bool Enabled => enabled;
 		public StealthLifecycleState State =>
 			new StealthLifecycleState(controller.Owner, controller.Epoch, controller.LastObservedTick);
 
@@ -82,13 +83,15 @@ namespace OpenRA.Mods.Common.Traits
 			IStealthLifecycleCacheService cache,
 			IStealthLifecycleThreatService threats,
 			IStealthLifecycleRouteService routes,
-			IStealthLifecycleDiagnosticService diagnostics)
+			IStealthLifecycleDiagnosticService diagnostics,
+			bool enabled = false)
 		{
 			this.controller = controller ?? throw new ArgumentNullException(nameof(controller));
 			this.cache = cache ?? throw new ArgumentNullException(nameof(cache));
 			this.threats = threats ?? throw new ArgumentNullException(nameof(threats));
 			this.routes = routes ?? throw new ArgumentNullException(nameof(routes));
 			this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+			this.enabled = enabled;
 		}
 
 		public void Observe(StealthLifecycleObservationFrame frame)

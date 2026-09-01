@@ -20,7 +20,8 @@ namespace OpenRA.Test.Mods.Common
 	[TestFixture]
 	public sealed class StealthApproachBehaviorTest
 	{
-		sealed class CacheProbe : IStealthApproachStrategicCache
+		sealed class CacheProbe : IStealthApproachStrategicCache,
+			IStealthApproachStrategicRouteCache
 		{
 			readonly StealthApproachStrategicCacheSnapshot snapshot;
 			public int Reads { get; private set; }
@@ -34,6 +35,26 @@ namespace OpenRA.Test.Mods.Common
 				if (ThrowOnRead)
 					throw new InvalidOperationException("Strategic cache was read during a live-only check.");
 				return snapshot;
+			}
+
+			public IReadOnlyList<CPos> ReadRoute(CPos origin, CPos destination)
+			{
+				var danger = snapshot.Cells.Select(cell =>
+					cell.HasDetectorCoverage || cell.PlannedActionRevealsFormation ?
+					(float)cell.EnemyGroup.Sum(enemy =>
+						enemy.ActorType == "obelisk" ? 50 * enemy.Count : 10 * enemy.Count) : 0f).ToArray();
+				var endpoints = new[]
+				{
+					destination, destination + new CVec(-1, 0), destination + new CVec(1, 0),
+					destination + new CVec(0, -1), destination + new CVec(0, 1)
+				}.Where(cell => cell.X >= 0 && cell.Y >= 0 &&
+					cell.X < snapshot.Width && cell.Y < snapshot.Height).Distinct();
+				return endpoints.Select(endpoint => ThreatAwareRoutePlanner.FindRoute(danger,
+					snapshot.Width, snapshot.Height, origin.X, origin.Y, endpoint.X, endpoint.Y,
+					snapshot.RouteThreatPenalty)).Where(route => route != null)
+					.OrderBy(route => route.Sum(cell => 1d +
+						danger[cell.Y * snapshot.Width + cell.X] * snapshot.RouteThreatPenalty))
+					.ThenBy(route => route.Count).FirstOrDefault() ?? new List<CPos>();
 			}
 		}
 

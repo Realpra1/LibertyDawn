@@ -24,7 +24,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 {
 	public enum StealthClearMode { None, Kite, Crush, CrushBridge, Mass }
 
-	abstract class StealthAIStateBase : StateBase
+	#pragma warning disable SA1205
+	abstract partial class StealthAIStateBase : StateBase
+	#pragma warning restore SA1205
 	{
 		static readonly BitSet<TargetableType> AirTargetTypes = new BitSet<TargetableType>("Air");
 
