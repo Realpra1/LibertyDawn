@@ -276,6 +276,9 @@ namespace OpenRA.Mods.Common.Traits
 		public StealthUndefendedAttackHandoff UndefendedAttack { get; }
 		public StealthBehaviorHandoff Reacquisition { get; }
 		public StealthBehaviorHandoff RecalculateFlee { get; }
+		public StealthRecalculateFleeHandoff RecalculateFleeEntry { get; }
+		public StealthBehaviorHandoff SquadConstruction { get; }
+		public StealthSquadConstructionRecoveryHandoff SquadConstructionEntry { get; }
 
 		internal StealthMassAttackTransition(StealthBehaviorHandoff handoff,
 			StealthMassAttackResult result)
@@ -286,8 +289,17 @@ namespace OpenRA.Mods.Common.Traits
 				UndefendedAttack = new StealthUndefendedAttackHandoff(handoff, result.Mission);
 			else if (result.Disposition == StealthMassAttackDisposition.Reacquire)
 				Reacquisition = handoff;
-			else
+			else if (handoff.Owner == BehaviorId.RecalculateFlee)
+			{
 				RecalculateFlee = handoff;
+				RecalculateFleeEntry = new StealthRecalculateFleeHandoff(handoff, result);
+			}
+			else
+			{
+				SquadConstruction = handoff;
+				SquadConstructionEntry = new StealthSquadConstructionRecoveryHandoff(
+					handoff, result.Mission);
+			}
 		}
 	}
 }

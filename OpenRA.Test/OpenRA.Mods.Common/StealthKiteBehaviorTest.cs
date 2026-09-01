@@ -402,6 +402,8 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(input.Controller.Owner, Is.EqualTo(expected == StealthKiteDisposition.MassAttack ?
 				BehaviorId.MassAttack : BehaviorId.RecalculateFlee));
 			Assert.That(transition.MassAttack != null, Is.EqualTo(expected == StealthKiteDisposition.MassAttack));
+			Assert.That(transition.RecalculateFleeEntry != null,
+				Is.EqualTo(expected == StealthKiteDisposition.RecalculateFlee));
 		}
 
 		[Test]
@@ -684,7 +686,10 @@ namespace OpenRA.Test.Mods.Common
 			var transitionInput = CreateInput();
 			var transitionResult = Behavior(transitionInput, snapshot, out _, out _, out _).Execute();
 			Assert.That(transitionInput.Controller.TryAccept(transitionResult, out var transition), Is.True);
-			Assert.That(transition.RecalculateFlee, Is.Not.Null);
+			Assert.That(transition.SquadConstruction, Is.Not.Null);
+			Assert.That(transition.SquadConstructionEntry.Mission, Is.SameAs(transitionResult.Mission));
+			Assert.That(transition.RecalculateFlee, Is.Null);
+			Assert.That(transition.RecalculateFleeEntry, Is.Null);
 		}
 
 		[Test]

@@ -422,6 +422,8 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(flee.Disposition, Is.EqualTo(StealthMassAttackDisposition.RecalculateFlee));
 			Assert.That(crossoverInput.Controller.TryAccept(flee, out var fleeTransition), Is.True);
 			Assert.That(fleeTransition.RecalculateFlee, Is.Not.Null);
+			Assert.That(fleeTransition.RecalculateFleeEntry, Is.Not.Null);
+			Assert.That(fleeTransition.RecalculateFleeEntry.Mission, Is.SameAs(flee.Mission));
 
 			var zeroInput = CreateInput(snapshot);
 			var zero = Behavior(zeroInput, snapshot, out var zeroLive, out _, out _);
@@ -430,7 +432,9 @@ namespace OpenRA.Test.Mods.Common
 			var zeroResult = zero.Execute();
 			Assert.That(zeroResult.Disposition, Is.EqualTo(StealthMassAttackDisposition.RecalculateFlee));
 			Assert.That(zeroInput.Controller.TryAccept(zeroResult, out var zeroTransition), Is.True);
-			Assert.That(zeroTransition.RecalculateFlee, Is.Not.Null);
+			Assert.That(zeroTransition.SquadConstruction, Is.Not.Null);
+			Assert.That(zeroTransition.SquadConstructionEntry.Mission, Is.SameAs(zeroResult.Mission));
+			Assert.That(zeroTransition.RecalculateFlee, Is.Null);
 
 			foreach (var actors in new[]
 			{
@@ -446,7 +450,9 @@ namespace OpenRA.Test.Mods.Common
 				Assert.That(result.Threat, Is.Null);
 				Assert.That(result.LastOrderToken, Is.Null);
 				Assert.That(noMembersInput.Controller.TryAccept(result, out var transition), Is.True);
-				Assert.That(transition.RecalculateFlee, Is.Not.Null);
+				Assert.That(transition.SquadConstruction, Is.Not.Null);
+				Assert.That(transition.SquadConstructionEntry.Mission, Is.SameAs(result.Mission));
+				Assert.That(transition.RecalculateFlee, Is.Null);
 			}
 
 			var objectiveInput = CreateInput(snapshot);
@@ -806,6 +812,7 @@ namespace OpenRA.Test.Mods.Common
 
 			Assert.That(input.Controller.TryAccept(result, out var transition), Is.True);
 			Assert.That(transition.RecalculateFlee, Is.Not.Null);
+			Assert.That(transition.RecalculateFleeEntry, Is.Not.Null);
 		}
 
 		[TestCase(false)]

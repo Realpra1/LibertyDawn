@@ -293,7 +293,9 @@ namespace OpenRA.Mods.Common.Traits
 				case StealthKiteDisposition.RecalculateFlee:
 					if (!ValidKiteFallback(result, false))
 						return false;
-					nextOwner = BehaviorId.RecalculateFlee;
+					nextOwner = result.FallbackEvidence.Reason ==
+						StealthKiteFallbackReason.NoLiveMembers ?
+						BehaviorId.SquadConstruction : BehaviorId.RecalculateFlee;
 					break;
 				default:
 					return false;
@@ -342,13 +344,44 @@ namespace OpenRA.Mods.Common.Traits
 						(zeroMembers && !ValidMassTargetless(result)) ||
 						result.LastOrderToken != null)
 						return false;
-					nextHandoff = AdvanceTo(BehaviorId.RecalculateFlee);
+					nextHandoff = AdvanceTo(zeroMembers ? BehaviorId.SquadConstruction :
+						BehaviorId.RecalculateFlee);
 					break;
 				default:
 					return false;
 			}
 
 			transition = new StealthMassAttackTransition(nextHandoff, result);
+			return true;
+		}
+
+		public bool TryAccept(StealthRecalculateFleeResult result,
+			out StealthRecalculateFleeTransition transition)
+		{
+			transition = null;
+			if (result == null || owner != BehaviorId.RecalculateFlee ||
+				result.Handoff.Owner != owner || result.Handoff.Epoch != epoch ||
+				result.Source == null || !ReferenceEquals(result.Mission, result.Source.Mission))
+				return false;
+
+			StealthBehaviorHandoff next;
+			if (result.Disposition == StealthRecalculateFleeDisposition.Retain)
+			{
+				if (result.LiveCause == StealthRecalculateFleeLiveCause.Completed)
+					return false;
+				next = CurrentHandoff;
+			}
+			else if (result.Disposition == StealthRecalculateFleeDisposition.TargetAcquisition)
+			{
+				if (result.LiveCause != StealthRecalculateFleeLiveCause.Completed ||
+					!result.SelectedDestinationCell.HasValue || result.LastOrderToken == null)
+					return false;
+				next = AdvanceTo(BehaviorId.TargetAcquisition);
+			}
+			else
+				return false;
+
+			transition = new StealthRecalculateFleeTransition(next, result);
 			return true;
 		}
 

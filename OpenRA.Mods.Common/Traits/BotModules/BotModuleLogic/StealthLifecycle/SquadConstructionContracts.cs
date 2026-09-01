@@ -15,6 +15,27 @@ using System.Collections.ObjectModel;
 
 namespace OpenRA.Mods.Common.Traits
 {
+	/// <summary>
+	/// Typed immutable no-squad boundary used when a combat owner loses every member. The prior
+	/// mission is context only: SquadConstruction remains the sole owner of rebuilding a squad.
+	/// </summary>
+	public sealed class StealthSquadConstructionRecoveryHandoff
+	{
+		internal StealthBehaviorHandoff Handoff { get; }
+		public BehaviorId Owner => Handoff.Owner;
+		public OwnershipEpoch Epoch => Handoff.Epoch;
+		public StealthApproachMission Mission { get; }
+
+		internal StealthSquadConstructionRecoveryHandoff(StealthBehaviorHandoff handoff,
+			StealthApproachMission mission)
+		{
+			Handoff = handoff ?? throw new ArgumentNullException(nameof(handoff));
+			if (handoff.Owner != BehaviorId.SquadConstruction)
+				throw new ArgumentException("Recovery must belong to SquadConstruction.", nameof(handoff));
+			Mission = mission ?? throw new ArgumentNullException(nameof(mission));
+		}
+	}
+
 	public enum StealthSquadConstructionDisposition
 	{
 		Completed,
