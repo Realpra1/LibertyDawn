@@ -204,6 +204,47 @@ namespace OpenRA.Mods.Common.Traits
 			return true;
 		}
 
+		public bool TryAccept(StealthCrushResult result, out StealthCrushTransition transition)
+		{
+			transition = null;
+			if (result == null || owner != BehaviorId.CrushEvaluation ||
+				result.Handoff.Owner != owner || result.Handoff.Epoch != epoch)
+				return false;
+
+			StealthBehaviorHandoff nextHandoff;
+			switch (result.Disposition)
+			{
+				case StealthCrushDisposition.Retain:
+					if (result.LiveDefenderActorIds.Count == 0 ||
+						!result.SelectedTargetActorId.HasValue || !result.Safety.HasValue ||
+						!result.Safety.Value.Approved)
+						return false;
+					nextHandoff = CurrentHandoff;
+					break;
+				case StealthCrushDisposition.Kite:
+					if (result.LiveDefenderActorIds.Count == 0 ||
+						(result.Safety.HasValue && result.Safety.Value.Approved))
+						return false;
+					nextHandoff = AdvanceTo(BehaviorId.Kite);
+					break;
+				case StealthCrushDisposition.UndefendedAttack:
+					if (result.LiveDefenderActorIds.Count != 0 || result.LiveObjectiveActorIds.Count == 0)
+						return false;
+					nextHandoff = AdvanceTo(BehaviorId.UndefendedAttack);
+					break;
+				case StealthCrushDisposition.Reacquire:
+					if (result.LiveDefenderActorIds.Count != 0 || result.LiveObjectiveActorIds.Count != 0)
+						return false;
+					nextHandoff = AdvanceTo(BehaviorId.TargetAcquisition);
+					break;
+				default:
+					return false;
+			}
+
+			transition = new StealthCrushTransition(nextHandoff, result);
+			return true;
+		}
+
 		StealthBehaviorHandoff AdvanceTo(BehaviorId nextOwner)
 		{
 			if (epoch.Value == long.MaxValue)

@@ -250,9 +250,19 @@ namespace OpenRA.Mods.Common.Traits
 		internal StealthCrushEvaluationHandoff(StealthBehaviorHandoff handoff,
 			StealthApproachMission mission, IEnumerable<uint> defenders)
 		{
-			Handoff = handoff;
-			Mission = mission;
-			liveDefenderActorIds = Array.AsReadOnly(defenders.ToArray());
+			Handoff = handoff ?? throw new ArgumentNullException(nameof(handoff));
+			if (handoff.Owner != BehaviorId.CrushEvaluation)
+				throw new ArgumentException(
+					"The handoff must belong to Crush.", nameof(handoff));
+			Mission = mission ?? throw new ArgumentNullException(nameof(mission));
+			if (defenders == null)
+				throw new ArgumentNullException(nameof(defenders));
+			var normalized = defenders.OrderBy(id => id).ToArray();
+			if (normalized.Length == 0 || normalized.Any(id => id == 0) ||
+				normalized.Distinct().Count() != normalized.Length)
+				throw new ArgumentException(
+					"Crush requires unique nonzero incoming defender identities.", nameof(defenders));
+			liveDefenderActorIds = Array.AsReadOnly(normalized);
 		}
 	}
 
