@@ -62,13 +62,31 @@ namespace OpenRA.Mods.Common.Traits
 			if (result == null || !result.HasTransition || owner != BehaviorId.Start ||
 				result.Handoff.Owner != owner || result.Handoff.Epoch != epoch)
 				return false;
+
+			nextHandoff = AdvanceTo(BehaviorId.SquadConstruction);
+			return true;
+		}
+
+		public bool TryAccept(StealthSquadConstructionResult result,
+			out StealthBehaviorHandoff nextHandoff)
+		{
+			nextHandoff = null;
+			if (result == null || !result.IsComplete || owner != BehaviorId.SquadConstruction ||
+				result.Handoff.Owner != owner || result.Handoff.Epoch != epoch)
+				return false;
+
+			nextHandoff = AdvanceTo(BehaviorId.TargetAcquisition);
+			return true;
+		}
+
+		StealthBehaviorHandoff AdvanceTo(BehaviorId nextOwner)
+		{
 			if (epoch.Value == long.MaxValue)
 				throw new InvalidOperationException("The stealth lifecycle ownership epoch is exhausted.");
 
-			owner = BehaviorId.SquadConstruction;
+			owner = nextOwner;
 			epoch = new OwnershipEpoch(epoch.Value + 1);
-			nextHandoff = CurrentHandoff;
-			return true;
+			return CurrentHandoff;
 		}
 
 		public StealthLifecycleSavePayload ExportState()

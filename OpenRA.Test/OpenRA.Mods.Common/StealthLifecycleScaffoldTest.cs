@@ -360,7 +360,8 @@ namespace OpenRA.Test.Mods.Common
 		{
 			var controller = new StealthLifecycleController();
 			var tryAccept = typeof(StealthLifecycleController).GetMethods()
-				.Single(method => method.Name == nameof(StealthLifecycleController.TryAccept));
+				.Single(method => method.Name == nameof(StealthLifecycleController.TryAccept) &&
+					method.GetParameters()[0].ParameterType == typeof(StealthStartResult));
 
 			Assert.That(tryAccept.GetParameters()[0].ParameterType, Is.EqualTo(typeof(StealthStartResult)));
 			Assert.That(typeof(StealthStartResult).GetConstructors(), Is.Empty);
