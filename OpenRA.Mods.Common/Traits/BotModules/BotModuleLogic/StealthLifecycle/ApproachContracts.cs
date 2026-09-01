@@ -230,8 +230,11 @@ namespace OpenRA.Mods.Common.Traits
 		internal StealthUndefendedAttackHandoff(StealthBehaviorHandoff handoff,
 			StealthApproachMission mission)
 		{
-			Handoff = handoff;
-			Mission = mission;
+			Handoff = handoff ?? throw new ArgumentNullException(nameof(handoff));
+			if (handoff.Owner != BehaviorId.UndefendedAttack)
+				throw new ArgumentException(
+					"The handoff must belong to UndefendedAttack.", nameof(handoff));
+			Mission = mission ?? throw new ArgumentNullException(nameof(mission));
 		}
 	}
 

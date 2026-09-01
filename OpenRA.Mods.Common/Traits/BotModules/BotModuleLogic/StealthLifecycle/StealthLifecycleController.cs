@@ -17,7 +17,7 @@ namespace OpenRA.Mods.Common.Traits
 	/// Disconnected lifecycle scaffold. Ownership changes only when the current handoff is returned
 	/// in a behavior result; observing time or world events can never select another owner.
 	/// </summary>
-	public sealed class StealthLifecycleController
+	public sealed class StealthLifecycleController : IStealthLifecycleOwnershipGuard
 	{
 		BehaviorId owner;
 		OwnershipEpoch epoch;
@@ -27,6 +27,11 @@ namespace OpenRA.Mods.Common.Traits
 		public OwnershipEpoch Epoch => epoch;
 		public int LastObservedTick => lastObservedTick;
 		public StealthBehaviorHandoff CurrentHandoff => new StealthBehaviorHandoff(owner, epoch);
+
+		public bool IsActive(BehaviorId candidateOwner, OwnershipEpoch candidateEpoch)
+		{
+			return owner == candidateOwner && epoch == candidateEpoch;
+		}
 
 		public StealthLifecycleController()
 			: this(BehaviorId.Start, new OwnershipEpoch(1), -1) { }
@@ -162,6 +167,40 @@ namespace OpenRA.Mods.Common.Traits
 			}
 
 			transition = new StealthApproachTransition(AdvanceTo(nextOwner), result);
+			return true;
+		}
+
+		public bool TryAccept(StealthUndefendedAttackResult result,
+			out StealthUndefendedAttackTransition transition)
+		{
+			transition = null;
+			if (result == null || owner != BehaviorId.UndefendedAttack ||
+				result.Handoff.Owner != owner || result.Handoff.Epoch != epoch)
+				return false;
+
+			StealthBehaviorHandoff nextHandoff;
+			switch (result.Disposition)
+			{
+				case StealthUndefendedAttackDisposition.Retain:
+					if (result.LiveDefenderActorIds.Count != 0)
+						return false;
+					nextHandoff = CurrentHandoff;
+					break;
+				case StealthUndefendedAttackDisposition.Reacquire:
+					if (result.LiveDefenderActorIds.Count != 0)
+						return false;
+					nextHandoff = AdvanceTo(BehaviorId.TargetAcquisition);
+					break;
+				case StealthUndefendedAttackDisposition.CrushEvaluation:
+					if (result.LiveDefenderActorIds.Count == 0)
+						return false;
+					nextHandoff = AdvanceTo(BehaviorId.CrushEvaluation);
+					break;
+				default:
+					return false;
+			}
+
+			transition = new StealthUndefendedAttackTransition(nextHandoff, result);
 			return true;
 		}
 

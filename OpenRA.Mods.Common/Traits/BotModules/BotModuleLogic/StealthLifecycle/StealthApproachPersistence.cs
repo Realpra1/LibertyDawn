@@ -162,7 +162,7 @@ namespace OpenRA.Mods.Common.Traits
 			};
 		}
 
-		static MiniYamlNode SerializeMission(StealthApproachMission mission)
+		internal static MiniYamlNode SerializeMission(StealthApproachMission mission)
 		{
 			var option = mission.TargetOption;
 			var value = option.ValueOption;
@@ -242,7 +242,7 @@ namespace OpenRA.Mods.Common.Traits
 				classification == StealthApproachArrivalClassification.None;
 		}
 
-		static string Canonical(MiniYamlNode node)
+		internal static string Canonical(MiniYamlNode node)
 		{
 			return new List<MiniYamlNode> { node }.WriteToString();
 		}

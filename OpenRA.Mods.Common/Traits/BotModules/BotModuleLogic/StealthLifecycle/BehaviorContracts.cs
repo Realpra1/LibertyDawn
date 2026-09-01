@@ -109,6 +109,11 @@ namespace OpenRA.Mods.Common.Traits
 		}
 	}
 
+	public interface IStealthLifecycleOwnershipGuard
+	{
+		bool IsActive(BehaviorId owner, OwnershipEpoch epoch);
+	}
+
 	public enum StealthStartDisposition
 	{
 		ObservationOnly,
