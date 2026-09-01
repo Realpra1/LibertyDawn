@@ -299,6 +299,7 @@ namespace OpenRA.Mods.Common.Traits
 		public StealthUndefendedAttackHandoff UndefendedAttack { get; }
 		public StealthBehaviorHandoff Reacquisition { get; }
 		public StealthBehaviorHandoff MassAttack { get; }
+		public StealthMassAttackHandoff MassAttackEntry { get; }
 		public StealthBehaviorHandoff RecalculateFlee { get; }
 
 		internal StealthKiteTransition(StealthBehaviorHandoff handoff, StealthKiteResult result)
@@ -313,7 +314,11 @@ namespace OpenRA.Mods.Common.Traits
 			else if (result.Disposition == StealthKiteDisposition.Reacquire)
 				Reacquisition = handoff;
 			else if (result.Disposition == StealthKiteDisposition.MassAttack)
+			{
 				MassAttack = handoff;
+				MassAttackEntry = new StealthMassAttackHandoff(
+					handoff, result.Mission, result.FallbackEvidence);
+			}
 			else
 				RecalculateFlee = handoff;
 		}

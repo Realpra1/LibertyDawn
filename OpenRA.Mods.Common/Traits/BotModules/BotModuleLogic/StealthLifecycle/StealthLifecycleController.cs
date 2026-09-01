@@ -304,6 +304,85 @@ namespace OpenRA.Mods.Common.Traits
 			return true;
 		}
 
+		public bool TryAccept(StealthMassAttackResult result,
+			out StealthMassAttackTransition transition)
+		{
+			transition = null;
+			if (result == null || owner != BehaviorId.MassAttack ||
+				result.Handoff.Owner != owner || result.Handoff.Epoch != epoch ||
+				result.Source == null || !ReferenceEquals(result.Mission, result.Source.Mission) ||
+				result.Source.Handoff.Owner != owner || result.Source.Handoff.Epoch != epoch)
+				return false;
+
+			StealthBehaviorHandoff nextHandoff;
+			switch (result.Disposition)
+			{
+				case StealthMassAttackDisposition.Retain:
+					if (!ValidMassTarget(result) || result.Threat.Value.StandardScore.Crossover <= 1 ||
+						!ValidMassOrder(result))
+						return false;
+					nextHandoff = CurrentHandoff;
+					break;
+				case StealthMassAttackDisposition.UndefendedAttack:
+					if (!ValidMassTargetless(result) || result.ActiveMemberActorIds.Count == 0 ||
+						result.LiveDefenderActorIds.Count != 0 || result.LiveObjectiveActorIds.Count == 0)
+						return false;
+					nextHandoff = AdvanceTo(BehaviorId.UndefendedAttack);
+					break;
+				case StealthMassAttackDisposition.Reacquire:
+					if (!ValidMassTargetless(result) || result.ActiveMemberActorIds.Count == 0 ||
+						result.LiveDefenderActorIds.Count != 0 || result.LiveObjectiveActorIds.Count != 0)
+						return false;
+					nextHandoff = AdvanceTo(BehaviorId.TargetAcquisition);
+					break;
+				case StealthMassAttackDisposition.RecalculateFlee:
+					var zeroMembers = result.ActiveMemberActorIds.Count == 0;
+					if ((!zeroMembers && (!ValidMassTarget(result) ||
+							result.Threat.Value.StandardScore.Crossover > 1)) ||
+						(zeroMembers && !ValidMassTargetless(result)) ||
+						result.LastOrderToken != null)
+						return false;
+					nextHandoff = AdvanceTo(BehaviorId.RecalculateFlee);
+					break;
+				default:
+					return false;
+			}
+
+			transition = new StealthMassAttackTransition(nextHandoff, result);
+			return true;
+		}
+
+		static bool ValidMassTarget(StealthMassAttackResult result)
+		{
+			var facts = result.ThreatFacts;
+			return result.ActiveMemberActorIds.Count != 0 && result.LiveDefenderActorIds.Count != 0 &&
+				result.SelectedTargetActorId.HasValue && result.SelectedTargetCurrentCell.HasValue &&
+				facts != null && result.Threat.HasValue &&
+				result.LiveDefenderActorIds.Contains(result.SelectedTargetActorId.Value) &&
+				facts.SelectedTargetActorId == result.SelectedTargetActorId.Value &&
+				facts.SelectedTargetCurrentCell == result.SelectedTargetCurrentCell.Value &&
+				facts.FriendlyActorIds.SequenceEqual(result.ActiveMemberActorIds) &&
+				facts.EnemyActorIds.SequenceEqual(result.LiveDefenderActorIds) &&
+				facts.PlannedReveal && facts.PlannedAttack && facts.FullCurrentFiringRangeExposure;
+		}
+
+		static bool ValidMassTargetless(StealthMassAttackResult result)
+		{
+			return result.Phase == StealthMassAttackPhase.Advance &&
+				!result.SelectedTargetActorId.HasValue && !result.SelectedTargetCurrentCell.HasValue &&
+				result.ThreatFacts == null && !result.Threat.HasValue && result.LastOrderToken == null;
+		}
+
+		static bool ValidMassOrder(StealthMassAttackResult result)
+		{
+			var token = result.LastOrderToken;
+			return token != null && token.Owner == BehaviorId.MassAttack &&
+				token.Epoch == result.Handoff.Epoch && token.Phase == result.Phase &&
+				token.ActorIds.SequenceEqual(result.ActiveMemberActorIds) &&
+				token.TargetActorId == result.SelectedTargetActorId &&
+				token.TargetCurrentCell == result.SelectedTargetCurrentCell;
+		}
+
 		static bool ValidKiteFallback(StealthKiteResult result, bool massAttack)
 		{
 			var evidence = result.FallbackEvidence;
