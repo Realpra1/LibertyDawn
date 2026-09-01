@@ -15,7 +15,7 @@ namespace OpenRA.Mods.Common.Traits
 {
 	/// <summary>
 	/// Instance-local guard for behavior calls that may invoke reentrant external callbacks.
-	/// It does not change lifecycle ownership and is currently used only by the Crush owner.
+	/// It does not change lifecycle ownership and is shared by the local combat owners.
 	/// </summary>
 	sealed class StealthBehaviorExecutionLease
 	{

@@ -28,7 +28,9 @@ namespace OpenRA.Mods.Common.Traits
 		Damage,
 		UndefendedAttack,
 		CrushEvaluation,
-		Kite
+		Kite,
+		MassAttack,
+		RecalculateFlee
 	}
 
 	public enum StealthLifecycleObservationKind

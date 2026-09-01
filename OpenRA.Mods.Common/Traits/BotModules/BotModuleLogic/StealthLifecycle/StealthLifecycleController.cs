@@ -10,6 +10,7 @@
 #endregion
 
 using System;
+using System.Linq;
 
 namespace OpenRA.Mods.Common.Traits
 {
@@ -243,6 +244,88 @@ namespace OpenRA.Mods.Common.Traits
 
 			transition = new StealthCrushTransition(nextHandoff, result);
 			return true;
+		}
+
+		public bool TryAccept(StealthKiteResult result, out StealthKiteTransition transition)
+		{
+			transition = null;
+			if (result == null || owner != BehaviorId.Kite ||
+				result.Handoff.Owner != owner || result.Handoff.Epoch != epoch)
+				return false;
+
+			BehaviorId nextOwner;
+			switch (result.Disposition)
+			{
+				case StealthKiteDisposition.Retain:
+					if (result.ActiveMemberActorIds.Count == 0 || result.LiveDefenderActorIds.Count == 0 ||
+						!result.SelectedTargetActorId.HasValue || !result.FireCell.HasValue ||
+						!result.WithdrawCell.HasValue || !result.Safety.HasValue ||
+						!result.Safety.Value.Approved || result.FallbackEvidence != null)
+						return false;
+					nextOwner = BehaviorId.Kite;
+					break;
+				case StealthKiteDisposition.CrushEvaluation:
+					if (result.ActiveMemberActorIds.Count == 0 || result.LiveDefenderActorIds.Count == 0 ||
+						!result.SelectedTargetActorId.HasValue || result.FireCell.HasValue ||
+						result.WithdrawCell.HasValue || result.Safety.HasValue || result.FallbackEvidence != null)
+						return false;
+					nextOwner = BehaviorId.CrushEvaluation;
+					break;
+				case StealthKiteDisposition.UndefendedAttack:
+					if (result.LiveDefenderActorIds.Count != 0 || result.LiveObjectiveActorIds.Count == 0 ||
+						result.SelectedTargetActorId.HasValue || result.FireCell.HasValue ||
+						result.WithdrawCell.HasValue || result.Safety.HasValue || result.FallbackEvidence != null)
+						return false;
+					nextOwner = BehaviorId.UndefendedAttack;
+					break;
+				case StealthKiteDisposition.Reacquire:
+					if (result.LiveDefenderActorIds.Count != 0 || result.LiveObjectiveActorIds.Count != 0 ||
+						result.SelectedTargetActorId.HasValue || result.FireCell.HasValue ||
+						result.WithdrawCell.HasValue || result.Safety.HasValue || result.FallbackEvidence != null)
+						return false;
+					nextOwner = BehaviorId.TargetAcquisition;
+					break;
+				case StealthKiteDisposition.MassAttack:
+					if (!ValidKiteFallback(result, true))
+						return false;
+					nextOwner = BehaviorId.MassAttack;
+					break;
+				case StealthKiteDisposition.RecalculateFlee:
+					if (!ValidKiteFallback(result, false))
+						return false;
+					nextOwner = BehaviorId.RecalculateFlee;
+					break;
+				default:
+					return false;
+			}
+
+			var nextHandoff = nextOwner == BehaviorId.Kite ? CurrentHandoff : AdvanceTo(nextOwner);
+			transition = new StealthKiteTransition(nextHandoff, result);
+			return true;
+		}
+
+		static bool ValidKiteFallback(StealthKiteResult result, bool massAttack)
+		{
+			var evidence = result.FallbackEvidence;
+			if (evidence == null || result.LiveDefenderActorIds.Count == 0 ||
+				result.FireCell.HasValue || result.WithdrawCell.HasValue || result.Safety.HasValue ||
+				!evidence.DefenderActorIds.SequenceEqual(result.LiveDefenderActorIds))
+				return false;
+			if (evidence.Reason == StealthKiteFallbackReason.NoLiveMembers)
+				return !massAttack && result.ActiveMemberActorIds.Count == 0 &&
+					!result.SelectedTargetActorId.HasValue && evidence.AttackFacts == null &&
+					!evidence.AttackScore.HasValue;
+
+			var facts = evidence.AttackFacts;
+			var score = evidence.AttackScore;
+			return evidence.Reason == StealthKiteFallbackReason.NoSafePlan &&
+				result.ActiveMemberActorIds.Count != 0 && result.SelectedTargetActorId.HasValue &&
+				result.SelectedTargetCurrentCell.HasValue && facts != null && score.HasValue &&
+				facts.SelectedTargetActorId == result.SelectedTargetActorId.Value &&
+				facts.SelectedTargetCurrentCell == result.SelectedTargetCurrentCell.Value &&
+				facts.FriendlyActorIds.SequenceEqual(result.ActiveMemberActorIds) &&
+				facts.EnemyActorIds.SequenceEqual(result.LiveDefenderActorIds) &&
+				massAttack == (score.Value.Crossover > 2);
 		}
 
 		StealthBehaviorHandoff AdvanceTo(BehaviorId nextOwner)
