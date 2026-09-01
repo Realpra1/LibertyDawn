@@ -20,7 +20,7 @@ namespace OpenRA.Mods.Common.Traits
 		Start,
 		SquadConstruction,
 		TargetAcquisition,
-		TargetChoosing,
+		TargetValueFilter,
 		Engagement,
 		Damage
 	}

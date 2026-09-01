@@ -124,6 +124,7 @@ namespace OpenRA.Mods.Common.Traits
 			readonly int height;
 			readonly IReadOnlyList<CPos> targetCells;
 			readonly float dangerCost;
+			readonly float maximumRouteCost;
 			readonly int maximumResults;
 			readonly int requiredIndex;
 			readonly Dictionary<int, List<int>> targetsByCell = new Dictionary<int, List<int>>();
@@ -151,11 +152,11 @@ namespace OpenRA.Mods.Common.Traits
 
 			internal ReachableTargetCellSearch(float[] danger, int width, int height,
 				int startX, int startY, IReadOnlyList<CPos> targetCells, float dangerCost,
-				int maximumResults, int requiredIndex)
+				int maximumResults, int requiredIndex, float maximumRouteCost)
 			{
 				if (danger == null || width <= 0 || height <= 0 || danger.Length != width * height ||
 					startX < 0 || startY < 0 || startX >= width || startY >= height ||
-					targetCells == null || maximumResults <= 0)
+					targetCells == null || maximumResults <= 0 || maximumRouteCost < 0)
 				{
 					Complete = true;
 					return;
@@ -166,6 +167,7 @@ namespace OpenRA.Mods.Common.Traits
 				this.height = height;
 				this.targetCells = targetCells;
 				this.dangerCost = dangerCost;
+				this.maximumRouteCost = maximumRouteCost;
 				this.maximumResults = maximumResults;
 				this.requiredIndex = requiredIndex;
 				start = startY * width + startX;
@@ -242,7 +244,8 @@ namespace OpenRA.Mods.Common.Traits
 						break;
 
 					case SearchPhase.ExpandCell:
-						if (open.Count == 0 || (regularResults >= maximumResults && requiredFound))
+						if (open.Count == 0 || open.Min.Cost > maximumRouteCost ||
+							(regularResults >= maximumResults && requiredFound))
 						{
 							CompleteSearch();
 							break;
@@ -437,10 +440,10 @@ namespace OpenRA.Mods.Common.Traits
 		public static ReachableTargetCellSearch StartReachableTargetCellSearch(
 			float[] danger, int width, int height, int startX, int startY,
 			IReadOnlyList<CPos> targetCells, float dangerCost, int maximumResults,
-			int requiredIndex = -1)
+			int requiredIndex = -1, float maximumRouteCost = float.MaxValue)
 		{
 			return new ReachableTargetCellSearch(danger, width, height, startX, startY,
-				targetCells, dangerCost, maximumResults, requiredIndex);
+				targetCells, dangerCost, maximumResults, requiredIndex, maximumRouteCost);
 		}
 
 		/// <summary>
