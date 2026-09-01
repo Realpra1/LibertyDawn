@@ -87,7 +87,8 @@ namespace OpenRA.Mods.Common.Traits
 				var incumbent = candidates.FirstOrDefault(candidate =>
 					candidate.Cell == incumbentStrategicCell.Value);
 				options.Add(new StealthTargetOption(incumbentStrategicCell.Value,
-					incumbent?.TravelMilliseconds, true));
+					incumbent?.TravelMilliseconds, true,
+					TargetsAt(snapshot, incumbentStrategicCell.Value)));
 			}
 
 			foreach (var candidate in candidates)
@@ -98,7 +99,7 @@ namespace OpenRA.Mods.Common.Traits
 					continue;
 
 				options.Add(new StealthTargetOption(candidate.Cell,
-					candidate.TravelMilliseconds, false));
+					candidate.TravelMilliseconds, false, TargetsAt(snapshot, candidate.Cell)));
 			}
 
 			var needsRescan = options.Count < MaximumOptions;
@@ -133,13 +134,18 @@ namespace OpenRA.Mods.Common.Traits
 			};
 
 			foreach (var option in result.Options)
-				nodes.Add(new MiniYamlNode("Option", "", new List<MiniYamlNode>
+			{
+				var optionNodes = new List<MiniYamlNode>
 				{
 					new MiniYamlNode("StrategicCell", FieldSaver.FormatValue(option.StrategicCell)),
 					new MiniYamlNode("EstimatedTravelMilliseconds",
 						FieldSaver.FormatValue(option.EstimatedTravelMilliseconds)),
 					new MiniYamlNode("IsIncumbent", FieldSaver.FormatValue(option.IsIncumbent))
-				}));
+				};
+				foreach (var target in option.StrategicTargets)
+					optionNodes.Add(SerializeTarget(target));
+				nodes.Add(new MiniYamlNode("Option", "", optionNodes));
+			}
 
 			return new MiniYamlNode(key, "", nodes);
 		}
@@ -177,10 +183,40 @@ namespace OpenRA.Mods.Common.Traits
 
 		static StealthTargetOption RestoreOption(MiniYamlNode node)
 		{
-			var values = ReadUniqueValues(node.Value.Nodes, "TargetAcquisition option");
+			var values = ReadUniqueValues(node.Value.Nodes.Where(child => child.Key != "Target"),
+				"TargetAcquisition option");
 			return new StealthTargetOption(Read<CPos>(values, "StrategicCell"),
 				Read<int?>(values, "EstimatedTravelMilliseconds"),
-				Read<bool>(values, "IsIncumbent"));
+				Read<bool>(values, "IsIncumbent"),
+				node.Value.Nodes.Where(child => child.Key == "Target").Select(RestoreTarget));
+		}
+
+		static MiniYamlNode SerializeTarget(StealthStrategicTargetSnapshot target)
+		{
+			return new MiniYamlNode("Target", "", new List<MiniYamlNode>
+			{
+				new MiniYamlNode("StableActorId", FieldSaver.FormatValue(target.StableActorId)),
+				new MiniYamlNode("StrategicCell", FieldSaver.FormatValue(target.StrategicCell)),
+				new MiniYamlNode("ConfiguredPriority", FieldSaver.FormatValue(target.ConfiguredPriority)),
+				new MiniYamlNode("ActorValue", FieldSaver.FormatValue(target.ActorValue)),
+				new MiniYamlNode("HitPoints", FieldSaver.FormatValue(target.HitPoints)),
+				new MiniYamlNode("MaximumHitPoints", FieldSaver.FormatValue(target.MaximumHitPoints))
+			});
+		}
+
+		static StealthStrategicTargetSnapshot RestoreTarget(MiniYamlNode node)
+		{
+			var values = ReadUniqueValues(node.Value.Nodes, "TargetAcquisition target");
+			return new StealthStrategicTargetSnapshot(
+				Read<uint>(values, "StableActorId"), Read<CPos>(values, "StrategicCell"),
+				Read<int>(values, "ConfiguredPriority"), Read<int>(values, "ActorValue"),
+				Read<int>(values, "HitPoints"), Read<int>(values, "MaximumHitPoints"));
+		}
+
+		static IEnumerable<StealthStrategicTargetSnapshot> TargetsAt(
+			StealthTargetAcquisitionCacheSnapshot snapshot, CPos cell)
+		{
+			return snapshot.StrategicTargets.Where(target => target.StrategicCell == cell);
 		}
 
 		static CPos? MoveCloser(CPos start, IReadOnlyList<CPos> enemies,
@@ -259,6 +295,9 @@ namespace OpenRA.Mods.Common.Traits
 			var options = result.Options.ToArray();
 			if (options.Length > MaximumOptions ||
 				options.Select(option => option.StrategicCell).Distinct().Count() != options.Length ||
+				options.SelectMany(option => option.StrategicTargets)
+					.Select(target => target.StableActorId).Distinct().Count() !=
+					options.Sum(option => option.StrategicTargets.Count) ||
 				options.Any(option => option.EstimatedTravelMilliseconds > MaximumTravelSeconds * 1000 &&
 					!option.IsIncumbent) || options.Count(option => option.IsIncumbent) > 1 ||
 				(result.IncumbentStrategicCell == null && options.Any(option => option.IsIncumbent)) ||

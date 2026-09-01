@@ -92,6 +92,19 @@ namespace OpenRA.Mods.Common.Traits
 			return true;
 		}
 
+		public bool TryAccept(StealthTargetValueFilterResult result,
+			out StealthTargetThreatFilterHandoff nextHandoff)
+		{
+			nextHandoff = null;
+			if (result == null || !result.IsReadyForThreatFilter || owner != BehaviorId.TargetValueFilter ||
+				result.Handoff.Owner != owner || result.Handoff.Epoch != epoch)
+				return false;
+
+			nextHandoff = new StealthTargetThreatFilterHandoff(
+				AdvanceTo(BehaviorId.TargetThreatFilter), result.Options);
+			return true;
+		}
+
 		StealthBehaviorHandoff AdvanceTo(BehaviorId nextOwner)
 		{
 			if (epoch.Value == long.MaxValue)

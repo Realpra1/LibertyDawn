@@ -31,16 +31,19 @@ namespace OpenRA.Mods.Common.Traits
 	{
 		readonly ReadOnlyCollection<float> danger;
 		readonly ReadOnlyCollection<CPos> enemyStrategicCells;
+		readonly ReadOnlyCollection<StealthStrategicTargetSnapshot> strategicTargets;
 
 		public int Width { get; }
 		public int Height { get; }
 		public float SecondsPerCostUnit { get; }
 		public IReadOnlyList<float> Danger => danger;
 		public IReadOnlyList<CPos> EnemyStrategicCells => enemyStrategicCells;
+		public IReadOnlyList<StealthStrategicTargetSnapshot> StrategicTargets => strategicTargets;
 
 		public StealthTargetAcquisitionCacheSnapshot(int width, int height,
 			IEnumerable<float> danger, IEnumerable<CPos> enemyStrategicCells,
-			float secondsPerCostUnit)
+			float secondsPerCostUnit,
+			IEnumerable<StealthStrategicTargetSnapshot> strategicTargets = null)
 		{
 			if (width <= 0 || height <= 0 || (long)width * height > int.MaxValue)
 				throw new ArgumentOutOfRangeException(nameof(width));
@@ -60,12 +63,22 @@ namespace OpenRA.Mods.Common.Traits
 			if (enemies.Any(cell => cell.X < 0 || cell.Y < 0 || cell.X >= width || cell.Y >= height))
 				throw new ArgumentException("Enemy strategic cells must be inside the cached grid.",
 					nameof(enemyStrategicCells));
+			var targets = (strategicTargets ?? Array.Empty<StealthStrategicTargetSnapshot>()).ToArray();
+			if (targets.Any(target => target == null || target.StrategicCell.X < 0 ||
+				target.StrategicCell.Y < 0 || target.StrategicCell.X >= width || target.StrategicCell.Y >= height))
+				throw new ArgumentException("Strategic target snapshots must be inside the cached grid.",
+					nameof(strategicTargets));
+			if (targets.Select(target => target.StableActorId).Distinct().Count() != targets.Length)
+				throw new ArgumentException("Strategic target snapshots must have unique stable identities.",
+					nameof(strategicTargets));
 
 			Width = width;
 			Height = height;
 			SecondsPerCostUnit = secondsPerCostUnit;
 			this.danger = Array.AsReadOnly(dangerCells);
 			this.enemyStrategicCells = Array.AsReadOnly(enemies);
+			this.strategicTargets = Array.AsReadOnly(targets.OrderBy(target => target.StrategicCell.Y)
+				.ThenBy(target => target.StrategicCell.X).ThenBy(target => target.StableActorId).ToArray());
 		}
 	}
 
@@ -74,21 +87,65 @@ namespace OpenRA.Mods.Common.Traits
 		StealthTargetAcquisitionCacheSnapshot ReadSnapshot();
 	}
 
+	/// <summary>
+	/// Immutable value facts captured by the strategic cache. ConfiguredPriority has already been
+	/// resolved by the established squad policy; no actor/type policy is duplicated in the lifecycle.
+	/// </summary>
+	public sealed class StealthStrategicTargetSnapshot
+	{
+		public uint StableActorId { get; }
+		public CPos StrategicCell { get; }
+		public int ConfiguredPriority { get; }
+		public int ActorValue { get; }
+		public int HitPoints { get; }
+		public int MaximumHitPoints { get; }
+
+		public StealthStrategicTargetSnapshot(uint stableActorId, CPos strategicCell,
+			int configuredPriority, int actorValue, int hitPoints, int maximumHitPoints)
+		{
+			if (stableActorId == 0)
+				throw new ArgumentOutOfRangeException(nameof(stableActorId));
+			if (actorValue < 0)
+				throw new ArgumentOutOfRangeException(nameof(actorValue));
+			if (hitPoints < 0 || maximumHitPoints < 0)
+				throw new ArgumentOutOfRangeException(nameof(hitPoints));
+
+			StableActorId = stableActorId;
+			StrategicCell = strategicCell;
+			ConfiguredPriority = configuredPriority;
+			ActorValue = actorValue;
+			HitPoints = hitPoints;
+			MaximumHitPoints = maximumHitPoints;
+		}
+	}
+
 	public sealed class StealthTargetOption
 	{
+		readonly ReadOnlyCollection<StealthStrategicTargetSnapshot> strategicTargets;
+
 		public CPos StrategicCell { get; }
 		public int? EstimatedTravelMilliseconds { get; }
 		public bool IsIncumbent { get; }
+		public IReadOnlyList<StealthStrategicTargetSnapshot> StrategicTargets => strategicTargets;
 
 		internal StealthTargetOption(CPos strategicCell,
-			int? estimatedTravelMilliseconds, bool isIncumbent)
+			int? estimatedTravelMilliseconds, bool isIncumbent,
+			IEnumerable<StealthStrategicTargetSnapshot> strategicTargets = null)
 		{
 			if (estimatedTravelMilliseconds < 0)
 				throw new ArgumentOutOfRangeException(nameof(estimatedTravelMilliseconds));
+			var targets = (strategicTargets ?? Array.Empty<StealthStrategicTargetSnapshot>()).ToArray();
+			if (targets.Any(target => target == null || target.StrategicCell != strategicCell) ||
+				targets.Select(target => target.StableActorId).Distinct().Count() != targets.Length)
+				throw new ArgumentException(
+					"Strategic target snapshots must be unique and belong to the option cell.",
+					nameof(strategicTargets));
 
 			StrategicCell = strategicCell;
 			EstimatedTravelMilliseconds = estimatedTravelMilliseconds;
 			IsIncumbent = isIncumbent;
+			this.strategicTargets = Array.AsReadOnly(
+				targets.OrderBy(target => target.StableActorId).ToArray());
 		}
 	}
 
