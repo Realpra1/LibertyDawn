@@ -135,8 +135,11 @@ without desync; old replays simply contain no overlay metadata.
 
 Remaining:
 
-1. Finish five simple-control and five full-module Empire Earth games to natural
-   game-over. Report average simulated game time, wall time, normalized throughput,
-   and non-overlapping module CPU; a fixed-tick exit is not valid evidence.
-2. Run the complete CNC validation, record the final benchmark report, and publish
-   the PR 143 release candidate for human testing.
+1. Publish the final evidence update to PR 143.
+
+Final natural CPU evidence is recorded in `CNC-AI-PERFORMANCE-BENCHMARK.md`:
+five control and five full-module games passed natural completion. Full modules
+averaged `2.538x` wall-clock speed (slowest `2.160x`) with no advanced-module
+disable. The release-candidate behavior commit is available on PR 143 for human
+testing; complete .NET, benchmark-tool, Release build, and CNC rules/map
+validation are green.

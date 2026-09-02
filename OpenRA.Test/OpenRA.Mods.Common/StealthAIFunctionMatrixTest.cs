@@ -110,11 +110,15 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(decoded[7], Is.EqualTo(new CPos(3, 4)));
 
 			var publisher = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/StealthSquadOverlayPublisher.cs");
+			var factory = Source(
+				"OpenRA.Mods.Common/Traits/BotModules/Squads/StealthSquadLifecycleOwnerFactory.cs");
 			Assert.That(publisher, Does.Contain("const int PublishInterval = 5"));
 			Assert.That(publisher, Does.Contain("prior == item.Payload"),
 				"Replay orders must be emitted only when displayed squad state changes.");
 			Assert.That(Source("OpenRA.Mods.Common/Traits/Player/StealthSquadOverlay.cs"),
 				Does.Contain("new LineAnnotationRenderable"));
+			Assert.That(factory, Does.Contain("squad.StealthOverlayChosenTarget = null;"),
+				"Reacquisition must not display the abandoned mission as the chosen target.");
 			Assert.That(Source("mods/cnc/hotkeys.yaml"), Does.Contain(
 				"ToggleStealthSquadOverlay: F8"));
 			Assert.That(Source("mods/cnc/chrome/ingame.yaml"), Does.Contain(
