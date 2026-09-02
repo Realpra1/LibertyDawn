@@ -135,11 +135,12 @@ without desync; old replays simply contain no overlay metadata.
 
 Remaining:
 
-1. Publish the final evidence update to PR 143.
+1. Human playtest feedback on the merged PR 143 behavior.
 
 Final natural CPU evidence is recorded in `CNC-AI-PERFORMANCE-BENCHMARK.md`:
 five control and five full-module games passed natural completion. Full modules
 averaged `2.538x` wall-clock speed (slowest `2.160x`) with no advanced-module
-disable. The release-candidate behavior commit is available on PR 143 for human
-testing; complete .NET, benchmark-tool, Release build, and CNC rules/map
-validation are green.
+disable. PR 143 is merged and available for human testing. Final evidence and
+the stale overlay-target cleanup are published separately in PR 144 because the
+behavior PR merged before the evidence update; complete .NET, benchmark-tool,
+Release build, and CNC rules/map validation are green.
