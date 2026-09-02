@@ -9,6 +9,8 @@
 #endregion
 
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using OpenRA.Traits;
 
@@ -23,6 +25,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		readonly StealthSquadLifecycleStrategicAdapter strategic;
 		readonly StealthSquadLifecycleOwnerFactory factory;
 		readonly StealthLifecycleRuntime runtime;
+		public BehaviorId Phase => runtime.Owner;
 
 		public StealthSquadLifecycleRuntimeHost(Squad squad)
 		{
@@ -81,12 +84,16 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		void AdvanceUntilRetained()
 		{
 			// Decision-only owners hand control on immediately. Stop when an owner retains control
-			// (usually after issuing an order) so one scheduler interval cannot delay the next action.
+			// (usually after issuing an order) or when a handoff cycle revisits an owner. The latter
+			// defers stale strategic-cache retries to the normal scheduler interval.
+			var visitedOwners = new HashSet<BehaviorId>();
 			for (var i = 0; i < MaxImmediateHandoffs; i++)
 			{
 				var previousOwner = runtime.Owner;
+				if (!visitedOwners.Add(previousOwner))
+					break;
 				var previousEpoch = runtime.Epoch;
-				var accepted = runtime.Tick();
+				var accepted = BenchmarkOwnerTick(previousOwner, runtime.Tick);
 				var handedOff = accepted && (runtime.Owner != previousOwner || runtime.Epoch != previousEpoch);
 				if (handedOff && previousOwner == BehaviorId.SquadConstruction)
 					factory.CommitConstructionMembership(previousEpoch);
@@ -94,6 +101,27 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					runtime.Owner, runtime.Epoch);
 				if (!handedOff)
 					break;
+			}
+		}
+
+		T BenchmarkOwnerTick<T>(BehaviorId owner, Func<T> work)
+		{
+			if (!Game.IsBenchmarking)
+				return work();
+
+			var started = Stopwatch.GetTimestamp();
+			var modularBot = squad.Bot as ModularBot;
+			var queuedOrders = modularBot?.QueuedOrderCount ?? 0;
+			try
+			{
+				return work();
+			}
+			finally
+			{
+				var elapsed = 1000d * Math.Max(0, Stopwatch.GetTimestamp() - started) / Stopwatch.Frequency;
+				var addedOrders = modularBot == null ? 0 : modularBot.QueuedOrderCount - queuedOrders;
+				Game.RecordBotModuleSample(squad.Bot.Player.ClientIndex,
+					$"StealthSquad/{squad.AirProfile}/lifecycle-{owner}", elapsed, Math.Max(0, addedOrders));
 			}
 		}
 
@@ -131,7 +159,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 		public void ObserveDamage(Actor damaged, AttackInfo attack)
 		{
-			if (damaged == null || attack?.Attacker == null || attack.Damage.Value <= 0)
+			if (damaged == null || attack?.Damage == null ||
+				attack.Attacker == null || attack.Damage.Value <= 0)
 				return;
 			var health = damaged.TraitOrDefault<IHealth>();
 			if (health == null || health.HP <= 0 || health.MaxHP <= 0)

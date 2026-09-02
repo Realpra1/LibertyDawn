@@ -339,6 +339,34 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
+		public void ApproachDoesNotReplaceAnActiveEngineRouteWhenTheStrategicRouteChanges()
+		{
+			var world = new ApproachWorld
+			{
+				Snapshot = ApproachSnapshot(new CPos(0, 0), Array.Empty<uint>())
+			};
+			var behavior = new StealthApproachBehavior(
+				Construct<StealthApproachHandoff>(Handoff(BehaviorId.Approach), MissionAt(5)),
+				world, world, world);
+
+			behavior.Execute();
+			Assert.That(world.Destination, Is.EqualTo(new CPos(1, 0)));
+
+			world.Snapshot = ApproachSnapshot(new CPos(0, 1), Array.Empty<uint>());
+			world.Route = new[] { new CPos(0, 1), new CPos(0, 2), new CPos(5, 0) };
+			behavior.Execute();
+
+			Assert.That(world.Moves, Is.EqualTo(1));
+			Assert.That(world.Destination, Is.EqualTo(new CPos(1, 0)));
+
+			world.Snapshot = ApproachSnapshot(new CPos(0, 1), Array.Empty<uint>(), true);
+			behavior.Execute();
+
+			Assert.That(world.Moves, Is.EqualTo(2));
+			Assert.That(world.Destination, Is.EqualTo(new CPos(0, 2)));
+		}
+
+		[Test]
 		public void ApproachHandsAnUnsafeExposedPositionToLeastDangerousFlee()
 		{
 			var member = new StealthApproachMemberSnapshot(1, new CPos(0, 0));

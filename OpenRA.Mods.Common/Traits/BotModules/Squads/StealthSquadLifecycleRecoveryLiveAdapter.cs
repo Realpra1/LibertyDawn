@@ -29,32 +29,31 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		public StealthRecalculateFleeLiveSnapshot ReadFlee(
 			StealthApproachMission mission, string sourceFingerprint)
 		{
-			var members = Members().Select(actor =>
+			var memberActors = Members();
+			var members = memberActors.Select(actor =>
 			{
 				var health = Health(actor);
 				return new StealthRecalculateFleeMemberSnapshot(actor.ActorID, actor.Location,
 					WeaponRange(actor), health.HP, health.Max,
 					needsMovementOrder: actor.IsIdle);
 			}).ToArray();
-			var enemies = LocalEnemies().Select(actor =>
+			var target = squad.World.GetActorById(mission.StableTargetActorId);
+			var enemies = new[] { target }.Where(actor => Live(actor) &&
+				squad.SquadManager.IsPreferredEnemyUnit(actor)).Select(actor =>
 			{
 				var health = Health(actor);
 				return new StealthRecalculateFleeEnemySnapshot(actor.ActorID, actor.Info.Name,
 					actor.Location, health.HP, health.Max, WeaponRange(actor), IsDetector(actor));
 			}).ToArray();
-			var center = Center();
-			var mobile = Members().Select(actor => actor.TraitOrDefault<Mobile>()).FirstOrDefault();
-			var candidates = CandidateCells(center, 8).Select(cell =>
-				new StealthRecalculateFleeCandidateSnapshot(cell, mobile != null &&
-					mobile.CanEnterCell(cell, null, BlockedByActor.Immovable),
-					(cell - center).LengthSquared > 16, HasDetectorCoverage(cell))).ToArray();
 			return new StealthRecalculateFleeLiveSnapshot(squad.World.WorldTick, members, enemies,
-				candidates, FormationCloaked(), sourceFingerprint);
+				FormationCloaked(memberActors), sourceFingerprint);
 		}
 
 		public StealthRepairLiveSnapshot ReadRepair(StealthRepairHandoff handoff)
 		{
-			var members = Members().Select(actor =>
+			var memberActors = Members();
+			var center = Center(memberActors);
+			var members = memberActors.Select(actor =>
 			{
 				var health = Health(actor);
 				return new StealthRepairMemberSnapshot(actor.ActorID, actor.Location,
@@ -65,14 +64,14 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				.Where(actor => Live(actor) && actor.Owner.IsAlliedWith(squad.Bot.Player))
 				.Select(actor => new StealthRepairOptionSnapshot(actor.ActorID,
 					actor.Location, Reservable.IsAvailableFor(actor,
-						Members().FirstOrDefault()))).ToArray();
-			var enemies = LocalEnemies().Select(actor =>
+						memberActors.FirstOrDefault()))).ToArray();
+			var enemies = LocalEnemies(center).Select(actor =>
 			{
 				var health = Health(actor);
 				return new StealthRepairEnemySnapshot(actor.ActorID, actor.Info.Name, actor.Location,
 					health.HP, health.Max, WeaponRange(actor), IsDetector(actor));
 			}).ToArray();
-			var center = Center();
+			var detectors = EnemyDetectorCoverage().ToArray();
 			var routes = options.Select(option =>
 			{
 				var route = CardinalRoute(center, option.CurrentCell).ToArray();
@@ -80,12 +79,12 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					route = new[] { option.CurrentCell };
 				return new StealthRepairRouteSnapshot(option.ActorId,
 					option.ActorId, route, true, route.Length > 8,
-					route.Any(HasDetectorCoverage));
+					route.Any(cell => HasDetectorCoverage(cell, detectors)));
 			}).ToArray();
 			return new StealthRepairLiveSnapshot(squad.World.WorldTick, handoff.DamageEventId,
 				handoff.DamageTick, handoff.DamageSourceActorId, handoff.DamageAmount,
 				handoff.Resume.ContextFingerprint, members, options, enemies,
-				Array.Empty<StealthRepairStaticActorSnapshot>(), routes, FormationCloaked());
+				Array.Empty<StealthRepairStaticActorSnapshot>(), routes, FormationCloaked(memberActors));
 		}
 
 		IReadOnlyList<Actor> Members()
@@ -94,9 +93,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				.OrderBy(actor => actor.ActorID).ToArray();
 		}
 
-		IEnumerable<Actor> LocalEnemies()
+		IEnumerable<Actor> LocalEnemies(CPos centerCell)
 		{
-			var center = squad.World.Map.CenterOfCell(Center());
+			var center = squad.World.Map.CenterOfCell(centerCell);
 			var radius = WDist.FromCells(Math.Max(1, squad.SquadManager.Info.DangerScanRadius)).Length;
 			return squad.World.Actors.Where(actor => Live(actor) &&
 				squad.SquadManager.IsPreferredEnemyUnit(actor) &&
@@ -104,33 +103,30 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				.OrderBy(actor => actor.ActorID);
 		}
 
-		CPos Center()
+		CPos Center(IReadOnlyList<Actor> members)
 		{
-			var members = Members();
 			return members.Count == 0 ? default(CPos) : squad.World.Map.CellContaining(
 				members.Select(actor => actor.CenterPosition).Average());
 		}
 
-		IEnumerable<CPos> CandidateCells(CPos center, int radius)
+		IEnumerable<(WPos Position, int Range)> EnemyDetectorCoverage()
 		{
-			return Enumerable.Range(-radius, radius * 2 + 1).SelectMany(y =>
-				Enumerable.Range(-radius, radius * 2 + 1)
-					.Select(x => squad.World.Map.Clamp(new CPos(center.X + x, center.Y + y))))
-				.Distinct().OrderBy(cell => cell.Y).ThenBy(cell => cell.X);
+			return squad.World.Actors.Where(actor => Live(actor) &&
+				squad.SquadManager.IsPreferredEnemyUnit(actor)).SelectMany(actor =>
+					actor.TraitsImplementing<DetectCloaked>()
+						.Where(detector => !detector.IsTraitDisabled)
+						.Select(detector => (actor.CenterPosition, detector.Range.Length)));
 		}
 
-		bool HasDetectorCoverage(CPos cell)
+		bool HasDetectorCoverage(CPos cell, IReadOnlyList<(WPos Position, int Range)> detectors)
 		{
 			var position = squad.World.Map.CenterOfCell(cell);
-			return squad.World.Actors.Where(actor => Live(actor) &&
-				squad.SquadManager.IsPreferredEnemyUnit(actor)).Any(actor =>
-				actor.TraitsImplementing<DetectCloaked>().Where(detector => !detector.IsTraitDisabled)
-					.Any(detector => (actor.CenterPosition - position).HorizontalLength <= detector.Range.Length));
+			return detectors.Any(detector =>
+				(detector.Position - position).HorizontalLength <= detector.Range);
 		}
 
-		bool FormationCloaked()
+		static bool FormationCloaked(IReadOnlyList<Actor> members)
 		{
-			var members = Members();
 			return members.Count != 0 && members.All(actor =>
 				actor.TraitsImplementing<Cloak>().Any(cloak => cloak.Cloaked));
 		}

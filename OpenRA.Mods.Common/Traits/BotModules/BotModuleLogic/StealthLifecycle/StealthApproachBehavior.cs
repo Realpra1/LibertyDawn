@@ -77,12 +77,17 @@ namespace OpenRA.Mods.Common.Traits
 					Array.Empty<uint>(), localScore, Array.Empty<CPos>());
 
 			var destination = route[0];
-			if (lastDestination != destination || !lastMembers.SequenceEqual(memberIds) ||
-				members.Any(member => member.NeedsMovementOrder))
+			var membershipChanged = !lastMembers.SequenceEqual(memberIds);
+			var movementFinished = lastDestination.HasValue &&
+				members.All(member => member.NeedsMovementOrder);
+			if (!lastDestination.HasValue || membershipChanged || movementFinished)
+			{
 				movementOrders.IssueMove(handoff.Owner, handoff.Epoch, memberIds,
 					destination, ++orderRevision);
-			lastDestination = destination;
-			lastMembers = memberIds;
+				lastDestination = destination;
+				lastMembers = memberIds;
+			}
+
 			return Result(StealthApproachDisposition.Moving,
 				StealthApproachArrivalClassification.None, center, memberIds,
 				Array.Empty<uint>(), localScore, route);

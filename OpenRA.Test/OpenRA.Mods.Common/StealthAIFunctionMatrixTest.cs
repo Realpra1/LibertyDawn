@@ -63,6 +63,65 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
+		public void EveryStealthSquadUsesTheSingleModularLifecycleRuntime()
+		{
+			Assert.That(InvokeInternal<bool>(typeof(Squad),
+				"UsesModularStealthLifecycleFor", SquadType.Stealth), Is.True);
+			foreach (var ordinaryType in Enum.GetValues<SquadType>()
+				.Where(type => type != SquadType.Stealth))
+				Assert.That(InvokeInternal<bool>(typeof(Squad),
+					"UsesModularStealthLifecycleFor", ordinaryType), Is.False);
+
+			var manager = Source("OpenRA.Mods.Common/Traits/BotModules/SquadManagerBotModule.cs");
+			Assert.That(manager, Does.Not.Contain("UseModularStealthLifecycle"),
+				"No bot or stealth definition may select the retired fuzzy stealth runtime.");
+		}
+
+		[Test]
+		public void CpuThrottlePreservesLiveModularStealthUpdates()
+		{
+			var manager = Source("OpenRA.Mods.Common/Traits/BotModules/SquadManagerBotModule.cs");
+			Assert.That(manager, Does.Contain("s.UsesModularStealthLifecycle || updateStrategicSquads"));
+			Assert.That(manager, Does.Contain("stealthSafetyTicks = Info.StealthSafetyCheckInterval"),
+				"The planning factor must not slow live stealth safety checks.");
+		}
+
+		[Test]
+		public void SpectatorOverlayStateIsSparseReplayDataAndUsesF8()
+		{
+			var overlayType = typeof(StealthSquadOverlay);
+			var encode = overlayType.GetMethod("Encode", BindingFlags.Static | BindingFlags.NonPublic);
+			var decode = overlayType.GetMethod("TryDecode", BindingFlags.Static | BindingFlags.NonPublic);
+			Assert.That(encode, Is.Not.Null);
+			Assert.That(decode, Is.Not.Null);
+			var payload = (string)encode.Invoke(null, new object[]
+			{
+				"stealth-tank", 2, "Kite", new uint[] { 9, 3, 9 }, 5,
+				new[] { new CPos(8, 2), new CPos(3, 4), new CPos(8, 2) }, new CPos(3, 4)
+			});
+			var decoded = new object[] { payload, null, -1, null, null, 0, null, null };
+			Assert.That(decode.Invoke(null, decoded), Is.True);
+			Assert.That(decoded[1], Is.EqualTo("stealth-tank"));
+			Assert.That(decoded[2], Is.EqualTo(2));
+			Assert.That(decoded[3], Is.EqualTo("Kite"));
+			Assert.That(decoded[4], Is.EqualTo(new uint[] { 3, 9 }));
+			Assert.That(decoded[5], Is.EqualTo(5));
+			Assert.That(decoded[6], Is.EqualTo(new[] { new CPos(8, 2), new CPos(3, 4) }));
+			Assert.That(decoded[7], Is.EqualTo(new CPos(3, 4)));
+
+			var publisher = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/StealthSquadOverlayPublisher.cs");
+			Assert.That(publisher, Does.Contain("const int PublishInterval = 5"));
+			Assert.That(publisher, Does.Contain("prior == item.Payload"),
+				"Replay orders must be emitted only when displayed squad state changes.");
+			Assert.That(Source("OpenRA.Mods.Common/Traits/Player/StealthSquadOverlay.cs"),
+				Does.Contain("new LineAnnotationRenderable"));
+			Assert.That(Source("mods/cnc/hotkeys.yaml"), Does.Contain(
+				"ToggleStealthSquadOverlay: F8"));
+			Assert.That(Source("mods/cnc/chrome/ingame.yaml"), Does.Contain(
+				"ToggleStealthSquadOverlayKey: ToggleStealthSquadOverlay"));
+		}
+
+		[Test]
 		public void LocalStealthPackageMembershipAndPriorityAreLive()
 		{
 			var states = StealthStateSources("StealthAIStates");
@@ -1640,7 +1699,7 @@ namespace OpenRA.Test.Mods.Common
 			assign = assign.Substring(0, assign.IndexOf(
 				"void AssignRolesToIdleUnitsDegraded", StringComparison.Ordinal));
 			var demand = assign.IndexOf("squad.StealthLocalSafetyRequested = true", StringComparison.Ordinal);
-			var strategy = assign.IndexOf("foreach (var s in Squads)\n\t\t\t\t\ts.Update();", StringComparison.Ordinal);
+			var strategy = assign.IndexOf("foreach (var s in Squads)", StringComparison.Ordinal);
 			Assert.That(demand, Is.GreaterThanOrEqualTo(0));
 			Assert.That(demand, Is.LessThan(strategy),
 				"All due live-local demand must be visible before squad state updates run.");
@@ -1744,10 +1803,13 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(manager, Does.Contain("stealthEfficiencyDamageTaken += Math.Max(0, e.Damage.Value)"),
 				"Damage and efficiency evidence remains event-driven and unbounded by recurring log suppression.");
 
-			Assert.That(manager, Does.Contain("stealth_manager_phase_attribution|summary={0}"));
+			Assert.That(manager, Does.Contain(
+				"stealth_manager_phase_attribution|owner={0}|bot_id={1}|summary={2}"));
 			foreach (var phase in new[]
 			{
-				"manager_tick", "scheduler_selection", "guard_dirty_check",
+				"manager_tick", "efficiency_telemetry", "ensure_stealth_squads",
+				"rebalance_stealth_squads", "recruit_unassigned", "assign_roles",
+				"scheduler_selection", "guard_dirty_check",
 				"incremental_path", "dependency_validation", "threat_route_cell",
 				"local_planning_inclusive", "diagnostic_emission"
 			})
@@ -2456,6 +2518,28 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
+		public void ModularLifecycleDamageCallbackRejectsIncompleteDamagePayloads()
+		{
+			var host = Source(
+				"OpenRA.Mods.Common/Traits/BotModules/Squads/StealthSquadLifecycleRuntimeHost.cs");
+			var nullGuard = host.IndexOf("attack?.Damage == null", StringComparison.Ordinal);
+			var valueRead = host.IndexOf("attack.Damage.Value <= 0", StringComparison.Ordinal);
+			Assert.That(nullGuard, Is.GreaterThanOrEqualTo(0));
+			Assert.That(valueRead, Is.GreaterThan(nullGuard),
+				"Damage notifications may omit Damage and must be rejected before reading its value.");
+		}
+
+		[Test]
+		public void ModularLifecycleDefersRepeatedOwnerCyclesToTheScheduler()
+		{
+			var host = Source(
+				"OpenRA.Mods.Common/Traits/BotModules/Squads/StealthSquadLifecycleRuntimeHost.cs");
+			Assert.That(host, Does.Contain("var visitedOwners = new HashSet<BehaviorId>();"));
+			Assert.That(host, Does.Contain("if (!visitedOwners.Add(previousOwner))\n\t\t\t\t\tbreak;"),
+				"A stale target must not spin through the same lifecycle owner repeatedly in one tick.");
+		}
+
+		[Test]
 		public void FleeRepositionUsesLiveWholeRouteDangerOnlyAfterExistingFleeDecision()
 		{
 			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
@@ -2628,7 +2712,7 @@ namespace OpenRA.Test.Mods.Common
 			assign = assign.Substring(0, assign.IndexOf(
 				"void AssignRolesToIdleUnitsDegraded", StringComparison.Ordinal));
 			Assert.That(assign.IndexOf("RefreshStealthManagerWorkDemands();", StringComparison.Ordinal),
-				Is.LessThan(assign.IndexOf("foreach (var s in Squads)\n\t\t\t\t\ts.Update();", StringComparison.Ordinal)),
+				Is.LessThan(assign.IndexOf("foreach (var s in Squads)", StringComparison.Ordinal)),
 				"The new transition must enter oldest-due action scheduling before strategic traversal.");
 			var revealedService = assign.IndexOf(
 				"if (squad.StealthRevealedIdleSafetyRequested)", StringComparison.Ordinal);

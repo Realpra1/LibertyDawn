@@ -27,6 +27,50 @@ namespace OpenRA.Test
 			return new AdvancedBotCpuFailsafeController(modules, 2, 2, 1, 0.1f, 0.5f);
 		}
 
+		static AdvancedBotCpuFailsafeController CreateThrottled(params string[] modules)
+		{
+			return new AdvancedBotCpuFailsafeController(modules, 2, 2, 1, 0.1f, 0.5f,
+				maxPlanningIntervalFactor: 4);
+		}
+
+		[Test]
+		public void SustainedPressureThrottlesPlanningBeforeDisablingAModule()
+		{
+			var controller = CreateThrottled("advanced");
+			var times = new Dictionary<string, double> { { "advanced", 75 } };
+
+			Assert.That(controller.Update(Slow, 100, times).Transition, Is.EqualTo("held"));
+			Assert.That(controller.Update(Slow, 100, times).Transition, Is.EqualTo("throttled"));
+			Assert.That(controller.PlanningIntervalFactor, Is.EqualTo(2));
+			Assert.That(controller.IsEnabled("advanced"), Is.True);
+			controller.Update(Slow, 100, times);
+			Assert.That(controller.Update(Slow, 100, times).Transition, Is.EqualTo("throttled"));
+			Assert.That(controller.PlanningIntervalFactor, Is.EqualTo(4));
+			controller.Update(Slow, 100, times);
+			Assert.That(controller.Update(Slow, 100, times).Transition, Is.EqualTo("disabled"));
+			Assert.That(controller.IsEnabled("advanced"), Is.False);
+		}
+
+		[Test]
+		public void SustainedHealthyWindowsRelaxPlanningThrottleGradually()
+		{
+			var controller = CreateThrottled("advanced");
+			var times = new Dictionary<string, double> { { "advanced", 75 } };
+			controller.Update(Slow, 100, times);
+			controller.Update(Slow, 100, times);
+			controller.Update(Slow, 100, times);
+			controller.Update(Slow, 100, times);
+
+			Assert.That(controller.PlanningIntervalFactor, Is.EqualTo(4));
+			Assert.That(controller.Update(Healthy, 100, times).Transition, Is.EqualTo("healthy"));
+			Assert.That(controller.Update(Healthy, 100, times).Transition, Is.EqualTo("relaxed"));
+			Assert.That(controller.PlanningIntervalFactor, Is.EqualTo(2));
+			controller.Update(Healthy, 100, times);
+			Assert.That(controller.Update(Healthy, 100, times).Transition, Is.EqualTo("relaxed"));
+			Assert.That(controller.PlanningIntervalFactor, Is.EqualTo(1));
+			Assert.That(controller.IsEnabled("advanced"), Is.True);
+		}
+
 		[Test]
 		public void SustainedNormalSpeedLagDisablesDominantModuleWithStableTieBreak()
 		{
@@ -171,6 +215,20 @@ namespace OpenRA.Test
 			Assert.That(controller.Update(Healthy, 25, disabled).Transition, Is.EqualTo("cooldown"));
 			Assert.That(controller.Update(Healthy, 25, disabled).Transition, Is.EqualTo("enabled-probe"));
 			Assert.That(controller.Update(Slow, 100, pressure).Transition, Is.EqualTo("re-shed"));
+		}
+
+		[Test]
+		public void InitiallyDisabledModulesRemainDisabledAtMaximumSpeed()
+		{
+			var controller = new AdvancedBotCpuFailsafeController(new[] { "first", "second" },
+				2, 2, 1, 0.1f, 0.5f, initiallyDisabled: true);
+			var quiet = new Dictionary<string, double> { { "first", 0 }, { "second", 0 } };
+
+			for (var i = 0; i < 10; i++)
+				Assert.That(controller.Update(Maximum, 1, quiet).Transition, Is.EqualTo("cooldown"));
+
+			Assert.That(controller.IsEnabled("first"), Is.False);
+			Assert.That(controller.IsEnabled("second"), Is.False);
 		}
 
 		[Test]

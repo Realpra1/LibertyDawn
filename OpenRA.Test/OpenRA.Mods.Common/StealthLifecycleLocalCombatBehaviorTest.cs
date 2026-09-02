@@ -132,12 +132,21 @@ namespace OpenRA.Test.Mods.Common
 			public StealthMassAttackLiveSnapshot Read(StealthApproachMission mission) { return Snapshot; }
 		}
 
-		sealed class MassThreat : IStealthMassAttackThreatAdapter
+		sealed class MassThreat : IStealthMassAttackThreatAdapter, IStealthMassAttackThreatEvaluation
 		{
 			public double Crossover = 2;
 			public Func<StealthMassAttackThreatFacts, bool> Approved = facts => true;
+			public int Beginnings;
+			public int Calculations;
+			public IStealthMassAttackThreatEvaluation Begin(StealthMassAttackThreatFacts facts)
+			{
+				Beginnings++;
+				return this;
+			}
+
 			public StealthMassAttackThreatResult Calculate(StealthMassAttackThreatFacts facts)
 			{
+				Calculations++;
 				return new StealthMassAttackThreatResult(
 					new StealthTargetThreatScore(1, Crossover), facts.SelectedTargetActorId,
 					Approved(facts));
@@ -327,6 +336,28 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
+		public void DisabledKitingUsesCrossoverHandoffWithoutIssuingOrders()
+		{
+			var snapshot = KiteSnapshot(new CPos(0, 0), new CPos(7, 0));
+			var world = new KiteWorld
+			{
+				Snapshot = new StealthKiteLiveSnapshot(snapshot.Tick, snapshot.Members,
+					snapshot.Actors, snapshot.CandidateCells, snapshot.FormationCloaked,
+					formationDetected: snapshot.FormationDetected, kitingEnabled: false)
+			};
+			var threat = new KiteThreat { Approved = facts => true, FallbackCrossover = 3 };
+			var orders = new KiteOrders();
+
+			var result = new StealthKiteBehavior(KiteHandoff(), new Guard(), world,
+				threat, orders).Execute();
+
+			Assert.That(result.Disposition, Is.EqualTo(StealthKiteDisposition.MassAttack));
+			Assert.That(orders.Attacks, Is.Zero);
+			Assert.That(orders.Moves, Is.Zero);
+			Assert.That(threat.Facts, Is.Empty);
+		}
+
+		[Test]
 		public void KiteHandsAnUnsafeExposedPositionToLeastDangerousFlee()
 		{
 			var safeCell = new CPos(2, 0);
@@ -510,6 +541,21 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(result.Phase, Is.EqualTo(StealthMassAttackPhase.Attack));
 			Assert.That(orders.Attacks, Is.EqualTo(1));
 			Assert.That(orders.Moves, Is.Zero);
+		}
+
+		[Test]
+		public void MassAttackBoundsSafeCellChecksInsideOneLiveThreatEvaluation()
+		{
+			var candidates = Enumerable.Range(1, 20).Select(x => new CPos(x, 1));
+			var world = new MassWorld { Snapshot = MassSnapshot(candidates) };
+			var threat = new MassThreat { Approved = facts => false };
+
+			new StealthMassAttackBehavior(MassHandoff(), new Guard(), world,
+				threat, new MassOrders()).Execute();
+
+			Assert.That(threat.Beginnings, Is.EqualTo(1));
+			Assert.That(threat.Calculations, Is.EqualTo(10),
+				"Two live targets plus at most eight candidate cells may be evaluated.");
 		}
 
 		static StealthKiteLiveSnapshot KiteSnapshot(CPos memberCell, CPos targetCell,

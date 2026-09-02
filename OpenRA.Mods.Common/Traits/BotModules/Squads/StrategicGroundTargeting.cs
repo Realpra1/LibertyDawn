@@ -146,7 +146,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				.DefaultIfEmpty(info.GroundTargetReferenceSpeed).Min();
 
 			if (!WorldCaches.TryGetValue(owner.SquadManager, out var cache) ||
-				owner.World.WorldTick - cache.Tick >= info.GroundInfluenceCacheInterval)
+				owner.World.WorldTick - cache.Tick >= owner.SquadManager.StrategicPlanningInterval(
+					info.GroundInfluenceCacheInterval))
 			{
 				cache = new GroundWorldCache
 				{

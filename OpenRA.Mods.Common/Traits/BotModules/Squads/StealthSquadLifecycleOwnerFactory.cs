@@ -146,6 +146,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		IStealthLifecycleRuntimeOwner TargetAcquisition(StealthLifecycleRuntimeEntry entry,
 			IStealthLifecycleRuntimeOrders runtimeOrders)
 		{
+			squad.StealthOverlayConsideredTargets.Clear();
 			var behavior = new StealthTargetAcquisitionBehavior(entry.Handoff, strategic);
 			StealthTargetAcquisitionResult result = null;
 			object Execute() { return result = ExecuteAcquisition(behavior, runtimeOrders); }
@@ -156,6 +157,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			StealthTargetAcquisitionBehavior behavior, IStealthLifecycleRuntimeOrders runtimeOrders)
 		{
 			var result = behavior.Execute(combat.ActiveCenter(), squad.AirTargetStrategicCell);
+			squad.StealthOverlayConsideredTargets.Clear();
+			squad.StealthOverlayConsideredTargets.AddRange(result.Options.Select(option => option.StrategicCell));
 			if (result.Disposition == StealthTargetAcquisitionDisposition.MoveCloserAndRescan &&
 				result.MoveCloserStrategicCell.HasValue)
 			{
@@ -193,7 +196,17 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var behavior = new StealthTargetDistanceChoiceBehavior(
 				handoff, combat.OtherActiveSquads(), policy);
 			StealthTargetDistanceChoiceResult result = null;
-			return Owner(entry, () => result = behavior.Execute());
+			return Owner(entry, () =>
+			{
+				result = behavior.Execute();
+				if (result.Mission != null)
+				{
+					squad.AirTargetStrategicCell = result.Mission.StrategicCell;
+					squad.StealthOverlayChosenTarget = result.Mission.StrategicCell;
+				}
+
+				return result;
+			});
 		}
 
 		IStealthLifecycleRuntimeOwner Approach(StealthLifecycleRuntimeEntry entry,
@@ -258,8 +271,6 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var handoff = (StealthRecalculateFleeHandoff)entry.Context;
 			var behavior = new StealthRecalculateFleeBehavior(handoff, guard,
 				new StealthRecalculateFleeLiveWorld(recovery, handoff.Evidence.LiveFingerprint),
-				new GeneralizedCombatRecalculateFleeThreatAdapter(
-					squad.SquadManager.CombatThreatCalculator, combat.Resolve, GroundTargetTypes),
 				strategic, orders);
 			return Owner(entry, behavior.Execute);
 		}

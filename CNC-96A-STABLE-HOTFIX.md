@@ -20,7 +20,7 @@ calculation. Preserve established balance and build-order behavior.
 - Approach follows the cached strategic route. Obelisks are passable while
   cloaked; detectors are real route danger according to actual coverage.
 - Local engagement is live-only. Do not use the strategic cache for local safety,
-  target positions, crush, kite, mass attack, or flee decisions.
+  target positions, crush, kite, or mass attack decisions.
 - Undefended attack uses configured priority/value and finishes its retained live
   target instead of firing once and forgetting it.
 - Crush remains cloaked, rejects actual detector coverage, and orders the target's
@@ -29,8 +29,9 @@ calculation. Preserve established balance and build-order behavior.
   a safe firing position, or explicitly yield to mass attack/flee.
 - Mass attack begins only above crossover 2, attacks the highest live threat,
   continues above 1, and flees at or below 1.
-- Flee follows the least-dangerous current route. Damage uses the safest repair
-  route; if none is safe, resume the fight.
+- After live combat chooses to flee, use the strategic cache for a simple safest
+  route roughly two strategic cells outward. Damage uses the safest repair route;
+  if none is safe, resume the fight.
 - Tactical owner state, plans, timers, fingerprints, and orders are not saved.
   Save allocations only and load each squad into TargetAcquisition.
 - Normal strategic replanning must not interrupt active local combat. Replan after
@@ -90,3 +91,52 @@ regression requires code and policy review.
   median 1955.57). Damage-adjusted median: 0.589.
 - The prior reviewed human replay baselines were primary 869.88 / adjusted
   0.220 and primary 417.01 / adjusted 0.024; final natural median exceeds both.
+
+## PR 143 follow-up evidence
+
+- Lifecycle rule 4D now states that in-flight move orders are retained so engine
+  pathing can work. On long-obstacle maps, Approach must retain its issued
+  strategic waypoint while the formation is moving even when its cached route
+  recalculates from an off-course strategic cell. Reissue only after movement
+  finishes or active membership changes; do not add a replacement routing system.
+- The five-run disabled-module baseline and five matched full-module runs are
+  recorded in `CNC-AI-PERFORMANCE-BENCHMARK.md`.
+- The generated special map has no resource-layer contents and gives VIKI four
+  two-tank squads against the requested mixed Brutalis force.
+- Three final `playtest-20260901` runs passed. The retained seed `9609314` replay
+  is a VIKI win at tick 4218 with six tanks surviving, all four squads passing
+  cadence, and no stall or Obelisk-death failure. Primary efficiency is 1979.05;
+  damage-adjusted efficiency is 0.4362.
+- Human-review artifacts are `tests/CNC-96A-Four-Squad-Lifecycle.oramap` and
+  `tests/CNC-96A-Four-Squad-Passing-playtest-20260901.orarep`; replay and map UID
+  are both `e5f1fe6b06ef14a1b921f0af69fa2073763af654`.
+
+## Current PR 143 work order
+
+Work and validate one item at a time:
+
+Completed: the replay's first stank was already generic-fallback controlled at
+tick 7643, so its later targeting/deaths are not lifecycle evidence. Its long-route
+oscillation is fixed by retaining the active engine move. Flee detector coverage now
+snapshots actors once per live evaluation (same candidates/threat math), cutting the
+measured flee cost 86.6%. All stealth definitions now use one modular runtime;
+chemical behavior remains configuration-driven.
+
+The 17-by-17 live flee search is replaced by a simple cached strategic route
+roughly two cells outward. Expensive strategic work now throttles through a
+central 1/2/4 interval factor before the retained final failsafe; live local
+combat remains responsive. MassAttack reuses one live calculator evaluation and
+bounds safe-cell checks. Same-tick owner cycles wait for the normal scheduler.
+
+The off-by-default F8 spectator/replay overlay records and displays squad
+identity, center, phase, blue considered-target lines, and the purple chosen
+target line with endpoint labels. Replay playback resolves the sparse orders
+without desync; old replays simply contain no overlay metadata.
+
+Remaining:
+
+1. Finish five simple-control and five full-module Empire Earth games to natural
+   game-over. Report average simulated game time, wall time, normalized throughput,
+   and non-overlapping module CPU; a fixed-tick exit is not valid evidence.
+2. Run the complete CNC validation, record the final benchmark report, and publish
+   the PR 143 release candidate for human testing.

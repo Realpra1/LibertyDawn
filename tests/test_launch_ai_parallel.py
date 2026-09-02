@@ -95,6 +95,28 @@ class ParallelLauncherTest(unittest.TestCase):
         with self.assertRaisesRegex(parallel.ConfigurationError, "gamespeed max"):
             parallel.load_manifest(non_max, 10)
 
+    def test_bot_debug_is_boolean_and_controls_the_launch_argument(self):
+        game_map = self.map("map.oramap")
+        invalid = self.write_manifest([{
+            "name": "invalid", "map": str(game_map),
+            "lobby_commands": "option gamespeed max", "bot_debug": "false",
+        }])
+        with self.assertRaisesRegex(parallel.ConfigurationError, "bot_debug must be a boolean"):
+            parallel.load_manifest(invalid, 10)
+
+        valid = self.write_manifest([{
+            "name": "valid", "map": str(game_map),
+            "lobby_commands": "option gamespeed max", "bot_debug": False,
+        }])
+        _, specs = parallel.load_manifest(valid, 10)
+        output = self.root / "prepared"
+        output.mkdir()
+        run_dir, _, _, command = parallel.prepare_run(
+            specs[0], output, self.content, None, self.launcher, None, 90, True,
+        )
+        self.assertIn("Debug.BotDebug=false", command)
+        self.assertTrue((run_dir / "command.json").is_file())
+
     def test_validates_opt_in_readiness_contract(self):
         game_map = self.map("map.oramap")
         ordinary = self.write_manifest([{

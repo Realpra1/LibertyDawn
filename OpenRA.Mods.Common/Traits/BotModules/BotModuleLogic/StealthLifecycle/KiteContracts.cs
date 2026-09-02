@@ -121,6 +121,7 @@ namespace OpenRA.Mods.Common.Traits
 		public IReadOnlyList<CPos> CandidateCells => candidateCells;
 		public bool FormationCloaked { get; }
 		public bool FormationDetected { get; }
+		public bool KitingEnabled { get; }
 		public bool HasActivityObservation { get; }
 		public long ActivityRevision { get; }
 		public StealthKiteOrderToken ActiveOrderToken { get; }
@@ -131,7 +132,7 @@ namespace OpenRA.Mods.Common.Traits
 			bool formationCloaked, bool hasActivityObservation = false,
 			long activityRevision = 0, StealthKiteOrderToken activeOrderToken = null,
 			StealthKiteOrderToken completedOrderToken = null,
-			bool formationDetected = false)
+			bool formationDetected = false, bool kitingEnabled = true)
 		{
 			if (tick < 0 || activityRevision < 0)
 				throw new ArgumentOutOfRangeException(nameof(tick));
@@ -157,6 +158,7 @@ namespace OpenRA.Mods.Common.Traits
 			this.candidateCells = Array.AsReadOnly(cells);
 			FormationCloaked = formationCloaked;
 			FormationDetected = formationDetected;
+			KitingEnabled = kitingEnabled;
 			HasActivityObservation = hasActivityObservation;
 			ActivityRevision = activityRevision;
 			ActiveOrderToken = activeOrderToken;

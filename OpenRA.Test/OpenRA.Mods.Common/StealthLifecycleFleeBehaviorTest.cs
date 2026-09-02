@@ -31,31 +31,16 @@ namespace OpenRA.Test.Mods.Common
 			public StealthRecalculateFleeLiveSnapshot Read(StealthApproachMission mission) { return Snapshot; }
 		}
 
-		sealed class Threat : IStealthRecalculateFleeThreatAdapter
-		{
-			public readonly Dictionary<CPos, StealthTargetThreatScore> Dangers =
-				new Dictionary<CPos, StealthTargetThreatScore>();
-			public StealthTargetThreatScore CalculateEntryCrossover(
-				StealthRecalculateFleeEntryThreatFacts facts)
-			{
-				throw new InvalidOperationException("Flee must not revalidate stale entry evidence.");
-			}
-
-			public StealthTargetThreatScore CalculateRouteDanger(StealthRecalculateFleeThreatFacts facts)
-			{
-				return Dangers[facts.CandidateCell];
-			}
-		}
-
 		sealed class Cache : IStealthRecalculateFleeStrategicCache
 		{
 			public int Reads;
-			public StealthRecalculateFleeStrategicCacheSnapshot ReadLongRoute(
-				StealthApproachMission mission, CPos liveDestination)
+			public CPos[] Route = { new CPos(-1, 0), new CPos(-5, 0) };
+			public StealthTargetThreatScore Danger = new StealthTargetThreatScore(1, double.PositiveInfinity);
+			public StealthRecalculateFleeStrategicCacheSnapshot ReadEscapeRoute(
+				StealthApproachMission mission)
 			{
 				Reads++;
-				return new StealthRecalculateFleeStrategicCacheSnapshot(3,
-					new[] { new CPos(-1, 0), liveDestination });
+				return new StealthRecalculateFleeStrategicCacheSnapshot(3, Danger, Route);
 			}
 		}
 
@@ -72,30 +57,21 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
-		public void FleeChoosesLeastDangerousLiveCandidateAndUsesCacheOnlyForLongRoute()
+		public void FleeUsesOneCachedStrategicEscapeRoute()
 		{
-			var local = new CPos(2, 0);
-			var longRoute = new CPos(-5, 0);
 			var world = new World
 			{
-				Snapshot = Snapshot(new CPos(0, 0), new[]
-				{
-					new StealthRecalculateFleeCandidateSnapshot(local, true),
-					new StealthRecalculateFleeCandidateSnapshot(longRoute, true, true)
-				})
+				Snapshot = Snapshot(new CPos(0, 0))
 			};
-			var threat = new Threat();
-			threat.Dangers[local] = new StealthTargetThreatScore(8, 4);
-			threat.Dangers[longRoute] = new StealthTargetThreatScore(1, 1);
 			var cache = new Cache();
 			var orders = new Orders();
 			var behavior = new StealthRecalculateFleeBehavior(Handoff(), new Guard(),
-				world, threat, cache, orders);
+				world, cache, orders);
 
 			var result = behavior.Execute();
 
-			Assert.That(result.SelectedDestinationCell, Is.EqualTo(longRoute));
-			Assert.That(result.OrderedRoute, Is.EqualTo(new[] { new CPos(-1, 0), longRoute }));
+			Assert.That(result.SelectedDestinationCell, Is.EqualTo(new CPos(-5, 0)));
+			Assert.That(result.OrderedRoute, Is.EqualTo(cache.Route));
 			Assert.That(orders.Destinations.Single(), Is.EqualTo(new CPos(-1, 0)));
 			Assert.That(cache.Reads, Is.EqualTo(1));
 		}
@@ -104,18 +80,12 @@ namespace OpenRA.Test.Mods.Common
 		public void FleeAdvancesOneSharedWaypointFromCurrentLivePositions()
 		{
 			var destination = new CPos(-5, 0);
-			var candidates = new[]
-			{
-				new StealthRecalculateFleeCandidateSnapshot(destination, true, true)
-			};
-			var world = new World { Snapshot = Snapshot(new CPos(0, 0), candidates) };
-			var threat = new Threat();
-			threat.Dangers[destination] = new StealthTargetThreatScore(1, 1);
+			var world = new World { Snapshot = Snapshot(new CPos(0, 0)) };
 			var orders = new Orders();
 			var behavior = new StealthRecalculateFleeBehavior(Handoff(), new Guard(),
-				world, threat, new Cache(), orders);
+				world, new Cache(), orders);
 			behavior.Execute();
-			world.Snapshot = Snapshot(new CPos(-1, 0), candidates);
+			world.Snapshot = Snapshot(new CPos(-1, 0));
 
 			var result = behavior.Execute();
 
@@ -128,19 +98,13 @@ namespace OpenRA.Test.Mods.Common
 		public void FleeCompletesWhenTheFormationCenterReachesTheSafeCell()
 		{
 			var destination = new CPos(-5, 0);
-			var candidates = new[]
-			{
-				new StealthRecalculateFleeCandidateSnapshot(destination, true)
-			};
-			var world = new World { Snapshot = Snapshot(new CPos(0, 0), candidates) };
-			var threat = new Threat();
-			threat.Dangers[destination] = new StealthTargetThreatScore(0, double.PositiveInfinity);
+			var world = new World { Snapshot = Snapshot(new CPos(0, 0)) };
 			var orders = new Orders();
 
 			var behavior = new StealthRecalculateFleeBehavior(Handoff(), new Guard(), world,
-				threat, new Cache(), orders);
+				new Cache { Route = new[] { destination } }, orders);
 			behavior.Execute();
-			world.Snapshot = Snapshot(new CPos(-6, 0), candidates);
+			world.Snapshot = Snapshot(new CPos(-6, 0));
 			var result = behavior.Execute();
 
 			Assert.That(result.Disposition,
@@ -153,16 +117,10 @@ namespace OpenRA.Test.Mods.Common
 		public void FleeWaitsForMovementAndRetriesOnlyAfterItEnds()
 		{
 			var destination = new CPos(-5, 0);
-			var candidates = new[]
-			{
-				new StealthRecalculateFleeCandidateSnapshot(destination, true)
-			};
-			var world = new World { Snapshot = Snapshot(new CPos(0, 0), candidates) };
-			var threat = new Threat();
-			threat.Dangers[destination] = new StealthTargetThreatScore(1, 1);
+			var world = new World { Snapshot = Snapshot(new CPos(0, 0)) };
 			var orders = new Orders();
 			var behavior = new StealthRecalculateFleeBehavior(Handoff(), new Guard(),
-				world, threat, new Cache(), orders);
+				world, new Cache { Route = new[] { destination } }, orders);
 
 			behavior.Execute();
 			behavior.Execute();
@@ -177,7 +135,7 @@ namespace OpenRA.Test.Mods.Common
 				{
 					new StealthRecalculateFleeEnemySnapshot(71, "mtnk", new CPos(5, 0),
 						100, 100, 4, false)
-				}, candidates, true, "current-live");
+				}, true, "current-live");
 			behavior.Execute();
 
 			Assert.That(orders.Destinations, Is.EqualTo(new[] { destination, destination }));
@@ -191,10 +149,10 @@ namespace OpenRA.Test.Mods.Common
 				Snapshot = new StealthRecalculateFleeLiveSnapshot(1,
 					new[] { new StealthRecalculateFleeMemberSnapshot(1, new CPos(0, 0), 5) },
 					Array.Empty<StealthRecalculateFleeEnemySnapshot>(),
-					Array.Empty<StealthRecalculateFleeCandidateSnapshot>(), true, "current-live")
+					true, "current-live")
 			};
 			var behavior = new StealthRecalculateFleeBehavior(Handoff(), new Guard(), world,
-				new Threat(), new Cache(), new Orders());
+				new Cache(), new Orders());
 
 			var result = behavior.Execute();
 
@@ -203,8 +161,7 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(result.LiveCause, Is.EqualTo(StealthRecalculateFleeLiveCause.NoTarget));
 		}
 
-		static StealthRecalculateFleeLiveSnapshot Snapshot(CPos memberCell,
-			IEnumerable<StealthRecalculateFleeCandidateSnapshot> candidates)
+		static StealthRecalculateFleeLiveSnapshot Snapshot(CPos memberCell)
 		{
 			return new StealthRecalculateFleeLiveSnapshot(1,
 				new[]
@@ -216,7 +173,7 @@ namespace OpenRA.Test.Mods.Common
 				{
 					new StealthRecalculateFleeEnemySnapshot(71, "mtnk", new CPos(5, 0),
 						100, 100, 4, false)
-				}, candidates, true, "current-live");
+				}, true, "current-live");
 		}
 
 		static StealthRecalculateFleeHandoff Handoff()

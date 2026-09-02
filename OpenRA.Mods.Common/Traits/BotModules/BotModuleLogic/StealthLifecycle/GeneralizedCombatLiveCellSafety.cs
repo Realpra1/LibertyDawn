@@ -20,25 +20,28 @@ namespace OpenRA.Mods.Common.Traits
 		public static bool CanAttackSafely(GeneralizedCombatThreatCalculator calculator,
 			IReadOnlyList<Actor> friendly, IReadOnlyList<Actor> enemies, Actor target,
 			CPos plannedCell, int formationRadiusCells,
-			BitSet<TargetableType>? plannedTargetTypesOverride)
+			BitSet<TargetableType>? plannedTargetTypesOverride,
+			Func<Actor, Actor, GeneralizedCombatThreatCalculator.PairThreat> calculatePair = null)
 		{
 			if (calculator == null || friendly == null || enemies == null || target == null)
 				throw new ArgumentNullException(calculator == null ? nameof(calculator) :
 					friendly == null ? nameof(friendly) : enemies == null ? nameof(enemies) : nameof(target));
 			if (friendly.Count == 0 || formationRadiusCells < 0)
 				return false;
+			if (calculatePair == null)
+				calculatePair = (attacker, defender) => calculator.CalculateLive(
+					attacker, defender, plannedTargetTypesOverride, true);
 
 			var targetDistance = Distance(plannedCell, target.Location) + formationRadiusCells;
 			if (friendly.Any(attacker => !GeneralizedCombatThreatCalculator.CanEngageAtDistance(
-				calculator.CalculateLive(attacker, target, plannedTargetTypesOverride, true).Forward,
+				calculatePair(attacker, target).Forward,
 				targetDistance)))
 				return false;
 
 			return friendly.All(attacker => enemies.All(enemy =>
 			{
 				var distance = Math.Max(0, Distance(plannedCell, enemy.Location) - formationRadiusCells);
-				var pair = calculator.CalculateLive(attacker, enemy,
-					plannedTargetTypesOverride, true);
+				var pair = calculatePair(attacker, enemy);
 				return GeneralizedCombatThreatCalculator.DefenderThreatAtDistance(pair, distance) <= 0;
 			}));
 		}

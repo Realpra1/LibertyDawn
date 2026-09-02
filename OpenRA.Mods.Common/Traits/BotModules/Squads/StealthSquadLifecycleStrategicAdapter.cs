@@ -59,14 +59,15 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		}
 
 		StealthRecalculateFleeStrategicCacheSnapshot
-			IStealthRecalculateFleeStrategicCache.ReadLongRoute(
-				StealthApproachMission mission, CPos liveDestination)
+			IStealthRecalculateFleeStrategicCache.ReadEscapeRoute(
+				StealthApproachMission mission)
 		{
-			if (StealthAIStateBase.TryReadLifecycleLongRoute(squad, liveDestination,
-				out var revision, out var route))
-				return new StealthRecalculateFleeStrategicCacheSnapshot(revision, route);
+			if (StealthAIStateBase.TryReadLifecycleFleeRoute(squad, mission,
+				out var revision, out var danger, out var route))
+				return new StealthRecalculateFleeStrategicCacheSnapshot(revision,
+					new StealthTargetThreatScore(danger, double.PositiveInfinity), route);
 			return new StealthRecalculateFleeStrategicCacheSnapshot(Current().Revision,
-				Array.Empty<CPos>());
+				new StealthTargetThreatScore(0, double.PositiveInfinity), Array.Empty<CPos>());
 		}
 
 		StealthRepairStrategicCacheSnapshot IStealthRepairStrategicCache.ReadLongRoute(

@@ -118,7 +118,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			if (UsesStrategicTargeting(owner) && owner.World.WorldTick >= owner.GroundNextTargetReviewTick)
 			{
 				owner.GroundNextTargetReviewTick = owner.World.WorldTick +
-					owner.SquadManager.Info.GroundInfluenceCacheInterval;
+					owner.SquadManager.StrategicPlanningInterval(
+						owner.SquadManager.Info.GroundInfluenceCacheInterval);
 				var replacement = StrategicGroundTargeting.FindBestTarget(owner);
 				if (replacement != null)
 					owner.TargetActor = replacement.Actor;

@@ -38,6 +38,9 @@ and scan again.
    harassment and shorter opportunities, and choose the least-close surviving
    option.
 
+4D. Do not reissue move orders constantly, but let the engine's default pathing
+work.
+
 Target-cell filtering selects where to engage; it must not alter routing.
 
 ## 5. Engagement
@@ -61,6 +64,9 @@ stage. Outside timers and events must not bypass the active owner.
 - Detection rejects crushing in kite and mass-attack modes.
 - Obelisks remain passable while the squad is cloaked. Never decloak or attack
   unsafely near an Obelisk.
+- Once live combat decides to flee, use the cached strategic threat map to move
+  roughly two strategic cells along the safest outward route. Flee routing is
+  strategic work; do not build a large live tactical candidate grid.
 
 Use one shared squad action. Design the decision so a one-tank squad behaves
 exactly; larger squads use the same order and may absorb formation error. Do not

@@ -51,7 +51,8 @@ namespace OpenRA.Mods.Common.Traits
 	}
 
 	public sealed class EconomyFieldDefenseBotModule : ConditionalTrait<EconomyFieldDefenseBotModuleInfo>,
-		IBotEnabled, IBotTick, IBotUnitReservations, IBotRespondToAttack, IGameSaveTraitData, IAdvancedBotTick
+		IBotEnabled, IBotTick, IBotUnitReservations, IBotRespondToAttack, IGameSaveTraitData, IAdvancedBotTick,
+		IAdvancedBotPlanningThrottle
 	{
 		const string ProductionRequestOwner = "EconomyFieldDefense";
 
@@ -84,6 +85,7 @@ namespace OpenRA.Mods.Common.Traits
 		IBotRequestOwnedUnitProduction[] productionRequesters;
 		IBotRequestOwnedUnitProduction productionRequester;
 		bool advancedBehaviorEnabled = true;
+		int planningIntervalFactor = 1;
 		int maintenanceTicks = 1;
 
 		public EconomyFieldDefenseBotModule(Actor self, EconomyFieldDefenseBotModuleInfo info)
@@ -116,6 +118,19 @@ namespace OpenRA.Mods.Common.Traits
 		}
 
 		string IAdvancedBotTick.FailsafeModuleId => "EconomyFieldDefenseBotModule";
+
+		void IAdvancedBotPlanningThrottle.SetPlanningIntervalFactor(int factor)
+		{
+			var next = Math.Max(1, factor);
+			if (planningIntervalFactor == next)
+				return;
+
+			var increasing = next > planningIntervalFactor;
+			planningIntervalFactor = next;
+			var interval = ReinforcementIntervalTicks();
+			maintenanceTicks = increasing ? Math.Max(maintenanceTicks, interval) :
+				Math.Min(maintenanceTicks, interval);
+		}
 
 		void IAdvancedBotTick.SetAdvancedBehaviorEnabled(bool enabled)
 		{
@@ -458,8 +473,9 @@ namespace OpenRA.Mods.Common.Traits
 
 		int ReinforcementIntervalTicks()
 		{
-			return EconomyFieldDefensePolicy.ReinforcementIntervalTicks(
+			var interval = EconomyFieldDefensePolicy.ReinforcementIntervalTicks(
 				Info.ReinforcementIntervalSeconds, world.Timestep);
+			return (int)Math.Min(int.MaxValue, (long)interval * planningIntervalFactor);
 		}
 
 		int InitialMaintenanceDelay()
