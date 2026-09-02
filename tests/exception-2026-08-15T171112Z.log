@@ -1,0 +1,21 @@
+OpenRA engine version playtest-20260815-2
+Tiberian Dawn mod version playtest-20260815-2
+on map 7e1899fb3dc54edfaee043bcc3a2b89de1c82ecb (Empire Earth4 by Realpra1).
+Date: 2026-08-15 17:11:12Z
+Operating System: Linux (Unix 5.15.0.139)
+Runtime Version: .NET CLR 6.0.36
+Exception of type `System.InvalidOperationException`: Out of sync in frame 8233.
+ Compare syncreport.log with other players.
+   at OpenRA.Network.OrderManager.OutOfSync(Int32 frame) in /home/runner/work/LibertyDawn/LibertyDawn/OpenRA.Game/Network/OrderManager.cs:line 77
+   at OpenRA.Network.OrderManager.ReceiveSync(ValueTuple`3 sync) in /home/runner/work/LibertyDawn/LibertyDawn/OpenRA.Game/Network/OrderManager.cs:line 155
+   at OpenRA.Network.ReplayConnection.OpenRA.Network.IConnection.Receive(OrderManager orderManager) in /home/runner/work/LibertyDawn/LibertyDawn/OpenRA.Game/Network/ReplayConnection.cs:line 142
+   at OpenRA.Sync.<>c__DisplayClass13_0.<RunUnsynced>b__0() in /home/runner/work/LibertyDawn/LibertyDawn/OpenRA.Game/Sync.cs:line 167
+   at OpenRA.Sync.RunUnsynced[T](Boolean checkSyncHash, World world, Func`1 fn) in /home/runner/work/LibertyDawn/LibertyDawn/OpenRA.Game/Sync.cs:line 205
+   at OpenRA.Sync.RunUnsynced(World world, Action fn) in /home/runner/work/LibertyDawn/LibertyDawn/OpenRA.Game/Sync.cs:line 168
+   at OpenRA.Game.InnerLogicTick(OrderManager orderManager, Boolean forceWorldTick) in /home/runner/work/LibertyDawn/LibertyDawn/OpenRA.Game/Game.cs:line 715
+   at OpenRA.Game.LogicTick(Boolean forceCurrentWorldTick) in /home/runner/work/LibertyDawn/LibertyDawn/OpenRA.Game/Game.cs:line 736
+   at OpenRA.Game.Loop() in /home/runner/work/LibertyDawn/LibertyDawn/OpenRA.Game/Game.cs:line 936
+   at OpenRA.Game.Run() in /home/runner/work/LibertyDawn/LibertyDawn/OpenRA.Game/Game.cs:line 1026
+   at OpenRA.Game.InitializeAndRun(String[] args) in /home/runner/work/LibertyDawn/LibertyDawn/OpenRA.Game/Game.cs:line 317
+   at OpenRA.Launcher.Program.Main(String[] args) in /home/runner/work/LibertyDawn/LibertyDawn/OpenRA.Launcher/Program.cs:line 32
+
