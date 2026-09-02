@@ -174,6 +174,20 @@ namespace OpenRA.Test
 		}
 
 		[Test]
+		public void InitiallyDisabledModulesRemainDisabledAtMaximumSpeed()
+		{
+			var controller = new AdvancedBotCpuFailsafeController(new[] { "first", "second" },
+				2, 2, 1, 0.1f, 0.5f, initiallyDisabled: true);
+			var quiet = new Dictionary<string, double> { { "first", 0 }, { "second", 0 } };
+
+			for (var i = 0; i < 10; i++)
+				Assert.That(controller.Update(Maximum, 1, quiet).Transition, Is.EqualTo("cooldown"));
+
+			Assert.That(controller.IsEnabled("first"), Is.False);
+			Assert.That(controller.IsEnabled("second"), Is.False);
+		}
+
+		[Test]
 		public void ExportImportPreservesDegradedStateAndCooldownProgress()
 		{
 			var first = Create("advanced");

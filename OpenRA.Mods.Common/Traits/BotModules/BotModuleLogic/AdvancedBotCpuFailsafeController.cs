@@ -76,7 +76,8 @@ namespace OpenRA.Mods.Common.Traits
 		public string Offender => offender;
 
 		public AdvancedBotCpuFailsafeController(IEnumerable<string> moduleOrder, int breachSamplesRequired,
-			int recoverySamplesRequired, int offenderRecoveryPenaltySamples, float lagTolerance, float fallbackShare)
+			int recoverySamplesRequired, int offenderRecoveryPenaltySamples, float lagTolerance, float fallbackShare,
+			bool initiallyDisabled = false)
 		{
 			this.moduleOrder = moduleOrder.Distinct(StringComparer.Ordinal).ToArray();
 			this.breachSamplesRequired = Math.Max(1, breachSamplesRequired);
@@ -84,6 +85,8 @@ namespace OpenRA.Mods.Common.Traits
 			this.offenderRecoveryPenaltySamples = Math.Max(0, offenderRecoveryPenaltySamples);
 			this.lagTolerance = Math.Max(0, lagTolerance);
 			this.fallbackShare = Math.Max(0, Math.Min(1, fallbackShare));
+			if (initiallyDisabled)
+				disabled.UnionWith(this.moduleOrder);
 		}
 
 		public bool IsEnabled(string module) { return !disabled.Contains(module); }

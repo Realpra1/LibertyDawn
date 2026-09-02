@@ -1,0 +1,33 @@
+{
+  "defaults": {
+    "map": "CNC-96A-Four-Squad-Lifecycle.oramap",
+    "mode": "headless",
+    "bot_debug": true,
+    "lobby_commands": "spectate;option gamespeed max;option shortgame true;option explored true;slot_bot Multi0 0 viki 1 1;slot_bot Multi1 0 brutalis 2 2",
+    "exit_at_tick": 25000,
+    "minimum_world_tick": 1,
+    "timeout_seconds": 1800,
+    "required_log_patterns": [
+      "Headless MAX automation started map 'CNC-96A Four Squad Lifecycle'",
+      "bot=viki",
+      "bot=brutalis",
+      "Headless MAX automation reached natural game over",
+      "Stealth kill watchdog \\[stealth-tank\\] squad result: owner=VIKI.*stnks=[1-9].*summary=terminal",
+      "stealth_efficiency_watchdog\\|summary=terminal"
+    ],
+    "forbidden_log_patterns": [
+      "AI stationary watchdog failure",
+      "Stealth Obelisk death watchdog failure",
+      "Desync detected"
+    ],
+    "expected_artifacts": [
+      "Replays/**/*.orarep"
+    ]
+  },
+  "runs": [
+    {
+      "name": "cnc96a-four-squad",
+      "seed": 9609314
+    }
+  ]
+}

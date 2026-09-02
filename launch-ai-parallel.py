@@ -36,6 +36,7 @@ FATAL_PATTERN = re.compile(
 )
 SAFE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 ISOLATED_ARGUMENTS = (
+    "Debug.BotDebug=",
     "Engine.SupportDir=",
     "Launch.Benchmark=",
     "Launch.ExitAtTick=",
@@ -65,6 +66,7 @@ class RunSpec:
     source_path: Path
     source_kind: str
     mode: str
+    bot_debug: bool
     seed: int | None
     lobby_commands: str | None
     exit_at_tick: int | None
@@ -198,6 +200,9 @@ def load_manifest(path: Path, default_timeout: float) -> tuple[dict[str, Any], l
         mode = config.get("mode", "headless")
         if mode not in ("headless", "paced"):
             raise ConfigurationError(f"Run '{name}' mode must be 'headless' or 'paced'.")
+        bot_debug = config.get("bot_debug", True)
+        if not isinstance(bot_debug, bool):
+            raise ConfigurationError(f"Run '{name}' bot_debug must be a boolean.")
 
         lobby_commands = config.get("lobby_commands")
         if source_kind == "map":
@@ -314,6 +319,7 @@ def load_manifest(path: Path, default_timeout: float) -> tuple[dict[str, Any], l
             source_path=source_path,
             source_kind=source_kind,
             mode=mode,
+            bot_debug=bot_debug,
             seed=config.get("seed"),
             lobby_commands=lobby_commands,
             exit_at_tick=exit_at_tick,
@@ -388,7 +394,7 @@ def prepare_run(
     command.extend((
         str(launcher),
         f"Engine.SupportDir={support_dir}",
-        "Debug.BotDebug=true",
+        f"Debug.BotDebug={str(spec.bot_debug).lower()}",
         f"Launch.{'Headless' if spec.mode == 'headless' else 'Paced'}=true",
         f"Launch.Benchmark={spec.name}-",
     ))

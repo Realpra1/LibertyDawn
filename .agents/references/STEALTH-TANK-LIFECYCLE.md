@@ -38,6 +38,9 @@ and scan again.
    harassment and shorter opportunities, and choose the least-close surviving
    option.
 
+4D. Do not reissue move orders constantly, but let the engine's default pathing
+work.
+
 Target-cell filtering selects where to engage; it must not alter routing.
 
 ## 5. Engagement

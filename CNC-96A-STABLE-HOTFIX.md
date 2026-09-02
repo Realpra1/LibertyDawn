@@ -90,3 +90,19 @@ regression requires code and policy review.
   median 1955.57). Damage-adjusted median: 0.589.
 - The prior reviewed human replay baselines were primary 869.88 / adjusted
   0.220 and primary 417.01 / adjusted 0.024; final natural median exceeds both.
+
+## PR 143 follow-up evidence
+
+- Lifecycle rule 4D now states that in-flight move orders are retained so engine
+  pathing can work; no replacement routing system was added.
+- The five-run disabled-module baseline and five matched full-module runs are
+  recorded in `CNC-AI-PERFORMANCE-BENCHMARK.md`.
+- The generated special map has no resource-layer contents and gives VIKI four
+  two-tank squads against the requested mixed Brutalis force.
+- Three final `playtest-20260901` runs passed. The retained seed `9609314` replay
+  is a VIKI win at tick 4218 with six tanks surviving, all four squads passing
+  cadence, and no stall or Obelisk-death failure. Primary efficiency is 1979.05;
+  damage-adjusted efficiency is 0.4362.
+- Human-review artifacts are `tests/CNC-96A-Four-Squad-Lifecycle.oramap` and
+  `tests/CNC-96A-Four-Squad-Passing-playtest-20260901.orarep`; replay and map UID
+  are both `e5f1fe6b06ef14a1b921f0af69fa2073763af654`.

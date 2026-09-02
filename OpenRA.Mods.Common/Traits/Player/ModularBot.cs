@@ -38,6 +38,10 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Stable module ids participating in the advanced squad CPU failsafe, in recovery priority order.")]
 		public readonly string[] AdvancedSquadModules = Array.Empty<string>();
 
+		[Desc("Start every configured advanced squad module disabled. Intended for isolated performance baselines;",
+			"maximum-speed games keep the modules disabled because recovery requires reliable real-time pacing.")]
+		public readonly bool AdvancedSquadModulesInitiallyDisabled = false;
+
 		[Desc("World ticks in each aligned CPU/pacing sample window.")]
 		public readonly int AdvancedSquadSampleInterval = 250;
 
@@ -74,6 +78,8 @@ namespace OpenRA.Mods.Common.Traits
 				throw new YamlException("Advanced squad failsafe thresholds must use a non-negative lag tolerance and a CPU share in (0, 1].");
 			if (AdvancedSquadCpuFailsafe && AdvancedSquadModules.Length == 0)
 				throw new YamlException("AdvancedSquadModules must name at least one module when the failsafe is enabled.");
+			if (AdvancedSquadModulesInitiallyDisabled && !AdvancedSquadCpuFailsafe)
+				throw new YamlException("AdvancedSquadModulesInitiallyDisabled requires AdvancedSquadCpuFailsafe.");
 			if (AdvancedSquadModules.Any(string.IsNullOrEmpty) ||
 				AdvancedSquadModules.Distinct(StringComparer.Ordinal).Count() != AdvancedSquadModules.Length)
 				throw new YamlException("AdvancedSquadModules must contain unique, non-empty ids.");
@@ -146,16 +152,17 @@ namespace OpenRA.Mods.Common.Traits
 				advancedFailsafe = new AdvancedBotCpuFailsafeController(info.AdvancedSquadModules,
 					info.AdvancedSquadBreachSamples, info.AdvancedSquadRecoverySamples,
 					info.AdvancedSquadOffenderPenaltySamples, info.AdvancedSquadLagTolerance,
-					info.AdvancedSquadCpuShare);
+					info.AdvancedSquadCpuShare, info.AdvancedSquadModulesInitiallyDisabled);
 				pacingSampler = new SimulationPacingSampler(info.AdvancedSquadSampleInterval);
 				if (pendingFailsafeState.HasValue)
 					advancedFailsafe.ImportState(pendingFailsafeState.Value);
 				ApplyAdvancedModuleStates();
 				if (info.AdvancedSquadFailsafeDebugLogging)
 					Log.Write("debug", "Advanced squad failsafe [{0}] active: configured={1} matched={2} " +
-						"window={3} lag={4:P0} cpu-share={5:P0}.", p.PlayerName,
+						"window={3} lag={4:P0} cpu-share={5:P0} initially-disabled={6}.", p.PlayerName,
 						string.Join(",", info.AdvancedSquadModules), string.Join(",", advancedModules.Keys),
-						info.AdvancedSquadSampleInterval, info.AdvancedSquadLagTolerance, info.AdvancedSquadCpuShare);
+						info.AdvancedSquadSampleInterval, info.AdvancedSquadLagTolerance, info.AdvancedSquadCpuShare,
+						info.AdvancedSquadModulesInitiallyDisabled);
 			}
 
 			foreach (var ibe in p.PlayerActor.TraitsImplementing<IBotEnabled>())
