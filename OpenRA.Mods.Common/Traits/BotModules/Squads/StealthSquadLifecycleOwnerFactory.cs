@@ -147,6 +147,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			IStealthLifecycleRuntimeOrders runtimeOrders)
 		{
 			squad.StealthOverlayConsideredTargets.Clear();
+			squad.StealthOverlayChosenTarget = null;
 			var behavior = new StealthTargetAcquisitionBehavior(entry.Handoff, strategic);
 			StealthTargetAcquisitionResult result = null;
 			object Execute() { return result = ExecuteAcquisition(behavior, runtimeOrders); }

@@ -117,6 +117,7 @@ class CncAiModuleBenchmarkTest(unittest.TestCase):
             "game_seconds": 400,
             "game_seconds_per_wall_second": 4,
             "cpu_seconds": 90,
+            "cpu_seconds_per_1000_ticks": 0.9,
             "tick_mean_milliseconds": 2,
             "module_cpu_seconds": 10,
             "module_cpu_seconds_per_1000_ticks": 1,
@@ -125,6 +126,7 @@ class CncAiModuleBenchmarkTest(unittest.TestCase):
             "wall_seconds": 125,
             "game_seconds": 500,
             "cpu_seconds": 108,
+            "cpu_seconds_per_1000_ticks": 1.08,
             "tick_mean_milliseconds": 3,
             "module_cpu_seconds": 15,
             "module_cpu_seconds_per_1000_ticks": 1.25,
@@ -137,6 +139,7 @@ class CncAiModuleBenchmarkTest(unittest.TestCase):
         self.assertAlmostEqual(result["game_time_change_percent"], 25)
         self.assertAlmostEqual(result["simulation_throughput_change_percent"], -20)
         self.assertAlmostEqual(result["cpu_time_change_percent"], 20)
+        self.assertAlmostEqual(result["normalized_cpu_time_change_percent"], 20)
         self.assertAlmostEqual(result["mean_tick_time_change_percent"], 50)
         self.assertAlmostEqual(result["module_cpu_time_change_percent"], 50)
         self.assertAlmostEqual(result["normalized_module_cpu_change_percent"], 25)
