@@ -13,6 +13,7 @@ EditorPlayer:
 Player:
 	Inherits: ^BasePlayer
 	StealthEfficiencyControlWatchdog:
+	StealthSquadOverlay:
 	PlaceBuilding:
 		NewOptionsNotification: NewOptions
 		CannotPlaceNotification: BuildingCannotPlaceAudio

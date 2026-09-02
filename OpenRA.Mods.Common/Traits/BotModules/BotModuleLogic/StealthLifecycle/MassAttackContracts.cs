@@ -307,6 +307,12 @@ namespace OpenRA.Mods.Common.Traits
 
 	public interface IStealthMassAttackThreatAdapter
 	{
+		IStealthMassAttackThreatEvaluation Begin(StealthMassAttackThreatFacts facts);
+	}
+
+	/// <summary>One immutable live combat snapshot shared by a single MassAttack decision.</summary>
+	public interface IStealthMassAttackThreatEvaluation
+	{
 		StealthMassAttackThreatResult Calculate(StealthMassAttackThreatFacts facts);
 	}
 

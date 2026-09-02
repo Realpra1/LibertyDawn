@@ -65,7 +65,7 @@ namespace OpenRA.Mods.Common.Traits
 
 			var target = decision.ResolveTarget(targetId);
 			var currentCell = decision.CurrentFormationCell();
-			if (currentCell.HasValue)
+			if (decision.KitingEnabled && currentCell.HasValue)
 			{
 				var liveSafety = decision.MemberCells.Select(cell =>
 					Calculate(decision.ThreatFacts(target, cell), revision)).ToArray();
@@ -76,12 +76,13 @@ namespace OpenRA.Mods.Common.Traits
 					return FleeUnsafeCurrentPosition(decision, target, revision);
 			}
 
-			foreach (var cell in decision.OrderedCandidateCells(target, currentCell))
-			{
-				var safety = Calculate(decision.ThreatFacts(target, cell), revision);
-				if (safety.Approved)
-					return Retain(decision, target, cell, safety, StealthKiteAction.Position, revision);
-			}
+			if (decision.KitingEnabled)
+				foreach (var cell in decision.OrderedCandidateCells(target, currentCell))
+				{
+					var safety = Calculate(decision.ThreatFacts(target, cell), revision);
+					if (safety.Approved)
+						return Retain(decision, target, cell, safety, StealthKiteAction.Position, revision);
+				}
 
 			var fallbackFacts = decision.FallbackFacts(target);
 			var score = CalculateFallback(fallbackFacts, revision);

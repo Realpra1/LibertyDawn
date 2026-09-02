@@ -17,97 +17,6 @@ using System.Text;
 
 namespace OpenRA.Mods.Common.Traits
 {
-	public sealed class StealthRecalculateFleeEntryThreatFacts
-	{
-		readonly ReadOnlyCollection<uint> memberIds;
-		readonly ReadOnlyCollection<StealthRecalculateFleeEnemySnapshot> enemies;
-		public StealthRecalculateFleeSource Source { get; }
-		public uint SelectedTargetActorId { get; }
-		public CPos SelectedTargetCurrentCell { get; }
-		public IReadOnlyList<uint> MemberActorIds => memberIds;
-		public IReadOnlyList<StealthRecalculateFleeEnemySnapshot> Enemies => enemies;
-		public bool FormationCloaked { get; }
-		public bool PlannedDecloak => true;
-		public bool PlannedAttack => true;
-		public bool PlannedCurrentRangeEngagement => true;
-
-		internal StealthRecalculateFleeEntryThreatFacts(StealthRecalculateFleeSource source,
-			uint targetId, CPos targetCell, IEnumerable<uint> memberIds,
-			IEnumerable<StealthRecalculateFleeEnemySnapshot> enemies, bool formationCloaked)
-		{
-			var members = memberIds?.OrderBy(id => id).ToArray();
-			var enemyCopy = enemies?.OrderBy(enemy => enemy?.ActorId).ToArray();
-			if (!Enum.IsDefined(typeof(StealthRecalculateFleeSource), source) || targetId == 0 ||
-				members == null || members.Length == 0 || members.Any(id => id == 0) ||
-				members.Distinct().Count() != members.Length || enemyCopy == null || enemyCopy.Length == 0 ||
-				enemyCopy.Any(enemy => enemy == null) ||
-				enemyCopy.Select(enemy => enemy.ActorId).Distinct().Count() != enemyCopy.Length ||
-				!enemyCopy.Any(enemy => enemy.ActorId == targetId && enemy.CurrentCell == targetCell))
-				throw new ArgumentException("Entry threat facts require exact current participants and target.");
-			Source = source;
-			SelectedTargetActorId = targetId;
-			SelectedTargetCurrentCell = targetCell;
-			this.memberIds = Array.AsReadOnly(members);
-			this.enemies = Array.AsReadOnly(enemyCopy);
-			FormationCloaked = formationCloaked;
-		}
-	}
-
-	public sealed class StealthRecalculateFleeThreatFacts
-	{
-		readonly ReadOnlyCollection<StealthRecalculateFleeMemberSnapshot> members;
-		readonly ReadOnlyCollection<StealthRecalculateFleeEnemySnapshot> enemies;
-		public CPos CandidateCell { get; }
-		public IReadOnlyList<StealthRecalculateFleeMemberSnapshot> Members => members;
-		public IReadOnlyList<StealthRecalculateFleeEnemySnapshot> Enemies => enemies;
-		public bool FormationCloaked { get; }
-		public bool HasDetectorCoverage { get; }
-		public bool PlannedDecloak => false;
-		public bool PlannedAttack => false;
-		public bool PlannedCurrentRangeEngagement => false;
-
-		internal StealthRecalculateFleeThreatFacts(CPos candidateCell,
-			IEnumerable<StealthRecalculateFleeMemberSnapshot> members,
-			IEnumerable<StealthRecalculateFleeEnemySnapshot> enemies, bool formationCloaked,
-			bool hasDetectorCoverage)
-		{
-			var memberCopy = members?.OrderBy(member => member?.ActorId).ToArray();
-			var enemyCopy = enemies?.OrderBy(enemy => enemy?.ActorId).ToArray();
-			if (memberCopy == null || memberCopy.Length == 0 || memberCopy.Any(member => member == null) ||
-				memberCopy.Select(member => member.ActorId).Distinct().Count() != memberCopy.Length ||
-				enemyCopy == null || enemyCopy.Length == 0 || enemyCopy.Any(enemy => enemy == null) ||
-				enemyCopy.Select(enemy => enemy.ActorId).Distinct().Count() != enemyCopy.Length)
-				throw new ArgumentException("Flee threat facts require unique current participants.");
-			CandidateCell = candidateCell;
-			this.members = Array.AsReadOnly(memberCopy);
-			this.enemies = Array.AsReadOnly(enemyCopy);
-			FormationCloaked = formationCloaked;
-			HasDetectorCoverage = hasDetectorCoverage;
-		}
-	}
-
-	public interface IStealthRecalculateFleeThreatAdapter
-	{
-		StealthTargetThreatScore CalculateEntryCrossover(StealthRecalculateFleeEntryThreatFacts facts);
-		StealthTargetThreatScore CalculateRouteDanger(StealthRecalculateFleeThreatFacts facts);
-	}
-
-	public sealed class StealthRecalculateFleeRouteEvaluation
-	{
-		public StealthRecalculateFleeCandidateSnapshot Candidate { get; }
-		public StealthRecalculateFleeThreatFacts Facts { get; }
-		public StealthTargetThreatScore StandardDanger { get; }
-		internal StealthRecalculateFleeRouteEvaluation(StealthRecalculateFleeCandidateSnapshot candidate,
-			StealthRecalculateFleeThreatFacts facts, StealthTargetThreatScore standardDanger)
-		{
-			Candidate = candidate ?? throw new ArgumentNullException(nameof(candidate));
-			Facts = facts ?? throw new ArgumentNullException(nameof(facts));
-			if (facts.CandidateCell != candidate.Cell)
-				throw new ArgumentException("Route evaluation does not match its live candidate.");
-			StandardDanger = standardDanger;
-		}
-	}
-
 	public sealed class StealthRecalculateFleeOrderToken : IEquatable<StealthRecalculateFleeOrderToken>
 	{
 		readonly ReadOnlyCollection<uint> actorIds;
@@ -170,7 +79,6 @@ namespace OpenRA.Mods.Common.Traits
 	{
 		readonly ReadOnlyCollection<uint> memberIds;
 		readonly ReadOnlyCollection<uint> enemyIds;
-		readonly ReadOnlyCollection<StealthRecalculateFleeRouteEvaluation> evaluations;
 		internal StealthRecalculateFleeHandoff Source { get; }
 		internal StealthBehaviorHandoff Handoff => Source.Handoff;
 		public StealthApproachMission Mission { get; }
@@ -179,7 +87,6 @@ namespace OpenRA.Mods.Common.Traits
 		public StealthRecalculateFleeLiveCause LiveCause { get; }
 		public IReadOnlyList<uint> ActiveMemberActorIds => memberIds;
 		public IReadOnlyList<uint> LiveEnemyActorIds => enemyIds;
-		public IReadOnlyList<StealthRecalculateFleeRouteEvaluation> RouteEvaluations => evaluations;
 		public CPos? SelectedDestinationCell { get; }
 		public StealthTargetThreatScore? SelectedStandardDanger { get; }
 		public IReadOnlyList<CPos> OrderedRoute { get; }
@@ -191,7 +98,6 @@ namespace OpenRA.Mods.Common.Traits
 		internal StealthRecalculateFleeResult(StealthRecalculateFleeHandoff source,
 			StealthRecalculateFleeDisposition disposition, StealthRecalculateFleeLiveCause liveCause,
 			IEnumerable<uint> members, IEnumerable<uint> enemies,
-			IEnumerable<StealthRecalculateFleeRouteEvaluation> evaluations,
 			CPos? destination, StealthTargetThreatScore? danger,
 			IEnumerable<CPos> orderedRoute, int routeProgress,
 			StealthRecalculateFleeOrderToken lastOrderToken, string fingerprint,
@@ -203,10 +109,6 @@ namespace OpenRA.Mods.Common.Traits
 			LiveCause = liveCause;
 			memberIds = CanonicalIds(members, nameof(members));
 			enemyIds = CanonicalIds(enemies, nameof(enemies));
-			var routes = evaluations?.ToArray() ?? throw new ArgumentNullException(nameof(evaluations));
-			if (routes.Any(route => route == null) || routes.Select(route => route.Candidate.Cell).Distinct().Count() != routes.Length)
-				throw new ArgumentException("Route evaluations must be unique.", nameof(evaluations));
-			this.evaluations = Array.AsReadOnly(routes);
 			SelectedDestinationCell = destination;
 			SelectedStandardDanger = danger;
 			OrderedRoute = Array.AsReadOnly(orderedRoute?.ToArray() ??
@@ -228,8 +130,7 @@ namespace OpenRA.Mods.Common.Traits
 						LiveCause == StealthRecalculateFleeLiveCause.NoTarget))
 				throw new ArgumentException("Invalid RecalculateFlee result disposition.");
 			var hasRoute = SelectedDestinationCell.HasValue && SelectedStandardDanger.HasValue &&
-				LastOrderToken != null && evaluations.Any(route => route.Candidate.Cell == SelectedDestinationCell &&
-					SameScore(route.StandardDanger, SelectedStandardDanger.Value));
+				LastOrderToken != null;
 			var routeCause = LiveCause == StealthRecalculateFleeLiveCause.Traversing ||
 				LiveCause == StealthRecalculateFleeLiveCause.Completed ||
 				(LiveCause == StealthRecalculateFleeLiveCause.MemberLoss && memberIds.Count != 0);
@@ -247,8 +148,7 @@ namespace OpenRA.Mods.Common.Traits
 			if (!hasRoute && (OrderedRoute.Count != 0 || RouteProgress != 0))
 				throw new ArgumentException("Flee terminal result cannot retain route progress.");
 			if ((LiveCause == StealthRecalculateFleeLiveCause.NoTarget && enemyIds.Count != 0) ||
-				(LiveCause == StealthRecalculateFleeLiveCause.NoRoute &&
-					(enemyIds.Count == 0 || evaluations.Count != 0)) ||
+				(LiveCause == StealthRecalculateFleeLiveCause.NoRoute && enemyIds.Count == 0) ||
 				(LiveCause == StealthRecalculateFleeLiveCause.MemberLoss &&
 					memberIds.SequenceEqual(EntryCause.MemberActorIds)))
 				throw new ArgumentException("Flee outcome has no exact live cause.");
@@ -261,11 +161,6 @@ namespace OpenRA.Mods.Common.Traits
 				copy.Distinct().Count() != copy.Length)
 				throw new ArgumentException("Result identities must be canonical.", name);
 			return Array.AsReadOnly(copy);
-		}
-
-		static bool SameScore(StealthTargetThreatScore left, StealthTargetThreatScore right)
-		{
-			return left.ThreatRating.Equals(right.ThreatRating) && left.Crossover.Equals(right.Crossover);
 		}
 	}
 
@@ -298,11 +193,6 @@ namespace OpenRA.Mods.Common.Traits
 			text.Append(";E=");
 			foreach (var enemy in live.Enemies)
 				text.Append(Enemy(enemy));
-			text.Append(";P=");
-			foreach (var candidate in live.Candidates)
-				text.Append(candidate.Cell.Bits).Append(',').Append(candidate.IsPassable ? 1 : 0).Append(',')
-					.Append(candidate.RequiresStrategicRouting ? 1 : 0).Append(',')
-					.Append(candidate.HasDetectorCoverage ? 1 : 0).Append('|');
 			return text.ToString();
 		}
 

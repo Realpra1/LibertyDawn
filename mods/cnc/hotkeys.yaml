@@ -21,3 +21,7 @@ ProductionTypeAircraft: U
 ToggleOpsGrid: O
 	Description: Toggle Ops Grid
 	Types: Player
+
+ToggleStealthSquadOverlay: F8
+	Description: Toggle Stealth Squad Overlay
+	Types: Observer, Replay, Spectator

@@ -730,7 +730,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var influenceStarted = Stopwatch.GetTimestamp();
 			var rebuildInfluence = !profileCaches.TryGetValue(cacheKey, out var cache) ||
 				cache.Width != width || cache.Height != height ||
-				owner.World.WorldTick - cache.Tick >= info.AirInfluenceCacheInterval;
+				owner.World.WorldTick - cache.Tick >= owner.SquadManager.StrategicPlanningInterval(
+					info.AirInfluenceCacheInterval);
 			if (rebuildInfluence)
 			{
 				var rebuiltDanger = new float[width * height];
@@ -1329,7 +1330,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				owner.AirAaClearThreatIds.UnionWith(plan.AaThreatIds);
 			owner.AirAaClearEngaged = false;
 
-			owner.AirNextTargetReviewTick = owner.World.WorldTick + info.AirInfluenceCacheInterval;
+			owner.AirNextTargetReviewTick = owner.World.WorldTick +
+				owner.SquadManager.StrategicPlanningInterval(info.AirInfluenceCacheInterval);
 			if (plan.Route != null)
 				owner.AirRoute.AddRange(plan.Route);
 
@@ -2710,7 +2712,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 			if (owner.IsTargetValid && owner.World.WorldTick >= owner.AirNextTargetReviewTick)
 			{
-				owner.AirNextTargetReviewTick = owner.World.WorldTick + info.AirInfluenceCacheInterval;
+				owner.AirNextTargetReviewTick = owner.World.WorldTick +
+					owner.SquadManager.StrategicPlanningInterval(info.AirInfluenceCacheInterval);
 				if (owner.TargetActor.Info.HasTraitInfo<BuildingInfo>() && hasArmedUnit)
 				{
 					var incumbent = owner.TargetActor;

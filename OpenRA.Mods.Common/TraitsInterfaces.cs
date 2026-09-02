@@ -589,6 +589,12 @@ namespace OpenRA.Mods.Common.Traits
 	}
 
 	[RequireExplicitImplementation]
+	public interface IAdvancedBotPlanningThrottle
+	{
+		void SetPlanningIntervalFactor(int factor);
+	}
+
+	[RequireExplicitImplementation]
 	public interface IAdvancedBotFailsafeWindowDiagnostics
 	{
 		void EmitAdvancedFailsafeWindowDiagnostics(int sampleInterval, string transition);

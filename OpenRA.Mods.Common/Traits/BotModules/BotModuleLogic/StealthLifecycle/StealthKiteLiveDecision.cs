@@ -18,6 +18,7 @@ namespace OpenRA.Mods.Common.Traits
 	{
 		readonly bool formationCloaked;
 		public bool FormationExposed { get; }
+		public bool KitingEnabled { get; }
 		public StealthKiteMemberSnapshot[] Members { get; }
 		public StealthKiteActorSnapshot[] Defenders { get; }
 		public StealthKiteActorSnapshot[] Objectives { get; }
@@ -30,6 +31,7 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			formationCloaked = live.FormationCloaked;
 			FormationExposed = !live.FormationCloaked || live.FormationDetected;
+			KitingEnabled = live.KitingEnabled;
 			Members = live.Members.Where(member => member.IsValid)
 				.OrderBy(member => member.ActorId).ToArray();
 			var actors = live.Actors.Where(actor => actor.IsValid && actor.IsInLocalEngagementArea)

@@ -71,7 +71,8 @@ Container@PERF_WIDGETS:
 					Height: 200
 
 Container@OBSERVER_WIDGETS:
-	Logic: MenuButtonsChromeLogic, LoadIngamePerfLogic, LoadIngameChatLogic
+	Logic: MenuButtonsChromeLogic, LoadIngamePerfLogic, LoadIngameChatLogic, StealthSquadOverlayHotkeyLogic
+		ToggleStealthSquadOverlayKey: ToggleStealthSquadOverlay
 	Children:
 		Container@CHAT_ROOT:
 		Container@PERF_ROOT:

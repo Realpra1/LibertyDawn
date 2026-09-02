@@ -83,13 +83,14 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		internal Target Target;
 		internal StateMachine FuzzyStateMachine;
 		StealthSquadLifecycleRuntimeHost stealthLifecycleRuntime;
-		internal bool UsesModularStealthLifecycle => UsesModularStealthLifecycleFor(
-			Type, StealthSquadDefinition, SquadManager.Info.UseModularStealthLifecycle);
-		internal static bool UsesModularStealthLifecycleFor(SquadType type,
-			string definition, bool managerEnabled)
+		internal bool UsesModularStealthLifecycle => UsesModularStealthLifecycleFor(Type);
+		internal BehaviorId StealthLifecyclePhase =>
+			stealthLifecycleRuntime?.Phase ?? BehaviorId.Start;
+		internal readonly List<CPos> StealthOverlayConsideredTargets = new List<CPos>();
+		internal CPos? StealthOverlayChosenTarget;
+		internal static bool UsesModularStealthLifecycleFor(SquadType type)
 		{
-			return managerEnabled && type == SquadType.Stealth &&
-				string.Equals(definition, "stealth-tank", StringComparison.Ordinal);
+			return type == SquadType.Stealth;
 		}
 
 		internal static bool LegacyStealthAuthorityAllowed(bool modularRuntimeEnabled)
@@ -255,7 +256,10 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				{
 					if (stealthLifecycleRuntime == null)
 						stealthLifecycleRuntime = new StealthSquadLifecycleRuntimeHost(this);
-					stealthLifecycleRuntime.Tick();
+					if (Game.IsBenchmarking)
+						BenchmarkAirWork("lifecycle", stealthLifecycleRuntime.Tick);
+					else
+						stealthLifecycleRuntime.Tick();
 					return;
 				}
 
@@ -786,7 +790,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			if (typeNode != null)
 				type = FieldLoader.GetValue<SquadType>("Type", typeNode.Value.Value);
 			StealthSquadLifecycleAuthorityPersistence.Validate(yaml,
-				type == SquadType.Stealth && squadManager.Info.UseModularStealthLifecycle);
+				UsesModularStealthLifecycleFor(type));
 
 			var targetNode = yaml.Nodes.FirstOrDefault(n => n.Key == "Target");
 			if (targetNode != null)

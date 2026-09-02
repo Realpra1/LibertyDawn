@@ -2031,7 +2031,6 @@ Player:
 			tmpl: 1
 			fix: 1
     SquadManagerBotModule@viki:
-		UseModularStealthLifecycle: true
 		StealthSquadDefinitions:
 			stealth-tank:
 				UnitTypes: stnk

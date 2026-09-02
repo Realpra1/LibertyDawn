@@ -23,9 +23,10 @@ namespace OpenRA.Mods.Common.Traits
 		public readonly double AdvancedMilliseconds;
 		public readonly double TotalMilliseconds;
 		public readonly double Share;
+		public readonly int PlanningIntervalFactor;
 
 		public AdvancedBotFailsafeDecision(string transition, string module, string reason,
-			double advancedMilliseconds, double totalMilliseconds)
+			double advancedMilliseconds, double totalMilliseconds, int planningIntervalFactor = 1)
 		{
 			Transition = transition;
 			Module = module;
@@ -33,6 +34,7 @@ namespace OpenRA.Mods.Common.Traits
 			AdvancedMilliseconds = advancedMilliseconds;
 			TotalMilliseconds = totalMilliseconds;
 			Share = totalMilliseconds > 0 ? advancedMilliseconds / totalMilliseconds : 0;
+			PlanningIntervalFactor = planningIntervalFactor;
 		}
 	}
 
@@ -43,15 +45,17 @@ namespace OpenRA.Mods.Common.Traits
 		public readonly int BreachSamples;
 		public readonly int HealthySamples;
 		public readonly string RecoveryProbe;
+		public readonly int PlanningIntervalFactor;
 
 		public AdvancedBotFailsafeState(string[] disabledModules, string offender, int breachSamples, int healthySamples,
-			string recoveryProbe)
+			string recoveryProbe, int planningIntervalFactor = 1)
 		{
 			DisabledModules = disabledModules;
 			Offender = offender;
 			BreachSamples = breachSamples;
 			HealthySamples = healthySamples;
 			RecoveryProbe = recoveryProbe;
+			PlanningIntervalFactor = planningIntervalFactor;
 		}
 	}
 
@@ -66,18 +70,21 @@ namespace OpenRA.Mods.Common.Traits
 		readonly int offenderRecoveryPenaltySamples;
 		readonly double lagTolerance;
 		readonly double fallbackShare;
+		readonly int maxPlanningIntervalFactor;
 
 		int breachSamples;
 		int healthySamples;
 		string offender;
 		string recoveryProbe;
+		int planningIntervalFactor = 1;
 
 		public IEnumerable<string> DisabledModules => moduleOrder.Where(disabled.Contains);
 		public string Offender => offender;
+		public int PlanningIntervalFactor => planningIntervalFactor;
 
 		public AdvancedBotCpuFailsafeController(IEnumerable<string> moduleOrder, int breachSamplesRequired,
 			int recoverySamplesRequired, int offenderRecoveryPenaltySamples, float lagTolerance, float fallbackShare,
-			bool initiallyDisabled = false)
+			bool initiallyDisabled = false, int maxPlanningIntervalFactor = 1)
 		{
 			this.moduleOrder = moduleOrder.Distinct(StringComparer.Ordinal).ToArray();
 			this.breachSamplesRequired = Math.Max(1, breachSamplesRequired);
@@ -85,6 +92,7 @@ namespace OpenRA.Mods.Common.Traits
 			this.offenderRecoveryPenaltySamples = Math.Max(0, offenderRecoveryPenaltySamples);
 			this.lagTolerance = Math.Max(0, lagTolerance);
 			this.fallbackShare = Math.Max(0, Math.Min(1, fallbackShare));
+			this.maxPlanningIntervalFactor = Math.Max(1, maxPlanningIntervalFactor);
 			if (initiallyDisabled)
 				disabled.UnionWith(this.moduleOrder);
 		}
@@ -111,28 +119,31 @@ namespace OpenRA.Mods.Common.Traits
 					var dominant = enabledTimes.Where(kv => kv.Value > 0).OrderByDescending(kv => kv.Value)
 						.ThenBy(kv => Array.IndexOf(moduleOrder, kv.Key)).Select(kv => kv.Key).FirstOrDefault();
 					if (!string.Equals(dominant, recoveryProbe, StringComparison.Ordinal))
-						return new AdvancedBotFailsafeDecision("probe-pending", recoveryProbe, reason,
-							advancedMilliseconds, totalMilliseconds);
+						return Decision("probe-pending", recoveryProbe, reason, advancedMilliseconds, totalMilliseconds);
 
 					disabled.Add(recoveryProbe);
 					var failedProbe = recoveryProbe;
 					offender = failedProbe;
 					recoveryProbe = null;
 					breachSamples = 0;
-					return new AdvancedBotFailsafeDecision("re-shed", failedProbe, reason,
-						advancedMilliseconds, totalMilliseconds);
+					return Decision("re-shed", failedProbe, reason, advancedMilliseconds, totalMilliseconds);
 				}
 
 				if (++breachSamples < breachSamplesRequired || !enabledTimes.Any(kv => kv.Value > 0))
-					return new AdvancedBotFailsafeDecision("held", null, reason, advancedMilliseconds, totalMilliseconds);
+					return Decision("held", null, reason, advancedMilliseconds, totalMilliseconds);
 
 				breachSamples = 0;
+				if (planningIntervalFactor < maxPlanningIntervalFactor)
+				{
+					planningIntervalFactor = Math.Min(maxPlanningIntervalFactor, planningIntervalFactor * 2);
+					return Decision("throttled", null, reason, advancedMilliseconds, totalMilliseconds);
+				}
+
 				var selected = enabledTimes.Where(kv => kv.Value > 0).OrderByDescending(kv => kv.Value)
 					.ThenBy(kv => Array.IndexOf(moduleOrder, kv.Key)).First().Key;
 				disabled.Add(selected);
 				offender = selected;
-				return new AdvancedBotFailsafeDecision("disabled", selected, reason,
-					advancedMilliseconds, totalMilliseconds);
+				return Decision("disabled", selected, reason, advancedMilliseconds, totalMilliseconds);
 			}
 
 			breachSamples = 0;
@@ -141,25 +152,30 @@ namespace OpenRA.Mods.Common.Traits
 				if (!pacing.Reliable)
 				{
 					healthySamples = 0;
-					return new AdvancedBotFailsafeDecision("probe-pending", recoveryProbe, reason,
-						advancedMilliseconds, totalMilliseconds);
+					return Decision("probe-pending", recoveryProbe, reason, advancedMilliseconds, totalMilliseconds);
 				}
 
 				if (++healthySamples < recoverySamplesRequired)
-					return new AdvancedBotFailsafeDecision("probe-pending", recoveryProbe, reason,
-						advancedMilliseconds, totalMilliseconds);
+					return Decision("probe-pending", recoveryProbe, reason, advancedMilliseconds, totalMilliseconds);
 
 				var recovered = recoveryProbe;
 				recoveryProbe = null;
 				healthySamples = 0;
-				return new AdvancedBotFailsafeDecision("recovered", recovered, reason,
-					advancedMilliseconds, totalMilliseconds);
+				return Decision("recovered", recovered, reason, advancedMilliseconds, totalMilliseconds);
 			}
 
 			if (disabled.Count == 0)
 			{
-				healthySamples = 0;
-				return new AdvancedBotFailsafeDecision("healthy", null, reason, advancedMilliseconds, totalMilliseconds);
+				if (planningIntervalFactor > 1 && ++healthySamples >= recoverySamplesRequired)
+				{
+					planningIntervalFactor = Math.Max(1, planningIntervalFactor / 2);
+					healthySamples = 0;
+					return Decision("relaxed", null, reason, advancedMilliseconds, totalMilliseconds);
+				}
+
+				if (planningIntervalFactor == 1)
+					healthySamples = 0;
+				return Decision("healthy", null, reason, advancedMilliseconds, totalMilliseconds);
 			}
 
 			// An unreliable share window cannot prove recovery while work is disabled:
@@ -169,7 +185,7 @@ namespace OpenRA.Mods.Common.Traits
 			if (!pacing.Reliable)
 			{
 				healthySamples = 0;
-				return new AdvancedBotFailsafeDecision("cooldown", null, reason, advancedMilliseconds, totalMilliseconds);
+				return Decision("cooldown", null, reason, advancedMilliseconds, totalMilliseconds);
 			}
 
 			healthySamples++;
@@ -182,18 +198,25 @@ namespace OpenRA.Mods.Common.Traits
 			}
 
 			if (recovery == null || healthySamples < required)
-				return new AdvancedBotFailsafeDecision("cooldown", null, reason, advancedMilliseconds, totalMilliseconds);
+				return Decision("cooldown", null, reason, advancedMilliseconds, totalMilliseconds);
 
 			disabled.Remove(recovery);
 			recoveryProbe = recovery;
 			healthySamples = 0;
-			return new AdvancedBotFailsafeDecision("enabled-probe", recovery, reason,
-				advancedMilliseconds, totalMilliseconds);
+			return Decision("enabled-probe", recovery, reason, advancedMilliseconds, totalMilliseconds);
+		}
+
+		AdvancedBotFailsafeDecision Decision(string transition, string module, string reason,
+			double advancedMilliseconds, double totalMilliseconds)
+		{
+			return new AdvancedBotFailsafeDecision(transition, module, reason,
+				advancedMilliseconds, totalMilliseconds, planningIntervalFactor);
 		}
 
 		public AdvancedBotFailsafeState ExportState()
 		{
-			return new AdvancedBotFailsafeState(DisabledModules.ToArray(), offender, breachSamples, healthySamples, recoveryProbe);
+			return new AdvancedBotFailsafeState(DisabledModules.ToArray(), offender, breachSamples,
+				healthySamples, recoveryProbe, planningIntervalFactor);
 		}
 
 		public void ImportState(AdvancedBotFailsafeState state)
@@ -208,6 +231,8 @@ namespace OpenRA.Mods.Common.Traits
 			healthySamples = Math.Max(0, state.HealthySamples);
 			recoveryProbe = moduleOrder.Contains(state.RecoveryProbe) && !disabled.Contains(state.RecoveryProbe) ?
 				state.RecoveryProbe : null;
+			planningIntervalFactor = Math.Max(1,
+				Math.Min(maxPlanningIntervalFactor, state.PlanningIntervalFactor));
 		}
 	}
 }

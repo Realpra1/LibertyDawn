@@ -125,7 +125,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			}).ToArray();
 			return new StealthKiteLiveSnapshot(squad.World.WorldTick, members, actors,
 				CandidateCells(4), FormationCloaked(),
-				formationDetected: Members().Any(actor => HasDetectorCoverage(actor.Location)));
+				formationDetected: Members().Any(actor => HasDetectorCoverage(actor.Location)),
+				kitingEnabled: squad.StealthDefinition?.EnableKiting != false);
 		}
 
 		StealthMassAttackLiveSnapshot IStealthMassAttackLiveWorld.Read(StealthApproachMission mission)
@@ -145,7 +146,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					IsObjective(actor, mission), HasDetectorCoverage(actor.Location));
 			}).ToArray();
 			return new StealthMassAttackLiveSnapshot(squad.World.WorldTick, members, actors,
-				CandidateCells(Math.Max(4, squad.SquadManager.Info.DangerScanRadius)), FormationCloaked());
+				CandidateCells(4), FormationCloaked());
 		}
 
 		public Actor Resolve(uint actorId)
@@ -237,6 +238,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 		bool CanCrush(Actor target)
 		{
+			if (squad.StealthDefinition?.CrushInfantryTargets == false)
+				return false;
+
 			return Members().All(unit =>
 			{
 				var mobile = unit.TraitOrDefault<Mobile>();

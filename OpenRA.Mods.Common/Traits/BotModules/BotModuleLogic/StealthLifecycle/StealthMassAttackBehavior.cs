@@ -17,6 +17,7 @@ namespace OpenRA.Mods.Common.Traits
 	/// <summary>Reactive live MassAttack owner: attack the greatest threat while crossover is above one.</summary>
 	public sealed class StealthMassAttackBehavior
 	{
+		const int MaximumSafeCellChecks = 8;
 		readonly StealthMassAttackHandoff handoff;
 		readonly StealthApproachMission mission;
 		readonly IStealthLifecycleOwnershipGuard ownershipGuard;
@@ -56,10 +57,11 @@ namespace OpenRA.Mods.Common.Traits
 				return Targetless(decision, decision.TargetlessDisposition.Value, revision);
 
 			var currentCell = decision.CurrentFormationCell();
+			var evaluation = BeginEvaluation(decision.Facts(decision.Defenders[0], currentCell), revision);
 			var choices = decision.Defenders.Select(target =>
 			{
 				var facts = decision.Facts(target, currentCell);
-				return (Target: target, Facts: facts, Threat: Calculate(facts, revision));
+				return (Target: target, Facts: facts, Threat: Calculate(evaluation, facts, revision));
 			}).ToArray();
 			var selected = choices.OrderByDescending(choice => choice.Threat.SelectedTargetThreat)
 				.ThenBy(choice => choice.Target.ActorId).First();
@@ -72,14 +74,13 @@ namespace OpenRA.Mods.Common.Traits
 			var orderCell = selected.Target.CurrentCell;
 			var selectedFacts = selected.Facts;
 			var threat = selected.Threat;
-			var currentAttackApproved = decision.MemberCells.All(cell =>
-				Calculate(decision.Facts(selected.Target, cell), revision).AttackApproved);
-			if (!currentAttackApproved)
+			if (!selected.Threat.AttackApproved)
 			{
-				foreach (var candidate in decision.OrderedCandidateCells(selected.Target, currentCell))
+				foreach (var candidate in decision.OrderedCandidateCells(selected.Target, currentCell)
+					.Take(MaximumSafeCellChecks))
 				{
 					var candidateFacts = decision.Facts(selected.Target, candidate);
-					var candidateThreat = Calculate(candidateFacts, revision);
+					var candidateThreat = Calculate(evaluation, candidateFacts, revision);
 					if (!candidateThreat.AttackApproved)
 						continue;
 					phase = StealthMassAttackPhase.Advance;
@@ -133,10 +134,21 @@ namespace OpenRA.Mods.Common.Traits
 			return live;
 		}
 
-		StealthMassAttackThreatResult Calculate(StealthMassAttackThreatFacts facts, long revision)
+		IStealthMassAttackThreatEvaluation BeginEvaluation(
+			StealthMassAttackThreatFacts facts, long revision)
 		{
 			executionLease.Verify(revision, "MassAttack", EnsureActiveOwnership);
-			var result = threatAdapter.Calculate(facts);
+			var evaluation = threatAdapter.Begin(facts) ??
+				throw new InvalidOperationException("MassAttack threat adapter returned no live evaluation.");
+			executionLease.Verify(revision, "MassAttack", EnsureActiveOwnership);
+			return evaluation;
+		}
+
+		StealthMassAttackThreatResult Calculate(IStealthMassAttackThreatEvaluation evaluation,
+			StealthMassAttackThreatFacts facts, long revision)
+		{
+			executionLease.Verify(revision, "MassAttack", EnsureActiveOwnership);
+			var result = evaluation.Calculate(facts);
 			executionLease.Verify(revision, "MassAttack", EnsureActiveOwnership);
 			return result;
 		}

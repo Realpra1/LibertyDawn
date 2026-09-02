@@ -1460,7 +1460,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var cacheKey = owner.StealthProfile + ":" + locomotor;
 			var info = owner.SquadManager.Info;
 			if (profileCaches.TryGetValue(cacheKey, out var cached) && cached.Width == width &&
-				cached.Height == height && owner.World.WorldTick - cached.Tick < info.AirInfluenceCacheInterval)
+				cached.Height == height && owner.World.WorldTick - cached.Tick <
+					owner.SquadManager.StrategicPlanningInterval(info.AirInfluenceCacheInterval))
 			{
 				RecordAirPhase(owner, "influence-cache-hit", Stopwatch.GetTimestamp());
 				return cached;
@@ -4504,7 +4505,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var influenceStarted = Stopwatch.GetTimestamp();
 			var rebuildInfluence = !profileCaches.TryGetValue(cacheKey, out var cache) ||
 				cache.Width != width || cache.Height != height ||
-				owner.World.WorldTick - cache.Tick >= info.AirInfluenceCacheInterval;
+				owner.World.WorldTick - cache.Tick >= owner.SquadManager.StrategicPlanningInterval(
+					info.AirInfluenceCacheInterval);
 			if (rebuildInfluence)
 			{
 				var rebuiltDanger = new float[width * height];
@@ -5219,7 +5221,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var targetReviewInterval = owner.StealthProfile == "stealth-tank" ?
 				StealthAISpecialistPolicy.StrategicTargetReviewIntervalTicks(
 					owner.World.Timestep, info.AirInfluenceCacheInterval) : info.AirInfluenceCacheInterval;
-			owner.AirNextTargetReviewTick = owner.World.WorldTick + targetReviewInterval;
+			owner.AirNextTargetReviewTick = owner.World.WorldTick +
+				owner.SquadManager.StrategicPlanningInterval(targetReviewInterval);
 			if (plan.Route != null)
 				owner.AirRoute.AddRange(plan.Route);
 
@@ -6796,7 +6799,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				var targetReviewInterval = owner.StealthProfile == "stealth-tank" ?
 					StealthAISpecialistPolicy.StrategicTargetReviewIntervalTicks(
 						owner.World.Timestep, info.AirInfluenceCacheInterval) : info.AirInfluenceCacheInterval;
-				owner.AirNextTargetReviewTick = owner.World.WorldTick + targetReviewInterval;
+				owner.AirNextTargetReviewTick = owner.World.WorldTick +
+					owner.SquadManager.StrategicPlanningInterval(targetReviewInterval);
 				if (owner.TargetActor.Info.HasTraitInfo<BuildingInfo>() && hasArmedUnit)
 				{
 					var incumbent = owner.TargetActor;

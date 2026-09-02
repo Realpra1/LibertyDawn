@@ -42,6 +42,9 @@ class CncAiModuleBenchmarkTest(unittest.TestCase):
             )
             rules = archive.read("benchmark-baseline.yaml").decode("utf-8")
             self.assertEqual(rules.count("AdvancedSquadModulesInitiallyDisabled: true"), 4)
+            self.assertEqual(rules.count("SimpleAttackMoveFallbackWhenDisabled: true"), 4)
+            self.assertEqual(rules.count("FailsafeReconsiderInterval: 750"), 4)
+            self.assertEqual(rules.count("heli, orca"), 4)
             for controller in (
                 "TransportManagerBotModule", "CrateCollectorBotModule",
                 "CrateCollectorBotModule@VIKI", "RedTiberiumBombBotModule",
@@ -53,7 +56,7 @@ class CncAiModuleBenchmarkTest(unittest.TestCase):
 
     def test_manifest_uses_fixed_corner_spawns_and_matched_seeds(self):
         manifest = benchmark.phase_manifest(
-            "baseline", self.root / "map.oramap", 5, 10000, 1234, 100, True,
+            "baseline", self.root / "map.oramap", 5, 1234, 100, True,
         )
 
         commands = manifest["defaults"]["lobby_commands"]
@@ -65,10 +68,27 @@ class CncAiModuleBenchmarkTest(unittest.TestCase):
         ):
             self.assertIn(command, commands)
         self.assertEqual([run["seed"] for run in manifest["runs"]], list(range(1234, 1239)))
+        self.assertNotIn("exit_at_tick", manifest["defaults"])
+        self.assertNotIn("minimum_world_tick", manifest["defaults"])
         self.assertFalse(manifest["defaults"]["bot_debug"])
+        self.assertIn(
+            r"Failed to load rules", manifest["defaults"]["forbidden_log_patterns"],
+        )
         self.assertTrue(all(
             "initially-disabled=True" in pattern
             for pattern in manifest["defaults"]["required_log_patterns"][-4:]
+        ))
+        self.assertFalse(any(
+            "transition=disabled" in pattern
+            for pattern in manifest["defaults"]["forbidden_log_patterns"]
+        ))
+
+        full = benchmark.phase_manifest(
+            "full", self.root / "map.oramap", 5, 1234, 100, False,
+        )
+        self.assertTrue(any(
+            "transition=disabled" in pattern
+            for pattern in full["defaults"]["forbidden_log_patterns"]
         ))
 
     def test_periodic_report_exposes_cpu_tick_and_module_cost(self):
@@ -94,24 +114,32 @@ class CncAiModuleBenchmarkTest(unittest.TestCase):
     def test_comparison_reports_overhead_and_realtime_gate(self):
         baseline = {"averages": {
             "wall_seconds": 100,
+            "game_seconds": 400,
+            "game_seconds_per_wall_second": 4,
             "cpu_seconds": 90,
             "tick_mean_milliseconds": 2,
             "module_cpu_seconds": 10,
+            "module_cpu_seconds_per_1000_ticks": 1,
         }}
         full = {"averages": {
             "wall_seconds": 125,
+            "game_seconds": 500,
             "cpu_seconds": 108,
             "tick_mean_milliseconds": 3,
             "module_cpu_seconds": 15,
+            "module_cpu_seconds_per_1000_ticks": 1.25,
             "game_seconds_per_wall_second": 3.2,
         }}
 
         result = benchmark.comparison(baseline, full)
 
         self.assertAlmostEqual(result["wall_time_change_percent"], 25)
+        self.assertAlmostEqual(result["game_time_change_percent"], 25)
+        self.assertAlmostEqual(result["simulation_throughput_change_percent"], -20)
         self.assertAlmostEqual(result["cpu_time_change_percent"], 20)
         self.assertAlmostEqual(result["mean_tick_time_change_percent"], 50)
         self.assertAlmostEqual(result["module_cpu_time_change_percent"], 50)
+        self.assertAlmostEqual(result["normalized_module_cpu_change_percent"], 25)
         self.assertTrue(result["full_faster_than_wall_clock"])
 
 

@@ -282,31 +282,13 @@ namespace OpenRA.Mods.Common.Traits
 		}
 	}
 
-	public sealed class StealthRecalculateFleeCandidateSnapshot
-	{
-		public CPos Cell { get; }
-		public bool IsPassable { get; }
-		public bool RequiresStrategicRouting { get; }
-		public bool HasDetectorCoverage { get; }
-		public StealthRecalculateFleeCandidateSnapshot(CPos cell, bool isPassable,
-			bool requiresStrategicRouting = false, bool hasDetectorCoverage = false)
-		{
-			Cell = cell;
-			IsPassable = isPassable;
-			RequiresStrategicRouting = requiresStrategicRouting;
-			HasDetectorCoverage = hasDetectorCoverage;
-		}
-	}
-
 	public sealed class StealthRecalculateFleeLiveSnapshot
 	{
 		readonly ReadOnlyCollection<StealthRecalculateFleeMemberSnapshot> members;
 		readonly ReadOnlyCollection<StealthRecalculateFleeEnemySnapshot> enemies;
-		readonly ReadOnlyCollection<StealthRecalculateFleeCandidateSnapshot> candidates;
 		public int Tick { get; }
 		public IReadOnlyList<StealthRecalculateFleeMemberSnapshot> Members => members;
 		public IReadOnlyList<StealthRecalculateFleeEnemySnapshot> Enemies => enemies;
-		public IReadOnlyList<StealthRecalculateFleeCandidateSnapshot> Candidates => candidates;
 		public bool FormationCloaked { get; }
 		public string SourceFingerprint { get; }
 		public bool HasActivityObservation { get; }
@@ -317,25 +299,20 @@ namespace OpenRA.Mods.Common.Traits
 		public StealthRecalculateFleeLiveSnapshot(int tick,
 			IEnumerable<StealthRecalculateFleeMemberSnapshot> members,
 			IEnumerable<StealthRecalculateFleeEnemySnapshot> enemies,
-			IEnumerable<StealthRecalculateFleeCandidateSnapshot> candidates,
 			bool formationCloaked, string sourceFingerprint,
 			bool hasActivityObservation = false, long activityRevision = 0,
 			StealthRecalculateFleeOrderToken activeOrderToken = null,
 			StealthRecalculateFleeOrderToken completedOrderToken = null)
 		{
-			if (tick < 0 || activityRevision < 0 || members == null || enemies == null || candidates == null ||
+			if (tick < 0 || activityRevision < 0 || members == null || enemies == null ||
 				string.IsNullOrEmpty(sourceFingerprint))
 				throw new ArgumentException("Invalid RecalculateFlee live snapshot.");
 			var memberCopy = members.OrderBy(member => member?.ActorId).ToArray();
 			var enemyCopy = enemies.OrderBy(enemy => enemy?.ActorId).ToArray();
-			var candidateCopy = candidates.OrderBy(candidate => candidate?.Cell.Y)
-				.ThenBy(candidate => candidate?.Cell.X).ToArray();
 			if (memberCopy.Length == 0 || memberCopy.Any(member => member == null) ||
 				memberCopy.Select(member => member.ActorId).Distinct().Count() != memberCopy.Length ||
 				enemyCopy.Any(enemy => enemy == null) ||
 				enemyCopy.Select(enemy => enemy.ActorId).Distinct().Count() != enemyCopy.Length ||
-				candidateCopy.Any(candidate => candidate == null) ||
-				candidateCopy.Select(candidate => candidate.Cell).Distinct().Count() != candidateCopy.Length ||
 				(!hasActivityObservation && (activityRevision != 0 || activeOrderToken != null || completedOrderToken != null)) ||
 				(activeOrderToken != null && activeOrderToken.ActivityRevision != activityRevision) ||
 				(completedOrderToken != null && completedOrderToken.ActivityRevision > activityRevision))
@@ -343,7 +320,6 @@ namespace OpenRA.Mods.Common.Traits
 			Tick = tick;
 			this.members = Array.AsReadOnly(memberCopy);
 			this.enemies = Array.AsReadOnly(enemyCopy);
-			this.candidates = Array.AsReadOnly(candidateCopy);
 			FormationCloaked = formationCloaked;
 			SourceFingerprint = sourceFingerprint;
 			HasActivityObservation = hasActivityObservation;
@@ -362,19 +338,22 @@ namespace OpenRA.Mods.Common.Traits
 	{
 		readonly ReadOnlyCollection<CPos> waypoints;
 		public long Revision { get; }
+		public StealthTargetThreatScore Danger { get; }
 		public IReadOnlyList<CPos> Waypoints => waypoints;
-		public StealthRecalculateFleeStrategicCacheSnapshot(long revision, IEnumerable<CPos> waypoints)
+		public StealthRecalculateFleeStrategicCacheSnapshot(long revision,
+			StealthTargetThreatScore danger, IEnumerable<CPos> waypoints)
 		{
 			if (revision < 0 || waypoints == null)
 				throw new ArgumentException("Invalid long-route cache snapshot.");
 			Revision = revision;
+			Danger = danger;
 			this.waypoints = Array.AsReadOnly(waypoints.ToArray());
 		}
 	}
 
 	public interface IStealthRecalculateFleeStrategicCache
 	{
-		StealthRecalculateFleeStrategicCacheSnapshot ReadLongRoute(
-			StealthApproachMission mission, CPos liveDestination);
+		StealthRecalculateFleeStrategicCacheSnapshot ReadEscapeRoute(
+			StealthApproachMission mission);
 	}
 }

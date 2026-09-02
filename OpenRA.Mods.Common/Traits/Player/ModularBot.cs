@@ -54,6 +54,9 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Consecutive breached windows required before shedding an advanced module.")]
 		public readonly int AdvancedSquadBreachSamples = 2;
 
+		[Desc("Maximum multiplier applied to expensive strategic planning intervals before shedding a module.")]
+		public readonly int AdvancedSquadMaxPlanningIntervalFactor = 4;
+
 		[Desc("Consecutive healthy windows required before probing one disabled module.")]
 		public readonly int AdvancedSquadRecoverySamples = 3;
 
@@ -74,6 +77,8 @@ namespace OpenRA.Mods.Common.Traits
 			if (AdvancedSquadSampleInterval <= 0 || AdvancedSquadBreachSamples <= 0 ||
 				AdvancedSquadRecoverySamples <= 0 || AdvancedSquadOffenderPenaltySamples < 0)
 				throw new YamlException("Advanced squad failsafe intervals and sample counts are invalid.");
+			if (AdvancedSquadMaxPlanningIntervalFactor < 1 || AdvancedSquadMaxPlanningIntervalFactor > 16)
+				throw new YamlException("AdvancedSquadMaxPlanningIntervalFactor must be between 1 and 16.");
 			if (AdvancedSquadLagTolerance < 0 || AdvancedSquadCpuShare <= 0 || AdvancedSquadCpuShare > 1)
 				throw new YamlException("Advanced squad failsafe thresholds must use a non-negative lag tolerance and a CPU share in (0, 1].");
 			if (AdvancedSquadCpuFailsafe && AdvancedSquadModules.Length == 0)
@@ -152,17 +157,18 @@ namespace OpenRA.Mods.Common.Traits
 				advancedFailsafe = new AdvancedBotCpuFailsafeController(info.AdvancedSquadModules,
 					info.AdvancedSquadBreachSamples, info.AdvancedSquadRecoverySamples,
 					info.AdvancedSquadOffenderPenaltySamples, info.AdvancedSquadLagTolerance,
-					info.AdvancedSquadCpuShare, info.AdvancedSquadModulesInitiallyDisabled);
+					info.AdvancedSquadCpuShare, info.AdvancedSquadModulesInitiallyDisabled,
+					info.AdvancedSquadMaxPlanningIntervalFactor);
 				pacingSampler = new SimulationPacingSampler(info.AdvancedSquadSampleInterval);
 				if (pendingFailsafeState.HasValue)
 					advancedFailsafe.ImportState(pendingFailsafeState.Value);
 				ApplyAdvancedModuleStates();
 				if (info.AdvancedSquadFailsafeDebugLogging)
 					Log.Write("debug", "Advanced squad failsafe [{0}] active: configured={1} matched={2} " +
-						"window={3} lag={4:P0} cpu-share={5:P0} initially-disabled={6}.", p.PlayerName,
+						"window={3} lag={4:P0} cpu-share={5:P0} max-plan-factor={6} initially-disabled={7}.", p.PlayerName,
 						string.Join(",", info.AdvancedSquadModules), string.Join(",", advancedModules.Keys),
 						info.AdvancedSquadSampleInterval, info.AdvancedSquadLagTolerance, info.AdvancedSquadCpuShare,
-						info.AdvancedSquadModulesInitiallyDisabled);
+						info.AdvancedSquadMaxPlanningIntervalFactor, info.AdvancedSquadModulesInitiallyDisabled);
 			}
 
 			foreach (var ibe in p.PlayerActor.TraitsImplementing<IBotEnabled>())
@@ -273,17 +279,17 @@ namespace OpenRA.Mods.Common.Traits
 			foreach (var module in info.AdvancedSquadModules)
 				advancedElapsed[module] = 0;
 
-			if (decision.Module != null)
+			if (decision.Module != null || decision.Transition == "throttled" || decision.Transition == "relaxed")
 				ApplyAdvancedModuleStates();
 
 			if (info.AdvancedSquadFailsafeDebugLogging && decision.Transition != "healthy" && decision.Transition != "cooldown")
 			{
 				Log.Write("debug", "Advanced squad failsafe [{0}]: tick={1} source={2} reliable={3} reason={4} ratio={5:0.000} " +
 					"window={6} total-ms={7:0.000} advanced-ms={8:0.000} module-ms={9} share={10:P1} threshold={11:P0} " +
-					"transition={12} module={13} offender={14} disabled={15}.", player.PlayerName, world.WorldTick,
+					"transition={12} module={13} plan-factor={14} offender={15} disabled={16}.", player.PlayerName, world.WorldTick,
 					pacing.Source, pacing.Reliable, decision.Reason, pacing.RealTimeRatio, info.AdvancedSquadSampleInterval,
 					decision.TotalMilliseconds, decision.AdvancedMilliseconds, advancedBreakdown, decision.Share,
-					info.AdvancedSquadCpuShare, decision.Transition, decision.Module ?? "none",
+					info.AdvancedSquadCpuShare, decision.Transition, decision.Module ?? "none", decision.PlanningIntervalFactor,
 					advancedFailsafe.Offender ?? "none", string.Join(",", advancedFailsafe.DisabledModules));
 			}
 
@@ -300,7 +306,11 @@ namespace OpenRA.Mods.Common.Traits
 
 			foreach (var entry in advancedModules)
 				foreach (var module in entry.Value)
+				{
 					module.SetAdvancedBehaviorEnabled(advancedFailsafe.IsEnabled(entry.Key));
+					(module as IAdvancedBotPlanningThrottle)?.SetPlanningIntervalFactor(
+						advancedFailsafe.PlanningIntervalFactor);
+				}
 		}
 
 		void INotifyDamage.Damaged(Actor self, AttackInfo e)
@@ -332,6 +342,7 @@ namespace OpenRA.Mods.Common.Traits
 				new MiniYamlNode("AdvancedFailsafeBreachSamples", FieldSaver.FormatValue(state.BreachSamples)),
 				new MiniYamlNode("AdvancedFailsafeHealthySamples", FieldSaver.FormatValue(state.HealthySamples)),
 				new MiniYamlNode("AdvancedFailsafeRecoveryProbe", FieldSaver.FormatValue(state.RecoveryProbe ?? "")),
+				new MiniYamlNode("AdvancedFailsafePlanningIntervalFactor", FieldSaver.FormatValue(state.PlanningIntervalFactor)),
 			};
 		}
 
@@ -341,15 +352,18 @@ namespace OpenRA.Mods.Common.Traits
 				return;
 
 			var fields = data.ToDictionary(n => n.Key);
-			var state = new AdvancedBotFailsafeState(
-				fields.TryGetValue("AdvancedFailsafeDisabled", out var disabledNode) ?
-					FieldLoader.GetValue<string[]>("AdvancedFailsafeDisabled", disabledNode.Value.Value) : Array.Empty<string>(),
+			var disabled = fields.TryGetValue("AdvancedFailsafeDisabled", out var disabledNode) ?
+				FieldLoader.GetValue<string[]>("AdvancedFailsafeDisabled", disabledNode.Value.Value) : Array.Empty<string>();
+			var state = new AdvancedBotFailsafeState(disabled,
 				fields.TryGetValue("AdvancedFailsafeOffender", out var offenderNode) ? offenderNode.Value.Value : null,
 				fields.TryGetValue("AdvancedFailsafeBreachSamples", out var breachNode) ?
 					FieldLoader.GetValue<int>("AdvancedFailsafeBreachSamples", breachNode.Value.Value) : 0,
 				fields.TryGetValue("AdvancedFailsafeHealthySamples", out var healthyNode) ?
 					FieldLoader.GetValue<int>("AdvancedFailsafeHealthySamples", healthyNode.Value.Value) : 0,
-				fields.TryGetValue("AdvancedFailsafeRecoveryProbe", out var recoveryProbeNode) ? recoveryProbeNode.Value.Value : null);
+				fields.TryGetValue("AdvancedFailsafeRecoveryProbe", out var recoveryProbeNode) ? recoveryProbeNode.Value.Value : null,
+				fields.TryGetValue("AdvancedFailsafePlanningIntervalFactor", out var planningFactorNode) ?
+					FieldLoader.GetValue<int>("AdvancedFailsafePlanningIntervalFactor", planningFactorNode.Value.Value) :
+					disabled.Length == 0 ? 1 : info.AdvancedSquadMaxPlanningIntervalFactor);
 			pendingFailsafeState = state;
 			if (advancedFailsafe != null)
 			{

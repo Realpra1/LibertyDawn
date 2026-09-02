@@ -30,6 +30,11 @@ namespace OpenRA.Mods.Common.Traits
 	enum StealthManagerAttributionPhase
 	{
 		ManagerTick,
+		EfficiencyTelemetry,
+		EnsureStealthSquads,
+		RebalanceStealthSquads,
+		RecruitUnassigned,
+		AssignRoles,
 		SchedulerSelection,
 		GuardDirtyCheck,
 		IncrementalPath,
@@ -94,9 +99,6 @@ namespace OpenRA.Mods.Common.Traits
 		public readonly Dictionary<string, StealthSquadDefinition> StealthSquadDefinitions =
 			new Dictionary<string, StealthSquadDefinition>();
 
-		[Desc("Use the modular stealth lifecycle runtime. Disabled until integration review and game validation.")]
-		public readonly bool UseModularStealthLifecycle = false;
-
 		static object LoadStealthSquadDefinitions(MiniYaml yaml)
 		{
 			var ret = new Dictionary<string, StealthSquadDefinition>();
@@ -117,12 +119,16 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Actor types that should generally be excluded from attack squads.")]
 		public readonly HashSet<string> ExcludeFromSquadsTypes = new HashSet<string>();
 
-		[Desc("Ground-combat actor types this module may retain under its bounded aggressive AttackMove fallback.",
+		[Desc("Combat actor types this module may retain under its bounded aggressive AttackMove fallback.",
 			"Active reservations still take priority, so approved specialist squads keep their members.")]
 		public readonly HashSet<string> FailsafeDirectCombatTypes = new HashSet<string>();
 
 		[Desc("Maximum ticks between degraded fallback reconsiderations. Unchanged active orders are not reissued.")]
 		public readonly int FailsafeReconsiderInterval = 75;
+
+		[Desc("Use only the bounded direct AttackMove fallback while advanced squads are disabled.",
+			"This is intended for isolated baseline benchmarks, not normal bot definitions.")]
+		public readonly bool SimpleAttackMoveFallbackWhenDisabled = false;
 
 		[Desc("Test-only unsynced advanced-work pressure in milliseconds. Leave at zero outside isolated failsafe evidence maps.")]
 		public readonly int FailsafeTestAdvancedWorkMilliseconds = 0;
@@ -578,8 +584,10 @@ namespace OpenRA.Mods.Common.Traits
 				FailsafeTestAdvancedWorkUntilTick < 0 || (FailsafeTestAdvancedWorkUntilTick > 0 &&
 					FailsafeTestAdvancedWorkUntilTick <= FailsafeTestAdvancedWorkFromTick))
 				throw new YamlException("Failsafe test pressure and tick bounds must be non-negative and valid.");
-			if (FailsafeDirectCombatTypes.Any(t => ExcludeFromSquadsTypes.Contains(t) || AirUnitsTypes.Contains(t) || NavalUnitsTypes.Contains(t)))
-				throw new YamlException("FailsafeDirectCombatTypes cannot include excluded, air, or naval actor types.");
+			if (FailsafeDirectCombatTypes.Any(t => ExcludeFromSquadsTypes.Contains(t) || NavalUnitsTypes.Contains(t) ||
+				(!SimpleAttackMoveFallbackWhenDisabled && AirUnitsTypes.Contains(t))))
+				throw new YamlException("FailsafeDirectCombatTypes cannot include excluded or naval actor types; " +
+					"air actors require SimpleAttackMoveFallbackWhenDisabled.");
 			foreach (var actorName in FailsafeDirectCombatTypes)
 				if (!rules.Actors.TryGetValue(actorName, out var actor) || !actor.HasTraitInfo<AttackBaseInfo>())
 					throw new YamlException($"FailsafeDirectCombatTypes actor '{actorName}' must exist and have an attack trait.");
@@ -598,7 +606,7 @@ namespace OpenRA.Mods.Common.Traits
 
 	public class SquadManagerBotModule : ConditionalTrait<SquadManagerBotModuleInfo>, IBotEnabled, IBotTick, IBotRespondToAttack,
 		IBotPositionsUpdated, INotifyKilled, INotifyAppliedDamage, IGameSaveTraitData, IAdvancedBotTick,
-		IAdvancedBotFailsafeWindowDiagnostics
+		IAdvancedBotPlanningThrottle, IAdvancedBotFailsafeWindowDiagnostics
 	{
 		public CPos GetRandomBaseCenter()
 		{
@@ -634,6 +642,8 @@ namespace OpenRA.Mods.Common.Traits
 			Enumerable.Range(0, (int)StealthManagerAttributionPhase.Count)
 				.Select(_ => new StealthManagerAttributionCounter()).ToArray();
 		int stealthManagerAttributionWindowStartTick;
+		readonly StealthSquadOverlayPublisher stealthOverlayPublisher =
+			new StealthSquadOverlayPublisher();
 
 		// Units that the bot already knows about. Any unit not on this list needs to be given a role.
 		readonly List<Actor> activeUnits = new List<Actor>();
@@ -683,14 +693,22 @@ namespace OpenRA.Mods.Common.Traits
 			}
 
 			var emissionStarted = BeginStealthManagerAttributionPhase();
-			Log.Write("debug", "stealth_manager_phase_attribution|summary={0}|tick={1}|" +
-				"window_start_tick={2}|window_ticks={3}|transition={4}|units=milliseconds/calls/operations|" +
-				"manager_tick={5}|scheduler_selection={6}|guard_dirty_check={7}|incremental_path={8}|" +
-				"dependency_validation={9}|threat_route_cell={10}|local_planning_inclusive={11}|" +
-				"diagnostic_emission={12}|overlap=manager-and-local-inclusive,child-phases-nested|" +
-				"diagnostic_only=true", summary, World.WorldTick,
+			Log.Write("debug", "stealth_manager_phase_attribution|owner={0}|bot_id={1}|summary={2}|tick={3}|" +
+				"window_start_tick={4}|window_ticks={5}|transition={6}|units=milliseconds/calls/operations|" +
+				"manager_tick={7}|efficiency_telemetry={8}|ensure_stealth_squads={9}|" +
+				"rebalance_stealth_squads={10}|recruit_unassigned={11}|assign_roles={12}|" +
+				"scheduler_selection={13}|guard_dirty_check={14}|incremental_path={15}|" +
+				"dependency_validation={16}|threat_route_cell={17}|local_planning_inclusive={18}|" +
+				"diagnostic_emission={19}|overlap=manager-and-local-inclusive,child-phases-nested|" +
+				"diagnostic_only=true", Player.PlayerName, Player.PlayerActor.ActorID,
+				summary, World.WorldTick,
 				stealthManagerAttributionWindowStartTick, windowTicks, transition,
 				Phase(StealthManagerAttributionPhase.ManagerTick),
+				Phase(StealthManagerAttributionPhase.EfficiencyTelemetry),
+				Phase(StealthManagerAttributionPhase.EnsureStealthSquads),
+				Phase(StealthManagerAttributionPhase.RebalanceStealthSquads),
+				Phase(StealthManagerAttributionPhase.RecruitUnassigned),
+				Phase(StealthManagerAttributionPhase.AssignRoles),
 				Phase(StealthManagerAttributionPhase.SchedulerSelection),
 				Phase(StealthManagerAttributionPhase.GuardDirtyCheck),
 				Phase(StealthManagerAttributionPhase.IncrementalPath),
@@ -932,6 +950,7 @@ namespace OpenRA.Mods.Common.Traits
 		int rushTicks;
 		int assignRolesTicks;
 		int attackForceTicks;
+		int strategicSquadUpdateCycles = 1;
 		int minAttackForceDelayTicks;
 		int airSafetyTicks;
 		int stealthSafetyTicks;
@@ -939,6 +958,7 @@ namespace OpenRA.Mods.Common.Traits
 		int stealthBlueSafetyTicks;
 		int adaptiveAirRiskTicks;
 		int stealthRecruitTicks;
+		int planningIntervalFactor = 1;
 		bool advancedBehaviorEnabled = true;
 		int fallbackReconsiderTicks;
 		Actor fallbackTarget;
@@ -1112,23 +1132,40 @@ namespace OpenRA.Mods.Common.Traits
 			var attributionStarted = BeginStealthManagerAttributionPhase();
 			try
 			{
-			UpdateStealthEfficiencyTelemetry();
-			EnsureStealthSquads(bot);
-			if (advancedBehaviorEnabled && --stealthRecruitTicks <= 0)
-			{
-				RebalanceStealthSquads();
-				stealthRecruitTicks = Info.StealthSquadDefinitions.Count == 0 ? int.MaxValue :
-					Info.StealthSquadDefinitions.Values.Min(definition => definition.ScanInterval);
-			}
+				var phaseStarted = BeginStealthManagerAttributionPhase();
+				UpdateStealthEfficiencyTelemetry();
+				RecordStealthManagerAttributionPhase(
+					StealthManagerAttributionPhase.EfficiencyTelemetry, phaseStarted, 1);
+				phaseStarted = BeginStealthManagerAttributionPhase();
+				EnsureStealthSquads(bot);
+				RecordStealthManagerAttributionPhase(
+					StealthManagerAttributionPhase.EnsureStealthSquads, phaseStarted, 1);
+				if (advancedBehaviorEnabled && --stealthRecruitTicks <= 0)
+				{
+					phaseStarted = BeginStealthManagerAttributionPhase();
+					RebalanceStealthSquads();
+					RecordStealthManagerAttributionPhase(
+						StealthManagerAttributionPhase.RebalanceStealthSquads, phaseStarted, 1);
+					stealthRecruitTicks = Info.StealthSquadDefinitions.Count == 0 ? int.MaxValue :
+						StrategicPlanningInterval(Info.StealthSquadDefinitions.Values.Min(
+							definition => definition.ScanInterval));
+				}
 
-			RecruitUnassignedCombatUnits(bot);
-			if (advancedBehaviorEnabled)
-			{
-				RunFailsafeTestPressure();
-				AssignRolesToIdleUnits(bot);
-			}
-			else
-				AssignRolesToIdleUnitsDegraded(bot);
+				phaseStarted = BeginStealthManagerAttributionPhase();
+				RecruitUnassignedCombatUnits(bot);
+				RecordStealthManagerAttributionPhase(
+					StealthManagerAttributionPhase.RecruitUnassigned, phaseStarted, 1);
+				phaseStarted = BeginStealthManagerAttributionPhase();
+				if (advancedBehaviorEnabled)
+				{
+					RunFailsafeTestPressure();
+					AssignRolesToIdleUnits(bot);
+				}
+				else
+					AssignRolesToIdleUnitsDegraded(bot);
+				RecordStealthManagerAttributionPhase(
+					StealthManagerAttributionPhase.AssignRoles, phaseStarted, 1);
+				stealthOverlayPublisher.Publish(this, bot);
 			}
 			finally
 			{
@@ -1350,6 +1387,39 @@ namespace OpenRA.Mods.Common.Traits
 
 		string IAdvancedBotTick.FailsafeModuleId => "SquadManagerBotModule";
 
+		void IAdvancedBotPlanningThrottle.SetPlanningIntervalFactor(int factor)
+		{
+			var next = Math.Max(1, factor);
+			if (planningIntervalFactor == next)
+				return;
+
+			var increasing = next > planningIntervalFactor;
+			planningIntervalFactor = next;
+			AdjustPlanningTimer(ref rushTicks, Info.RushInterval, increasing);
+			AdjustPlanningTimer(ref assignRolesTicks, Info.AssignRolesInterval, increasing);
+			AdjustPlanningTimer(ref minAttackForceDelayTicks, Info.MinimumAttackForceDelay, increasing);
+			AdjustPlanningTimer(ref adaptiveAirRiskTicks, Info.AirAdaptiveRiskInterval, increasing);
+			strategicSquadUpdateCycles = increasing ? Math.Max(strategicSquadUpdateCycles, next) :
+				Math.Min(strategicSquadUpdateCycles, next);
+			if (Info.StealthSquadDefinitions.Count != 0)
+				AdjustPlanningTimer(ref stealthRecruitTicks,
+					Info.StealthSquadDefinitions.Values.Min(definition => definition.ScanInterval), increasing);
+		}
+
+		internal int StrategicPlanningInterval(int interval)
+		{
+			return interval <= 0 ? interval : (int)Math.Min(int.MaxValue, (long)interval * planningIntervalFactor);
+		}
+
+		void AdjustPlanningTimer(ref int timer, int interval, bool increasing)
+		{
+			if (interval <= 0 || timer == int.MaxValue)
+				return;
+
+			var adjusted = StrategicPlanningInterval(interval);
+			timer = increasing ? Math.Max(timer, adjusted) : Math.Min(timer, adjusted);
+		}
+
 		void IAdvancedBotFailsafeWindowDiagnostics.EmitAdvancedFailsafeWindowDiagnostics(
 			int sampleInterval, string transition)
 		{
@@ -1398,6 +1468,16 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			var units = World.Actors.Where(IsPreferredEnemyUnit);
 			return units.Where(IsNotHiddenUnit).ClosestTo(pos) ?? units.ClosestTo(pos);
+		}
+
+		Actor FindFallbackTarget(WPos pos)
+		{
+			if (!Info.SimpleAttackMoveFallbackWhenDisabled)
+				return FindClosestEnemy(pos);
+
+			var bases = World.ActorsHavingTrait<MustBeDestroyed>(t => t.Info.RequiredForShortGame)
+				.Where(IsPreferredEnemyUnit);
+			return bases.Where(IsNotHiddenUnit).ClosestTo(pos) ?? bases.ClosestTo(pos) ?? FindClosestEnemy(pos);
 		}
 
 		internal Actor FindClosestEnemy(WPos pos, WDist radius)
@@ -1822,15 +1902,19 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (--rushTicks <= 0)
 			{
-				rushTicks = Info.RushInterval;
+				rushTicks = StrategicPlanningInterval(Info.RushInterval);
 				TryToRushAttack(bot);
 			}
 
 			if (--attackForceTicks <= 0)
 			{
 				attackForceTicks = Info.AttackForceInterval;
+				var updateStrategicSquads = --strategicSquadUpdateCycles <= 0;
+				if (updateStrategicSquads)
+					strategicSquadUpdateCycles = planningIntervalFactor;
 				foreach (var s in Squads)
-					s.Update();
+					if (s.UsesModularStealthLifecycle || updateStrategicSquads)
+						s.Update();
 			}
 
 			// Air squads re-check the anti-air around themselves far more often than the state machine
@@ -1903,19 +1987,19 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (Info.AirAdaptiveRiskInterval > 0 && --adaptiveAirRiskTicks <= 0)
 			{
-				adaptiveAirRiskTicks = Info.AirAdaptiveRiskInterval;
+				adaptiveAirRiskTicks = StrategicPlanningInterval(Info.AirAdaptiveRiskInterval);
 				UpdateAdaptiveAirRisk();
 			}
 
 			if (--assignRolesTicks <= 0)
 			{
-				assignRolesTicks = Info.AssignRolesInterval;
+				assignRolesTicks = StrategicPlanningInterval(Info.AssignRolesInterval);
 				FindNewUnits(bot);
 			}
 
 			if (--minAttackForceDelayTicks <= 0)
 			{
-				minAttackForceDelayTicks = Info.MinimumAttackForceDelay;
+				minAttackForceDelayTicks = StrategicPlanningInterval(Info.MinimumAttackForceDelay);
 				CreateAttackForce(bot);
 			}
 		}
@@ -1928,13 +2012,13 @@ namespace OpenRA.Mods.Common.Traits
 			unitsHangingAroundTheBase.RemoveAll(unitCannotBeOrdered);
 			unitsHangingAroundTheBase.RemoveAll(IsReservedForSpecialBehavior);
 
-			if (--rushTicks <= 0)
+			if (!Info.SimpleAttackMoveFallbackWhenDisabled && --rushTicks <= 0)
 			{
-				rushTicks = Info.RushInterval;
+				rushTicks = StrategicPlanningInterval(Info.RushInterval);
 				TryToRushAttack(bot);
 			}
 
-			if (--attackForceTicks <= 0)
+			if (!Info.SimpleAttackMoveFallbackWhenDisabled && --attackForceTicks <= 0)
 			{
 				attackForceTicks = Info.AttackForceInterval;
 				foreach (var squad in Squads)
@@ -1944,13 +2028,13 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (--assignRolesTicks <= 0)
 			{
-				assignRolesTicks = Info.AssignRolesInterval;
+				assignRolesTicks = StrategicPlanningInterval(Info.AssignRolesInterval);
 				FindNewUnits(bot);
 			}
 
-			if (--minAttackForceDelayTicks <= 0)
+			if (!Info.SimpleAttackMoveFallbackWhenDisabled && --minAttackForceDelayTicks <= 0)
 			{
-				minAttackForceDelayTicks = Info.MinimumAttackForceDelay;
+				minAttackForceDelayTicks = StrategicPlanningInterval(Info.MinimumAttackForceDelay);
 				CreateAttackForce(bot);
 			}
 
@@ -1995,7 +2079,7 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (!IsPreferredEnemyUnit(fallbackTarget) || !IsNotHiddenUnit(fallbackTarget))
 			{
-				fallbackTarget = FindClosestEnemy(controlledActors.Select(a => a.CenterPosition).Average());
+				fallbackTarget = FindFallbackTarget(controlledActors.Select(a => a.CenterPosition).Average());
 				fallbackOrderedActors.Clear();
 				fallbackOrderTargets.Clear();
 			}
@@ -2043,7 +2127,8 @@ namespace OpenRA.Mods.Common.Traits
 					}
 				}
 
-				var preCodexAssaultAvailable = !Info.ExcludeFromSquadsTypes.Contains(actor.Info.Name) &&
+				var preCodexAssaultAvailable = !Info.SimpleAttackMoveFallbackWhenDisabled &&
+					!Info.ExcludeFromSquadsTypes.Contains(actor.Info.Name) &&
 					!Info.AirUnitsTypes.Contains(actor.Info.Name) && !Info.NavalUnitsTypes.Contains(actor.Info.Name) &&
 					actor.Info.HasTraitInfo<AttackBaseInfo>();
 				var genericFallbackEligible = BotModules.AdvancedBotFallbackOwnership.IsEligibleForGenericFallback(
@@ -2062,8 +2147,8 @@ namespace OpenRA.Mods.Common.Traits
 						continue;
 				}
 
-				// There is no safe generic fallback for aircraft, naval units, or excluded
-				// specialists. Leave them registered for a compatible owner or specialist reclaim.
+				// Outside the explicit simple benchmark, aircraft, naval units, and excluded specialists
+				// remain registered for a compatible owner or specialist reclaim.
 			}
 
 			if (legacyFallback.Count > 0)
@@ -2090,7 +2175,7 @@ namespace OpenRA.Mods.Common.Traits
 			}
 
 			if (!IsPreferredEnemyUnit(fallbackTarget) || !IsNotHiddenUnit(fallbackTarget))
-				fallbackTarget = FindClosestEnemy(actors.Select(a => a.CenterPosition).Average());
+				fallbackTarget = FindFallbackTarget(actors.Select(a => a.CenterPosition).Average());
 			if (fallbackTarget != null)
 				QueueFailsafeFallback(bot, "unassigned-registry", actors);
 		}
@@ -2225,7 +2310,8 @@ namespace OpenRA.Mods.Common.Traits
 		void QueueFailsafeFallback(IBot bot, string source, IEnumerable<Actor> candidates)
 		{
 			var orderable = candidates.Where(a => !fallbackOrderedActors.Contains(a.ActorID) ||
-				!fallbackOrderTargets.TryGetValue(a.ActorID, out var target) || target != fallbackTarget.Location).ToArray();
+				!fallbackOrderTargets.TryGetValue(a.ActorID, out var target) || target != fallbackTarget.Location ||
+				(Info.SimpleAttackMoveFallbackWhenDisabled && a.IsIdle)).ToArray();
 			if (orderable.Length == 0)
 				return;
 

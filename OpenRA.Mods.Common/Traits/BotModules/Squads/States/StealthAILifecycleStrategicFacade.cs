@@ -147,6 +147,57 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				out revision, out route);
 		}
 
+		internal static bool TryReadLifecycleFleeRoute(Squad owner,
+			StealthApproachMission mission, out long revision, out double danger,
+			out IReadOnlyList<CPos> route)
+		{
+			var representative = AirDecisionUnits(owner).Where(LiveLifecycleActor)
+				.OrderBy(actor => actor.ActorID).FirstOrDefault();
+			if (representative == null)
+			{
+				revision = 0;
+				danger = 0;
+				route = Array.Empty<CPos>();
+				return false;
+			}
+
+			var cache = StealthInfluence(owner, representative);
+			if (cache == null)
+			{
+				revision = 0;
+				danger = 0;
+				route = Array.Empty<CPos>();
+				return false;
+			}
+
+			var coarseSize = StealthCoarseSize(owner);
+			var current = LifecycleCoarseCell(representative.Location, coarseSize);
+			var cachedDanger = representative.TraitsImplementing<Cloak>().Any(cloak => cloak.Cloaked) ?
+				cache.CloakedDanger : cache.Danger;
+			var offsets = new[]
+			{
+				new CVec(-2, -2), new CVec(0, -2), new CVec(2, -2), new CVec(-2, 0),
+				new CVec(2, 0), new CVec(-2, 2), new CVec(0, 2), new CVec(2, 2)
+			};
+			var candidates = offsets.Select(offset => current + offset)
+				.Where(cell => cell.X >= 0 && cell.Y >= 0 && cell.X < cache.Width && cell.Y < cache.Height)
+				.OrderBy(cell => cachedDanger[cell.Y * cache.Width + cell.X])
+				.ThenByDescending(cell => (cell - mission.StrategicCell).LengthSquared)
+				.ThenBy(cell => cell.Y).ThenBy(cell => cell.X);
+			foreach (var candidate in candidates)
+				if (TryReadLifecycleStrategicRoute(owner, representative.ActorID, current,
+					candidate, false, true, out revision, out route))
+				{
+					danger = Math.Max(0, cachedDanger[candidate.Y * cache.Width + candidate.X]);
+					return true;
+				}
+
+			revision = cache.Tick;
+			danger = 0;
+			route = Array.Empty<CPos>();
+			return false;
+		}
+
 		internal static IReadOnlyList<CPos> ReadLifecycleApproachRoute(Squad owner,
 			CPos originStrategicCell, CPos destinationStrategicCell)
 		{
