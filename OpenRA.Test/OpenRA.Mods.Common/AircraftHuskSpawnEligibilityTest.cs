@@ -9,6 +9,7 @@
  */
 #endregion
 
+using System;
 using NUnit.Framework;
 using OpenRA.Mods.Common.Traits;
 
@@ -20,7 +21,7 @@ namespace OpenRA.Test.Mods.Common
 		[Test]
 		public void EmptyCellAndOnlyDeadActorsHaveNoLiveBlocker()
 		{
-			Assert.That(HuskSpawnCellEligibility.HasLiveBlocker(new bool[0]), Is.False);
+			Assert.That(HuskSpawnCellEligibility.HasLiveBlocker(Array.Empty<bool>()), Is.False);
 			Assert.That(HuskSpawnCellEligibility.HasLiveBlocker(new[] { true }), Is.False);
 			Assert.That(HuskSpawnCellEligibility.HasLiveBlocker(new[] { true, true, true }), Is.False);
 		}

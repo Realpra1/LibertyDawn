@@ -49,6 +49,7 @@ Use this assignment footer:
 
 - Separate concerns and give each module, class, object, and function one coherent responsibility.
 - Split code when size or coupling harms understanding, testing, or reuse; do not fragment cohesive code solely to reduce line count.
+- Keep classes below 400 lines when practical and never above 500 lines; split oversized responsibilities into short modular owners.
 - Prefer established repository patterns and small, reviewable changes.
 - Make dependencies and ownership explicit. Avoid hidden global state and duplicated policy.
 - Handle expected failures deliberately and preserve useful context in warnings and errors.

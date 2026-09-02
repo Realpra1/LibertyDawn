@@ -279,6 +279,11 @@ namespace OpenRA.Mods.Common.Traits
 					info.AdvancedSquadCpuShare, decision.Transition, decision.Module ?? "none",
 					advancedFailsafe.Offender ?? "none", string.Join(",", advancedFailsafe.DisabledModules));
 			}
+
+			foreach (var diagnostics in advancedModules.Values.SelectMany(modules => modules)
+				.OfType<IAdvancedBotFailsafeWindowDiagnostics>())
+				diagnostics.EmitAdvancedFailsafeWindowDiagnostics(
+					info.AdvancedSquadSampleInterval, decision.Transition);
 		}
 
 		void ApplyAdvancedModuleStates()

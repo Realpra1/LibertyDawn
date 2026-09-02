@@ -89,6 +89,19 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		public double CanonicalThreat;
 	}
 
+	sealed class LiveStealthEscapeCandidate
+	{
+		public CPos Cell;
+		public CPos Destination;
+		public int DetectorSteps;
+		public double AggregateDanger;
+		public double MaximumDanger;
+		public int RouteLength;
+		public long TargetDistance;
+		public string MemberRoutes;
+		public Dictionary<uint, List<CPos>> Routes;
+	}
+
 	sealed class StealthInfluenceCache
 	{
 		public int Tick;

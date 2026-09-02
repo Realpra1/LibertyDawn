@@ -82,6 +82,20 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 		internal Target Target;
 		internal StateMachine FuzzyStateMachine;
+		StealthSquadLifecycleRuntimeHost stealthLifecycleRuntime;
+		internal bool UsesModularStealthLifecycle => UsesModularStealthLifecycleFor(
+			Type, StealthSquadDefinition, SquadManager.Info.UseModularStealthLifecycle);
+		internal static bool UsesModularStealthLifecycleFor(SquadType type,
+			string definition, bool managerEnabled)
+		{
+			return managerEnabled && type == SquadType.Stealth &&
+				string.Equals(definition, "stealth-tank", StringComparison.Ordinal);
+		}
+
+		internal static bool LegacyStealthAuthorityAllowed(bool modularRuntimeEnabled)
+		{
+			return !modularRuntimeEnabled;
+		}
 
 		// Where this squad last saw enemy anti-air, and the tick each sighting is forgotten on.
 		// Purely advisory bot state: it never touches the synced simulation, is not saved with the
@@ -112,9 +126,28 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		internal readonly Dictionary<uint, int> AirReinforcementFallbackTicks = new Dictionary<uint, int>();
 		internal int StealthReinforcementRouteIssues;
 		internal int StealthReinforcementRoutePreserves;
+		internal int StealthCatchUpWorkRequestedTick = -1;
+		internal int StealthLocalPlanningWorkRequestedTick = -1;
+		internal bool StealthLocalSafetyRequested;
+		internal bool StealthLiveTargetRequested;
+		internal bool StealthBlueSafetyRequested;
+		internal bool StealthRevealedIdleSafetyRequested;
+		internal readonly HashSet<uint> StealthRevealedIdleSafetyCloakArmed = new HashSet<uint>();
+		internal readonly HashSet<uint> StealthRevealedIdleSafetyPending = new HashSet<uint>();
+
+		internal long StealthLiveLocalDiagnosticSamples;
+		internal long StealthLiveLocalDiagnosticEmitted;
+		internal long StealthLiveLocalDiagnosticChanges;
+		internal bool StealthLiveLocalDiagnosticHasSignature;
+		internal int StealthLiveLocalDiagnosticSignature;
+		internal int StealthLiveLocalDiagnosticNextSummaryTick = -1;
 		internal int StealthCoreRouteIssues;
 		internal int StealthCoreRoutePreserves;
 		internal int StealthLastFrontierTargetCells;
+		internal CPos? StealthTargetlessApproachCell;
+		internal int StealthTargetlessApproachStartedTick = -1;
+		internal int StealthTargetlessApproachSteps;
+		internal readonly HashSet<CPos> StealthTargetlessRejectedCells = new HashSet<CPos>();
 		internal CPos? StealthRouteLastCenterCell;
 		internal int StealthRouteLastCenterProgressTick;
 
@@ -153,9 +186,11 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		internal int StealthEscapeLastProgressTick = -1;
 		internal int StealthEscapeLastDistanceCells = int.MaxValue;
 		internal bool StealthEscapePreserveEngagement;
+		internal bool StealthEscapeNeedsActivityRestore;
 		internal CPos? StealthKiteTargetCell;
 		internal CPos? StealthCrushTargetCell;
 		internal CPos? StealthPostAttackCell;
+		internal readonly Dictionary<uint, CPos> StealthValidatedFiringCells = new Dictionary<uint, CPos>();
 		internal uint StealthKiteSupersessionActorId;
 		internal int StealthKiteSupersessionConfirmations;
 		internal readonly Dictionary<uint, int> StealthKiteParticipantHealth = new Dictionary<uint, int>();
@@ -216,6 +251,14 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		{
 			if (IsValid)
 			{
+				if (UsesModularStealthLifecycle)
+				{
+					if (stealthLifecycleRuntime == null)
+						stealthLifecycleRuntime = new StealthSquadLifecycleRuntimeHost(this);
+					stealthLifecycleRuntime.Tick();
+					return;
+				}
+
 				if (Type == SquadType.GeneralAttack)
 				{
 					UpdateGroundReinforcements();
@@ -236,6 +279,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		/// </summary>
 		public void TickAirSafety()
 		{
+			if (!LegacyStealthAuthorityAllowed(UsesModularStealthLifecycle))
+				return;
+
 			if (IsValid && (Type == SquadType.Air || Type == SquadType.Stealth))
 			{
 				if (Game.IsBenchmarking)
@@ -253,8 +299,20 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			}
 		}
 
+		internal void TickModularStealthLocalSafety()
+		{
+			if (!UsesModularStealthLifecycle || !IsValid)
+				return;
+			if (stealthLifecycleRuntime == null)
+				stealthLifecycleRuntime = new StealthSquadLifecycleRuntimeHost(this);
+			stealthLifecycleRuntime.TickLocalSafety();
+		}
+
 		public void TickStealthBlueSafety()
 		{
+			if (!LegacyStealthAuthorityAllowed(UsesModularStealthLifecycle))
+				return;
+
 			if (!IsValid || Type != SquadType.Stealth)
 				return;
 
@@ -266,8 +324,31 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 		public void TickStealthLiveTarget()
 		{
+			if (!LegacyStealthAuthorityAllowed(UsesModularStealthLifecycle))
+				return;
+
 			if (IsValid && Type == SquadType.Stealth)
 				StealthAIStateBase.TickStealthLiveTarget(this);
+		}
+
+		public bool TickStealthRevealedIdleSafety(out bool repositionIssued)
+		{
+			repositionIssued = false;
+			if (!LegacyStealthAuthorityAllowed(UsesModularStealthLifecycle))
+				return true;
+
+			return !IsValid || Type != SquadType.Stealth ||
+				StealthAIStateBase.TickStealthRevealedIdleSafety(this, out repositionIssued);
+		}
+
+		internal bool ObserveModularStealthDamage(Actor damaged, AttackInfo attack)
+		{
+			if (!UsesModularStealthLifecycle)
+				return false;
+			if (stealthLifecycleRuntime == null)
+				stealthLifecycleRuntime = new StealthSquadLifecycleRuntimeHost(this);
+			stealthLifecycleRuntime.ObserveDamage(damaged, attack);
+			return true;
 		}
 
 		void BenchmarkAirWork(string phase, Action work)
@@ -612,25 +693,27 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				nodes.Nodes.Add(new MiniYamlNode("StealthSquadDefinition", StealthSquadDefinition));
 				nodes.Nodes.Add(new MiniYamlNode("StealthSquadIndex",
 					FieldSaver.FormatValue(StealthSquadIndex)));
-				if (StealthKillCadenceGeneration != null)
+				if (UsesModularStealthLifecycle)
 				{
-					var generation = StealthKillCadenceGeneration;
-					nodes.Nodes.Add(new MiniYamlNode("StealthCadenceGenerationId",
-						FieldSaver.FormatValue(generation.GenerationId)));
-					nodes.Nodes.Add(new MiniYamlNode("StealthCadenceGenerationStartTick",
-						FieldSaver.FormatValue(generation.GenerationStartTick)));
-					nodes.Nodes.Add(new MiniYamlNode("StealthCadenceWindowStartTick",
-						FieldSaver.FormatValue(generation.WindowStartTick)));
-					nodes.Nodes.Add(new MiniYamlNode("StealthCadenceLastObservedTick",
-						FieldSaver.FormatValue(generation.LastObservedTick)));
-					nodes.Nodes.Add(new MiniYamlNode("StealthCadenceAge",
-						FieldSaver.FormatValue(generation.CadenceAge)));
-					nodes.Nodes.Add(new MiniYamlNode("StealthCadenceAttributedKills",
-						FieldSaver.FormatValue(generation.AttributedKills)));
-					nodes.Nodes.Add(new MiniYamlNode("StealthCadenceFailed",
-						FieldSaver.FormatValue(generation.CadenceFailed)));
-					nodes.Nodes.Add(new MiniYamlNode("StealthCadenceMismatchFailed",
-						FieldSaver.FormatValue(generation.MismatchFailed)));
+					if (stealthLifecycleRuntime == null)
+						stealthLifecycleRuntime = new StealthSquadLifecycleRuntimeHost(this);
+				}
+				else
+				{
+					if (StealthKillCadenceGeneration != null)
+					{
+						var generation = StealthKillCadenceGeneration;
+						nodes.Nodes.Add(new MiniYamlNode("StealthCadenceGenerationId", FieldSaver.FormatValue(generation.GenerationId)));
+						nodes.Nodes.Add(new MiniYamlNode("StealthCadenceGenerationStartTick", FieldSaver.FormatValue(generation.GenerationStartTick)));
+						nodes.Nodes.Add(new MiniYamlNode("StealthCadenceWindowStartTick", FieldSaver.FormatValue(generation.WindowStartTick)));
+						nodes.Nodes.Add(new MiniYamlNode("StealthCadenceLastObservedTick", FieldSaver.FormatValue(generation.LastObservedTick)));
+						nodes.Nodes.Add(new MiniYamlNode("StealthCadenceAge", FieldSaver.FormatValue(generation.CadenceAge)));
+						nodes.Nodes.Add(new MiniYamlNode("StealthCadenceAttributedKills", FieldSaver.FormatValue(generation.AttributedKills)));
+						nodes.Nodes.Add(new MiniYamlNode("StealthCadenceFailed", FieldSaver.FormatValue(generation.CadenceFailed)));
+						nodes.Nodes.Add(new MiniYamlNode("StealthCadenceMismatchFailed", FieldSaver.FormatValue(generation.MismatchFailed)));
+					}
+
+					SerializeStealthEscapeState(this, nodes);
 				}
 			}
 
@@ -655,6 +738,45 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			return nodes;
 		}
 
+		static void SerializeStealthEscapeState(Squad squad, MiniYaml yaml)
+		{
+			yaml.Nodes.Add(new MiniYamlNode("AirEscapingLocalAa", FieldSaver.FormatValue(squad.AirEscapingLocalAa)));
+			yaml.Nodes.Add(new MiniYamlNode("StealthEscapeIssuedTick", FieldSaver.FormatValue(squad.StealthEscapeIssuedTick)));
+			yaml.Nodes.Add(new MiniYamlNode("StealthEscapeSafetyChecks", FieldSaver.FormatValue(squad.StealthEscapeSafetyChecks)));
+			yaml.Nodes.Add(new MiniYamlNode("StealthEscapeDestination", FieldSaver.FormatValue(squad.StealthEscapeDestination)));
+			yaml.Nodes.Add(new MiniYamlNode("StealthEscapeStartCell", FieldSaver.FormatValue(squad.StealthEscapeStartCell)));
+			yaml.Nodes.Add(new MiniYamlNode("StealthEscapeDestinationCell", FieldSaver.FormatValue(squad.StealthEscapeDestinationCell)));
+			yaml.Nodes.Add(new MiniYamlNode("StealthEscapePendingExplosion", FieldSaver.FormatValue(squad.StealthEscapePendingExplosion)));
+			yaml.Nodes.Add(new MiniYamlNode("StealthEscapeLastProgressTick", FieldSaver.FormatValue(squad.StealthEscapeLastProgressTick)));
+			yaml.Nodes.Add(new MiniYamlNode("StealthEscapeLastDistanceCells", FieldSaver.FormatValue(squad.StealthEscapeLastDistanceCells)));
+			yaml.Nodes.Add(new MiniYamlNode("StealthEscapePreserveEngagement", FieldSaver.FormatValue(squad.StealthEscapePreserveEngagement)));
+			yaml.Nodes.Add(new MiniYamlNode("AirTargetStrategicCell", FieldSaver.FormatValue(squad.AirTargetStrategicCell)));
+		}
+
+		static void DeserializeStealthEscapeState(Squad squad, MiniYaml yaml)
+		{
+			var escapeNode = yaml.Nodes.FirstOrDefault(n => n.Key == "AirEscapingLocalAa");
+			if (escapeNode != null)
+			{
+				T LoadEscape<T>(string key) => FieldLoader.GetValue<T>(key,
+					yaml.Nodes.First(n => n.Key == key).Value.Value);
+				squad.AirEscapingLocalAa = FieldLoader.GetValue<bool>("AirEscapingLocalAa", escapeNode.Value.Value);
+				squad.StealthEscapeIssuedTick = LoadEscape<int>("StealthEscapeIssuedTick");
+				squad.StealthEscapeSafetyChecks = LoadEscape<int>("StealthEscapeSafetyChecks");
+				squad.StealthEscapeDestination = LoadEscape<CPos?>("StealthEscapeDestination");
+				squad.StealthEscapeStartCell = LoadEscape<CPos?>("StealthEscapeStartCell");
+				squad.StealthEscapeDestinationCell = LoadEscape<CPos?>("StealthEscapeDestinationCell");
+				squad.StealthEscapePendingExplosion = LoadEscape<bool>("StealthEscapePendingExplosion");
+				squad.StealthEscapeLastProgressTick = LoadEscape<int>("StealthEscapeLastProgressTick");
+				squad.StealthEscapeLastDistanceCells = LoadEscape<int>("StealthEscapeLastDistanceCells");
+				squad.StealthEscapePreserveEngagement = LoadEscape<bool>("StealthEscapePreserveEngagement");
+				squad.AirTargetStrategicCell = LoadEscape<CPos?>("AirTargetStrategicCell");
+				squad.StealthEscapeNeedsActivityRestore = false;
+			}
+			else
+				squad.StealthEscapeNeedsActivityRestore = true;
+		}
+
 		public static Squad Deserialize(IBot bot, SquadManagerBotModule squadManager, MiniYaml yaml)
 		{
 			var type = SquadType.Rush;
@@ -663,6 +785,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var typeNode = yaml.Nodes.FirstOrDefault(n => n.Key == "Type");
 			if (typeNode != null)
 				type = FieldLoader.GetValue<SquadType>("Type", typeNode.Value.Value);
+			StealthSquadLifecycleAuthorityPersistence.Validate(yaml,
+				type == SquadType.Stealth && squadManager.Info.UseModularStealthLifecycle);
 
 			var targetNode = yaml.Nodes.FirstOrDefault(n => n.Key == "Target");
 			if (targetNode != null)
@@ -697,6 +821,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 						Load<bool>("StealthCadenceFailed"),
 						Load<bool>("StealthCadenceMismatchFailed"));
 				}
+
+				DeserializeStealthEscapeState(squad, yaml);
 			}
 
 			var unitsNode = yaml.Nodes.FirstOrDefault(n => n.Key == "Units");
@@ -736,6 +862,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			}
 
 			squad.CleanAirMembership();
+			if (squad.UsesModularStealthLifecycle)
+				squad.stealthLifecycleRuntime = StealthSquadLifecycleRuntimeHost.ForLoadedSquad(squad);
+
 			if (squad.Type == SquadType.GeneralAttack)
 				squad.CleanGroundMembership();
 

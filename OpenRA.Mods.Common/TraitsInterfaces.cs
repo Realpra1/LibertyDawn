@@ -589,6 +589,12 @@ namespace OpenRA.Mods.Common.Traits
 	}
 
 	[RequireExplicitImplementation]
+	public interface IAdvancedBotFailsafeWindowDiagnostics
+	{
+		void EmitAdvancedFailsafeWindowDiagnostics(int sampleInterval, string transition);
+	}
+
+	[RequireExplicitImplementation]
 	public interface IBotPerformanceIdentity { string PerformanceIdentity { get; } }
 
 	[RequireExplicitImplementation]

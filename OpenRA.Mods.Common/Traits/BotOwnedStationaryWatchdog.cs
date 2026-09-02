@@ -73,6 +73,18 @@ namespace OpenRA.Mods.Common.Traits
 				return;
 			}
 
+			// A terminal owner has no remaining gameplay objective. Keep the permanent
+			// watchdog from converting the normal post-result interval into a failure.
+			if (self.Owner.WinState != WinState.Undefined)
+			{
+				stationaryAge = 0;
+				stationaryFailureReported = false;
+				lastCenterPosition = self.CenterPosition;
+				lastHealth = self.TraitOrDefault<IHealth>()?.HP ?? 0;
+				UpdateExemption(self, BotStationaryWatchdogExemption.None);
+				return;
+			}
+
 			var currentHealth = self.TraitOrDefault<IHealth>()?.HP ?? 0;
 			var currentCloaked = IsCloaked(self);
 			if (currentCloaked != lastCloaked)
@@ -131,7 +143,7 @@ namespace OpenRA.Mods.Common.Traits
 					info.MaximumStationaryMilliseconds, currentExemption,
 					ActivitySignature(self.CurrentActivity));
 
-			if (stationaryFailureReported ||
+			if (stationaryFailureReported || currentExemption != BotStationaryWatchdogExemption.None ||
 				!StealthAISpecialistPolicy.StationaryWatchdogFailed(stationaryAge, maximumTicks))
 				return;
 
