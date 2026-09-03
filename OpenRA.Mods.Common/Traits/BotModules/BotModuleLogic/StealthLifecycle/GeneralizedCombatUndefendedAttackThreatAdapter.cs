@@ -23,12 +23,17 @@ namespace OpenRA.Mods.Common.Traits
 	{
 		readonly GeneralizedCombatThreatCalculator calculator;
 		readonly Func<uint, Actor> resolveLiveActor;
+		readonly int safetyMarginCells;
 
 		public GeneralizedCombatUndefendedAttackThreatAdapter(
-			GeneralizedCombatThreatCalculator calculator, Func<uint, Actor> resolveLiveActor)
+			GeneralizedCombatThreatCalculator calculator, Func<uint, Actor> resolveLiveActor,
+			int safetyMarginCells = 0)
 		{
+			if (safetyMarginCells < 0)
+				throw new ArgumentOutOfRangeException(nameof(safetyMarginCells));
 			this.calculator = calculator ?? throw new ArgumentNullException(nameof(calculator));
 			this.resolveLiveActor = resolveLiveActor ?? throw new ArgumentNullException(nameof(resolveLiveActor));
+			this.safetyMarginCells = safetyMarginCells;
 		}
 
 		public StealthUndefendedAttackSafetyResult Calculate(
@@ -42,20 +47,26 @@ namespace OpenRA.Mods.Common.Traits
 
 			var friendly = facts.FriendlyActorIds.Select(Resolve).ToArray();
 			var enemy = facts.EnemyActorIds.Select(Resolve).ToArray();
+			var representative = friendly.OrderBy(attacker => enemy.Min(defender =>
+				(attacker.CenterPosition - defender.CenterPosition).HorizontalLengthSquared))
+				.ThenBy(attacker => attacker.ActorID).First();
+			var evaluatedFriendly = new[] { representative };
 			var crossover = calculator.EstimateLiveMixedGroupCrossover(
-				friendly, enemy, null, plannedCurrentRangeEngagement: true);
-			var maximumThreat = friendly.SelectMany(attacker => enemy.Select(defender =>
+				evaluatedFriendly, enemy, null, plannedCurrentRangeEngagement: true);
+			var maximumThreat = enemy.Select(defender =>
 			{
-				var pair = calculator.CalculateLive(attacker, defender, null,
+				var pair = calculator.CalculateLive(representative, defender, null,
 					plannedCurrentRangeEngagement: true);
-				var dx = (long)attacker.Location.X - defender.Location.X;
-				var dy = (long)attacker.Location.Y - defender.Location.Y;
+				var dx = (long)representative.Location.X - defender.Location.X;
+				var dy = (long)representative.Location.Y - defender.Location.Y;
 				return GeneralizedCombatThreatCalculator.DefenderThreatAtDistance(
-					pair, Math.Sqrt(dx * dx + dy * dy));
-			})).DefaultIfEmpty().Max();
+					pair, Math.Sqrt(dx * dx + dy * dy), includeDefenderHitRadius: true);
+			}).DefaultIfEmpty().Max();
 			var score = new StealthTargetThreatScore(maximumThreat, crossover);
 			return new StealthUndefendedAttackSafetyResult(score,
-				GeneralizedCombatLiveCellSafety.IsCurrentAttackSafe(calculator, friendly, enemy), false);
+				GeneralizedCombatLiveCellSafety.IsCurrentAttackSafe(calculator, evaluatedFriendly, enemy, null,
+					(attacker, defender) => GeneralizedCombatPlannedDecloakThreat.Calculate(
+						calculator, attacker, defender), safetyMarginCells), false);
 		}
 
 		Actor Resolve(uint actorId)

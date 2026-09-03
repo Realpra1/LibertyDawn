@@ -52,11 +52,13 @@ namespace OpenRA.Test.Mods.Common
 		{
 			public StealthApproachLiveSnapshot Snapshot;
 			public IReadOnlyList<CPos> Route;
+			public int RouteReads;
 			public int Moves;
 			public CPos Destination;
 			public StealthApproachStrategicCacheSnapshot ReadSnapshot() { throw new NotSupportedException(); }
 			public IReadOnlyList<CPos> ReadRoute(CPos originStrategicCell, CPos destinationStrategicCell)
 			{
+				RouteReads++;
 				return Route ?? new[]
 				{
 					originStrategicCell,
@@ -200,9 +202,113 @@ namespace OpenRA.Test.Mods.Common
 
 			Assert.That(first.Disposition,
 				Is.EqualTo(StealthTargetAcquisitionDisposition.MoveCloserAndRescan));
+			Assert.That(first.MoveCloserStrategicCell, Is.EqualTo(new CPos(3, 0)),
+				"The cached route should use the full 30-second safe travel prefix, not four fixed legs.");
 			Assert.That(retained.MoveCloserStrategicCell,
 				Is.EqualTo(first.MoveCloserStrategicCell));
 			Assert.That(retained.PrimitiveOperations, Is.Zero);
+		}
+
+		[Test]
+		public void AcquisitionRescansWhenEnginePathFinishesShortOfMoveCloserDestination()
+		{
+			var cache = new Cache
+			{
+				Snapshot = new StealthTargetAcquisitionCacheSnapshot(12, 2, new float[24],
+					new[] { new CPos(10, 0) }, 10f)
+			};
+			var behavior = new StealthTargetAcquisitionBehavior(
+				Handoff(BehaviorId.TargetAcquisition), cache);
+			var first = behavior.Execute(new CPos(0, 0));
+			var rescanned = behavior.Execute(new CPos(1, 0), movementFinished: true);
+
+			Assert.That(first.MoveCloserStrategicCell, Is.EqualTo(new CPos(3, 0)));
+			Assert.That(rescanned.MoveCloserStrategicCell, Is.EqualTo(new CPos(4, 0)));
+			Assert.That(rescanned.PrimitiveOperations, Is.GreaterThan(0));
+		}
+
+		[Test]
+		public void AcquisitionRescansWhenItsRouteExposureChanges()
+		{
+			var cache = new Cache
+			{
+				Snapshot = new StealthTargetAcquisitionCacheSnapshot(12, 2, new float[24],
+					new[] { new CPos(10, 0) }, 10f, formationCloaked: true)
+			};
+			var behavior = new StealthTargetAcquisitionBehavior(
+				Handoff(BehaviorId.TargetAcquisition), cache);
+			var first = behavior.Execute(new CPos(0, 0));
+			cache.Snapshot = new StealthTargetAcquisitionCacheSnapshot(12, 2, new float[24],
+				new[] { new CPos(10, 0) }, 10f, formationCloaked: false);
+			var rescanned = behavior.Execute(new CPos(1, 0));
+
+			Assert.That(first.MoveCloserStrategicCell, Is.EqualTo(new CPos(3, 0)));
+			Assert.That(rescanned.MoveCloserStrategicCell, Is.EqualTo(new CPos(4, 0)));
+			Assert.That(rescanned.PrimitiveOperations, Is.GreaterThan(0));
+		}
+
+		[Test]
+		public void AcquisitionBudgetExhaustionStillMovesOneCachedCellTowardTheEnemy()
+		{
+			const int size = 256;
+			var cache = new Cache
+			{
+				Snapshot = new StealthTargetAcquisitionCacheSnapshot(size, size,
+					new float[size * size], new[] { new CPos(size - 1, size - 1) }, 10f)
+			};
+			var result = new StealthTargetAcquisitionBehavior(
+				Handoff(BehaviorId.TargetAcquisition), cache).Execute(new CPos(0, 0));
+
+			Assert.That(result.Disposition,
+				Is.EqualTo(StealthTargetAcquisitionDisposition.MoveCloserAndRescan));
+			Assert.That(result.MoveCloserStrategicCell, Is.EqualTo(new CPos(1, 0)));
+		}
+
+		[Test]
+		public void AcquisitionPermanentlyBiasesDifferentSquadsTowardDifferentCorners()
+		{
+			var enemies = Enumerable.Range(0, 6).Select(x => new CPos(x, 0))
+				.Concat(Enumerable.Range(6, 6).Select(x => new CPos(x, 11))).ToArray();
+			var cache = new Cache
+			{
+				Snapshot = new StealthTargetAcquisitionCacheSnapshot(12, 12, new float[144],
+					enemies, .1f)
+			};
+			var upperLeft = new StealthTargetAcquisitionBehavior(
+				Handoff(BehaviorId.TargetAcquisition), cache, 0).Execute(new CPos(6, 6));
+			var lowerRight = new StealthTargetAcquisitionBehavior(
+				Handoff(BehaviorId.TargetAcquisition), cache, 3).Execute(new CPos(6, 6));
+
+			Assert.That(upperLeft.Options.Select(option => option.StrategicCell),
+				Does.Contain(new CPos(0, 0)));
+			Assert.That(upperLeft.Options.Select(option => option.StrategicCell),
+				Does.Not.Contain(new CPos(11, 11)));
+			Assert.That(lowerRight.Options.Select(option => option.StrategicCell),
+				Does.Contain(new CPos(11, 11)));
+			Assert.That(lowerRight.Options.Select(option => option.StrategicCell),
+				Does.Not.Contain(new CPos(0, 0)));
+		}
+
+		[Test]
+		public void AcquisitionCornerBiasAlsoRanksSmallCandidateSets()
+		{
+			var cache = new Cache
+			{
+				Snapshot = new StealthTargetAcquisitionCacheSnapshot(12, 12, new float[144],
+					new[] { new CPos(0, 0), new CPos(11, 11) }, .1f)
+			};
+			var upperLeft = new StealthTargetAcquisitionBehavior(
+				Handoff(BehaviorId.TargetAcquisition), cache, 0).Execute(new CPos(6, 6));
+			var lowerRight = new StealthTargetAcquisitionBehavior(
+				Handoff(BehaviorId.TargetAcquisition), cache, 3).Execute(new CPos(6, 6));
+
+			Assert.That(upperLeft.Options.First().StrategicCell, Is.EqualTo(new CPos(0, 0)));
+			Assert.That(lowerRight.Options.First().StrategicCell, Is.EqualTo(new CPos(11, 11)));
+			Assert.That(upperLeft.Options.Single(option => option.StrategicCell == new CPos(0, 0))
+				.EstimatedTravelMilliseconds,
+				Is.EqualTo(lowerRight.Options.Single(option => option.StrategicCell == new CPos(0, 0))
+					.EstimatedTravelMilliseconds),
+				"Corner bias may order discovery but travel cost must stay rooted at the live squad center.");
 		}
 
 		[Test]
@@ -257,17 +363,15 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
-		public void DistanceChoiceRewardsSeparationWithoutOverridingTravelCost()
+		public void DistanceChoiceUsesLowestCachedRouteCost()
 		{
 			var nearCrowded = ThreatOption(1, 5000);
 			var slightlyFarSeparated = ThreatOption(5, 5500);
 			var behavior = new StealthTargetDistanceChoiceBehavior(
 				Construct<StealthTargetDistanceChoiceHandoff>(Handoff(BehaviorId.TargetDistanceChoice),
-					new[] { nearCrowded, slightlyFarSeparated }),
-				new[] { new StealthActiveSquadTargetSnapshot(99, new CPos(1, 0)) },
-				new StealthTargetDistanceChoicePolicy(100, 3000));
+					new[] { nearCrowded, slightlyFarSeparated }));
 
-			Assert.That(behavior.Execute().Mission.StrategicCell, Is.EqualTo(new CPos(5, 0)));
+			Assert.That(behavior.Execute().Mission.StrategicCell, Is.EqualTo(new CPos(1, 0)));
 		}
 
 		[Test]
@@ -289,8 +393,8 @@ namespace OpenRA.Test.Mods.Common
 			var arrived = behavior.Execute();
 
 			Assert.That(moving.Disposition, Is.EqualTo(StealthApproachDisposition.Moving));
-			Assert.That(world.Destination, Is.EqualTo(new CPos(1, 0)));
-			Assert.That(arrived.Disposition, Is.EqualTo(StealthApproachDisposition.CrushEvaluation));
+			Assert.That(world.Destination, Is.EqualTo(new CPos(5, 0)));
+			Assert.That(arrived.Disposition, Is.EqualTo(StealthApproachDisposition.Kite));
 			Assert.That(arrived.LiveDefenderActorIds, Is.EqualTo(new uint[] { 71 }));
 		}
 
@@ -315,7 +419,7 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
-		public void ApproachReissuesTheSameNextCellOnlyAfterMovementEnds()
+		public void ApproachReacquiresWhenTheEngineCannotLeaveItsStrategicCell()
 		{
 			var world = new ApproachWorld
 			{
@@ -333,9 +437,30 @@ namespace OpenRA.Test.Mods.Common
 			world.Snapshot = ApproachSnapshot(new CPos(0, 0), Array.Empty<uint>());
 			behavior.Execute();
 			world.Snapshot = ApproachSnapshot(new CPos(0, 0), Array.Empty<uint>(), true);
-			behavior.Execute();
+			var result = behavior.Execute();
 
-			Assert.That(world.Moves, Is.EqualTo(2));
+			Assert.That(result.Disposition, Is.EqualTo(StealthApproachDisposition.Reacquire));
+			Assert.That(world.Moves, Is.EqualTo(1));
+		}
+
+		[Test]
+		public void BlockedApproachHandsNearbyDefendersToLiveCombat()
+		{
+			var world = new ApproachWorld
+			{
+				Snapshot = ApproachSnapshot(new CPos(0, 0), Array.Empty<uint>(), true)
+			};
+			var behavior = new StealthApproachBehavior(
+				Construct<StealthApproachHandoff>(Handoff(BehaviorId.Approach), MissionAt(5)),
+				world, world, world);
+
+			behavior.Execute();
+			world.Snapshot = ApproachSnapshot(new CPos(0, 0), new uint[] { 71 }, true);
+			var result = behavior.Execute();
+
+			Assert.That(result.Disposition, Is.EqualTo(StealthApproachDisposition.Kite));
+			Assert.That(result.LiveDefenderActorIds, Is.EqualTo(new uint[] { 71 }));
+			Assert.That(world.Moves, Is.EqualTo(1));
 		}
 
 		[Test]
@@ -350,20 +475,45 @@ namespace OpenRA.Test.Mods.Common
 				world, world, world);
 
 			behavior.Execute();
-			Assert.That(world.Destination, Is.EqualTo(new CPos(1, 0)));
+			Assert.That(world.Destination, Is.EqualTo(new CPos(5, 0)));
 
 			world.Snapshot = ApproachSnapshot(new CPos(0, 1), Array.Empty<uint>());
 			world.Route = new[] { new CPos(0, 1), new CPos(0, 2), new CPos(5, 0) };
 			behavior.Execute();
 
 			Assert.That(world.Moves, Is.EqualTo(1));
-			Assert.That(world.Destination, Is.EqualTo(new CPos(1, 0)));
+			Assert.That(world.RouteReads, Is.EqualTo(1),
+				"A live safety tick must not recalculate an in-flight engine route.");
+			Assert.That(world.Destination, Is.EqualTo(new CPos(5, 0)));
 
 			world.Snapshot = ApproachSnapshot(new CPos(0, 1), Array.Empty<uint>(), true);
 			behavior.Execute();
 
 			Assert.That(world.Moves, Is.EqualTo(2));
 			Assert.That(world.Destination, Is.EqualTo(new CPos(0, 2)));
+		}
+
+		[Test]
+		public void ApproachPreservesCachedTurnsAroundStrategicDanger()
+		{
+			var world = new ApproachWorld
+			{
+				Snapshot = ApproachSnapshot(new CPos(0, 0), Array.Empty<uint>()),
+				Route = new[]
+				{
+					new CPos(0, 0), new CPos(1, 0), new CPos(2, 0),
+					new CPos(2, 1), new CPos(3, 1), new CPos(4, 1), new CPos(5, 0)
+				}
+			};
+			var behavior = new StealthApproachBehavior(
+				Construct<StealthApproachHandoff>(Handoff(BehaviorId.Approach), MissionAt(5)),
+				world, world, world);
+
+			var result = behavior.Execute();
+
+			Assert.That(result.Disposition, Is.EqualTo(StealthApproachDisposition.Moving));
+			Assert.That(world.Destination, Is.EqualTo(new CPos(2, 0)));
+			Assert.That(world.Moves, Is.EqualTo(1));
 		}
 
 		[Test]
@@ -391,6 +541,30 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(controller.TryAccept(result, out var transition), Is.True);
 			Assert.That(transition.RecalculateFlee.Evidence.Source,
 				Is.EqualTo(StealthRecalculateFleeSource.ApproachUnsafeCurrentPosition));
+		}
+
+		[Test]
+		public void ApproachEscapesUnsafePositionBeforeReacquiringAnInvalidTarget()
+		{
+			var member = new StealthApproachMemberSnapshot(1, new CPos(0, 0));
+			var world = new ApproachWorld
+			{
+				Snapshot = new StealthApproachLiveSnapshot(false, new[] { member },
+					new[] { new StealthCombatGroupSnapshot("stnk", 1, 900) },
+					new[] { new StealthCombatGroupSnapshot("mtnk", 1, 800) },
+					new uint[] { 71 }, false, false, currentPositionSafe: false,
+					immediateThreatActorId: 71, immediateThreatCurrentCell: new CPos(1, 0),
+					currentThreatScore: new StealthTargetThreatScore(2, 2))
+			};
+			var behavior = new StealthApproachBehavior(
+				Construct<StealthApproachHandoff>(Handoff(BehaviorId.Approach), MissionAt(5)),
+				world, world, world);
+
+			var result = behavior.Execute();
+
+			Assert.That(result.Disposition, Is.EqualTo(StealthApproachDisposition.RecalculateFlee));
+			Assert.That(result.ImmediateThreatActorId, Is.EqualTo(71));
+			Assert.That(world.Moves, Is.Zero);
 		}
 
 		static StealthBehaviorHandoff Handoff(BehaviorId owner)
@@ -421,7 +595,7 @@ namespace OpenRA.Test.Mods.Common
 
 		static StealthApproachMission MissionAt(int x)
 		{
-			return Construct<StealthApproachMission>(ThreatOption(x, x * 1000), 0L, 0, (long)x * 1000);
+			return Construct<StealthApproachMission>(ThreatOption(x, x * 1000));
 		}
 
 		static StealthApproachLiveSnapshot ApproachSnapshot(CPos memberCell,

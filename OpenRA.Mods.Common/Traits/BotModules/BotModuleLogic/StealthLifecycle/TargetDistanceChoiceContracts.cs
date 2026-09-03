@@ -15,49 +15,6 @@ using System.Collections.ObjectModel;
 
 namespace OpenRA.Mods.Common.Traits
 {
-	/// <summary>Immutable bounded cost policy supplied to TargetDistanceChoice.</summary>
-	public sealed class StealthTargetDistanceChoicePolicy
-	{
-		const int MillisecondsPerSecond = 1000;
-		const int MaximumCreditFractionDenominator = 10;
-
-		public const int AbsoluteMaximumSeparationCreditMilliseconds =
-			StealthTargetAcquisitionBehavior.MaximumTravelSeconds * MillisecondsPerSecond /
-			MaximumCreditFractionDenominator;
-
-		public int SeparationCreditPerSquaredCellMilliseconds { get; }
-		public int MaximumSeparationCreditMilliseconds { get; }
-
-		public StealthTargetDistanceChoicePolicy(int separationCreditPerSquaredCellMilliseconds,
-			int maximumSeparationCreditMilliseconds)
-		{
-			if (separationCreditPerSquaredCellMilliseconds <= 0)
-				throw new ArgumentOutOfRangeException(nameof(separationCreditPerSquaredCellMilliseconds));
-			if (maximumSeparationCreditMilliseconds <= 0 ||
-				maximumSeparationCreditMilliseconds > AbsoluteMaximumSeparationCreditMilliseconds)
-				throw new ArgumentOutOfRangeException(nameof(maximumSeparationCreditMilliseconds));
-
-			SeparationCreditPerSquaredCellMilliseconds = separationCreditPerSquaredCellMilliseconds;
-			MaximumSeparationCreditMilliseconds = maximumSeparationCreditMilliseconds;
-		}
-	}
-
-	/// <summary>Immutable strategic-cache position for another active stealth squad.</summary>
-	public sealed class StealthActiveSquadTargetSnapshot
-	{
-		public uint StableActorId { get; }
-		public CPos StrategicCell { get; }
-
-		public StealthActiveSquadTargetSnapshot(uint stableActorId, CPos strategicCell)
-		{
-			if (stableActorId == 0)
-				throw new ArgumentOutOfRangeException(nameof(stableActorId));
-
-			StableActorId = stableActorId;
-			StrategicCell = strategicCell;
-		}
-	}
-
 	/// <summary>One immutable strategic-cell mission selected by TargetDistanceChoice.</summary>
 	public sealed class StealthApproachMission
 	{
@@ -65,22 +22,9 @@ namespace OpenRA.Mods.Common.Traits
 		public CPos StrategicCell => TargetOption.StrategicCell;
 		public uint StableTargetActorId => TargetOption.StableIdentity;
 		public int? EstimatedTravelMilliseconds => TargetOption.ValueOption.EstimatedTravelMilliseconds;
-		public long MinimumSquadSeparationSquared { get; }
-		public int SeparationCreditMilliseconds { get; }
-		public long AdjustedTravelCostMilliseconds { get; }
-
-		internal StealthApproachMission(StealthTargetThreatOption targetOption,
-			long minimumSquadSeparationSquared, int separationCreditMilliseconds,
-			long adjustedTravelCostMilliseconds)
+		internal StealthApproachMission(StealthTargetThreatOption targetOption)
 		{
 			TargetOption = targetOption ?? throw new ArgumentNullException(nameof(targetOption));
-			if (minimumSquadSeparationSquared < 0 || separationCreditMilliseconds < 0 ||
-				adjustedTravelCostMilliseconds < 0)
-				throw new ArgumentOutOfRangeException(nameof(minimumSquadSeparationSquared));
-
-			MinimumSquadSeparationSquared = minimumSquadSeparationSquared;
-			SeparationCreditMilliseconds = separationCreditMilliseconds;
-			AdjustedTravelCostMilliseconds = adjustedTravelCostMilliseconds;
 		}
 	}
 

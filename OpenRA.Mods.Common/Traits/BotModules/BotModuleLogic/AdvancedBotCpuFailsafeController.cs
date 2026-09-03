@@ -108,7 +108,7 @@ namespace OpenRA.Mods.Common.Traits
 			var advancedMilliseconds = enabledTimes.Values.Sum();
 			var share = totalMilliseconds > 0 ? advancedMilliseconds / totalMilliseconds : 0;
 			var breached = pacing.Reliable ? pacing.RealTimeRatio > 1d + lagTolerance :
-				totalMilliseconds > 0 && share > fallbackShare;
+				totalMilliseconds > 0 && share * Math.Max(0, pacing.RealTimeRatio) > fallbackShare;
 			var reason = pacing.Reliable ? "normal-speed-keep-up" : pacing.Source + "-half-cpu-budget";
 
 			if (breached)

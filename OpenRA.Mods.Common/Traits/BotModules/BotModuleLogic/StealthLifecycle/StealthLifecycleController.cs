@@ -174,11 +174,11 @@ namespace OpenRA.Mods.Common.Traits
 						return false;
 					nextOwner = BehaviorId.UndefendedAttack;
 					break;
-				case StealthApproachDisposition.CrushEvaluation:
+				case StealthApproachDisposition.Kite:
 					if (result.ArrivalClassification != StealthApproachArrivalClassification.Defended ||
 						result.LiveDefenderActorIds.Count == 0)
 						return false;
-					nextOwner = BehaviorId.CrushEvaluation;
+					nextOwner = BehaviorId.Kite;
 					break;
 				default:
 					return false;
@@ -283,7 +283,7 @@ namespace OpenRA.Mods.Common.Traits
 					break;
 				case StealthKiteDisposition.CrushEvaluation:
 					if (result.ActiveMemberActorIds.Count == 0 || result.LiveDefenderActorIds.Count == 0 ||
-						!result.SelectedTargetActorId.HasValue || result.FireCell.HasValue ||
+						result.SelectedTargetActorId.HasValue || result.FireCell.HasValue ||
 						result.Safety.HasValue || result.FallbackEvidence != null)
 						return false;
 					nextOwner = BehaviorId.CrushEvaluation;
@@ -364,7 +364,8 @@ namespace OpenRA.Mods.Common.Traits
 				case StealthMassAttackDisposition.RecalculateFlee:
 					var zeroMembers = result.ActiveMemberActorIds.Count == 0;
 					if ((!zeroMembers && (!ValidMassTarget(result) ||
-							result.Threat.Value.StandardScore.Crossover > 1)) ||
+							(result.Threat.Value.StandardScore.Crossover > 1 &&
+								result.Threat.Value.AttackApproved))) ||
 						(zeroMembers && !ValidMassTargetless(result)) ||
 						result.LastOrderToken != null)
 						return false;
@@ -399,9 +400,13 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				var completedRoute = result.LiveCause == StealthRecalculateFleeLiveCause.Completed &&
 					result.SelectedDestinationCell.HasValue && result.LastOrderToken != null;
+				var safeToReconsider = result.LiveCause == StealthRecalculateFleeLiveCause.SafeToReconsider &&
+					!result.SelectedDestinationCell.HasValue && result.LastOrderToken == null;
 				var targetGone = result.LiveCause == StealthRecalculateFleeLiveCause.NoTarget &&
 					!result.SelectedDestinationCell.HasValue && result.LastOrderToken == null;
-				if (!completedRoute && !targetGone)
+				var noRoute = result.LiveCause == StealthRecalculateFleeLiveCause.NoRoute &&
+					!result.SelectedDestinationCell.HasValue && result.LastOrderToken == null;
+				if (!completedRoute && !safeToReconsider && !targetGone && !noRoute)
 					return false;
 				next = AdvanceTo(BehaviorId.TargetAcquisition);
 			}
@@ -471,13 +476,15 @@ namespace OpenRA.Mods.Common.Traits
 
 			var facts = evidence.AttackFacts;
 			var score = evidence.AttackScore;
+			var defenderFactsMatch = facts != null &&
+				result.LiveDefenderActorIds.All(facts.EnemyActorIds.Contains);
 			var canonical =
 				result.ActiveMemberActorIds.Count != 0 && result.SelectedTargetActorId.HasValue &&
 				result.SelectedTargetCurrentCell.HasValue && facts != null && score.HasValue &&
 				facts.SelectedTargetActorId == result.SelectedTargetActorId.Value &&
 				facts.SelectedTargetCurrentCell == result.SelectedTargetCurrentCell.Value &&
 				facts.FriendlyActorIds.SequenceEqual(result.ActiveMemberActorIds) &&
-				facts.EnemyActorIds.SequenceEqual(result.LiveDefenderActorIds);
+				defenderFactsMatch;
 			if (!canonical)
 				return false;
 			if (evidence.Reason == StealthKiteFallbackReason.UnsafeCurrentPosition)

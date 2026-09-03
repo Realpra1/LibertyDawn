@@ -176,18 +176,25 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 	sealed class StealthRecalculateFleeLiveWorld : IStealthRecalculateFleeLiveWorld
 	{
 		readonly StealthSquadLifecycleRecoveryLiveAdapter adapter;
+		readonly StealthSquadLifecycleCombatLiveAdapter combat;
 		readonly string fingerprint;
 
 		public StealthRecalculateFleeLiveWorld(
-			StealthSquadLifecycleRecoveryLiveAdapter adapter, string fingerprint)
+			StealthSquadLifecycleRecoveryLiveAdapter adapter,
+			StealthSquadLifecycleCombatLiveAdapter combat, string fingerprint)
 		{
 			this.adapter = adapter;
+			this.combat = combat;
 			this.fingerprint = fingerprint;
 		}
 
 		public StealthRecalculateFleeLiveSnapshot Read(StealthApproachMission mission)
 		{
-			return adapter.ReadFlee(mission, fingerprint);
+			var live = adapter.ReadFlee(mission, fingerprint);
+			var currentPositionSafe = combat.CurrentPlannedAttackSafe(mission);
+			return new StealthRecalculateFleeLiveSnapshot(live.Tick, live.Members, live.Enemies,
+				live.FormationCloaked, live.SourceFingerprint,
+				currentPositionSafe: currentPositionSafe);
 		}
 	}
 

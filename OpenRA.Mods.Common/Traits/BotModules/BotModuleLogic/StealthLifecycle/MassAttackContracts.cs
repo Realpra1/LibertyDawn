@@ -55,7 +55,7 @@ namespace OpenRA.Mods.Common.Traits
 			SelectedTargetCurrentCell = source.AttackFacts.SelectedTargetCurrentCell;
 			friendlyActorIds = CopyIds(source.AttackFacts.FriendlyActorIds, nameof(source));
 			enemyActorIds = CopyIds(source.AttackFacts.EnemyActorIds, nameof(source));
-			if (!enemyActorIds.SequenceEqual(source.DefenderActorIds) ||
+			if (!source.DefenderActorIds.All(enemyActorIds.Contains) ||
 				!enemyActorIds.Contains(SelectedTargetActorId) ||
 				!source.AttackFacts.PlannedDecloak || !source.AttackFacts.PlannedAttack ||
 				!source.AttackFacts.PlannedCurrentRangeEngagement)

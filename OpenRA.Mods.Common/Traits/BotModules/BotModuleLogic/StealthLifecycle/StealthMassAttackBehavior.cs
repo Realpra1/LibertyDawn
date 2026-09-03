@@ -18,6 +18,7 @@ namespace OpenRA.Mods.Common.Traits
 	public sealed class StealthMassAttackBehavior
 	{
 		const int MaximumSafeCellChecks = 8;
+		const int OrderRetryIntervalTicks = 75;
 		readonly StealthMassAttackHandoff handoff;
 		readonly StealthApproachMission mission;
 		readonly IStealthLifecycleOwnershipGuard ownershipGuard;
@@ -26,6 +27,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly IStealthMassAttackOrders orders;
 		readonly StealthBehaviorExecutionLease executionLease = new StealthBehaviorExecutionLease();
 		StealthMassAttackOrderToken lastOrder;
+		int lastOrderTick = int.MinValue;
 		long attemptRevision;
 
 		public StealthMassAttackBehavior(StealthMassAttackHandoff handoff,
@@ -57,10 +59,12 @@ namespace OpenRA.Mods.Common.Traits
 				return Targetless(decision, decision.TargetlessDisposition.Value, revision);
 
 			var currentCell = decision.CurrentFormationCell();
-			var evaluation = BeginEvaluation(decision.Facts(decision.Defenders[0], currentCell), revision);
+			var representativeCell = decision.RepresentativeCell();
+			var evaluation = BeginEvaluation(
+				decision.Facts(decision.Defenders[0], representativeCell), revision);
 			var choices = decision.Defenders.Select(target =>
 			{
-				var facts = decision.Facts(target, currentCell);
+				var facts = decision.Facts(target, representativeCell);
 				return (Target: target, Facts: facts, Threat: Calculate(evaluation, facts, revision));
 			}).ToArray();
 			var selected = choices.OrderByDescending(choice => choice.Threat.SelectedTargetThreat)
@@ -76,6 +80,7 @@ namespace OpenRA.Mods.Common.Traits
 			var threat = selected.Threat;
 			if (!selected.Threat.AttackApproved)
 			{
+				var safeCellFound = false;
 				foreach (var candidate in decision.OrderedCandidateCells(selected.Target, currentCell)
 					.Take(MaximumSafeCellChecks))
 				{
@@ -87,14 +92,20 @@ namespace OpenRA.Mods.Common.Traits
 					orderCell = candidate;
 					selectedFacts = candidateFacts;
 					threat = candidateThreat;
+					safeCellFound = true;
 					break;
 				}
+
+				if (!safeCellFound)
+					return Result(decision, StealthMassAttackDisposition.RecalculateFlee,
+						StealthMassAttackPhase.Advance, selected.Target, selectedFacts,
+						threat, null, revision);
 			}
 
 			var sameIntent = SameIntent(lastOrder, phase,
 				decision.MemberActorIds, selected.Target, orderCell);
-			var shouldApply = !sameIntent || (phase == StealthMassAttackPhase.Advance &&
-				decision.Members.Any(member => member.NeedsMovementOrder));
+			var shouldApply = !sameIntent || (decision.Members.All(member => member.NeedsMovementOrder) &&
+				(long)decision.Tick - lastOrderTick >= OrderRetryIntervalTicks);
 			if (shouldApply)
 				attemptRevision++;
 			var desired = new StealthMassAttackOrderToken(handoff.Owner, handoff.Epoch, phase, 0,
@@ -120,8 +131,13 @@ namespace OpenRA.Mods.Common.Traits
 			var result = new StealthMassAttackResult(handoff, mission, disposition, phase,
 				target?.ActorId, target?.CurrentCell, decision.MemberActorIds,
 				decision.DefenderActorIds, decision.ObjectiveActorIds, facts, threat, order);
-			executionLease.Commit(revision, "MassAttack", EnsureActiveOwnership,
-				() => lastOrder = order);
+			executionLease.Commit(revision, "MassAttack", EnsureActiveOwnership, () =>
+			{
+				if (order != null && (lastOrder == null ||
+					lastOrder.AttemptRevision != order.AttemptRevision))
+					lastOrderTick = decision.Tick;
+				lastOrder = order;
+			});
 			return result;
 		}
 

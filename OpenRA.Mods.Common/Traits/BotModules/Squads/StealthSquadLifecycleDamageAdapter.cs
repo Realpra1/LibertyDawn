@@ -13,7 +13,7 @@ using System.Linq;
 
 namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 {
-	/// <summary>Lets only the active fight owner turn one passive engine fact into Damage.</summary>
+	/// <summary>Lets an active mission owner turn one passive engine fact into Damage.</summary>
 	sealed class StealthSquadLifecycleDamageAdapter
 	{
 		readonly StealthLifecycleRuntimeEntry entry;
@@ -54,7 +54,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 		uint[] Members(object result)
 		{
-			IEnumerable<uint> ids = result is StealthUndefendedAttackResult undefended ?
+			IEnumerable<uint> ids = result is StealthApproachResult approach ?
+				approach.ActiveMemberActorIds :
+				result is StealthUndefendedAttackResult undefended ?
 				undefended.AttackMemberActorIds :
 				result is StealthCrushResult crush ? crush.ActiveMemberActorIds :
 				result is StealthKiteResult kite ? kite.ActiveMemberActorIds :
@@ -65,6 +67,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 		IEnumerable<uint> Enemies(object result)
 		{
+			if (result is StealthApproachResult approach) return approach.LiveDefenderActorIds;
 			if (result is StealthUndefendedAttackResult undefended) return undefended.LiveDefenderActorIds;
 			if (result is StealthCrushResult crush) return crush.LiveDefenderActorIds;
 			if (result is StealthKiteResult kite) return kite.LiveDefenderActorIds;
@@ -94,6 +97,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 		StealthApproachMission Mission()
 		{
+			if (entry.Context is StealthApproachHandoff approach) return approach.Missions[0];
 			if (entry.Context is StealthUndefendedAttackHandoff undefended) return undefended.Mission;
 			if (entry.Context is StealthCrushEvaluationHandoff crush) return crush.Mission;
 			if (entry.Context is StealthKiteHandoff kite) return kite.Mission;

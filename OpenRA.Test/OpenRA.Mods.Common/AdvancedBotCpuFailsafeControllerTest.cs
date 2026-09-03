@@ -21,6 +21,8 @@ namespace OpenRA.Test
 		static readonly SimulationPacingSample Healthy = new SimulationPacingSample(true, true, 1, "normal-real-time");
 		static readonly SimulationPacingSample Slow = new SimulationPacingSample(true, true, 1.2, "normal-real-time");
 		static readonly SimulationPacingSample Maximum = new SimulationPacingSample(true, false, 0.1, "maximum-speed");
+		static readonly SimulationPacingSample MaximumSlow =
+			new SimulationPacingSample(true, false, 1, "maximum-speed");
 
 		static AdvancedBotCpuFailsafeController Create(params string[] modules)
 		{
@@ -98,17 +100,30 @@ namespace OpenRA.Test
 		}
 
 		[Test]
-		public void UnreliablePacingUsesCollectiveHalfCpuBudget()
+		public void UnreliablePacingUsesCollectiveHalfRealTimeCpuBudget()
 		{
 			var controller = Create("first", "second");
 			var collective = new Dictionary<string, double> { { "first", 30 }, { "second", 25 } };
 
-			controller.Update(Maximum, 100, collective);
-			var decision = controller.Update(Maximum, 100, collective);
+			controller.Update(MaximumSlow, 100, collective);
+			var decision = controller.Update(MaximumSlow, 100, collective);
 
 			Assert.That(decision.Transition, Is.EqualTo("disabled"));
 			Assert.That(decision.Module, Is.EqualTo("first"));
 			Assert.That(decision.Share, Is.EqualTo(0.55).Within(0.001));
+		}
+
+		[Test]
+		public void FastMaximumSpeedDoesNotDisableAHighShareButSmallAbsoluteCost()
+		{
+			var controller = Create("advanced");
+			var highShare = new Dictionary<string, double> { { "advanced", 75 } };
+
+			for (var i = 0; i < 10; i++)
+				Assert.That(controller.Update(Maximum, 100, highShare).Transition,
+					Is.EqualTo("healthy"));
+
+			Assert.That(controller.IsEnabled("advanced"), Is.True);
 		}
 
 		[Test]
@@ -204,8 +219,8 @@ namespace OpenRA.Test
 			var controller = Create("advanced");
 			var pressure = new Dictionary<string, double> { { "advanced", 75 } };
 			var disabled = new Dictionary<string, double> { { "advanced", 0 } };
-			controller.Update(Maximum, 100, pressure);
-			controller.Update(Maximum, 100, pressure);
+			controller.Update(MaximumSlow, 100, pressure);
+			controller.Update(MaximumSlow, 100, pressure);
 
 			for (var i = 0; i < 10; i++)
 				Assert.That(controller.Update(Maximum, 25, disabled).Transition, Is.EqualTo("cooldown"));

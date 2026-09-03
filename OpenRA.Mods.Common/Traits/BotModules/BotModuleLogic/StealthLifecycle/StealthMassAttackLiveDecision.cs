@@ -17,6 +17,7 @@ namespace OpenRA.Mods.Common.Traits
 	sealed class StealthMassAttackLiveDecision
 	{
 		readonly bool formationCloaked;
+		public int Tick { get; }
 		public bool FormationCloaked => formationCloaked;
 		public StealthMassAttackMemberSnapshot[] Members { get; }
 		public StealthMassAttackActorSnapshot[] Defenders { get; }
@@ -30,6 +31,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		StealthMassAttackLiveDecision(StealthMassAttackLiveSnapshot live)
 		{
+			Tick = live.Tick;
 			formationCloaked = live.FormationCloaked;
 			Members = live.Members.Where(member => member.IsValid)
 				.OrderBy(member => member.ActorId).ToArray();
@@ -71,7 +73,18 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			if (Members.Length == 0)
 				throw new InvalidOperationException("MassAttack has no current formation cell.");
-			return Members[0].CurrentCell;
+			return new CPos(
+				(int)Math.Round(Members.Average(member => member.CurrentCell.X)),
+				(int)Math.Round(Members.Average(member => member.CurrentCell.Y)));
+		}
+
+		public CPos RepresentativeCell()
+		{
+			if (Members.Length == 0 || Defenders.Length == 0)
+				throw new InvalidOperationException("MassAttack has no representative live engagement cell.");
+			return Members.OrderBy(member => Defenders.Min(defender =>
+				DistanceSquared(member.CurrentCell, defender.CurrentCell)))
+				.ThenBy(member => member.ActorId).First().CurrentCell;
 		}
 
 		public CPos[] OrderedCandidateCells(StealthMassAttackActorSnapshot target, CPos currentCell)

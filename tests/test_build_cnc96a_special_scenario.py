@@ -18,6 +18,27 @@ MODULE_SPEC.loader.exec_module(scenario)
 
 
 class Cnc96aSpecialScenarioTest(unittest.TestCase):
+    def test_fixture_disables_production_but_keeps_combat_managers(self):
+        self.assertIn("-CrateSpawner:", scenario.RULES_HEADER)
+        self.assertIn("-UnitBuilderBotModule@viki:", scenario.RULES_HEADER)
+        self.assertIn("-UnitBuilderBotModule@brutalis:", scenario.RULES_HEADER)
+        self.assertIn("-BaseBuilderBotModule@viki:", scenario.RULES_HEADER)
+        self.assertIn("-BaseBuilderBotModule@brutalis:", scenario.RULES_HEADER)
+        self.assertNotIn("-SquadManagerBotModule@brutalis:", scenario.RULES_HEADER)
+
+    def test_dense_compound_is_closed_and_requires_its_center_structure(self):
+        actors = scenario.dense_compound_actors()
+
+        self.assertEqual(actors.count(": brik\n"), 168)
+        self.assertEqual(actors.count(": e3\n"), 4)
+        self.assertIn("CompoundPower: nuk2", actors)
+        for x in range(68, 96):
+            for y in (37, 38, 53, 54):
+                self.assertIn(f"Location: {x},{y}", actors)
+        for y in range(39, 53):
+            for x in (68, 69, 94, 95):
+                self.assertIn(f"Location: {x},{y}", actors)
+
     def test_resource_layer_is_cleared_without_touching_tiles(self):
         width, height = 2, 2
         tiles = bytes(range(12))
@@ -39,6 +60,7 @@ class Cnc96aSpecialScenarioTest(unittest.TestCase):
 \t\t\tchemical:
 \t\t\t\tUnitTypes: ctnk
 \t\tRequiresCondition: enable-viki-ai
+\t\tGroundTargetDebugLogging: false
 \tUnitBuilderBotModule@viki:
 """
         with tempfile.TemporaryDirectory() as temporary:
@@ -51,6 +73,7 @@ class Cnc96aSpecialScenarioTest(unittest.TestCase):
         self.assertIn("MaximumHarassmentGroups: 3", result)
         self.assertIn("ReserveOpeningPair: false", result)
         self.assertIn("RequiresCondition: enable-viki-ai", result)
+        self.assertIn("GroundTargetDebugLogging: false", result)
         self.assertNotIn("chemical:", result)
         self.assertNotIn("UnitTypes: ctnk", result)
 

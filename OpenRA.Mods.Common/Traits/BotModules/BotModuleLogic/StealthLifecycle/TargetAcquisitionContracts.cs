@@ -102,6 +102,7 @@ namespace OpenRA.Mods.Common.Traits
 		public int Height { get; }
 		public float SecondsPerCostUnit { get; }
 		public float RouteThreatPenalty { get; }
+		public bool FormationCloaked { get; }
 		public IReadOnlyList<float> Danger => danger;
 		public IReadOnlyList<CPos> EnemyStrategicCells => enemyStrategicCells;
 		public IReadOnlyList<StealthStrategicTargetSnapshot> StrategicTargets => strategicTargets;
@@ -112,7 +113,7 @@ namespace OpenRA.Mods.Common.Traits
 			float secondsPerCostUnit,
 			IEnumerable<StealthStrategicTargetSnapshot> strategicTargets = null,
 			IEnumerable<StealthTargetThreatFacts> threatFacts = null,
-			float routeThreatPenalty = 1f)
+			float routeThreatPenalty = 1f, bool formationCloaked = true)
 		{
 			if (width <= 0 || height <= 0 || (long)width * height > int.MaxValue)
 				throw new ArgumentOutOfRangeException(nameof(width));
@@ -153,6 +154,7 @@ namespace OpenRA.Mods.Common.Traits
 			Height = height;
 			SecondsPerCostUnit = secondsPerCostUnit;
 			RouteThreatPenalty = routeThreatPenalty;
+			FormationCloaked = formationCloaked;
 			this.danger = Array.AsReadOnly(dangerCells);
 			this.enemyStrategicCells = Array.AsReadOnly(enemies);
 			this.strategicTargets = Array.AsReadOnly(targets.OrderBy(target => target.StrategicCell.Y)

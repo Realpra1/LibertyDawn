@@ -127,23 +127,23 @@ namespace OpenRA.Mods.Common.Traits
 				!Enum.IsDefined(typeof(StealthRecalculateFleeLiveCause), LiveCause) ||
 				Disposition == StealthRecalculateFleeDisposition.TargetAcquisition !=
 					(LiveCause == StealthRecalculateFleeLiveCause.Completed ||
-						LiveCause == StealthRecalculateFleeLiveCause.NoTarget))
+						LiveCause == StealthRecalculateFleeLiveCause.NoTarget ||
+						LiveCause == StealthRecalculateFleeLiveCause.NoRoute ||
+						LiveCause == StealthRecalculateFleeLiveCause.SafeToReconsider))
 				throw new ArgumentException("Invalid RecalculateFlee result disposition.");
 			var hasRoute = SelectedDestinationCell.HasValue && SelectedStandardDanger.HasValue &&
 				LastOrderToken != null;
 			var routeCause = LiveCause == StealthRecalculateFleeLiveCause.Traversing ||
-				LiveCause == StealthRecalculateFleeLiveCause.Completed ||
 				(LiveCause == StealthRecalculateFleeLiveCause.MemberLoss && memberIds.Count != 0);
 			if (routeCause != hasRoute)
 				throw new ArgumentException("Flee route shape does not match its live cause.");
 			if (hasRoute && (memberIds.Count == 0 || enemyIds.Count == 0 ||
 				LastOrderToken.Owner != BehaviorId.RecalculateFlee ||
 				LastOrderToken.Epoch != Handoff.Epoch ||
-				!LastOrderToken.ActorIds.SequenceEqual(memberIds) || OrderedRoute.Count == 0 ||
-				RouteProgress < 0 || RouteProgress >= OrderedRoute.Count ||
+				!LastOrderToken.ActorIds.SequenceEqual(memberIds) || OrderedRoute.Count != 1 ||
+				RouteProgress != 0 ||
 				LastOrderToken.DestinationCell != OrderedRoute[RouteProgress] ||
-				(LongRouteCacheRevision == null &&
-					(OrderedRoute.Count != 1 || OrderedRoute[0] != SelectedDestinationCell))))
+				OrderedRoute[0] != SelectedDestinationCell))
 				throw new ArgumentException("Flee route token is not exact.");
 			if (!hasRoute && (OrderedRoute.Count != 0 || RouteProgress != 0))
 				throw new ArgumentException("Flee terminal result cannot retain route progress.");

@@ -161,7 +161,7 @@ namespace OpenRA.Mods.Common.Traits
 				(Disposition == StealthMassAttackDisposition.Retain &&
 					Threat.Value.StandardScore.Crossover <= 1) ||
 				(Disposition == StealthMassAttackDisposition.RecalculateFlee &&
-					Threat.Value.StandardScore.Crossover > 1))
+					Threat.Value.StandardScore.Crossover > 1 && Threat.Value.AttackApproved))
 				throw new ArgumentException("MassAttack targeted result has no exact live cause.");
 		}
 

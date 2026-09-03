@@ -32,10 +32,11 @@ namespace OpenRA.Mods.Common.Traits
 		public int HitPoints { get; }
 		public int MaximumHitPoints { get; }
 		public int CurrentWeaponRangeCells { get; }
+		public bool NeedsAttackOrder { get; }
 
 		public StealthUndefendedAttackMemberSnapshot(uint actorId, string actorType,
 			int economicValue, CPos currentCell, int hitPoints, int maximumHitPoints,
-			int currentWeaponRangeCells)
+			int currentWeaponRangeCells, bool needsAttackOrder = false)
 		{
 			if (actorId == 0)
 				throw new ArgumentOutOfRangeException(nameof(actorId));
@@ -51,6 +52,7 @@ namespace OpenRA.Mods.Common.Traits
 			HitPoints = hitPoints;
 			MaximumHitPoints = maximumHitPoints;
 			CurrentWeaponRangeCells = currentWeaponRangeCells;
+			NeedsAttackOrder = needsAttackOrder;
 		}
 	}
 
@@ -218,7 +220,7 @@ namespace OpenRA.Mods.Common.Traits
 	public interface IStealthUndefendedAttackOrders
 	{
 		void IssueAttack(BehaviorId owner, OwnershipEpoch epoch,
-			IReadOnlyList<uint> actorIds, uint targetActorId);
+			IReadOnlyList<uint> actorIds, uint targetActorId, long orderRevision);
 	}
 
 	public sealed class StealthUndefendedAttackResult

@@ -23,7 +23,7 @@ namespace OpenRA.Mods.Common.Traits
 		Reacquire,
 		RecalculateFlee,
 		UndefendedAttack,
-		CrushEvaluation
+		Kite
 	}
 
 	public enum StealthApproachArrivalClassification
@@ -310,7 +310,7 @@ namespace OpenRA.Mods.Common.Traits
 	{
 		public StealthBehaviorHandoff Reacquisition { get; }
 		public StealthUndefendedAttackHandoff UndefendedAttack { get; }
-		public StealthCrushEvaluationHandoff CrushEvaluation { get; }
+		public StealthKiteHandoff Kite { get; }
 		public StealthRecalculateFleeHandoff RecalculateFlee { get; }
 
 		internal StealthApproachTransition(StealthBehaviorHandoff handoff,
@@ -323,10 +323,8 @@ namespace OpenRA.Mods.Common.Traits
 			else if (result.Disposition == StealthApproachDisposition.UndefendedAttack)
 				UndefendedAttack = new StealthUndefendedAttackHandoff(handoff, result.Mission);
 			else
-			{
-				CrushEvaluation = new StealthCrushEvaluationHandoff(
+				Kite = new StealthKiteHandoff(
 					handoff, result.Mission, result.LiveDefenderActorIds);
-			}
 		}
 	}
 }

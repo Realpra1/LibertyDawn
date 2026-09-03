@@ -54,6 +54,7 @@ namespace OpenRA.Mods.Common.Traits
 			readonly GeneralizedCombatThreatCalculator calculator;
 			readonly BitSet<TargetableType> plannedTargetTypesOverride;
 			readonly Actor[] friendly;
+			readonly Actor representative;
 			readonly Actor[] enemy;
 			readonly Dictionary<uint, Actor> enemyById;
 			readonly Dictionary<(uint Attacker, uint Defender),
@@ -77,14 +78,19 @@ namespace OpenRA.Mods.Common.Traits
 				formationCloaked = facts.FormationCloaked;
 				friendly = friendlyIds.Select(resolve).ToArray();
 				enemy = enemyIds.Select(resolve).ToArray();
+				representative = friendly.OrderBy(attacker => enemy.Min(defender =>
+					(attacker.CenterPosition - defender.CenterPosition).HorizontalLengthSquared))
+					.ThenBy(attacker => attacker.ActorID).First();
 				enemyById = enemy.ToDictionary(actor => actor.ActorID);
 				ValidateLiveEnemyPositions();
 
 				var mixed = calculator.CalculateLiveMixedGroupThreat(friendly, enemy,
-					plannedTargetTypesOverride, true);
-				pairThreats = friendly.SelectMany(attacker => enemy.Select(defender =>
-					(Key: (attacker.ActorID, defender.ActorID), Threat: calculator.CalculateLive(
-						attacker, defender, plannedTargetTypesOverride, true))))
+					plannedTargetTypesOverride, true,
+					preserveRulesDefenderThreatForPlannedExposure: true);
+				pairThreats = enemy.Select(defender =>
+					(Key: (representative.ActorID, defender.ActorID),
+						Threat: GeneralizedCombatPlannedDecloakThreat.Calculate(
+							calculator, representative, defender, plannedTargetTypesOverride)))
 					.ToDictionary(item => item.Key, item => item.Threat);
 				standard = new StealthTargetThreatScore(pairThreats.Values.Select(pair =>
 					pair.DefenderThreatInAttackerEquivalents).DefaultIfEmpty().Max(), mixed.Crossover);
@@ -103,10 +109,9 @@ namespace OpenRA.Mods.Common.Traits
 					target.Location != facts.SelectedTargetCurrentCell)
 					throw new InvalidOperationException("The MassAttack target moved during live evaluation.");
 
-				var targetThreat = friendly.Sum(attacker => Pair(attacker, target)
-					.DefenderThreatInAttackerEquivalents);
+				var targetThreat = Pair(representative, target).DefenderThreatInAttackerEquivalents;
 				var approved = GeneralizedCombatLiveCellSafety.CanAttackSafely(calculator,
-					friendly, enemy, target, facts.PlannedCell, facts.FormationRadiusCells,
+					new[] { representative }, enemy, target, facts.PlannedCell, facts.FormationRadiusCells,
 					plannedTargetTypesOverride, Pair);
 				return new StealthMassAttackThreatResult(standard, targetThreat, approved);
 			}

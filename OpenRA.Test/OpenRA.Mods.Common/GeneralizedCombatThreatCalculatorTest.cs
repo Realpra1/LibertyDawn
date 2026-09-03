@@ -136,6 +136,15 @@ namespace OpenRA.Test
 		}
 
 		[Test]
+		public void CurrentPositionRangeMayIncludeTheTargetsHitRadiusWithoutChangingTheDefault()
+		{
+			Assert.That(GeneralizedCombatThreatCalculator.CanEngageAtDistance(
+				true, false, 0, 4, 0.5, 4.25), Is.False);
+			Assert.That(GeneralizedCombatThreatCalculator.CanEngageAtDistance(
+				true, false, 0, 4, 0.5, 4.25, includeDefenderHitRadius: true), Is.True);
+		}
+
+		[Test]
 		public void CanonicalPairCountAndKeyDoNotRecalculateReverseMatchups()
 		{
 			Assert.That(GeneralizedCombatThreatCalculator.CanonicalPairCount(17), Is.EqualTo(153));

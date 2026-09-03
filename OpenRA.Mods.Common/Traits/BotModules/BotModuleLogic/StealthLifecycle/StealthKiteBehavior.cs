@@ -9,6 +9,7 @@
 #endregion
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace OpenRA.Mods.Common.Traits
@@ -23,6 +24,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly IStealthKiteThreatAdapter threatAdapter;
 		readonly IStealthKiteOrders orders;
 		readonly StealthBehaviorExecutionLease executionLease = new StealthBehaviorExecutionLease();
+		readonly HashSet<CPos> unreachableCells = new HashSet<CPos>();
 		uint? targetId;
 		StealthKiteOrderToken lastOrder;
 
@@ -50,7 +52,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		StealthKiteResult Execute(long revision)
 		{
-			var decision = StealthKiteLiveDecision.Create(ReadLive(revision));
+			var decision = StealthKiteLiveDecision.Create(ReadLive(revision), handoff.RequiredKiteActorId);
 			if (decision.Defenders.Length == 0)
 				return Result(decision, decision.TargetlessDisposition.Value,
 					StealthKitePhase.Position, null, null, null, null, revision);
@@ -63,26 +65,49 @@ namespace OpenRA.Mods.Common.Traits
 					StealthKitePhase.Position, null, null, null, empty, revision);
 			}
 
-			var target = decision.ResolveTarget(targetId);
-			var currentCell = decision.CurrentFormationCell();
-			if (decision.KitingEnabled && currentCell.HasValue)
+			if (decision.TargetlessDisposition == StealthKiteDisposition.CrushEvaluation)
 			{
-				var liveSafety = decision.MemberCells.Select(cell =>
-					Calculate(decision.ThreatFacts(target, cell), revision)).ToArray();
-				if (liveSafety.All(safety => safety.Approved))
-					return Retain(decision, target, currentCell.Value, liveSafety[0],
-						StealthKiteAction.Fire, revision);
-				if (decision.FormationExposed)
-					return FleeUnsafeCurrentPosition(decision, target, revision);
+				return Result(decision, StealthKiteDisposition.CrushEvaluation,
+					StealthKitePhase.Position, null, null, null, null, revision);
 			}
 
+			var targets = decision.OrderedTargets(targetId);
+			var target = targets[0];
+			var currentCell = decision.CurrentFormationCell();
+			if (decision.KitingEnabled && decision.FormationExposed && currentCell.HasValue &&
+				!Calculate(decision.ThreatFacts(target,
+					currentCell.Value), revision).Approved)
+				return FleeUnsafeCurrentPosition(decision, target, revision);
+
+			if (decision.KitingEnabled && lastOrder?.Action == StealthKiteAction.Position &&
+				decision.Members.Any(member => !member.NeedsMovementOrder))
+			{
+				var plannedSafety = Calculate(decision.ThreatFacts(target, lastOrder.Cell), revision);
+				if (plannedSafety.Approved)
+					return RetainMoving(decision, target, plannedSafety, revision);
+			}
+
+			if (lastOrder?.Action == StealthKiteAction.Position && currentCell.HasValue &&
+				decision.Members.All(member => member.NeedsMovementOrder) &&
+				currentCell.Value != lastOrder.Cell)
+				unreachableCells.Add(lastOrder.Cell);
+
 			if (decision.KitingEnabled)
-				foreach (var cell in decision.OrderedCandidateCells(target, currentCell))
-				{
-					var safety = Calculate(decision.ThreatFacts(target, cell), revision);
-					if (safety.Approved)
-						return Retain(decision, target, cell, safety, StealthKiteAction.Position, revision);
-				}
+				foreach (var candidate in targets)
+					if (TrySafeAction(decision, candidate, currentCell, revision,
+						out var cell, out var safety, out var action))
+						return Retain(decision, candidate, cell, safety, action, revision);
+
+			if (decision.CrushableInfantry.Length != 0 && !handoff.RequiredKiteActorId.HasValue)
+				return Result(decision, StealthKiteDisposition.CrushEvaluation,
+					StealthKitePhase.Position, null, null, null, null, revision);
+
+			if (handoff.RequiredKiteActorId.HasValue)
+				foreach (var fallbackTarget in decision.OrderedFallbackObjectives())
+					if (TrySafeAction(decision, fallbackTarget, currentCell, revision,
+						out var fallbackCell, out var fallbackSafety, out var fallbackAction))
+						return Retain(decision, fallbackTarget, fallbackCell,
+							fallbackSafety, fallbackAction, revision);
 
 			var fallbackFacts = decision.FallbackFacts(target);
 			var score = CalculateFallback(fallbackFacts, revision);
@@ -92,6 +117,42 @@ namespace OpenRA.Mods.Common.Traits
 				StealthKiteDisposition.MassAttack : StealthKiteDisposition.RecalculateFlee;
 			return Result(decision, disposition, StealthKitePhase.Position,
 				target, null, null, fallback, revision);
+		}
+
+		bool TrySafeAction(StealthKiteLiveDecision decision,
+			StealthKiteActorSnapshot target, CPos? currentCell, long revision,
+			out CPos cell, out StealthKiteSafetyResult safety, out StealthKiteAction action)
+		{
+			if (currentCell.HasValue)
+			{
+				var liveSafety = Calculate(decision.ThreatFacts(target,
+					currentCell.Value), revision);
+				if (liveSafety.Approved &&
+					!BlockedFireAtCurrentPosition(decision, target))
+				{
+					cell = currentCell.Value;
+					safety = liveSafety;
+					action = StealthKiteAction.Fire;
+					return true;
+				}
+			}
+
+			foreach (var candidate in decision.OrderedCandidateCells(target, currentCell)
+				.Where(candidateCell => !unreachableCells.Contains(candidateCell)))
+			{
+				var candidateSafety = Calculate(decision.ThreatFacts(target, candidate), revision);
+				if (!candidateSafety.Approved)
+					continue;
+				cell = candidate;
+				safety = candidateSafety;
+				action = StealthKiteAction.Position;
+				return true;
+			}
+
+			cell = default;
+			safety = default;
+			action = default;
+			return false;
 		}
 
 		StealthKiteResult FleeUnsafeCurrentPosition(StealthKiteLiveDecision decision,
@@ -113,12 +174,19 @@ namespace OpenRA.Mods.Common.Traits
 			var token = DesiredOrder(decision, target, cell, action);
 			var shouldApply = !SameIntent(token, lastOrder) ||
 				(action == StealthKiteAction.Position &&
-					decision.Members.Any(member => member.NeedsMovementOrder));
+					decision.Members.All(member => member.NeedsMovementOrder));
 			if (shouldApply)
 				ApplyOrder(token, revision);
 			return Result(decision, StealthKiteDisposition.Retain,
 				action == StealthKiteAction.Fire ? StealthKitePhase.Fire : StealthKitePhase.Position,
 				target, cell, safety, null, revision, token);
+		}
+
+		StealthKiteResult RetainMoving(StealthKiteLiveDecision decision,
+			StealthKiteActorSnapshot target, StealthKiteSafetyResult safety, long revision)
+		{
+			return Result(decision, StealthKiteDisposition.Retain,
+				StealthKitePhase.Position, target, lastOrder.Cell, safety, null, revision, lastOrder);
 		}
 
 		StealthKiteOrderToken DesiredOrder(StealthKiteLiveDecision decision,
@@ -193,8 +261,17 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			return left != null && right != null && left.Owner == right.Owner &&
 				left.Epoch == right.Epoch && left.Action == right.Action &&
-				left.TargetActorId == right.TargetActorId && left.Cell == right.Cell &&
+				left.TargetActorId == right.TargetActorId &&
+				(left.Action == StealthKiteAction.Fire || left.Cell == right.Cell) &&
 				left.ActorIds.SequenceEqual(right.ActorIds);
+		}
+
+		bool BlockedFireAtCurrentPosition(StealthKiteLiveDecision decision,
+			StealthKiteActorSnapshot target)
+		{
+			return lastOrder?.Action == StealthKiteAction.Fire &&
+				lastOrder.TargetActorId == target.ActorId &&
+				decision.Members.All(member => member.NeedsMovementOrder);
 		}
 
 		void EnsureActiveOwnership()

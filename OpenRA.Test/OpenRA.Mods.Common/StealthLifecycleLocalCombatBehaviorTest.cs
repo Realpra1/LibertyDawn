@@ -119,10 +119,12 @@ namespace OpenRA.Test.Mods.Common
 		sealed class UndefendedOrders : IStealthUndefendedAttackOrders
 		{
 			public readonly List<uint> Targets = new List<uint>();
+			public readonly List<long> Revisions = new List<long>();
 			public void IssueAttack(BehaviorId owner, OwnershipEpoch epoch,
-				IReadOnlyList<uint> actorIds, uint targetActorId)
+				IReadOnlyList<uint> actorIds, uint targetActorId, long orderRevision)
 			{
 				Targets.Add(targetActorId);
+				Revisions.Add(orderRevision);
 			}
 		}
 
@@ -194,6 +196,72 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
+		public void KiteRechecksAMovingTargetWithoutReplacingTheSameActorAttack()
+		{
+			var world = new KiteWorld { Snapshot = KiteSnapshot(new CPos(0, 0), new CPos(4, 0)) };
+			var threat = new KiteThreat { Approved = facts => true };
+			var orders = new KiteOrders();
+			var behavior = new StealthKiteBehavior(KiteHandoff(), new Guard(), world, threat, orders);
+
+			behavior.Execute();
+			world.Snapshot = KiteSnapshot(new CPos(0, 0), new CPos(3, 0));
+			behavior.Execute();
+
+			Assert.That(threat.Facts, Has.Count.EqualTo(2));
+			Assert.That(orders.Attacks, Is.EqualTo(1),
+				"the engine tracks an actor target without repeated attack orders");
+		}
+
+		[Test]
+		public void KiteLetsTheEngineFinishAMoveWhenTheTargetMoves()
+		{
+			var firstCell = new CPos(2, 0);
+			var replacementCell = new CPos(3, 0);
+			var world = new KiteWorld
+			{
+				Snapshot = KiteSnapshot(new CPos(0, 0), new CPos(7, 0), new[] { firstCell })
+			};
+			var threat = new KiteThreat { Approved = facts => facts.PlannedCell != new CPos(0, 0) };
+			var orders = new KiteOrders();
+			var behavior = new StealthKiteBehavior(KiteHandoff(), new Guard(), world, threat, orders);
+
+			behavior.Execute();
+			world.Snapshot = KiteSnapshot(new CPos(1, 0), new CPos(8, 0),
+				new[] { replacementCell });
+			var retained = behavior.Execute();
+
+			Assert.That(retained.Phase, Is.EqualTo(StealthKitePhase.Position));
+			Assert.That(retained.FireCell, Is.EqualTo(firstCell));
+			Assert.That(retained.Safety.HasValue, Is.True);
+			Assert.That(retained.Safety.Value.Approved, Is.True);
+			Assert.That(orders.Moves, Is.EqualTo(1));
+			Assert.That(orders.Cell, Is.EqualTo(firstCell));
+		}
+
+		[Test]
+		public void KiteRepositionsWhenTheWholeSquadCannotExecuteItsSafeAttack()
+		{
+			var safeCell = new CPos(1, 0);
+			var world = new KiteWorld
+			{
+				Snapshot = KiteSnapshot(new CPos(0, 0), new CPos(4, 0), new[] { safeCell })
+			};
+			var threat = new KiteThreat { Approved = facts => true };
+			var orders = new KiteOrders();
+			var behavior = new StealthKiteBehavior(KiteHandoff(), new Guard(), world, threat, orders);
+
+			behavior.Execute();
+			world.Snapshot = new StealthKiteLiveSnapshot(2,
+				new[] { new StealthKiteMemberSnapshot(1, new CPos(0, 0), 5, needsMovementOrder: true) },
+				KiteSnapshot(new CPos(0, 0), new CPos(4, 0)).Actors, new[] { safeCell }, true);
+			behavior.Execute();
+
+			Assert.That(orders.Attacks, Is.EqualTo(1));
+			Assert.That(orders.Moves, Is.EqualTo(1));
+			Assert.That(orders.Cell, Is.EqualTo(safeCell));
+		}
+
+		[Test]
 		public void KiteUsesOneSharedMoveToCurrentSafeFiringCell()
 		{
 			var safeCell = new CPos(2, 0);
@@ -237,13 +305,15 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(result.Phase, Is.EqualTo(StealthKitePhase.Fire));
 			Assert.That(orders.Attacks, Is.EqualTo(1));
 			Assert.That(orders.Actors, Is.EqualTo(new uint[] { 1, 2 }));
+			Assert.That(threat.Facts.Single().FormationRadiusCells, Is.EqualTo(1));
+			Assert.That(threat.Facts.Single().PlannedCell, Is.EqualTo(new CPos(0, 0)));
 		}
 
 		[Test]
-		public void KiteDoesNotDecloakTheGroupWhileOneLiveMemberIsUnsafe()
+		public void KiteUsesTheWholeFormationEnvelopeBeforeDecloakingTheGroup()
 		{
 			var safeCell = new CPos(0, 0);
-			var unsafeCell = new CPos(0, 1);
+			var unsafeCell = new CPos(1, 0);
 			var fallbackCell = new CPos(-1, 0);
 			var target = new StealthKiteActorSnapshot(71, "obli", new CPos(5, 0),
 				100, 100, 4, true, true, false, false, false);
@@ -257,7 +327,7 @@ namespace OpenRA.Test.Mods.Common
 			};
 			var threat = new KiteThreat
 			{
-				Approved = facts => facts.PlannedCell == safeCell || facts.PlannedCell == fallbackCell
+				Approved = facts => facts.PlannedCell == fallbackCell
 			};
 			var orders = new KiteOrders();
 
@@ -266,10 +336,37 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(orders.Attacks, Is.Zero);
 			Assert.That(orders.Moves, Is.EqualTo(1));
 			Assert.That(orders.Cell, Is.EqualTo(fallbackCell));
+			Assert.That(threat.Facts.First().PlannedCell, Is.EqualTo(safeCell));
+			Assert.That(threat.Facts.First().FormationRadiusCells, Is.EqualTo(1));
 		}
 
 		[Test]
-		public void KiteWaitsForMovementAndRetriesOnlyAfterItEnds()
+		public void KiteMovesBeforeDecloakingInsideAMediumTanksLiveRange()
+		{
+			var currentCell = new CPos(0, 0);
+			var safeCell = new CPos(-2, 0);
+			var mediumTank = new StealthKiteActorSnapshot(71, "mtnk", new CPos(3, 0),
+				100, 100, 4, true, true, false, false, false);
+			var world = new KiteWorld
+			{
+				Snapshot = new StealthKiteLiveSnapshot(1,
+					new[] { new StealthKiteMemberSnapshot(1, currentCell, 5) },
+					new[] { mediumTank }, new[] { safeCell }, true)
+			};
+			var threat = new KiteThreat { Approved = facts => facts.PlannedCell == safeCell };
+			var orders = new KiteOrders();
+
+			var result = new StealthKiteBehavior(KiteHandoff(), new Guard(), world,
+				threat, orders).Execute();
+
+			Assert.That(result.Phase, Is.EqualTo(StealthKitePhase.Position));
+			Assert.That(orders.Attacks, Is.Zero);
+			Assert.That(orders.Moves, Is.EqualTo(1));
+			Assert.That(orders.Cell, Is.EqualTo(safeCell));
+		}
+
+		[Test]
+		public void KiteDoesNotReissueAnUnreachableFiringCellAfterMovementEnds()
 		{
 			var safeCell = new CPos(2, 0);
 			var world = new KiteWorld
@@ -293,9 +390,39 @@ namespace OpenRA.Test.Mods.Common
 					new StealthKiteActorSnapshot(71, "harv", new CPos(7, 0), 100, 100,
 						1, true, true, false, false, false)
 				}, new[] { safeCell }, true);
+			var result = behavior.Execute();
+
+			Assert.That(result.Disposition, Is.EqualTo(StealthKiteDisposition.RecalculateFlee));
+			Assert.That(orders.Moves, Is.EqualTo(1));
+		}
+
+		[Test]
+		public void KiteLetsTheMovingPartOfAGroupReachTheSharedFiringCell()
+		{
+			var safeCell = new CPos(2, 0);
+			var target = new StealthKiteActorSnapshot(71, "mtnk", new CPos(7, 0),
+				100, 100, 4, true, false, false, false, false);
+			var world = new KiteWorld
+			{
+				Snapshot = new StealthKiteLiveSnapshot(1, new[]
+				{
+					new StealthKiteMemberSnapshot(1, new CPos(0, 0), 5),
+					new StealthKiteMemberSnapshot(2, new CPos(0, 1), 5)
+				}, new[] { target }, new[] { safeCell }, true)
+			};
+			var threat = new KiteThreat { Approved = facts => facts.PlannedCell == safeCell };
+			var orders = new KiteOrders();
+			var behavior = new StealthKiteBehavior(KiteHandoff(), new Guard(), world, threat, orders);
+
+			behavior.Execute();
+			world.Snapshot = new StealthKiteLiveSnapshot(2, new[]
+			{
+				new StealthKiteMemberSnapshot(1, safeCell, 5, needsMovementOrder: true),
+				new StealthKiteMemberSnapshot(2, new CPos(1, 1), 5)
+			}, new[] { target }, new[] { safeCell }, true);
 			behavior.Execute();
 
-			Assert.That(orders.Moves, Is.EqualTo(2));
+			Assert.That(orders.Moves, Is.EqualTo(1));
 		}
 
 		[Test]
@@ -313,12 +440,204 @@ namespace OpenRA.Test.Mods.Common
 					new StealthKiteMemberSnapshot(2, occupied, 5)
 				}, new[] { target }, new[] { occupied, safeCell }, true)
 			};
-			var threat = new KiteThreat { Approved = facts => facts.PlannedCell != new CPos(0, 0) };
+			var threat = new KiteThreat
+			{
+				Approved = facts => facts.PlannedCell != new CPos(0, 0) && facts.PlannedCell != occupied
+			};
 			var orders = new KiteOrders();
 
 			new StealthKiteBehavior(KiteHandoff(), new Guard(), world, threat, orders).Execute();
 
 			Assert.That(orders.Cell, Is.EqualTo(safeCell));
+		}
+
+		[Test]
+		public void KiteRanksSharedMovementFromTheLiveSquadCenter()
+		{
+			var centerCandidate = new CPos(5, 1);
+			var flankCandidate = new CPos(1, 1);
+			var target = new StealthKiteActorSnapshot(71, "harv", new CPos(10, 5),
+				100, 100, 1, true, true, false, false, false);
+			var world = new KiteWorld
+			{
+				Snapshot = new StealthKiteLiveSnapshot(1, new[]
+				{
+					new StealthKiteMemberSnapshot(1, new CPos(0, 0), 5),
+					new StealthKiteMemberSnapshot(2, new CPos(10, 0), 5)
+				}, new[] { target }, new[] { flankCandidate, centerCandidate }, true)
+			};
+			var threat = new KiteThreat
+			{
+				Approved = facts => facts.PlannedCell == flankCandidate ||
+					facts.PlannedCell == centerCandidate
+			};
+			var orders = new KiteOrders();
+
+			new StealthKiteBehavior(KiteHandoff(), new Guard(), world, threat, orders).Execute();
+
+			Assert.That(orders.Cell, Is.EqualTo(centerCandidate));
+		}
+
+		[Test]
+		public void KiteChoosesTheTargetClosestToTheLiveSquadCenter()
+		{
+			var flankTarget = new StealthKiteActorSnapshot(71, "mtnk", new CPos(0, 4),
+				100, 100, 4, true, false, false, false, false);
+			var centerTarget = new StealthKiteActorSnapshot(72, "htnk", new CPos(6, 0),
+				100, 100, 4, true, false, false, false, false);
+			var world = new KiteWorld
+			{
+				Snapshot = new StealthKiteLiveSnapshot(1, new[]
+				{
+					new StealthKiteMemberSnapshot(1, new CPos(0, 0), 5),
+					new StealthKiteMemberSnapshot(2, new CPos(10, 0), 5)
+				}, new[] { flankTarget, centerTarget }, Array.Empty<CPos>(), true)
+			};
+
+			var result = new StealthKiteBehavior(KiteHandoff(), new Guard(), world,
+				new KiteThreat(), new KiteOrders()).Execute();
+
+			Assert.That(result.SelectedTargetActorId, Is.EqualTo(72));
+		}
+
+		[Test]
+		public void KiteYieldsCrushableInfantryAfterHigherThreatTargetsAreGone()
+		{
+			var infantry = new StealthKiteActorSnapshot(71, "e3", new CPos(2, 0),
+				100, 100, 4, true, false, true, true, false);
+			var world = new KiteWorld
+			{
+				Snapshot = new StealthKiteLiveSnapshot(1,
+					new[] { new StealthKiteMemberSnapshot(1, new CPos(0, 0), 5) },
+					new[] { infantry }, Array.Empty<CPos>(), true)
+			};
+			var orders = new KiteOrders();
+
+			var result = new StealthKiteBehavior(KiteHandoff(), new Guard(), world,
+				new KiteThreat(), orders).Execute();
+
+			Assert.That(result.Disposition, Is.EqualTo(StealthKiteDisposition.CrushEvaluation));
+			Assert.That(result.SelectedTargetActorId, Is.Null);
+			Assert.That(orders.Attacks + orders.Moves, Is.Zero);
+		}
+
+		[Test]
+		public void KiteHandlesInfantryRejectedByCrushSafetyWithoutCyclingBack()
+		{
+			var infantry = new StealthKiteActorSnapshot(71, "e3", new CPos(2, 0),
+				100, 100, 4, true, false, true, true, false);
+			var world = new KiteWorld
+			{
+				Snapshot = new StealthKiteLiveSnapshot(1,
+					new[] { new StealthKiteMemberSnapshot(1, new CPos(0, 0), 5) },
+					new[] { infantry }, Array.Empty<CPos>(), true)
+			};
+			var handoff = Construct<StealthKiteHandoff>(Handoff(BehaviorId.Kite),
+				Mission(), new uint[] { 71 }, (uint?)71);
+			var orders = new KiteOrders();
+
+			var result = new StealthKiteBehavior(handoff, new Guard(), world,
+				new KiteThreat(), orders).Execute();
+
+			Assert.That(result.Disposition, Is.EqualTo(StealthKiteDisposition.Retain));
+			Assert.That(result.SelectedTargetActorId, Is.EqualTo(71));
+			Assert.That(orders.Attacks, Is.EqualTo(1));
+		}
+
+		[Test]
+		public void KiteDoesNotReturnARejectedCrushTargetToCrushAgain()
+		{
+			var infantry = new StealthKiteActorSnapshot(71, "e3", new CPos(7, 0),
+				100, 100, 4, true, false, true, true, false);
+			var world = new KiteWorld
+			{
+				Snapshot = new StealthKiteLiveSnapshot(1,
+					new[] { new StealthKiteMemberSnapshot(1, new CPos(0, 0), 5) },
+					new[] { infantry }, Array.Empty<CPos>(), true)
+			};
+			var handoff = Construct<StealthKiteHandoff>(Handoff(BehaviorId.Kite),
+				Mission(), new uint[] { 71 }, (uint?)71);
+			var threat = new KiteThreat { Approved = facts => false, FallbackCrossover = 3 };
+
+			var result = new StealthKiteBehavior(handoff, new Guard(), world,
+				threat, new KiteOrders()).Execute();
+
+			Assert.That(result.Disposition, Is.EqualTo(StealthKiteDisposition.MassAttack));
+			Assert.That(result.SelectedTargetActorId, Is.EqualTo(71));
+		}
+
+		[Test]
+		public void KiteAttacksAReachableMissionFallbackAfterCrushCannotReachInfantry()
+		{
+			var infantry = new StealthKiteActorSnapshot(71, "e3", new CPos(7, 0),
+				100, 100, 4, true, true, true, true, false);
+			var wall = new StealthKiteActorSnapshot(72, "brik", new CPos(3, 0),
+				100, 100, 0, false, true, false, false, false, priorityValue: 150);
+			var world = new KiteWorld
+			{
+				Snapshot = new StealthKiteLiveSnapshot(1,
+					new[] { new StealthKiteMemberSnapshot(1, new CPos(0, 0), 5) },
+					new[] { infantry, wall }, Array.Empty<CPos>(), true,
+					minimumKitePriorityValue: 250000)
+			};
+			var handoff = Construct<StealthKiteHandoff>(Handoff(BehaviorId.Kite),
+				Mission(), new uint[] { 71 }, (uint?)71);
+			var threat = new KiteThreat
+			{
+				Approved = facts => facts.SelectedTargetActorId == 72
+			};
+			var orders = new KiteOrders();
+
+			var behavior = new StealthKiteBehavior(handoff, new Guard(), world, threat, orders);
+			var result = behavior.Execute();
+			var retained = behavior.Execute();
+
+			Assert.That(result.Disposition, Is.EqualTo(StealthKiteDisposition.Retain));
+			Assert.That(result.SelectedTargetActorId, Is.EqualTo(72));
+			Assert.That(retained.SelectedTargetActorId, Is.EqualTo(72));
+			Assert.That(orders.Attacks, Is.EqualTo(1));
+		}
+
+		[Test]
+		public void KitePrefersAThreatVehicleBeforeCrushableInfantry()
+		{
+			var infantry = new StealthKiteActorSnapshot(71, "e3", new CPos(1, 0),
+				100, 100, 4, true, false, true, true, false);
+			var tank = new StealthKiteActorSnapshot(72, "mtnk", new CPos(4, 0),
+				100, 100, 4, true, false, false, false, false);
+			var world = new KiteWorld
+			{
+				Snapshot = new StealthKiteLiveSnapshot(1,
+					new[] { new StealthKiteMemberSnapshot(1, new CPos(0, 0), 5) },
+					new[] { infantry, tank }, Array.Empty<CPos>(), true)
+			};
+
+			var result = new StealthKiteBehavior(KiteHandoff(), new Guard(), world,
+				new KiteThreat(), new KiteOrders()).Execute();
+
+			Assert.That(result.SelectedTargetActorId, Is.EqualTo(72));
+		}
+
+		[Test]
+		public void KiteTriesTheNextClosestThreatBeforeGivingUp()
+		{
+			var blocked = new StealthKiteActorSnapshot(71, "mtnk", new CPos(2, 0),
+				100, 100, 4, true, false, false, false, false);
+			var kiteable = new StealthKiteActorSnapshot(72, "htnk", new CPos(4, 0),
+				100, 100, 4, true, false, false, false, false);
+			var world = new KiteWorld
+			{
+				Snapshot = new StealthKiteLiveSnapshot(1,
+					new[] { new StealthKiteMemberSnapshot(1, new CPos(0, 0), 5) },
+					new[] { blocked, kiteable }, Array.Empty<CPos>(), true)
+			};
+			var threat = new KiteThreat { Approved = facts => facts.SelectedTargetActorId == 72 };
+
+			var result = new StealthKiteBehavior(KiteHandoff(), new Guard(), world,
+				threat, new KiteOrders()).Execute();
+
+			Assert.That(result.SelectedTargetActorId, Is.EqualTo(72));
+			Assert.That(result.Disposition, Is.EqualTo(StealthKiteDisposition.Retain));
 		}
 
 		[Test]
@@ -412,6 +731,126 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
+		public void KiteMaySelectACloserHighValueEconomicObjectiveWhileRespectingItsGuard()
+		{
+			var harvester = new StealthKiteActorSnapshot(71, "harv", new CPos(4, 0),
+				100, 100, 0, false, true, false, false, false, priorityValue: 5500000);
+			var guard = new StealthKiteActorSnapshot(72, "mtnk", new CPos(6, 0),
+				100, 100, 4, true, false, false, false, false);
+			var world = new KiteWorld
+			{
+				Snapshot = new StealthKiteLiveSnapshot(1,
+					new[] { new StealthKiteMemberSnapshot(1, new CPos(0, 0), 5) },
+					new[] { harvester, guard }, Array.Empty<CPos>(), true,
+					minimumKitePriorityValue: 250000)
+			};
+			var threat = new KiteThreat();
+
+			var result = new StealthKiteBehavior(KiteHandoff(), new Guard(), world,
+				threat, new KiteOrders()).Execute();
+
+			Assert.That(result.SelectedTargetActorId, Is.EqualTo(71));
+			Assert.That(threat.Facts.Single().EnemyActorIds, Is.EqualTo(new uint[] { 71, 72 }),
+				"The economic target's live guard must remain part of the safety calculation.");
+		}
+
+		[Test]
+		public void UnsafeEconomicKiteTargetCanFleeFromItsLiveGuard()
+		{
+			var harvester = new StealthKiteActorSnapshot(71, "harv", new CPos(2, 0),
+				100, 100, 0, false, true, false, false, false, priorityValue: 5500000);
+			var guard = new StealthKiteActorSnapshot(72, "mtnk", new CPos(4, 0),
+				100, 100, 4, true, false, false, false, false);
+			var world = new KiteWorld
+			{
+				Snapshot = new StealthKiteLiveSnapshot(1,
+					new[] { new StealthKiteMemberSnapshot(1, new CPos(0, 0), 5) },
+					new[] { harvester, guard }, Array.Empty<CPos>(), false,
+					minimumKitePriorityValue: 250000)
+			};
+			var threat = new KiteThreat { Approved = facts => false, FallbackCrossover = 1 };
+			var result = new StealthKiteBehavior(KiteHandoff(), new Guard(), world,
+				threat, new KiteOrders()).Execute();
+
+			Assert.That(result.Disposition, Is.EqualTo(StealthKiteDisposition.RecalculateFlee));
+			Assert.That(result.SelectedTargetActorId, Is.EqualTo(71));
+			Assert.That(result.LiveDefenderActorIds, Is.EqualTo(new uint[] { 72 }));
+			Assert.That(result.FallbackEvidence.AttackFacts.EnemyActorIds,
+				Is.EqualTo(new uint[] { 71, 72 }));
+			var controller = Construct<StealthLifecycleController>(BehaviorId.Kite);
+			Assert.That(controller.TryAccept(result, out var transition), Is.True);
+			Assert.That(transition.RecalculateFleeEntry.Evidence.EnemyActorIds,
+				Is.EqualTo(new uint[] { 71, 72 }));
+		}
+
+		[Test]
+		public void UnsafeEconomicKiteTargetCanMassAttackItsLiveGuard()
+		{
+			var harvester = new StealthKiteActorSnapshot(71, "harv", new CPos(2, 0),
+				100, 100, 0, false, true, false, false, false, priorityValue: 5500000);
+			var guard = new StealthKiteActorSnapshot(72, "mtnk", new CPos(4, 0),
+				100, 100, 4, true, false, false, false, false);
+			var world = new KiteWorld
+			{
+				Snapshot = new StealthKiteLiveSnapshot(1,
+					new[] { new StealthKiteMemberSnapshot(1, new CPos(0, 0), 5) },
+					new[] { harvester, guard }, Array.Empty<CPos>(), true,
+					minimumKitePriorityValue: 250000)
+			};
+			var threat = new KiteThreat { Approved = facts => false, FallbackCrossover = 3 };
+			var result = new StealthKiteBehavior(KiteHandoff(), new Guard(), world,
+				threat, new KiteOrders()).Execute();
+
+			Assert.That(result.Disposition, Is.EqualTo(StealthKiteDisposition.MassAttack));
+			Assert.That(result.SelectedTargetActorId, Is.EqualTo(71));
+			Assert.That(result.LiveDefenderActorIds, Is.EqualTo(new uint[] { 72 }));
+			Assert.That(result.FallbackEvidence.AttackFacts.EnemyActorIds,
+				Is.EqualTo(new uint[] { 71, 72 }));
+			var controller = Construct<StealthLifecycleController>(BehaviorId.Kite);
+			Assert.That(controller.TryAccept(result, out var transition), Is.True);
+			Assert.That(transition.MassAttackEntry, Is.Not.Null);
+		}
+
+		[Test]
+		public void KiteReturnsAnUnguardedHighValueEconomicObjectiveToUndefendedAttack()
+		{
+			var harvester = new StealthKiteActorSnapshot(71, "harv", new CPos(4, 0),
+				100, 100, 0, false, true, false, false, false, priorityValue: 5500000);
+			var world = new KiteWorld
+			{
+				Snapshot = new StealthKiteLiveSnapshot(1,
+					new[] { new StealthKiteMemberSnapshot(1, new CPos(0, 0), 5) },
+					new[] { harvester }, Array.Empty<CPos>(), true,
+					minimumKitePriorityValue: 250000)
+			};
+			var result = new StealthKiteBehavior(KiteHandoff(), new Guard(), world,
+				new KiteThreat(), new KiteOrders()).Execute();
+
+			Assert.That(result.Disposition, Is.EqualTo(StealthKiteDisposition.UndefendedAttack));
+		}
+
+		[Test]
+		public void KiteDoesNotSelectAnEconomicObjectiveBelowTheConfiguredFloor()
+		{
+			var lowValueTarget = new StealthKiteActorSnapshot(71, "sam", new CPos(4, 0),
+				100, 100, 0, false, true, false, false, false, priorityValue: 500);
+			var guard = new StealthKiteActorSnapshot(72, "mtnk", new CPos(6, 0),
+				100, 100, 4, true, false, false, false, false);
+			var world = new KiteWorld
+			{
+				Snapshot = new StealthKiteLiveSnapshot(1,
+					new[] { new StealthKiteMemberSnapshot(1, new CPos(0, 0), 5) },
+					new[] { lowValueTarget, guard }, Array.Empty<CPos>(), true,
+					minimumKitePriorityValue: 250000)
+			};
+
+			var result = new StealthKiteBehavior(KiteHandoff(), new Guard(), world,
+				new KiteThreat(), new KiteOrders()).Execute();
+
+			Assert.That(result.SelectedTargetActorId, Is.EqualTo(72));
+		}
+
+		[Test]
 		public void CrushUsesLiveTargetCellAndRejectsActualDetectorCoverage()
 		{
 			var world = new CrushWorld { Snapshot = CrushSnapshot(new CPos(5, 0), false) };
@@ -422,7 +861,7 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(behavior.Execute().Disposition, Is.EqualTo(StealthCrushDisposition.Retain));
 			world.Snapshot = CrushSnapshot(new CPos(7, 0), false);
 			behavior.Execute();
-			world.Snapshot = CrushSnapshot(new CPos(8, 0), true);
+			world.Snapshot = CrushSnapshot(new CPos(7, 0), true);
 
 			Assert.That(behavior.Execute().Disposition, Is.EqualTo(StealthCrushDisposition.Kite));
 			Assert.That(orders.Cells, Is.EqualTo(new[] { new CPos(5, 0), new CPos(7, 0) }));
@@ -430,7 +869,39 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
-		public void CrushRetriesAStationaryLiveInfantryTarget()
+		public void CrushPursuesLiveInfantryAcrossTheLocalBattle()
+		{
+			var world = new CrushWorld { Snapshot = CrushSnapshot(new CPos(8, 0), false) };
+			var orders = new CrushOrders();
+
+			var result = new StealthCrushBehavior(CrushHandoff(), new Guard(), world,
+				new CrushThreat(), orders).Execute();
+
+			Assert.That(result.Disposition, Is.EqualTo(StealthCrushDisposition.Retain));
+			Assert.That(result.SelectedTargetActorId, Is.EqualTo(71));
+			Assert.That(orders.Cells, Is.EqualTo(new[] { new CPos(8, 0) }));
+		}
+
+		[Test]
+		public void CrushHandsAnUnreachableInfantryTargetToKiteWithoutReissuing()
+		{
+			var world = new CrushWorld { Snapshot = CrushSnapshot(new CPos(5, 0), false) };
+			var orders = new CrushOrders();
+			var behavior = new StealthCrushBehavior(CrushHandoff(), new Guard(), world,
+				new CrushThreat(), orders);
+
+			Assert.That(behavior.Execute().Disposition, Is.EqualTo(StealthCrushDisposition.Retain));
+			world.Snapshot = CrushSnapshot(new CPos(5, 0), false, needsMovementOrder: true);
+			var result = behavior.Execute();
+
+			Assert.That(result.Disposition, Is.EqualTo(StealthCrushDisposition.Kite));
+			Assert.That(result.SelectedTargetActorId, Is.EqualTo(71));
+			Assert.That(result.Safety, Is.Null);
+			Assert.That(orders.Cells, Is.EqualTo(new[] { new CPos(5, 0) }));
+		}
+
+		[Test]
+		public void CrushRetainsAStationaryLiveInfantryTargetWithoutReissuingItsOrder()
 		{
 			var world = new CrushWorld { Snapshot = CrushSnapshot(new CPos(5, 0), false) };
 			var orders = new CrushOrders();
@@ -440,21 +911,49 @@ namespace OpenRA.Test.Mods.Common
 			behavior.Execute();
 			behavior.Execute();
 
-			Assert.That(orders.Cells,
-				Is.EqualTo(new[] { new CPos(5, 0), new CPos(5, 0) }));
+			Assert.That(orders.Cells, Is.EqualTo(new[] { new CPos(5, 0) }));
 		}
 
 		[Test]
-		public void CrushHandsAnUncaughtInfantryTargetToKite()
+		public void CrushLetsTheMovingPartOfAGroupFinishWithoutReissuingItsOrder()
+		{
+			var target = new StealthCrushActorSnapshot(71, "e1", new CPos(1, 0),
+				new CPos(5, 0), 100, true, false, true, true, false);
+			var world = new CrushWorld
+			{
+				Snapshot = new StealthCrushLiveSnapshot(1, new[]
+				{
+					new StealthCrushMemberSnapshot(1, new CPos(0, 0)),
+					new StealthCrushMemberSnapshot(2, new CPos(0, 1))
+				}, new[] { target }, true)
+			};
+			var orders = new CrushOrders();
+			var behavior = new StealthCrushBehavior(CrushHandoff(), new Guard(), world,
+				new CrushThreat(), orders);
+
+			behavior.Execute();
+			world.Snapshot = new StealthCrushLiveSnapshot(2, new[]
+			{
+				new StealthCrushMemberSnapshot(1, new CPos(0, 0), needsMovementOrder: true),
+				new StealthCrushMemberSnapshot(2, new CPos(1, 1))
+			}, new[] { target }, true);
+			var result = behavior.Execute();
+
+			Assert.That(result.Disposition, Is.EqualTo(StealthCrushDisposition.Retain));
+			Assert.That(orders.Cells, Is.EqualTo(new[] { new CPos(5, 0) }));
+		}
+
+		[Test]
+		public void CrushDoesNotAbandonAnUncaughtSafeInfantryTargetOnATimer()
 		{
 			var world = new CrushWorld { Snapshot = CrushSnapshot(new CPos(5, 0), false) };
 			var behavior = new StealthCrushBehavior(CrushHandoff(), new Guard(), world,
 				new CrushThreat(), new CrushOrders());
 
-			for (var i = 0; i < 4; i++)
+			for (var i = 0; i < 20; i++)
 				Assert.That(behavior.Execute().Disposition, Is.EqualTo(StealthCrushDisposition.Retain));
 
-			Assert.That(behavior.Execute().Disposition, Is.EqualTo(StealthCrushDisposition.Kite));
+			Assert.That(behavior.Execute().Disposition, Is.EqualTo(StealthCrushDisposition.Retain));
 		}
 
 		[Test]
@@ -487,6 +986,47 @@ namespace OpenRA.Test.Mods.Common
 				Is.EqualTo(StealthUndefendedAttackDisposition.CrushEvaluation));
 			Assert.That(result.LiveDefenderActorIds, Is.EqualTo(new uint[] { 90 }));
 			Assert.That(orders.Targets, Is.Empty);
+		}
+
+		[Test]
+		public void UndefendedAttackHandsOffWhenItsObjectiveDiesButLiveDefendersRemain()
+		{
+			var world = new UndefendedWorld
+			{
+				Snapshot = new StealthUndefendedAttackLiveSnapshot(1,
+					new[]
+					{
+						new StealthUndefendedAttackMemberSnapshot(1, "stnk", 900,
+							new CPos(0, 0), 100, 100, 5, true)
+					}, Array.Empty<StealthUndefendedAttackTargetSnapshot>(), new uint[] { 90 },
+					true, false, true)
+			};
+			var result = new StealthUndefendedAttackBehavior(UndefendedHandoff(), new Guard(),
+				world, new UndefendedThreat(), new UndefendedOrders()).Execute();
+
+			Assert.That(result.Disposition,
+				Is.EqualTo(StealthUndefendedAttackDisposition.CrushEvaluation));
+			var controller = Construct<StealthLifecycleController>(BehaviorId.UndefendedAttack);
+			Assert.That(controller.TryAccept(result, out var transition), Is.True);
+			Assert.That(transition.CrushEvaluation, Is.Not.Null);
+		}
+
+		[Test]
+		public void UndefendedAttackRetriesItsRetainedTargetAfterTheEngineOrderCompletes()
+		{
+			var world = new UndefendedWorld { Snapshot = UndefendedSnapshot(false) };
+			var orders = new UndefendedOrders();
+			var behavior = new StealthUndefendedAttackBehavior(UndefendedHandoff(), new Guard(),
+				world, new UndefendedThreat(), orders);
+
+			behavior.Execute();
+			world.Snapshot = UndefendedSnapshot(false, membersIdle: true);
+			var retained = behavior.Execute();
+
+			Assert.That(retained.Disposition, Is.EqualTo(StealthUndefendedAttackDisposition.Retain));
+			Assert.That(orders.Targets, Is.EqualTo(new uint[] { 71, 71 }));
+			Assert.That(orders.Revisions, Is.EqualTo(new long[] { 1, 2 }),
+				"A completed engine activity must produce a distinct runtime order fingerprint.");
 		}
 
 		[Test]
@@ -529,7 +1069,53 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
-		public void MassAttackCommitsWhenCrossoverApprovesNoSafeFiringCell()
+		public void MassAttackDoesNotDecloakAFormationMateFromAnUnsafeLiveCell()
+		{
+			var safeCell = new CPos(2, 0);
+			var world = new MassWorld
+			{
+				Snapshot = MassSnapshot(new[] { safeCell },
+					memberCells: new[] { new CPos(0, 0), new CPos(1, 0) })
+			};
+			var threat = new MassThreat
+			{
+				Approved = facts => facts.PlannedCell != new CPos(1, 0)
+			};
+			var orders = new MassOrders();
+
+			var result = new StealthMassAttackBehavior(MassHandoff(), new Guard(),
+				world, threat, orders).Execute();
+
+			Assert.That(result.Phase, Is.EqualTo(StealthMassAttackPhase.Advance));
+			Assert.That(orders.Cell, Is.EqualTo(safeCell));
+			Assert.That(orders.Moves, Is.EqualTo(1));
+			Assert.That(orders.Attacks, Is.Zero);
+		}
+
+		[Test]
+		public void MassAttackRanksSharedMovementFromTheLiveSquadCenter()
+		{
+			var centerCandidate = new CPos(5, 1);
+			var flankCandidate = new CPos(1, 1);
+			var world = new MassWorld
+			{
+				Snapshot = MassSnapshot(new[] { flankCandidate, centerCandidate },
+					memberCells: new[] { new CPos(0, 0), new CPos(10, 0) })
+			};
+			var threat = new MassThreat
+			{
+				Approved = facts => facts.PlannedCell == flankCandidate ||
+					facts.PlannedCell == centerCandidate
+			};
+			var orders = new MassOrders();
+
+			new StealthMassAttackBehavior(MassHandoff(), new Guard(), world, threat, orders).Execute();
+
+			Assert.That(orders.Cell, Is.EqualTo(centerCandidate));
+		}
+
+		[Test]
+		public void CrossoverApprovedMassAttackFleesWhenNoSafeFiringCellExists()
 		{
 			var world = new MassWorld { Snapshot = MassSnapshot() };
 			var threat = new MassThreat { Approved = facts => false };
@@ -538,9 +1124,48 @@ namespace OpenRA.Test.Mods.Common
 			var result = new StealthMassAttackBehavior(MassHandoff(), new Guard(), world,
 				threat, orders).Execute();
 
-			Assert.That(result.Phase, Is.EqualTo(StealthMassAttackPhase.Attack));
-			Assert.That(orders.Attacks, Is.EqualTo(1));
+			Assert.That(result.Disposition,
+				Is.EqualTo(StealthMassAttackDisposition.RecalculateFlee));
+			Assert.That(result.Phase, Is.EqualTo(StealthMassAttackPhase.Advance));
+			Assert.That(orders.Attacks, Is.Zero);
 			Assert.That(orders.Moves, Is.Zero);
+		}
+
+		[Test]
+		public void MassAttackRetriesItsRetainedTargetOnlyAfterTheBoundedInterval()
+		{
+			var world = new MassWorld { Snapshot = MassSnapshot(membersIdle: true) };
+			var orders = new MassOrders();
+			var behavior = new StealthMassAttackBehavior(MassHandoff(), new Guard(), world,
+				new MassThreat(), orders);
+
+			behavior.Execute();
+			behavior.Execute();
+			world.Snapshot = MassSnapshot(membersIdle: true, tick: 76);
+			behavior.Execute();
+
+			Assert.That(orders.Attacks, Is.EqualTo(2));
+		}
+
+		[Test]
+		public void MassAttackRetriesItsRetainedAdvanceOnlyAfterTheBoundedInterval()
+		{
+			var safeCell = new CPos(2, 0);
+			var world = new MassWorld
+			{
+				Snapshot = MassSnapshot(new[] { safeCell }, membersIdle: true)
+			};
+			var orders = new MassOrders();
+			var behavior = new StealthMassAttackBehavior(MassHandoff(), new Guard(), world,
+				new MassThreat { Approved = facts => facts.PlannedCell == safeCell }, orders);
+
+			behavior.Execute();
+			behavior.Execute();
+			world.Snapshot = MassSnapshot(new[] { safeCell }, membersIdle: true, tick: 76);
+			behavior.Execute();
+
+			Assert.That(orders.Moves, Is.EqualTo(2));
+			Assert.That(orders.Attacks, Is.Zero);
 		}
 
 		[Test]
@@ -569,12 +1194,14 @@ namespace OpenRA.Test.Mods.Common
 				candidates ?? Array.Empty<CPos>(), true);
 		}
 
-		static StealthCrushLiveSnapshot CrushSnapshot(CPos targetCell, bool detected)
+		static StealthCrushLiveSnapshot CrushSnapshot(CPos targetCell, bool detected,
+			bool needsMovementOrder = false)
 		{
 			return new StealthCrushLiveSnapshot(1,
 				new[]
 				{
-					new StealthCrushMemberSnapshot(1, new CPos(0, 0))
+					new StealthCrushMemberSnapshot(1, new CPos(0, 0),
+						needsMovementOrder: needsMovementOrder)
 				},
 				new[]
 				{
@@ -584,7 +1211,7 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		static StealthUndefendedAttackLiveSnapshot UndefendedSnapshot(bool addBetterTarget,
-			IEnumerable<uint> defenders = null)
+			IEnumerable<uint> defenders = null, bool membersIdle = false)
 		{
 			var targets = new List<StealthUndefendedAttackTargetSnapshot>
 			{
@@ -598,14 +1225,18 @@ namespace OpenRA.Test.Mods.Common
 				new[]
 				{
 					new StealthUndefendedAttackMemberSnapshot(1, "stnk", 900,
-						new CPos(0, 0), 100, 100, 5)
+						new CPos(0, 0), 100, 100, 5, membersIdle)
 				}, targets, defenders ?? Array.Empty<uint>(), true, false, true);
 		}
 
-		static StealthMassAttackLiveSnapshot MassSnapshot(IEnumerable<CPos> candidates = null)
+		static StealthMassAttackLiveSnapshot MassSnapshot(IEnumerable<CPos> candidates = null,
+			bool membersIdle = false, IEnumerable<CPos> memberCells = null, int tick = 1)
 		{
-			return new StealthMassAttackLiveSnapshot(1,
-				new[] { new StealthMassAttackMemberSnapshot(1, new CPos(0, 0), 5) },
+			var members = (memberCells ?? new[] { new CPos(0, 0) }).Select((cell, index) =>
+				new StealthMassAttackMemberSnapshot((uint)index + 1, cell, 5,
+					needsMovementOrder: membersIdle));
+			return new StealthMassAttackLiveSnapshot(tick,
+				members,
 				new[]
 				{
 					new StealthMassAttackActorSnapshot(71, "e1", new CPos(3, 0),
@@ -649,7 +1280,7 @@ namespace OpenRA.Test.Mods.Common
 				new[] { new StealthStrategicTargetSnapshot(71, cell, 5000, 1100, 100, 100) }, null);
 			var value = Construct<StealthTargetValueOption>(option, 5500000L);
 			return Construct<StealthApproachMission>(Construct<StealthTargetThreatOption>(value,
-				new StealthTargetThreatScore(1, 2)), 0L, 0, 1000L);
+				new StealthTargetThreatScore(1, 2)));
 		}
 
 		static StealthBehaviorHandoff Handoff(BehaviorId owner)

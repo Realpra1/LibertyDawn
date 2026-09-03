@@ -24,7 +24,7 @@ namespace OpenRA.Mods.Common.Traits
 		public readonly bool IncludeAttackGroup = true;
 		public readonly bool ReserveOpeningPair = true;
 		public readonly bool ClaimAllEligible = false;
-		public readonly int ThreatRangeBufferCells = 2;
+		public readonly int ThreatRangeBufferCells = 0;
 		public readonly int DetectorRangeBufferCells = 2;
 		public readonly int RouteThreatPenalty = 4;
 		public readonly int MaximumRouteStretchPercent = 150;
@@ -38,6 +38,8 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Preferred maximum driving time in seconds for an undefended target. Farther safe targets remain a fallback.")]
 		public readonly int MaximumUndefendedTargetTravelSeconds = 20;
 		public readonly bool EnableKiting = true;
+		[Desc("Minimum configured priority-times-value for an economic objective to be considered by Kite.")]
+		public readonly long MinimumKitePriorityValue = 250000;
 		public readonly int MinimumKiteSpeedPercent = 120;
 		public readonly int MassClearEntryCrossoverPercent = 200;
 		public readonly int MassClearAbortCrossoverPercent = 100;
@@ -76,7 +78,8 @@ namespace OpenRA.Mods.Common.Traits
 				KiteRangeMarginCells < 0 || CarefulClearValueRatio <= 0 || MinimumLateHarassmentGroupSize <= 0 ||
 				TargetSwitchImprovementPercent < 0 || HarassmentDistancePenalty <= 0 ||
 				OutwardTargetCellLimit < 5 || OutwardTargetCellLimit > 10 ||
-				MaximumUndefendedTargetTravelSeconds <= 0 || MinimumKiteSpeedPercent < 100 ||
+				MaximumUndefendedTargetTravelSeconds <= 0 || MinimumKitePriorityValue < 0 ||
+				MinimumKiteSpeedPercent < 100 ||
 				MassClearEntryCrossoverPercent <= MassClearAbortCrossoverPercent ||
 				MassClearAbortCrossoverPercent < 0 ||
 				ResourceWaitingSearchRadius < 0 || ResourceWaitingOrderInterval <= 0 ||

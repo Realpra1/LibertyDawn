@@ -163,7 +163,16 @@ namespace OpenRA.Mods.Common.Traits
 						next = Entry(crushTransition);
 					break;
 				case BehaviorId.Kite:
-					accepted = controller.TryAccept(Require<StealthKiteResult>(result), out var kiteTransition);
+					var kite = Require<StealthKiteResult>(result);
+					accepted = controller.TryAccept(kite, out var kiteTransition);
+					if (!accepted)
+						Log.Write("debug", "Stealth lifecycle rejected Kite result: disposition={0} " +
+							"members={1} defenders={2} objectives={3} target={4} cell={5} " +
+							"safety={6}/{7} fallback={8}.", kite.Disposition,
+							kite.ActiveMemberActorIds.Count, kite.LiveDefenderActorIds.Count,
+							kite.LiveObjectiveActorIds.Count, kite.SelectedTargetActorId?.ToString() ?? "none",
+							kite.FireCell?.ToString() ?? "none", kite.Safety.HasValue,
+							kite.Safety?.Approved ?? false, kite.FallbackEvidence?.Reason.ToString() ?? "none");
 					if (accepted)
 						next = Entry(kiteTransition);
 					break;
@@ -258,7 +267,7 @@ namespace OpenRA.Mods.Common.Traits
 			if (value.RecalculateFlee != null) return new StealthLifecycleRuntimeEntry(
 				value.RecalculateFlee.Handoff, value.RecalculateFlee);
 			if (value.UndefendedAttack != null) return new StealthLifecycleRuntimeEntry(value.UndefendedAttack.Handoff, value.UndefendedAttack);
-			return new StealthLifecycleRuntimeEntry(value.CrushEvaluation.Handoff, value.CrushEvaluation);
+			return new StealthLifecycleRuntimeEntry(value.Kite.Handoff, value.Kite);
 		}
 
 		static StealthLifecycleRuntimeEntry Entry(StealthUndefendedAttackTransition value)

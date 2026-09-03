@@ -38,10 +38,11 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		}
 
 		void IStealthUndefendedAttackOrders.IssueAttack(BehaviorId owner, OwnershipEpoch epoch,
-			IReadOnlyList<uint> actorIds, uint targetActorId)
+			IReadOnlyList<uint> actorIds, uint targetActorId, long orderRevision)
 		{
-			Issue(owner, epoch, StealthLifecycleRuntimeOrderKind.Attack, "undefended", actorIds,
-				targetActorId);
+			Issue(owner, epoch, StealthLifecycleRuntimeOrderKind.Attack,
+				"undefended-" + orderRevision.ToString(CultureInfo.InvariantCulture),
+				actorIds, targetActorId);
 		}
 
 		void IStealthCrushOrders.IssueCrush(BehaviorId owner, OwnershipEpoch epoch,
@@ -168,7 +169,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				switch (order.Kind)
 				{
 					case StealthLifecycleRuntimeOrderKind.Attack:
-						return new Order("Attack", null, Target.FromActor(target), false,
+						var attackOrder = order.Owner == BehaviorId.Kite ||
+							order.Owner == BehaviorId.MassAttack ? "AttackWithoutMoving" : "Attack";
+						return new Order(attackOrder, null, Target.FromActor(target), false,
 							groupedActors: actors);
 					case StealthLifecycleRuntimeOrderKind.Crush:
 						return new Order("Move", null,
@@ -200,8 +203,24 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var size = Math.Max(1, squad.StealthDefinition?.StrategicCellSize ??
 				StealthAISpecialistPolicy.RequiredStrategicCellSize);
 			var strategic = order.TargetCell.Value;
-			return squad.World.Map.Clamp(new CPos(strategic.X * size + size / 2,
+			var center = squad.World.Map.Clamp(new CPos(strategic.X * size + size / 2,
 				strategic.Y * size + size / 2));
+			var members = order.ActorIds.Select(squad.World.GetActorById)
+				.Where(actor => actor != null && actor.IsInWorld && !actor.IsDead).ToArray();
+			var representative = members.FirstOrDefault();
+			var mobile = representative?.TraitOrDefault<Mobile>();
+			if (mobile == null)
+				return center;
+			var occupiedFormationCells = new HashSet<CPos>(members.Select(actor => actor.Location));
+
+			return Enumerable.Range(0, size).SelectMany(y => Enumerable.Range(0, size)
+				.Select(x => new CPos(strategic.X * size + x, strategic.Y * size + y)))
+				.Where(cell => squad.World.Map.Contains(cell) && !occupiedFormationCells.Contains(cell) &&
+					mobile.CanEnterCell(cell, null, BlockedByActor.Immovable))
+				.OrderBy(cell => (cell - representative.Location).LengthSquared)
+				.ThenBy(cell => (cell - center).LengthSquared)
+				.ThenBy(cell => cell.Y).ThenBy(cell => cell.X)
+				.DefaultIfEmpty(center).First();
 		}
 
 		Actor Resolve(uint? actorId)

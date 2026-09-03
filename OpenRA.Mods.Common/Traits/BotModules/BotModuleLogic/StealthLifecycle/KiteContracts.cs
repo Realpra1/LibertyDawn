@@ -67,6 +67,7 @@ namespace OpenRA.Mods.Common.Traits
 		public int HitPoints { get; }
 		public int MaximumHitPoints { get; }
 		public int CurrentWeaponRangeCells { get; }
+		public long PriorityValue { get; }
 		public bool IsInLocalEngagementArea { get; }
 		public bool IsDefender { get; }
 		public bool IsMissionObjective { get; }
@@ -84,7 +85,7 @@ namespace OpenRA.Mods.Common.Traits
 			bool isDefender, bool isMissionObjective, bool isInfantry,
 			bool canBeCrushedByFormation, bool hasDetectorCoverage,
 			bool isInLocalEngagementArea = true, bool isInWorld = true,
-			bool isDead = false, bool isTargetable = true)
+			bool isDead = false, bool isTargetable = true, long priorityValue = 0)
 		{
 			if (actorId == 0)
 				throw new ArgumentOutOfRangeException(nameof(actorId));
@@ -98,6 +99,7 @@ namespace OpenRA.Mods.Common.Traits
 			HitPoints = hitPoints;
 			MaximumHitPoints = maximumHitPoints;
 			CurrentWeaponRangeCells = currentWeaponRangeCells;
+			PriorityValue = priorityValue;
 			IsInLocalEngagementArea = isInLocalEngagementArea;
 			IsDefender = isDefender;
 			IsMissionObjective = isMissionObjective;
@@ -122,6 +124,7 @@ namespace OpenRA.Mods.Common.Traits
 		public bool FormationCloaked { get; }
 		public bool FormationDetected { get; }
 		public bool KitingEnabled { get; }
+		public long MinimumKitePriorityValue { get; }
 		public bool HasActivityObservation { get; }
 		public long ActivityRevision { get; }
 		public StealthKiteOrderToken ActiveOrderToken { get; }
@@ -132,9 +135,10 @@ namespace OpenRA.Mods.Common.Traits
 			bool formationCloaked, bool hasActivityObservation = false,
 			long activityRevision = 0, StealthKiteOrderToken activeOrderToken = null,
 			StealthKiteOrderToken completedOrderToken = null,
-			bool formationDetected = false, bool kitingEnabled = true)
+			bool formationDetected = false, bool kitingEnabled = true,
+			long minimumKitePriorityValue = 0)
 		{
-			if (tick < 0 || activityRevision < 0)
+			if (tick < 0 || activityRevision < 0 || minimumKitePriorityValue < 0)
 				throw new ArgumentOutOfRangeException(nameof(tick));
 			if ((!hasActivityObservation && (activityRevision != 0 || activeOrderToken != null ||
 					completedOrderToken != null)) ||
@@ -159,6 +163,7 @@ namespace OpenRA.Mods.Common.Traits
 			FormationCloaked = formationCloaked;
 			FormationDetected = formationDetected;
 			KitingEnabled = kitingEnabled;
+			MinimumKitePriorityValue = minimumKitePriorityValue;
 			HasActivityObservation = hasActivityObservation;
 			ActivityRevision = activityRevision;
 			ActiveOrderToken = activeOrderToken;
