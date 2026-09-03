@@ -81,16 +81,22 @@ are acceptable; active unexplained failures are not.
   StankChallenge.
 - Dense StankChallenge: VIKI win at tick `24967`, `600.34` ticks/second; no
   stationary, Obelisk-death, rejected-result, or failsafe-disable signal.
-- Three concurrent full natural games: `3/3` completed at ticks `19107`, `30007`,
-  and `40743`; no stationary, Obelisk-death, rejected-result, or failsafe-disable
-  signal. Active terminal squads passed cadence.
-- Natural damage-adjusted efficiency: `0.465`, `0.066`, `0.201`; median `0.201`,
-  mean `0.244`. The low run was a long 91-stealth-tank war and remains a variance
-  signal, not a hidden acceptance threshold.
+- Exact 0902-matched natural VIKI-versus-two-allied-Brutalis validation: `5/5`
+  VIKI wins at ticks `3678`, `4529`, `5455`, `7474`, and `10756`; no stationary,
+  Obelisk-death, rejected-result, or failsafe-disable signal. Every active terminal
+  squad passed cadence.
+- Against the retained 0902 five-win baseline, mean victory time is `6378` versus
+  `5130` ticks (`+24.3%`) and median is `5455` versus `4608` (`+18.4%`). Primary
+  efficiency mean is effectively flat (`1933.99` versus `1923.69`) while median
+  is `5.7%` lower (`1844.75` versus `1955.57`). Damage-adjusted median is `0.428`
+  versus `0.589`; treat both slower victory time and damage as review signals.
+- An earlier three-run manifest accidentally configured the Brutalis players as
+  enemies of each other. Its completion/efficiency data is not acceptance evidence.
 
 ## Release state
 
 - Final diff review is complete and PR 144 contains this release candidate and
-  its exact evidence. No implementation work remains before human testing.
+  its exact evidence. Correctness acceptance passes, but the matched win-time and
+  damage regressions remain explicit human-review signals.
 - Do not make further behavior changes unless review or playtesting exposes a
   clear reproduced bug.
