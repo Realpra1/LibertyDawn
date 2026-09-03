@@ -88,7 +88,9 @@ are acceptable; active unexplained failures are not.
   mean `0.244`. The low run was a long 91-stealth-tank war and remains a variance
   signal, not a hidden acceptance threshold.
 
-## Remaining release work
+## Release state
 
-- Complete the final diff review, update PR 144, and publish the exact evidence.
-  Do not make further behavior changes unless review exposes a clear bug.
+- Final diff review is complete and PR 144 contains this release candidate and
+  its exact evidence. No implementation work remains before human testing.
+- Do not make further behavior changes unless review or playtesting exposes a
+  clear reproduced bug.
