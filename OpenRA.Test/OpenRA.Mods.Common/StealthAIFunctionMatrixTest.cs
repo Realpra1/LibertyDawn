@@ -78,12 +78,35 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
-		public void CpuThrottlePreservesLiveModularStealthUpdates()
+		public void SquadManagerReservesConfiguredStealthUnitsFromCompetingModules()
+		{
+			Assert.That(typeof(IBotUnitReservations).IsAssignableFrom(typeof(SquadManagerBotModule)),
+				Is.True, "The lifecycle owner must reserve eligible stealth units before another module claims them.");
+			var manager = Source("OpenRA.Mods.Common/Traits/BotModules/SquadManagerBotModule.cs");
+			Assert.That(manager, Does.Contain("definition.UnitTypes.Contains(actor.Info.Name)"));
+			Assert.That(manager, Does.Contain("!ReferenceEquals(reservation, this)"),
+				"The squad manager must not reject its own reserved stealth units during recruitment.");
+		}
+
+		[Test]
+		public void CpuThrottleKeepsLiveModularStealthUpdatesButSpacesTheirCost()
 		{
 			var manager = Source("OpenRA.Mods.Common/Traits/BotModules/SquadManagerBotModule.cs");
 			Assert.That(manager, Does.Contain("s.UsesModularStealthLifecycle || updateStrategicSquads"));
-			Assert.That(manager, Does.Contain("stealthSafetyTicks = Info.StealthSafetyCheckInterval"),
-				"The planning factor must not slow live stealth safety checks.");
+			Assert.That(manager, Does.Contain(
+				"stealthSafetyTicks = StrategicPlanningInterval(Info.StealthSafetyCheckInterval)"),
+				"Failsafe throttling must space expensive local checks without disabling them.");
+			Assert.That(manager, Does.Contain(
+				"AdjustPlanningTimer(ref stealthSafetyTicks, Info.StealthSafetyCheckInterval, increasing)"));
+		}
+
+		[Test]
+		public void ExposedStrategicRoutesRetainRealRangeThreatsAfterOutrangeScoring()
+		{
+			var states = Source(
+				"OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
+			Assert.That(states, Does.Contain("DefenderThreatDuringRangeExposure(pair)"),
+				"Exposed cached routes must not treat an in-range Obelisk as harmless just because the stank can kite it.");
 		}
 
 		[Test]
@@ -110,11 +133,15 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(decoded[7], Is.EqualTo(new CPos(3, 4)));
 
 			var publisher = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/StealthSquadOverlayPublisher.cs");
+			var factory = Source(
+				"OpenRA.Mods.Common/Traits/BotModules/Squads/StealthSquadLifecycleOwnerFactory.cs");
 			Assert.That(publisher, Does.Contain("const int PublishInterval = 5"));
 			Assert.That(publisher, Does.Contain("prior == item.Payload"),
 				"Replay orders must be emitted only when displayed squad state changes.");
 			Assert.That(Source("OpenRA.Mods.Common/Traits/Player/StealthSquadOverlay.cs"),
 				Does.Contain("new LineAnnotationRenderable"));
+			Assert.That(factory, Does.Contain("squad.StealthOverlayChosenTarget = null;"),
+				"Reacquisition must not display the abandoned mission as the chosen target.");
 			Assert.That(Source("mods/cnc/hotkeys.yaml"), Does.Contain(
 				"ToggleStealthSquadOverlay: F8"));
 			Assert.That(Source("mods/cnc/chrome/ingame.yaml"), Does.Contain(
@@ -193,8 +220,8 @@ namespace OpenRA.Test.Mods.Common
 				"BitSet<TargetableType>? plannedAttackerTargetTypesOverride = null"));
 			Assert.That(calculator, Does.Contain("bool plannedCurrentRangeEngagement = false"));
 			Assert.That(calculator, Does.Contain(
-				"attackerIsImmobile && !plannedCurrentRangeEngagement"),
-				"Only the immobile range-control zero may be bypassed for an exact planned local shot.");
+				"plannedCurrentRangeEngagement ? nominalRangeCells"),
+				"An exact planned local shot must use actual range, not pursuit-adjusted strategic range.");
 			Assert.That(calculator, Does.Contain(
 				"defenderTargetTypesOverride ?? defender.GetEnabledTargetTypes()"),
 				"The planned-decloak override must be optional so every existing calculator caller is unchanged.");
@@ -248,9 +275,10 @@ namespace OpenRA.Test.Mods.Common
 			handoff = handoff.Substring(0, handoff.IndexOf(
 				"void AdoptLegacyFallbackAssault", StringComparison.Ordinal));
 			Assert.That(handoff, Does.Contain("Info.StealthSquadDefinitions.Values.Any"));
-			Assert.That(handoff, Does.Contain("bot.QueueOrder(new Order(\"Move\", actor"));
-			Assert.That(handoff, Does.Contain("generic-attackmove=False"),
-				"A configured cloaked specialist must not inherit ordinary opportunistic fire before claim.");
+			Assert.That(handoff, Does.Contain("stealthRecruitTicks = 0"));
+			Assert.That(handoff, Does.Contain("specialist-claim=same-tick"));
+			Assert.That(handoff, Does.Not.Contain("bot.QueueOrder(new Order(\"Move\", actor"),
+				"A configured cloaked specialist must receive no temporary order before lifecycle claim.");
 
 			var continuation = states.Substring(states.IndexOf(
 				"protected static bool ContinueStealthClear", StringComparison.Ordinal));
@@ -437,13 +465,19 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(yaml.Split("UnitTypes: ctnk").Length - 1, Is.EqualTo(10));
 			Assert.That(yaml.Split("StrategicCellSize: 6").Length - 1, Is.EqualTo(20));
 			Assert.That(yaml, Does.Not.Contain("StealthAISpecialistModule@"));
+			var stealthTankProfiles = yaml.Split("stealth-tank:").Skip(1).Select(section =>
+				section.Substring(0, section.IndexOf("chemical:", StringComparison.Ordinal))).ToArray();
+			Assert.That(stealthTankProfiles.All(profile => profile == stealthTankProfiles[0]), Is.True,
+				"Every AI, including VIKI and Iron Reaper, must use one identical STNK lifecycle configuration.");
 
 			Assert.That(StealthAISpecialistPolicy.MaximumSquadCount, Is.EqualTo(4));
 			var manager = Source("OpenRA.Mods.Common/Traits/BotModules/SquadManagerBotModule.cs");
 			Assert.That(manager, Does.Contain("specialistSquadCount > StealthAISpecialistPolicy.MaximumSquadCount"));
 			Assert.That(manager, Does.Contain("RebalanceStealthSquads();"));
-			Assert.That(manager.IndexOf("RebalanceStealthSquads();", StringComparison.Ordinal),
-				Is.LessThan(manager.IndexOf("RecruitUnassignedCombatUnits(bot);", StringComparison.Ordinal)));
+			Assert.That(manager.IndexOf("RecruitUnassignedCombatUnits(bot);", StringComparison.Ordinal),
+				Is.LessThan(manager.IndexOf("RebalanceStealthSquads();", StringComparison.Ordinal)),
+				"New stealth specialists must enter their modular squad in the registration tick.");
+			Assert.That(manager, Does.Contain("specialist-claim=same-tick"));
 			Assert.That(new StealthSquadDefinition(new MiniYaml("", new List<MiniYamlNode>())).StrategicCellSize,
 				Is.EqualTo(6));
 		}
@@ -558,8 +592,8 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(states, Does.Contain("StealthClearMode.CrushBridge"));
 			Assert.That(states, Does.Contain("completed cached blocker:"));
 			Assert.That(states, Does.Contain("legal-band backoff queued:"));
-			Assert.That(states, Does.Contain("OrderByDescending(p => Separation(p.Plan)).ThenBy(p => p.ServiceMs)"),
-				"Comparable-value STNK targets should prefer multi-angle separation, then bounded service time.");
+			Assert.That(states, Does.Not.Contain("Separation(p.Plan)"),
+				"Stable corner-biased discovery replaces target-distance weighting between squads.");
 			Assert.That(states, Does.Contain("p.ServiceMs, owner.StealthDefinition.MaximumUndefendedTargetTravelSeconds"),
 				"The ordinary-target preference must bound total travel-plus-kill service, not travel alone.");
 			Assert.That(states, Does.Contain("bounded Crush fallback:"),
@@ -744,8 +778,8 @@ namespace OpenRA.Test.Mods.Common
 				"Another squad's target must never remove an otherwise-live candidate.");
 			Assert.That(states, Does.Not.Contain("squad.IsTargetValid && squad.TargetActor == plan.Actor) &&"),
 				"The moving-MTNK challenger must remain eligible when a peer already targets it.");
-			Assert.That(states, Does.Contain("OrderByDescending(Separation)"),
-				"Multi-angle service remains a final ranking preference rather than eligibility.");
+			Assert.That(states, Does.Not.Contain("OrderByDescending(Separation)"),
+				"Corner-biased discovery replaces all target-distance weighting between squads.");
 			Assert.That(states, Does.Contain("var stnks = owner.Units.Where"),
 				"Formation promotion and reinforcement membership must share one squad clock.");
 			Assert.That(states, Does.Not.Contain(
@@ -1199,6 +1233,11 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(yaml.Split('\n').Count(line => line.Trim() == "vice: -1"), Is.EqualTo(30),
 				"Every STNK and chemical stealth profile must reject both Visceroid actor types.");
 			Assert.That(yaml.Split('\n').Count(line => line.Trim() == "pvice: -1"), Is.EqualTo(30));
+			var stankProfiles = yaml.Split("stealth-tank:").Skip(1).Select(section =>
+				section.Substring(0, section.IndexOf("chemical:", StringComparison.Ordinal)));
+			Assert.That(stankProfiles.All(profile => profile.Split('\n')
+				.Count(line => line.Trim() == "sam: 1") == 2), Is.True,
+				"Every STNK harassment and attack profile must treat SAM sites as low-value ground targets.");
 
 			Assert.That(StealthAISpecialistPolicy.MinimumStrategicCellValue,
 				Is.EqualTo(5000L * 1100L));
@@ -1240,10 +1279,52 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(states, Does.Not.Contain("throw new InvalidOperationException"));
 			Assert.That(manager, Does.Not.Contain("throw new InvalidOperationException"),
 				"Premade stealth watchdogs are diagnostic-only and must never terminate gameplay.");
+
+			var liveCombat = Source(
+				"OpenRA.Mods.Common/Traits/BotModules/Squads/StealthSquadLifecycleCombatLiveAdapter.cs");
+			var defenderClassification = liveCombat.Substring(liveCombat.IndexOf(
+				"bool IsDefender", StringComparison.Ordinal));
+			defenderClassification = defenderClassification.Substring(0,
+				defenderClassification.IndexOf("bool HasDetectorCoverage", StringComparison.Ordinal));
+			Assert.That(defenderClassification, Does.Contain("CombatThreatCalculator"));
+			Assert.That(defenderClassification, Does.Contain("GeneralizedCombatPlannedDecloakThreat.Calculate("));
+			Assert.That(defenderClassification, Does.Contain("Reverse.CanTarget"));
+			Assert.That(defenderClassification, Does.Not.Contain("WeaponRange(actor) > 0"),
+				"Anti-air-only weapons such as SAMs must not become invented ground threats.");
+			var plannedDecloak = Source(
+				"OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthLifecycle/" +
+				"GeneralizedCombatPlannedDecloakThreat.cs");
+			Assert.That(plannedDecloak, Does.Contain("calculator.CalculateLive("));
+			Assert.That(plannedDecloak,
+				Does.Contain("preserveRulesDefenderThreatForPlannedExposure: true"),
+				"A temporarily range-zero defense can recover while a planned attack remains exposed.");
+			Assert.That(plannedDecloak, Does.Not.Contain("obli"),
+				"Planned-decloak safety must remain actor-identity agnostic.");
+			var massThreat = Source(
+				"OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthLifecycle/" +
+				"GeneralizedCombatMassAttackThreatAdapter.cs");
+			Assert.That(massThreat, Does.Contain("GeneralizedCombatPlannedDecloakThreat.Calculate("));
+			Assert.That(massThreat,
+				Does.Contain("preserveRulesDefenderThreatForPlannedExposure: true"),
+				"MassAttack must evaluate both its firing cell and crossover as a planned reveal.");
+			var calculator = Source(
+				"OpenRA.Mods.Common/Traits/BotModules/GeneralizedCombatThreat.cs");
+			Assert.That(calculator, Does.Contain(
+				"plannedCurrentRangeEngagement ? nominalRangeCells"),
+				"Local planned attacks need actual weapon range, not strategic pursuit-adjusted range.");
+			Assert.That(liveCombat, Does.Contain("DetectorCoversSegment("),
+				"Crush safety must cover the live path to its infantry, not only the endpoint.");
+			var lifecycleOrders = Source(
+				"OpenRA.Mods.Common/Traits/BotModules/Squads/StealthSquadLifecycleOrders.cs");
+			Assert.That(lifecycleOrders, Does.Contain("order.Owner == BehaviorId.Kite ?"));
+			Assert.That(lifecycleOrders, Does.Not.Contain("order.Owner == BehaviorId.MassAttack ?"),
+				"MassAttack must be able to close range after Kite proves no safe firing cell exists.");
+			var attackBase = Source("OpenRA.Mods.Common/Traits/Attack/AttackBase.cs");
+			Assert.That(attackBase, Does.Contain("order.OrderString != AttackWithoutMovingOrderName"));
 		}
 
 		[Test]
-		public void StealthLifecycleUsesTenCellFrontierAndMultiAngleSeparation()
+		public void StealthLifecycleUsesTenCellFrontierAndCornerBiasedDiscovery()
 		{
 			var definition = new StealthSquadDefinition(new MiniYaml("", new List<MiniYamlNode>()));
 			Assert.That(definition.OutwardTargetCellLimit, Is.EqualTo(10));
@@ -1257,8 +1338,12 @@ namespace OpenRA.Test.Mods.Common
 				new CPos(0, 0), Array.Empty<CPos>()), Is.EqualTo(long.MaxValue));
 
 			var states = StealthStateSources("StealthAIStates", "StealthAIIdleState");
-			Assert.That(states, Does.Contain("OrderByDescending(p => Separation(p.Plan))"),
-				"Surviving opportunities must prefer the cell least close to another STNK squad target.");
+			Assert.That(states, Does.Not.Contain("Separation(p.Plan)"),
+				"Final target ranking must not reintroduce distance-to-other-squad weighting.");
+			var acquisition = Source("OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/" +
+				"StealthLifecycle/StealthTargetAcquisitionBehavior.cs");
+			Assert.That(acquisition, Does.Contain("BiasedScanOrigin"));
+			Assert.That(acquisition, Does.Contain("squadCornerIndex"));
 			Assert.That(states, Does.Contain("BeginStealthEnemyApproach(owner)"),
 				"A targetless squad must take one bounded safe step toward live enemies even after a full frontier scan.");
 			Assert.That(states, Does.Not.Contain("owner.StealthLastFrontierTargetCells >= 10 || " +
@@ -1307,23 +1392,19 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
-		public void StealthSeparationCannotResurrectFilteredTargetCell()
+		public void FinalDistanceChoiceCannotResurrectFilteredTargetCell()
 		{
 			var selected = InvokeInternal<IReadOnlyList<int>>(typeof(StealthAIThreatGeometry),
 				"SelectOrderedTargetCellHalf",
 				new long[] { 100, 90, 80, 70 },
 				new double[] { 20, 10, 0, 0 },
 				new double[] { 1, 2, 100, 100 });
-			var separation = new long[] { 1, 2, 1000, 10000 };
-			var final = selected.OrderByDescending(index => separation[index]).First();
-
 			Assert.That(selected, Is.EqualTo(new[] { 1 }));
-			Assert.That(final, Is.EqualTo(1),
-				"The separation stage sees only the ordered-filter survivors.");
-			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
-			Assert.That(states.IndexOf("SelectOrderedTargetCellHalf", StringComparison.Ordinal),
-				Is.LessThan(states.IndexOf("long Separation(AirTargetPlan plan)", StringComparison.Ordinal)));
-			Assert.That(states, Does.Not.Contain("bestSafe.Plan.Score / 4"));
+			var distance = Source("OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/" +
+				"StealthLifecycle/StealthTargetDistanceChoiceBehavior.cs");
+			Assert.That(distance, Does.Contain(
+				"OrderBy(option => option.ValueOption.EstimatedTravelMilliseconds"));
+			Assert.That(distance, Does.Not.Contain("Separation"));
 		}
 
 		[Test]
@@ -1594,6 +1675,43 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
+		public void ModularReinforcementCatchUpRunsOnItsStrategicTickWithoutLegacyStarvation()
+		{
+			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
+			var modular = states.Substring(states.IndexOf(
+				"internal static void RoutePendingStealthReinforcementsForModularLifecycle", StringComparison.Ordinal));
+			modular = modular.Substring(0, modular.IndexOf("/// <summary>", StringComparison.Ordinal));
+			Assert.That(modular, Does.Contain("QueueStealthReinforcementsToFormation(owner, false)"));
+			Assert.That(modular, Does.Not.Contain("owner.StealthProfile != \"stealth-tank\""));
+
+			var host = Source(
+				"OpenRA.Mods.Common/Traits/BotModules/Squads/StealthSquadLifecycleRuntimeHost.cs");
+			var local = host.Substring(host.IndexOf("public void TickLocalSafety()", StringComparison.Ordinal));
+			local = local.Substring(0, local.IndexOf("void AdvanceUntilRetained()", StringComparison.Ordinal));
+			Assert.That(local, Does.Not.Contain("RoutePendingStealthReinforcementsForModularLifecycle"),
+				"Cached reinforcement routing belongs to the normal strategic tick, not live safety.");
+			Assert.That(local, Does.Contain("runtime.Owner == BehaviorId.Approach"));
+			Assert.That(local, Does.Contain("AdvanceApproachSafety()"),
+				"Approach must run its own live safety check without opening a fast strategic loop.");
+			Assert.That(local, Does.Contain("runtime.Owner == BehaviorId.RecalculateFlee"),
+				"Flee must reconsider the next lifecycle action at the live-safety cadence.");
+		}
+
+		[Test]
+		public void ModularDamageObservationRejectsNonEnemyDamageBeforeReadingAttackerPosition()
+		{
+			var manager = Source("OpenRA.Mods.Common/Traits/BotModules/SquadManagerBotModule.cs");
+			var respond = manager.Substring(manager.IndexOf(
+				"void IBotRespondToAttack.RespondToAttack", StringComparison.Ordinal));
+			respond = respond.Substring(0, respond.IndexOf(
+				"List<MiniYamlNode> IGameSaveTraitData.IssueTraitData", StringComparison.Ordinal));
+
+			Assert.That(respond.IndexOf("if (!IsPreferredEnemyUnit(e.Attacker))", StringComparison.Ordinal),
+				Is.LessThan(respond.IndexOf("ObserveModularStealthDamage(self, e)", StringComparison.Ordinal)),
+				"Non-enemy or non-positional damage sources must not enter live combat recovery.");
+		}
+
+		[Test]
 		public void WholeManagerAllowanceUsesOldestContinuousDemandAndClearsCanceledAge()
 		{
 			var manager = Source("OpenRA.Mods.Common/Traits/BotModules/SquadManagerBotModule.cs");
@@ -1668,7 +1786,8 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(traversal, Does.Contain("SelectOrderedTargetCellHalf("));
 			Assert.That(traversal, Does.Contain("selectedIndices = survivors.Concat(locallyArrived).Distinct()"));
 			Assert.That(traversal, Does.Contain("HighestPriorityFinalEngagements("));
-			Assert.That(traversal, Does.Contain("OrderByDescending(p => Separation(p.Plan)).ThenBy(p => p.ServiceMs)"));
+			Assert.That(traversal, Does.Contain("OrderBy(p => p.ServiceMs)"));
+			Assert.That(traversal, Does.Not.Contain("Separation(p.Plan)"));
 			Assert.That(traversal, Does.Contain("ThenByDescending(p => p.Plan.Score).ThenBy(p => p.TravelMs)"),
 				"Synchronous completion must retain the exact final ranking chain.");
 			Assert.That(traversal, Does.Contain("return best;"));
@@ -2540,6 +2659,39 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
+		public void ModularLifecycleRepairsARecoveredLowHealthTankBeforeStartingItsMission()
+		{
+			var host = Source(
+				"OpenRA.Mods.Common/Traits/BotModules/Squads/StealthSquadLifecycleRuntimeHost.cs");
+			var gate = host.IndexOf("MaintainInitialStealthRepairsForModularLifecycle", StringComparison.Ordinal);
+			var advance = host.IndexOf("PromoteArrivedReinforcements();", StringComparison.Ordinal);
+			Assert.That(gate, Is.GreaterThanOrEqualTo(0));
+			Assert.That(gate, Is.LessThan(advance),
+				"A restored low-health tank must finish the existing safe repair flow before construction advances.");
+
+			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
+			Assert.That(states, Does.Contain("internal static bool MaintainInitialStealthRepairsForModularLifecycle"));
+			Assert.That(states, Does.Contain("SendHomeToRepair(owner, unit);"));
+		}
+
+		[Test]
+		public void LocalPlannedDecloakSafetyUsesTheConfiguredGenericThreatMargin()
+		{
+			var factory = Source(
+				"OpenRA.Mods.Common/Traits/BotModules/Squads/StealthSquadLifecycleOwnerFactory.cs");
+			Assert.That(factory, Does.Contain("squad.StealthDefinition.ThreatRangeBufferCells"));
+
+			var safety = Source("OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthLifecycle/" +
+				"GeneralizedCombatLiveCellSafety.cs");
+			Assert.That(safety, Does.Contain("formationRadiusCells - safetyMarginCells"));
+			Assert.That(safety, Does.Contain("includeDefenderHitRadius: true"));
+			var kite = Source("OpenRA.Mods.Common/Traits/BotModules/BotModuleLogic/StealthLifecycle/" +
+				"GeneralizedCombatKiteThreatAdapter.cs");
+			Assert.That(kite, Does.Not.Contain("obli"),
+				"Local safety must use standard live threat facts rather than actor-specific exceptions.");
+		}
+
+		[Test]
 		public void FleeRepositionUsesLiveWholeRouteDangerOnlyAfterExistingFleeDecision()
 		{
 			var states = Source("OpenRA.Mods.Common/Traits/BotModules/Squads/States/StealthAIStates.cs");
@@ -2754,6 +2906,71 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(liveThreat, Does.Contain("DefenderThreatAtDistance("));
 			Assert.That(liveThreat, Does.Not.Contain("obli"),
 				"Current-position safety authority must remain actor-identity agnostic.");
+		}
+
+		[Test]
+		public void ProvincialMassCoordinationGroupsMatureRequestsInOneProvince()
+		{
+			var plans = StealthProvincialMassCoordinator.Plan(new[]
+			{
+				new StealthProvincialMassRequest("stealth-tank", 0, new CPos(11, 6), 100, 1),
+				new StealthProvincialMassRequest("stealth-tank", 2, new CPos(12, 7), 101, 3),
+				new StealthProvincialMassRequest("stealth-tank", 1, new CPos(12, 2), 101, 2),
+				new StealthProvincialMassRequest("stealth-tank", 3, new CPos(11, 6), 105, 2),
+				new StealthProvincialMassRequest("chem-tank", 4, new CPos(11, 6), 100, 4)
+			}, 110, 9);
+
+			Assert.That(plans, Has.Length.EqualTo(1));
+			Assert.That(plans[0].StrategicCell, Is.EqualTo(new CPos(11, 6)));
+			Assert.That(plans[0].LeaderIndex, Is.EqualTo(2));
+			Assert.That(plans[0].JoiningIndices, Is.EqualTo(new[] { 0 }));
+		}
+
+		[Test]
+		public void ProvincialMassCoordinationLetsAMatureRequestJoinAnActiveCommitment()
+		{
+			var plans = StealthProvincialMassCoordinator.Plan(new[]
+			{
+				new StealthProvincialMassRequest("stealth-tank", 0, new CPos(13, 4), 0, 2),
+				new StealthProvincialMassRequest("stealth-tank", 1, new CPos(14, 4), 100, 2),
+				new StealthProvincialMassRequest("stealth-tank", 2, new CPos(13, 4), -1, 2)
+			}, 110, 10);
+
+			Assert.That(plans, Has.Length.EqualTo(1));
+			Assert.That(plans[0].LeaderIndex, Is.EqualTo(0));
+			Assert.That(plans[0].JoiningIndices, Is.EqualTo(new[] { 1 }));
+		}
+
+		[Test]
+		public void ProvincialMassCoordinationKeepsOverlappingDefinitionIndicesIndependent()
+		{
+			var plans = StealthProvincialMassCoordinator.Plan(new[]
+			{
+				new StealthProvincialMassRequest("stealth-tank", 0, new CPos(13, 4), 0, 2),
+				new StealthProvincialMassRequest("stealth-tank", 1, new CPos(13, 4), 0, 2),
+				new StealthProvincialMassRequest("chem-tank", 0, new CPos(13, 4), 0, 2),
+				new StealthProvincialMassRequest("chem-tank", 1, new CPos(13, 4), 0, 2)
+			}, 10, 10);
+
+			Assert.That(plans.Select(plan => plan.Definition),
+				Is.EqualTo(new[] { "chem-tank", "stealth-tank" }));
+			Assert.That(plans.All(plan => plan.LeaderIndex == 0 &&
+				plan.JoiningIndices.SequenceEqual(new[] { 1 })), Is.True);
+		}
+
+		[Test]
+		public void StealthFormationKeepsTheLargestLocalClusterActive()
+		{
+			var core = StealthSquadFormationCohesion.SelectCore(new[]
+			{
+				(1u, new CPos(10, 8)),
+				(2u, new CPos(11, 8)),
+				(3u, new CPos(11, 9)),
+				(4u, new CPos(10, 5)),
+				(5u, new CPos(11, 5))
+			});
+
+			Assert.That(core, Is.EqualTo(new uint[] { 1, 2, 3 }));
 		}
 
 		[Test]

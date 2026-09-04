@@ -64,7 +64,8 @@ namespace OpenRA.Mods.Common.Traits
 
 		internal static bool IsFightOwner(BehaviorId owner)
 		{
-			return owner == BehaviorId.Engagement || owner == BehaviorId.UndefendedAttack ||
+			return owner == BehaviorId.Approach || owner == BehaviorId.Engagement ||
+				owner == BehaviorId.UndefendedAttack ||
 				owner == BehaviorId.CrushEvaluation || owner == BehaviorId.Kite ||
 				owner == BehaviorId.MassAttack;
 		}

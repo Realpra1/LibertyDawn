@@ -127,10 +127,12 @@ namespace OpenRA.Mods.Common.Traits
 		public IReadOnlyList<uint> DefenderActorIds => defenderActorIds;
 		public StealthKiteFallbackFacts AttackFacts { get; }
 		public StealthTargetThreatScore? AttackScore { get; }
+		public bool CoordinatedMassAttack { get; }
 
 		internal StealthKiteFallbackEvidence(StealthKiteFallbackReason reason,
 			string liveFingerprint, IEnumerable<uint> defenderActorIds,
-			StealthKiteFallbackFacts attackFacts, StealthTargetThreatScore? attackScore)
+			StealthKiteFallbackFacts attackFacts, StealthTargetThreatScore? attackScore,
+			bool coordinatedMassAttack = false)
 		{
 			if (!Enum.IsDefined(typeof(StealthKiteFallbackReason), reason) ||
 				string.IsNullOrEmpty(liveFingerprint) || defenderActorIds == null)
@@ -147,6 +149,7 @@ namespace OpenRA.Mods.Common.Traits
 			this.defenderActorIds = Array.AsReadOnly(defenders);
 			AttackFacts = attackFacts;
 			AttackScore = attackScore;
+			CoordinatedMassAttack = coordinatedMassAttack;
 		}
 	}
 }

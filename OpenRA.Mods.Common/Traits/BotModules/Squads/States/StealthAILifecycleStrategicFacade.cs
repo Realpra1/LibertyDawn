@@ -91,7 +91,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				})).ToArray();
 			var secondsPerCost = LifecycleSecondsPerCostUnit(owner, representative, coarseSize);
 			var acquisition = new StealthTargetAcquisitionCacheSnapshot(cache.Width, cache.Height,
-				danger, enemyCells, secondsPerCost, targets, facts, routePenalty);
+				danger, enemyCells, secondsPerCost, targets, facts, routePenalty, formationCloaked);
 			var approach = new StealthApproachStrategicCacheSnapshot(cache.Width, cache.Height,
 				facts.Select(fact => new StealthApproachStrategicCellSnapshot(fact.StrategicCell,
 					fact.EnemyGroup, fact.HasDetectorCoverage,
@@ -151,8 +151,13 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			StealthApproachMission mission, out long revision, out double danger,
 			out IReadOnlyList<CPos> route)
 		{
-			var representative = AirDecisionUnits(owner).Where(LiveLifecycleActor)
-				.OrderBy(actor => actor.ActorID).FirstOrDefault();
+			var formation = AirDecisionUnits(owner).Where(LiveLifecycleActor).ToArray();
+			var target = owner.World.GetActorById(mission.StableTargetActorId);
+			var representative = target != null && target.IsInWorld && !target.IsDead ?
+				formation.OrderBy(actor =>
+					(actor.CenterPosition - target.CenterPosition).HorizontalLengthSquared)
+					.ThenBy(actor => actor.ActorID).FirstOrDefault() :
+				formation.OrderBy(actor => actor.ActorID).FirstOrDefault();
 			if (representative == null)
 			{
 				revision = 0;
@@ -171,26 +176,63 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			}
 
 			var coarseSize = StealthCoarseSize(owner);
-			var current = LifecycleCoarseCell(representative.Location, coarseSize);
-			var cachedDanger = representative.TraitsImplementing<Cloak>().Any(cloak => cloak.Cloaked) ?
+			var center = owner.World.Map.CellContaining(
+				formation.Select(actor => actor.CenterPosition).Average());
+			var current = LifecycleCoarseCell(center, coarseSize);
+			var formationCloaked = formation.All(actor =>
+				actor.TraitsImplementing<Cloak>().Any(cloak => cloak.Cloaked));
+			var cachedDanger = formationCloaked ?
 				cache.CloakedDanger : cache.Danger;
-			var offsets = new[]
+			var mobile = representative.TraitOrDefault<Mobile>();
+			if (mobile == null)
 			{
-				new CVec(-2, -2), new CVec(0, -2), new CVec(2, -2), new CVec(-2, 0),
-				new CVec(2, 0), new CVec(-2, 2), new CVec(0, 2), new CVec(2, 2)
+				revision = cache.Tick;
+				danger = 0;
+				route = Array.Empty<CPos>();
+				return false;
+			}
+
+			var directions = new[]
+			{
+				new CVec(-1, -1), new CVec(0, -1), new CVec(1, -1), new CVec(-1, 0),
+				new CVec(1, 0), new CVec(-1, 1), new CVec(0, 1), new CVec(1, 1)
 			};
-			var candidates = offsets.Select(offset => current + offset)
-				.Where(cell => cell.X >= 0 && cell.Y >= 0 && cell.X < cache.Width && cell.Y < cache.Height)
-				.OrderBy(cell => cachedDanger[cell.Y * cache.Width + cell.X])
-				.ThenByDescending(cell => (cell - mission.StrategicCell).LengthSquared)
-				.ThenBy(cell => cell.Y).ThenBy(cell => cell.X);
-			foreach (var candidate in candidates)
-				if (TryReadLifecycleStrategicRoute(owner, representative.ActorID, current,
-					candidate, false, true, out revision, out route))
+			var selected = directions.Select(direction =>
+					(First: current + direction, Candidate: current + direction * 2))
+				.Where(option => option.First.X >= 0 && option.First.Y >= 0 &&
+					option.First.X < cache.Width && option.First.Y < cache.Height &&
+					option.Candidate.X >= 0 && option.Candidate.Y >= 0 &&
+					option.Candidate.X < cache.Width && option.Candidate.Y < cache.Height)
+				.Select(option =>
 				{
-					danger = Math.Max(0, cachedDanger[candidate.Y * cache.Width + candidate.X]);
-					return true;
-				}
+					var destination = owner.World.Map.Clamp(new CPos(
+						option.Candidate.X * coarseSize + coarseSize / 2,
+						option.Candidate.Y * coarseSize + coarseSize / 2));
+					var escapeRoute = StealthRouteToCell(owner, representative, cache,
+						option.Candidate, cachedDanger, true)?.SkipWhile(cell =>
+							LifecycleCoarseCell(cell, coarseSize) == current).ToArray();
+					var routeDanger = escapeRoute?.Select(cell => LifecycleCoarseCell(cell, coarseSize))
+						.Sum(cell => Math.Max(0, cachedDanger[cell.Y * cache.Width + cell.X])) ??
+						double.PositiveInfinity;
+					return (option.Candidate, Destination: destination,
+						CanEnter: mobile.CanEnterCell(destination, null, BlockedByActor.Immovable),
+						Route: escapeRoute, RouteDanger: routeDanger);
+				})
+				.Where(option => option.CanEnter && option.Route != null && option.Route.Length != 0)
+				.OrderBy(candidate => candidate.RouteDanger)
+				.ThenBy(candidate => cachedDanger[
+					candidate.Candidate.Y * cache.Width + candidate.Candidate.X])
+				.ThenByDescending(candidate =>
+					(candidate.Candidate - mission.StrategicCell).LengthSquared)
+				.ThenBy(candidate => candidate.Candidate.Y)
+				.ThenBy(candidate => candidate.Candidate.X).FirstOrDefault();
+			if (selected.Route != null)
+			{
+				revision = cache.Tick;
+				danger = selected.RouteDanger;
+				route = selected.Route;
+				return true;
+			}
 
 			revision = cache.Tick;
 			danger = 0;
@@ -214,7 +256,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				cache.CloakedDanger : cache.Danger;
 			var current = LifecycleCoarseCell(representative.Location, coarseSize);
 			var approaches = Enumerable.Range(-1, 3).SelectMany(y => Enumerable.Range(-1, 3)
-				.Where(x => x != 0 || y != 0).Select(x => new CPos(
+				.Select(x => new CPos(
 					destinationStrategicCell.X + x, destinationStrategicCell.Y + y)))
 				.Where(cell => cell.X >= 0 && cell.Y >= 0 && cell.X < cache.Width && cell.Y < cache.Height)
 				.OrderBy(cell => danger[cell.Y * cache.Width + cell.X])

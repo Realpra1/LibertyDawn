@@ -136,6 +136,21 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(captures, Is.EqualTo(1));
 		}
 
+		[Test]
+		public void ApproachMayYieldDamageToRepairAndResumeItsMission()
+		{
+			var epoch = new OwnershipEpoch(1);
+			var approachOwner = Construct<StealthBehaviorHandoff>(BehaviorId.Approach, epoch);
+			var resume = Construct<StealthRepairResumeContext>(BehaviorId.Approach,
+				epoch, Mission(), new uint[] { 1 }, new uint[] { 900 },
+				(uint?)null, (CPos?)null, "approach-damage");
+			var yielded = Construct<StealthLifecycleDamageYield>(approachOwner, 1L, 5, 900u, 25,
+				new[] { new StealthRepairDamagedMember(1, 40, 100) }, resume);
+
+			Assert.That(yielded.Resume.Owner, Is.EqualTo(BehaviorId.Approach));
+			Assert.That(yielded.Resume.Mission, Is.SameAs(resume.Mission));
+		}
+
 		static StealthApproachMission Mission()
 		{
 			var cell = new CPos(5, 5);
@@ -143,7 +158,7 @@ namespace OpenRA.Test.Mods.Common
 				new[] { new StealthStrategicTargetSnapshot(71, cell, 5000, 1100, 100, 100) }, null);
 			var value = Construct<StealthTargetValueOption>(option, 5500000L);
 			return Construct<StealthApproachMission>(Construct<StealthTargetThreatOption>(value,
-				new StealthTargetThreatScore(1, 2)), 0L, 0, 1000L);
+				new StealthTargetThreatScore(1, 2)));
 		}
 
 		static T Construct<T>(params object[] arguments)

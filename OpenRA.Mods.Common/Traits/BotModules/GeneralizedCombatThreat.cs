@@ -319,7 +319,8 @@ namespace OpenRA.Mods.Common.Traits
 		/// Calculates an immutable-rules matchup without requiring both actors to belong to the
 		/// combat cache. This supports analysis against unarmed but targetable baseline actors.
 		/// </summary>
-		public PairThreat CalculateBaseline(string attacker, string defender)
+		public PairThreat CalculateBaseline(string attacker, string defender,
+			bool currentRangeEngagement = false)
 		{
 			if (string.IsNullOrEmpty(attacker))
 				throw new ArgumentException("Actor types must be non-empty.", nameof(attacker));
@@ -334,7 +335,7 @@ namespace OpenRA.Mods.Common.Traits
 				!defenderInfo.HasTraitInfo<IHealthInfo>() || !defenderInfo.HasTraitInfo<ITargetableInfo>())
 				throw new InvalidOperationException("Baseline combat analysis requires targetable actors with health.");
 
-			return CalculatePair(attackerInfo, defenderInfo);
+			return CalculatePair(attackerInfo, defenderInfo, currentRangeEngagement);
 		}
 
 		/// <summary>
@@ -418,17 +419,20 @@ namespace OpenRA.Mods.Common.Traits
 		public double EstimateLiveMixedGroupCrossover(IEnumerable<Actor> ourActors,
 			IEnumerable<Actor> theirActors,
 			BitSet<TargetableType>? plannedAttackerTargetTypesOverride = null,
-			bool plannedCurrentRangeEngagement = false)
+			bool plannedCurrentRangeEngagement = false,
+			bool preserveRulesDefenderThreatForPlannedExposure = false)
 		{
 			return CalculateLiveMixedGroupThreat(ourActors, theirActors,
-				plannedAttackerTargetTypesOverride, plannedCurrentRangeEngagement).Crossover;
+				plannedAttackerTargetTypesOverride, plannedCurrentRangeEngagement,
+				preserveRulesDefenderThreatForPlannedExposure).Crossover;
 		}
 
 		/// <summary>Returns the standard live threat rating and crossover in one aggregation.</summary>
 		public MixedGroupThreat CalculateLiveMixedGroupThreat(IEnumerable<Actor> ourActors,
 			IEnumerable<Actor> theirActors,
 			BitSet<TargetableType>? plannedAttackerTargetTypesOverride = null,
-			bool plannedCurrentRangeEngagement = false)
+			bool plannedCurrentRangeEngagement = false,
+			bool preserveRulesDefenderThreatForPlannedExposure = false)
 		{
 			if (ourActors == null)
 				throw new ArgumentNullException(nameof(ourActors));
@@ -450,10 +454,12 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				var pairThreats = ours.Where(actor => actor.Info.Name.Equals(
 					ourType, StringComparison.OrdinalIgnoreCase)).SelectMany(attacker =>
-					theirs.Where(actor => actor.Info.Name.Equals(theirType,
-						StringComparison.OrdinalIgnoreCase)).Select(defender =>
-							CalculateLive(attacker, defender, plannedAttackerTargetTypesOverride,
-								plannedCurrentRangeEngagement).DefenderThreatInAttackerEquivalents));
+						theirs.Where(actor => actor.Info.Name.Equals(theirType,
+							StringComparison.OrdinalIgnoreCase)).Select(defender =>
+								CalculateLive(attacker, defender, plannedAttackerTargetTypesOverride,
+									plannedCurrentRangeEngagement,
+									preserveRulesDefenderThreatForPlannedExposure)
+									.DefenderThreatInAttackerEquivalents));
 				return pairThreats.DefaultIfEmpty().Average();
 			});
 		}
@@ -614,14 +620,17 @@ namespace OpenRA.Mods.Common.Traits
 			return true;
 		}
 
-		public static double DefenderThreatAtDistance(PairThreat pair, double engagementDistanceCells)
+		public static double DefenderThreatAtDistance(PairThreat pair, double engagementDistanceCells,
+			bool includeDefenderHitRadius = false)
 		{
 			if (pair == null)
 				throw new ArgumentNullException(nameof(pair));
 
 			var distance = Math.Max(0, engagementDistanceCells);
-			var incoming = CanEngageAtDistance(pair.Reverse, distance) ? pair.Reverse.RawKillRate : 0;
-			var outgoing = CanEngageAtDistance(pair.Forward, distance) ? pair.Forward.RawKillRate : 0;
+			var incoming = CanEngageAtDistance(pair.Reverse, distance, includeDefenderHitRadius) ?
+				pair.Reverse.RawKillRate : 0;
+			var outgoing = CanEngageAtDistance(pair.Forward, distance, includeDefenderHitRadius) ?
+				pair.Forward.RawKillRate : 0;
 			return SpecificDistanceThreatEquivalent(incoming, outgoing,
 				pair.DefenderVeterancyFactor, pair.AttackerVeterancyFactor);
 		}
@@ -633,21 +642,41 @@ namespace OpenRA.Mods.Common.Traits
 				defenderFactor, attackerFactor);
 		}
 
-		public static bool CanEngageAtDistance(DirectionalThreat direction, double engagementDistanceCells)
+		/// <summary>
+		/// Rates an exposed position inside the defender's real weapon range. This deliberately
+		/// ignores strategic outranging: route callers already decide whether the position lies
+		/// inside that range and need the exchange magnitude if it does.
+		/// </summary>
+		public static double DefenderThreatDuringRangeExposure(PairThreat pair)
 		{
-			return direction != null && CanEngageAtDistance(direction.CanTarget, direction.ContactAttack,
+			if (pair == null)
+				throw new ArgumentNullException(nameof(pair));
+			return SpecificDistanceThreatEquivalent(
+				pair.Reverse.CanTarget ? pair.Reverse.RawKillRate : 0,
+				pair.Forward.CanTarget ? pair.Forward.RawKillRate : 0,
+				pair.DefenderVeterancyFactor, pair.AttackerVeterancyFactor);
+		}
+
+		public static bool CanEngageAtDistance(DirectionalThreat direction, double engagementDistanceCells,
+			bool includeDefenderHitRadius = false)
+		{
+			if (direction == null)
+				return false;
+			return CanEngageAtDistance(direction.CanTarget, direction.ContactAttack,
 				direction.MinimumRangeCells, direction.RangeCells, direction.DefenderHitRadiusCells,
-				engagementDistanceCells);
+				engagementDistanceCells, includeDefenderHitRadius);
 		}
 
 		public static bool CanEngageAtDistance(bool canTarget, bool contactAttack,
 			double minimumRangeCells, double maximumRangeCells, double defenderHitRadiusCells,
-			double engagementDistanceCells)
+			double engagementDistanceCells, bool includeDefenderHitRadius = false)
 		{
 			if (!canTarget)
 				return false;
 			if (contactAttack)
 				return engagementDistanceCells <= Math.Max(defenderHitRadiusCells, 1d / 1024);
+			if (includeDefenderHitRadius)
+				engagementDistanceCells = Math.Max(0, engagementDistanceCells - defenderHitRadiusCells);
 
 			return engagementDistanceCells >= minimumRangeCells &&
 				engagementDistanceCells <= maximumRangeCells;
@@ -898,12 +927,37 @@ namespace OpenRA.Mods.Common.Traits
 		/// </summary>
 		public PairThreat CalculateLive(Actor attacker, Actor defender,
 			BitSet<TargetableType>? plannedAttackerTargetTypesOverride = null,
-			bool plannedCurrentRangeEngagement = false)
+			bool plannedCurrentRangeEngagement = false,
+			bool preserveRulesDefenderThreatForPlannedExposure = false)
 		{
 			var forward = CalculateLiveDirection(attacker, defender);
 			var reverse = CalculateLiveDirection(
 				defender, attacker, plannedAttackerTargetTypesOverride, plannedCurrentRangeEngagement);
-			return CreatePair(forward, reverse);
+			var live = CreatePair(forward, reverse);
+			if (!preserveRulesDefenderThreatForPlannedExposure)
+				return live;
+
+			var attackerLevel = attacker.TraitOrDefault<GainsExperience>()?.Level ?? 0;
+			var defenderLevel = defender.TraitOrDefault<GainsExperience>()?.Level ?? 0;
+			var baseline = ApplyVeterancyFactors(
+				CalculatePair(attacker.Info, defender.Info, currentRangeEngagement: true),
+				VeterancyFactor(attackerLevel), VeterancyFactor(defenderLevel));
+			if (
+				!baseline.Reverse.CanTarget ||
+				(live.Reverse.CanTarget && live.Reverse.RangeCells >= baseline.Reverse.RangeCells))
+				return live;
+
+			return new PairThreat
+			{
+				Forward = live.Forward,
+				Reverse = baseline.Reverse,
+				AttackerVeterancyFactor = live.AttackerVeterancyFactor,
+				DefenderVeterancyFactor = baseline.DefenderVeterancyFactor,
+				DefenderThreatInAttackerEquivalents = Math.Max(
+					live.DefenderThreatInAttackerEquivalents,
+					baseline.DefenderThreatInAttackerEquivalents),
+				AttackerThreatInDefenderEquivalents = live.AttackerThreatInDefenderEquivalents
+			};
 		}
 
 		static PairThreat Reverse(PairThreat pair)
@@ -919,10 +973,11 @@ namespace OpenRA.Mods.Common.Traits
 			};
 		}
 
-		PairThreat CalculatePair(ActorInfo attacker, ActorInfo defender)
+		PairThreat CalculatePair(ActorInfo attacker, ActorInfo defender,
+			bool currentRangeEngagement = false)
 		{
-			var forward = CalculateDirection(attacker, defender);
-			var reverse = CalculateDirection(defender, attacker);
+			var forward = CalculateDirection(attacker, defender, currentRangeEngagement);
+			var reverse = CalculateDirection(defender, attacker, currentRangeEngagement);
 			return CreatePair(forward, reverse);
 		}
 
@@ -1023,7 +1078,8 @@ namespace OpenRA.Mods.Common.Traits
 			return matchups.Sum(m => m.DefenderThreatInAttackerEquivalents);
 		}
 
-		DirectionalThreat CalculateDirection(ActorInfo attacker, ActorInfo defender)
+		DirectionalThreat CalculateDirection(ActorInfo attacker, ActorInfo defender,
+			bool currentRangeEngagement = false)
 		{
 			var hp = defender.TraitInfo<IHealthInfo>().MaxHP;
 			var sharesCell = defender.TraitInfoOrDefault<MobileInfo>()?.LocomotorInfo.SharesCell == true;
@@ -1050,7 +1106,7 @@ namespace OpenRA.Mods.Common.Traits
 				.Select(a => (Info: a, Threat: CalculateArmament(a, hp, armor, hitRadius, sharesCell,
 					attackerSpeed <= 0, a.ModifiedRange,
 					Array.Empty<int>(), Array.Empty<int>(), Array.Empty<int>(), null, null,
-					targetSpeed, targetEngagementRange, targetTypes)))
+					targetSpeed, targetEngagementRange, targetTypes, currentRangeEngagement)))
 				.ToArray();
 			var ammoPools = attacker.TraitInfos<AmmoPoolInfo>().ToArray();
 			var reloadRates = attacker.TraitInfos<ReloadAmmoPoolInfo>()
@@ -1447,10 +1503,11 @@ namespace OpenRA.Mods.Common.Traits
 			var projectile = ProjectileMovement(weapon.Projectile);
 			var nominalRangeCells = Cells(effectiveRange);
 			var minimumRangeCells = Cells(weapon.MinRange);
-			var movementLimitedRangeCells = EffectiveRangeCells(nominalRangeCells, minimumRangeCells,
-				projectile.SpeedCellsPerTick, targetSpeedCellsPerTick, effectiveHitRadius,
-				projectile.IsInstant, projectile.IsHoming, targetEngagementRangeCells,
-				attackerIsImmobile && !plannedCurrentRangeEngagement);
+			var movementLimitedRangeCells = plannedCurrentRangeEngagement ? nominalRangeCells :
+				EffectiveRangeCells(nominalRangeCells, minimumRangeCells,
+					projectile.SpeedCellsPerTick, targetSpeedCellsPerTick, effectiveHitRadius,
+					projectile.IsInstant, projectile.IsHoming, targetEngagementRangeCells,
+					attackerIsImmobile);
 			effectiveRange = new WDist((int)(movementLimitedRangeCells * 1024));
 			var inaccuracy = weapon.TargetActorCenter && weapon.Projectile is InstantHitInfo ? 0 :
 				ProjectileInaccuracyCells(weapon.Projectile, effectiveRange, inaccuracyModifiers);

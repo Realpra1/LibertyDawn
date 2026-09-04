@@ -21,11 +21,20 @@ namespace OpenRA.Mods.Common.Traits
 		KiteNoSafePlan,
 		KiteUnsafeCurrentPosition,
 		ApproachUnsafeCurrentPosition,
-		MassAttackCrossover
+		MassAttackCrossover,
+		MassAttackNoSafePlan
 	}
 
 	public enum StealthRecalculateFleeDisposition { Retain, TargetAcquisition }
-	public enum StealthRecalculateFleeLiveCause { Traversing, NoTarget, NoRoute, MemberLoss, Completed }
+	public enum StealthRecalculateFleeLiveCause
+	{
+		Traversing,
+		NoTarget,
+		NoRoute,
+		MemberLoss,
+		Completed,
+		SafeToReconsider
+	}
 
 	/// <summary>Immutable, scored reason that alone may create RecalculateFlee ownership.</summary>
 	public sealed class StealthRecalculateFleeEntryEvidence
@@ -33,7 +42,8 @@ namespace OpenRA.Mods.Common.Traits
 		readonly ReadOnlyCollection<uint> memberIds;
 		readonly ReadOnlyCollection<uint> enemyIds;
 		public StealthRecalculateFleeSource Source { get; }
-		public BehaviorId SourceOwner => Source == StealthRecalculateFleeSource.MassAttackCrossover ?
+		public BehaviorId SourceOwner => Source == StealthRecalculateFleeSource.MassAttackCrossover ||
+			Source == StealthRecalculateFleeSource.MassAttackNoSafePlan ?
 			BehaviorId.MassAttack : Source == StealthRecalculateFleeSource.ApproachUnsafeCurrentPosition ?
 			BehaviorId.Approach : BehaviorId.Kite;
 		public OwnershipEpoch SourceEpoch { get; }
@@ -59,8 +69,8 @@ namespace OpenRA.Mods.Common.Traits
 				(evidence.Reason == StealthKiteFallbackReason.NoSafePlan &&
 					evidence.AttackScore.Value.Crossover > 2) ||
 				!source.ActiveMemberActorIds.SequenceEqual(evidence.AttackFacts.FriendlyActorIds) ||
-				!source.LiveDefenderActorIds.SequenceEqual(evidence.AttackFacts.EnemyActorIds) ||
-				!source.LiveDefenderActorIds.SequenceEqual(evidence.DefenderActorIds) ||
+				!evidence.DefenderActorIds.All(evidence.AttackFacts.EnemyActorIds.Contains) ||
+				!evidence.DefenderActorIds.All(source.LiveDefenderActorIds.Contains) ||
 				source.SelectedTargetActorId != evidence.AttackFacts.SelectedTargetActorId ||
 				source.SelectedTargetCurrentCell != evidence.AttackFacts.SelectedTargetCurrentCell)
 				throw new ArgumentException("RecalculateFlee requires canonical Kite escape evidence.", nameof(source));
@@ -82,13 +92,15 @@ namespace OpenRA.Mods.Common.Traits
 			if (source == null || source.Handoff == null || source.Handoff.Owner != BehaviorId.MassAttack ||
 				source.Disposition != StealthMassAttackDisposition.RecalculateFlee ||
 				source.ThreatFacts == null || !source.Threat.HasValue ||
-				source.Threat.Value.StandardScore.Crossover > 1 ||
+				(source.Threat.Value.StandardScore.Crossover > 1 && source.Threat.Value.AttackApproved) ||
 				!source.ActiveMemberActorIds.SequenceEqual(source.ThreatFacts.FriendlyActorIds) ||
 				!source.LiveDefenderActorIds.SequenceEqual(source.ThreatFacts.EnemyActorIds) ||
 				source.SelectedTargetActorId != source.ThreatFacts.SelectedTargetActorId ||
 				source.SelectedTargetCurrentCell != source.ThreatFacts.SelectedTargetCurrentCell)
-				throw new ArgumentException("RecalculateFlee requires canonical MassAttack <=1 crossover evidence.", nameof(source));
-			Source = StealthRecalculateFleeSource.MassAttackCrossover;
+				throw new ArgumentException("RecalculateFlee requires canonical MassAttack escape evidence.", nameof(source));
+			Source = source.Threat.Value.StandardScore.Crossover <= 1 ?
+				StealthRecalculateFleeSource.MassAttackCrossover :
+				StealthRecalculateFleeSource.MassAttackNoSafePlan;
 			SourceEpoch = source.Handoff.Epoch;
 			LiveFingerprint = StealthRecalculateFleeFingerprint.FromMassAttack(source.ThreatFacts);
 			SelectedTargetActorId = source.ThreatFacts.SelectedTargetActorId;
@@ -129,7 +141,9 @@ namespace OpenRA.Mods.Common.Traits
 				(source == StealthRecalculateFleeSource.KiteNoSafePlan &&
 					standardScore.Crossover > 2) ||
 				(source == StealthRecalculateFleeSource.MassAttackCrossover &&
-					standardScore.Crossover > 1))
+					standardScore.Crossover > 1) ||
+				(source == StealthRecalculateFleeSource.MassAttackNoSafePlan &&
+					standardScore.Crossover <= 1))
 				throw new ArgumentException("Invalid persisted RecalculateFlee entry evidence.");
 			Source = source;
 			SourceEpoch = sourceEpoch;
@@ -290,6 +304,7 @@ namespace OpenRA.Mods.Common.Traits
 		public IReadOnlyList<StealthRecalculateFleeMemberSnapshot> Members => members;
 		public IReadOnlyList<StealthRecalculateFleeEnemySnapshot> Enemies => enemies;
 		public bool FormationCloaked { get; }
+		public bool CurrentPositionSafe { get; }
 		public string SourceFingerprint { get; }
 		public bool HasActivityObservation { get; }
 		public long ActivityRevision { get; }
@@ -302,7 +317,8 @@ namespace OpenRA.Mods.Common.Traits
 			bool formationCloaked, string sourceFingerprint,
 			bool hasActivityObservation = false, long activityRevision = 0,
 			StealthRecalculateFleeOrderToken activeOrderToken = null,
-			StealthRecalculateFleeOrderToken completedOrderToken = null)
+			StealthRecalculateFleeOrderToken completedOrderToken = null,
+			bool currentPositionSafe = false)
 		{
 			if (tick < 0 || activityRevision < 0 || members == null || enemies == null ||
 				string.IsNullOrEmpty(sourceFingerprint))
@@ -321,6 +337,7 @@ namespace OpenRA.Mods.Common.Traits
 			this.members = Array.AsReadOnly(memberCopy);
 			this.enemies = Array.AsReadOnly(enemyCopy);
 			FormationCloaked = formationCloaked;
+			CurrentPositionSafe = currentPositionSafe;
 			SourceFingerprint = sourceFingerprint;
 			HasActivityObservation = hasActivityObservation;
 			ActivityRevision = activityRevision;

@@ -80,5 +80,16 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(AdvancedBotFallbackOwnership.IsEligibleForGenericFallback(
 				directCombatTypes, actorType, true), Is.False);
 		}
+
+		[TestCase(false, false, false, true)]
+		[TestCase(true, true, false, true)]
+		[TestCase(true, false, true, true)]
+		[TestCase(true, false, false, false)]
+		public void FailsafeAttackMoveIsRenewedWhenOwnershipTargetOrActivityNeedsIt(
+			bool previouslyOrdered, bool targetChanged, bool isIdle, bool expected)
+		{
+			Assert.That(AdvancedBotFallbackOwnership.RequiresAttackMove(
+				previouslyOrdered, targetChanged, isIdle), Is.EqualTo(expected));
+		}
 	}
 }

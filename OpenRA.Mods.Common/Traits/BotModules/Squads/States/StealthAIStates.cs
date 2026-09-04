@@ -301,7 +301,23 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 		internal static void RoutePendingStealthReinforcementsForModularLifecycle(Squad owner)
 		{
-			RoutePendingStealthReinforcements(owner);
+			if (owner.Type != SquadType.Stealth)
+				return;
+
+			var pending = owner.Units.Any(unit => unit != null && !unit.IsDead && unit.IsInWorld &&
+				owner.AirReinforcements.Contains(unit.ActorID) &&
+				!owner.AirUnitsRepairing.Contains(unit.ActorID));
+			if (pending && owner.AirFormationUnits().Any(unit => !unit.IsDead && unit.IsInWorld))
+				QueueStealthReinforcementsToFormation(owner, false);
+		}
+
+		internal static bool MaintainInitialStealthRepairsForModularLifecycle(Squad owner)
+		{
+			foreach (var unit in owner.Units.Where(unit => unit != null && !unit.IsDead && unit.IsInWorld)
+				.OrderBy(unit => unit.ActorID))
+				SendHomeToRepair(owner, unit);
+
+			return owner.AirUnitsRepairing.Count != 0;
 		}
 
 		/// <summary>Largest <see cref="DamageWarhead.Damage"/> among a weapon's warheads, or 0.</summary>
@@ -723,9 +739,10 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				var detectorRange = actor.TraitsImplementing<DetectCloaked>().Where(d => !d.IsTraitDisabled)
 					.Select(d => (int)Math.Ceiling(d.Range.Length / 1024f)).DefaultIfEmpty().Max();
 				var canonicalThreat = 0d;
-				if (representative != null)
-					owner.SquadManager.CombatThreatCalculator.TryGetDefenderThreat(
-						representative, actor, out canonicalThreat);
+				if (representative != null && owner.SquadManager.CombatThreatCalculator.TryGetCached(
+					representative, actor, out var pair))
+					canonicalThreat = GeneralizedCombatThreatCalculator
+						.DefenderThreatDuringRangeExposure(pair);
 				if (weaponRange > 0 || detectorRange > 0)
 					threats.Add(new GroundThreat
 					{
@@ -1439,7 +1456,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				}
 		}
 
-		protected static StealthInfluenceCache StealthInfluence(Squad owner, Actor unit)
+		protected static StealthInfluenceCache StealthInfluence(Squad owner, Actor unit,
+			bool forceRefresh = false)
 		{
 			var definition = owner.StealthDefinition;
 			var mobile = unit.TraitOrDefault<Mobile>();
@@ -1459,7 +1477,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var locomotor = unit.Info.TraitInfoOrDefault<MobileInfo>()?.Locomotor ?? "ground";
 			var cacheKey = owner.StealthProfile + ":" + locomotor;
 			var info = owner.SquadManager.Info;
-			if (profileCaches.TryGetValue(cacheKey, out var cached) && cached.Width == width &&
+			if (!forceRefresh && profileCaches.TryGetValue(cacheKey, out var cached) && cached.Width == width &&
 				cached.Height == height && owner.World.WorldTick - cached.Tick <
 					owner.SquadManager.StrategicPlanningInterval(info.AirInfluenceCacheInterval))
 			{
@@ -1642,8 +1660,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var goalY = Math.Clamp(goalCell.Y, 0, cache.Height - 1);
 			var route = FindAirRoute(owner, danger, cache.Width, cache.Height,
 				startX, startY, goalX, goalY, definition.RouteThreatPenalty);
-			if (route == null || route.Skip(allowDangerousStart ? 1 : 0).Any(cell => StealthAISpecialistPolicy.IsHardRouteDanger(
-				danger[cell.Y * cache.Width + cell.X])))
+			if (route == null)
 				return null;
 
 			return ThreatAwareRoutePlanner.SmoothRoute(danger, cache.Width, cache.Height,
@@ -4238,22 +4255,12 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 						?? incumbentPlan;
 			}
 
-			var otherStealthTargetCells = owner.SquadManager.Squads.Where(squad => squad != owner &&
-				squad.IsValid && squad.Type == SquadType.Stealth &&
-				squad.StealthProfile == owner.StealthProfile && squad.IsTargetValid)
-				.Select(squad => squad.AirTargetStrategicCell ?? new CPos(
-					squad.TargetActor.Location.X / coarseSize, squad.TargetActor.Location.Y / coarseSize))
-				.Distinct().OrderBy(cell => cell.Y).ThenBy(cell => cell.X).ToList();
-			long Separation(AirTargetPlan plan) => StealthAIThreatGeometry.MinimumCellSeparationSquared(
-				strategicCellByPlan.TryGetValue(plan, out var strategicCell) ? strategicCell :
-					new CPos(plan.Actor.Location.X / coarseSize, plan.Actor.Location.Y / coarseSize),
-				otherStealthTargetCells);
 			// Kill-cadence watchdog data is deliberately absent from this ordering. It is
 			// diagnostic output only and must never change target eligibility or routing.
 			AirTargetPlan best = null;
 			if (best == null)
 				best = clearPlans.Where(p => p.StealthMode == StealthClearMode.CrushBridge)
-					.OrderByDescending(Separation).ThenByDescending(p => p.Score)
+					.OrderByDescending(p => p.Score)
 					.ThenBy(p => p.Actor.ActorID).FirstOrDefault();
 			if (best == null)
 			{
@@ -4281,30 +4288,30 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				best = safePlans.Where(p =>
 					StealthAISpecialistPolicy.IsWithinUndefendedTravelPreference(
 						p.ServiceMs, owner.StealthDefinition.MaximumUndefendedTargetTravelSeconds))
-				.OrderByDescending(p => Separation(p.Plan)).ThenBy(p => p.ServiceMs)
+				.OrderBy(p => p.ServiceMs)
 					.ThenByDescending(p => p.Plan.Score).ThenBy(p => p.TravelMs)
 					.ThenBy(p => p.Plan.Actor.ActorID).Select(p => p.Plan).FirstOrDefault();
 			if (best == null)
 				best = safePlans
-					.OrderByDescending(p => Separation(p.Plan)).ThenBy(p => p.ServiceMs)
+					.OrderBy(p => p.ServiceMs)
 					.ThenByDescending(p => p.Plan.Score).ThenBy(p => p.TravelMs)
 					.ThenBy(p => p.Plan.Actor.ActorID).Select(p => p.Plan).FirstOrDefault();
 			if (best == null)
 				best = clearPlans.Where(p => p.StealthMode == StealthClearMode.Kite ||
 						p.StealthMode == StealthClearMode.CrushBridge)
-					.OrderByDescending(Separation).ThenByDescending(p => p.Score)
+					.OrderByDescending(p => p.Score)
 					.ThenBy(p => p.Actor.ActorID).FirstOrDefault();
 			if (best == null)
 				best = clearPlans.Where(p => p.StealthMode == StealthClearMode.Mass)
-					.OrderByDescending(Separation).ThenByDescending(p => p.Score)
+					.OrderByDescending(p => p.Score)
 					.ThenBy(p => p.Actor.ActorID).FirstOrDefault();
 			if (best == null)
-				best = safePlans.OrderByDescending(p => Separation(p.Plan)).ThenBy(p => p.ServiceMs)
+				best = safePlans.OrderBy(p => p.ServiceMs)
 					.ThenByDescending(p => p.Plan.Score)
 					.ThenBy(p => p.TravelMs).ThenBy(p => p.Plan.Actor.ActorID)
 					.Select(p => p.Plan).FirstOrDefault();
 			if (best == null)
-				best = clearPlans.OrderByDescending(Separation).ThenBy(p => p.ServiceMilliseconds)
+				best = clearPlans.OrderBy(p => p.ServiceMilliseconds)
 					.ThenByDescending(p => p.Score)
 					.ThenBy(p => p.Actor.ActorID).FirstOrDefault();
 
@@ -4334,8 +4341,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				{
 					var health = plan.Actor.TraitOrDefault<IHealth>();
 					return $"{plan.Actor.Info.Name}#{plan.Actor.ActorID}:score={plan.Score}:mode={plan.StealthMode}:" +
-						$"hp={health?.HP ?? 0}/{health?.MaxHP ?? 0}:service-ms={plan.ServiceMilliseconds}:" +
-						$"separation={Separation(plan)}";
+						$"hp={health?.HP ?? 0}/{health?.MaxHP ?? 0}:service-ms={plan.ServiceMilliseconds}";
 				}).JoinWith(",");
 				Log.Write("debug", "Stealth target evidence [{0}] tick={1}: incumbent={2} top-two={3}.",
 					owner.StealthProfile, owner.World.WorldTick,
@@ -5507,15 +5513,17 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		// of its neighbors. They always receive a route from their own position and never inherit the
 		// formation's shared route while catching up.
 
-		protected static void QueueStealthReinforcementsToFormation(Squad owner)
+		protected static void QueueStealthReinforcementsToFormation(Squad owner,
+			bool consumeManagerAllowance = true)
 		{
-			if (owner.StealthProfile != "stealth-tank")
+			if (owner.Type != SquadType.Stealth)
 				return;
 
 			var formation = owner.AirFormationUnits();
 			if (formation.Count == 0)
 				return;
-			if (!owner.SquadManager.TryConsumeStealthCatchUpRoutingAllowance(owner))
+			if (consumeManagerAllowance &&
+				!owner.SquadManager.TryConsumeStealthCatchUpRoutingAllowance(owner))
 				return;
 
 			var anchorCell = CoarseCell(owner, owner.World.Map.CellContaining(owner.AirFormationCenter));

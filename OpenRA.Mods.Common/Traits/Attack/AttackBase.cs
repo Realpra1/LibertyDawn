@@ -69,6 +69,7 @@ namespace OpenRA.Mods.Common.Traits
 
 	public abstract class AttackBase : PausableConditionalTrait<AttackBaseInfo>, ITick, IIssueOrder, IResolveOrder, IOrderVoice, ISync
 	{
+		const string AttackWithoutMovingOrderName = "AttackWithoutMoving";
 		readonly string attackOrderName = "Attack";
 		readonly string forceAttackOrderName = "ForceAttack";
 
@@ -197,12 +198,14 @@ namespace OpenRA.Mods.Common.Traits
 		void IResolveOrder.ResolveOrder(Actor self, Order order)
 		{
 			var forceAttack = order.OrderString == forceAttackOrderName;
-			if (forceAttack || order.OrderString == attackOrderName)
+			if (forceAttack || order.OrderString == attackOrderName ||
+				order.OrderString == AttackWithoutMovingOrderName)
 			{
 				if (!order.Target.IsValidFor(self))
 					return;
 
-				AttackTarget(order.Target, AttackSource.Default, order.Queued, true, forceAttack, Info.TargetLineColor);
+				AttackTarget(order.Target, AttackSource.Default, order.Queued,
+					order.OrderString != AttackWithoutMovingOrderName, forceAttack, Info.TargetLineColor);
 				self.ShowTargetLines();
 			}
 			else if (order.OrderString == "Stop")

@@ -10,6 +10,7 @@
 #endregion
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace OpenRA.Mods.Common.Traits
@@ -20,6 +21,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		public StealthCrushMemberSnapshot[] Members { get; }
 		public StealthCrushActorSnapshot[] Defenders { get; }
+		public StealthCrushActorSnapshot[] CrushableInfantry { get; }
 		public StealthCrushActorSnapshot[] Candidates { get; }
 		public uint[] DefenderActorIds { get; }
 		public uint[] ObjectiveActorIds { get; }
@@ -34,8 +36,10 @@ namespace OpenRA.Mods.Common.Traits
 			var actors = live.Actors.Where(actor => actor.IsValid)
 				.OrderBy(actor => actor.ActorId).ToArray();
 			Defenders = actors.Where(actor => actor.IsDefender).ToArray();
-			Candidates = Defenders.Where(actor => actor.IsInfantry &&
+			CrushableInfantry = Defenders.Where(actor => actor.IsInfantry &&
 				actor.CanBeCrushedByFormation).ToArray();
+			Candidates = Members.Length == 0 ? Array.Empty<StealthCrushActorSnapshot>() :
+				CrushableInfantry;
 			DefenderActorIds = Defenders.Select(actor => actor.ActorId).ToArray();
 			ObjectiveActorIds = actors.Where(actor => actor.IsMissionObjective &&
 				actor.StrategicCell == mission.StrategicCell)
@@ -65,6 +69,15 @@ namespace OpenRA.Mods.Common.Traits
 			return retained ?? SelectClosestHighestPriorityTarget();
 		}
 
+		public StealthCrushActorSnapshot SelectFallbackKiteTarget()
+		{
+			if (Members.Length == 0 || CrushableInfantry.Length == 0)
+				return null;
+			var center = FormationCenter(Members).Value;
+			return CrushableInfantry.OrderBy(actor => DistanceSquared(center, actor.CurrentCell))
+				.ThenBy(actor => actor.ActorId).First();
+		}
+
 		public StealthCrushThreatFacts ThreatFacts(StealthCrushActorSnapshot selected)
 		{
 			if (selected == null || !Candidates.Contains(selected))
@@ -78,9 +91,16 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			var priority = StealthAISpecialistPolicy.HighestPriorityEligibleEngagements(
 				Candidates.Select(candidate => (candidate, candidate.ConfiguredPriority)));
-			return priority.OrderBy(candidate => Members.Min(member =>
-				DistanceSquared(member.CurrentCell, candidate.CurrentCell)))
+			var center = FormationCenter(Members).Value;
+			return priority.OrderBy(candidate => DistanceSquared(center, candidate.CurrentCell))
 				.ThenBy(candidate => candidate.ActorId).First();
+		}
+
+		static CPos? FormationCenter(IReadOnlyList<StealthCrushMemberSnapshot> members)
+		{
+			return members.Count == 0 ? (CPos?)null : new CPos(
+				(int)Math.Round(members.Average(member => member.CurrentCell.X)),
+				(int)Math.Round(members.Average(member => member.CurrentCell.Y)));
 		}
 
 		static long DistanceSquared(CPos left, CPos right)

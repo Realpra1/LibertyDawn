@@ -10,76 +10,31 @@
 #endregion
 
 using System;
-using System.Collections.Generic;
 using System.Linq;
 
 namespace OpenRA.Mods.Common.Traits
 {
-	/// <summary>Step 4C: choose a nearby survivor while rewarding separation from other squads.</summary>
+	/// <summary>Step 4C: choose the survivor with the lowest cached route cost.</summary>
 	public sealed class StealthTargetDistanceChoiceBehavior
 	{
-		sealed class DistanceFact
-		{
-			public StealthTargetThreatOption Option { get; }
-			public long SeparationSquared { get; }
-			public int SeparationCreditMilliseconds { get; }
-			public long AdjustedTravelMilliseconds { get; }
-
-			public DistanceFact(StealthTargetThreatOption option, long separationSquared,
-				int separationCreditMilliseconds, long adjustedTravelMilliseconds)
-			{
-				Option = option;
-				SeparationSquared = separationSquared;
-				SeparationCreditMilliseconds = separationCreditMilliseconds;
-				AdjustedTravelMilliseconds = adjustedTravelMilliseconds;
-			}
-		}
-
 		readonly StealthTargetDistanceChoiceHandoff handoff;
-		readonly CPos[] otherSquadCells;
-		readonly StealthTargetDistanceChoicePolicy policy;
 
-		public StealthTargetDistanceChoiceBehavior(StealthTargetDistanceChoiceHandoff handoff,
-			IEnumerable<StealthActiveSquadTargetSnapshot> otherActiveSquads,
-			StealthTargetDistanceChoicePolicy policy)
+		public StealthTargetDistanceChoiceBehavior(StealthTargetDistanceChoiceHandoff handoff)
 		{
 			this.handoff = handoff ?? throw new ArgumentNullException(nameof(handoff));
 			if (handoff.Owner != BehaviorId.TargetDistanceChoice || handoff.Options.Count == 0)
 				throw new ArgumentException("TargetDistanceChoice requires candidate ownership.", nameof(handoff));
-			if (otherActiveSquads == null)
-				throw new ArgumentNullException(nameof(otherActiveSquads));
-			this.policy = policy ?? throw new ArgumentNullException(nameof(policy));
-			var squads = otherActiveSquads.OrderBy(squad => squad?.StableActorId).ToArray();
-			if (squads.Any(squad => squad == null) ||
-				squads.Select(squad => squad.StableActorId).Distinct().Count() != squads.Length)
-				throw new ArgumentException("Other squads require unique identities.", nameof(otherActiveSquads));
-			otherSquadCells = squads.Select(squad => squad.StrategicCell).ToArray();
 		}
 
 		public StealthTargetDistanceChoiceResult Execute()
 		{
-			var selected = handoff.Options.Select(Fact)
-				.OrderBy(fact => fact.AdjustedTravelMilliseconds)
-				.ThenByDescending(fact => fact.SeparationSquared)
-				.ThenBy(fact => fact.Option.ValueOption.EstimatedTravelMilliseconds ?? int.MaxValue)
-				.ThenBy(fact => fact.Option.StableIdentity)
-				.ThenBy(fact => fact.Option.StrategicCell.Y)
-				.ThenBy(fact => fact.Option.StrategicCell.X).First();
+			var selected = handoff.Options
+				.OrderBy(option => option.ValueOption.EstimatedTravelMilliseconds ?? int.MaxValue)
+				.ThenBy(option => option.StableIdentity)
+				.ThenBy(option => option.StrategicCell.Y)
+				.ThenBy(option => option.StrategicCell.X).First();
 			return new StealthTargetDistanceChoiceResult(handoff.Handoff,
-				new StealthApproachMission(selected.Option, selected.SeparationSquared,
-					selected.SeparationCreditMilliseconds, selected.AdjustedTravelMilliseconds));
-		}
-
-		DistanceFact Fact(StealthTargetThreatOption option)
-		{
-			var separation = StealthAIThreatGeometry.MinimumCellSeparationSquared(
-				option.StrategicCell, otherSquadCells);
-			var travel = option.ValueOption.EstimatedTravelMilliseconds;
-			var credit = separation == long.MaxValue || !travel.HasValue ? 0 : (int)Math.Min(
-				policy.MaximumSeparationCreditMilliseconds,
-				Math.Min(separation, int.MaxValue) * policy.SeparationCreditPerSquaredCellMilliseconds);
-			var adjusted = travel.HasValue ? Math.Max(0L, travel.Value - (long)credit) : long.MaxValue;
-			return new DistanceFact(option, separation, credit, adjusted);
+				new StealthApproachMission(selected));
 		}
 	}
 }

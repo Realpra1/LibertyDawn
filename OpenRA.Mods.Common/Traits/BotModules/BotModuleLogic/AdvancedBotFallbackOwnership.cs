@@ -29,6 +29,14 @@ namespace OpenRA.Mods.Common.Traits.BotModules
 			return hasAttackTrait && directCombatTypes.Contains(actorType);
 		}
 
+		public static bool RequiresAttackMove(bool previouslyOrdered, bool targetChanged, bool isIdle)
+		{
+			// Engine pathing may complete or abandon an AttackMove without reaching a viable
+			// target. A failsafe owner must reclaim that idle actor regardless of which
+			// ordinary squad policy was configured before advanced behavior was shed.
+			return !previouslyOrdered || targetChanged || isIdle;
+		}
+
 		public void Retain(string source, IEnumerable<uint> actorIds)
 		{
 			if (string.IsNullOrEmpty(source))

@@ -35,25 +35,24 @@ namespace OpenRA.Mods.Common.Traits
 				!facts.PlannedCurrentRangeEngagement)
 				throw new InvalidOperationException("Crush safety requires a remain-cloaked live action context.");
 
-			var friendly = facts.FriendlyActorIds.Select(Resolve).ToArray();
-			var enemy = facts.EnemyActorIds.Select(Resolve).ToArray();
 			var selected = Resolve(facts.SelectedTargetActorId);
 			if (selected.Location != facts.SelectedTargetCurrentCell)
 				throw new InvalidOperationException("The selected Crush infantry moved during live safety evaluation.");
-
-			var crossover = calculator.EstimateLiveMixedGroupCrossover(
-				friendly, enemy, null, plannedCurrentRangeEngagement: true);
-			var maximumThreat = friendly.SelectMany(attacker => enemy.Select(defender =>
-				calculator.CalculateLive(attacker, defender, null,
-					plannedCurrentRangeEngagement: true).DefenderThreatInAttackerEquivalents))
-				.DefaultIfEmpty().Max();
-
-			// The standard calculation is still required for the live package context. A
-			// remain-cloaked action makes that weapon threat ineffective only while the
-			// formation is actually cloaked and the exact live action has no detector coverage.
 			if (facts.FormationCloaked && !facts.HasDetectorCoverage)
 				return new StealthCrushSafetyResult(
 					new StealthTargetThreatScore(0, double.PositiveInfinity), true);
+
+			var friendly = facts.FriendlyActorIds.Select(Resolve).ToArray();
+			var enemy = facts.EnemyActorIds.Select(Resolve).ToArray();
+			var representative = friendly.OrderBy(attacker => enemy.Min(defender =>
+				(attacker.CenterPosition - defender.CenterPosition).HorizontalLengthSquared))
+				.ThenBy(attacker => attacker.ActorID).First();
+			var crossover = calculator.EstimateLiveMixedGroupCrossover(
+				friendly, enemy, null, plannedCurrentRangeEngagement: true);
+			var maximumThreat = enemy.Select(defender =>
+				calculator.CalculateLive(representative, defender, null,
+					plannedCurrentRangeEngagement: true).DefenderThreatInAttackerEquivalents)
+				.DefaultIfEmpty().Max();
 
 			return new StealthCrushSafetyResult(
 				new StealthTargetThreatScore(maximumThreat, crossover), false);

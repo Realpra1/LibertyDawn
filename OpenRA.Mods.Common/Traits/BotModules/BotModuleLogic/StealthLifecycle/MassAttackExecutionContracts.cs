@@ -159,9 +159,10 @@ namespace OpenRA.Mods.Common.Traits
 			if (!TargetShape() || (Disposition == StealthMassAttackDisposition.Retain) !=
 				(LastOrderToken != null) ||
 				(Disposition == StealthMassAttackDisposition.Retain &&
-					Threat.Value.StandardScore.Crossover <= 1) ||
+					Threat.Value.StandardScore.Crossover <= 1 &&
+					!Source.Evidence.CoordinatedMassAttack) ||
 				(Disposition == StealthMassAttackDisposition.RecalculateFlee &&
-					Threat.Value.StandardScore.Crossover > 1))
+					Threat.Value.StandardScore.Crossover > 1 && Threat.Value.AttackApproved))
 				throw new ArgumentException("MassAttack targeted result has no exact live cause.");
 		}
 
@@ -184,7 +185,8 @@ namespace OpenRA.Mods.Common.Traits
 				(LastOrderToken == null || (LastOrderToken.Owner == BehaviorId.MassAttack &&
 					LastOrderToken.Epoch == Handoff.Epoch && LastOrderToken.Phase == Phase &&
 					LastOrderToken.ActorIds.SequenceEqual(memberIds) &&
-					LastOrderToken.TargetActorId == SelectedTargetActorId));
+					(LastOrderToken.TargetActorId == SelectedTargetActorId ||
+						objectiveIds.Contains(LastOrderToken.TargetActorId))));
 		}
 
 		static ReadOnlyCollection<uint> Canonical(IEnumerable<uint> ids, string parameter)

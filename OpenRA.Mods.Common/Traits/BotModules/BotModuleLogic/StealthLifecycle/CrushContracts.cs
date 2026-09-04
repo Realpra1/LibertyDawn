@@ -30,10 +30,11 @@ namespace OpenRA.Mods.Common.Traits
 		public CPos CurrentCell { get; }
 		public bool IsInWorld { get; }
 		public bool IsDead { get; }
+		public bool NeedsMovementOrder { get; }
 		public bool IsValid => IsInWorld && !IsDead;
 
 		public StealthCrushMemberSnapshot(uint actorId, CPos currentCell,
-			bool isInWorld = true, bool isDead = false)
+			bool isInWorld = true, bool isDead = false, bool needsMovementOrder = false)
 		{
 			if (actorId == 0)
 				throw new ArgumentOutOfRangeException(nameof(actorId));
@@ -41,6 +42,7 @@ namespace OpenRA.Mods.Common.Traits
 			CurrentCell = currentCell;
 			IsInWorld = isInWorld;
 			IsDead = isDead;
+			NeedsMovementOrder = needsMovementOrder;
 		}
 	}
 
@@ -236,9 +238,15 @@ namespace OpenRA.Mods.Common.Traits
 		public OwnershipEpoch Epoch => Handoff.Epoch;
 		public StealthApproachMission Mission { get; }
 		public IReadOnlyList<uint> LiveDefenderActorIds => liveDefenderActorIds;
+		public uint? RequiredKiteActorId { get; }
 
 		internal StealthKiteHandoff(StealthBehaviorHandoff handoff,
 			StealthApproachMission mission, IEnumerable<uint> liveDefenderActorIds)
+			: this(handoff, mission, liveDefenderActorIds, null) { }
+
+		internal StealthKiteHandoff(StealthBehaviorHandoff handoff,
+			StealthApproachMission mission, IEnumerable<uint> liveDefenderActorIds,
+			uint? requiredKiteActorId)
 		{
 			Handoff = handoff ?? throw new ArgumentNullException(nameof(handoff));
 			if (handoff.Owner != BehaviorId.Kite)
@@ -252,6 +260,10 @@ namespace OpenRA.Mods.Common.Traits
 				throw new ArgumentException("Kite requires unique live defender identities.",
 					nameof(liveDefenderActorIds));
 			this.liveDefenderActorIds = Array.AsReadOnly(normalized);
+			if (requiredKiteActorId.HasValue && !normalized.Contains(requiredKiteActorId.Value))
+				throw new ArgumentException("A required Kite actor must be a live defender.",
+					nameof(requiredKiteActorId));
+			RequiredKiteActorId = requiredKiteActorId;
 		}
 	}
 
@@ -268,7 +280,8 @@ namespace OpenRA.Mods.Common.Traits
 			if (result.Disposition == StealthCrushDisposition.Retain)
 				Retained = handoff;
 			else if (result.Disposition == StealthCrushDisposition.Kite)
-				Kite = new StealthKiteHandoff(handoff, result.Mission, result.LiveDefenderActorIds);
+				Kite = new StealthKiteHandoff(handoff, result.Mission,
+					result.LiveDefenderActorIds, result.SelectedTargetActorId);
 			else if (result.Disposition == StealthCrushDisposition.UndefendedAttack)
 				UndefendedAttack = new StealthUndefendedAttackHandoff(handoff, result.Mission);
 			else

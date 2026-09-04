@@ -147,7 +147,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			IStealthLifecycleRuntimeOrders runtimeOrders)
 		{
 			squad.StealthOverlayConsideredTargets.Clear();
-			var behavior = new StealthTargetAcquisitionBehavior(entry.Handoff, strategic);
+			squad.StealthOverlayChosenTarget = null;
+			var behavior = new StealthTargetAcquisitionBehavior(
+				entry.Handoff, strategic, squad.StealthSquadIndex);
 			StealthTargetAcquisitionResult result = null;
 			object Execute() { return result = ExecuteAcquisition(behavior, runtimeOrders); }
 			return Owner(entry, Execute);
@@ -156,17 +158,19 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		StealthTargetAcquisitionResult ExecuteAcquisition(
 			StealthTargetAcquisitionBehavior behavior, IStealthLifecycleRuntimeOrders runtimeOrders)
 		{
-			var result = behavior.Execute(combat.ActiveCenter(), squad.AirTargetStrategicCell);
+			var members = combat.Members().ToArray();
+			var result = behavior.Execute(combat.ActiveCenter(), squad.AirTargetStrategicCell,
+				members.Length != 0 && members.All(actor => actor.IsIdle));
 			squad.StealthOverlayConsideredTargets.Clear();
 			squad.StealthOverlayConsideredTargets.AddRange(result.Options.Select(option => option.StrategicCell));
 			if (result.Disposition == StealthTargetAcquisitionDisposition.MoveCloserAndRescan &&
 				result.MoveCloserStrategicCell.HasValue)
 			{
-				var members = combat.Members().Select(actor => actor.ActorID).ToArray();
-				if (members.Length != 0)
+				var actorIds = members.Select(actor => actor.ActorID).ToArray();
+				if (actorIds.Length != 0)
 					runtimeOrders.Issue(new StealthLifecycleRuntimeOrder(result.Handoff.Owner,
 						result.Handoff.Epoch, StealthLifecycleRuntimeOrderKind.Move,
-						"acquisition-rescan", members, targetCell: result.MoveCloserStrategicCell));
+						"acquisition-rescan", actorIds, targetCell: result.MoveCloserStrategicCell));
 			}
 
 			return result;
@@ -192,9 +196,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		IStealthLifecycleRuntimeOwner TargetDistance(StealthLifecycleRuntimeEntry entry)
 		{
 			var handoff = (StealthTargetDistanceChoiceHandoff)entry.Context;
-			var policy = new StealthTargetDistanceChoicePolicy(1000, 3000);
-			var behavior = new StealthTargetDistanceChoiceBehavior(
-				handoff, combat.OtherActiveSquads(), policy);
+			var behavior = new StealthTargetDistanceChoiceBehavior(handoff);
 			StealthTargetDistanceChoiceResult result = null;
 			return Owner(entry, () =>
 			{
@@ -203,6 +205,11 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				{
 					squad.AirTargetStrategicCell = result.Mission.StrategicCell;
 					squad.StealthOverlayChosenTarget = result.Mission.StrategicCell;
+					var coordinatedCell = squad.StealthCoordinatedMassAttackCell ??
+						squad.StealthMassCoordinationCell;
+					if (coordinatedCell.HasValue && !StealthProvincialMassCoordinator.SameProvince(
+						coordinatedCell.Value, result.Mission.StrategicCell))
+						ClearProvincialMassRequest();
 				}
 
 				return result;
@@ -212,9 +219,21 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		IStealthLifecycleRuntimeOwner Approach(StealthLifecycleRuntimeEntry entry,
 			StealthSquadLifecycleOrders orders)
 		{
-			var handoff = (StealthApproachHandoff)entry.Context;
+			var handoff = ApproachHandoff(entry);
 			var behavior = new StealthApproachBehavior(handoff, strategic, combat, orders);
-			return Owner(entry, behavior.Execute);
+			return FightOwner(entry, () =>
+			{
+				var result = behavior.Execute();
+				if (result.Disposition == StealthApproachDisposition.Reacquire)
+				{
+					// A live-invalid mission is no longer an incumbent. Keeping its cached cell here
+					// would select the same stale mission on every acquisition cycle.
+					squad.AirTargetStrategicCell = null;
+					squad.StealthOverlayChosenTarget = null;
+				}
+
+				return result;
+			});
 		}
 
 		IStealthLifecycleRuntimeOwner Undefended(StealthLifecycleRuntimeEntry entry,
@@ -223,7 +242,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var handoff = UndefendedHandoff(entry);
 			var behavior = new StealthUndefendedAttackBehavior(handoff, guard, combat,
 				new GeneralizedCombatUndefendedAttackThreatAdapter(
-					squad.SquadManager.CombatThreatCalculator, combat.Resolve), orders);
+					squad.SquadManager.CombatThreatCalculator, combat.Resolve,
+					squad.StealthDefinition.ThreatRangeBufferCells), orders);
 			return FightOwner(entry, behavior.Execute);
 		}
 
@@ -243,8 +263,58 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var handoff = KiteHandoff(entry);
 			var behavior = new StealthKiteBehavior(handoff, guard, combat,
 				new GeneralizedCombatKiteThreatAdapter(squad.SquadManager.CombatThreatCalculator,
-					combat.Resolve, GroundTargetTypes), orders);
-			return FightOwner(entry, behavior.Execute);
+					combat.Resolve, GroundTargetTypes,
+					squad.StealthDefinition.ThreatRangeBufferCells), orders,
+				_ => squad.StealthCoordinatedMassAttackCell.HasValue &&
+					StealthProvincialMassCoordinator.SameProvince(
+						squad.StealthCoordinatedMassAttackCell.Value,
+						handoff.Mission.StrategicCell));
+			return FightOwner(entry, () =>
+			{
+				var result = behavior.Execute();
+				if (result.Disposition == StealthKiteDisposition.RecalculateFlee &&
+					result.FallbackEvidence?.Reason == StealthKiteFallbackReason.NoSafePlan &&
+					result.SelectedTargetCurrentCell.HasValue)
+				{
+					var targetStrategicCell = result.Mission.StrategicCell;
+					RequestProvincialMass(targetStrategicCell);
+				}
+
+				return result;
+			});
+		}
+
+		void RequestProvincialMass(CPos targetStrategicCell)
+		{
+			if (squad.StealthCoordinatedMassAttackCell.HasValue &&
+				StealthProvincialMassCoordinator.SameProvince(
+					squad.StealthCoordinatedMassAttackCell.Value, targetStrategicCell))
+				return;
+
+			if (squad.StealthCoordinatedMassAttackCell.HasValue &&
+				!StealthProvincialMassCoordinator.SameProvince(
+					squad.StealthCoordinatedMassAttackCell.Value, targetStrategicCell))
+				squad.StealthCoordinatedMassAttackCell = null;
+
+			if (!squad.StealthMassCoordinationCell.HasValue ||
+				!StealthProvincialMassCoordinator.SameProvince(
+					squad.StealthMassCoordinationCell.Value, targetStrategicCell))
+			{
+				squad.StealthMassCoordinationRequestedTick = squad.World.WorldTick;
+				squad.StealthMassCoordinationCell = targetStrategicCell;
+			}
+		}
+
+		void ClearProvincialMassRequest()
+		{
+			ClearPendingProvincialMassRequest();
+			squad.StealthCoordinatedMassAttackCell = null;
+		}
+
+		void ClearPendingProvincialMassRequest()
+		{
+			squad.StealthMassCoordinationCell = null;
+			squad.StealthMassCoordinationRequestedTick = -1;
 		}
 
 		IStealthLifecycleRuntimeOwner MassAttack(StealthLifecycleRuntimeEntry entry,
@@ -262,7 +332,13 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var behavior = new StealthMassAttackBehavior(handoff, guard, combat,
 				new GeneralizedCombatMassAttackThreatAdapter(squad.SquadManager.CombatThreatCalculator,
 					combat.Resolve, GroundTargetTypes), orders);
-			return FightOwner(entry, behavior.Execute);
+			return FightOwner(entry, () =>
+			{
+				var result = behavior.Execute();
+				if (result.Disposition != StealthMassAttackDisposition.Retain)
+					ClearProvincialMassRequest();
+				return result;
+			});
 		}
 
 		IStealthLifecycleRuntimeOwner RecalculateFlee(StealthLifecycleRuntimeEntry entry,
@@ -270,7 +346,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		{
 			var handoff = (StealthRecalculateFleeHandoff)entry.Context;
 			var behavior = new StealthRecalculateFleeBehavior(handoff, guard,
-				new StealthRecalculateFleeLiveWorld(recovery, handoff.Evidence.LiveFingerprint),
+				new StealthRecalculateFleeLiveWorld(
+					recovery, combat, handoff.Evidence.SelectedTargetActorId,
+					handoff.Evidence.LiveFingerprint),
 				strategic, orders);
 			return Owner(entry, behavior.Execute);
 		}
@@ -292,6 +370,14 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				return handoff;
 			var resume = ((StealthRepairFightResumeHandoff)entry.Context).Context;
 			return new StealthUndefendedAttackHandoff(entry.Handoff, resume.Mission);
+		}
+
+		StealthApproachHandoff ApproachHandoff(StealthLifecycleRuntimeEntry entry)
+		{
+			if (entry.Context is StealthApproachHandoff handoff)
+				return handoff;
+			var resume = ((StealthRepairFightResumeHandoff)entry.Context).Context;
+			return new StealthApproachHandoff(entry.Handoff, resume.Mission);
 		}
 
 		StealthCrushEvaluationHandoff CrushHandoff(StealthLifecycleRuntimeEntry entry)
@@ -336,7 +422,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		IStealthLifecycleRuntimeOwner FightOwner(StealthLifecycleRuntimeEntry entry,
 			Func<object> execute)
 		{
-			var damage = new StealthSquadLifecycleDamageAdapter(entry, combat);
+			var damage = new StealthSquadLifecycleDamageAdapter(entry, combat, recovery);
 			return new StealthSquadLifecycleRuntimeOwner(
 				entry.Owner, entry.Epoch, execute, damage.Capture);
 		}

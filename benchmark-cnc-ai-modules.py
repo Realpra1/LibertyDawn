@@ -174,6 +174,9 @@ def phase_results(batch: Path) -> dict[str, Any]:
         metrics["module_cpu_seconds_per_1000_ticks"] = (
             metrics["module_cpu_seconds"] * 1000 / world_ticks
         )
+        metrics["cpu_seconds_per_1000_ticks"] = (
+            metrics["cpu_seconds"] * 1000 / world_ticks
+        )
         wall_seconds = run["duration_seconds"]
         samples.append({
             "name": run["name"],
@@ -201,6 +204,7 @@ def phase_results(batch: Path) -> dict[str, Any]:
                 "wall_seconds",
                 "game_seconds_per_wall_second",
                 "cpu_seconds",
+                "cpu_seconds_per_1000_ticks",
                 "tick_mean_milliseconds",
                 "module_cpu_seconds",
                 "module_cpu_seconds_per_1000_ticks",
@@ -222,6 +226,7 @@ def comparison(baseline: dict[str, Any], full: dict[str, Any]) -> dict[str, Any]
         "game_time_change_percent": change("game_seconds"),
         "simulation_throughput_change_percent": change("game_seconds_per_wall_second"),
         "cpu_time_change_percent": change("cpu_seconds"),
+        "normalized_cpu_time_change_percent": change("cpu_seconds_per_1000_ticks"),
         "mean_tick_time_change_percent": change("tick_mean_milliseconds"),
         "module_cpu_time_change_percent": change("module_cpu_seconds"),
         "normalized_module_cpu_change_percent": change("module_cpu_seconds_per_1000_ticks"),
@@ -242,23 +247,23 @@ def write_markdown(path: Path, result: dict[str, Any]) -> None:
         "- Players: SkyNet spawn 1, VIKI spawn 6, Brutalis spawn 34, Iron Reaper spawn 35.",
         "- Execution: serial headless MAX games; identical seeds; bot debug logging disabled.",
         "",
-        "| Mode | Runs | Avg ticks | Avg game seconds | Avg wall seconds | Game/wall | Avg CPU seconds | Avg tick ms | Module CPU sec/1k ticks |",
+        "| Mode | Runs | Avg ticks | Avg game seconds | Avg wall seconds | Game/wall | CPU sec/1k ticks | Avg tick ms | Module CPU sec/1k ticks |",
         "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
         f"| Simple AttackMove baseline | {result['runs']} | {baseline['world_ticks']:.1f} | "
         f"{baseline['game_seconds']:.3f} | "
         f"{baseline['wall_seconds']:.3f} | {baseline['game_seconds_per_wall_second']:.3f}x | "
-        f"{baseline['cpu_seconds']:.3f} | {baseline['tick_mean_milliseconds']:.3f} | "
+        f"{baseline['cpu_seconds_per_1000_ticks']:.3f} | {baseline['tick_mean_milliseconds']:.3f} | "
         f"{baseline['module_cpu_seconds_per_1000_ticks']:.3f} |",
         f"| Full modules | {result['runs']} | {full['world_ticks']:.1f} | "
         f"{full['game_seconds']:.3f} | "
         f"{full['wall_seconds']:.3f} | {full['game_seconds_per_wall_second']:.3f}x | "
-        f"{full['cpu_seconds']:.3f} | {full['tick_mean_milliseconds']:.3f} | "
+        f"{full['cpu_seconds_per_1000_ticks']:.3f} | {full['tick_mean_milliseconds']:.3f} | "
         f"{full['module_cpu_seconds_per_1000_ticks']:.3f} |",
         "",
         f"Full-module game-duration change: {delta['game_time_change_percent']:+.2f}%. "
         f"Wall-time change: {delta['wall_time_change_percent']:+.2f}%. "
         f"Simulation-throughput change: {delta['simulation_throughput_change_percent']:+.2f}%. "
-        f"CPU-time change: {delta['cpu_time_change_percent']:+.2f}%. "
+        f"Normalized CPU-time change: {delta['normalized_cpu_time_change_percent']:+.2f}%. "
         f"Mean-tick-time change: {delta['mean_tick_time_change_percent']:+.2f}%. "
         f"Normalized bot-module CPU-time change: "
         f"{delta['normalized_module_cpu_change_percent']:+.2f}%.",

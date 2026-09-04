@@ -21,6 +21,8 @@ namespace OpenRA.Mods.Common.Traits
 		public uint[] MemberActorIds { get; }
 		public uint[] EnemyActorIds { get; }
 		public string Fingerprint { get; }
+		public bool CurrentPositionSafe { get; }
+		public bool FormationCloaked { get; }
 
 		StealthRecalculateFleeLiveDecision(StealthRecalculateFleeLiveSnapshot live)
 		{
@@ -31,6 +33,8 @@ namespace OpenRA.Mods.Common.Traits
 			MemberActorIds = Members.Select(member => member.ActorId).ToArray();
 			EnemyActorIds = Enemies.Select(enemy => enemy.ActorId).ToArray();
 			Fingerprint = StealthRecalculateFleeFingerprint.Create(live);
+			CurrentPositionSafe = live.CurrentPositionSafe;
+			FormationCloaked = live.FormationCloaked;
 		}
 
 		public static StealthRecalculateFleeLiveDecision Create(
@@ -44,11 +48,16 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			if (Members.Length == 0)
 				return false;
-			var center = new CPos(
-				(int)Math.Round(Members.Average(member => member.CurrentCell.X)),
-				(int)Math.Round(Members.Average(member => member.CurrentCell.Y)));
+			var center = FormationCenter();
 			return Math.Abs(center.X - destination.X) <= 1 &&
 				Math.Abs(center.Y - destination.Y) <= 1;
+		}
+
+		public CPos FormationCenter()
+		{
+			return new CPos(
+				(int)Math.Round(Members.Average(member => member.CurrentCell.X)),
+				(int)Math.Round(Members.Average(member => member.CurrentCell.Y)));
 		}
 	}
 }

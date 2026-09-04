@@ -60,6 +60,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		public void Tick()
 		{
 			EnforceLifecycleStance();
+			if ((runtime.Owner == BehaviorId.Start || runtime.Owner == BehaviorId.SquadConstruction) &&
+				StealthAIStateBase.MaintainInitialStealthRepairsForModularLifecycle(squad))
+				return;
 			PromoteArrivedReinforcements();
 			StealthAIStateBase.RoutePendingStealthReinforcementsForModularLifecycle(squad);
 			var observations = squad.Units.Where(actor => actor != null && actor.IsInWorld && !actor.IsDead)
@@ -73,12 +76,21 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		{
 			EnforceLifecycleStance();
 			PromoteArrivedReinforcements();
-			StealthAIStateBase.RoutePendingStealthReinforcementsForModularLifecycle(squad);
-			if (runtime.Owner == BehaviorId.Approach ||
-				StealthRepairResumeContext.IsFightOwner(runtime.Owner) ||
-				runtime.Owner == BehaviorId.RecalculateFlee ||
-				runtime.Owner == BehaviorId.Repair)
+			if (runtime.Owner == BehaviorId.Approach)
+				AdvanceApproachSafety();
+			else if (StealthRepairResumeContext.IsFightOwner(runtime.Owner) ||
+				runtime.Owner == BehaviorId.RecalculateFlee)
 				AdvanceUntilRetained();
+		}
+
+		void AdvanceApproachSafety()
+		{
+			// Approach owns its live safety check. Permit only its immediate escape order here:
+			// strategic reacquisition remains capped by the normal scheduler.
+			if (!AdvanceOwnerOnce() || runtime.Owner != BehaviorId.RecalculateFlee)
+				return;
+
+			AdvanceOwnerOnce();
 		}
 
 		void AdvanceUntilRetained()
@@ -92,16 +104,22 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				var previousOwner = runtime.Owner;
 				if (!visitedOwners.Add(previousOwner))
 					break;
-				var previousEpoch = runtime.Epoch;
-				var accepted = BenchmarkOwnerTick(previousOwner, runtime.Tick);
-				var handedOff = accepted && (runtime.Owner != previousOwner || runtime.Epoch != previousEpoch);
-				if (handedOff && previousOwner == BehaviorId.SquadConstruction)
-					factory.CommitConstructionMembership(previousEpoch);
-				StealthSquadLifecycleTelemetry.RecordHandoff(squad, previousOwner, previousEpoch,
-					runtime.Owner, runtime.Epoch);
-				if (!handedOff)
+				if (!AdvanceOwnerOnce())
 					break;
 			}
+		}
+
+		bool AdvanceOwnerOnce()
+		{
+			var previousOwner = runtime.Owner;
+			var previousEpoch = runtime.Epoch;
+			var accepted = BenchmarkOwnerTick(previousOwner, runtime.Tick);
+			var handedOff = accepted && (runtime.Owner != previousOwner || runtime.Epoch != previousEpoch);
+			if (handedOff && previousOwner == BehaviorId.SquadConstruction)
+				factory.CommitConstructionMembership(previousEpoch);
+			StealthSquadLifecycleTelemetry.RecordHandoff(squad, previousOwner, previousEpoch,
+				runtime.Owner, runtime.Epoch);
+			return handedOff;
 		}
 
 		T BenchmarkOwnerTick<T>(BehaviorId owner, Func<T> work)
@@ -140,9 +158,17 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		void PromoteArrivedReinforcements()
 		{
 			var formation = squad.AirFormationUnits();
-			if (formation.Count == 0 || squad.AirReinforcements.Count == 0)
+			if (formation.Count == 0)
 				return;
 			var size = Math.Max(1, squad.StealthDefinition?.StrategicCellSize ?? 1);
+			var core = StealthSquadFormationCohesion.SelectCore(formation.Select(actor =>
+				(actor.ActorID, new CPos(actor.Location.X / size, actor.Location.Y / size)))).ToHashSet();
+			foreach (var separated in formation.Where(actor => !core.Contains(actor.ActorID)).ToArray())
+				squad.MarkAirReinforcement(separated);
+
+			formation = squad.AirFormationUnits();
+			if (formation.Count == 0 || squad.AirReinforcements.Count == 0)
+				return;
 			var center = squad.World.Map.CellContaining(
 				formation.Select(actor => actor.CenterPosition).Average());
 			var strategicCenter = new CPos(center.X / size, center.Y / size);

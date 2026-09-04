@@ -87,7 +87,8 @@ namespace OpenRA.Mods.Common.Traits
 				owner == BehaviorId.TargetValueFilter ? context is StealthTargetValueFilterHandoff :
 				owner == BehaviorId.TargetThreatFilter ? context is StealthTargetThreatFilterHandoff :
 				owner == BehaviorId.TargetDistanceChoice ? context is StealthTargetDistanceChoiceHandoff :
-				owner == BehaviorId.Approach ? context is StealthApproachHandoff :
+				owner == BehaviorId.Approach ? context is StealthApproachHandoff ||
+					context is StealthRepairFightResumeHandoff :
 				owner == BehaviorId.UndefendedAttack ? context is StealthUndefendedAttackHandoff ||
 					context is StealthRepairFightResumeHandoff :
 				owner == BehaviorId.CrushEvaluation ? context is StealthCrushEvaluationHandoff ||

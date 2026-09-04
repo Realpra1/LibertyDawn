@@ -21,23 +21,27 @@ namespace OpenRA.Mods.Common.Traits
 		public const int MaximumOptions = 10;
 		public const int MaximumTravelSeconds = 30;
 		public const int MaximumPrimitiveOperations = 65536;
-		public const int MaximumFallbackSteps = 4;
 
 		readonly StealthBehaviorHandoff handoff;
 		readonly IStealthTargetAcquisitionCache cache;
+		readonly int? squadCornerIndex;
 		CPos? moveCloserDestination;
+		bool? moveCloserFormationCloaked;
 
 		public StealthTargetAcquisitionBehavior(StealthBehaviorHandoff handoff,
-			IStealthTargetAcquisitionCache cache)
+			IStealthTargetAcquisitionCache cache, int? squadCornerIndex = null)
 		{
 			this.handoff = handoff ?? throw new ArgumentNullException(nameof(handoff));
 			if (handoff.Owner != BehaviorId.TargetAcquisition)
 				throw new ArgumentException("TargetAcquisition requires its ownership.", nameof(handoff));
 			this.cache = cache ?? throw new ArgumentNullException(nameof(cache));
+			if (squadCornerIndex < 0)
+				throw new ArgumentOutOfRangeException(nameof(squadCornerIndex));
+			this.squadCornerIndex = squadCornerIndex;
 		}
 
 		public StealthTargetAcquisitionResult Execute(CPos activeSquadCenter,
-			CPos? incumbentStrategicCell = null)
+			CPos? incumbentStrategicCell = null, bool movementFinished = false)
 		{
 			var snapshot = cache.ReadSnapshot() ??
 				throw new InvalidOperationException("The TargetAcquisition cache returned no snapshot.");
@@ -45,32 +49,59 @@ namespace OpenRA.Mods.Common.Traits
 				(incumbentStrategicCell.HasValue && !Contains(snapshot, incumbentStrategicCell.Value)))
 				throw new ArgumentOutOfRangeException(nameof(activeSquadCenter));
 			if (moveCloserDestination.HasValue &&
+				moveCloserFormationCloaked == snapshot.FormationCloaked && !movementFinished &&
 				!IsSameOrAdjacent(activeSquadCenter, moveCloserDestination.Value))
 				return new StealthTargetAcquisitionResult(handoff, activeSquadCenter,
 					incumbentStrategicCell, StealthTargetAcquisitionDisposition.MoveCloserAndRescan,
 					Array.Empty<StealthTargetOption>(), moveCloserDestination, 0, 0);
 			moveCloserDestination = null;
+			moveCloserFormationCloaked = null;
 
-			var enemyCells = snapshot.EnemyStrategicCells.Distinct()
+			var allEnemyCells = snapshot.EnemyStrategicCells.Distinct()
 				.OrderBy(cell => cell.Y).ThenBy(cell => cell.X).ToArray();
+			var scanOrigin = BiasedScanOrigin(activeSquadCenter,
+				snapshot.Width, snapshot.Height, squadCornerIndex);
+			var highValueCells = HighValueCells(snapshot);
+			var enemyCells = highValueCells.Count == 0 ? allEnemyCells :
+				allEnemyCells.Where(highValueCells.Contains).ToArray();
 			var required = incumbentStrategicCell.HasValue ?
 				Array.IndexOf(enemyCells, incumbentStrategicCell.Value) : -1;
 			var search = StealthAIThreatGeometry.StartReachableTargetCellSearch(
 				snapshot.Danger.ToArray(), snapshot.Width, snapshot.Height,
-				activeSquadCenter.X, activeSquadCenter.Y, enemyCells, snapshot.RouteThreatPenalty,
+				scanOrigin.X, scanOrigin.Y, enemyCells, snapshot.RouteThreatPenalty,
 				incumbentStrategicCell.HasValue ? MaximumOptions - 1 : MaximumOptions, required,
-				MaximumTravelSeconds / snapshot.SecondsPerCostUnit);
+				float.MaxValue);
 			search.Advance(MaximumPrimitiveOperations);
-			var reachable = search.Complete ? search.Result.Targets :
+			var discovered = search.Complete ? search.Result.Targets :
 				new List<StealthAIThreatGeometry.ReachableTargetCell>();
-			var candidates = reachable.Select(target => new
+			var discoveredCells = discovered.Select(target => enemyCells[target.TargetIndex])
+				.Concat(incumbentStrategicCell.HasValue ? new[] { incumbentStrategicCell.Value } : Array.Empty<CPos>())
+				.Distinct().ToArray();
+			var routed = new List<StealthAIThreatGeometry.ReachableTargetCell>();
+			var routeOperations = 0;
+			var routeExpandedCells = 0;
+			if (discoveredCells.Length != 0)
+			{
+				var routeSearch = StealthAIThreatGeometry.StartReachableTargetCellSearch(
+					snapshot.Danger.ToArray(), snapshot.Width, snapshot.Height,
+					activeSquadCenter.X, activeSquadCenter.Y, discoveredCells,
+					snapshot.RouteThreatPenalty, discoveredCells.Length, -1, float.MaxValue);
+				routeSearch.Advance(MaximumPrimitiveOperations);
+				if (routeSearch.Complete)
+					routed = routeSearch.Result.Targets;
+				routeOperations = routeSearch.PrimitiveOperations;
+				routeExpandedCells = routeSearch.ExpandedCells;
+			}
+
+			var candidates = routed.Select(target => new
 				{
-					Cell = enemyCells[target.TargetIndex],
+					Cell = discoveredCells[target.TargetIndex],
+					DiscoveryRank = target.TargetIndex,
 					TravelMilliseconds = ToTravelMilliseconds(target.RouteCost,
 						snapshot.SecondsPerCostUnit)
 				})
 				.Where(candidate => candidate.TravelMilliseconds <= MaximumTravelSeconds * 1000)
-				.OrderBy(candidate => candidate.TravelMilliseconds)
+				.OrderBy(candidate => candidate.DiscoveryRank)
 				.ThenBy(candidate => candidate.Cell.Y).ThenBy(candidate => candidate.Cell.X).ToArray();
 
 			var options = new List<StealthTargetOption>(MaximumOptions);
@@ -90,17 +121,22 @@ namespace OpenRA.Mods.Common.Traits
 					options.Add(Option(snapshot, candidate.Cell, candidate.TravelMilliseconds, false));
 			}
 
-			var needsRescan = enemyCells.Length == 0 ||
-				options.Count < Math.Min(MaximumOptions, enemyCells.Length);
+			// Moving closer is the far-from-all-targets fallback. Once any live target cell is
+			// reachable within the bounded travel window, phase 4 should choose it instead of
+			// retaining a long blind acquisition move through local combat.
+			var hasReachableTarget = options.Any(option => option.EstimatedTravelMilliseconds.HasValue);
+			var needsRescan = enemyCells.Length == 0 || !hasReachableTarget;
 			var disposition = !needsRescan ? StealthTargetAcquisitionDisposition.ReadyForValueFilter :
 				enemyCells.Length == 0 ? StealthTargetAcquisitionDisposition.AwaitingCache :
 				StealthTargetAcquisitionDisposition.MoveCloserAndRescan;
 			var moveCloser = needsRescan && enemyCells.Length != 0 ?
-				MoveCloser(activeSquadCenter, enemyCells, snapshot, reachable) : null;
+				MoveCloser(activeSquadCenter, enemyCells, snapshot) : null;
 			moveCloserDestination = moveCloser;
+			moveCloserFormationCloaked = moveCloser.HasValue ? (bool?)snapshot.FormationCloaked : null;
 			return new StealthTargetAcquisitionResult(handoff, activeSquadCenter,
 				incumbentStrategicCell, disposition, options, moveCloser,
-				search.PrimitiveOperations, search.ExpandedCells);
+				search.PrimitiveOperations + routeOperations,
+				search.ExpandedCells + routeExpandedCells);
 		}
 
 		static StealthTargetOption Option(StealthTargetAcquisitionCacheSnapshot snapshot,
@@ -111,34 +147,76 @@ namespace OpenRA.Mods.Common.Traits
 				snapshot.ThreatFacts.FirstOrDefault(facts => facts.StrategicCell == cell));
 		}
 
-		static CPos? MoveCloser(CPos start, IReadOnlyList<CPos> enemies,
-			StealthTargetAcquisitionCacheSnapshot snapshot,
-			IReadOnlyList<StealthAIThreatGeometry.ReachableTargetCell> reachable)
+		static HashSet<CPos> HighValueCells(StealthTargetAcquisitionCacheSnapshot snapshot)
 		{
+			return snapshot.StrategicTargets.GroupBy(target => target.StrategicCell)
+				.Where(group =>
+				{
+					long total = 0;
+					foreach (var target in group)
+					{
+						var value = StealthAISpecialistPolicy.StrategicTargetValueByRemainingHealth(
+							target.ConfiguredPriority, target.ActorValue,
+							target.HitPoints, target.MaximumHitPoints);
+						if (value <= 0)
+							continue;
+						total = long.MaxValue - total < value ? long.MaxValue : total + value;
+					}
+
+					return StealthAISpecialistPolicy.MeetsMinimumStrategicCellValue(total);
+				}).Select(group => group.Key).ToHashSet();
+		}
+
+		static CPos? MoveCloser(CPos start, IReadOnlyList<CPos> enemies,
+			StealthTargetAcquisitionCacheSnapshot snapshot)
+		{
+			var search = StealthAIThreatGeometry.StartReachableTargetCellSearch(
+				snapshot.Danger.ToArray(), snapshot.Width, snapshot.Height,
+				start.X, start.Y, enemies, snapshot.RouteThreatPenalty, 1, -1, float.MaxValue);
+			search.Advance(MaximumPrimitiveOperations);
+			var reachable = search.Complete ? search.Result.Targets :
+				new List<StealthAIThreatGeometry.ReachableTargetCell>();
 			var routed = reachable.Where(target => target.Route.Count != 0)
 				.OrderBy(target => target.RouteCost)
 				.ThenBy(target => enemies[target.TargetIndex].Y)
 				.ThenBy(target => enemies[target.TargetIndex].X).FirstOrDefault();
-			if (routed != null)
-				return routed.Route[Math.Min(MaximumFallbackSteps, routed.Route.Count) - 1];
+			if (routed == null)
+				return GreedyMoveCloser(start, enemies, snapshot);
 
-			var targetCell = enemies.OrderBy(cell => DistanceSquared(start, cell))
-				.ThenBy(cell => cell.Y).ThenBy(cell => cell.X).First();
-			var current = start;
-			for (var i = 0; i < MaximumFallbackSteps; i++)
+			var maximumCost = MaximumTravelSeconds / snapshot.SecondsPerCostUnit;
+			var cost = 0f;
+			var boundedRoute = new List<CPos>();
+			foreach (var cell in routed.Route)
 			{
-				var currentDistance = DistanceSquared(current, targetCell);
-				var next = Neighbors(current, snapshot.Width, snapshot.Height)
-					.Where(cell => DistanceSquared(cell, targetCell) < currentDistance)
-					.OrderBy(cell => DistanceSquared(cell, targetCell))
-					.ThenBy(cell => snapshot.Danger[cell.Y * snapshot.Width + cell.X])
-					.ThenBy(cell => cell.Y).ThenBy(cell => cell.X).FirstOrDefault(current);
-				if (next == current)
+				var stepCost = 1 + Math.Max(0, snapshot.Danger[cell.Y * snapshot.Width + cell.X]) *
+					snapshot.RouteThreatPenalty;
+				if (cost + stepCost > maximumCost)
 					break;
-				current = next;
+				cost += stepCost;
+				boundedRoute.Add(cell);
 			}
 
-			return current == start ? (CPos?)null : current;
+			return boundedRoute.Count == 0 ? (CPos?)null :
+				StealthStrategicRouteGeometry.EndOfFirstStraightLeg(start, boundedRoute);
+		}
+
+		static CPos? GreedyMoveCloser(CPos start, IReadOnlyList<CPos> enemies,
+			StealthTargetAcquisitionCacheSnapshot snapshot)
+		{
+			var currentDistance = enemies.Min(enemy => DistanceSquared(start, enemy));
+			var next = Neighbors(start, snapshot.Width, snapshot.Height)
+				.Select(cell => new
+				{
+					Cell = cell,
+					Distance = enemies.Min(enemy => DistanceSquared(cell, enemy)),
+					Danger = snapshot.Danger[cell.Y * snapshot.Width + cell.X]
+				})
+				.Where(candidate => candidate.Distance < currentDistance)
+				.OrderBy(candidate => candidate.Danger)
+				.ThenBy(candidate => candidate.Distance)
+				.ThenBy(candidate => candidate.Cell.Y).ThenBy(candidate => candidate.Cell.X)
+				.FirstOrDefault();
+			return next?.Cell;
 		}
 
 		static IEnumerable<CPos> Neighbors(CPos cell, int width, int height)
@@ -154,6 +232,24 @@ namespace OpenRA.Mods.Common.Traits
 			var dx = (long)left.X - right.X;
 			var dy = (long)left.Y - right.Y;
 			return dx * dx + dy * dy;
+		}
+
+		static CPos BiasedScanOrigin(CPos center, int width, int height, int? cornerIndex)
+		{
+			if (!cornerIndex.HasValue)
+				return center;
+
+			CPos corner;
+			switch (cornerIndex.Value % 4)
+			{
+				case 0: corner = new CPos(0, 0); break;
+				case 1: corner = new CPos(width - 1, 0); break;
+				case 2: corner = new CPos(0, height - 1); break;
+				default: corner = new CPos(width - 1, height - 1); break;
+			}
+
+			return new CPos((3 * center.X + corner.X) / 4,
+				(3 * center.Y + corner.Y) / 4);
 		}
 
 		static bool IsSameOrAdjacent(CPos left, CPos right)

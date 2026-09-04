@@ -320,11 +320,13 @@ namespace OpenRA.Mods.Common.Traits
 			"behaviour of only checking when a target is selected.")]
 		public readonly int AirSafetyCheckInterval = 0;
 		[Desc("Ticks between lightweight local safety checks for ground stealth squads.")]
-		public readonly int StealthSafetyCheckInterval = 25;
+		public readonly int StealthSafetyCheckInterval = 10;
 		[Desc("Ticks between bounded live checks of an owned stealth Crush or Kite target.")]
 		public readonly int StealthLiveTargetCheckInterval = 12;
 		[Desc("Ticks between live pending-Blue-explosion checks for ground stealth squads.")]
 		public readonly int StealthBlueSafetyCheckInterval = 5;
+		[Desc("Base ticks between spatial actor-roster scans for local stealth combat. Actor state remains live.")]
+		public readonly int StealthLocalActorCacheInterval = 50;
 
 		[Desc("Radius in cells around an air squad that is scanned for anti-air by the safety check.")]
 		public readonly int AirThreatScanRadius = 12;
@@ -521,6 +523,8 @@ namespace OpenRA.Mods.Common.Traits
 			if (StealthSafetyCheckInterval < 0 || StealthLiveTargetCheckInterval < 0 ||
 				StealthBlueSafetyCheckInterval < 0)
 				throw new YamlException("Stealth safety intervals must not be negative.");
+			if (StealthLocalActorCacheInterval <= 0)
+				throw new YamlException("StealthLocalActorCacheInterval must be greater than zero.");
 
 			if (AirThreatFleeMultiplier <= 0)
 				throw new YamlException("AirThreatFleeMultiplier must be greater than zero.");
@@ -606,7 +610,7 @@ namespace OpenRA.Mods.Common.Traits
 
 	public class SquadManagerBotModule : ConditionalTrait<SquadManagerBotModuleInfo>, IBotEnabled, IBotTick, IBotRespondToAttack,
 		IBotPositionsUpdated, INotifyKilled, INotifyAppliedDamage, IGameSaveTraitData, IAdvancedBotTick,
-		IAdvancedBotPlanningThrottle, IAdvancedBotFailsafeWindowDiagnostics
+		IAdvancedBotPlanningThrottle, IAdvancedBotFailsafeWindowDiagnostics, IBotUnitReservations
 	{
 		public CPos GetRandomBaseCenter()
 		{
@@ -1066,7 +1070,8 @@ namespace OpenRA.Mods.Common.Traits
 			notifyPositionsUpdated = self.Owner.PlayerActor.TraitsImplementing<IBotPositionsUpdated>().ToArray();
 			notifyIdleBaseUnits = self.Owner.PlayerActor.TraitsImplementing<IBotNotifyIdleBaseUnits>().ToArray();
 			transportReservations = self.Owner.PlayerActor.TraitsImplementing<IBotTransportReservations>().ToArray();
-			unitReservations = self.Owner.PlayerActor.TraitsImplementing<IBotUnitReservations>().ToArray();
+			unitReservations = self.Owner.PlayerActor.TraitsImplementing<IBotUnitReservations>()
+				.Where(reservation => !ReferenceEquals(reservation, this)).ToArray();
 			temporaryUnitControls = self.Owner.PlayerActor.TraitsImplementing<IBotTemporaryUnitControl>().ToArray();
 			unassignedCombatUnits = self.Owner.PlayerActor.TraitOrDefault<IUnassignedCombatUnitRegistry>();
 		}
@@ -1140,6 +1145,10 @@ namespace OpenRA.Mods.Common.Traits
 				EnsureStealthSquads(bot);
 				RecordStealthManagerAttributionPhase(
 					StealthManagerAttributionPhase.EnsureStealthSquads, phaseStarted, 1);
+				phaseStarted = BeginStealthManagerAttributionPhase();
+				RecruitUnassignedCombatUnits(bot);
+				RecordStealthManagerAttributionPhase(
+					StealthManagerAttributionPhase.RecruitUnassigned, phaseStarted, 1);
 				if (advancedBehaviorEnabled && --stealthRecruitTicks <= 0)
 				{
 					phaseStarted = BeginStealthManagerAttributionPhase();
@@ -1151,10 +1160,6 @@ namespace OpenRA.Mods.Common.Traits
 							definition => definition.ScanInterval));
 				}
 
-				phaseStarted = BeginStealthManagerAttributionPhase();
-				RecruitUnassignedCombatUnits(bot);
-				RecordStealthManagerAttributionPhase(
-					StealthManagerAttributionPhase.RecruitUnassigned, phaseStarted, 1);
 				phaseStarted = BeginStealthManagerAttributionPhase();
 				if (advancedBehaviorEnabled)
 				{
@@ -1399,6 +1404,9 @@ namespace OpenRA.Mods.Common.Traits
 			AdjustPlanningTimer(ref assignRolesTicks, Info.AssignRolesInterval, increasing);
 			AdjustPlanningTimer(ref minAttackForceDelayTicks, Info.MinimumAttackForceDelay, increasing);
 			AdjustPlanningTimer(ref adaptiveAirRiskTicks, Info.AirAdaptiveRiskInterval, increasing);
+			AdjustPlanningTimer(ref stealthSafetyTicks, Info.StealthSafetyCheckInterval, increasing);
+			AdjustPlanningTimer(ref stealthLiveTargetTicks, Info.StealthLiveTargetCheckInterval, increasing);
+			AdjustPlanningTimer(ref stealthBlueSafetyTicks, Info.StealthBlueSafetyCheckInterval, increasing);
 			strategicSquadUpdateCycles = increasing ? Math.Max(strategicSquadUpdateCycles, next) :
 				Math.Min(strategicSquadUpdateCycles, next);
 			if (Info.StealthSquadDefinitions.Count != 0)
@@ -1410,6 +1418,8 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			return interval <= 0 ? interval : (int)Math.Min(int.MaxValue, (long)interval * planningIntervalFactor);
 		}
+
+		internal int PlanningIntervalFactor => planningIntervalFactor;
 
 		void AdjustPlanningTimer(ref int timer, int interval, bool increasing)
 		{
@@ -1677,6 +1687,13 @@ namespace OpenRA.Mods.Common.Traits
 				(unitReservations != null && unitReservations.Any(r => r.IsUnitReserved(actor)));
 		}
 
+		bool IBotUnitReservations.IsUnitReserved(Actor actor)
+		{
+			return advancedBehaviorEnabled && !IsTraitDisabled && actor != null &&
+				Info.StealthSquadDefinitions.Values.Any(definition =>
+					definition.UnitTypes.Contains(actor.Info.Name));
+		}
+
 		internal bool IsUnitProtectingBase(Actor actor)
 		{
 			return actor != null && Squads.Any(s => s.Type == SquadType.Protection && s.Units.Contains(actor));
@@ -1864,7 +1881,7 @@ namespace OpenRA.Mods.Common.Traits
 			// not invalidate the activity already owned by the squad lifecycle.
 			if (Info.StealthSafetyCheckInterval > 0 && --stealthSafetyTicks <= 0)
 			{
-				stealthSafetyTicks = Info.StealthSafetyCheckInterval;
+				stealthSafetyTicks = StrategicPlanningInterval(Info.StealthSafetyCheckInterval);
 				foreach (var squad in Squads.Where(squad => squad.Type == SquadType.Stealth))
 				{
 					if (squad.UsesModularStealthLifecycle)
@@ -1880,7 +1897,7 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (Info.StealthLiveTargetCheckInterval > 0 && --stealthLiveTargetTicks <= 0)
 			{
-				stealthLiveTargetTicks = Info.StealthLiveTargetCheckInterval;
+				stealthLiveTargetTicks = StrategicPlanningInterval(Info.StealthLiveTargetCheckInterval);
 				foreach (var squad in Squads.Where(squad => squad.Type == SquadType.Stealth &&
 					!squad.UsesModularStealthLifecycle))
 				{
@@ -1891,7 +1908,7 @@ namespace OpenRA.Mods.Common.Traits
 
 			if (Info.StealthBlueSafetyCheckInterval > 0 && --stealthBlueSafetyTicks <= 0)
 			{
-				stealthBlueSafetyTicks = Info.StealthBlueSafetyCheckInterval;
+				stealthBlueSafetyTicks = StrategicPlanningInterval(Info.StealthBlueSafetyCheckInterval);
 				foreach (var squad in Squads.Where(squad => squad.Type == SquadType.Stealth &&
 					!squad.UsesModularStealthLifecycle))
 				{
@@ -1915,6 +1932,7 @@ namespace OpenRA.Mods.Common.Traits
 				foreach (var s in Squads)
 					if (s.UsesModularStealthLifecycle || updateStrategicSquads)
 						s.Update();
+				CoordinateProvincialStealthMassAttacks();
 			}
 
 			// Air squads re-check the anti-air around themselves far more often than the state machine
@@ -2001,6 +2019,67 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				minAttackForceDelayTicks = StrategicPlanningInterval(Info.MinimumAttackForceDelay);
 				CreateAttackForce(bot);
+			}
+		}
+
+		void CoordinateProvincialStealthMassAttacks()
+		{
+			var stealthSquads = Squads.Where(squad => squad.Type == SquadType.Stealth &&
+				squad.UsesModularStealthLifecycle &&
+				(squad.StealthCoordinatedMassAttackCell.HasValue ||
+					squad.StealthMassCoordinationCell.HasValue || squad.AirTargetStrategicCell.HasValue))
+				.ToArray();
+			var requests = stealthSquads.Select(squad => new StealthProvincialMassRequest(
+				squad.StealthSquadDefinition, squad.StealthSquadIndex,
+				squad.StealthCoordinatedMassAttackCell ??
+					squad.StealthMassCoordinationCell ?? squad.AirTargetStrategicCell.Value,
+				squad.StealthCoordinatedMassAttackCell.HasValue ? 0 :
+					squad.StealthMassCoordinationCell.HasValue ?
+					squad.StealthMassCoordinationRequestedTick : -1,
+				squad.Units.Count(actor => !unitCannotBeOrdered(actor))));
+
+			// No-safe-plan evidence already exhausts Kite, Crush, and ordinary crossover.
+			// One short review window lets peers in the same target province rendezvous
+			// without spending a sizeable part of the kill-cadence window fleeing alone.
+			var minimumAge = Math.Max(1, 5000 / Math.Max(1, World.Timestep));
+			foreach (var plan in StealthProvincialMassCoordinator.Plan(
+				requests, World.WorldTick, minimumAge))
+			{
+				var leader = stealthSquads.FirstOrDefault(squad =>
+					squad.StealthSquadDefinition == plan.Definition &&
+					squad.StealthSquadIndex == plan.LeaderIndex);
+				if (leader == null)
+					continue;
+
+				var participants = plan.JoiningIndices.Prepend(plan.LeaderIndex).ToArray();
+				if (!stealthSquads.Any(squad =>
+					squad.StealthSquadDefinition == plan.Definition &&
+					participants.Contains(squad.StealthSquadIndex) &&
+					squad.StealthMassCoordinationCell.HasValue))
+					continue;
+
+				var committed = new List<uint>();
+				foreach (var index in participants)
+				{
+					var participant = stealthSquads.FirstOrDefault(squad =>
+						squad.StealthSquadDefinition == plan.Definition &&
+						squad.StealthSquadIndex == index);
+					if (participant == null)
+						continue;
+
+					committed.AddRange(participant.Units.Where(actor => !unitCannotBeOrdered(actor))
+						.Select(actor => actor.ActorID));
+					participant.StealthMassCoordinationCell = null;
+					participant.StealthMassCoordinationRequestedTick = -1;
+					participant.StealthCoordinatedMassAttackCell = plan.StrategicCell;
+				}
+
+				if (Game.Settings.Debug.BotDebug)
+					Log.Write("debug", "Stealth provincial mass coordination: tick={0} " +
+						"definition={1} cell={2} squads=[{3}] committed=[{4}].", World.WorldTick,
+						plan.Definition, plan.StrategicCell,
+						string.Join(",", participants.OrderBy(index => index)),
+						string.Join(",", committed.OrderBy(actorId => actorId)));
 			}
 		}
 
@@ -2189,24 +2268,18 @@ namespace OpenRA.Mods.Common.Traits
 				return true;
 			}
 
-			// Configured stealth specialists can enter the registry one tick before their persistent
-			// specialist squad claims them. Preserve the ordinary strategic destination during that
-			// handoff, but never give the temporary ground owner an opportunistic AttackMove that can
-			// decloak the unit before live local threat/firing-cell safety has run.
+			// Trigger the same-tick specialist rebalance. No temporary generic owner may issue an order:
+			// safe reinforcement routing belongs exclusively to the modular lifecycle.
 			if (Info.StealthSquadDefinitions.Values.Any(definition =>
 				definition.UnitTypes.Contains(actor.Info.Name)))
 			{
-				var destination = FindClosestEnemy(actor.CenterPosition);
-				if (destination != null)
-					bot.QueueOrder(new Order("Move", actor,
-						Target.FromCell(World, destination.Location), false));
 				if (!activeUnits.Contains(actor))
 					activeUnits.Add(actor);
+				stealthRecruitTicks = 0;
 				if (Info.GroundTargetDebugLogging || Info.AirTargetDebugLogging || Game.Settings.Debug.BotDebug)
 					Log.Write("debug", "Stealth strategic handoff [{0}]: actor={1}#{2} " +
-						"destination={3} generic-attackmove=False specialist-claim=pending.",
-						Player.PlayerName, actor.Info.Name, actor.ActorID,
-						destination?.Location.ToString() ?? "none");
+						"generic-order=False specialist-claim=same-tick.",
+						Player.PlayerName, actor.Info.Name, actor.ActorID);
 				return true;
 			}
 
@@ -2309,9 +2382,10 @@ namespace OpenRA.Mods.Common.Traits
 
 		void QueueFailsafeFallback(IBot bot, string source, IEnumerable<Actor> candidates)
 		{
-			var orderable = candidates.Where(a => !fallbackOrderedActors.Contains(a.ActorID) ||
-				!fallbackOrderTargets.TryGetValue(a.ActorID, out var target) || target != fallbackTarget.Location ||
-				(Info.SimpleAttackMoveFallbackWhenDisabled && a.IsIdle)).ToArray();
+			var orderable = candidates.Where(a => BotModules.AdvancedBotFallbackOwnership.RequiresAttackMove(
+				fallbackOrderedActors.Contains(a.ActorID),
+				!fallbackOrderTargets.TryGetValue(a.ActorID, out var target) || target != fallbackTarget.Location,
+				a.IsIdle)).ToArray();
 			if (orderable.Length == 0)
 				return;
 
@@ -2634,12 +2708,12 @@ namespace OpenRA.Mods.Common.Traits
 				}
 			}
 
+			if (!IsPreferredEnemyUnit(e.Attacker))
+				return;
+
 			var modularStealth = Squads.FirstOrDefault(candidate => candidate.Type == SquadType.Stealth &&
 				candidate.Units.Contains(self));
 			if (modularStealth?.ObserveModularStealthDamage(self, e) == true)
-				return;
-
-			if (!IsPreferredEnemyUnit(e.Attacker))
 				return;
 
 			if (Info.ProtectionTypes.Contains(self.Info.Name))

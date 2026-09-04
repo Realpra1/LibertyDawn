@@ -166,6 +166,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		WPos airLastFormationCenter;
 		bool hasAirFormationCenter;
 		internal CPos? AirTargetStrategicCell;
+		internal CPos? StealthMassCoordinationCell;
+		internal int StealthMassCoordinationRequestedTick = -1;
+		internal CPos? StealthCoordinatedMassAttackCell;
 		internal int AirTargetLastProgressTick;
 		internal int AirTargetLastDistanceCells = int.MaxValue;
 		internal int AirTargetLastHP = int.MaxValue;

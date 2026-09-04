@@ -26,6 +26,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly IStealthUndefendedAttackOrders orders;
 		uint? targetId;
 		uint[] lastMembers = Array.Empty<uint>();
+		long orderRevision;
 
 		public StealthUndefendedAttackBehavior(StealthUndefendedAttackHandoff handoff,
 			IStealthLifecycleOwnershipGuard ownershipGuard,
@@ -54,7 +55,9 @@ namespace OpenRA.Mods.Common.Traits
 			var targets = live.Targets.Where(candidate => candidate.IsValid &&
 				candidate.StrategicCell == mission.StrategicCell).ToArray();
 			if (targets.Length == 0)
-				return Result(live, StealthUndefendedAttackDisposition.Reacquire, null, null);
+				return Result(live, live.LiveDefenderActorIds.Count == 0 ?
+					StealthUndefendedAttackDisposition.Reacquire :
+					StealthUndefendedAttackDisposition.CrushEvaluation, null, null);
 
 			var target = targetId.HasValue ?
 				targets.FirstOrDefault(candidate => candidate.ActorId == targetId.Value) : null;
@@ -67,9 +70,11 @@ namespace OpenRA.Mods.Common.Traits
 				return Result(live, StealthUndefendedAttackDisposition.CrushEvaluation, target, safety);
 
 			var members = live.Members.Select(member => member.ActorId).ToArray();
-			if (targetId != target.ActorId || !lastMembers.SequenceEqual(members))
+			if (targetId != target.ActorId || !lastMembers.SequenceEqual(members) ||
+				live.Members.All(member => member.NeedsAttackOrder))
 			{
-				orders.IssueAttack(handoff.Owner, handoff.Epoch, members, target.ActorId);
+				orders.IssueAttack(handoff.Owner, handoff.Epoch, members, target.ActorId,
+					++orderRevision);
 				EnsureActiveOwnership();
 			}
 
@@ -112,15 +117,19 @@ namespace OpenRA.Mods.Common.Traits
 					.Concat(live.LiveDefenderActorIds).Distinct(),
 				live.FormationCloaked, live.HasDetectorCoverage,
 				live.PlannedActionRevealsFormation,
-				live.Members.Any(member => InCurrentRange(member, target)));
+				InCurrentRange(live.Members, target));
 		}
 
-		static bool InCurrentRange(StealthUndefendedAttackMemberSnapshot member,
+		static bool InCurrentRange(IReadOnlyList<StealthUndefendedAttackMemberSnapshot> members,
 			StealthUndefendedAttackTargetSnapshot target)
 		{
-			var dx = (long)member.CurrentCell.X - target.CurrentCell.X;
-			var dy = (long)member.CurrentCell.Y - target.CurrentCell.Y;
-			var range = (long)member.CurrentWeaponRangeCells;
+			if (members.Count == 0)
+				return false;
+			var x = (int)Math.Round(members.Average(member => member.CurrentCell.X));
+			var y = (int)Math.Round(members.Average(member => member.CurrentCell.Y));
+			var dx = (long)x - target.CurrentCell.X;
+			var dy = (long)y - target.CurrentCell.Y;
+			var range = (long)members.Min(member => member.CurrentWeaponRangeCells);
 			return dx * dx + dy * dy <= range * range;
 		}
 

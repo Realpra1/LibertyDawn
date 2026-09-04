@@ -1,6 +1,6 @@
 {
   "defaults": {
-    "map": "CNC-96A-Four-Squad-Lifecycle.oramap",
+    "map": "../mods/cnc/maps/StankChallenge.oramap",
     "mode": "headless",
     "bot_debug": true,
     "lobby_commands": "spectate;option gamespeed max;option shortgame true;option explored true;slot_bot Multi0 0 viki 1 1;slot_bot Multi1 0 brutalis 2 2",
@@ -8,7 +8,7 @@
     "minimum_world_tick": 1,
     "timeout_seconds": 1800,
     "required_log_patterns": [
-      "Headless MAX automation started map 'CNC-96A Four Squad Lifecycle'",
+      "Headless MAX automation started map 'StankChallenge'",
       "bot=viki",
       "bot=brutalis",
       "Headless MAX automation reached natural game over",

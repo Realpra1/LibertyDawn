@@ -17,6 +17,7 @@ namespace OpenRA.Mods.Common.Traits
 	sealed class StealthMassAttackLiveDecision
 	{
 		readonly bool formationCloaked;
+		public int Tick { get; }
 		public bool FormationCloaked => formationCloaked;
 		public StealthMassAttackMemberSnapshot[] Members { get; }
 		public StealthMassAttackActorSnapshot[] Defenders { get; }
@@ -30,6 +31,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		StealthMassAttackLiveDecision(StealthMassAttackLiveSnapshot live)
 		{
+			Tick = live.Tick;
 			formationCloaked = live.FormationCloaked;
 			Members = live.Members.Where(member => member.IsValid)
 				.OrderBy(member => member.ActorId).ToArray();
@@ -59,6 +61,21 @@ namespace OpenRA.Mods.Common.Traits
 			return Defenders.SingleOrDefault(actor => actor.ActorId == targetId);
 		}
 
+		public StealthMassAttackActorSnapshot FindObjective(uint targetId)
+		{
+			return Objectives.SingleOrDefault(actor => actor.ActorId == targetId);
+		}
+
+		public StealthMassAttackActorSnapshot[] OrderedObjectives(CPos currentCell,
+			StealthMassAttackActorSnapshot defendedTarget)
+		{
+			return Objectives.Where(actor => actor.ActorId != defendedTarget.ActorId)
+				.OrderBy(actor => DistanceToSegmentSquared(actor.CurrentCell,
+					currentCell, defendedTarget.CurrentCell))
+				.ThenBy(actor => DistanceSquared(currentCell, actor.CurrentCell))
+				.ThenBy(actor => actor.ActorId).ToArray();
+		}
+
 		public StealthMassAttackThreatFacts Facts(StealthMassAttackActorSnapshot target, CPos plannedCell)
 		{
 			if (target == null || !Defenders.Contains(target) || Members.Length == 0)
@@ -71,7 +88,18 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			if (Members.Length == 0)
 				throw new InvalidOperationException("MassAttack has no current formation cell.");
-			return Members[0].CurrentCell;
+			return new CPos(
+				(int)Math.Round(Members.Average(member => member.CurrentCell.X)),
+				(int)Math.Round(Members.Average(member => member.CurrentCell.Y)));
+		}
+
+		public CPos RepresentativeCell()
+		{
+			if (Members.Length == 0 || Defenders.Length == 0)
+				throw new InvalidOperationException("MassAttack has no representative live engagement cell.");
+			return Members.OrderBy(member => Defenders.Min(defender =>
+				DistanceSquared(member.CurrentCell, defender.CurrentCell)))
+				.ThenBy(member => member.ActorId).First().CurrentCell;
 		}
 
 		public CPos[] OrderedCandidateCells(StealthMassAttackActorSnapshot target, CPos currentCell)
@@ -88,6 +116,18 @@ namespace OpenRA.Mods.Common.Traits
 			var dx = (long)left.X - right.X;
 			var dy = (long)left.Y - right.Y;
 			return dx * dx + dy * dy;
+		}
+
+		static double DistanceToSegmentSquared(CPos point, CPos start, CPos end)
+		{
+			var dx = (double)end.X - start.X;
+			var dy = (double)end.Y - start.Y;
+			var lengthSquared = dx * dx + dy * dy;
+			var projection = lengthSquared == 0 ? 0 : Math.Clamp(
+				((point.X - start.X) * dx + (point.Y - start.Y) * dy) / lengthSquared, 0, 1);
+			var offsetX = point.X - (start.X + projection * dx);
+			var offsetY = point.Y - (start.Y + projection * dy);
+			return offsetX * offsetX + offsetY * offsetY;
 		}
 	}
 }

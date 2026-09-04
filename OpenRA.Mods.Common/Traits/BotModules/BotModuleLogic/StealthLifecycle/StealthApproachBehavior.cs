@@ -25,6 +25,7 @@ namespace OpenRA.Mods.Common.Traits
 		readonly IStealthApproachMovementOrders movementOrders;
 		uint[] lastMembers = Array.Empty<uint>();
 		CPos? lastDestination;
+		CPos? lastOrderCenter;
 		long orderRevision;
 
 		public StealthApproachBehavior(StealthApproachHandoff handoff,
@@ -48,6 +49,15 @@ namespace OpenRA.Mods.Common.Traits
 			var members = ActiveMembers(live.Members);
 			var memberIds = members.Select(member => member.ActorId).ToArray();
 			var center = Center(members);
+			var localScore = live.CurrentThreatScore;
+			if (!live.CurrentPositionSafe)
+				return Result(StealthApproachDisposition.Kite,
+					StealthApproachArrivalClassification.Defended, center, memberIds,
+					live.LiveDefenderActorIds, localScore, Array.Empty<CPos>(), live);
+			if (live.LiveDefenderActorIds.Count != 0)
+				return Result(StealthApproachDisposition.Kite,
+					StealthApproachArrivalClassification.Defended, center, memberIds,
+					live.LiveDefenderActorIds, localScore, Array.Empty<CPos>(), live);
 			if (!live.TargetIsValid)
 				return Result(StealthApproachDisposition.Reacquire,
 					StealthApproachArrivalClassification.None, center, memberIds,
@@ -56,28 +66,53 @@ namespace OpenRA.Mods.Common.Traits
 			if (IsSameOrAdjacent(center, mission.StrategicCell))
 			{
 				var defended = live.LiveDefenderActorIds.Count != 0;
-				return Result(defended ? StealthApproachDisposition.CrushEvaluation :
+				return Result(defended ? StealthApproachDisposition.Kite :
 					StealthApproachDisposition.UndefendedAttack,
 					defended ? StealthApproachArrivalClassification.Defended :
 					StealthApproachArrivalClassification.Undefended,
 					center, memberIds, live.LiveDefenderActorIds, null, Array.Empty<CPos>());
 			}
 
-			var localScore = live.CurrentThreatScore;
-			if (!live.CurrentPositionSafe)
-				return Result(StealthApproachDisposition.RecalculateFlee,
+			if (lastDestination.HasValue && lastMembers.SequenceEqual(memberIds) &&
+				members.Any(member => !member.NeedsMovementOrder))
+				return Result(StealthApproachDisposition.Moving,
 					StealthApproachArrivalClassification.None, center, memberIds,
-					live.LiveDefenderActorIds, localScore, Array.Empty<CPos>(), live);
+					Array.Empty<uint>(), localScore, new[] { lastDestination.Value });
+
+			// The engine finished the order without leaving this strategic cell. Do not fight
+			// its pathfinder by issuing the same order forever: nearby defenders now belong to
+			// live combat, otherwise choose another strategic mission.
+			var sameMembers = lastMembers.SequenceEqual(memberIds);
+			if (lastDestination.HasValue && sameMembers && lastOrderCenter == center &&
+				members.All(member => member.NeedsMovementOrder))
+			{
+				var defended = live.LiveDefenderActorIds.Count != 0;
+				return Result(defended ? StealthApproachDisposition.Kite :
+					StealthApproachDisposition.Reacquire,
+					defended ? StealthApproachArrivalClassification.Defended :
+					StealthApproachArrivalClassification.None,
+					center, memberIds, live.LiveDefenderActorIds, localScore,
+					Array.Empty<CPos>(), live);
+			}
+
 			var route = routeCache.ReadRoute(center, mission.StrategicCell)?
 				.SkipWhile(cell => cell == center).ToArray() ?? Array.Empty<CPos>();
 			if (route.Length == 0 || route.Distinct().Count() != route.Length ||
 				!IsSameOrAdjacent(route[route.Length - 1], mission.StrategicCell))
+			{
+				if (live.LiveDefenderActorIds.Count != 0)
+					return Result(StealthApproachDisposition.Kite,
+						StealthApproachArrivalClassification.Defended, center, memberIds,
+						live.LiveDefenderActorIds, localScore, Array.Empty<CPos>(), live);
 				return Result(StealthApproachDisposition.Reacquire,
 					StealthApproachArrivalClassification.None, center, memberIds,
 					Array.Empty<uint>(), localScore, Array.Empty<CPos>());
+			}
 
-			var destination = route[0];
-			var membershipChanged = !lastMembers.SequenceEqual(memberIds);
+			// Collapse a clear straight route into one engine order, but preserve cached turns around
+			// strategic danger. The active leg is retained until the engine finishes it.
+			var destination = StealthStrategicRouteGeometry.EndOfFirstStraightLeg(center, route);
+			var membershipChanged = !sameMembers;
 			var movementFinished = lastDestination.HasValue &&
 				members.All(member => member.NeedsMovementOrder);
 			if (!lastDestination.HasValue || membershipChanged || movementFinished)
@@ -85,6 +120,7 @@ namespace OpenRA.Mods.Common.Traits
 				movementOrders.IssueMove(handoff.Owner, handoff.Epoch, memberIds,
 					destination, ++orderRevision);
 				lastDestination = destination;
+				lastOrderCenter = center;
 				lastMembers = memberIds;
 			}
 
@@ -102,6 +138,7 @@ namespace OpenRA.Mods.Common.Traits
 			if (disposition != StealthApproachDisposition.Moving)
 			{
 				lastDestination = null;
+				lastOrderCenter = null;
 				lastMembers = Array.Empty<uint>();
 			}
 

@@ -16,88 +16,199 @@ namespace OpenRA.Mods.Common.Traits
 	/// <summary>One current-World view for one reactive Kite decision.</summary>
 	sealed class StealthKiteLiveDecision
 	{
-		readonly bool formationCloaked;
-		public bool FormationExposed { get; }
+		public bool FormationCloaked { get; }
+		public bool FormationDetected { get; }
+		public bool FormationHidden => FormationCloaked && !FormationDetected;
+		public bool CurrentPositionSafe { get; }
 		public bool KitingEnabled { get; }
 		public StealthKiteMemberSnapshot[] Members { get; }
 		public StealthKiteActorSnapshot[] Defenders { get; }
 		public StealthKiteActorSnapshot[] Objectives { get; }
+		public StealthKiteActorSnapshot[] KiteTargets { get; }
+		public StealthKiteActorSnapshot[] FallbackObjectives { get; }
+		public StealthKiteActorSnapshot[] CrushableInfantry { get; }
 		public CPos[] CandidateCells { get; }
 		public uint[] DefenderActorIds { get; }
 		public uint[] ObjectiveActorIds { get; }
 		public CPos[] MemberCells => Members.Select(member => member.CurrentCell).Distinct().ToArray();
 		public StealthKiteDisposition? TargetlessDisposition { get; }
-		StealthKiteLiveDecision(StealthKiteLiveSnapshot live)
+		StealthKiteLiveDecision(StealthKiteLiveSnapshot live,
+			uint? requiredKiteActorId, uint? retainedActorId)
 		{
-			formationCloaked = live.FormationCloaked;
-			FormationExposed = !live.FormationCloaked || live.FormationDetected;
+			FormationCloaked = live.FormationCloaked;
+			FormationDetected = live.FormationDetected;
+			CurrentPositionSafe = live.CurrentPositionSafe;
 			KitingEnabled = live.KitingEnabled;
 			Members = live.Members.Where(member => member.IsValid)
 				.OrderBy(member => member.ActorId).ToArray();
-			var actors = live.Actors.Where(actor => actor.IsValid && actor.IsInLocalEngagementArea)
+			var actors = live.Actors.Where(actor => actor.IsValid)
 				.OrderBy(actor => actor.ActorId).ToArray();
 			Defenders = actors.Where(actor => actor.IsDefender).ToArray();
-			Objectives = actors.Where(actor => actor.IsMissionObjective).ToArray();
+			var localActors = actors.Where(actor => actor.IsInLocalEngagementArea).ToArray();
+			Objectives = localActors.Where(actor => actor.IsMissionObjective).ToArray();
+			CrushableInfantry = localActors.Where(actor => actor.IsDefender && actor.IsInfantry &&
+				actor.CanBeCrushedByFormation && !actor.HasDetectorCoverage).ToArray();
+			KiteTargets = actors.Where(actor => actor.IsInLocalEngagementArea).Where(actor =>
+				(actor.IsDefender && (!actor.IsInfantry || !actor.CanBeCrushedByFormation ||
+					actor.HasDetectorCoverage || actor.ActorId == requiredKiteActorId)) ||
+				(actor.IsMissionObjective && actor.PriorityValue >= live.MinimumKitePriorityValue)).ToArray();
+			FallbackObjectives = localActors.Where(actor => actor.PriorityValue > 0)
+				.Except(KiteTargets).ToArray();
 			CandidateCells = live.CandidateCells.ToArray();
 			DefenderActorIds = Defenders.Select(actor => actor.ActorId).ToArray();
 			ObjectiveActorIds = Objectives.Select(actor => actor.ActorId).ToArray();
-			if (Defenders.Length == 0)
-				TargetlessDisposition = Objectives.Length == 0 ?
-					StealthKiteDisposition.Reacquire : StealthKiteDisposition.UndefendedAttack;
+			var retainedTargetIsLive = retainedActorId.HasValue &&
+				actors.Any(actor => actor.ActorId == retainedActorId.Value);
+			var requiredTargetIsLive = requiredKiteActorId.HasValue &&
+				actors.Any(actor => actor.ActorId == requiredKiteActorId.Value);
+			if (Objectives.Length == 0 && !retainedTargetIsLive && !requiredTargetIsLive &&
+				(Defenders.Length == 0 || FormationHidden))
+				TargetlessDisposition = StealthKiteDisposition.Reacquire;
+			else if (Defenders.Length == 0)
+				TargetlessDisposition = StealthKiteDisposition.UndefendedAttack;
 			else if (Members.Length == 0)
 				TargetlessDisposition = StealthKiteDisposition.RecalculateFlee;
+			else if (KiteTargets.Length == 0 && CrushableInfantry.Length != 0)
+				TargetlessDisposition = StealthKiteDisposition.CrushEvaluation;
+			else if (KiteTargets.Length == 0)
+				TargetlessDisposition = StealthKiteDisposition.Reacquire;
 		}
 
-		public static StealthKiteLiveDecision Create(StealthKiteLiveSnapshot live)
+		public static StealthKiteLiveDecision Create(StealthKiteLiveSnapshot live,
+			uint? requiredKiteActorId = null, uint? retainedActorId = null)
 		{
-			return new StealthKiteLiveDecision(live ?? throw new ArgumentNullException(nameof(live)));
+			return new StealthKiteLiveDecision(live ?? throw new ArgumentNullException(nameof(live)),
+				requiredKiteActorId, retainedActorId);
 		}
 
 		public StealthKiteActorSnapshot ResolveTarget(uint? retainedActorId)
 		{
 			if (TargetlessDisposition.HasValue)
 				throw new InvalidOperationException("A targetless Kite decision cannot resolve a target.");
-			var retained = retainedActorId.HasValue ?
-				Defenders.FirstOrDefault(actor => actor.ActorId == retainedActorId.Value) : null;
-			return retained ?? Defenders.OrderBy(actor => Members.Min(member =>
-				DistanceSquared(member.CurrentCell, actor.CurrentCell)))
-				.ThenBy(actor => actor.ActorId).First();
+			return OrderedTargets(retainedActorId).First();
+		}
+
+		public StealthKiteActorSnapshot[] OrderedTargets(uint? retainedActorId)
+		{
+			var center = CurrentFormationCell().Value;
+			return KiteTargets.OrderBy(actor => actor.ActorId == retainedActorId ? 0 : 1)
+				.ThenBy(actor => DistanceSquared(center, actor.CurrentCell))
+				.ThenBy(actor => actor.ActorId).ToArray();
+		}
+
+		public bool IsCloserToFormation(StealthKiteActorSnapshot candidate,
+			StealthKiteActorSnapshot incumbent)
+		{
+			if (candidate == null || incumbent == null || Members.Length == 0)
+				return false;
+			var center = CurrentFormationCell().Value;
+			return DistanceSquared(center, candidate.CurrentCell) <
+				DistanceSquared(center, incumbent.CurrentCell);
 		}
 
 		public CPos? CurrentFormationCell()
 		{
-			return Members.Length == 0 ? (CPos?)null : Members[0].CurrentCell;
+			return Members.Length == 0 ? (CPos?)null : new CPos(
+				(int)Math.Round(Members.Average(member => member.CurrentCell.X)),
+				(int)Math.Round(Members.Average(member => member.CurrentCell.Y)));
+		}
+
+		public CPos RepresentativeCell(StealthKiteActorSnapshot target)
+		{
+			if (target == null || Members.Length == 0)
+				throw new ArgumentException("A representative Kite cell requires a live target and squad.");
+			var threats = ThreatActors(target);
+			return Members.OrderBy(member => threats.Min(actor =>
+				DistanceSquared(member.CurrentCell, actor.CurrentCell)))
+				.ThenBy(member => member.ActorId).First().CurrentCell;
 		}
 
 		public CPos[] OrderedCandidateCells(StealthKiteActorSnapshot target, CPos? currentCell)
 		{
 			var occupied = MemberCells.ToHashSet();
-			return CandidateCells.Where(cell => !occupied.Contains(cell))
-				.OrderBy(cell => DistanceSquared(Members[0].CurrentCell, cell))
+			var formationCell = currentCell ?? Members[0].CurrentCell;
+			var firingRange = Members.Min(member => member.CurrentWeaponRangeCells);
+			var firingRangeSquared = (long)firingRange * firingRange;
+			return CandidateCells.Where(cell => !occupied.Contains(cell) &&
+				DistanceSquared(cell, target.CurrentCell) <= firingRangeSquared)
+				.OrderBy(cell => DistanceSquared(formationCell, cell))
 				.ThenByDescending(cell => DistanceSquared(cell, target.CurrentCell))
 				.ThenBy(cell => cell.Y).ThenBy(cell => cell.X).ToArray();
 		}
 
-		public StealthKiteThreatFacts ThreatFacts(StealthKiteActorSnapshot target, CPos cell)
+		public StealthKiteActorSnapshot[] OrderedFallbackObjectives()
 		{
-			if (target == null || !Defenders.Contains(target) || Members.Length == 0)
+			var center = CurrentFormationCell().Value;
+			return FallbackObjectives.OrderByDescending(actor => actor.PriorityValue)
+				.ThenBy(actor => DistanceSquared(center, actor.CurrentCell))
+				.ThenBy(actor => actor.ActorId).ToArray();
+		}
+
+		public StealthKiteActorSnapshot ClosestDefender()
+		{
+			var center = CurrentFormationCell().Value;
+			return Defenders.OrderBy(actor => DistanceSquared(center, actor.CurrentCell))
+				.ThenBy(actor => actor.ActorId).First();
+		}
+
+		public StealthKiteActorSnapshot Actor(uint actorId)
+		{
+			return KiteTargets.Concat(FallbackObjectives)
+				.FirstOrDefault(actor => actor.ActorId == actorId);
+		}
+
+		public StealthKiteThreatFacts CurrentThreatFacts(StealthKiteActorSnapshot target)
+		{
+			return ThreatFacts(target, RepresentativeCell(target), 0);
+		}
+
+		public StealthKiteThreatFacts PlannedThreatFacts(
+			StealthKiteActorSnapshot target, CPos formationCell)
+		{
+			return ThreatFacts(target, formationCell, 0);
+		}
+
+		StealthKiteThreatFacts ThreatFacts(
+			StealthKiteActorSnapshot target, CPos cell, int formationRadiusCells)
+		{
+			if (target == null || (!KiteTargets.Contains(target) &&
+				!FallbackObjectives.Contains(target)) || Members.Length == 0)
 				throw new ArgumentException("Kite safety requires a live target and squad.", nameof(target));
 			return new StealthKiteThreatFacts(StealthKiteAction.Fire, target.ActorId,
 				target.CurrentCell, cell, Members.Min(member => member.CurrentWeaponRangeCells),
-				Members.Select(member => member.ActorId), Defenders, formationCloaked, true, true,
-				0);
+				Members.Select(member => member.ActorId), ThreatActors(target), FormationCloaked, true, true,
+				formationRadiusCells);
 		}
 
 		public StealthKiteFallbackFacts FallbackFacts(StealthKiteActorSnapshot target)
 		{
+			var attackPackage = AttackPackage(target);
 			return new StealthKiteFallbackFacts(target.ActorId, target.CurrentCell,
-				Members.Select(member => member.ActorId), DefenderActorIds, formationCloaked);
+				Members.Select(member => member.ActorId), attackPackage.Select(actor => actor.ActorId),
+				FormationCloaked);
+		}
+
+		public StealthKiteActorSnapshot[] AttackPackage(StealthKiteActorSnapshot target)
+		{
+			var firingRange = Members.Min(member => member.CurrentWeaponRangeCells);
+			return Defenders.Append(target).Distinct().Where(defender =>
+			{
+				if (defender.ActorId == target.ActorId)
+					return true;
+				var reach = defender.CurrentWeaponRangeCells + firingRange;
+				return DistanceSquared(defender.CurrentCell, target.CurrentCell) <= (long)reach * reach;
+			}).OrderBy(actor => actor.ActorId).ToArray();
 		}
 
 		public string LiveIdentity(StealthKiteActorSnapshot target)
 		{
 			return string.Join("|", target.ActorId, string.Join(",",
 				Members.Select(member => member.ActorId)), string.Join(",", DefenderActorIds));
+		}
+
+		StealthKiteActorSnapshot[] ThreatActors(StealthKiteActorSnapshot target)
+		{
+			return Defenders.Append(target).Distinct().OrderBy(actor => actor.ActorId).ToArray();
 		}
 
 		static long DistanceSquared(CPos left, CPos right)

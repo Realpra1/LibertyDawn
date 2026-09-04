@@ -17,8 +17,6 @@ namespace OpenRA.Mods.Common.Traits
 	/// <summary>Reactive live Crush owner: crush one safe live infantry target or hand off to Kite.</summary>
 	public sealed class StealthCrushBehavior
 	{
-		const int MaximumAttemptsPerTarget = 4;
-
 		readonly StealthCrushEvaluationHandoff handoff;
 		readonly StealthApproachMission mission;
 		readonly IStealthLifecycleOwnershipGuard ownershipGuard;
@@ -27,8 +25,9 @@ namespace OpenRA.Mods.Common.Traits
 		readonly IStealthCrushOrders orders;
 		readonly StealthBehaviorExecutionLease executionLease = new StealthBehaviorExecutionLease();
 		uint? targetId;
+		CPos? targetCell;
+		uint[] orderedMembers = Array.Empty<uint>();
 		long attemptRevision;
-		int targetAttempts;
 
 		public StealthCrushBehavior(StealthCrushEvaluationHandoff handoff,
 			IStealthLifecycleOwnershipGuard ownershipGuard, IStealthCrushLiveWorld liveWorld,
@@ -56,25 +55,34 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			var decision = StealthCrushLiveDecision.Create(ReadLive(revision), mission);
 			if (decision.TargetlessDisposition.HasValue)
+			{
+				var fallbackTarget = decision.TargetlessDisposition == StealthCrushDisposition.Kite ?
+					decision.SelectFallbackKiteTarget() : null;
 				return Result(decision, decision.TargetlessDisposition.Value,
-					null, null, revision);
+					fallbackTarget, null, revision);
+			}
 
 			var target = decision.SelectTarget(targetId);
-			if (targetId != target.ActorId)
-				targetAttempts = 0;
-			if (targetAttempts >= MaximumAttemptsPerTarget)
-				return Result(decision, StealthCrushDisposition.Kite, target, null, revision);
 			var safety = Calculate(decision.ThreatFacts(target), revision);
 			if (!safety.Approved)
 				return Result(decision, StealthCrushDisposition.Kite, target, safety, revision);
 
 			var members = decision.Members.Select(member => member.ActorId).ToArray();
-			executionLease.Verify(revision, "Crush", EnsureActiveOwnership);
-			attemptRevision++;
-			targetAttempts++;
-			orders.IssueCrush(handoff.Owner, handoff.Epoch, members,
-				target.ActorId, target.CurrentCell, attemptRevision);
-			executionLease.Verify(revision, "Crush", EnsureActiveOwnership);
+			var sameAttempt = targetId == target.ActorId && targetCell == target.CurrentCell &&
+				orderedMembers.SequenceEqual(members);
+			if (sameAttempt && decision.Members.All(member => member.NeedsMovementOrder))
+				return Result(decision, StealthCrushDisposition.Kite, target, null, revision);
+			var needsOrder = targetId != target.ActorId || targetCell != target.CurrentCell ||
+				!orderedMembers.SequenceEqual(members) ||
+				decision.Members.All(member => member.NeedsMovementOrder);
+			if (needsOrder)
+			{
+				executionLease.Verify(revision, "Crush", EnsureActiveOwnership);
+				attemptRevision++;
+				orders.IssueCrush(handoff.Owner, handoff.Epoch, members,
+					target.ActorId, target.CurrentCell, attemptRevision);
+				executionLease.Verify(revision, "Crush", EnsureActiveOwnership);
+			}
 
 			return Result(decision, StealthCrushDisposition.Retain, target, safety, revision);
 		}
@@ -88,7 +96,12 @@ namespace OpenRA.Mods.Common.Traits
 				target?.ActorId, target?.CurrentCell, members,
 				decision.DefenderActorIds, decision.ObjectiveActorIds, safety);
 			executionLease.Commit(revision, "Crush", EnsureActiveOwnership,
-				() => targetId = disposition == StealthCrushDisposition.Retain ? target?.ActorId : null);
+				() =>
+				{
+					targetId = disposition == StealthCrushDisposition.Retain ? target?.ActorId : null;
+					targetCell = disposition == StealthCrushDisposition.Retain ? target?.CurrentCell : null;
+					orderedMembers = disposition == StealthCrushDisposition.Retain ? members : Array.Empty<uint>();
+				});
 			return result;
 		}
 

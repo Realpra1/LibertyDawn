@@ -157,7 +157,7 @@ namespace OpenRA.Test.Mods.Common
 				new[] { new StealthStrategicTargetSnapshot(71, cell, 5000, 1100, 100, 100) }, null);
 			var value = Construct<StealthTargetValueOption>(option, 5500000L);
 			return Construct<StealthApproachMission>(Construct<StealthTargetThreatOption>(value,
-				new StealthTargetThreatScore(1, 2)), 0L, 0, 1000L);
+				new StealthTargetThreatScore(1, 2)));
 		}
 
 		static T Construct<T>(params object[] arguments)
