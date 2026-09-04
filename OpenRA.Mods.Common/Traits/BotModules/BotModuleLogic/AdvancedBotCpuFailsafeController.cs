@@ -107,9 +107,16 @@ namespace OpenRA.Mods.Common.Traits
 				StringComparer.Ordinal);
 			var advancedMilliseconds = enabledTimes.Values.Sum();
 			var share = totalMilliseconds > 0 ? advancedMilliseconds / totalMilliseconds : 0;
-			var breached = pacing.Reliable ? pacing.RealTimeRatio > 1d + lagTolerance :
-				totalMilliseconds > 0 && share * Math.Max(0, pacing.RealTimeRatio) > fallbackShare;
-			var reason = pacing.Reliable ? "normal-speed-keep-up" : pacing.Source + "-half-cpu-budget";
+			var realTimeShare = share * Math.Max(0, pacing.RealTimeRatio);
+
+			// Normal-speed lag alone does not identify an advanced module as its cause:
+			// rendering, the F8 overlay, or unrelated simulation work may dominate the
+			// frame. Shed advanced behavior only when its measured work also exceeds the
+			// configured share of one real-time simulation budget.
+			var breached = totalMilliseconds > 0 && realTimeShare > fallbackShare &&
+				(!pacing.Reliable || pacing.RealTimeRatio > 1d + lagTolerance);
+			var reason = pacing.Reliable ? "normal-speed-keep-up-and-cpu-share" :
+				pacing.Source + "-half-cpu-budget";
 
 			if (breached)
 			{

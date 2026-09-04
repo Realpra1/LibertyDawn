@@ -78,31 +78,54 @@ are acceptable; active unexplained failures are not.
    as the normal covert-behavior test.
 4. Preserve the permanent watchdogs and keep raw logs/replays/build artifacts out
    of git except an explicitly requested reviewed replay.
+5. Ship both maintained scenarios as visible CNC maps:
+   `mods/cnc/maps/StankChallenge.oramap` and
+   `mods/cnc/maps/StankChallenge2.oramap`.
+6. A squad-manager failsafe transition must release every stealth tank to a
+   working aggressive `AttackMove` fallback. Idle or completed orders are
+   reconsidered, so a disabled module can never leave surviving tanks stopped.
+   The F8 overlay may clear stale advanced-squad labels after the handoff, but
+   loss of the overlay must not mean loss of unit ownership or orders.
 
 ## Current release-candidate evidence
 
-- Focused lifecycle/function suite: `200/200` passing.
-- Complete .NET suite: `961/961` passing. `make test MOD=cnc` passes with
-  Release compilation, CNC rules, and every packaged CNC map including
-  StankChallenge.
-- StankChallenge2 completed naturally at ticks `18060`, `19692`, and `23110`.
-  Median completion is `19692` (about `6:34`); two runs were below seven minutes
-  and the slower run had an explained terminal tail after its last credited kills.
-  There were no stalls or failsafe disables. Two runs diagnosed one
-  Obelisk-attributed loss each during the forced compound assault.
-- Original StankChallenge completed naturally at ticks `10500`, `18316`, and
-  `23993`; no stall or failsafe-disable signal occurred. Two runs diagnosed
-  Obelisk-attributed losses and remain human-review signals.
-- Fresh natural VIKI-versus-two-allied-Brutalis validation: `5/5` wins at ticks
-  `4210`, `5200`, `5468`, `6463`, and `8816` (median `5468`). No stationary,
-  Obelisk-death, failsafe-disable, or desync signal occurred. Primary efficiency
-  mean/median are `1978.78`/`1890.87`; damage-adjusted mean/median are
-  `2.5816`/`1.0052`. One squad exceeded cadence by `305` ticks during terminal
-  kill stealing in one game; every active terminal squad passed in the other four.
+- The reviewed `playtest-20260904` replay records all four F8 squad entries being
+  cleared at ticks `1509-1512`. Surviving tanks later become idle and are not
+  reclaimed. Retained automation independently records the same controller
+  disabling `SquadManagerBotModule`, with `assign_roles` dominating its sample.
+- Normal-speed lag now requires the advanced modules themselves to exceed their
+  configured share of one real-time simulation budget before throttling/shedding.
+  Rendering, overlay, or unrelated simulation lag cannot alone disable squads.
+- A disabled squad manager releases all retained actors to aggressive fallback,
+  and fallback renews a completed/abandoned order whenever an actor becomes idle.
+  A forced runtime transition retained all eight tanks and renewed fallback orders
+  through tick `1500` without a stationary failure.
+- Exact final binary: StankChallenge won naturally at tick `15643`; Challenge 2
+  won naturally at tick `23604`. Neither run disabled the manager or stalled.
+  Challenge 2 diagnosed one Obelisk-attributed loss. A concurrent Challenge 2
+  run also recorded one win at `18861`, while a second timing-variable run hit its
+  `40000`-tick cap with two idle tanks; keep this as a lifecycle review signal.
+- Five full Empire Earth games, VIKI versus two allied Brutalis players: `5/5`
+  VIKI wins at ticks `22022`, `23285`, `28453`, `28603`, and `48261` (median
+  `28453`). No manager disable, stationary, cadence, exception, or desync signal.
+  Primary efficiency mean/median: `1137.39`/`668.57`; damage-adjusted mean/median:
+  `0.13427`/`0.08982`. Five Obelisk-loss diagnostics occurred across the batch.
+- CPU profile on the identical paced Challenge 1 fixture reduced Kite from
+  `5386.164 ms / 755 calls` to `5302.569 ms / 735 calls`; candidate order and
+  behavior are unchanged because duplicates are removed before passability checks.
+- Validation: focused failsafe/ownership `29/29`; scenario packaging `5/5`;
+  complete .NET `966/966`; `make check`, `make check-scripts`, and
+  `make test MOD=cnc` pass. Both challenge maps are packaged and validated.
 
 ## Release state
 
-- Ready for human testing on PR 144. Kite now finishes a retained live target,
+- **Ready for human retest, not final acceptance.** The uploaded replay's
+  failsafe/fallback defect is repaired and reproduced by a forced transition
+  test. Human testing should confirm F8 ownership remains active normally and,
+  if a genuine overload sheds the module, tanks continue aggressive fallback.
+  Challenge 2 timing variance and Obelisk-loss diagnostics remain review signals;
+  they do not invalidate this bounded crash/handoff hotfix.
+- Kite now finishes a retained live target,
   yields to phases 3-4 when it dies, and cannot reuse that target's movement plan.
 - A fresh Kite phase may try the next safe valid target. Once it selects one, it
   cannot silently abandon it for another target's move; an unsafe retained fight

@@ -88,6 +88,19 @@ namespace OpenRA.Test
 		}
 
 		[Test]
+		public void NormalSpeedLagFromOutsideAdvancedModulesDoesNotShedThem()
+		{
+			var controller = Create("advanced");
+			var smallShare = new Dictionary<string, double> { { "advanced", 15 } };
+
+			for (var i = 0; i < 10; i++)
+				Assert.That(controller.Update(Slow, 100, smallShare).Transition,
+					Is.EqualTo("healthy"));
+
+			Assert.That(controller.IsEnabled("advanced"), Is.True);
+		}
+
+		[Test]
 		public void IsolatedSpikeDoesNotDisableAndExactlyHalfBudgetIsHealthy()
 		{
 			var controller = Create("advanced");

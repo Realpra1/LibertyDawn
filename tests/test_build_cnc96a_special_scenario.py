@@ -5,6 +5,7 @@ import struct
 import sys
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
 
@@ -18,6 +19,18 @@ MODULE_SPEC.loader.exec_module(scenario)
 
 
 class Cnc96aSpecialScenarioTest(unittest.TestCase):
+    def test_both_challenge_maps_are_packaged_as_visible_cnc_maps(self):
+        for filename, title in (
+            ("StankChallenge.oramap", "StankChallenge"),
+            ("StankChallenge2.oramap", "StankChallenge2"),
+        ):
+            path = REPO_ROOT / "mods/cnc/maps" / filename
+            self.assertTrue(path.is_file(), f"missing packaged challenge map: {filename}")
+            with zipfile.ZipFile(path) as archive:
+                map_yaml = archive.read("map.yaml").decode("utf-8")
+            self.assertIn(f"Title: {title}\n", map_yaml)
+            self.assertIn("Visibility: Lobby\n", map_yaml)
+
     def test_fixture_disables_production_but_keeps_combat_managers(self):
         self.assertIn("-CrateSpawner:", scenario.RULES_HEADER)
         self.assertIn("-UnitBuilderBotModule@viki:", scenario.RULES_HEADER)

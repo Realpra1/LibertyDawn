@@ -313,8 +313,9 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			{
 				var target = squad.World.Map.CellContaining(enemy.CenterPosition);
 				return offsets.Select(offset => squad.World.Map.Clamp(target + offset));
-			}).Where(cell => mobile.CanEnterCell(cell, null, BlockedByActor.Immovable))
-				.Distinct().OrderBy(cell => cell.Y).ThenBy(cell => cell.X).ToArray();
+			}).Distinct()
+				.Where(cell => mobile.CanEnterCell(cell, null, BlockedByActor.Immovable))
+				.OrderBy(cell => cell.Y).ThenBy(cell => cell.X).ToArray();
 		}
 
 		bool TargetValid(StealthApproachMission mission, IEnumerable<Actor> enemies)

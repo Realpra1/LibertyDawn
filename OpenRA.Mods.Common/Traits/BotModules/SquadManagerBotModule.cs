@@ -2376,9 +2376,10 @@ namespace OpenRA.Mods.Common.Traits
 
 		void QueueFailsafeFallback(IBot bot, string source, IEnumerable<Actor> candidates)
 		{
-			var orderable = candidates.Where(a => !fallbackOrderedActors.Contains(a.ActorID) ||
-				!fallbackOrderTargets.TryGetValue(a.ActorID, out var target) || target != fallbackTarget.Location ||
-				(Info.SimpleAttackMoveFallbackWhenDisabled && a.IsIdle)).ToArray();
+			var orderable = candidates.Where(a => BotModules.AdvancedBotFallbackOwnership.RequiresAttackMove(
+				fallbackOrderedActors.Contains(a.ActorID),
+				!fallbackOrderTargets.TryGetValue(a.ActorID, out var target) || target != fallbackTarget.Location,
+				a.IsIdle)).ToArray();
 			if (orderable.Length == 0)
 				return;
 
