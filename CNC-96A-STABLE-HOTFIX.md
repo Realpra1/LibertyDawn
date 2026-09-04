@@ -93,12 +93,12 @@ are acceptable; active unexplained failures are not.
 - Original StankChallenge completed naturally at ticks `10500`, `18316`, and
   `23993`; no stall or failsafe-disable signal occurred. Two runs diagnosed
   Obelisk-attributed losses and remain human-review signals.
-- Fresh natural VIKI-versus-two-allied-Brutalis validation: `3/3` wins at ticks
-  `5200`, `5468`, and `6463`. No stationary, Obelisk-death, failsafe-disable, or
-  desync signal occurred. Primary efficiency mean/median are `1791.54`/`1858.54`;
-  damage-adjusted mean/median are `3.6413`/`1.0052`. One squad exceeded cadence
-  by `305` ticks during terminal kill stealing while the other squads finished
-  the game.
+- Fresh natural VIKI-versus-two-allied-Brutalis validation: `5/5` wins at ticks
+  `4210`, `5200`, `5468`, `6463`, and `8816` (median `5468`). No stationary,
+  Obelisk-death, failsafe-disable, or desync signal occurred. Primary efficiency
+  mean/median are `1978.78`/`1890.87`; damage-adjusted mean/median are
+  `2.5816`/`1.0052`. One squad exceeded cadence by `305` ticks during terminal
+  kill stealing in one game; every active terminal squad passed in the other four.
 
 ## Release state
 
