@@ -69,8 +69,8 @@ namespace OpenRA.Mods.Common.Traits
 				(evidence.Reason == StealthKiteFallbackReason.NoSafePlan &&
 					evidence.AttackScore.Value.Crossover > 2) ||
 				!source.ActiveMemberActorIds.SequenceEqual(evidence.AttackFacts.FriendlyActorIds) ||
-				!source.LiveDefenderActorIds.All(evidence.AttackFacts.EnemyActorIds.Contains) ||
-				!source.LiveDefenderActorIds.SequenceEqual(evidence.DefenderActorIds) ||
+				!evidence.DefenderActorIds.All(evidence.AttackFacts.EnemyActorIds.Contains) ||
+				!evidence.DefenderActorIds.All(source.LiveDefenderActorIds.Contains) ||
 				source.SelectedTargetActorId != evidence.AttackFacts.SelectedTargetActorId ||
 				source.SelectedTargetCurrentCell != evidence.AttackFacts.SelectedTargetCurrentCell)
 				throw new ArgumentException("RecalculateFlee requires canonical Kite escape evidence.", nameof(source));

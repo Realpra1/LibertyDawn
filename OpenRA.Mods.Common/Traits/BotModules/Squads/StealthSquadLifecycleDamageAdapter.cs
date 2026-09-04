@@ -18,12 +18,15 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 	{
 		readonly StealthLifecycleRuntimeEntry entry;
 		readonly StealthSquadLifecycleCombatLiveAdapter live;
+		readonly StealthSquadLifecycleRecoveryLiveAdapter recovery;
 
 		public StealthSquadLifecycleDamageAdapter(StealthLifecycleRuntimeEntry entry,
-			StealthSquadLifecycleCombatLiveAdapter live)
+			StealthSquadLifecycleCombatLiveAdapter live,
+			StealthSquadLifecycleRecoveryLiveAdapter recovery)
 		{
 			this.entry = entry ?? throw new ArgumentNullException(nameof(entry));
 			this.live = live ?? throw new ArgumentNullException(nameof(live));
+			this.recovery = recovery ?? throw new ArgumentNullException(nameof(recovery));
 		}
 
 		public StealthLifecycleDamageYield Capture(object lastResult,
@@ -31,7 +34,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		{
 			if (observation == null ||
 				observation.DamagedMember.HitPoints >= observation.DamagedMember.MaximumHitPoints ||
-				!StealthRepairResumeContext.IsFightOwner(entry.Owner))
+				!StealthRepairResumeContext.IsFightOwner(entry.Owner) || !recovery.HasRepairOption())
 				return null;
 			var members = Members(lastResult);
 			if (!members.Contains(observation.DamagedMember.ActorId))

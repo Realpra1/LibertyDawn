@@ -141,6 +141,10 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var memberActors = Members();
 			var localEnemies = LocalEnemies(mission, memberActors);
 			var detectors = DetectorCircles(localEnemies);
+			var defenderActors = localEnemies.Where(actor => IsDefender(actor, memberActors)).ToArray();
+			var cloaked = FormationCloaked(memberActors);
+			var detected = memberActors.Any(actor =>
+				HasDetectorCoverage(actor.CenterPosition, detectors));
 			var members = memberActors.Select(actor =>
 			{
 				var health = Health(actor);
@@ -155,21 +159,70 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					health.HP, health.Max, WeaponRange(actor), IsDefender(actor, memberActors),
 					IsObjective(actor, mission), IsInfantry(actor), CanCrush(actor),
 					HasDetectorCoverage(actor.CenterPosition, detectors),
+					isInLocalEngagementArea: localActors.IsInEngagementArea(mission, memberActors, actor),
 					priorityValue: (long)Priority(actor) * Value(actor));
 			}).ToArray();
+			var candidateCells = KiteCandidateCells(localEnemies, memberActors);
 			return new StealthKiteLiveSnapshot(squad.World.WorldTick, members, actors,
-				KiteCandidateCells(localEnemies, memberActors), FormationCloaked(memberActors),
-				formationDetected: memberActors.Any(actor =>
-					HasDetectorCoverage(actor.CenterPosition, detectors)),
+				candidateCells,
+				cloaked,
+				formationDetected: detected,
 				kitingEnabled: squad.StealthDefinition?.EnableKiting != false,
-				minimumKitePriorityValue: squad.StealthDefinition?.MinimumKitePriorityValue ?? 0);
+				minimumKitePriorityValue: squad.StealthDefinition?.MinimumKitePriorityValue ?? 0,
+				currentPositionSafe: CurrentPositionSafety(memberActors, defenderActors,
+					cloaked, detected, true).Threat == null);
 		}
 
-		StealthMassAttackLiveSnapshot IStealthMassAttackLiveWorld.Read(StealthApproachMission mission)
+		bool IStealthKiteLiveWorld.CanReach(uint targetActorId, CPos cell)
+		{
+			var target = Resolve(targetActorId);
+			var member = StealthSquadLiveLocalActors.Representative(Members(), target);
+			var mobile = member?.TraitOrDefault<Mobile>();
+			if (mobile == null || !squad.World.Map.Contains(cell) ||
+				!mobile.CanEnterCell(cell, null, BlockedByActor.Immovable))
+				return false;
+			if (member.Location == cell)
+				return true;
+			return squad.World.WorldActor.Trait<IPathFinder>().FindUnitPath(
+				member.Location, cell, member, null, BlockedByActor.Immovable).Count != 0;
+		}
+
+		uint? IStealthKiteLiveWorld.BlockingActor(uint targetActorId, CPos firingCell)
+		{
+			return BlockingActor(targetActorId, firingCell);
+		}
+
+		uint? IStealthMassAttackLiveWorld.BlockingActor(uint targetActorId, CPos firingCell)
+		{
+			return BlockingActor(targetActorId, firingCell);
+		}
+
+		uint? BlockingActor(uint targetActorId, CPos firingCell)
+		{
+			var target = Resolve(targetActorId);
+			var member = StealthSquadLiveLocalActors.Representative(Members(), target);
+			if (member == null || target == null)
+				return null;
+
+			var source = squad.World.Map.CenterOfCell(firingCell);
+			return squad.World.FindBlockingActorsOnLine(source, target.CenterPosition, WDist.Zero)
+				.Where(actor => actor != target && Live(actor) &&
+					squad.SquadManager.IsPreferredEnemyUnit(actor) &&
+					actor.TraitsImplementing<IBlocksProjectiles>().Any(blocker =>
+						Exts.IsTraitEnabled(blocker) && blocker.ValidRelationships.HasRelationship(
+							actor.Owner.RelationshipWith(member.Owner))))
+				.OrderBy(actor => (actor.CenterPosition - source).HorizontalLengthSquared)
+				.ThenBy(actor => actor.ActorID).Select(actor => (uint?)actor.ActorID).FirstOrDefault();
+		}
+
+		StealthMassAttackLiveSnapshot IStealthMassAttackLiveWorld.Read(
+			StealthApproachMission mission, CPos attackCenter)
 		{
 			var memberActors = Members();
 			var localEnemies = LocalEnemies(mission, memberActors);
-			var detectors = DetectorCircles(localEnemies);
+			var package = localEnemies.Where(actor => IsObjective(actor, mission) ||
+				ThreatensAttackArea(actor, attackCenter, memberActors)).ToArray();
+			var detectors = DetectorCircles(package);
 			var members = memberActors.Select(actor =>
 			{
 				var health = Health(actor);
@@ -177,7 +230,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					WeaponRange(actor), health.HP, health.Max,
 					needsMovementOrder: actor.IsIdle);
 			}).ToArray();
-			var actors = localEnemies.Select(actor =>
+			var actors = package.Select(actor =>
 			{
 				var health = Health(actor);
 				return new StealthMassAttackActorSnapshot(actor.ActorID, actor.Info.Name, actor.Location,
@@ -186,6 +239,18 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			}).ToArray();
 			return new StealthMassAttackLiveSnapshot(squad.World.WorldTick, members, actors,
 				CandidateCells(4), FormationCloaked(memberActors));
+		}
+
+		bool ThreatensAttackArea(Actor actor, CPos attackCenter,
+			IReadOnlyList<Actor> members)
+		{
+			if (!IsDefender(actor, members))
+				return false;
+			var friendlyRange = members.Select(WeaponRange).DefaultIfEmpty().Min();
+			var reach = WeaponRange(actor) + friendlyRange + 2;
+			var dx = (long)actor.Location.X - attackCenter.X;
+			var dy = (long)actor.Location.Y - attackCenter.Y;
+			return dx * dx + dy * dy <= (long)reach * reach;
 		}
 
 		public Actor Resolve(uint actorId)
@@ -233,23 +298,21 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			if (mobile == null || enemies.Count == 0)
 				return Array.Empty<CPos>();
 
-			var center = new CPos(
-				(int)Math.Round(members.Average(member => member.Location.X)),
-				(int)Math.Round(members.Average(member => member.Location.Y)));
-			var spread = (int)Math.Ceiling(Math.Sqrt(members.Max(member =>
-				(long)(member.Location.X - center.X) * (member.Location.X - center.X) +
-				(long)(member.Location.Y - center.Y) * (member.Location.Y - center.Y))));
-			var range = Math.Max(1, members.Min(WeaponRange)) + spread;
-			var directions = new[]
-			{
-				new CVec(-1, -1), new CVec(0, -1), new CVec(1, -1), new CVec(1, 0),
-				new CVec(1, 1), new CVec(0, 1), new CVec(-1, 1), new CVec(-1, 0)
-			};
+			var range = Math.Max(1, members.Min(WeaponRange));
+			var innerRange = Math.Max(0, range - 1);
+			var outerSquared = range * range;
+			var innerSquared = innerRange * innerRange;
+			var offsets = Enumerable.Range(-range, range * 2 + 1).SelectMany(y =>
+				Enumerable.Range(-range, range * 2 + 1).Select(x => new CVec(x, y)))
+				.Where(offset =>
+				{
+					var distanceSquared = offset.X * offset.X + offset.Y * offset.Y;
+					return distanceSquared <= outerSquared && distanceSquared > innerSquared;
+				}).ToArray();
 			return enemies.SelectMany(enemy =>
 			{
 				var target = squad.World.Map.CellContaining(enemy.CenterPosition);
-				return directions.Select(direction => squad.World.Map.Clamp(
-					new CPos(target.X + direction.X * range, target.Y + direction.Y * range)));
+				return offsets.Select(offset => squad.World.Map.Clamp(target + offset));
 			}).Where(cell => mobile.CanEnterCell(cell, null, BlockedByActor.Immovable))
 				.Distinct().OrderBy(cell => cell.Y).ThenBy(cell => cell.X).ToArray();
 		}

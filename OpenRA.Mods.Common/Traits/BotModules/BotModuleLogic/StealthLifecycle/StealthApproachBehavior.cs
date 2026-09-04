@@ -51,8 +51,12 @@ namespace OpenRA.Mods.Common.Traits
 			var center = Center(members);
 			var localScore = live.CurrentThreatScore;
 			if (!live.CurrentPositionSafe)
-				return Result(StealthApproachDisposition.RecalculateFlee,
-					StealthApproachArrivalClassification.None, center, memberIds,
+				return Result(StealthApproachDisposition.Kite,
+					StealthApproachArrivalClassification.Defended, center, memberIds,
+					live.LiveDefenderActorIds, localScore, Array.Empty<CPos>(), live);
+			if (live.LiveDefenderActorIds.Count != 0)
+				return Result(StealthApproachDisposition.Kite,
+					StealthApproachArrivalClassification.Defended, center, memberIds,
 					live.LiveDefenderActorIds, localScore, Array.Empty<CPos>(), live);
 			if (!live.TargetIsValid)
 				return Result(StealthApproachDisposition.Reacquire,
@@ -107,7 +111,7 @@ namespace OpenRA.Mods.Common.Traits
 
 			// Collapse a clear straight route into one engine order, but preserve cached turns around
 			// strategic danger. The active leg is retained until the engine finishes it.
-			var destination = EndOfFirstStraightLeg(center, route);
+			var destination = StealthStrategicRouteGeometry.EndOfFirstStraightLeg(center, route);
 			var membershipChanged = !sameMembers;
 			var movementFinished = lastDestination.HasValue &&
 				members.All(member => member.NeedsMovementOrder);
@@ -163,24 +167,6 @@ namespace OpenRA.Mods.Common.Traits
 		static bool IsSameOrAdjacent(CPos left, CPos right)
 		{
 			return Math.Abs(left.X - right.X) <= 1 && Math.Abs(left.Y - right.Y) <= 1;
-		}
-
-		static CPos EndOfFirstStraightLeg(CPos start, IReadOnlyList<CPos> route)
-		{
-			var previous = start;
-			var first = route[0];
-			var direction = new CVec(Math.Sign(first.X - start.X), Math.Sign(first.Y - start.Y));
-			for (var i = 1; i < route.Count; i++)
-			{
-				var next = route[i];
-				var nextDirection = new CVec(Math.Sign(next.X - previous.X), Math.Sign(next.Y - previous.Y));
-				if (nextDirection != direction)
-					break;
-				first = next;
-				previous = next;
-			}
-
-			return first;
 		}
 	}
 }

@@ -172,6 +172,28 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
+		public void AcquisitionDoesNotLetNearbyLowValueCellsHideAHighValueTarget()
+		{
+			var lowCells = Enumerable.Range(1, 10).Select(x => new CPos(x, 0)).ToArray();
+			var highCell = new CPos(11, 0);
+			var enemies = lowCells.Append(highCell).ToArray();
+			var targets = lowCells.Select((cell, index) =>
+				new StealthStrategicTargetSnapshot((uint)index + 1, cell, 1, 100, 100, 100))
+				.Append(new StealthStrategicTargetSnapshot(20, highCell, 6000, 1100, 100, 100));
+			var cache = new Cache
+			{
+				Snapshot = new StealthTargetAcquisitionCacheSnapshot(12, 2, new float[24],
+					enemies, .1f, targets)
+			};
+
+			var result = new StealthTargetAcquisitionBehavior(
+				Handoff(BehaviorId.TargetAcquisition), cache).Execute(new CPos(0, 0));
+
+			Assert.That(result.Options.Select(option => option.StrategicCell),
+				Is.EqualTo(new[] { highCell }));
+		}
+
+		[Test]
 		public void AcquisitionAwaitsAnEmptyCache()
 		{
 			var cache = new Cache
@@ -245,6 +267,24 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(first.MoveCloserStrategicCell, Is.EqualTo(new CPos(3, 0)));
 			Assert.That(rescanned.MoveCloserStrategicCell, Is.EqualTo(new CPos(4, 0)));
 			Assert.That(rescanned.PrimitiveOperations, Is.GreaterThan(0));
+		}
+
+		[Test]
+		public void AcquisitionPreservesTheFirstSafeTurnWhenMovingCloser()
+		{
+			var danger = new float[10];
+			danger[1] = StealthAISpecialistPolicy.HardRouteDangerThreshold;
+			var cache = new Cache
+			{
+				Snapshot = new StealthTargetAcquisitionCacheSnapshot(5, 2, danger,
+					new[] { new CPos(4, 0) }, 10f, routeThreatPenalty: 10f)
+			};
+
+			var result = new StealthTargetAcquisitionBehavior(
+				Handoff(BehaviorId.TargetAcquisition), cache).Execute(new CPos(0, 0));
+
+			Assert.That(result.MoveCloserStrategicCell, Is.EqualTo(new CPos(0, 1)),
+				"The engine order must stop at the cached route's first turn instead of cutting through danger.");
 		}
 
 		[Test]
@@ -517,7 +557,7 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
-		public void ApproachHandsAnUnsafeExposedPositionToLeastDangerousFlee()
+		public void ApproachHandsAnUnsafeExposedPositionToLiveKiting()
 		{
 			var member = new StealthApproachMemberSnapshot(1, new CPos(0, 0));
 			var world = new ApproachWorld
@@ -536,15 +576,33 @@ namespace OpenRA.Test.Mods.Common
 			var result = behavior.Execute();
 			var controller = Construct<StealthLifecycleController>(BehaviorId.Approach);
 
-			Assert.That(result.Disposition, Is.EqualTo(StealthApproachDisposition.RecalculateFlee));
+			Assert.That(result.Disposition, Is.EqualTo(StealthApproachDisposition.Kite));
 			Assert.That(world.Moves, Is.Zero);
 			Assert.That(controller.TryAccept(result, out var transition), Is.True);
-			Assert.That(transition.RecalculateFlee.Evidence.Source,
-				Is.EqualTo(StealthRecalculateFleeSource.ApproachUnsafeCurrentPosition));
+			Assert.That(transition.Kite, Is.Not.Null);
 		}
 
 		[Test]
-		public void ApproachEscapesUnsafePositionBeforeReacquiringAnInvalidTarget()
+		public void ApproachStartsKitingWhenItFindsADefenderFromASafeCell()
+		{
+			var world = new ApproachWorld
+			{
+				Snapshot = ApproachSnapshot(new CPos(0, 0), new uint[] { 71 })
+			};
+			var behavior = new StealthApproachBehavior(
+				Construct<StealthApproachHandoff>(Handoff(BehaviorId.Approach), MissionAt(5)),
+				world, world, world);
+
+			var result = behavior.Execute();
+
+			Assert.That(result.Disposition, Is.EqualTo(StealthApproachDisposition.Kite));
+			Assert.That(result.CurrentPositionSafe, Is.True);
+			Assert.That(result.LiveDefenderActorIds, Is.EqualTo(new uint[] { 71 }));
+			Assert.That(world.Moves, Is.Zero);
+		}
+
+		[Test]
+		public void ApproachUsesLiveKitingBeforeReacquiringAnInvalidTarget()
 		{
 			var member = new StealthApproachMemberSnapshot(1, new CPos(0, 0));
 			var world = new ApproachWorld
@@ -562,7 +620,7 @@ namespace OpenRA.Test.Mods.Common
 
 			var result = behavior.Execute();
 
-			Assert.That(result.Disposition, Is.EqualTo(StealthApproachDisposition.RecalculateFlee));
+			Assert.That(result.Disposition, Is.EqualTo(StealthApproachDisposition.Kite));
 			Assert.That(result.ImmediateThreatActorId, Is.EqualTo(71));
 			Assert.That(world.Moves, Is.Zero);
 		}

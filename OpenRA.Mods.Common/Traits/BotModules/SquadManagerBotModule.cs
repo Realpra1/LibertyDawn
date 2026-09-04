@@ -1926,6 +1926,7 @@ namespace OpenRA.Mods.Common.Traits
 				foreach (var s in Squads)
 					if (s.UsesModularStealthLifecycle || updateStrategicSquads)
 						s.Update();
+				CoordinateProvincialStealthMassAttacks();
 			}
 
 			// Air squads re-check the anti-air around themselves far more often than the state machine
@@ -2012,6 +2013,67 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				minAttackForceDelayTicks = StrategicPlanningInterval(Info.MinimumAttackForceDelay);
 				CreateAttackForce(bot);
+			}
+		}
+
+		void CoordinateProvincialStealthMassAttacks()
+		{
+			var stealthSquads = Squads.Where(squad => squad.Type == SquadType.Stealth &&
+				squad.UsesModularStealthLifecycle &&
+				(squad.StealthCoordinatedMassAttackCell.HasValue ||
+					squad.StealthMassCoordinationCell.HasValue || squad.AirTargetStrategicCell.HasValue))
+				.ToArray();
+			var requests = stealthSquads.Select(squad => new StealthProvincialMassRequest(
+				squad.StealthSquadDefinition, squad.StealthSquadIndex,
+				squad.StealthCoordinatedMassAttackCell ??
+					squad.StealthMassCoordinationCell ?? squad.AirTargetStrategicCell.Value,
+				squad.StealthCoordinatedMassAttackCell.HasValue ? 0 :
+					squad.StealthMassCoordinationCell.HasValue ?
+					squad.StealthMassCoordinationRequestedTick : -1,
+				squad.Units.Count(actor => !unitCannotBeOrdered(actor))));
+
+			// No-safe-plan evidence already exhausts Kite, Crush, and ordinary crossover.
+			// One short review window lets peers in the same target province rendezvous
+			// without spending a sizeable part of the kill-cadence window fleeing alone.
+			var minimumAge = Math.Max(1, 5000 / Math.Max(1, World.Timestep));
+			foreach (var plan in StealthProvincialMassCoordinator.Plan(
+				requests, World.WorldTick, minimumAge))
+			{
+				var leader = stealthSquads.FirstOrDefault(squad =>
+					squad.StealthSquadDefinition == plan.Definition &&
+					squad.StealthSquadIndex == plan.LeaderIndex);
+				if (leader == null)
+					continue;
+
+				var participants = plan.JoiningIndices.Prepend(plan.LeaderIndex).ToArray();
+				if (!stealthSquads.Any(squad =>
+					squad.StealthSquadDefinition == plan.Definition &&
+					participants.Contains(squad.StealthSquadIndex) &&
+					squad.StealthMassCoordinationCell.HasValue))
+					continue;
+
+				var committed = new List<uint>();
+				foreach (var index in participants)
+				{
+					var participant = stealthSquads.FirstOrDefault(squad =>
+						squad.StealthSquadDefinition == plan.Definition &&
+						squad.StealthSquadIndex == index);
+					if (participant == null)
+						continue;
+
+					committed.AddRange(participant.Units.Where(actor => !unitCannotBeOrdered(actor))
+						.Select(actor => actor.ActorID));
+					participant.StealthMassCoordinationCell = null;
+					participant.StealthMassCoordinationRequestedTick = -1;
+					participant.StealthCoordinatedMassAttackCell = plan.StrategicCell;
+				}
+
+				if (Game.Settings.Debug.BotDebug)
+					Log.Write("debug", "Stealth provincial mass coordination: tick={0} " +
+						"definition={1} cell={2} squads=[{3}] committed=[{4}].", World.WorldTick,
+						plan.Definition, plan.StrategicCell,
+						string.Join(",", participants.OrderBy(index => index)),
+						string.Join(",", committed.OrderBy(actorId => actorId)));
 			}
 		}
 

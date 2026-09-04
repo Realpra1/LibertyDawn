@@ -123,6 +123,7 @@ namespace OpenRA.Mods.Common.Traits
 		public IReadOnlyList<CPos> CandidateCells => candidateCells;
 		public bool FormationCloaked { get; }
 		public bool FormationDetected { get; }
+		public bool CurrentPositionSafe { get; }
 		public bool KitingEnabled { get; }
 		public long MinimumKitePriorityValue { get; }
 		public bool HasActivityObservation { get; }
@@ -136,7 +137,7 @@ namespace OpenRA.Mods.Common.Traits
 			long activityRevision = 0, StealthKiteOrderToken activeOrderToken = null,
 			StealthKiteOrderToken completedOrderToken = null,
 			bool formationDetected = false, bool kitingEnabled = true,
-			long minimumKitePriorityValue = 0)
+			long minimumKitePriorityValue = 0, bool currentPositionSafe = true)
 		{
 			if (tick < 0 || activityRevision < 0 || minimumKitePriorityValue < 0)
 				throw new ArgumentOutOfRangeException(nameof(tick));
@@ -162,6 +163,7 @@ namespace OpenRA.Mods.Common.Traits
 			this.candidateCells = Array.AsReadOnly(cells);
 			FormationCloaked = formationCloaked;
 			FormationDetected = formationDetected;
+			CurrentPositionSafe = currentPositionSafe;
 			KitingEnabled = kitingEnabled;
 			MinimumKitePriorityValue = minimumKitePriorityValue;
 			HasActivityObservation = hasActivityObservation;
@@ -174,6 +176,8 @@ namespace OpenRA.Mods.Common.Traits
 	public interface IStealthKiteLiveWorld
 	{
 		StealthKiteLiveSnapshot Read(StealthApproachMission mission);
+		bool CanReach(uint targetActorId, CPos cell);
+		uint? BlockingActor(uint targetActorId, CPos firingCell);
 	}
 
 	public sealed class StealthKiteThreatFacts

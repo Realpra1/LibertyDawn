@@ -27,7 +27,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		}
 
 		public StealthRecalculateFleeLiveSnapshot ReadFlee(
-			StealthApproachMission mission, string sourceFingerprint)
+			StealthApproachMission mission, uint escapeThreatActorId, string sourceFingerprint)
 		{
 			var memberActors = Members();
 			var members = memberActors.Select(actor =>
@@ -37,7 +37,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 					WeaponRange(actor), health.HP, health.Max,
 					needsMovementOrder: actor.IsIdle);
 			}).ToArray();
-			var target = squad.World.GetActorById(mission.StableTargetActorId);
+			var target = squad.World.GetActorById(escapeThreatActorId);
 			var enemies = new[] { target }.Where(actor => Live(actor) &&
 				squad.SquadManager.IsPreferredEnemyUnit(actor)).Select(actor =>
 			{
@@ -85,6 +85,12 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				handoff.DamageTick, handoff.DamageSourceActorId, handoff.DamageAmount,
 				handoff.Resume.ContextFingerprint, members, options, enemies,
 				Array.Empty<StealthRepairStaticActorSnapshot>(), routes, FormationCloaked(memberActors));
+		}
+
+		public bool HasRepairOption()
+		{
+			return squad.World.ActorsHavingTrait<RepairsUnits>()
+				.Any(actor => Live(actor) && actor.Owner.IsAlliedWith(squad.Bot.Player));
 		}
 
 		IReadOnlyList<Actor> Members()
@@ -177,20 +183,23 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 	{
 		readonly StealthSquadLifecycleRecoveryLiveAdapter adapter;
 		readonly StealthSquadLifecycleCombatLiveAdapter combat;
+		readonly uint escapeThreatActorId;
 		readonly string fingerprint;
 
 		public StealthRecalculateFleeLiveWorld(
 			StealthSquadLifecycleRecoveryLiveAdapter adapter,
-			StealthSquadLifecycleCombatLiveAdapter combat, string fingerprint)
+			StealthSquadLifecycleCombatLiveAdapter combat, uint escapeThreatActorId,
+			string fingerprint)
 		{
 			this.adapter = adapter;
 			this.combat = combat;
+			this.escapeThreatActorId = escapeThreatActorId;
 			this.fingerprint = fingerprint;
 		}
 
 		public StealthRecalculateFleeLiveSnapshot Read(StealthApproachMission mission)
 		{
-			var live = adapter.ReadFlee(mission, fingerprint);
+			var live = adapter.ReadFlee(mission, escapeThreatActorId, fingerprint);
 			var currentPositionSafe = combat.CurrentPlannedAttackSafe(mission);
 			return new StealthRecalculateFleeLiveSnapshot(live.Tick, live.Members, live.Enemies,
 				live.FormationCloaked, live.SourceFingerprint,

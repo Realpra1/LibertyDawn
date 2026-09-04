@@ -103,10 +103,12 @@ namespace OpenRA.Mods.Common.Traits
 				return cachedScore.Value;
 			var result = calculator.CalculateLiveMixedGroupThreat(friendly, enemy,
 				plannedTargetTypesOverride, plannedCurrentRangeEngagement);
+			var overmatch = GeneralizedCombatCrossover.Overmatch(
+				friendly.Length, enemy.Length, result.Crossover);
 			cachedFriendlyIds = friendlyIds;
 			cachedEnemyIds = enemyIds;
 			return (cachedScore = new StealthTargetThreatScore(
-				result.ThreatRating, result.Crossover)).Value;
+				result.ThreatRating, overmatch)).Value;
 		}
 
 		static Actor Representative(IReadOnlyList<Actor> friendly, IReadOnlyList<Actor> enemy)

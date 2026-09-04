@@ -58,22 +58,21 @@ namespace OpenRA.Mods.Common.Traits
 			if (decision.Enemies.Length == 0)
 				return Terminal(decision, StealthRecalculateFleeDisposition.TargetAcquisition,
 					StealthRecalculateFleeLiveCause.NoTarget, executionRevision);
+			if (decision.CurrentPositionSafe)
+				return Terminal(decision, StealthRecalculateFleeDisposition.TargetAcquisition,
+					StealthRecalculateFleeLiveCause.SafeToReconsider, executionRevision);
 
 			if (lastOrder != null)
 			{
-				if (decision.CurrentPositionSafe)
-					return Terminal(decision, StealthRecalculateFleeDisposition.TargetAcquisition,
-						StealthRecalculateFleeLiveCause.SafeToReconsider, executionRevision);
-				if (decision.Arrived(lastOrder.DestinationCell))
-					return Terminal(decision, StealthRecalculateFleeDisposition.TargetAcquisition,
-						StealthRecalculateFleeLiveCause.Completed, executionRevision);
-
 				var sameMembers = lastOrder.ActorIds.SequenceEqual(decision.MemberActorIds);
 				var sameExposure = routeFormationCloaked == decision.FormationCloaked;
-				if (sameMembers && sameExposure && decision.Members.Any(member => !member.NeedsMovementOrder))
-					return Commit(decision, StealthRecalculateFleeDisposition.Retain,
-						StealthRecalculateFleeLiveCause.Traversing, route, danger.Value,
-						cacheRevision.Value, lastOrder, executionRevision);
+				if (sameMembers && sameExposure && !decision.Arrived(lastOrder.DestinationCell))
+				{
+					if (decision.Members.Any(member => !member.NeedsMovementOrder))
+						return Commit(decision, StealthRecalculateFleeDisposition.Retain,
+							StealthRecalculateFleeLiveCause.Traversing, route, danger.Value,
+							cacheRevision.Value, lastOrder, executionRevision);
+				}
 			}
 
 			var cached = ReadEscapeRoute(executionRevision);

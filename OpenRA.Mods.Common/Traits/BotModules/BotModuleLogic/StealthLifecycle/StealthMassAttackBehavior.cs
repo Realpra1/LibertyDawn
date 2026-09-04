@@ -10,6 +10,7 @@
 #endregion
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace OpenRA.Mods.Common.Traits
@@ -26,7 +27,9 @@ namespace OpenRA.Mods.Common.Traits
 		readonly IStealthMassAttackThreatAdapter threatAdapter;
 		readonly IStealthMassAttackOrders orders;
 		readonly StealthBehaviorExecutionLease executionLease = new StealthBehaviorExecutionLease();
+		readonly HashSet<uint> unreachableObjectives = new HashSet<uint>();
 		StealthMassAttackOrderToken lastOrder;
+		uint? retainedDefenderActorId;
 		int lastOrderTick = int.MinValue;
 		long attemptRevision;
 
@@ -60,25 +63,49 @@ namespace OpenRA.Mods.Common.Traits
 
 			var currentCell = decision.CurrentFormationCell();
 			var representativeCell = decision.RepresentativeCell();
+			var retainedTarget = retainedDefenderActorId.HasValue ?
+				decision.FindTarget(retainedDefenderActorId.Value) : null;
 			var evaluation = BeginEvaluation(
-				decision.Facts(decision.Defenders[0], representativeCell), revision);
-			var choices = decision.Defenders.Select(target =>
-			{
-				var facts = decision.Facts(target, representativeCell);
-				return (Target: target, Facts: facts, Threat: Calculate(evaluation, facts, revision));
-			}).ToArray();
-			var selected = choices.OrderByDescending(choice => choice.Threat.SelectedTargetThreat)
+				decision.Facts(retainedTarget ?? decision.Defenders[0], representativeCell), revision);
+			var selected = retainedTarget != null ? Evaluate(retainedTarget) : decision.Defenders
+				.Select(Evaluate).OrderByDescending(choice => choice.Threat.SelectedTargetThreat)
+				.ThenBy(choice => DistanceSquared(currentCell, choice.Target.CurrentCell))
 				.ThenBy(choice => choice.Target.ActorId).First();
-			if (selected.Threat.StandardScore.Crossover <= 1)
+			if (selected.Threat.StandardScore.Crossover <= 1 &&
+				!handoff.Evidence.CoordinatedMassAttack)
 				return Result(decision, StealthMassAttackDisposition.RecalculateFlee,
 					StealthMassAttackPhase.Advance, selected.Target, selected.Facts,
 					selected.Threat, null, revision);
+			if (lastOrder?.Phase == StealthMassAttackPhase.Advance &&
+				lastOrder.TargetActorId == selected.Target.ActorId &&
+				lastOrder.ActorIds.SequenceEqual(decision.MemberActorIds) &&
+				decision.Members.Any(member => !member.NeedsMovementOrder))
+			{
+				var retainedFacts = decision.Facts(selected.Target, lastOrder.OrderCell);
+				var retainedThreat = Calculate(evaluation, retainedFacts, revision);
+				if (retainedThreat.AttackApproved)
+					return Result(decision, StealthMassAttackDisposition.Retain,
+						StealthMassAttackPhase.Advance, selected.Target, retainedFacts,
+						retainedThreat, lastOrder, revision);
+			}
+
+			var orderTarget = selected.Target;
+			var retainedObjective = lastOrder == null ? null :
+				decision.FindObjective(lastOrder.TargetActorId);
+			if (retainedObjective != null && retainedObjective.ActorId != selected.Target.ActorId)
+			{
+				if (decision.Members.All(member => member.NeedsMovementOrder) &&
+					(long)decision.Tick - lastOrderTick >= OrderRetryIntervalTicks)
+					unreachableObjectives.Add(retainedObjective.ActorId);
+				else
+					orderTarget = retainedObjective;
+			}
 
 			var phase = StealthMassAttackPhase.Attack;
-			var orderCell = selected.Target.CurrentCell;
+			var orderCell = orderTarget.CurrentCell;
 			var selectedFacts = selected.Facts;
 			var threat = selected.Threat;
-			if (!selected.Threat.AttackApproved)
+			if (orderTarget.ActorId == selected.Target.ActorId && !selected.Threat.AttackApproved)
 			{
 				var safeCellFound = false;
 				foreach (var candidate in decision.OrderedCandidateCells(selected.Target, currentCell)
@@ -96,24 +123,48 @@ namespace OpenRA.Mods.Common.Traits
 					break;
 				}
 
+				// MassAttack is entered only after Kite proves that no safe local action exists
+				// and crossover is above two. A safe firing cell is still preferable, but its
+				// absence is the reason to commit the approved mass attack, not to flee again.
 				if (!safeCellFound)
-					return Result(decision, StealthMassAttackDisposition.RecalculateFlee,
-						StealthMassAttackPhase.Advance, selected.Target, selectedFacts,
-						threat, null, revision);
+				{
+					var stalled = lastOrder?.Phase == StealthMassAttackPhase.Attack &&
+						lastOrder.TargetActorId == selected.Target.ActorId &&
+						decision.Members.All(member => member.NeedsMovementOrder) &&
+						(long)decision.Tick - lastOrderTick >= OrderRetryIntervalTicks;
+					var liveBlockerId = stalled ?
+						liveWorld.BlockingActor(selected.Target.ActorId, representativeCell) : null;
+					var blocker = liveBlockerId.HasValue ?
+						decision.FindObjective(liveBlockerId.Value) : stalled ?
+						decision.OrderedObjectives(currentCell, selected.Target)
+							.FirstOrDefault(actor => !unreachableObjectives.Contains(actor.ActorId)) : null;
+					if (blocker != null)
+					{
+						orderTarget = blocker;
+						orderCell = blocker.CurrentCell;
+					}
+				}
 			}
 
 			var sameIntent = SameIntent(lastOrder, phase,
-				decision.MemberActorIds, selected.Target, orderCell);
+				decision.MemberActorIds, orderTarget, orderCell);
 			var shouldApply = !sameIntent || (decision.Members.All(member => member.NeedsMovementOrder) &&
 				(long)decision.Tick - lastOrderTick >= OrderRetryIntervalTicks);
 			if (shouldApply)
 				attemptRevision++;
 			var desired = new StealthMassAttackOrderToken(handoff.Owner, handoff.Epoch, phase, 0,
-				attemptRevision, decision.MemberActorIds, selected.Target.ActorId, orderCell);
+				attemptRevision, decision.MemberActorIds, orderTarget.ActorId, orderCell);
 			if (shouldApply)
 				ApplyOrder(desired, revision);
 			return Result(decision, StealthMassAttackDisposition.Retain, phase,
 				selected.Target, selectedFacts, threat, desired, revision);
+
+			(StealthMassAttackActorSnapshot Target, StealthMassAttackThreatFacts Facts,
+				StealthMassAttackThreatResult Threat) Evaluate(StealthMassAttackActorSnapshot target)
+			{
+				var facts = decision.Facts(target, representativeCell);
+				return (target, facts, Calculate(evaluation, facts, revision));
+			}
 		}
 
 		StealthMassAttackResult Targetless(StealthMassAttackLiveDecision decision,
@@ -133,6 +184,8 @@ namespace OpenRA.Mods.Common.Traits
 				decision.DefenderActorIds, decision.ObjectiveActorIds, facts, threat, order);
 			executionLease.Commit(revision, "MassAttack", EnsureActiveOwnership, () =>
 			{
+				retainedDefenderActorId = disposition == StealthMassAttackDisposition.Retain ?
+					target?.ActorId : null;
 				if (order != null && (lastOrder == null ||
 					lastOrder.AttemptRevision != order.AttemptRevision))
 					lastOrderTick = decision.Tick;
@@ -144,7 +197,7 @@ namespace OpenRA.Mods.Common.Traits
 		StealthMassAttackLiveSnapshot ReadLive(long revision)
 		{
 			executionLease.Verify(revision, "MassAttack", EnsureActiveOwnership);
-			var live = liveWorld.Read(mission) ??
+			var live = liveWorld.Read(mission, handoff.Evidence.SelectedTargetCurrentCell) ??
 				throw new InvalidOperationException("The live MassAttack view returned no snapshot.");
 			executionLease.Verify(revision, "MassAttack", EnsureActiveOwnership);
 			return live;
@@ -186,7 +239,15 @@ namespace OpenRA.Mods.Common.Traits
 			CPos orderCell)
 		{
 			return order != null && order.Phase == phase && order.TargetActorId == target.ActorId &&
-				order.OrderCell == orderCell && order.ActorIds.SequenceEqual(members);
+				(phase == StealthMassAttackPhase.Attack || order.OrderCell == orderCell) &&
+				order.ActorIds.SequenceEqual(members);
+		}
+
+		static long DistanceSquared(CPos left, CPos right)
+		{
+			var dx = (long)left.X - right.X;
+			var dy = (long)left.Y - right.Y;
+			return dx * dx + dy * dy;
 		}
 
 		void EnsureActiveOwnership()

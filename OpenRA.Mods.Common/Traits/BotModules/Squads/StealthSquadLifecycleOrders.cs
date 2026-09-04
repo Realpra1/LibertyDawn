@@ -169,8 +169,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				switch (order.Kind)
 				{
 					case StealthLifecycleRuntimeOrderKind.Attack:
-						var attackOrder = order.Owner == BehaviorId.Kite ||
-							order.Owner == BehaviorId.MassAttack ? "AttackWithoutMoving" : "Attack";
+						var attackOrder = order.Owner == BehaviorId.Kite ?
+							"AttackWithoutMoving" : "Attack";
 						return new Order(attackOrder, null, Target.FromActor(target), false,
 							groupedActors: actors);
 					case StealthLifecycleRuntimeOrderKind.Crush:

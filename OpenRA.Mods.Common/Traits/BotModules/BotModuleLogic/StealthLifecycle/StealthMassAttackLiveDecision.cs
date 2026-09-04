@@ -61,6 +61,21 @@ namespace OpenRA.Mods.Common.Traits
 			return Defenders.SingleOrDefault(actor => actor.ActorId == targetId);
 		}
 
+		public StealthMassAttackActorSnapshot FindObjective(uint targetId)
+		{
+			return Objectives.SingleOrDefault(actor => actor.ActorId == targetId);
+		}
+
+		public StealthMassAttackActorSnapshot[] OrderedObjectives(CPos currentCell,
+			StealthMassAttackActorSnapshot defendedTarget)
+		{
+			return Objectives.Where(actor => actor.ActorId != defendedTarget.ActorId)
+				.OrderBy(actor => DistanceToSegmentSquared(actor.CurrentCell,
+					currentCell, defendedTarget.CurrentCell))
+				.ThenBy(actor => DistanceSquared(currentCell, actor.CurrentCell))
+				.ThenBy(actor => actor.ActorId).ToArray();
+		}
+
 		public StealthMassAttackThreatFacts Facts(StealthMassAttackActorSnapshot target, CPos plannedCell)
 		{
 			if (target == null || !Defenders.Contains(target) || Members.Length == 0)
@@ -101,6 +116,18 @@ namespace OpenRA.Mods.Common.Traits
 			var dx = (long)left.X - right.X;
 			var dy = (long)left.Y - right.Y;
 			return dx * dx + dy * dy;
+		}
+
+		static double DistanceToSegmentSquared(CPos point, CPos start, CPos end)
+		{
+			var dx = (double)end.X - start.X;
+			var dy = (double)end.Y - start.Y;
+			var lengthSquared = dx * dx + dy * dy;
+			var projection = lengthSquared == 0 ? 0 : Math.Clamp(
+				((point.X - start.X) * dx + (point.Y - start.Y) * dy) / lengthSquared, 0, 1);
+			var offsetX = point.X - (start.X + projection * dx);
+			var offsetY = point.Y - (start.Y + projection * dy);
+			return offsetX * offsetX + offsetY * offsetY;
 		}
 	}
 }

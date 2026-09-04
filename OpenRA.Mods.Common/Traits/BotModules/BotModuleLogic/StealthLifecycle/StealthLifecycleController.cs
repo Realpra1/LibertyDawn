@@ -296,8 +296,7 @@ namespace OpenRA.Mods.Common.Traits
 					nextOwner = BehaviorId.UndefendedAttack;
 					break;
 				case StealthKiteDisposition.Reacquire:
-					if (result.LiveDefenderActorIds.Count != 0 || result.LiveObjectiveActorIds.Count != 0 ||
-						result.SelectedTargetActorId.HasValue || result.FireCell.HasValue ||
+					if (result.SelectedTargetActorId.HasValue || result.FireCell.HasValue ||
 						result.Safety.HasValue || result.FallbackEvidence != null)
 						return false;
 					nextOwner = BehaviorId.TargetAcquisition;
@@ -337,7 +336,9 @@ namespace OpenRA.Mods.Common.Traits
 			switch (result.Disposition)
 			{
 				case StealthMassAttackDisposition.Retain:
-					if (!ValidMassTarget(result) || result.Threat.Value.StandardScore.Crossover <= 1 ||
+					if (!ValidMassTarget(result) ||
+						(result.Threat.Value.StandardScore.Crossover <= 1 &&
+							!result.Source.Evidence.CoordinatedMassAttack) ||
 						!ValidMassOrder(result))
 						return false;
 					nextHandoff = CurrentHandoff;
@@ -459,7 +460,8 @@ namespace OpenRA.Mods.Common.Traits
 			return token != null && token.Owner == BehaviorId.MassAttack &&
 				token.Epoch == result.Handoff.Epoch && token.Phase == result.Phase &&
 				token.ActorIds.SequenceEqual(result.ActiveMemberActorIds) &&
-				token.TargetActorId == result.SelectedTargetActorId;
+				(token.TargetActorId == result.SelectedTargetActorId ||
+					result.LiveObjectiveActorIds.Contains(token.TargetActorId));
 		}
 
 		static bool ValidKiteFallback(StealthKiteResult result, bool massAttack)
@@ -467,7 +469,7 @@ namespace OpenRA.Mods.Common.Traits
 			var evidence = result.FallbackEvidence;
 			if (evidence == null || result.LiveDefenderActorIds.Count == 0 ||
 				result.FireCell.HasValue || result.Safety.HasValue ||
-				!evidence.DefenderActorIds.SequenceEqual(result.LiveDefenderActorIds))
+				!evidence.DefenderActorIds.All(result.LiveDefenderActorIds.Contains))
 				return false;
 			if (evidence.Reason == StealthKiteFallbackReason.NoLiveMembers)
 				return !massAttack && result.ActiveMemberActorIds.Count == 0 &&
@@ -477,7 +479,7 @@ namespace OpenRA.Mods.Common.Traits
 			var facts = evidence.AttackFacts;
 			var score = evidence.AttackScore;
 			var defenderFactsMatch = facts != null &&
-				result.LiveDefenderActorIds.All(facts.EnemyActorIds.Contains);
+				evidence.DefenderActorIds.All(facts.EnemyActorIds.Contains);
 			var canonical =
 				result.ActiveMemberActorIds.Count != 0 && result.SelectedTargetActorId.HasValue &&
 				result.SelectedTargetCurrentCell.HasValue && facts != null && score.HasValue &&
@@ -490,7 +492,7 @@ namespace OpenRA.Mods.Common.Traits
 			if (evidence.Reason == StealthKiteFallbackReason.UnsafeCurrentPosition)
 				return !massAttack;
 			return evidence.Reason == StealthKiteFallbackReason.NoSafePlan &&
-				massAttack == (score.Value.Crossover > 2);
+				massAttack == (score.Value.Crossover > 2 || evidence.CoordinatedMassAttack);
 		}
 
 		StealthBehaviorHandoff AdvanceTo(BehaviorId nextOwner)

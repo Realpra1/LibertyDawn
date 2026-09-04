@@ -1316,9 +1316,9 @@ namespace OpenRA.Test.Mods.Common
 				"Crush safety must cover the live path to its infantry, not only the endpoint.");
 			var lifecycleOrders = Source(
 				"OpenRA.Mods.Common/Traits/BotModules/Squads/StealthSquadLifecycleOrders.cs");
-			Assert.That(lifecycleOrders, Does.Contain("order.Owner == BehaviorId.Kite ||"));
-			Assert.That(lifecycleOrders, Does.Contain("order.Owner == BehaviorId.MassAttack ? \"AttackWithoutMoving\""),
-				"A validated local firing cell must not turn into an unvalidated chase.");
+			Assert.That(lifecycleOrders, Does.Contain("order.Owner == BehaviorId.Kite ?"));
+			Assert.That(lifecycleOrders, Does.Not.Contain("order.Owner == BehaviorId.MassAttack ?"),
+				"MassAttack must be able to close range after Kite proves no safe firing cell exists.");
 			var attackBase = Source("OpenRA.Mods.Common/Traits/Attack/AttackBase.cs");
 			Assert.That(attackBase, Does.Contain("order.OrderString != AttackWithoutMovingOrderName"));
 		}
@@ -2906,6 +2906,71 @@ namespace OpenRA.Test.Mods.Common
 			Assert.That(liveThreat, Does.Contain("DefenderThreatAtDistance("));
 			Assert.That(liveThreat, Does.Not.Contain("obli"),
 				"Current-position safety authority must remain actor-identity agnostic.");
+		}
+
+		[Test]
+		public void ProvincialMassCoordinationGroupsMatureRequestsInOneProvince()
+		{
+			var plans = StealthProvincialMassCoordinator.Plan(new[]
+			{
+				new StealthProvincialMassRequest("stealth-tank", 0, new CPos(11, 6), 100, 1),
+				new StealthProvincialMassRequest("stealth-tank", 2, new CPos(12, 7), 101, 3),
+				new StealthProvincialMassRequest("stealth-tank", 1, new CPos(12, 2), 101, 2),
+				new StealthProvincialMassRequest("stealth-tank", 3, new CPos(11, 6), 105, 2),
+				new StealthProvincialMassRequest("chem-tank", 4, new CPos(11, 6), 100, 4)
+			}, 110, 9);
+
+			Assert.That(plans, Has.Length.EqualTo(1));
+			Assert.That(plans[0].StrategicCell, Is.EqualTo(new CPos(11, 6)));
+			Assert.That(plans[0].LeaderIndex, Is.EqualTo(2));
+			Assert.That(plans[0].JoiningIndices, Is.EqualTo(new[] { 0 }));
+		}
+
+		[Test]
+		public void ProvincialMassCoordinationLetsAMatureRequestJoinAnActiveCommitment()
+		{
+			var plans = StealthProvincialMassCoordinator.Plan(new[]
+			{
+				new StealthProvincialMassRequest("stealth-tank", 0, new CPos(13, 4), 0, 2),
+				new StealthProvincialMassRequest("stealth-tank", 1, new CPos(14, 4), 100, 2),
+				new StealthProvincialMassRequest("stealth-tank", 2, new CPos(13, 4), -1, 2)
+			}, 110, 10);
+
+			Assert.That(plans, Has.Length.EqualTo(1));
+			Assert.That(plans[0].LeaderIndex, Is.EqualTo(0));
+			Assert.That(plans[0].JoiningIndices, Is.EqualTo(new[] { 1 }));
+		}
+
+		[Test]
+		public void ProvincialMassCoordinationKeepsOverlappingDefinitionIndicesIndependent()
+		{
+			var plans = StealthProvincialMassCoordinator.Plan(new[]
+			{
+				new StealthProvincialMassRequest("stealth-tank", 0, new CPos(13, 4), 0, 2),
+				new StealthProvincialMassRequest("stealth-tank", 1, new CPos(13, 4), 0, 2),
+				new StealthProvincialMassRequest("chem-tank", 0, new CPos(13, 4), 0, 2),
+				new StealthProvincialMassRequest("chem-tank", 1, new CPos(13, 4), 0, 2)
+			}, 10, 10);
+
+			Assert.That(plans.Select(plan => plan.Definition),
+				Is.EqualTo(new[] { "chem-tank", "stealth-tank" }));
+			Assert.That(plans.All(plan => plan.LeaderIndex == 0 &&
+				plan.JoiningIndices.SequenceEqual(new[] { 1 })), Is.True);
+		}
+
+		[Test]
+		public void StealthFormationKeepsTheLargestLocalClusterActive()
+		{
+			var core = StealthSquadFormationCohesion.SelectCore(new[]
+			{
+				(1u, new CPos(10, 8)),
+				(2u, new CPos(11, 8)),
+				(3u, new CPos(11, 9)),
+				(4u, new CPos(10, 5)),
+				(5u, new CPos(11, 5))
+			});
+
+			Assert.That(core, Is.EqualTo(new uint[] { 1, 2, 3 }));
 		}
 
 		[Test]

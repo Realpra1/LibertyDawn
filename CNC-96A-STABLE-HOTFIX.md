@@ -39,6 +39,12 @@ calculator. Preserve established balance and build-order behavior.
   the active owner.
 - MassAttack starts only above crossover 2, targets the highest live threat, and
   continues until completion or crossover reaches 1. Otherwise recalculate.
+- Two or more squads that independently exhaust safe local actions in the same
+  target province may commit simultaneously to one provincial MassAttack. Squad
+  membership is never merged: each squad clears its temporary coordination when
+  its MassAttack yields and resumes independently. Squads still making safe
+  progress do not veto or get pulled into that commitment, while a later blocked
+  squad may join an active commitment in that province.
 - Flee is one simple cached safe route roughly two strategic cells outward and
   immediately reconsiders better lifecycle work. It is not a default phase.
 - Damaged tanks use a safe repair route; if none exists, resume the fight.
@@ -75,28 +81,38 @@ are acceptable; active unexplained failures are not.
 
 ## Current release-candidate evidence
 
-- Focused local-combat/flee/threat suite: `112/112` passing.
-- Complete .NET suite: `925/925` passing. `make test MOD=cnc` passes with
+- Focused lifecycle/function suite: `200/200` passing.
+- Complete .NET suite: `961/961` passing. `make test MOD=cnc` passes with
   Release compilation, CNC rules, and every packaged CNC map including
   StankChallenge.
-- Dense StankChallenge: VIKI win at tick `24967`, `600.34` ticks/second; no
-  stationary, Obelisk-death, rejected-result, or failsafe-disable signal.
-- Exact 0902-matched natural VIKI-versus-two-allied-Brutalis validation: `5/5`
-  VIKI wins at ticks `3678`, `4529`, `5455`, `7474`, and `10756`; no stationary,
-  Obelisk-death, rejected-result, or failsafe-disable signal. Every active terminal
-  squad passed cadence.
-- Against the retained 0902 five-win baseline, mean victory time is `6378` versus
-  `5130` ticks (`+24.3%`) and median is `5455` versus `4608` (`+18.4%`). Primary
-  efficiency mean is effectively flat (`1933.99` versus `1923.69`) while median
-  is `5.7%` lower (`1844.75` versus `1955.57`). Damage-adjusted median is `0.428`
-  versus `0.589`; treat both slower victory time and damage as review signals.
-- An earlier three-run manifest accidentally configured the Brutalis players as
-  enemies of each other. Its completion/efficiency data is not acceptance evidence.
+- StankChallenge2 completed naturally at ticks `18060`, `19692`, and `23110`.
+  Median completion is `19692` (about `6:34`); two runs were below seven minutes
+  and the slower run had an explained terminal tail after its last credited kills.
+  There were no stalls or failsafe disables. Two runs diagnosed one
+  Obelisk-attributed loss each during the forced compound assault.
+- Original StankChallenge completed naturally at ticks `10500`, `18316`, and
+  `23993`; no stall or failsafe-disable signal occurred. Two runs diagnosed
+  Obelisk-attributed losses and remain human-review signals.
+- Fresh natural VIKI-versus-two-allied-Brutalis validation: `3/3` wins at ticks
+  `5200`, `5468`, and `6463`. No stationary, Obelisk-death, failsafe-disable, or
+  desync signal occurred. Primary efficiency mean/median are `1791.54`/`1858.54`;
+  damage-adjusted mean/median are `3.6413`/`1.0052`. One squad exceeded cadence
+  by `305` ticks during terminal kill stealing while the other squads finished
+  the game.
 
 ## Release state
 
-- Final diff review is complete and PR 144 contains this release candidate and
-  its exact evidence. Correctness acceptance passes, but the matched win-time and
-  damage regressions remain explicit human-review signals.
-- Do not make further behavior changes unless review or playtesting exposes a
-  clear reproduced bug.
+- Ready for human testing on PR 144. Kite now finishes a retained live target,
+  yields to phases 3-4 when it dies, and cannot reuse that target's movement plan.
+- A fresh Kite phase may try the next safe valid target. Once it selects one, it
+  cannot silently abandon it for another target's move; an unsafe retained fight
+  must explicitly use crossover and MassAttack/RecalculateFlee.
+- Low-priority walls are excluded from normal Kite selection and remain reachable
+  fallback only. UndefendedAttack keeps configured priority/value/remaining-health
+  selection.
+- Lone crushable Riflemen yield to Crush rather than Flee. Exposed unsafe squads
+  seek a live threat-approved firing cell; Flee immediately yields when live combat
+  is safe again and otherwise uses one cached least-danger route.
+- Provincial coordination is a temporary synchronized commitment, not a squad
+  merge. Participants retain their membership, MassAttack together, then resume
+  independent lifecycle work as soon as their own MassAttack yields.

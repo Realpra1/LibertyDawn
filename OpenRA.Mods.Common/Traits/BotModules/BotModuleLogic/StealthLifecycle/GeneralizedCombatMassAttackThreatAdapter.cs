@@ -93,7 +93,8 @@ namespace OpenRA.Mods.Common.Traits
 							calculator, representative, defender, plannedTargetTypesOverride)))
 					.ToDictionary(item => item.Key, item => item.Threat);
 				standard = new StealthTargetThreatScore(pairThreats.Values.Select(pair =>
-					pair.DefenderThreatInAttackerEquivalents).DefaultIfEmpty().Max(), mixed.Crossover);
+					pair.DefenderThreatInAttackerEquivalents).DefaultIfEmpty().Max(),
+					GeneralizedCombatCrossover.Overmatch(friendly.Length, enemy.Length, mixed.Crossover));
 			}
 
 			public StealthMassAttackThreatResult Calculate(StealthMassAttackThreatFacts facts)
@@ -109,7 +110,11 @@ namespace OpenRA.Mods.Common.Traits
 					target.Location != facts.SelectedTargetCurrentCell)
 					throw new InvalidOperationException("The MassAttack target moved during live evaluation.");
 
-				var targetThreat = Pair(representative, target).DefenderThreatInAttackerEquivalents;
+				var plannedPosition = representative.Location == facts.PlannedCell ?
+					representative.CenterPosition : representative.World.Map.CenterOfCell(facts.PlannedCell);
+				var targetDistance = (plannedPosition - target.CenterPosition).HorizontalLength / 1024d;
+				var targetThreat = GeneralizedCombatThreatCalculator.DefenderThreatAtDistance(
+					Pair(representative, target), targetDistance, includeDefenderHitRadius: true);
 				var approved = GeneralizedCombatLiveCellSafety.CanAttackSafely(calculator,
 					new[] { representative }, enemy, target, facts.PlannedCell, facts.FormationRadiusCells,
 					plannedTargetTypesOverride, Pair);

@@ -145,35 +145,40 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
-		public void FleeCompletesWhenTheFormationCenterReachesTheSafeCell()
+		public void FleeTakesAnotherCachedStepWhenItsFirstDestinationIsStillUnsafe()
 		{
 			var destination = new CPos(-5, 0);
 			var world = new World { Snapshot = Snapshot(new CPos(0, 0)) };
+			var cache = new Cache { Route = new[] { destination } };
 			var orders = new Orders();
 
 			var behavior = new StealthRecalculateFleeBehavior(Handoff(), new Guard(), world,
-				new Cache { Route = new[] { destination } }, orders);
+				cache, orders);
 			behavior.Execute();
 			world.Snapshot = Snapshot(new CPos(-6, 0));
+			cache.Route = new[] { new CPos(-10, 0) };
 			var result = behavior.Execute();
 
 			Assert.That(result.Disposition,
-				Is.EqualTo(StealthRecalculateFleeDisposition.TargetAcquisition));
-			Assert.That(result.LiveCause, Is.EqualTo(StealthRecalculateFleeLiveCause.Completed));
-			Assert.That(orders.Destinations, Is.EqualTo(new[] { destination }));
+				Is.EqualTo(StealthRecalculateFleeDisposition.Retain));
+			Assert.That(result.LiveCause, Is.EqualTo(StealthRecalculateFleeLiveCause.Traversing));
+			Assert.That(orders.Destinations, Is.EqualTo(new[] { destination, new CPos(-10, 0) }));
 		}
 
 		[Test]
-		public void FleeWaitsForMovementAndRetriesOnlyAfterItEnds()
+		public void FleeReplansWhenItsOneEscapeMoveEndsWithoutArrival()
 		{
 			var destination = new CPos(-5, 0);
 			var world = new World { Snapshot = Snapshot(new CPos(0, 0)) };
+			var cache = new Cache { Route = new[] { destination } };
 			var orders = new Orders();
 			var behavior = new StealthRecalculateFleeBehavior(Handoff(), new Guard(),
-				world, new Cache { Route = new[] { destination } }, orders);
+				world, cache, orders);
 
 			behavior.Execute();
 			behavior.Execute();
+			var nextDestination = new CPos(-6, -5);
+			cache.Route = new[] { nextDestination };
 			world.Snapshot = new StealthRecalculateFleeLiveSnapshot(2,
 				new[]
 				{
@@ -187,9 +192,12 @@ namespace OpenRA.Test.Mods.Common
 					new StealthRecalculateFleeEnemySnapshot(71, "mtnk", new CPos(5, 0),
 						100, 100, 4, false)
 				}, true, "current-live");
-			behavior.Execute();
+			var result = behavior.Execute();
 
-			Assert.That(orders.Destinations, Is.EqualTo(new[] { destination, destination }));
+			Assert.That(result.Disposition,
+				Is.EqualTo(StealthRecalculateFleeDisposition.Retain));
+			Assert.That(result.LiveCause, Is.EqualTo(StealthRecalculateFleeLiveCause.Traversing));
+			Assert.That(orders.Destinations, Is.EqualTo(new[] { destination, nextDestination }));
 		}
 
 		[Test]
@@ -232,7 +240,7 @@ namespace OpenRA.Test.Mods.Common
 		}
 
 		[Test]
-		public void FleeIssuesOneSafeStepThenReconsidersWhenLiveCombatIsSafe()
+		public void FleeImmediatelyReconsidersWhenLiveCombatIsAlreadySafe()
 		{
 			var initial = Snapshot(new CPos(0, 0));
 			var world = new World
@@ -245,25 +253,14 @@ namespace OpenRA.Test.Mods.Common
 			var behavior = new StealthRecalculateFleeBehavior(Handoff(), new Guard(), world,
 				new Cache(), orders);
 
-			Assert.That(behavior.Execute().Disposition,
-				Is.EqualTo(StealthRecalculateFleeDisposition.Retain));
 			var reconsidered = behavior.Execute();
-			world.Snapshot = new StealthRecalculateFleeLiveSnapshot(2,
-				new[]
-				{
-					new StealthRecalculateFleeMemberSnapshot(1, new CPos(-5, 0), 5,
-						needsMovementOrder: true),
-					new StealthRecalculateFleeMemberSnapshot(2, new CPos(-5, 0), 5,
-						needsMovementOrder: true)
-				}, initial.Enemies, initial.FormationCloaked,
-				initial.SourceFingerprint, currentPositionSafe: true);
 			Assert.That(reconsidered.Disposition,
 				Is.EqualTo(StealthRecalculateFleeDisposition.TargetAcquisition));
 			Assert.That(reconsidered.LiveCause,
 				Is.EqualTo(StealthRecalculateFleeLiveCause.SafeToReconsider));
 			Assert.That(reconsidered.SelectedDestinationCell, Is.Null);
 			Assert.That(reconsidered.LastOrderToken, Is.Null);
-			Assert.That(orders.Destinations, Has.Count.EqualTo(1));
+			Assert.That(orders.Destinations, Is.Empty);
 			var controller = Construct<StealthLifecycleController>(BehaviorId.RecalculateFlee,
 				new OwnershipEpoch(2), -1);
 			Assert.That(controller.TryAccept(reconsidered, out var transition), Is.True);

@@ -61,7 +61,9 @@ namespace OpenRA.Mods.Common.Traits
 				.OrderBy(cell => cell.Y).ThenBy(cell => cell.X).ToArray();
 			var scanOrigin = BiasedScanOrigin(activeSquadCenter,
 				snapshot.Width, snapshot.Height, squadCornerIndex);
-			var enemyCells = allEnemyCells;
+			var highValueCells = HighValueCells(snapshot);
+			var enemyCells = highValueCells.Count == 0 ? allEnemyCells :
+				allEnemyCells.Where(highValueCells.Contains).ToArray();
 			var required = incumbentStrategicCell.HasValue ?
 				Array.IndexOf(enemyCells, incumbentStrategicCell.Value) : -1;
 			var search = StealthAIThreatGeometry.StartReachableTargetCellSearch(
@@ -145,6 +147,26 @@ namespace OpenRA.Mods.Common.Traits
 				snapshot.ThreatFacts.FirstOrDefault(facts => facts.StrategicCell == cell));
 		}
 
+		static HashSet<CPos> HighValueCells(StealthTargetAcquisitionCacheSnapshot snapshot)
+		{
+			return snapshot.StrategicTargets.GroupBy(target => target.StrategicCell)
+				.Where(group =>
+				{
+					long total = 0;
+					foreach (var target in group)
+					{
+						var value = StealthAISpecialistPolicy.StrategicTargetValueByRemainingHealth(
+							target.ConfiguredPriority, target.ActorValue,
+							target.HitPoints, target.MaximumHitPoints);
+						if (value <= 0)
+							continue;
+						total = long.MaxValue - total < value ? long.MaxValue : total + value;
+					}
+
+					return StealthAISpecialistPolicy.MeetsMinimumStrategicCellValue(total);
+				}).Select(group => group.Key).ToHashSet();
+		}
+
 		static CPos? MoveCloser(CPos start, IReadOnlyList<CPos> enemies,
 			StealthTargetAcquisitionCacheSnapshot snapshot)
 		{
@@ -163,7 +185,7 @@ namespace OpenRA.Mods.Common.Traits
 
 			var maximumCost = MaximumTravelSeconds / snapshot.SecondsPerCostUnit;
 			var cost = 0f;
-			var destination = start;
+			var boundedRoute = new List<CPos>();
 			foreach (var cell in routed.Route)
 			{
 				var stepCost = 1 + Math.Max(0, snapshot.Danger[cell.Y * snapshot.Width + cell.X]) *
@@ -171,10 +193,11 @@ namespace OpenRA.Mods.Common.Traits
 				if (cost + stepCost > maximumCost)
 					break;
 				cost += stepCost;
-				destination = cell;
+				boundedRoute.Add(cell);
 			}
 
-			return destination == start ? (CPos?)null : destination;
+			return boundedRoute.Count == 0 ? (CPos?)null :
+				StealthStrategicRouteGeometry.EndOfFirstStraightLeg(start, boundedRoute);
 		}
 
 		static CPos? GreedyMoveCloser(CPos start, IReadOnlyList<CPos> enemies,

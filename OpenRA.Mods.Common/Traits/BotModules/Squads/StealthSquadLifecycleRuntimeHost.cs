@@ -158,9 +158,17 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		void PromoteArrivedReinforcements()
 		{
 			var formation = squad.AirFormationUnits();
-			if (formation.Count == 0 || squad.AirReinforcements.Count == 0)
+			if (formation.Count == 0)
 				return;
 			var size = Math.Max(1, squad.StealthDefinition?.StrategicCellSize ?? 1);
+			var core = StealthSquadFormationCohesion.SelectCore(formation.Select(actor =>
+				(actor.ActorID, new CPos(actor.Location.X / size, actor.Location.Y / size)))).ToHashSet();
+			foreach (var separated in formation.Where(actor => !core.Contains(actor.ActorID)).ToArray())
+				squad.MarkAirReinforcement(separated);
+
+			formation = squad.AirFormationUnits();
+			if (formation.Count == 0 || squad.AirReinforcements.Count == 0)
+				return;
 			var center = squad.World.Map.CellContaining(
 				formation.Select(actor => actor.CenterPosition).Average());
 			var strategicCenter = new CPos(center.X / size, center.Y / size);

@@ -43,13 +43,14 @@ namespace OpenRA.Mods.Common.Traits
 		public bool PlannedAttack => true;
 		public bool FullCurrentFiringRangeExposure => true;
 		public StealthTargetThreatScore StandardScore { get; }
+		public bool CoordinatedMassAttack { get; }
 
 		internal StealthMassAttackEntryEvidence(StealthKiteFallbackEvidence source)
 		{
 			if (source?.Reason != StealthKiteFallbackReason.NoSafePlan ||
 				source.AttackFacts == null || !source.AttackScore.HasValue ||
-				source.AttackScore.Value.Crossover <= 2)
-				throw new ArgumentException("MassAttack requires canonical >2 Kite no-safe-plan evidence.", nameof(source));
+				(source.AttackScore.Value.Crossover <= 2 && !source.CoordinatedMassAttack))
+				throw new ArgumentException("MassAttack requires canonical crossover or coordinated Kite evidence.", nameof(source));
 			LiveFingerprint = source.LiveFingerprint;
 			SelectedTargetActorId = source.AttackFacts.SelectedTargetActorId;
 			SelectedTargetCurrentCell = source.AttackFacts.SelectedTargetCurrentCell;
@@ -62,13 +63,21 @@ namespace OpenRA.Mods.Common.Traits
 				throw new ArgumentException("Kite evidence is not an exact planned live attack.", nameof(source));
 			FormationCloaked = source.AttackFacts.FormationCloaked;
 			StandardScore = source.AttackScore.Value;
+			CoordinatedMassAttack = source.CoordinatedMassAttack;
 		}
 
 		internal StealthMassAttackEntryEvidence(string fingerprint, uint targetId,
 			CPos targetCell, IEnumerable<uint> friendIds, IEnumerable<uint> enemyIds,
 			bool formationCloaked, StealthTargetThreatScore score)
+			: this(fingerprint, targetId, targetCell, friendIds, enemyIds,
+				formationCloaked, score, false) { }
+
+		internal StealthMassAttackEntryEvidence(string fingerprint, uint targetId,
+			CPos targetCell, IEnumerable<uint> friendIds, IEnumerable<uint> enemyIds,
+			bool formationCloaked, StealthTargetThreatScore score, bool coordinatedMassAttack)
 		{
-			if (string.IsNullOrEmpty(fingerprint) || targetId == 0 || score.Crossover <= 2)
+			if (string.IsNullOrEmpty(fingerprint) || targetId == 0 ||
+				(score.Crossover <= 2 && !coordinatedMassAttack))
 				throw new ArgumentException("Invalid persisted MassAttack entry evidence.");
 			LiveFingerprint = fingerprint;
 			SelectedTargetActorId = targetId;
@@ -79,6 +88,7 @@ namespace OpenRA.Mods.Common.Traits
 				throw new ArgumentException("MassAttack evidence enemies must contain its target.");
 			FormationCloaked = formationCloaked;
 			StandardScore = score;
+			CoordinatedMassAttack = coordinatedMassAttack;
 		}
 
 		static ReadOnlyCollection<uint> CopyIds(IEnumerable<uint> ids, string name)
@@ -242,7 +252,8 @@ namespace OpenRA.Mods.Common.Traits
 
 	public interface IStealthMassAttackLiveWorld
 	{
-		StealthMassAttackLiveSnapshot Read(StealthApproachMission mission);
+		StealthMassAttackLiveSnapshot Read(StealthApproachMission mission, CPos attackCenter);
+		uint? BlockingActor(uint targetActorId, CPos firingCell);
 	}
 
 	public sealed class StealthMassAttackThreatFacts

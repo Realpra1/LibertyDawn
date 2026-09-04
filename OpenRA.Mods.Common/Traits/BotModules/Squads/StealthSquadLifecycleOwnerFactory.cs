@@ -205,6 +205,11 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				{
 					squad.AirTargetStrategicCell = result.Mission.StrategicCell;
 					squad.StealthOverlayChosenTarget = result.Mission.StrategicCell;
+					var coordinatedCell = squad.StealthCoordinatedMassAttackCell ??
+						squad.StealthMassCoordinationCell;
+					if (coordinatedCell.HasValue && !StealthProvincialMassCoordinator.SameProvince(
+						coordinatedCell.Value, result.Mission.StrategicCell))
+						ClearProvincialMassRequest();
 				}
 
 				return result;
@@ -259,8 +264,57 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var behavior = new StealthKiteBehavior(handoff, guard, combat,
 				new GeneralizedCombatKiteThreatAdapter(squad.SquadManager.CombatThreatCalculator,
 					combat.Resolve, GroundTargetTypes,
-					squad.StealthDefinition.ThreatRangeBufferCells), orders);
-			return FightOwner(entry, behavior.Execute);
+					squad.StealthDefinition.ThreatRangeBufferCells), orders,
+				_ => squad.StealthCoordinatedMassAttackCell.HasValue &&
+					StealthProvincialMassCoordinator.SameProvince(
+						squad.StealthCoordinatedMassAttackCell.Value,
+						handoff.Mission.StrategicCell));
+			return FightOwner(entry, () =>
+			{
+				var result = behavior.Execute();
+				if (result.Disposition == StealthKiteDisposition.RecalculateFlee &&
+					result.FallbackEvidence?.Reason == StealthKiteFallbackReason.NoSafePlan &&
+					result.SelectedTargetCurrentCell.HasValue)
+				{
+					var targetStrategicCell = result.Mission.StrategicCell;
+					RequestProvincialMass(targetStrategicCell);
+				}
+
+				return result;
+			});
+		}
+
+		void RequestProvincialMass(CPos targetStrategicCell)
+		{
+			if (squad.StealthCoordinatedMassAttackCell.HasValue &&
+				StealthProvincialMassCoordinator.SameProvince(
+					squad.StealthCoordinatedMassAttackCell.Value, targetStrategicCell))
+				return;
+
+			if (squad.StealthCoordinatedMassAttackCell.HasValue &&
+				!StealthProvincialMassCoordinator.SameProvince(
+					squad.StealthCoordinatedMassAttackCell.Value, targetStrategicCell))
+				squad.StealthCoordinatedMassAttackCell = null;
+
+			if (!squad.StealthMassCoordinationCell.HasValue ||
+				!StealthProvincialMassCoordinator.SameProvince(
+					squad.StealthMassCoordinationCell.Value, targetStrategicCell))
+			{
+				squad.StealthMassCoordinationRequestedTick = squad.World.WorldTick;
+				squad.StealthMassCoordinationCell = targetStrategicCell;
+			}
+		}
+
+		void ClearProvincialMassRequest()
+		{
+			ClearPendingProvincialMassRequest();
+			squad.StealthCoordinatedMassAttackCell = null;
+		}
+
+		void ClearPendingProvincialMassRequest()
+		{
+			squad.StealthMassCoordinationCell = null;
+			squad.StealthMassCoordinationRequestedTick = -1;
 		}
 
 		IStealthLifecycleRuntimeOwner MassAttack(StealthLifecycleRuntimeEntry entry,
@@ -278,7 +332,13 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var behavior = new StealthMassAttackBehavior(handoff, guard, combat,
 				new GeneralizedCombatMassAttackThreatAdapter(squad.SquadManager.CombatThreatCalculator,
 					combat.Resolve, GroundTargetTypes), orders);
-			return FightOwner(entry, behavior.Execute);
+			return FightOwner(entry, () =>
+			{
+				var result = behavior.Execute();
+				if (result.Disposition != StealthMassAttackDisposition.Retain)
+					ClearProvincialMassRequest();
+				return result;
+			});
 		}
 
 		IStealthLifecycleRuntimeOwner RecalculateFlee(StealthLifecycleRuntimeEntry entry,
@@ -287,7 +347,8 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			var handoff = (StealthRecalculateFleeHandoff)entry.Context;
 			var behavior = new StealthRecalculateFleeBehavior(handoff, guard,
 				new StealthRecalculateFleeLiveWorld(
-					recovery, combat, handoff.Evidence.LiveFingerprint),
+					recovery, combat, handoff.Evidence.SelectedTargetActorId,
+					handoff.Evidence.LiveFingerprint),
 				strategic, orders);
 			return Owner(entry, behavior.Execute);
 		}
@@ -361,7 +422,7 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		IStealthLifecycleRuntimeOwner FightOwner(StealthLifecycleRuntimeEntry entry,
 			Func<object> execute)
 		{
-			var damage = new StealthSquadLifecycleDamageAdapter(entry, combat);
+			var damage = new StealthSquadLifecycleDamageAdapter(entry, combat, recovery);
 			return new StealthSquadLifecycleRuntimeOwner(
 				entry.Owner, entry.Epoch, execute, damage.Capture);
 		}
