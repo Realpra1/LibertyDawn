@@ -30,8 +30,9 @@ calculator. Preserve established balance and build-order behavior.
   threat calculator, including planned-decloak/current-range overrides.
 - Cache only the bounded local actor roster between spatial scans. Re-read live
   position, health, detection, weapons, threat, and reachability on every combat
-  decision. Scale roster refresh from 25 to at most 50 ticks with the adaptive
-  planning factor; refresh immediately for a new mission or substantial squad
+  decision. Refresh the roster every 50 ticks normally and multiply that interval
+  without a separate cap when the master increases its adaptive planning factor;
+  refresh immediately for a new mission or substantial squad
   movement. The module throttles and recovers continuously; only the master
   failsafe may disable it and transfer ownership to aggressive fallback.
 - UndefendedAttack uses configured priorities, retains and finishes its target,
@@ -128,6 +129,15 @@ are acceptable; active unexplained failures are not.
   Empire Earth games were `3/3` VIKI wins at ticks `19992`, `20633`, and `22788`,
   with no permanent-watchdog failure. Primary efficiency mean/median were
   `1911.53`/`1949.18`; damage-adjusted mean/median were `0.29452`/`0.28301`.
+- With the requested 50-tick base and uncapped adaptive multiplier, Challenge 2
+  completed cleanly at tick `19077`. Three natural games were `3/3` VIKI wins at
+  ticks `22951`, `23351`, and `25959`; no stall, cadence, disable, exception, or
+  desync signal occurred, while two Obelisk losses remain diagnostic signals.
+  Primary efficiency mean/median were `1939.43`/`1785.76`; damage-adjusted
+  mean/median were `0.26720`/`0.21463`.
+- The 50-tick paced profile made 163 spatial refreshes and 706 cache hits. Run
+  variance increased Kite calls from 721 to 785, but total manager/Kite CPU
+  remained `15.4%`/`14.2%` below uncached (`5510.537`/`4551.086 ms`).
 - Validation: focused failsafe/ownership `29/29`; cache/throttle policy `5/5`;
   scenario packaging `5/5`; complete .NET `971/971`; `make check`, `make check-scripts`, and
   `make test MOD=cnc` pass. Both challenge maps are packaged and validated.

@@ -86,7 +86,6 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 				cachedCenterCell = centerCell;
 				rosterRefreshTick = squad.World.WorldTick + StealthLocalActorCachePolicy.RefreshInterval(
 					squad.SquadManager.Info.StealthLocalActorCacheInterval,
-					squad.SquadManager.Info.StealthLocalActorCacheMaximumInterval,
 					squad.SquadManager.PlanningIntervalFactor);
 				hasCachedRoster = true;
 			}

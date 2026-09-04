@@ -25,13 +25,13 @@ namespace OpenRA.Test
 			Assert.That(StealthLocalActorCachePolicy.MovementBufferCells(local), Is.EqualTo(5));
 		}
 
-		[TestCase(1, 25)]
-		[TestCase(2, 50)]
-		[TestCase(4, 50)]
-		public void RefreshIntervalTracksPlanningThrottleAndCapsAtTwoSeconds(
+		[TestCase(1, 50)]
+		[TestCase(2, 100)]
+		[TestCase(4, 200)]
+		public void RefreshIntervalTracksPlanningThrottleWithoutASeparateCap(
 			int planningFactor, int expected)
 		{
-			Assert.That(StealthLocalActorCachePolicy.RefreshInterval(25, 50, planningFactor),
+			Assert.That(StealthLocalActorCachePolicy.RefreshInterval(50, planningFactor),
 				Is.EqualTo(expected));
 		}
 

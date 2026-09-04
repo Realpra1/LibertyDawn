@@ -22,10 +22,10 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 			return Math.Max(localRadius, maximumWeaponRange + padding);
 		}
 
-		public static int RefreshInterval(int baseInterval, int maximumInterval, int planningFactor)
+		public static int RefreshInterval(int baseInterval, int planningFactor)
 		{
-			return Math.Min(maximumInterval, (int)Math.Min(int.MaxValue,
-				(long)baseInterval * Math.Max(1, planningFactor)));
+			return (int)Math.Min(int.MaxValue,
+				(long)baseInterval * Math.Max(1, planningFactor));
 		}
 
 		public static int MovementBufferCells(int localRadius)

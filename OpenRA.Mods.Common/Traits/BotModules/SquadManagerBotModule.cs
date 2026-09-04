@@ -326,9 +326,7 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Ticks between live pending-Blue-explosion checks for ground stealth squads.")]
 		public readonly int StealthBlueSafetyCheckInterval = 5;
 		[Desc("Base ticks between spatial actor-roster scans for local stealth combat. Actor state remains live.")]
-		public readonly int StealthLocalActorCacheInterval = 25;
-		[Desc("Maximum adaptive interval between local stealth actor-roster scans.")]
-		public readonly int StealthLocalActorCacheMaximumInterval = 50;
+		public readonly int StealthLocalActorCacheInterval = 50;
 
 		[Desc("Radius in cells around an air squad that is scanned for anti-air by the safety check.")]
 		public readonly int AirThreatScanRadius = 12;
@@ -525,9 +523,8 @@ namespace OpenRA.Mods.Common.Traits
 			if (StealthSafetyCheckInterval < 0 || StealthLiveTargetCheckInterval < 0 ||
 				StealthBlueSafetyCheckInterval < 0)
 				throw new YamlException("Stealth safety intervals must not be negative.");
-			if (StealthLocalActorCacheInterval <= 0 ||
-				StealthLocalActorCacheMaximumInterval < StealthLocalActorCacheInterval)
-				throw new YamlException("Stealth local actor cache intervals must be positive and ordered.");
+			if (StealthLocalActorCacheInterval <= 0)
+				throw new YamlException("StealthLocalActorCacheInterval must be greater than zero.");
 
 			if (AirThreatFleeMultiplier <= 0)
 				throw new YamlException("AirThreatFleeMultiplier must be greater than zero.");
