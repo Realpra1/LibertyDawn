@@ -8,6 +8,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 
 namespace OpenRA.Mods.Common.Traits.BotModules.Squads
@@ -18,6 +19,11 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		const int ThreatSearchPaddingCells = 4;
 		readonly Squad squad;
 		readonly int maximumWeaponRangeCells;
+		Actor[] cachedRoster = Array.Empty<Actor>();
+		CPos cachedMissionCell;
+		CPos cachedCenterCell;
+		int rosterRefreshTick;
+		bool hasCachedRoster;
 
 		public StealthSquadLiveLocalActors(Squad squad)
 		{
@@ -36,20 +42,68 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 
 			var center = members.Select(actor => actor.CenterPosition).Average();
 			var localRadius = LocalRadiusCells();
-			var radius = Math.Max(localRadius,
-				maximumWeaponRangeCells + ThreatSearchPaddingCells);
-			var nearby = squad.World.FindActorsInCircle(center, WDist.FromCells(localRadius));
-			var coveringThreats = squad.World.FindActorsInCircle(center, WDist.FromCells(radius))
+			var radius = StealthLocalActorCachePolicy.CoveringRadiusCells(
+				localRadius, maximumWeaponRangeCells, ThreatSearchPaddingCells);
+			var roster = CurrentRoster(mission, center, localRadius, radius);
+			var localRadiusLength = WDist.FromCells(localRadius).Length;
+			var radiusLength = WDist.FromCells(radius).Length;
+			var nearby = roster.Where(actor =>
+				(actor.CenterPosition - center).HorizontalLengthSquared <=
+				(long)localRadiusLength * localRadiusLength);
+			var coveringThreats = roster.Where(actor =>
+				(actor.CenterPosition - center).HorizontalLengthSquared <=
+				(long)radiusLength * radiusLength)
 				.Where(actor => ThreatensFormation(actor, members));
 
 			var (topLeft, bottomRight) = MissionBounds(mission);
-			var map = squad.World.Map;
-			var missionArea = squad.World.ActorMap.ActorsInBox(
-				map.CenterOfCell(topLeft), map.CenterOfCell(bottomRight));
+			var missionArea = roster.Where(actor => InBounds(actor.Location, topLeft, bottomRight));
 
 			return nearby.Concat(missionArea).Concat(coveringThreats).Where(actor => Live(actor) &&
 				squad.SquadManager.IsPreferredEnemyUnit(actor))
 				.Distinct().OrderBy(actor => actor.ActorID).ToArray();
+		}
+
+		Actor[] CurrentRoster(StealthApproachMission mission, WPos center,
+			int localRadius, int coveringRadius)
+		{
+			var map = squad.World.Map;
+			var centerCell = map.CellContaining(center);
+			var movementBuffer = StealthLocalActorCachePolicy.MovementBufferCells(localRadius);
+			var refresh = StealthLocalActorCachePolicy.RequiresRefresh(hasCachedRoster,
+				squad.World.WorldTick, rosterRefreshTick, mission.StrategicCell, cachedMissionCell,
+				centerCell, cachedCenterCell, movementBuffer);
+			var started = Game.IsBenchmarking ? Stopwatch.GetTimestamp() : 0;
+			if (refresh)
+			{
+				var queryRadius = coveringRadius + movementBuffer;
+				var (topLeft, bottomRight) = MissionBounds(mission, movementBuffer);
+				cachedRoster = squad.World.FindActorsInCircle(center, WDist.FromCells(queryRadius))
+					.Concat(squad.World.ActorMap.ActorsInBox(
+						map.CenterOfCell(topLeft), map.CenterOfCell(bottomRight)))
+					.Where(actor => Live(actor) && squad.SquadManager.IsPreferredEnemyUnit(actor))
+					.Distinct().OrderBy(actor => actor.ActorID).ToArray();
+				cachedMissionCell = mission.StrategicCell;
+				cachedCenterCell = centerCell;
+				rosterRefreshTick = squad.World.WorldTick + StealthLocalActorCachePolicy.RefreshInterval(
+					squad.SquadManager.Info.StealthLocalActorCacheInterval,
+					squad.SquadManager.Info.StealthLocalActorCacheMaximumInterval,
+					squad.SquadManager.PlanningIntervalFactor);
+				hasCachedRoster = true;
+			}
+
+			RecordCacheSample(refresh, started);
+			return cachedRoster;
+		}
+
+		void RecordCacheSample(bool refresh, long started)
+		{
+			if (!Game.IsBenchmarking)
+				return;
+
+			var elapsed = 1000d * Math.Max(0, Stopwatch.GetTimestamp() - started) / Stopwatch.Frequency;
+			Game.RecordBotModuleSample(squad.Bot.Player.ClientIndex,
+				$"StealthSquad/{squad.AirProfile}/local-actor-cache-{(refresh ? "refresh" : "hit")}",
+				elapsed, 0);
 		}
 
 		static bool ThreatensFormation(Actor enemy, IReadOnlyList<Actor> members)
@@ -88,18 +142,24 @@ namespace OpenRA.Mods.Common.Traits.BotModules.Squads
 		int LocalRadiusCells()
 		{
 			var size = Math.Max(1, squad.StealthDefinition?.StrategicCellSize ?? 1);
-			return Math.Max(squad.SquadManager.Info.DangerScanRadius + ThreatSearchPaddingCells,
-				size * 3 + ThreatSearchPaddingCells);
+			return StealthLocalActorCachePolicy.LocalRadiusCells(
+				squad.SquadManager.Info.DangerScanRadius, size, ThreatSearchPaddingCells);
 		}
 
-		(CPos TopLeft, CPos BottomRight) MissionBounds(StealthApproachMission mission)
+		(CPos TopLeft, CPos BottomRight) MissionBounds(StealthApproachMission mission, int padding = 0)
 		{
 			var size = Math.Max(1, squad.StealthDefinition?.StrategicCellSize ?? 1);
 			var map = squad.World.Map;
-			return (map.Clamp(new CPos((mission.StrategicCell.X - 1) * size,
-				(mission.StrategicCell.Y - 1) * size)),
-				map.Clamp(new CPos((mission.StrategicCell.X + 2) * size - 1,
-					(mission.StrategicCell.Y + 2) * size - 1)));
+			return (map.Clamp(new CPos((mission.StrategicCell.X - 1) * size - padding,
+				(mission.StrategicCell.Y - 1) * size - padding)),
+				map.Clamp(new CPos((mission.StrategicCell.X + 2) * size - 1 + padding,
+					(mission.StrategicCell.Y + 2) * size - 1 + padding)));
+		}
+
+		static bool InBounds(CPos cell, CPos topLeft, CPos bottomRight)
+		{
+			return cell.X >= topLeft.X && cell.X <= bottomRight.X &&
+				cell.Y >= topLeft.Y && cell.Y <= bottomRight.Y;
 		}
 
 		public static Actor Representative(IReadOnlyList<Actor> members,

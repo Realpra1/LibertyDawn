@@ -28,6 +28,12 @@ calculator. Preserve established balance and build-order behavior.
 - Local combat is live-only. Do not use the strategic cache for local safety,
   positions, crush, Kite, or mass attack. Use current positions and the standard
   threat calculator, including planned-decloak/current-range overrides.
+- Cache only the bounded local actor roster between spatial scans. Re-read live
+  position, health, detection, weapons, threat, and reachability on every combat
+  decision. Scale roster refresh from 25 to at most 50 ticks with the adaptive
+  planning factor; refresh immediately for a new mission or substantial squad
+  movement. The module throttles and recovers continuously; only the master
+  failsafe may disable it and transfer ownership to aggressive fallback.
 - UndefendedAttack uses configured priorities, retains and finishes its target,
   retries a completed engine activity, and yields to defended combat if a shared
   target dies while nearby defenders remain.
@@ -113,8 +119,17 @@ are acceptable; active unexplained failures are not.
 - CPU profile on the identical paced Challenge 1 fixture reduced Kite from
   `5386.164 ms / 755 calls` to `5302.569 ms / 735 calls`; candidate order and
   behavior are unchanged because duplicates are removed before passability checks.
-- Validation: focused failsafe/ownership `29/29`; scenario packaging `5/5`;
-  complete .NET `966/966`; `make check`, `make check-scripts`, and
+- Adaptive local-actor roster caching reduced the same paced Kite profile from
+  `5302.569` to `4055.701 ms` (`23.5%`) and the complete VIKI squad manager from
+  `6516.470` to `5231.219 ms` (`19.7%`). Tick p95 fell from `35` to `26 ms` and
+  50+ ms samples from `19` to `6`; 263 spatial refreshes served 628 cache hits.
+- Cache behavior validation: both challenge maps completed naturally without a
+  stall, disable, or Obelisk loss (`13506` and `23630`). Three full concurrent
+  Empire Earth games were `3/3` VIKI wins at ticks `19992`, `20633`, and `22788`,
+  with no permanent-watchdog failure. Primary efficiency mean/median were
+  `1911.53`/`1949.18`; damage-adjusted mean/median were `0.29452`/`0.28301`.
+- Validation: focused failsafe/ownership `29/29`; cache/throttle policy `5/5`;
+  scenario packaging `5/5`; complete .NET `971/971`; `make check`, `make check-scripts`, and
   `make test MOD=cnc` pass. Both challenge maps are packaged and validated.
 
 ## Release state
